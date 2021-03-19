@@ -12,7 +12,7 @@ on:
 
 env:
   # TODO: Change variable to your image's name.
-  IMAGE_NAME: server
+  IMAGE_NAME: website
 
 jobs:
   # Run tests.
