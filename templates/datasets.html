@@ -1,0 +1,54 @@
+<html>
+	<head>
+		{{template "baseHeader"}}
+	</head>
+	{{template "baseTopBar" .}}
+	<body>
+		<meta name="csrf-token" content="{{.csrfToken}}">
+		<div class="container-fluid">
+			<div class="row">
+				<div class="col-md-1"></div>
+				<div class="col-md-1">
+					<div class="container-fluid">
+						<a href="/project/{{.projectid}}/dataset/new"><button type="button" class="btn btn-info btn-sm">New Dataset</button></a>
+					</div>
+				</div>
+				<div class="col-md-1">
+					<div class="container-fluid">
+						<a href="/project/{{.projectid}}/adduser"><button type="button" class="btn btn-info btn-sm">Add user</button></a>
+					</div>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-1">
+				</div>
+				<div class="col-md-10">
+					<table class="table">
+						<thead>
+							<tr>
+								<th scope="col">ID</th>
+								<th scope="col">Name</th>
+								<th scope="col">Datatype</th>
+								<th scope="col"></th>
+								<th scope="col"></th>
+							</tr>
+						</thead>
+						<tbody>
+							{{range .dataset}}
+								<tr>
+									<th scope="row">{{.ID}}</th>
+									<td>{{.Datasetname}}</td>
+									<td>{{.Datasettype}}</td>
+									<td><a href="/dataset/details/{{.ID}}"><button type="button" class="btn btn-info btn-sm">Details</button></a></td>
+									<td><button type="button" onclick="deleteDataset('{{.ID}}')" class="btn btn-danger btn-sm">Delete</button></td>
+								</tr>
+							{{end}}
+						</tbody>
+					</table>
+				</div>
+				<div class="col-md-1">
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

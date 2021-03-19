@@ -1,0 +1,11 @@
+Endpoints:
+  DatasetHandler:
+    Host: "biodatadbapi"
+    Port: 9000
+Auth:
+  URL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDBDev"
+  CallbackURL: "https://ui.dev.biodatadb.ingress.rancher2.computational.bio/auth/callback"
+  ClientID: "BioDataDBDev"
+  AuthURL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDBDev/protocol/openid-connect/auth"
+  TokenURL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDBDev/protocol/openid-connect/token"
+  UserInfoURL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDBDev/protocol/openid-connect/userinfo"

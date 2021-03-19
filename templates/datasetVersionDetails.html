@@ -1,0 +1,47 @@
+<html>
+    <head>
+        {{template "baseHeader"}}
+      </head>
+	<body>
+        <meta name="csrf-token" content="{{.csrfToken}}">
+        {{template "baseTopBar" .}}
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-1">
+                </div>
+                <div class="col-md-10">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">ID</th>
+                                <th scope="col">Filename</th>
+                                <th scope="col">Filetype</th>
+                                <th scope="col">Version</th>
+                                <th scope="col">Details</th>
+                                <th scope="col">Link</th>
+                                <th scope="col">Delete</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range $group := .objectGroups.DatasetObjectGroups}}
+                                {{range .Objects}}
+                                <tr>
+                                    <th scope="row">{{.ID}}</th>
+                                    <td scope="row">{{ .Filename}}</td>
+                                    <td scope="row">{{ .Filetype}}</td>
+                                    <td>{{ $group.Version | formatAsVersion }}</td>
+                                    <td><a href="/datasetobjects/details/{{.ID}}"><button type="button" class="btn btn-info btn-sm">Details</button></a></td>
+                                    <td><a href="/datasetobjects/link/{{.ID}}"><button type="button" class="btn btn-info btn-sm">Link</button></a></td>
+                                    <td><button type="button" onclick="deleteDatasetObject('{{.ID}}')" class="btn btn-danger btn-sm">Delete</button></a></td>
+                                </tr>
+                                {{end}}
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-md-1">
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

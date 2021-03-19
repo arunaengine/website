@@ -1,0 +1,11 @@
+Endpoints:
+  DatasetHandler:
+    Host: "localhost"
+    Port: 9000
+Auth:
+  URL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDB"
+  CallbackURL: "http://localhost:8080/auth/callback"
+  ClientID: "SciObjDBWeb_Rust_Test"
+  AuthURL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDB/protocol/openid-connect/auth"
+  TokenURL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDB/protocol/openid-connect/token"
+  UserInfoURL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDB/protocol/openid-connect/userinfo"

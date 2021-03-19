@@ -1,0 +1,38 @@
+<html>
+    <head>
+        {{template "baseHeader"}}
+      </head>
+	<body>
+        {{template "baseTopBar" .}}
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-1">
+                </div>
+                <div class="col-md-10">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">ID</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Filetype</th>
+                                <th scope="col">Link</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .objects}}
+                                <tr>
+                                    <th scope="row">{{.ID}}</th>
+                                    <td scope="row">{{ .Filename}}</td>
+                                    <td scope="row">{{ .Filetype}}</td>
+                                    <td><a href="/object/{{.ID}}/link"><button type="button" class="btn btn-info btn-sm">Link</button></a></td>
+                                </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-md-1">
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
