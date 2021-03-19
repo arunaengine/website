@@ -1,9 +1,9 @@
 package main
 
 import (
-	"log"
+	"github.com/ScienceObjectsDB/Website/webserver"
+	log "github.com/sirupsen/logrus"
 
-	"github.com/ag-computational-bio/BioDataDBWebsite/server"
 	"github.com/jessevdk/go-flags"
 	"github.com/spf13/viper"
 )
@@ -13,7 +13,6 @@ var opts struct {
 }
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	_, err := flags.Parse(&opts)
 	if err != nil {
@@ -26,6 +25,6 @@ func main() {
 		log.Fatalln(err.Error())
 	}
 
-	webserver := server.WebServer{}
+	webserver := webserver.WebServer{}
 	webserver.Run()
 }

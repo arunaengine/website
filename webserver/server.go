@@ -1,15 +1,16 @@
-package server
+package webserver
 
 import (
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"os"
 
+	log "github.com/sirupsen/logrus"
+
 	csrf "github.com/MariusDieckmann/gin-csrf"
-	"github.com/ag-computational-bio/BioDataDBWebsite/client"
-	"github.com/ag-computational-bio/BioDataDBWebsite/middleware"
+	"github.com/ScienceObjectsDB/Website/client"
+	"github.com/ScienceObjectsDB/Website/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-contrib/sessions"

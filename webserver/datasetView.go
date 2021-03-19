@@ -1,23 +1,24 @@
-package server
+package webserver
 
 import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 
+	"github.com/ScienceObjectsDB/Website/middleware"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/ScienceObjectsDB/Website/client"
 	"github.com/ScienceObjectsDB/go-api/models"
 	"github.com/ScienceObjectsDB/go-api/services"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 
 	csrf "github.com/MariusDieckmann/gin-csrf"
-	"github.com/ag-computational-bio/BioDataDBWebsite/client"
-	"github.com/ag-computational-bio/BioDataDBWebsite/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/protobuf/ptypes/timestamp"
 )

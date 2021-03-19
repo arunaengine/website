@@ -1,10 +1,11 @@
-package server
+package webserver
 
 import (
 	"encoding/base64"
 	"encoding/json"
-	"log"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
 )

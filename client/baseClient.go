@@ -6,9 +6,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/ScienceObjectsDB/go-api/services"
 	"github.com/gin-gonic/gin"
