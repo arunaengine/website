@@ -1,5 +1,6 @@
 Endpoints:
   DatasetHandler:
+    UseTLS: true
     Host: "biodatadbapi"
     Port: 9000
 Auth:

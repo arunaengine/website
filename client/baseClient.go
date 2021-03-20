@@ -10,6 +10,7 @@ import (
 	"net/url"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/ScienceObjectsDB/go-api/services"
 	"github.com/gin-gonic/gin"
@@ -47,10 +48,12 @@ func New(host string, port int) (*GrpcClients, error) {
 
 	var tlsConf tls.Config
 
+	useTLS := viper.GetViper().GetBool("Endpoints.DatasetHandler.UseTLS")
+
 	credentials := credentials.NewTLS(&tlsConf)
 
 	dialOptions := grpc.WithTransportCredentials(credentials)
-	if host == "localhost" {
+	if !useTLS {
 		dialOptions = grpc.WithInsecure()
 	}
 
