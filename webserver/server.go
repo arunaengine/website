@@ -115,6 +115,8 @@ func (server *WebServer) routes() *gin.Engine {
 	projectGroup.GET("/project/:projectid/datasets", server.ServerEndpoints.ListDatasets)
 	projectGroup.GET("/project/:projectid/adduser", server.ServerEndpoints.AddUserToProjectForm)
 	projectGroup.POST("project/:projectid/adduser", server.ServerEndpoints.AddUserToProject)
+	projectGroup.GET("/project/:projectid/apitoken/list", server.ServerEndpoints.ListProjectTokens)
+	projectGroup.GET("/project/:projectid/apitoken/new", server.ServerEndpoints.CreateProjectToken)
 
 	dataHandlerGroup := router.Group("/")
 	dataHandlerGroup.Use(server.ServerEndpoints.AuthHandler.CheckToken)

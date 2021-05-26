@@ -122,8 +122,6 @@ func (clients *GrpcClients) GetAccessTokenFromGinContext(c *gin.Context) string 
 		c.AbortWithError(400, err)
 	}
 
-	println(token.AccessToken)
-
 	return token.AccessToken
 }
 

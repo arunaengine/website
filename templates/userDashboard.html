@@ -32,12 +32,12 @@
 						<tbody>
 							{{range .projects}}
 								<tr>
-									<th scope="row">{{.ProjectName}}</th>
+									<th scope="row">{{.Name}}</th>
 									<td>{{.Description}}</td>
-									<td>{{.ID}}</td>
-									<td><a href="/project/{{.ID}}/datasets"><button type="button" class="btn btn-info btn-sm">Details</button></td>
-									<td><a href="/project/{{.ID}}/apitoken/list"><button type="button" class="btn btn-info btn-sm">API Tokens</button></a></td>
-									<td><button type="button" onclick="deleteProject('{{.ID}}')" class="btn btn-danger btn-sm">Delete</button></td>
+									<td>{{.Id}}</td>
+									<td><a href="/project/{{ .Id }}/datasets"><button type="button" class="btn btn-info btn-sm">Details</button></td>
+									<td><a href="/project/{{ .Id }}/apitoken/list"><button type="button" class="btn btn-info btn-sm">API Tokens</button></a></td>
+									<td><button type="button" onclick="deleteProject('{{.Id}}')" class="btn btn-danger btn-sm">Delete</button></td>
 								</tr>
 							{{end}}
 						</tbody>

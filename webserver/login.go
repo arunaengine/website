@@ -24,12 +24,14 @@ func (server *Endpoints) Callback(c *gin.Context) {
 	if err != nil {
 		log.Println(err.Error())
 		c.AbortWithError(400, err)
+		return
 	}
 
 	marshalledToken, err := json.Marshal(token)
 	if err != nil {
 		log.Println(err.Error())
 		c.AbortWithError(400, err)
+		return
 	}
 
 	tokenString := base64.StdEncoding.EncodeToString(marshalledToken)
