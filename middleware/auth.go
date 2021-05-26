@@ -31,7 +31,7 @@ func (handler *AuthHandler) Init() {
 
 	oauth2Conf := &oauth2.Config{
 		ClientID:     clientID,
-		ClientSecret: os.Getenv("Oauth2ClientSecret"),
+		ClientSecret: os.Getenv("OAuth2ClientSecret"),
 		RedirectURL:  callbackURL,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  AuthURL,
