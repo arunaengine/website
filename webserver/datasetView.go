@@ -9,12 +9,13 @@ import (
 	"net/url"
 	"strconv"
 
+	models "github.com/ScienceObjectsDB/go-api/api/models/v1"
+	services "github.com/ScienceObjectsDB/go-api/api/services/v1"
+
+	"github.com/ScienceObjectsDB/Website/client"
 	"github.com/ScienceObjectsDB/Website/middleware"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/ScienceObjectsDB/Website/client"
-	"github.com/ScienceObjectsDB/go-api/models"
-	"github.com/ScienceObjectsDB/go-api/services"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 
@@ -155,13 +156,13 @@ func (server *Endpoints) CreateDatasetVersion(c *gin.Context) {
 	var stageVersion models.Version_VersionStage
 	switch createDatasetData.Stage {
 	case "alpha":
-		stageVersion = models.Version_Alpha
+		stageVersion = models.Version_ALPHA
 	case "beta":
-		stageVersion = models.Version_Beta
+		stageVersion = models.Version_BETA
 	case "stable":
-		stageVersion = models.Version_Stable
+		stageVersion = models.Version_STABLE
 	case "rc":
-		stageVersion = models.Version_ReleaseCandidate
+		stageVersion = models.Version_RC
 	default:
 		err := fmt.Errorf("Could not parse stage version")
 		log.Println(err.Error())
@@ -210,7 +211,7 @@ func (server *Endpoints) ListDatasets(c *gin.Context) {
 		return
 	}
 
-	id := models.ID{
+	id := services.GetProjectDatasetsRequest{
 		Id: projectID.ProjectID,
 	}
 
@@ -235,7 +236,7 @@ func (server *Endpoints) DeleteDatasets(c *gin.Context) {
 		return
 	}
 
-	_, err := server.GRPCEndpointsBackend.DatasetClient.DeleteDataset(server.GRPCEndpointsBackend.OutGoingContext(c), &models.ID{Id: datasetID.ID})
+	_, err := server.GRPCEndpointsBackend.DatasetClient.DeleteDataset(server.GRPCEndpointsBackend.OutGoingContext(c), &services.DeleteDatasetRequest{Id: datasetID.ID})
 	if err != nil {
 		log.Println(err.Error())
 		c.AbortWithError(400, err)
@@ -251,7 +252,7 @@ func (server *Endpoints) ListDatasetVersion(c *gin.Context) {
 		c.AbortWithError(400, err)
 	}
 
-	id := models.ID{
+	id := services.GetDatasetVersionsRequest{
 		Id: datasetID.ID,
 	}
 
@@ -265,7 +266,7 @@ func (server *Endpoints) ListDatasetVersion(c *gin.Context) {
 	}
 
 	csrfToken := csrf.GetToken(c)
-	c.HTML(http.StatusOK, "datasetDetails.html", gin.H{"currentdatasetversion": currentDatasetVersion, "dataset": datasetversions.GetDatasetVersion(), "datasetid": datasetID.ID, "csrfToken": csrfToken})
+	c.HTML(http.StatusOK, "datasetDetails.html", gin.H{"currentdatasetversion": currentDatasetVersion, "dataset": datasetversions.DatasetVersions, "datasetid": datasetID.ID, "csrfToken": csrfToken})
 }
 
 // ListDatasetVersionObjects Lists all objects of a dataset version
@@ -277,7 +278,7 @@ func (server *Endpoints) ListDatasetVersionObjects(c *gin.Context) {
 		c.AbortWithError(400, err)
 	}
 
-	objectGroups, err := server.GRPCEndpointsBackend.DatasetClient.GetDatasetVersion(server.GRPCEndpointsBackend.OutGoingContext(c), &models.ID{Id: datasetVersionID.ID})
+	objectGroups, err := server.GRPCEndpointsBackend.DatasetClient.GetDatasetVersion(server.GRPCEndpointsBackend.OutGoingContext(c), &services.GetDatasetVersionRequest{Id: datasetVersionID.ID})
 	if err != nil {
 		log.Println(err.Error())
 		c.AbortWithError(400, err)
@@ -304,7 +305,7 @@ func (server *Endpoints) GetObjectGroupLinks(c *gin.Context) {
 		return
 	}
 
-	id := models.ID{
+	id := services.CreateDownloadLinkRequest{
 		Id: objectGroupID.ID,
 	}
 
@@ -328,7 +329,7 @@ func (server *Endpoints) GetObjectLink(c *gin.Context) {
 		return
 	}
 
-	id := models.ID{
+	id := services.CreateDownloadLinkRequest{
 		Id: objectID.ID,
 	}
 
@@ -343,7 +344,7 @@ func (server *Endpoints) GetObjectLink(c *gin.Context) {
 }
 
 func (server *Endpoints) ListProjects(c *gin.Context) {
-	projectsList, err := server.GRPCEndpointsBackend.ProjectClient.GetUserProjects(server.GRPCEndpointsBackend.OutGoingContext(c), &models.Empty{})
+	projectsList, err := server.GRPCEndpointsBackend.ProjectClient.GetUserProjects(server.GRPCEndpointsBackend.OutGoingContext(c), &services.GetUserProjectsRequest{})
 	if err != nil {
 		log.Println(err.Error())
 		c.AbortWithError(400, err)
@@ -403,7 +404,7 @@ func (server *Endpoints) AddUserToProject(c *gin.Context) {
 	_, err := server.GRPCEndpointsBackend.ProjectClient.AddUserToProject(server.GRPCEndpointsBackend.OutGoingContext(c), &services.AddUserToProjectRequest{
 		ProjectId: projectid.ProjectID,
 		UserId:    addUserToProjectForm.UserID,
-		Scope:     []models.Right{models.Right_Read, models.Right_Write},
+		Scope:     []models.Right{models.Right_READ, models.Right_WRITE},
 	})
 
 	if err != nil {
@@ -431,7 +432,7 @@ func (server *Endpoints) DeleteProject(c *gin.Context) {
 		return
 	}
 
-	_, err := server.GRPCEndpointsBackend.ProjectClient.DeleteProject(server.GRPCEndpointsBackend.OutGoingContext(c), &models.ID{Id: projectID.ProjectID})
+	_, err := server.GRPCEndpointsBackend.ProjectClient.DeleteProject(server.GRPCEndpointsBackend.OutGoingContext(c), &services.DeleteProjectRequest{Id: projectID.ProjectID})
 	if err != nil {
 		log.Println(err.Error())
 		c.AbortWithError(400, err)
@@ -442,7 +443,7 @@ func (server *Endpoints) DeleteProject(c *gin.Context) {
 }
 
 func (server *Endpoints) UserDashboard(c *gin.Context) {
-	projectsList, err := server.GRPCEndpointsBackend.ProjectClient.GetUserProjects(server.GRPCEndpointsBackend.OutGoingContext(c), &models.Empty{})
+	projectsList, err := server.GRPCEndpointsBackend.ProjectClient.GetUserProjects(server.GRPCEndpointsBackend.OutGoingContext(c), &services.GetUserProjectsRequest{})
 	if err != nil {
 		log.Println(err.Error())
 		c.AbortWithError(400, err)
@@ -464,11 +465,9 @@ func (server *Endpoints) GetDatasetObjectGroups(c *gin.Context) {
 		c.AbortWithError(400, err)
 	}
 
-	id := models.ID{
+	objectsGroups, err := server.GRPCEndpointsBackend.DatasetClient.GetDatasetObjectGroups(server.GRPCEndpointsBackend.OutGoingContext(c), &services.GetDatasetObjectGroupsRequest{
 		Id: datasetid,
-	}
-
-	objectsGroups, err := server.GRPCEndpointsBackend.DatasetClient.GetDatasetObjectGroups(server.GRPCEndpointsBackend.OutGoingContext(c), &id)
+	})
 	if err != nil {
 		if err.Error() == UNAUTHORIZEDERROR {
 			c.Redirect(http.StatusPermanentRedirect, "/auth/login")
@@ -494,11 +493,9 @@ func (server *Endpoints) GetDatasetVersionObjectGroups(c *gin.Context) {
 		c.AbortWithError(400, err)
 	}
 
-	id := models.ID{
+	objectsGroupVersions, err := server.GRPCEndpointsBackend.DatasetClient.GetDatasetVersion(server.GRPCEndpointsBackend.OutGoingContext(c), &services.GetDatasetVersionRequest{
 		Id: datasetversionid,
-	}
-
-	objectsGroupVersions, err := server.GRPCEndpointsBackend.DatasetClient.GetDatasetVersion(server.GRPCEndpointsBackend.OutGoingContext(c), &id)
+	})
 	if err != nil {
 		if err.Error() == UNAUTHORIZEDERROR {
 			c.Redirect(http.StatusPermanentRedirect, "/auth/login")
@@ -511,51 +508,11 @@ func (server *Endpoints) GetDatasetVersionObjectGroups(c *gin.Context) {
 
 	csrfToken := csrf.GetToken(c)
 
-	c.HTML(200, "datasetObjectGroups.html", gin.H{"objectgroups": objectsGroupVersions.GetObjectGroupIds(), "csrfToken": csrfToken})
+	c.HTML(200, "datasetObjectGroups.html", gin.H{"objectgroups": objectsGroupVersions.GetDatasetVersion().ObjectGroupIds, "csrfToken": csrfToken})
 }
 
 func (server *Endpoints) GetObjects(c *gin.Context) {
-	var id string
-	var resource string
-	var exists bool
-
-	if id, exists = c.GetQuery("resourceID"); !exists {
-		err := fmt.Errorf("Could not find id in query params")
-		log.Println(err.Error())
-		c.AbortWithError(400, err)
-	}
-
-	if resource, exists = c.GetQuery("resource"); !exists {
-		err := fmt.Errorf("Could not find resource in query params")
-		log.Println(err.Error())
-		c.AbortWithError(400, err)
-		return
-	}
-
-	var objects []*models.Object
-	var err error
-
-	switch resource {
-	case "datasetobjectgroup":
-		{
-			var objectGroup *services.GetObjectGroupRevisionResponse
-			id := models.ID{Id: id}
-			objectGroup, err = server.GRPCEndpointsBackend.ObjectGroupClient.GetObjectGroup(server.GRPCEndpointsBackend.OutGoingContext(c), &id)
-			objects = objectGroup.GetObjectGroupRevision().GetObjects()
-		}
-	}
-
-	if err != nil {
-		if err.Error() == UNAUTHORIZEDERROR {
-			c.Redirect(http.StatusPermanentRedirect, "/auth/login")
-			return
-		}
-		log.Println(err.Error())
-		c.AbortWithStatus(400)
-		return
-	}
-
-	c.HTML(200, "objects.html", gin.H{"objects": objects})
+	c.AbortWithStatus(400)
 }
 
 func (server *Endpoints) ListProjectTokens(c *gin.Context) {
@@ -567,9 +524,7 @@ func (server *Endpoints) ListProjectTokens(c *gin.Context) {
 		return
 	}
 
-	req := models.Empty{}
-
-	tokenList, err := server.GRPCEndpointsBackend.ProjectClient.GetAPIToken(server.GRPCEndpointsBackend.OutGoingContext(c), &req)
+	tokenList, err := server.GRPCEndpointsBackend.ProjectClient.GetAPIToken(server.GRPCEndpointsBackend.OutGoingContext(c), &services.GetAPITokenRequest{})
 	if err != nil {
 		c.AbortWithError(400, err)
 	}
@@ -593,14 +548,9 @@ func (server *Endpoints) CreateProjectToken(c *gin.Context) {
 		return
 	}
 
-	log.Println(projectID)
-	println(projectID.ProjectID)
-
-	req := models.ID{
+	_, err := server.GRPCEndpointsBackend.ProjectClient.CreateAPIToken(server.GRPCEndpointsBackend.OutGoingContext(c), &services.CreateAPITokenRequest{
 		Id: projectID.ProjectID,
-	}
-
-	_, err := server.GRPCEndpointsBackend.ProjectClient.CreateAPIToken(server.GRPCEndpointsBackend.OutGoingContext(c), &req)
+	})
 	if err != nil {
 		c.AbortWithError(400, err)
 	}

@@ -12,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/ScienceObjectsDB/go-api/services"
+	services "github.com/ScienceObjectsDB/go-api/api/services/v1"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
@@ -32,10 +32,10 @@ const (
 
 //GrpcClients struct to hold the individual api clients
 type GrpcClients struct {
-	ProjectClient          services.ProjectAPIClient
+	ProjectClient          services.ProjectServiceClient
 	DatasetClient          services.DatasetServiceClient
 	ObjectGroupClient      services.DatasetObjectsServiceClient
-	ObjectLoadClient       services.ObjectLoadClient
+	ObjectLoadClient       services.ObjectLoadServiceClient
 	GenericOutGoingContext context.Context
 }
 
@@ -130,7 +130,7 @@ func (clients *GrpcClients) createObjectsClient(conn *grpc.ClientConn) {
 }
 
 func (clients *GrpcClients) createLoadClient(conn *grpc.ClientConn) {
-	clients.ObjectLoadClient = services.NewObjectLoadClient(conn)
+	clients.ObjectLoadClient = services.NewObjectLoadServiceClient(conn)
 }
 
 func (clients *GrpcClients) createDatasetClient(conn *grpc.ClientConn) {
@@ -138,5 +138,5 @@ func (clients *GrpcClients) createDatasetClient(conn *grpc.ClientConn) {
 }
 
 func (clients *GrpcClients) createProjectClient(conn *grpc.ClientConn) {
-	clients.ProjectClient = services.NewProjectAPIClient(conn)
+	clients.ProjectClient = services.NewProjectServiceClient(conn)
 }
