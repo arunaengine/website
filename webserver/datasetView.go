@@ -32,12 +32,12 @@ type Endpoints struct {
 
 // ID binds string based ids
 type ID struct {
-	ID string `uri:"id" binding:"required"`
+	ID uint64 `uri:"id" binding:"required"`
 }
 
 // ProjectID binds the project id
 type ProjectID struct {
-	ProjectID string `uri:"projectid" binding:"required"`
+	ProjectID uint64 `uri:"projectid" binding:"required"`
 }
 
 type CreateProject struct {
@@ -121,7 +121,13 @@ func (server *Endpoints) CreateDatasetVersion(c *gin.Context) {
 		c.AbortWithError(400, err)
 	}
 
-	err := c.Request.ParseForm()
+	datasetIDInt, err := strconv.Atoi(datasetid)
+	if err != nil {
+		log.Println(err.Error())
+		c.AbortWithError(400, err)
+	}
+
+	err = c.Request.ParseForm()
 	if err != nil {
 		log.Println(err.Error())
 		c.AbortWithError(400, err)
@@ -177,7 +183,7 @@ func (server *Endpoints) CreateDatasetVersion(c *gin.Context) {
 	}
 
 	_, err = server.GRPCEndpointsBackend.DatasetClient.ReleaseDatasetVersion(server.GRPCEndpointsBackend.OutGoingContext(c), &services.ReleaseDatasetVersionRequest{
-		DatasetId: datasetid,
+		DatasetId: uint64(datasetIDInt),
 		Version:   &version,
 	})
 
@@ -465,8 +471,14 @@ func (server *Endpoints) GetDatasetObjectGroups(c *gin.Context) {
 		c.AbortWithError(400, err)
 	}
 
+	datasetIDInt, err := strconv.Atoi(datasetid)
+	if err != nil {
+		log.Println(err.Error())
+		c.AbortWithError(400, err)
+	}
+
 	objectsGroups, err := server.GRPCEndpointsBackend.DatasetClient.GetDatasetObjectGroups(server.GRPCEndpointsBackend.OutGoingContext(c), &services.GetDatasetObjectGroupsRequest{
-		Id: datasetid,
+		Id: uint64(datasetIDInt),
 	})
 	if err != nil {
 		if err.Error() == UNAUTHORIZEDERROR {
@@ -493,8 +505,14 @@ func (server *Endpoints) GetDatasetVersionObjectGroups(c *gin.Context) {
 		c.AbortWithError(400, err)
 	}
 
+	datasetversionidInt, err := strconv.Atoi(datasetversionid)
+	if err != nil {
+		log.Println(err.Error())
+		c.AbortWithError(400, err)
+	}
+
 	objectsGroupVersions, err := server.GRPCEndpointsBackend.DatasetClient.GetDatasetVersion(server.GRPCEndpointsBackend.OutGoingContext(c), &services.GetDatasetVersionRequest{
-		Id: datasetversionid,
+		Id: uint64(datasetversionidInt),
 	})
 	if err != nil {
 		if err.Error() == UNAUTHORIZEDERROR {

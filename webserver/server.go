@@ -73,13 +73,13 @@ func (server *WebServer) routes() *gin.Engine {
 
 	cookieSecret := os.Getenv("cookiesecret")
 	if cookieSecret == "" {
-		err := fmt.Errorf("Cookie secret needs to be set")
+		err := fmt.Errorf("cookie secret needs to be set: cookiesecret")
 		log.Fatalln(err.Error())
 	}
 
 	csrfsecret := os.Getenv("csrfsecret")
 	if cookieSecret == "" {
-		err := fmt.Errorf("csrf secret needs to be set")
+		err := fmt.Errorf("csrf secret needs to be set: csrfsecret")
 		log.Fatalln(err.Error())
 	}
 
