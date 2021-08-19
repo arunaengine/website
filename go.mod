@@ -4,12 +4,13 @@ go 1.16
 
 require (
 	github.com/MariusDieckmann/gin-csrf v0.1.0
+	github.com/ScienceObjectsDB/go-api v0.0.0-20210812102220-4d85a931b595
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-contrib/multitemplate v0.0.0-20210428235909-8a2f6dd269a0
-	github.com/ScienceObjectsDB/go-api v0.0.0-20210812102220-4d85a931b595
 	github.com/gin-contrib/sessions v0.0.4-0.20200514145905-5a8672ec5752
 	github.com/gin-gonic/gin v1.7.3
 	github.com/go-playground/validator/v10 v10.9.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.0.0 // indirect
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/sessions v1.2.1 // indirect
 	github.com/jessevdk/go-flags v1.5.0

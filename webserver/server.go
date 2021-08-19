@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	csrf "github.com/MariusDieckmann/gin-csrf"
+	"github.com/ScienceObjectsDB/Website/authz"
 	"github.com/ScienceObjectsDB/Website/client"
 	"github.com/ScienceObjectsDB/Website/middleware"
 	"github.com/gin-contrib/cors"
@@ -44,7 +45,14 @@ func (server *WebServer) Run() {
 		log.Fatalln(err.Error())
 	}
 
-	authHandler := middleware.AuthHandler{}
+	jwtHandler, err := authz.NewJWTHandler()
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	authHandler := middleware.AuthHandler{
+		JwtHandler: jwtHandler,
+	}
 	authHandler.Init()
 
 	serverEndpoints := Endpoints{
@@ -61,7 +69,7 @@ func (server *WebServer) Run() {
 		AllowMethods:    []string{"DELETE"},
 	}))
 
-	router.Run(":8080")
+	router.Run(":9050")
 }
 
 //

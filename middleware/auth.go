@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/ScienceObjectsDB/Website/authz"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,7 @@ import (
 type AuthHandler struct {
 	Oauth2Conf   *oauth2.Config
 	Oauth2String string
+	JwtHandler   *authz.JWTHandler
 }
 
 // Init Initializes the auth handler object
@@ -37,7 +39,7 @@ func (handler *AuthHandler) Init() {
 			AuthURL:  AuthURL,
 			TokenURL: TokenURL,
 		},
-		Scopes: []string{"profile", "email"},
+		Scopes: []string{"profile", "email", "groups"},
 	}
 	handler.Oauth2Conf = oauth2Conf
 
@@ -95,6 +97,7 @@ func (handler *AuthHandler) GetUserInfo(state string, code string) ([]byte, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed reading response body: %s", err.Error())
 	}
+
 	return contents, nil
 }
 
@@ -104,6 +107,7 @@ func (handler *AuthHandler) CheckToken(c *gin.Context) {
 		log.Println(err.Error())
 		c.Redirect(http.StatusTemporaryRedirect, "/index")
 		c.AbortWithError(400, err)
+		return
 	}
 
 	unescapedBase64Data, err := url.QueryUnescape(rawTokenCookie.Value)
@@ -111,6 +115,7 @@ func (handler *AuthHandler) CheckToken(c *gin.Context) {
 		log.Println(err.Error())
 		c.Redirect(http.StatusTemporaryRedirect, "/index")
 		c.AbortWithError(400, err)
+		return
 	}
 
 	rawBytesDecoded, err := base64.StdEncoding.DecodeString(unescapedBase64Data)
@@ -118,6 +123,7 @@ func (handler *AuthHandler) CheckToken(c *gin.Context) {
 		log.Println(err.Error())
 		c.Redirect(http.StatusTemporaryRedirect, "/index")
 		c.AbortWithError(400, err)
+		return
 	}
 
 	var token oauth2.Token
@@ -126,6 +132,7 @@ func (handler *AuthHandler) CheckToken(c *gin.Context) {
 		log.Println(err.Error())
 		c.Redirect(http.StatusTemporaryRedirect, "/index")
 		c.AbortWithError(400, err)
+		return
 	}
 
 	updatedToken, err := handler.Oauth2Conf.TokenSource(context.TODO(), &token).Token()
@@ -133,6 +140,7 @@ func (handler *AuthHandler) CheckToken(c *gin.Context) {
 		log.Println(err.Error())
 		c.Redirect(http.StatusTemporaryRedirect, "/index")
 		c.AbortWithError(400, err)
+		return
 	}
 
 	updatedRawToken, err := json.Marshal(updatedToken)
@@ -140,6 +148,38 @@ func (handler *AuthHandler) CheckToken(c *gin.Context) {
 		log.Println(err.Error())
 		c.Redirect(http.StatusTemporaryRedirect, "/index")
 		c.AbortWithError(400, err)
+		return
+	}
+
+	parsedToken, err := handler.JwtHandler.VerifyAndParseToken(token.AccessToken)
+	if err != nil {
+		log.Println(err.Error())
+		c.Redirect(http.StatusTemporaryRedirect, "/index")
+		c.AbortWithError(400, err)
+		return
+	}
+
+	var ok bool
+	var claims *authz.CustomClaim
+
+	if claims, ok = parsedToken.Claims.(*authz.CustomClaim); !ok || !parsedToken.Valid {
+		c.Redirect(http.StatusTemporaryRedirect, "/index")
+		c.AbortWithError(400, err)
+		return
+	}
+
+	isInGroup := false
+	for _, group := range claims.UserGroups {
+		if group == "/sciobjsdb-test" {
+			isInGroup = true
+			break
+		}
+	}
+
+	if !isInGroup {
+		c.Redirect(http.StatusTemporaryRedirect, "/index")
+		c.AbortWithStatus(403)
+		return
 	}
 
 	rawTokenCookie.Value = string(updatedRawToken)

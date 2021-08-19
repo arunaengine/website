@@ -3,9 +3,9 @@ Endpoints:
     Host: "localhost"
     Port: 50051
 Auth:
-  URL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDB"
-  CallbackURL: "http://localhost:8080/auth/callback"
-  ClientID: "scienceobjectstest"
-  AuthURL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDB/protocol/openid-connect/auth"
-  TokenURL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDB/protocol/openid-connect/token"
-  UserInfoURL: "https://keycloak.infra.ingress.rancher.computational.bio/auth/realms/BioDataDB/protocol/openid-connect/userinfo"
+  URL: "https://keycloak.m1.k8s.computational.bio/auth/realms/SciObjsDB"
+  CallbackURL: "http://localhost:9050/auth/callback"
+  ClientID: "core-server-test"
+  AuthURL: "https://keycloak.m1.k8s.computational.bio/auth/realms/SciObjsDB/protocol/openid-connect/auth"
+  TokenURL: "https://keycloak.m1.k8s.computational.bio/auth/realms/SciObjsDB/protocol/openid-connect/token"
+  UserInfoURL: "https://keycloak.m1.k8s.computational.bio/auth/realms/SciObjsDB/protocol/openid-connect/userinfo"
