@@ -56,6 +56,8 @@ func New(host string, port int) (*GrpcClients, error) {
 	if !useTLS {
 		log.Println("using insecure transport")
 		dialOptions = grpc.WithInsecure()
+	} else {
+		log.Println("using secure transport")
 	}
 
 	conn, err := grpc.Dial(fmt.Sprintf("%v:%v", host, port), dialOptions)
