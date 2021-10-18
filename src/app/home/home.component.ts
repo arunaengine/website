@@ -1,6 +1,9 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import {MatSort} from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
+import {MatDialog} from '@angular/material/dialog';
+import { CreateProjectComponent } from '../dialogs/create-project/create-project.component';
+import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
 
 
 @Component({
@@ -18,7 +21,9 @@ export class HomeComponent implements OnInit {
     {name: "Dummy1", description: "Some Dummy dataset", id: "007"},
     {name: "Dummy2", description: "Second Dummy dataset", id: "2042"}
   ]
-  constructor() { 
+  constructor(
+    public dialog: MatDialog
+  ) { 
     this.displayedColumns=["name", "description", "id", "details","generateKeys", "deleteProjects"]
     this.project_table = new MatTableDataSource(this.dummy_data)
     
@@ -41,11 +46,38 @@ export class HomeComponent implements OnInit {
   viewKeys(id){
     console.log("Generate API Key for ", id)
   }
-  deleteProject(id){
+  deleteProject(name, id){
     console.log("Delete Project", id)
+    const dialogRef = this.dialog.open(AlertDialogComponent,{
+      data:{
+        title: "Delete Project?",
+        message: "Are you sure you want to delete projcet '"+ name + "' (ID: "+id+")?"
+      },
+      hasBackdrop: true
+    })
+    dialogRef.afterClosed().subscribe(result => {
+      if (result){
+        console.log("Dialog closed: ", result)
+      } else {
+        console.log("Dialog dismissed")
+      }
+    })
   }
   viewDataset(id){
     console.log("View Project", id)
+  }
+  createProject(){
+    console.log("Generating Project...")
+    const dialogRef = this.dialog.open(CreateProjectComponent, { 
+      hasBackdrop:true
+       })
+    dialogRef.afterClosed().subscribe(result => {
+      if (result){
+        console.log("Dialog closed: ", result)
+      } else {
+        console.log("Dialog dismissed")
+      }
+    })
   }
 
 }

@@ -1,0 +1,12 @@
+<h1 mat-dialog-title color="primary">
+    {{data.title}}
+</h1>
+
+<div mat-dialog-content>
+    {{data.message}}
+</div>
+<div mat-dialog-actions>
+    <button mat-raised-button color="primary" [mat-dialog-close]="true">Delete Project</button>
+    <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
+
+</div>

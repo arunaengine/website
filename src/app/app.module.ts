@@ -15,12 +15,17 @@ import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatTableModule } from '@angular/material/table';
 import {MatInputModule} from '@angular/material/input';
+import {MatDialogModule} from '@angular/material/dialog';
+import { CreateProjectComponent } from './dialogs/create-project/create-project.component';
+import { AlertDialogComponent } from './dialogs/alert-dialog/alert-dialog.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     HomeComponent,
-    LoginComponent
+    LoginComponent,
+    CreateProjectComponent,
+    AlertDialogComponent
   ],
   imports: [
     BrowserModule,
@@ -34,7 +39,8 @@ import {MatInputModule} from '@angular/material/input';
     FormsModule,
     MatFormFieldModule,
     MatTableModule,
-    MatInputModule
+    MatInputModule,
+    MatDialogModule
   ],
   providers: [],
   bootstrap: [AppComponent]
