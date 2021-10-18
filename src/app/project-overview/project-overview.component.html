@@ -19,7 +19,7 @@
         </mat-list>
     </mat-card-content>
     <mat-card-actions>
-        <button mat-raised-button color="primary" >New Dataset</button>
+        <button mat-raised-button color="primary" (click)=newDataset()>New Dataset</button>
         <button mat-raised-button color="primary">Add User to Project</button>
     </mat-card-actions>
 </mat-card>
@@ -28,7 +28,7 @@
     <mat-label>Filter</mat-label>
     <input matInput (keyup)="applyFilter($event)" placeholder="Projectname" #input>
 </mat-form-field>
-<table mat-table [dataSource]="dataset_table" matSort>
+<table mat-table [dataSource]="dataset_table" matSort class="mat-elevation-z8">
 
     <ng-container matColumnDef="id">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> ID </th>

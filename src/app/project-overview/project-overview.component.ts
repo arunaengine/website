@@ -4,6 +4,7 @@ import {MatSort} from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatDialog } from '@angular/material/dialog';
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
+import { CreateProjectComponent } from '../dialogs/create-project/create-project.component';
 
 @Component({
   selector: 'app-project-overview',
@@ -62,5 +63,19 @@ export class ProjectOverviewComponent implements OnInit {
     //filter table
     const filterValue = (event.target as HTMLInputElement).value;
     this.dataset_table.filter = filterValue.trim().toLowerCase();
+  }
+
+  newDataset(){
+    console.log("Generating dataset...")
+    const dialogRef = this.dialog.open(CreateProjectComponent, { 
+      hasBackdrop:true
+       })
+    dialogRef.afterClosed().subscribe(result => {
+      if (result){
+        console.log("Dialog closed: ", result)
+      } else {
+        console.log("Dialog dismissed")
+      }
+    })
   }
 }

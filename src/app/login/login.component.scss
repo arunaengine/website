@@ -1,16 +1,8 @@
-mat-toolbar {
-    justify-content: space-between;
-}
-
-.content {
-    padding: 16px;
-}
-
-.content > mat-card {
-    margin-bottom: 16px;
-}
-
-.column-label {
-    margin-right: 8px;
-    font-size: 1rem;
+mat-card{
+    width: 350px;
+    height: 100px;
+    display: block;
+    margin-left:auto;
+    margin-right:auto;  
+    vertical-align:middle;
 }
