@@ -18,6 +18,8 @@ import {MatInputModule} from '@angular/material/input';
 import {MatDialogModule} from '@angular/material/dialog';
 import { CreateProjectComponent } from './dialogs/create-project/create-project.component';
 import { AlertDialogComponent } from './dialogs/alert-dialog/alert-dialog.component';
+import { ProjectTokensComponent } from './dialogs/project-tokens/project-tokens.component';
+import {MatIconModule} from '@angular/material/icon'
 
 @NgModule({
   declarations: [
@@ -25,7 +27,8 @@ import { AlertDialogComponent } from './dialogs/alert-dialog/alert-dialog.compon
     HomeComponent,
     LoginComponent,
     CreateProjectComponent,
-    AlertDialogComponent
+    AlertDialogComponent,
+    ProjectTokensComponent
   ],
   imports: [
     BrowserModule,
@@ -40,7 +43,8 @@ import { AlertDialogComponent } from './dialogs/alert-dialog/alert-dialog.compon
     MatFormFieldModule,
     MatTableModule,
     MatInputModule,
-    MatDialogModule
+    MatDialogModule,
+    MatIconModule
   ],
   providers: [],
   bootstrap: [AppComponent]

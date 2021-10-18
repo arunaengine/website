@@ -4,6 +4,7 @@ import { MatTableDataSource } from '@angular/material/table';
 import {MatDialog} from '@angular/material/dialog';
 import { CreateProjectComponent } from '../dialogs/create-project/create-project.component';
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
+import { ProjectTokensComponent } from '../dialogs/project-tokens/project-tokens.component';
 
 
 @Component({
@@ -44,7 +45,19 @@ export class HomeComponent implements OnInit {
     this.project_table.filter = filterValue.trim().toLowerCase();
   }
   viewKeys(id){
-    console.log("Generate API Key for ", id)
+    console.log("View API Keys for ", id)
+    const dialogRef = this.dialog.open(ProjectTokensComponent, { 
+      hasBackdrop:true,
+      width:"100%",
+      height:"auto"
+       })
+    dialogRef.afterClosed().subscribe(result => {
+      if (result){
+        console.log("Dialog closed: ", result)
+      } else {
+        console.log("Dialog dismissed")
+      }
+    })
   }
   deleteProject(name, id){
     console.log("Delete Project", id)
@@ -63,7 +76,7 @@ export class HomeComponent implements OnInit {
       }
     })
   }
-  viewDataset(id){
+  viewProject(id){
     console.log("View Project", id)
   }
   createProject(){

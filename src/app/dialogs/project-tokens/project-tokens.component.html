@@ -1,0 +1,33 @@
+<h1 mat-dialog-title color="primary">
+    <button mat-icon-button mat-dialog-close color="primary">
+        <mat-icon>close</mat-icon>
+    </button>
+
+    API Keys
+</h1>
+
+<button color="primary" mat-raised-button (click)="createProjectToken()">Create new Key</button>
+
+<table mat-table [dataSource]="token_table" matSort>
+
+    <ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> ID </th>
+        <td mat-cell *matCellDef="let element"> {{element.id}} </td>
+    </ng-container>
+    <ng-container matColumnDef="token">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Token </th>
+        <td mat-cell *matCellDef="let element"> {{element.token}} </td>
+    </ng-container>
+    <ng-container matColumnDef="rights">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Rights </th>
+        <td mat-cell *matCellDef="let element"> {{element.rights}} </td>
+    </ng-container>
+    <ng-container matColumnDef="delete">
+        <th mat-header-cell *matHeaderCellDef> Delete Key </th>
+        <td mat-cell *matCellDef="let element">
+            <button mat-raised-button color="warn" (click)="deleteKey(element.id)">Delete</button>
+        </td>
+    </ng-container>
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+</table>

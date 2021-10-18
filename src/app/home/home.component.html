@@ -49,15 +49,15 @@
         <td mat-cell *matCellDef="let element"> {{element.id}} </td>
     </ng-container>
     <ng-container matColumnDef="details">
-        <th mat-header-cell *matHeaderCellDef> View Dataset </th>
+        <th mat-header-cell *matHeaderCellDef> View Datasets </th>
         <td mat-cell *matCellDef="let element">
-            <button mat-raised-button color="primary" (click)="viewDataset(element.id)">View Dataset</button>
+            <button mat-raised-button color="primary" (click)="viewProject(element.id)">View Dataset</button>
         </td>
     </ng-container>
     <ng-container matColumnDef="generateKeys">
         <th mat-header-cell *matHeaderCellDef> View API Keys </th>
         <td mat-cell *matCellDef="let element">
-            <button mat-raised-button color="primary" (click)="viewKeys(element.id)">New API Key</button>
+            <button mat-raised-button color="primary" (click)="viewKeys(element.id)">View API Keys</button>
         </td>
     </ng-container>
     <ng-container matColumnDef="deleteProjects">
