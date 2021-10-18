@@ -5,6 +5,7 @@ import {MatDialog} from '@angular/material/dialog';
 import { CreateProjectComponent } from '../dialogs/create-project/create-project.component';
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
 import { ProjectTokensComponent } from '../dialogs/project-tokens/project-tokens.component';
+import { Router } from '@angular/router';
 
 
 @Component({
@@ -23,7 +24,8 @@ export class HomeComponent implements OnInit {
     {name: "Dummy2", description: "Second Dummy dataset", id: "2042"}
   ]
   constructor(
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private router: Router
   ) { 
     this.displayedColumns=["name", "description", "id", "details","generateKeys", "deleteProjects"]
     this.project_table = new MatTableDataSource(this.dummy_data)
@@ -64,6 +66,7 @@ export class HomeComponent implements OnInit {
     const dialogRef = this.dialog.open(AlertDialogComponent,{
       data:{
         title: "Delete Project?",
+        button: "Project",
         message: "Are you sure you want to delete projcet '"+ name + "' (ID: "+id+")?"
       },
       hasBackdrop: true
@@ -78,6 +81,7 @@ export class HomeComponent implements OnInit {
   }
   viewProject(id){
     console.log("View Project", id)
+    this.router.navigate(["/project_overview"])
   }
   createProject(){
     console.log("Generating Project...")

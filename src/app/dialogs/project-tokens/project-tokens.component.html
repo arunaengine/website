@@ -16,11 +16,17 @@
     </ng-container>
     <ng-container matColumnDef="token">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Token </th>
-        <td mat-cell *matCellDef="let element"> {{element.token}} </td>
+        <td mat-cell *matCellDef="let element"> 
+            {{element.token}} 
+            <button [cdkCopyToClipboard]="element.token" mat-icon-button color="primary" (click)="openSnackBar()">
+                <mat-icon>content_copy</mat-icon>
+            </button>
+         </td>
     </ng-container>
     <ng-container matColumnDef="rights">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Rights </th>
-        <td mat-cell *matCellDef="let element"> {{element.rights}} </td>
+        <td mat-cell *matCellDef="let element">
+             {{element.rights}}</td>
     </ng-container>
     <ng-container matColumnDef="delete">
         <th mat-header-cell *matHeaderCellDef> Delete Key </th>

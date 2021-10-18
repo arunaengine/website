@@ -19,7 +19,11 @@ import {MatDialogModule} from '@angular/material/dialog';
 import { CreateProjectComponent } from './dialogs/create-project/create-project.component';
 import { AlertDialogComponent } from './dialogs/alert-dialog/alert-dialog.component';
 import { ProjectTokensComponent } from './dialogs/project-tokens/project-tokens.component';
-import {MatIconModule} from '@angular/material/icon'
+import {MatIconModule} from '@angular/material/icon';
+import { ProjectOverviewComponent } from './project-overview/project-overview.component';
+import {MatListModule} from '@angular/material/list';
+import {ClipboardModule} from '@angular/cdk/clipboard';
+import {MatSnackBarModule} from '@angular/material/snack-bar';
 
 @NgModule({
   declarations: [
@@ -28,7 +32,8 @@ import {MatIconModule} from '@angular/material/icon'
     LoginComponent,
     CreateProjectComponent,
     AlertDialogComponent,
-    ProjectTokensComponent
+    ProjectTokensComponent,
+    ProjectOverviewComponent
   ],
   imports: [
     BrowserModule,
@@ -44,7 +49,10 @@ import {MatIconModule} from '@angular/material/icon'
     MatTableModule,
     MatInputModule,
     MatDialogModule,
-    MatIconModule
+    MatIconModule,
+    MatListModule,
+    ClipboardModule,
+    MatSnackBarModule
   ],
   providers: [],
   bootstrap: [AppComponent]

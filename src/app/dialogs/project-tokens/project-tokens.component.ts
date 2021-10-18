@@ -3,6 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import {MatSort} from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { AlertDialogComponent } from '../alert-dialog/alert-dialog.component';
+import {MatSnackBar} from '@angular/material/snack-bar';
 
 
 @Component({
@@ -23,7 +24,8 @@ export class ProjectTokensComponent implements OnInit {
   ]
 
   constructor(
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private snackBar: MatSnackBar
   ) {
     this.displayedColumns=["id", "token", "rights", "delete"]
     this.token_table = new MatTableDataSource(this.dummy)
@@ -40,6 +42,7 @@ export class ProjectTokensComponent implements OnInit {
     const dialogRef = this.dialog.open(AlertDialogComponent,{
       data:{
         title: "Delete API Key?",
+        button:"Key",
         message: "Are you sure you want to delete the API key (ID: "+id+")?"
       },
       hasBackdrop: true
@@ -55,6 +58,10 @@ export class ProjectTokensComponent implements OnInit {
 
   createProjectToken(){
     console.log("Creating new Key...")
+  }
+
+  openSnackBar(){
+    this.snackBar.open("Token copied to Clipboard","",{duration: 3000})
   }
 
   }
