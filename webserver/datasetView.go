@@ -32,12 +32,12 @@ type Endpoints struct {
 
 // ID binds string based ids
 type ID struct {
-	ID uint64 `uri:"id" binding:"required"`
+	ID string `uri:"id" binding:"required"`
 }
 
 // ProjectID binds the project id
 type ProjectID struct {
-	ProjectID uint64 `uri:"projectid" binding:"required"`
+	ProjectID string `uri:"projectid" binding:"required"`
 }
 
 type CreateProject struct {
@@ -121,13 +121,7 @@ func (server *Endpoints) CreateDatasetVersion(c *gin.Context) {
 		c.AbortWithError(400, err)
 	}
 
-	datasetIDInt, err := strconv.Atoi(datasetid)
-	if err != nil {
-		log.Println(err.Error())
-		c.AbortWithError(400, err)
-	}
-
-	err = c.Request.ParseForm()
+	err := c.Request.ParseForm()
 	if err != nil {
 		log.Println(err.Error())
 		c.AbortWithError(400, err)
@@ -183,7 +177,7 @@ func (server *Endpoints) CreateDatasetVersion(c *gin.Context) {
 	}
 
 	_, err = server.GRPCEndpointsBackend.DatasetClient.ReleaseDatasetVersion(server.GRPCEndpointsBackend.OutGoingContext(c), &services.ReleaseDatasetVersionRequest{
-		DatasetId: uint64(datasetIDInt),
+		DatasetId: datasetid,
 		Version:   &version,
 	})
 
@@ -471,14 +465,8 @@ func (server *Endpoints) GetDatasetObjectGroups(c *gin.Context) {
 		c.AbortWithError(400, err)
 	}
 
-	datasetIDInt, err := strconv.Atoi(datasetid)
-	if err != nil {
-		log.Println(err.Error())
-		c.AbortWithError(400, err)
-	}
-
 	objectsGroups, err := server.GRPCEndpointsBackend.DatasetClient.GetDatasetObjectGroups(server.GRPCEndpointsBackend.OutGoingContext(c), &services.GetDatasetObjectGroupsRequest{
-		Id: uint64(datasetIDInt),
+		Id: datasetid,
 	})
 	if err != nil {
 		if err.Error() == UNAUTHORIZEDERROR {
@@ -500,19 +488,13 @@ func (server *Endpoints) GetDatasetVersionObjectGroups(c *gin.Context) {
 	var exists bool
 
 	if datasetversionid, exists = c.GetQuery("datasetversionid"); !exists {
-		err := fmt.Errorf("Could not find datasetversionid in query params")
-		log.Println(err.Error())
-		c.AbortWithError(400, err)
-	}
-
-	datasetversionidInt, err := strconv.Atoi(datasetversionid)
-	if err != nil {
+		err := fmt.Errorf("could not find datasetversionid in query params")
 		log.Println(err.Error())
 		c.AbortWithError(400, err)
 	}
 
 	objectsGroupVersions, err := server.GRPCEndpointsBackend.DatasetClient.GetDatasetVersion(server.GRPCEndpointsBackend.OutGoingContext(c), &services.GetDatasetVersionRequest{
-		Id: uint64(datasetversionidInt),
+		Id: datasetversionid,
 	})
 	if err != nil {
 		if err.Error() == UNAUTHORIZEDERROR {
