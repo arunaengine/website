@@ -15,8 +15,7 @@ export class LoginComponent implements OnInit {
 
 
   login(){
-    console.log("Logging in...")
     this.authService.startAuthorization()
-    
+
   }
 }

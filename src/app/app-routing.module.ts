@@ -9,8 +9,8 @@ const routes: Routes = [
   {path:"login", component:LoginComponent},
   
   {path: "home", component:HomeComponent, canActivate: [AuthGuardService]},
-  {path:"project_overview", component:ProjectOverviewComponent, canActivate: [AuthGuardService]},
-
+  {path:"project_overview", component:ProjectOverviewComponent},
+//, canActivate: [AuthGuardService]
   {path: "", redirectTo:"login", pathMatch:"full"},
   {path: "auth-callback", redirectTo: "home", pathMatch:"full"}
 ];

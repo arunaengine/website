@@ -5,24 +5,61 @@
     BioData DB - project_name
 </mat-toolbar>
 
-<mat-card>
-    <mat-card-header>
-        <mat-card-title>
-            Users with access to this Project
-        </mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-        <mat-list role="list">
-            <mat-list-item role="listitem">User 1</mat-list-item>
-            <mat-list-item role="listitem">User 2</mat-list-item>
-            <mat-list-item role="listitem">User 3</mat-list-item>
-        </mat-list>
-    </mat-card-content>
-    <mat-card-actions>
-        <button mat-raised-button color="primary" (click)=newDataset()>New Dataset</button>
-        <button mat-raised-button color="primary">Add User to Project</button>
-    </mat-card-actions>
-</mat-card>
+
+<div fxLayout="row wrap" fxLayoutGap="16px grid">
+    <div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
+        <mat-card class="mat-elevation-z8">
+            <mat-card-header>
+                <mat-card-title>
+                    Stats about the Datasets
+                </mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+                <mat-list role="list">
+                    <mat-list-item role="listitem">Stat 1</mat-list-item>
+                    <mat-list-item role="listitem">Stat 2</mat-list-item>
+                    <mat-list-item role="listitem">Stat 3</mat-list-item>
+                </mat-list>
+            </mat-card-content>
+            <mat-card-actions>
+                <button mat-raised-button color="primary" (click)=newDataset()>New Dataset</button>
+            </mat-card-actions>
+        </mat-card>
+    </div>
+    <div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
+        <mat-card class="mat-elevation-z8">
+            <mat-card-header>
+                <mat-card-title>
+                    Users with access to this Project
+                </mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+                <div fxLayout="row" fxFlex="100" fxLayoutAlign="space-around start">
+                    <div fxLayout="column">
+                        <mat-list role="list">
+                            <mat-list-item role="listitem">User 1</mat-list-item>
+                            <mat-list-item role="listitem">User 2</mat-list-item>
+                            <mat-list-item role="listitem">User 3</mat-list-item>
+                        </mat-list>
+                    </div>
+                    <div fxLayout="column">
+                        <mat-form-field>
+
+
+                            <mat-label>User ID</mat-label>
+                            <input matInput [(ngModel)]="user_id" placeholder="User ID" #input>
+                        </mat-form-field>
+                    </div>
+                    
+                </div>
+            </mat-card-content>
+            <mat-card-actions>
+                <button mat-raised-button (click)="addUser()" color="primary">Add User to Project</button>
+            </mat-card-actions>
+        </mat-card>
+    </div>
+</div>
+
 
 <mat-form-field appearance="fill" class="example-form">
     <mat-label>Filter</mat-label>
@@ -36,13 +73,13 @@
     </ng-container>
     <ng-container matColumnDef="name">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
-        <td mat-cell *matCellDef="let element"> 
+        <td mat-cell *matCellDef="let element">
             {{element.name}} </td>
     </ng-container>
     <ng-container matColumnDef="datatype">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Datatype </th>
         <td mat-cell *matCellDef="let element">
-             {{element.datatype}}</td>
+            {{element.datatype}}</td>
     </ng-container>
     <ng-container matColumnDef="delete">
         <th mat-header-cell *matHeaderCellDef> Delete Dataset </th>

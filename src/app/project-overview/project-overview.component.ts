@@ -16,6 +16,7 @@ export class ProjectOverviewComponent implements OnInit {
   @ViewChild(MatSort) sort:MatSort
 
   dataset_table: any
+  user_id =""
   displayedColumns: string[]
   dummy= [
     {id: "001", name: "dyinglight", datatype: "story"},
@@ -45,7 +46,7 @@ export class ProjectOverviewComponent implements OnInit {
     const dialogRef = this.dialog.open(AlertDialogComponent,{
       data:{
         title: "Delete Dataset?",
-        button: "Dataset",
+        button: "Delete Dataset",
         message: "Are you sure you want to delete  '"+ name + "' (ID: "+id+")?"
       },
       hasBackdrop: true
@@ -68,6 +69,7 @@ export class ProjectOverviewComponent implements OnInit {
   newDataset(){
     console.log("Generating dataset...")
     const dialogRef = this.dialog.open(CreateProjectComponent, { 
+      data: {type: "Dataset"},
       hasBackdrop:true
        })
     dialogRef.afterClosed().subscribe(result => {
@@ -77,5 +79,25 @@ export class ProjectOverviewComponent implements OnInit {
         console.log("Dialog dismissed")
       }
     })
+  }
+  addUser(){
+    if (this.user_id != ""){
+    console.log("Adding User "+this.user_id+" to project.")
+    const dialogRef = this.dialog.open(AlertDialogComponent,{
+      data:{
+        title: "Add User to Project?",
+        button: "Add User",
+        message: "Are you sure you want to add user '" + this.user_id + "' to project_name?"
+      },
+      hasBackdrop: true
+    })
+    dialogRef.afterClosed().subscribe(result => {
+      if (result){
+        console.log("Dialog closed: ", result)
+      } else {
+        console.log("Dialog dismissed")
+      }
+    })
+  }
   }
 }

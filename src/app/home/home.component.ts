@@ -66,7 +66,7 @@ export class HomeComponent implements OnInit {
     const dialogRef = this.dialog.open(AlertDialogComponent,{
       data:{
         title: "Delete Project?",
-        button: "Project",
+        button: "Delete Project",
         message: "Are you sure you want to delete projcet '"+ name + "' (ID: "+id+")?"
       },
       hasBackdrop: true
@@ -85,7 +85,8 @@ export class HomeComponent implements OnInit {
   }
   createProject(){
     console.log("Generating Project...")
-    const dialogRef = this.dialog.open(CreateProjectComponent, { 
+    const dialogRef = this.dialog.open(CreateProjectComponent, {
+      data: {type: "Project"}, 
       hasBackdrop:true
        })
     dialogRef.afterClosed().subscribe(result => {
