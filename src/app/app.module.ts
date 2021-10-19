@@ -24,6 +24,10 @@ import { ProjectOverviewComponent } from './project-overview/project-overview.co
 import {MatListModule} from '@angular/material/list';
 import {ClipboardModule} from '@angular/cdk/clipboard';
 import {MatSnackBarModule} from '@angular/material/snack-bar';
+import { HttpClientModule } from '@angular/common/http';
+import { OAuthModule } from 'angular-oauth2-oidc';
+import { AuthGuardService } from './services/auth-guard.service';
+import { AuthService } from './services/auth.service';
 
 @NgModule({
   declarations: [
@@ -52,9 +56,11 @@ import {MatSnackBarModule} from '@angular/material/snack-bar';
     MatIconModule,
     MatListModule,
     ClipboardModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    HttpClientModule,
+    OAuthModule.forRoot()
   ],
-  providers: [],
+  providers: [AuthGuardService, AuthService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }
