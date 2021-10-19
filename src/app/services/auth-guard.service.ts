@@ -11,7 +11,7 @@ export class AuthGuardService implements CanActivate {
 
   canActivate(): boolean {
     console.log("can activate?")
-    //console.log(this.oauthService.getIdToken())
+    console.log(this.oauthService.getAccessToken())
     if (this.oauthService.hasValidAccessToken()){
       console.log(true)
       return true

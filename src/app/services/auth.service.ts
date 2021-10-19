@@ -10,11 +10,14 @@ export class AuthService {
   authCodeFlowConfig: AuthConfig = {
     issuer: "https://keycloak.m1.k8s.computational.bio/auth/realms/NFDI4Biodiversity",
     loginUrl: "https://keycloak.m1.k8s.computational.bio/auth/realms/NFDI4Biodiversity/protocol/openid-connect/auth",
+    //tokenEndpoint: "https://keycloak.m1.k8s.computational.bio/auth/realms/NFDI4Biodiversity/protocol/openid-connect/token",
     clientId: "website-angular-local",
     redirectUri: "http://localhost:4200/auth-callback",
     responseType: "code",
     scope: "openid profile email",
     showDebugInformation: true,
+    oidc: true
+    
   }
 
   user_data: any
@@ -30,7 +33,7 @@ export class AuthService {
      console.log("creating config...")
     this.oauthService.configure(this.authCodeFlowConfig)
     this.oauthService.tokenValidationHandler = new JwksValidationHandler()
-    this.oauthService.loadDiscoveryDocumentAndTryLogin()
+    this.oauthService.loadDiscoveryDocument()
    }
 
    startAuthorization(){
@@ -38,6 +41,10 @@ export class AuthService {
     if (!this.oauthService.hasValidAccessToken()){
           this.oauthService.initLoginFlow()
     }
+   }
+
+   tryLogin(){
+     this.oauthService.tryLogin()
    }
 
   

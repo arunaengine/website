@@ -6,6 +6,7 @@ import { CreateProjectComponent } from '../dialogs/create-project/create-project
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
 import { ProjectTokensComponent } from '../dialogs/project-tokens/project-tokens.component';
 import { Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
 
 
 @Component({
@@ -25,7 +26,8 @@ export class HomeComponent implements OnInit {
   ]
   constructor(
     public dialog: MatDialog,
-    private router: Router
+    private router: Router,
+    private authService: AuthService
   ) { 
     this.displayedColumns=["name", "description", "id", "details","generateKeys", "deleteProjects"]
     this.project_table = new MatTableDataSource(this.dummy_data)
