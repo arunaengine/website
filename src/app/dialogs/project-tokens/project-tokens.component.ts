@@ -61,7 +61,10 @@ export class ProjectTokensComponent implements OnInit {
   }
 
   openSnackBar(){
-    this.snackBar.open("Token copied to Clipboard","",{duration: 3000})
+    this.snackBar.open("Token copied to Clipboard.","",{
+      duration: 3000,
+      panelClass: ["success-snackbar"]
+    })
   }
 
   }

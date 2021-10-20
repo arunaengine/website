@@ -5,6 +5,7 @@ import { MatTableDataSource } from '@angular/material/table';
 import { MatDialog } from '@angular/material/dialog';
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
 import { CreateProjectComponent } from '../dialogs/create-project/create-project.component';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-project-overview',
@@ -26,7 +27,8 @@ export class ProjectOverviewComponent implements OnInit {
 
   constructor(
     private router: Router,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private snackBar: MatSnackBar
   ) {
     this.displayedColumns=["id", "name", "datatype", "delete"]
     this.dataset_table = new MatTableDataSource(this.dummy)
@@ -97,6 +99,11 @@ export class ProjectOverviewComponent implements OnInit {
       } else {
         console.log("Dialog dismissed")
       }
+    })
+  } else {
+    this.snackBar.open("Please enter valid user ID!","",{
+      duration: 3000,
+      panelClass: ["warning-snackbar"]
     })
   }
   }

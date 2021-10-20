@@ -27,7 +27,7 @@ export class HomeComponent implements OnInit {
   constructor(
     public dialog: MatDialog,
     private router: Router,
-    private authService: AuthService
+    public authService: AuthService
   ) { 
     this.displayedColumns=["name", "description", "id", "details","generateKeys", "deleteProjects"]
     this.project_table = new MatTableDataSource(this.dummy_data)
@@ -36,7 +36,7 @@ export class HomeComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    
+    console.log(this.authService.user_data)
   }
 
   ngAfterViewInit():void{
