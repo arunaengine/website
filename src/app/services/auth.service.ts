@@ -32,7 +32,7 @@ export class AuthService {
     responseType: "code",
     scope: "openid profile email",
     showDebugInformation: true,
-    oidc: true
+    oidc: true,
 
   }
 
@@ -58,6 +58,7 @@ export class AuthService {
     });
     console.log("creating config and try login...")
     this.oauthService.configure(this.authCodeFlowConfig)
+    this.oauthService.setupAutomaticSilentRefresh()
     this.oauthService.tokenValidationHandler = new JwksValidationHandler()
     this.oauthService.loadDiscoveryDocumentAndTryLogin().then(() => {
       console.log("getting user in config")
