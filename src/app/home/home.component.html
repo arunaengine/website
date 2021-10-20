@@ -57,9 +57,9 @@
         <td mat-cell *matCellDef="let element"> {{element.id}} </td>
     </ng-container>
     <ng-container matColumnDef="details">
-        <th mat-header-cell *matHeaderCellDef> View Datasets </th>
+        <th mat-header-cell *matHeaderCellDef> View Details </th>
         <td mat-cell *matCellDef="let element">
-            <button mat-raised-button color="primary" (click)="viewProject(element.id)">View Dataset</button>
+            <button mat-raised-button color="primary" (click)="viewProject(element.id)">View Details</button>
         </td>
     </ng-container>
     <ng-container matColumnDef="generateKeys">
