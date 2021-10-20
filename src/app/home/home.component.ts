@@ -99,5 +99,7 @@ export class HomeComponent implements OnInit {
       }
     })
   }
-
+  logout(){
+    this.authService.logout()
+  }
 }

@@ -29,6 +29,10 @@ import { OAuthModule, OAuthStorage } from 'angular-oauth2-oidc';
 import { AuthGuardService } from './services/auth-guard.service';
 import { AuthService } from './services/auth.service';
 
+export function storageFactory() : OAuthStorage {
+  return localStorage
+}
+
 @NgModule({
   declarations: [
     AppComponent,
@@ -60,7 +64,9 @@ import { AuthService } from './services/auth.service';
     HttpClientModule,
     OAuthModule.forRoot()
   ],
-  providers: [AuthGuardService, AuthService],
+  providers: [AuthGuardService, AuthService,
+    { provide: OAuthStorage, useFactory: storageFactory }
+  ],
   bootstrap: [AppComponent]
 })
 export class AppModule { }
