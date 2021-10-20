@@ -1,11 +1,11 @@
 import { Injectable } from '@angular/core';
-import { ProjectServiceClient } from '../generated/api/services/v1/project_service_grpc_web_pb';
+//import { ProjectServiceClient } from '../generated/api/services/v1/project_service_grpc_web_pb';
 
 @Injectable({
   providedIn: 'root'
 })
 export class GrpcApiService {
-  private projectServiceClient: ProjectServiceClient 
+  //private projectServiceClient: ProjectServiceClient 
   constructor() { }
 
   createProject(){
