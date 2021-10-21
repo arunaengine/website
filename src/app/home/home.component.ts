@@ -7,6 +7,7 @@ import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.compo
 import { ProjectTokensComponent } from '../dialogs/project-tokens/project-tokens.component';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { GrpcApiService } from '../services/grpc-api.service';
 
 
 @Component({
@@ -27,7 +28,8 @@ export class HomeComponent implements OnInit {
   constructor(
     public dialog: MatDialog,
     private router: Router,
-    public authService: AuthService
+    public authService: AuthService,
+    private grpcService: GrpcApiService
   ) { 
     this.displayedColumns=["name", "description", "id", "details","generateKeys", "deleteProjects"]
     this.project_table = new MatTableDataSource(this.dummy_data)
@@ -94,6 +96,7 @@ export class HomeComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
+        this.grpcService.createProject()
       } else {
         console.log("Dialog dismissed")
       }

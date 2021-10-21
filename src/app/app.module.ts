@@ -28,6 +28,7 @@ import { HttpClientModule } from '@angular/common/http';
 import { OAuthModule, OAuthStorage } from 'angular-oauth2-oidc';
 import { AuthGuardService } from './services/auth-guard.service';
 import { AuthService } from './services/auth.service';
+import {MatPaginatorModule} from '@angular/material/paginator';
 
 export function storageFactory() : OAuthStorage {
   return localStorage
@@ -59,6 +60,7 @@ export function storageFactory() : OAuthStorage {
     MatDialogModule,
     MatIconModule,
     MatListModule,
+    MatPaginatorModule,
     ClipboardModule,
     MatSnackBarModule,
     HttpClientModule,

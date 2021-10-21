@@ -6,6 +6,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
 import { CreateProjectComponent } from '../dialogs/create-project/create-project.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatPaginator } from '@angular/material/paginator';
 
 @Component({
   selector: 'app-project-overview',
@@ -14,6 +15,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 })
 export class ProjectOverviewComponent implements OnInit {
 
+  @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort:MatSort
 
   dataset_table: any
@@ -21,8 +23,12 @@ export class ProjectOverviewComponent implements OnInit {
   displayedColumns: string[]
   dummy= [
     {id: "001", name: "dyinglight", datatype: "story"},
-    {id: "002", name: "bf2042", datatype: "fps"}
-
+    {id: "002", name: "bf2042", datatype: "fps"},
+    {id: "003", name: "bf2042", datatype: "fps"},
+    {id: "004", name: "bf2042", datatype: "fps"},
+    {id: "005", name: "bf2042", datatype: "fps"},
+    {id: "006", name: "bf2042", datatype: "fps"},
+    {id: "007", name: "bf2042", datatype: "fps"}
   ]
 
   constructor(
@@ -30,7 +36,7 @@ export class ProjectOverviewComponent implements OnInit {
     public dialog: MatDialog,
     private snackBar: MatSnackBar
   ) {
-    this.displayedColumns=["id", "name", "datatype", "delete"]
+    this.displayedColumns=["id", "name", "datatype","details", "delete"]
     this.dataset_table = new MatTableDataSource(this.dummy)
    }
 
@@ -41,6 +47,7 @@ export class ProjectOverviewComponent implements OnInit {
     this.router.navigate(["/home"])
   }
   ngAfterViewInit():void{
+    this.dataset_table.paginator = this.paginator
     this.dataset_table.sort = this.sort
   }
   deleteDataset(name, id){
@@ -106,5 +113,8 @@ export class ProjectOverviewComponent implements OnInit {
       panelClass: ["warning-snackbar"]
     })
   }
+  }
+  viewDetails(id){
+    console.log("See Details...")
   }
 }
