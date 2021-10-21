@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 
-import { GrpcApiService } from './grpc-api.service';
+import { ApiService } from './api.service';
 
-describe('GrpcApiService', () => {
-  let service: GrpcApiService;
+describe('ApiService', () => {
+  let service: ApiService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(GrpcApiService);
+    service = TestBed.inject(ApiService);
   });
 
   it('should be created', () => {
