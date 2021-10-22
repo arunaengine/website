@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { AuthConfig, OAuthService, OAuthErrorEvent } from 'angular-oauth2-oidc';
 import { JwksValidationHandler } from 'angular-oauth2-oidc-jwks';
 import { ApiService } from './api.service';
+import { ConfigService } from './config.service';
 
 @Injectable({
   providedIn: 'root'
@@ -25,7 +26,7 @@ export class AuthService {
   scope: 'openid profile email voucher',
   */
 
-  authCodeFlowConfig: AuthConfig = {
+  /*authCodeFlowConfig: AuthConfig = {
     issuer: "https://keycloak.m1.k8s.computational.bio/auth/realms/NFDI4Biodiversity",
     loginUrl: "https://keycloak.m1.k8s.computational.bio/auth/realms/NFDI4Biodiversity/protocol/openid-connect/auth",
     clientId: "website-angular-local",
@@ -34,16 +35,18 @@ export class AuthService {
     scope: "openid profile email groups",
     showDebugInformation: true,
     oidc: true,
-  }
-
+  }*/
+  //authCodeFlowConfig: AuthConfig
   public user_data: any
 
   constructor(
     private oauthService: OAuthService,
-    private router: Router
+    private router: Router,
+    private config: ConfigService
   ) {
-
-
+    console.log(config.auth_config)
+    //this.authCodeFlowConfig = config.auth_config 
+    //console.log(this.authCodeFlowConfig)
 
     this.configueAuthentication()
   }
@@ -57,7 +60,7 @@ export class AuthService {
       }
     });
     console.log("creating config and try login...")
-    this.oauthService.configure(this.authCodeFlowConfig)
+    this.oauthService.configure(this.config.auth_config)
     this.oauthService.setupAutomaticSilentRefresh()
     this.oauthService.tokenValidationHandler = new JwksValidationHandler()
     this.oauthService.loadDiscoveryDocumentAndTryLogin().then(() => {

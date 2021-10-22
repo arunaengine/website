@@ -1,5 +1,0 @@
-{
-    "OAuth": {
-        "isuser": "https://keycloak.m1.k8s.computational.bio/auth/realms/NFDI4Biodiversity"
-    }
-}

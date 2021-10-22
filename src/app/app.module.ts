@@ -1,6 +1,5 @@
-import { NgModule } from '@angular/core';
+import { NgModule, APP_INITIALIZER } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
-
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
@@ -24,15 +23,35 @@ import { ProjectOverviewComponent } from './project-overview/project-overview.co
 import {MatListModule} from '@angular/material/list';
 import {ClipboardModule} from '@angular/cdk/clipboard';
 import {MatSnackBarModule} from '@angular/material/snack-bar';
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { OAuthModule, OAuthStorage } from 'angular-oauth2-oidc';
 import { AuthGuardService } from './services/auth-guard.service';
 import { AuthService } from './services/auth.service';
 import {MatPaginatorModule} from '@angular/material/paginator';
+import { ConfigService } from './services/config.service';
+import { of, Observable, ObservableInput } from '../../node_modules/rxjs';
+import { map, catchError } from 'rxjs/operators';
 
+function initialize(http: HttpClient, config: ConfigService) {
+	return (): Promise<boolean> => {
+    return new Promise<boolean>((resolve: (a: boolean) => void): void => {
+      http.get("assets/config/config.json").pipe(
+           map((x: ConfigService) => {
+             config.auth_config = x.auth_config;
+             resolve(true);
+           }),
+           catchError((x: { status: number }, caught: Observable<void>): ObservableInput<{}> => {
+               resolve(false);
+             return of({});
+           })
+         ).subscribe();
+    });
+  };
+}
 export function storageFactory() : OAuthStorage {
   return localStorage
 }
+
 
 @NgModule({
   declarations: [
@@ -66,7 +85,15 @@ export function storageFactory() : OAuthStorage {
     HttpClientModule,
     OAuthModule.forRoot()
   ],
-  providers: [AuthGuardService, AuthService,
+  providers: [[{
+    provide: APP_INITIALIZER,
+    useFactory: initialize,
+    deps: [
+        HttpClient,
+        ConfigService,
+      ],
+    multi: true
+  }],AuthGuardService, AuthService,
     { provide: OAuthStorage, useFactory: storageFactory }
   ],
   bootstrap: [AppComponent]
