@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthConfig, OAuthService, OAuthErrorEvent } from 'angular-oauth2-oidc';
 import { JwksValidationHandler } from 'angular-oauth2-oidc-jwks';
+import { ApiService } from './api.service';
 
 @Injectable({
   providedIn: 'root'

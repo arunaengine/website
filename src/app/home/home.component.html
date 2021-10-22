@@ -1,3 +1,5 @@
+
+
 <mat-toolbar color="primary">
     BioData DB
 
@@ -65,7 +67,7 @@
     <ng-container matColumnDef="generateKeys">
         <th mat-header-cell *matHeaderCellDef> View API Keys </th>
         <td mat-cell *matCellDef="let element">
-            <button mat-raised-button color="primary" (click)="viewKeys(element.id)">View API Keys</button>
+            <button mat-raised-button color="primary" (click)="viewKeys(element)">View API Keys</button>
         </td>
     </ng-container>
     <ng-container matColumnDef="deleteProjects">
