@@ -105,7 +105,7 @@ export class HomeComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
-        //this.apiService.deleteProject(id)
+        this.apiService.deleteProject(id).then(()=> this.refreshProjects())
       } else {
         console.log("Dialog dismissed")
       }
@@ -138,5 +138,11 @@ export class HomeComponent implements OnInit {
   }
   logout(){
     this.authService.logout()
+  }
+
+  refreshProjects(){
+    this.apiService.getProjects().then(()=> {
+      this.project_table = new MatTableDataSource(this.apiService.projects)
+    })
   }
 }

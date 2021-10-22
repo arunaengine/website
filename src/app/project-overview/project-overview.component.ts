@@ -66,6 +66,9 @@ export class ProjectOverviewComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
+        this.apiService.deleteDataset(id).then(()=> {
+          this.refreshDatasets()
+        })
       } else {
         console.log("Dialog dismissed")
       }
@@ -119,5 +122,14 @@ export class ProjectOverviewComponent implements OnInit {
   }
   viewDetails(id){
     console.log("See Details...")
+  }
+
+ async refreshDatasets(){
+  await this.apiService.viewSingleProject(this.apiService.project.project["id"])
+  await this.apiService.getDatasetsforProject(this.apiService.project.project["id"])
+      this.dataset_table = new MatTableDataSource(this.apiService.project.datasets)
+      this.dataset_table.paginator = this.paginator
+      this.dataset_table.sort = this.sort
+    
   }
 }

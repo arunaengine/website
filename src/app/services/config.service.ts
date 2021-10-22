@@ -5,7 +5,8 @@ import { AuthConfig } from 'angular-oauth2-oidc';
   providedIn: 'root'
 })
 export class ConfigService {
-  auth_config: AuthConfig 
+  auth_config: AuthConfig
   gateway_url: string
+  api_key: string
   constructor() { }
 }

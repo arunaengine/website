@@ -28,7 +28,7 @@ export class ApiService {
     return {
       headers: new HttpHeaders({
         "Grpc-Metadata-accesskey": this.oauthService.getAccessToken(),
-        "Grpc-Metadata-API_TOKEN": "x6EXNHhioasEnYw8e6Fy9PvMDd1Ea5edmatKqI70a25osXvE5suAh+3+4QMI"
+        "Grpc-Metadata-API_TOKEN": this.configService.api_key
       })
     }
   }
@@ -53,8 +53,11 @@ export class ApiService {
   }
 
   deleteProject(projcet_id) {
-    this.http.get(this.gateway_url + "/project/" + projcet_id + "/delete", this.configureHeadersAccessKey() ).pipe().subscribe(res => {
+    return new Promise(resolve => {
+      this.http.get(this.gateway_url + "/project/" + projcet_id + "/delete", this.configureHeadersAccessKey() ).pipe().subscribe(res => {
       console.log(res)
+      resolve("done")
+    })
     })
   }
 
@@ -109,6 +112,15 @@ export class ApiService {
     return new Promise(resolve => {
       this.http.delete(this.gateway_url + "/apitoken/" + token_id + "/delete", this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
         console.log(res_added)
+      })
+    })
+  }
+
+  deleteDataset(dataset_id){
+    return new Promise(resolve => {
+      this.http.delete(this.gateway_url + "/dataset/" + dataset_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
+        console.log(res_added)
+        resolve("done")
       })
     })
   }
