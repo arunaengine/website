@@ -2,7 +2,7 @@
     <button mat-icon-button color="secondary" (click)="goBack()">
         <mat-icon>arrow_back</mat-icon>
     </button>
-    BioData DB - project_name
+    BioData DB - {{apiService.project.project["name"]}}
 </mat-toolbar>
 
 
@@ -97,6 +97,6 @@
     <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
     <tr class="mat-row" *matNoDataRow>
-        <td class="mat-cell" colspan="4">No project found matching the filter "{{input.value}}"</td>
+        <td class="mat-cell" colspan="4">No dataset found matching the filter "{{input.value}}"</td>
     </tr>
 </table>

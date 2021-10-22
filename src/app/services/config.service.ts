@@ -6,5 +6,6 @@ import { AuthConfig } from 'angular-oauth2-oidc';
 })
 export class ConfigService {
   auth_config: AuthConfig 
+  gateway_url: string
   constructor() { }
 }

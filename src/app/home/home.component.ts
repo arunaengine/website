@@ -97,14 +97,15 @@ export class HomeComponent implements OnInit {
       data:{
         title: "Delete Project?",
         button: "Delete Project",
-        message: "Are you sure you want to delete projcet '"+ name + "' (ID: "+id+")?"
+        message: "Are you sure you want to delete projcet '"+ name + "' (ID: "+id+")?",
+        method: "delete_Project"
       },
       hasBackdrop: true
     })
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
-        this.apiService.deleteProject(id)
+        //this.apiService.deleteProject(id)
       } else {
         console.log("Dialog dismissed")
       }
@@ -129,7 +130,7 @@ export class HomeComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
-        this.apiService.createProject()
+        this.apiService.createProject(result.name, result.description)
       } else {
         console.log("Dialog dismissed")
       }

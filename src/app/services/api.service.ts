@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { OAuthService } from 'angular-oauth2-oidc';
+import { ConfigService } from './config.service';
 
 
 @Injectable({
@@ -8,15 +9,18 @@ import { OAuthService } from 'angular-oauth2-oidc';
 })
 
 export class ApiService {
-  gateway_url = "https://gateway.core-server-dev.m1.k8s.computational.bio/api/v1"
+  gateway_url = ""
   public projects: any
   public apiKeys: any
   public project = {project: {}, datasets: []}
+  public users: any
 
   constructor(
     private http: HttpClient,
-    private oauthService: OAuthService
+    private oauthService: OAuthService,
+    private configService: ConfigService
   ) {
+    this.gateway_url = this.configService.gateway_url
     this.projects = []
   }
 
@@ -24,7 +28,7 @@ export class ApiService {
     return {
       headers: new HttpHeaders({
         "Grpc-Metadata-accesskey": this.oauthService.getAccessToken(),
-        "Grpc-Metadata-API_TOKEN": "mP0JFfX1OR2h+h6YID85X2jUrLxkXf1/0JnT1G1XKUFzaiET6ngHNr4E0Mrq"
+        "Grpc-Metadata-API_TOKEN": "x6EXNHhioasEnYw8e6Fy9PvMDd1Ea5edmatKqI70a25osXvE5suAh+3+4QMI"
       })
     }
   }
@@ -40,9 +44,9 @@ export class ApiService {
     })
   }
 
-  createProject() {
+  createProject(name, description) {
     //console.log(this.oauthService.getIdentityClaims())
-    var post_object = { name: "dummy", desription: "just a dummy project", metadata: [], labels: [] }
+    var post_object = { name: name, desription: description, metadata: [], labels: [] }
     this.http.post(this.gateway_url + "/project/createproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
       console.log(res)
     })
@@ -73,6 +77,10 @@ export class ApiService {
     })
   }
 
+
+  addUsertoProject(user_id, project_id){
+
+  }
 
   //Functions for apiKey handling
   getApiKeys() {

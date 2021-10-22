@@ -36,7 +36,7 @@ export class ProjectOverviewComponent implements OnInit {
     private router: Router,
     public dialog: MatDialog,
     private snackBar: MatSnackBar,
-    private apiService: ApiService
+    public apiService: ApiService
   ) {
     console.log(this.apiService.project)
     this.displayedColumns=["id", "name", "description","details", "delete"]

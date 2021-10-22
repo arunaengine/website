@@ -36,8 +36,10 @@ function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
     return new Promise<boolean>((resolve: (a: boolean) => void): void => {
       http.get("assets/config/config.json").pipe(
-           map((x: ConfigService) => {
+           map((x: any) => {
+             //console.log(x)
              config.auth_config = x.auth_config;
+             config.gateway_url = x.api_config.gateway_url
              resolve(true);
            }),
            catchError((x: { status: number }, caught: Observable<void>): ObservableInput<{}> => {
