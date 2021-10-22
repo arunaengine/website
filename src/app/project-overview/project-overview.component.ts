@@ -7,6 +7,7 @@ import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.compo
 import { CreateProjectComponent } from '../dialogs/create-project/create-project.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatPaginator } from '@angular/material/paginator';
+import { ApiService } from '../services/api.service';
 
 @Component({
   selector: 'app-project-overview',
@@ -34,10 +35,12 @@ export class ProjectOverviewComponent implements OnInit {
   constructor(
     private router: Router,
     public dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private apiService: ApiService
   ) {
-    this.displayedColumns=["id", "name", "datatype","details", "delete"]
-    this.dataset_table = new MatTableDataSource(this.dummy)
+    console.log(this.apiService.project)
+    this.displayedColumns=["id", "name", "description","details", "delete"]
+    this.dataset_table = new MatTableDataSource(this.apiService.project.datasets)
    }
 
   ngOnInit(): void {

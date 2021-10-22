@@ -61,7 +61,7 @@
     <ng-container matColumnDef="details">
         <th mat-header-cell *matHeaderCellDef> Go to Project </th>
         <td mat-cell *matCellDef="let element">
-            <button mat-raised-button color="primary" (click)="viewProject(element.id)">To Project</button>
+            <button mat-raised-button color="primary" (click)="viewProject(element)">To Project</button>
         </td>
     </ng-container>
     <ng-container matColumnDef="generateKeys">

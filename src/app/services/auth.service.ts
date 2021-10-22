@@ -34,7 +34,6 @@ export class AuthService {
     scope: "openid profile email groups",
     showDebugInformation: true,
     oidc: true,
-
   }
 
   public user_data: any

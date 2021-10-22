@@ -59,8 +59,8 @@ export class HomeComponent implements OnInit {
     const filterValue = (event.target as HTMLInputElement).value;
     this.project_table.filter = filterValue.trim().toLowerCase();
   }
-  viewKeys(element){
 
+  viewKeys(element){
     console.log("View API Keys for ", element.id)
     var project_apiKeys = []
     this.apiService.getApiKeys().then(()=> {
@@ -111,9 +111,13 @@ export class HomeComponent implements OnInit {
     })
   }
 
-  viewProject(id){
-    console.log("View Project", id)
+  async viewProject(element){
+    console.log("View Project", element.id)
+    await this.apiService.viewSingleProject(element.id)
+    await this.apiService.getDatasetsforProject(element.id)
     this.router.navigate(["/project_overview"])
+    
+    
   }
 
   createProject(){

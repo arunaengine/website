@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { AuthService } from './auth.service';
 import { OAuthService } from 'angular-oauth2-oidc';
 
 
@@ -12,10 +11,10 @@ export class ApiService {
   gateway_url = "https://gateway.core-server-dev.m1.k8s.computational.bio/api/v1"
   public projects: any
   public apiKeys: any
+  public project = {project: {}, datasets: []}
 
   constructor(
     private http: HttpClient,
-    private authService: AuthService,
     private oauthService: OAuthService
   ) {
     this.projects = []
@@ -52,6 +51,25 @@ export class ApiService {
   deleteProject(projcet_id) {
     this.http.get(this.gateway_url + "/project/" + projcet_id + "/delete", this.configureHeadersAccessKey() ).pipe().subscribe(res => {
       console.log(res)
+    })
+  }
+
+  viewSingleProject(id){
+    return new Promise(resolve => {
+      this.http.get(this.gateway_url +"/project/"+ id, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        this.project.project = res["project"]
+        resolve("done")
+      })
+    })
+  }
+  getDatasetsforProject(id){
+    return new Promise(resolve => {
+      this.http.get(this.gateway_url +"/project/"+ id+"/projectdatasets", this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        this.project.datasets = res["dataset"]
+        resolve("done")
+      })
     })
   }
 
