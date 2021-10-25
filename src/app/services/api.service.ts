@@ -46,10 +46,14 @@ export class ApiService {
 
   createProject(name, description) {
     //console.log(this.oauthService.getIdentityClaims())
-    var post_object = { name: name, desription: description, metadata: [], labels: [] }
-    this.http.post(this.gateway_url + "/project/createproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-      console.log(res)
+    return new Promise(resolve => {
+      var post_object = { name: name, desription: description, metadata: [], labels: [] }
+          this.http.post(this.gateway_url + "/project/createproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+            console.log(res)
+            resolve("")
+          })
     })
+    
   }
 
   deleteProject(projcet_id) {
