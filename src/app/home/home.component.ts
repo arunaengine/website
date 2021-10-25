@@ -35,7 +35,7 @@ export class HomeComponent implements OnInit {
     
     this.project_table = new MatTableDataSource(this.apiService.projects)
 
-    this.displayedColumns=["name", "description", "id", "details","generateKeys", "deleteProjects"]
+    this.displayedColumns=["name", "description", "id", "generateKeys", "deleteProjects","details"]
     
     
     console.log(this.project_table)

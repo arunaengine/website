@@ -31,6 +31,7 @@ import {MatPaginatorModule} from '@angular/material/paginator';
 import { ConfigService } from './services/config.service';
 import { of, Observable, ObservableInput } from '../../node_modules/rxjs';
 import { map, catchError } from 'rxjs/operators';
+import { DetailsDialogComponent } from './dialogs/details-dialog/details-dialog.component';
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -65,6 +66,7 @@ export function storageFactory() : OAuthStorage {
     AlertDialogComponent,
     ProjectTokensComponent,
     ProjectOverviewComponent,
+    DetailsDialogComponent,
   ],
   imports: [
     BrowserModule,

@@ -147,4 +147,15 @@ export class ApiService {
       })
     })
   }
+
+  getDetails(dataset_id) {
+    return new Promise(resolve => {
+      var post_object = { id: dataset_id }
+    this.http.post(this.gateway_url + "/dataset/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+      //console.log(res)
+      resolve(res)
+    })
+    })
+  }
+
 }

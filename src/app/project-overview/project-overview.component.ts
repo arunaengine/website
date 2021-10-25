@@ -8,6 +8,7 @@ import { CreateProjectComponent } from '../dialogs/create-project/create-project
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatPaginator } from '@angular/material/paginator';
 import { ApiService } from '../services/api.service';
+import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog.component';
 
 @Component({
   selector: 'app-project-overview',
@@ -117,6 +118,14 @@ export class ProjectOverviewComponent implements OnInit {
   }
   viewDetails(id){
     console.log("See Details...")
+    this.apiService.getDetails(id).then(res => {
+      const dialogRef = this.dialog.open(DetailsDialogComponent, {
+        data: {
+          details: res
+        },
+        hasBackdrop: true
+      })
+    })
   }
 
  async refreshDatasets(){
