@@ -5,7 +5,7 @@
 <div mat-dialog-content>
     {{data.message}}
     <div *ngIf="data.method == 'delete_Project'">
-        <mat-label>Enter 'DELETE' to delete Project.</mat-label>
+        <mat-label>Enter 'DELETE' to delete project.</mat-label>
         <mat-form-field appearance="fill" class="example-form" color="warn">
             <mat-label>DELETE</mat-label>
             <input type="text" matInput (keyup)="activate_delete()" [(ngModel)]="delete_input" placeholder="" >

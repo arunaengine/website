@@ -1,4 +1,5 @@
 /* You can add global styles to this file, and also import other style files */
+
 @use '~@angular/material' as mat;
 
 @include mat.core();
@@ -61,10 +62,10 @@ $dark-theme: mat.define-dark-theme((
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 .warning-snackbar {
-    background: #eb7609;
+    background: #da5a5a;
     color: #000000;
   }
 .success-snackbar {
-    background: #279e03;
+    background: #383838;
     color: #ffffff;
 }

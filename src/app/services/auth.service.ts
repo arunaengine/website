@@ -52,13 +52,14 @@ export class AuthService {
   }
 
   configueAuthentication() {
-    this.oauthService.events.subscribe(event => {
+    /*this.oauthService.events.subscribe(event => {
       if (event instanceof OAuthErrorEvent) {
         console.error(event);
       } else {
         console.warn(event);
       }
     });
+    */
     console.log("creating config and try login...")
     this.oauthService.configure(this.config.auth_config)
     this.oauthService.setupAutomaticSilentRefresh()

@@ -32,7 +32,7 @@ export class ProjectOverviewComponent implements OnInit {
     public apiService: ApiService
   ) {
     console.log(this.apiService.project)
-    this.displayedColumns=["id", "name", "description","details", "delete"]
+    this.displayedColumns=[ "name", "description","id","details","version", "delete", "objectgroup"]
     this.dataset_table = new MatTableDataSource(this.apiService.project.datasets)
    }
 
@@ -128,12 +128,21 @@ export class ProjectOverviewComponent implements OnInit {
     })
   }
 
+  viewVersion(id){
+    console.log("See versions...")
+    //this.apiService.viewDatasetVersion(id)
+  }
+
+  toObjectGroups(id){
+    console.log("See ObjectGroups..." + id)
+    console.log(this.apiService.viewObjectGroups(id))
+  }
+
  async refreshDatasets(){
   await this.apiService.viewSingleProject(this.apiService.project.project["id"])
   await this.apiService.getDatasetsforProject(this.apiService.project.project["id"])
       this.dataset_table = new MatTableDataSource(this.apiService.project.datasets)
       this.dataset_table.paginator = this.paginator
       this.dataset_table.sort = this.sort
-    
   }
 }

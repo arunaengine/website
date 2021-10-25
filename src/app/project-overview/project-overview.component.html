@@ -15,10 +15,13 @@
                 </mat-card-title>
             </mat-card-header>
             <mat-card-content>
-                <mat-list role="list">
-                    <mat-list-item role="listitem">Number of Datasets: XX</mat-list-item>
-                    <mat-list-item role="listitem">Stat 2</mat-list-item>
-                    <mat-list-item role="listitem">Stat 3</mat-list-item>
+                <mat-list >
+                    <mat-list-item style="height: 40px;"><mat-icon>bar_chart</mat-icon>
+                        Number of Datasets: {{apiService.project.datasets.length}}</mat-list-item>
+                    <mat-list-item style="height: 40px;"><mat-icon>bar_chart</mat-icon>
+                        Stat 2</mat-list-item>
+                    <mat-list-item style="height: 40px;"><mat-icon>bar_chart</mat-icon>
+                        Stat 3</mat-list-item>
                 </mat-list>
             </mat-card-content>
             <mat-card-actions>
@@ -36,10 +39,13 @@
             <mat-card-content>
                 <div fxLayout="row" fxFlex="100" fxLayoutAlign="space-around start">
                     <div fxLayout="column">
-                        <mat-list role="list">
-                            <mat-list-item role="listitem">User 1</mat-list-item>
-                            <mat-list-item role="listitem">User 2</mat-list-item>
-                            <mat-list-item role="listitem">User 3</mat-list-item>
+                        <mat-list >
+                            <mat-list-item style="height: 40px;"><mat-icon>person</mat-icon>
+                                User 1</mat-list-item>
+                            <mat-list-item style="height: 40px;"><mat-icon>person</mat-icon>
+                                User 2</mat-list-item>
+                            <mat-list-item style="height: 40px;"><mat-icon>person</mat-icon>
+                                User 3</mat-list-item>
                         </mat-list>
                     </div>
                     <div fxLayout="column">
@@ -93,6 +99,20 @@
         <td mat-cell *matCellDef="let element">
             <button mat-icon-button color="warn" (click)="deleteDataset(element.name, element.id)">
                 <mat-icon>delete_forever</mat-icon></button>
+        </td>
+    </ng-container>
+    <ng-container matColumnDef="version">
+        <th mat-header-cell *matHeaderCellDef> View Versions </th>
+        <td mat-cell *matCellDef="let element">
+            <button mat-icon-button color="primary" (click)="viewVersion(element.id)">
+                <mat-icon>history</mat-icon></button>
+        </td>
+    </ng-container>
+    <ng-container matColumnDef="objectgroup">
+        <th mat-header-cell *matHeaderCellDef> Go to Object Groups </th>
+        <td mat-cell *matCellDef="let element">
+            <button mat-icon-button color="primary" (click)="toObjectGroups(element.id)">
+                <mat-icon>arrow_forward</mat-icon></button>
         </td>
     </ng-container>
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>

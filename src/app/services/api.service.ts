@@ -158,4 +158,24 @@ export class ApiService {
     })
   }
 
+  /*viewDatasetVersion(dataset_id){
+    return new Promise(resolve => {
+      var post_object = { id: dataset_id }
+    this.http.post(this.gateway_url + "/datasetversion/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+      console.log(res)
+      resolve(res)
+    })
+    })
+  }*/
+
+  viewObjectGroups(dataset_id){
+    return new Promise(resolve => {
+      var post_object = { id: dataset_id }
+    this.http.post(this.gateway_url + "/objectgroup/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+      console.log(res)
+      resolve(res)
+    })
+    })
+  }
+
 }

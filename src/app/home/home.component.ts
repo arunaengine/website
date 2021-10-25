@@ -26,7 +26,7 @@ export class HomeComponent implements OnInit {
     public dialog: MatDialog,
     private router: Router,
     public authService: AuthService,
-    private apiService: ApiService
+    public apiService: ApiService
   ) { 
     this.apiService.getProjects().then(()=> {
     
@@ -47,7 +47,7 @@ export class HomeComponent implements OnInit {
 
   ngAfterViewInit():void{
     this.project_table.sort = this.sort
-    console.log(this.apiService.projects.length)
+    
   }
 
   applyFilter(event: Event) {
@@ -93,7 +93,7 @@ export class HomeComponent implements OnInit {
       data:{
         title: "Delete Project?",
         button: "Delete Project",
-        message: "Are you sure you want to delete projcet '"+ name + "' (ID: "+id+")?",
+        message: "Are you sure you want to delete project '"+ name + "' (ID: "+id+")?",
         method: "delete_Project"
       },
       hasBackdrop: true

@@ -4,13 +4,24 @@
     </button>
     Details - {{data.details.dataset.name}}
 </h1>
-<mat-list role="list">
-                    <mat-list-item role="listitem">Created: {{data.details.dataset.created | date: "HH:mm.ss, dd. MMM yyyy"}}</mat-list-item>
-                    <mat-list-item role="listitem">ID: {{data.details.dataset.id}}
-                        <button [cdkCopyToClipboard]="data.details.dataset.id" mat-icon-button color="primary" 
-                        >
-                            <mat-icon>content_copy</mat-icon>
-                        </button>
-                    </mat-list-item>
-                    <mat-list-item role="listitem">Description: <br>{{data.details.dataset.description}}</mat-list-item>
-                </mat-list>
+<div mat-dialog-content>
+    <mat-list >
+        <mat-list-item >
+            <mat-icon>create</mat-icon>
+            Created: {{data.details.dataset.created | date: "HH:mm.ss, dd. MMM yyyy"}}
+        </mat-list-item>
+        <mat-list-item >
+            <mat-icon>fingerprint</mat-icon>
+            ID: {{data.details.dataset.id}}
+            <button [cdkCopyToClipboard]="data.details.dataset.id" mat-icon-button color="primary">
+                <mat-icon>content_copy</mat-icon>
+            </button>
+        </mat-list-item>
+        <mat-list-item >
+            <mat-icon>local_offer</mat-icon>
+            Datasettype: .xxx</mat-list-item>
+        <mat-list-item >
+            <mat-icon>description</mat-icon>
+            Description: <br>{{data.details.dataset.description}}</mat-list-item>
+    </mat-list>
+</div>
