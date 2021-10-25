@@ -21,24 +21,27 @@
                     <mat-card-title>Profile</mat-card-title>
                 </mat-card-header>
                 <mat-card-content>
-                    <mat-list >
-                        <mat-list-item  style="height: 40px;">
+                    <mat-list>
+                        <mat-list-item style="height: 40px;">
                             <mat-icon>login</mat-icon>
                             Logged in as User: {{authService.user_data.preferred_username}}
                         </mat-list-item>
-                        <mat-list-item  style="height: 40px;">
+                        <mat-list-item style="height: 40px;">
                             <mat-icon>person</mat-icon>
                             Name: {{authService.user_data.name}}
                         </mat-list-item>
-                        <mat-list-item  style="height: 40px;">
+                        <mat-list-item style="height: 40px;">
                             <mat-icon>alternate_email</mat-icon>
                             Email: {{authService.user_data.email}}
                         </mat-list-item>
-                        <mat-list-item  style="height: 40px;">
+                        <mat-list-item style="height: 40px;">
                             <mat-icon>fingerprint</mat-icon>
-                            User ID: xxx-XXX-xxx
+                            User ID: {{authService.user_data.sub}}
+                            <button [cdkCopyToClipboard]="authService.user_data.sub" mat-icon-button color="primary">
+                            <mat-icon>content_copy</mat-icon>
+                            </button>
                         </mat-list-item>
-                        <mat-list-item  style="height: 40px;">
+                        <mat-list-item style="height: 40px;">
                             <mat-icon>bar_chart</mat-icon>
                             Number of Projects: {{apiService.projects.length}}
                         </mat-list-item>
