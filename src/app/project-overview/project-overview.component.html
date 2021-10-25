@@ -2,7 +2,11 @@
     <button mat-icon-button color="secondary" (click)="goBack()">
         <mat-icon>arrow_back</mat-icon>
     </button>
-    BioData DB - {{apiService.project.project["name"]}}
+    <span>BioData DB - {{apiService.project.project["name"]}}</span>
+    <span class="example-spacer"></span>
+    <button mat-icon-button color="secondary" (click)=openProfile()>
+        <mat-icon>person</mat-icon>
+    </button>
 </mat-toolbar>
 
 

@@ -32,6 +32,7 @@ import { ConfigService } from './services/config.service';
 import { of, Observable, ObservableInput } from '../../node_modules/rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { DetailsDialogComponent } from './dialogs/details-dialog/details-dialog.component';
+import { ProfileDialogComponent } from './dialogs/profile-dialog/profile-dialog.component';
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -67,6 +68,7 @@ export function storageFactory() : OAuthStorage {
     ProjectTokensComponent,
     ProjectOverviewComponent,
     DetailsDialogComponent,
+    ProfileDialogComponent,
   ],
   imports: [
     BrowserModule,

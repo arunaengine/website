@@ -9,6 +9,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatPaginator } from '@angular/material/paginator';
 import { ApiService } from '../services/api.service';
 import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog.component';
+import { ProfileDialogComponent } from '../dialogs/profile-dialog/profile-dialog.component';
 
 @Component({
   selector: 'app-project-overview',
@@ -144,5 +145,12 @@ export class ProjectOverviewComponent implements OnInit {
       this.dataset_table = new MatTableDataSource(this.apiService.project.datasets)
       this.dataset_table.paginator = this.paginator
       this.dataset_table.sort = this.sort
+  }
+
+  openProfile(){
+    const dialogRef = this.dialog.open(ProfileDialogComponent, {
+      position: {right: "10px", top: "10px"},
+      hasBackdrop: true
+    })
   }
 }
