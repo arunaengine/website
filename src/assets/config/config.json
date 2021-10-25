@@ -10,8 +10,7 @@
         "oidc":true
     },
     "api_config": {
-        "gateway_url": "https://gateway.core-server-dev.m1.k8s.computational.bio/api/v1",
-        "api_key": "x6EXNHhioasEnYw8e6Fy9PvMDd1Ea5edmatKqI70a25osXvE5suAh+3+4QMI"
+        "gateway_url": "https://gateway.core-server-dev.m1.k8s.computational.bio/api/v1"
     }
     
 }

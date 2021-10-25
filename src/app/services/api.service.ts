@@ -28,7 +28,6 @@ export class ApiService {
     return {
       headers: new HttpHeaders({
         "Grpc-Metadata-accesstoken": this.oauthService.getAccessToken(),
-        //"Grpc-Metadata-API_TOKEN": this.configService.api_key
       })
     }
   }
