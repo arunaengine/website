@@ -55,7 +55,8 @@ export class ProjectTokensComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
-        this.apiService.deleteApiKey(id).then(()=> this.refreshKeys())
+        this.apiService.deleteApiKey(id).then(()=> {
+          this.refreshKeys()})
       } else {
         console.log("Dialog dismissed")
       }
