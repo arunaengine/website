@@ -27,8 +27,8 @@ export class ApiService {
   configureHeadersAccessKey() {
     return {
       headers: new HttpHeaders({
-        "Grpc-Metadata-accesskey": this.oauthService.getAccessToken(),
-        "Grpc-Metadata-API_TOKEN": this.configService.api_key
+        "Grpc-Metadata-accesstoken": this.oauthService.getAccessToken(),
+        //"Grpc-Metadata-API_TOKEN": this.configService.api_key
       })
     }
   }
@@ -114,6 +114,17 @@ export class ApiService {
         console.log(res_added)
       })
     })
+  }
+
+  createDataset(name, description){
+    return new Promise(resolve => {
+      var post_object = { name: name, desription: description, projectId: this.project.project["id"], metadata: [], labels: [] }
+    this.http.post(this.gateway_url + "/dataset/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+      console.log(res)
+      resolve("")
+    })
+    })
+    
   }
 
   deleteDataset(dataset_id){

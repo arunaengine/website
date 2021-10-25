@@ -90,6 +90,8 @@ export class ProjectOverviewComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
+        this.apiService.createDataset(result.name, result.description).then(()=> {
+          this.refreshDatasets()})
       } else {
         console.log("Dialog dismissed")
       }
