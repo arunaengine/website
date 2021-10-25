@@ -12,5 +12,4 @@
     "api_config": {
         "gateway_url": "https://gateway.core-server-dev.m1.k8s.computational.bio/api/v1"
     }
-    
 }
