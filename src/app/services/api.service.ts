@@ -84,8 +84,14 @@ export class ApiService {
   }
 
 
-  addUsertoProject(user_id, project_id){
-
+  addUsertoProject(user_id){
+    return new Promise(resolve => {
+      var post_object = { user_id: user_id, scope: ["READ", "WRITE"], projectId: this.project.project["id"]}
+    this.http.post(this.gateway_url + "/project/addusertoproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+      console.log(res)
+      resolve("")
+    })
+    })
   }
 
   //Functions for apiKey handling

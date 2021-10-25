@@ -21,10 +21,7 @@ export class HomeComponent implements OnInit {
 
   project_table: any
   displayedColumns: string[]
-  dummy_data = [
-    {name: "Dummy1", description: "Some Dummy dataset", id: "007"},
-    {name: "Dummy2", description: "Second Dummy dataset", id: "2042"}
-  ]
+
   constructor(
     public dialog: MatDialog,
     private router: Router,
@@ -32,8 +29,6 @@ export class HomeComponent implements OnInit {
     private apiService: ApiService
   ) { 
     this.apiService.getProjects().then(()=> {
-     // this.apiService.projects.push({name: "Dummy1", description: "Some Dummy dataset", id: "007"})
-    //this.apiService.projects.push({name: "Dummy2", description: "Second Dummy dataset", id: "2042"})
     
     this.project_table = new MatTableDataSource(this.apiService.projects)
     })
@@ -52,6 +47,7 @@ export class HomeComponent implements OnInit {
 
   ngAfterViewInit():void{
     this.project_table.sort = this.sort
+    console.log(this.apiService.projects.length)
   }
 
   applyFilter(event: Event) {

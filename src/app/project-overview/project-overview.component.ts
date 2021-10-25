@@ -22,15 +22,7 @@ export class ProjectOverviewComponent implements OnInit {
   dataset_table: any
   user_id =""
   displayedColumns: string[]
-  dummy= [
-    {id: "001", name: "dyinglight", datatype: "story"},
-    {id: "002", name: "bf2042", datatype: "fps"},
-    {id: "003", name: "bf2042", datatype: "fps"},
-    {id: "004", name: "bf2042", datatype: "fps"},
-    {id: "005", name: "bf2042", datatype: "fps"},
-    {id: "006", name: "bf2042", datatype: "fps"},
-    {id: "007", name: "bf2042", datatype: "fps"}
-  ]
+
 
   constructor(
     private router: Router,
@@ -104,13 +96,14 @@ export class ProjectOverviewComponent implements OnInit {
       data:{
         title: "Add User to Project?",
         button: "Add User",
-        message: "Are you sure you want to add user '" + this.user_id + "' to project_name?"
+        message: "Are you sure you want to add user '" + this.user_id + "' to "+ this.apiService.project.project["name"]+"?"
       },
       hasBackdrop: true
     })
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
+        this.apiService.addUsertoProject(this.user_id)
       } else {
         console.log("Dialog dismissed")
       }

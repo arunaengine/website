@@ -7,7 +7,7 @@
         </mat-form-field>
         <mat-form-field appearance="fill" class="example-form">
             <mat-label>Description</mat-label>
-            <input type="text" matInput (keyup)="validProject()" [(ngModel)]="new_project.description" placeholder="This is an Example Project" >
+            <input type="text" matInput (keyup)="validProject()" [(ngModel)]="new_project.description" placeholder="This is an example {{data.type}}" >
         </mat-form-field>
 
 <div mat-dialog-actions>
