@@ -106,7 +106,6 @@ export class ApiService {
         this.getApiKeys().then(() => {
           resolve("done")
         })
-
       })
     })
   }
@@ -115,6 +114,10 @@ export class ApiService {
     return new Promise(resolve => {
       this.http.delete(this.gateway_url + "/apitoken/" + token_id + "/delete", this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
         console.log(res_added)
+        this.getApiKeys().then(()=> {
+          resolve("")
+        })
+        
       })
     })
   }
