@@ -134,9 +134,9 @@ export class ProjectOverviewComponent implements OnInit {
     //this.apiService.viewDatasetVersion(id)
   }
 
-  toObjectGroups(id){
-    console.log("See ObjectGroups..." + id)
-    this.apiService.viewObjectGroups(id).then(()=> {
+  toObjectGroups(element){
+    console.log("See ObjectGroups..." + element)
+    this.apiService.viewObjectGroups(element).then(()=> {
       this.router.navigate(["/groups"])
     })
     

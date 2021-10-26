@@ -37,6 +37,7 @@ import { DetailsDialogComponent } from './dialogs/details-dialog/details-dialog.
 import { ProfileDialogComponent } from './dialogs/profile-dialog/profile-dialog.component';
 import { GroupsOverviewComponent } from './groups-overview/groups-overview.component';
 import { CreateObjgroupComponent } from './dialogs/create-objgroup/create-objgroup.component';
+import { CreateObjectComponent } from './dialogs/create-object/create-object.component';
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -75,6 +76,7 @@ export function storageFactory() : OAuthStorage {
     ProfileDialogComponent,
     GroupsOverviewComponent,
     CreateObjgroupComponent,
+    CreateObjectComponent,
   ],
   imports: [
     BrowserModule,

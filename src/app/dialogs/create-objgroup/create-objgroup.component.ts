@@ -1,5 +1,7 @@
 import { Component, OnInit } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { CreateObjectComponent } from '../create-object/create-object.component';
 //import {MatDatepickerModule} from '@angular/material/datepicker';
 
 @Component({
@@ -9,7 +11,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 })
 export class CreateObjgroupComponent implements OnInit {
   disabled = true
-  new_objgroup= {
+  new_objgroup = {
     name: "",
     description: "",
     generated: "",
@@ -20,33 +22,61 @@ export class CreateObjgroupComponent implements OnInit {
     objects: []
   }
   generated_date: any
-  label= {
+  label = {
     key: "",
     value: ""
   }
-  constructor(private snackBar: MatSnackBar) { }
+  constructor(private snackBar: MatSnackBar, private dialog: MatDialog) { }
 
   ngOnInit(): void {
   }
-  logME(){
+  logME() {
     console.log(this.new_objgroup, this.generated_date)
   }
-  addtoObject(){
-    this.new_objgroup.generated= this.generated_date
+  addtoObject() {
+    this.new_objgroup.generated = this.generated_date
   }
-  addtoLabels(){
-    if (this.label.key!="" && this.label.value!=""){
-      this.new_objgroup.labels.push(this.label)
-    this.label = {
-      key: "",
-      value: ""
+  addtoLabels() {
+    var add = true
+    for (let label_inObj of this.new_objgroup.labels) {
+      if (label_inObj.key == this.label.key) {
+        add = false
+      }
     }
-    }else {
-      this.snackBar.open("Key or Value can't be empty.","",{
+    if (this.label.key != "" && this.label.value != "") {
+      if (add) {
+        this.new_objgroup.labels.push(this.label)
+        this.label = {
+          key: "",
+          value: ""
+        }
+      } else {
+        this.snackBar.open("Key already in use.", "", {
+          duration: 3000,
+          panelClass: ["warning-snackbar"]
+        })
+      }
+    } else {
+      this.snackBar.open("Key or Value can't be empty.", "", {
         duration: 3000,
         panelClass: ["warning-snackbar"]
       })
     }
-    
+  }
+  deleteLabel(index) {
+    this.new_objgroup.labels.splice(index, 1)
+  }
+  createObject(){
+    const dialogRef = this.dialog.open(CreateObjectComponent,
+      {hasBackdrop: true,
+      disableClose: true
+    })
+    dialogRef.afterClosed().subscribe(result => {
+      if (result){
+        console.log("Dialog closed: ", result)
+      } else {
+        console.log("Dialog dismissed")
+      }
+    })
   }
 }

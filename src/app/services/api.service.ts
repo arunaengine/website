@@ -12,8 +12,9 @@ export class ApiService {
   gateway_url = ""
   public projects: any
   public apiKeys: any
-  public project = {project: {}, datasets: []}
+  public project = { project: {}, datasets: [] }
   public users: any
+  public dataset: any
   public obj_groups: []
 
   constructor(
@@ -48,35 +49,35 @@ export class ApiService {
     //console.log(this.oauthService.getIdentityClaims())
     return new Promise(resolve => {
       var post_object = { name: name, desription: description, metadata: [], labels: [] }
-          this.http.post(this.gateway_url + "/project/createproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-            console.log(res)
-            resolve("")
-          })
+      this.http.post(this.gateway_url + "/project/createproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        resolve("")
+      })
     })
-    
+
   }
 
   deleteProject(projcet_id) {
     return new Promise(resolve => {
-      this.http.get(this.gateway_url + "/project/" + projcet_id + "/delete", this.configureHeadersAccessKey() ).pipe().subscribe(res => {
-      console.log(res)
-      resolve("done")
-    })
+      this.http.get(this.gateway_url + "/project/" + projcet_id + "/delete", this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        resolve("done")
+      })
     })
   }
 
-  viewSingleProject(id){
+  viewSingleProject(id) {
     return new Promise(resolve => {
-      this.http.get(this.gateway_url +"/project/"+ id, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+      this.http.get(this.gateway_url + "/project/" + id, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         this.project.project = res["project"]
         resolve("done")
       })
     })
   }
-  getDatasetsforProject(id){
+  getDatasetsforProject(id) {
     return new Promise(resolve => {
-      this.http.get(this.gateway_url +"/project/"+ id+"/projectdatasets", this.configureHeadersAccessKey()).pipe().subscribe(res => {
+      this.http.get(this.gateway_url + "/project/" + id + "/projectdatasets", this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         this.project.datasets = res["dataset"]
         resolve("done")
@@ -85,13 +86,13 @@ export class ApiService {
   }
 
 
-  addUsertoProject(user_id){
+  addUsertoProject(user_id) {
     return new Promise(resolve => {
-      var post_object = { user_id: user_id, scope: ["READ", "WRITE"], projectId: this.project.project["id"]}
-    this.http.post(this.gateway_url + "/project/addusertoproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-      console.log(res)
-      resolve("")
-    })
+      var post_object = { user_id: user_id, scope: ["READ", "WRITE"], projectId: this.project.project["id"] }
+      this.http.post(this.gateway_url + "/project/addusertoproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        resolve("")
+      })
     })
   }
 
@@ -121,26 +122,26 @@ export class ApiService {
     return new Promise(resolve => {
       this.http.delete(this.gateway_url + "/apitoken/" + token_id + "/delete", this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
         console.log(res_added)
-        this.getApiKeys().then(()=> {
+        this.getApiKeys().then(() => {
           resolve("")
         })
-        
+
       })
     })
   }
 
-  createDataset(name, description){
+  createDataset(name, description) {
     return new Promise(resolve => {
       var post_object = { name: name, desription: description, projectId: this.project.project["id"], metadata: [], labels: [] }
-    this.http.post(this.gateway_url + "/dataset/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-      console.log(res)
-      resolve("")
+      this.http.post(this.gateway_url + "/dataset/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        resolve("")
+      })
     })
-    })
-    
+
   }
 
-  deleteDataset(dataset_id){
+  deleteDataset(dataset_id) {
     return new Promise(resolve => {
       this.http.delete(this.gateway_url + "/dataset/" + dataset_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
         console.log(res_added)
@@ -152,10 +153,10 @@ export class ApiService {
   getDetails(dataset_id) {
     return new Promise(resolve => {
       var post_object = { id: dataset_id }
-    this.http.post(this.gateway_url + "/dataset/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-      //console.log(res)
-      resolve(res)
-    })
+      this.http.post(this.gateway_url + "/dataset/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        //console.log(res)
+        resolve(res)
+      })
     })
   }
 
@@ -169,14 +170,27 @@ export class ApiService {
     })
   }*/
 
-  viewObjectGroups(dataset_id){
+  viewObjectGroups(element) {
     return new Promise(resolve => {
-      var post_object = { id: dataset_id }
-    this.http.post(this.gateway_url + "/dataset/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-      console.log(res)
-      this.obj_groups = res["objectGroups"]
-      resolve("")
+      var post_object = { id: element.id }
+      this.http.post(this.gateway_url + "/dataset/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        this.obj_groups = res["objectGroups"]
+        this.dataset = element
+        resolve("")
+      })
     })
+  }
+  createObjectGroup(dataset_id, new_objgroup) {
+    return new Promise(resolve => {
+      var post_object = new_objgroup
+      post_object["datasetId"]= dataset_id
+      console.log(post_object)
+      this.http.post(this.gateway_url + "/objectgroup/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        
+        resolve("")
+      })
     })
   }
 

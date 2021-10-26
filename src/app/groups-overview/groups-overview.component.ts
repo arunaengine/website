@@ -63,6 +63,14 @@ export class GroupsOverviewComponent implements OnInit {
       {hasBackdrop: true,
         disableClose: true
       })
+      dialogRef.afterClosed().subscribe(result => {
+        if (result){
+          console.log("Dialog closed: ", result)
+          this.apiService.createObjectGroup(this.apiService.dataset.id, result)
+        } else {
+          console.log("Dialog dismissed")
+        }
+      })
   }
   openSnackBar(){
     this.snackBar.open("ID copied to Clipboard.","",{

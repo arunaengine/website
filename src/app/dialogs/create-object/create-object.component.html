@@ -1,0 +1,27 @@
+<h1 mat-dialog-title color="primary">
+    <button mat-icon-button mat-dialog-close color="primary">
+        <mat-icon>close</mat-icon>
+    </button>
+    Create Object
+</h1>
+
+<div mat-dialog-content>
+
+    <mat-form-field appearance="fill" class="example-form">
+        <mat-label>Name</mat-label>
+        <input type="text" matInput [(ngModel)]="new_obj.name" placeholder="Example1">
+    </mat-form-field>
+    <mat-form-field appearance="fill" class="example-form">
+        <mat-label>Filetype</mat-label>
+        <input type="text" matInput [(ngModel)]="new_obj.filetype" placeholder="Example1">
+    </mat-form-field>
+
+    
+        
+        
+    
+</div>
+
+<div mat-dialog-actions>
+    <button mat-raised-button color="primary" [mat-dialog-close]="new_obj">Generate</button>
+</div>
