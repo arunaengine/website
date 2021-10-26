@@ -171,7 +171,7 @@ export class ApiService {
   viewObjectGroups(dataset_id){
     return new Promise(resolve => {
       var post_object = { id: dataset_id }
-    this.http.post(this.gateway_url + "/objectgroup/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+    this.http.post(this.gateway_url + "/dataset/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
       console.log(res)
       resolve(res)
     })

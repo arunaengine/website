@@ -9,6 +9,7 @@ import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { ApiService } from '../services/api.service';
 import { ProfileDialogComponent } from '../dialogs/profile-dialog/profile-dialog.component';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 
 @Component({
@@ -27,7 +28,8 @@ export class HomeComponent implements OnInit {
     public dialog: MatDialog,
     private router: Router,
     public authService: AuthService,
-    public apiService: ApiService
+    public apiService: ApiService,
+    private snackBar: MatSnackBar
   ) { 
     this.apiService.getProjects().then(()=> {
     
@@ -149,6 +151,12 @@ export class HomeComponent implements OnInit {
     const dialogRef = this.dialog.open(ProfileDialogComponent, {
       position: {right: "10px", top: "10px"},
       hasBackdrop: true
+    })
+  }
+  openSnackBar(){
+    this.snackBar.open("ID copied to Clipboard.","",{
+      duration: 3000,
+      panelClass: ["success-snackbar"]
     })
   }
 }

@@ -15,6 +15,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatTableModule } from '@angular/material/table';
 import {MatInputModule} from '@angular/material/input';
 import {MatDialogModule} from '@angular/material/dialog';
+import {MatDatepickerModule} from '@angular/material/datepicker';
+import {MatNativeDateModule} from '@angular/material/core';
 import { CreateProjectComponent } from './dialogs/create-project/create-project.component';
 import { AlertDialogComponent } from './dialogs/alert-dialog/alert-dialog.component';
 import { ProjectTokensComponent } from './dialogs/project-tokens/project-tokens.component';
@@ -33,6 +35,8 @@ import { of, Observable, ObservableInput } from '../../node_modules/rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { DetailsDialogComponent } from './dialogs/details-dialog/details-dialog.component';
 import { ProfileDialogComponent } from './dialogs/profile-dialog/profile-dialog.component';
+import { GroupsOverviewComponent } from './groups-overview/groups-overview.component';
+import { CreateObjgroupComponent } from './dialogs/create-objgroup/create-objgroup.component';
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -69,6 +73,8 @@ export function storageFactory() : OAuthStorage {
     ProjectOverviewComponent,
     DetailsDialogComponent,
     ProfileDialogComponent,
+    GroupsOverviewComponent,
+    CreateObjgroupComponent,
   ],
   imports: [
     BrowserModule,
@@ -87,6 +93,8 @@ export function storageFactory() : OAuthStorage {
     MatIconModule,
     MatListModule,
     MatPaginatorModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
     ClipboardModule,
     MatSnackBarModule,
     HttpClientModule,
@@ -101,7 +109,7 @@ export function storageFactory() : OAuthStorage {
       ],
     multi: true
   }],AuthGuardService, AuthService,
-    { provide: OAuthStorage, useFactory: storageFactory }
+    { provide: OAuthStorage, useFactory: storageFactory },
   ],
   bootstrap: [AppComponent]
 })

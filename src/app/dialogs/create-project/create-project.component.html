@@ -1,17 +1,19 @@
 <h1 mat-dialog-title color="primary">
     Generate {{data.type}}
 </h1>
-        <mat-form-field appearance="fill" class="example-form">
-            <mat-label>Name</mat-label>
-            <input type="text" matInput (keyup)="validProject()" [(ngModel)]="new_project.name" placeholder="Example1" >
-        </mat-form-field>
-        <mat-form-field appearance="fill" class="example-form">
-            <mat-label>Description</mat-label>
-            <input type="text" matInput (keyup)="validProject()" [(ngModel)]="new_project.description" placeholder="This is an example {{data.type}}" >
-        </mat-form-field>
-
+<div mat-dialog-content>
+    <mat-form-field appearance="fill" class="example-form">
+        <mat-label>Name</mat-label>
+        <input type="text" matInput (keyup)="validProject()" [(ngModel)]="new_project.name" placeholder="Example1">
+    </mat-form-field>
+    <mat-form-field appearance="fill" class="example-form">
+        <mat-label>Description</mat-label>
+        <input type="text" matInput (keyup)="validProject()" [(ngModel)]="new_project.description"
+            placeholder="This is an example {{data.type}}">
+    </mat-form-field>
+</div>
 <div mat-dialog-actions>
-            <button mat-raised-button color="primary" [disabled]="disabled" [mat-dialog-close]="new_project">Generate</button>
-            <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
+    <button mat-raised-button color="primary" [disabled]="disabled" [mat-dialog-close]="new_project">Generate</button>
+    <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
 
 </div>

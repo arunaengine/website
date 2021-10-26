@@ -80,7 +80,7 @@
     <ng-container matColumnDef="id">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> ID </th>
         <td mat-cell *matCellDef="let element"> {{element.id}} 
-            <button [cdkCopyToClipboard]="element.id" mat-icon-button color="primary">
+            <button [cdkCopyToClipboard]="element.id" mat-icon-button color="primary" (click)="openSnackBar()">
                 <mat-icon>content_copy</mat-icon>
                 </button>
         </td>

@@ -137,6 +137,7 @@ export class ProjectOverviewComponent implements OnInit {
   toObjectGroups(id){
     console.log("See ObjectGroups..." + id)
     console.log(this.apiService.viewObjectGroups(id))
+    this.router.navigate(["/groups"])
   }
 
  async refreshDatasets(){
@@ -151,6 +152,12 @@ export class ProjectOverviewComponent implements OnInit {
     const dialogRef = this.dialog.open(ProfileDialogComponent, {
       position: {right: "10px", top: "10px"},
       hasBackdrop: true
+    })
+  }
+  openSnackBar(){
+    this.snackBar.open("ID copied to Clipboard.","",{
+      duration: 3000,
+      panelClass: ["success-snackbar"]
     })
   }
 }

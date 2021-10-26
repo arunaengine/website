@@ -24,7 +24,7 @@
             <mat-list-item style="height: 40px;">
                 <mat-icon>fingerprint</mat-icon>
                 User ID: {{authService.user_data.sub}}
-                <button [cdkCopyToClipboard]="authService.user_data.sub" mat-icon-button color="primary">
+                <button [cdkCopyToClipboard]="authService.user_data.sub" mat-icon-button color="primary" (click)="openSnackBar()">
                 <mat-icon>content_copy</mat-icon>
                 </button>
             </mat-list-item>
