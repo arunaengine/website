@@ -28,21 +28,22 @@ export class CreateObjgroupComponent implements OnInit {
     key: "",
     value: ""
   }
-  
+  label_table: any
   object_table: any
+  labelColumns: string[]
   displayedColumns: string[]
 
   constructor(private snackBar: MatSnackBar, private dialog: MatDialog) {
-    this.displayedColumns=[ "name", "filename","filetype","contentLen", "delete", "uploaded"]
+    this.labelColumns=["key", "value", "delete"]
+    this.displayedColumns=[ "name", "filename","filetype","contentLen", "uploaded" , "delete"]
     this.object_table = new MatTableDataSource(this.new_objgroup.objects)
+    this.label_table = new MatTableDataSource(this.new_objgroup.labels)
    }
 
   ngOnInit(): void {
     
   }
-  logME() {
-    console.log(this.new_objgroup, this.generated_date)
-  }
+ 
   addtoObject() {
     this.new_objgroup.generated = this.generated_date
   }
@@ -60,6 +61,7 @@ export class CreateObjgroupComponent implements OnInit {
           key: "",
           value: ""
         }
+        this.label_table = new MatTableDataSource(this.new_objgroup.labels)
       } else {
         this.snackBar.open("Key already in use.", "", {
           duration: 3000,
@@ -73,8 +75,13 @@ export class CreateObjgroupComponent implements OnInit {
       })
     }
   }
-  deleteLabel(index) {
+  deleteLabel(element) {
+    const index: number = this.new_objgroup.labels.indexOf(element)
+    //console.log(index)
     this.new_objgroup.labels.splice(index, 1)
+    this.label_table = new MatTableDataSource(this.new_objgroup.labels)
+
+    
   }
   createObject(){
     const dialogRef = this.dialog.open(CreateObjectComponent,
