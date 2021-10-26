@@ -31,6 +31,9 @@ export class CreateObjgroupComponent implements OnInit {
   logME(){
     console.log(this.new_objgroup, this.generated_date)
   }
+  addtoObject(){
+    this.new_objgroup.generated= this.generated_date
+  }
   addtoLabels(){
     if (this.label.key!="" && this.label.value!=""){
       this.new_objgroup.labels.push(this.label)

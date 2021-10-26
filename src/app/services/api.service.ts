@@ -14,6 +14,7 @@ export class ApiService {
   public apiKeys: any
   public project = {project: {}, datasets: []}
   public users: any
+  public obj_groups: []
 
   constructor(
     private http: HttpClient,
@@ -173,7 +174,8 @@ export class ApiService {
       var post_object = { id: dataset_id }
     this.http.post(this.gateway_url + "/dataset/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
       console.log(res)
-      resolve(res)
+      this.obj_groups = res["objectGroups"]
+      resolve("")
     })
     })
   }

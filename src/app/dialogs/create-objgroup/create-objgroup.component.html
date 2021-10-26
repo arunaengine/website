@@ -20,7 +20,7 @@
     </mat-form-field>
     <mat-form-field appearance="fill">
         <mat-label>Generated on</mat-label>
-        <input matInput [(ngModel)]="generated_date" [matDatepicker]="generated" >
+        <input matInput (dateInput)="addtoObject()" [(ngModel)]="generated_date" [matDatepicker]="generated" >
         <mat-datepicker-toggle matSuffix [for]="generated"></mat-datepicker-toggle>
         <mat-datepicker #generated></mat-datepicker>
       </mat-form-field>

@@ -136,8 +136,10 @@ export class ProjectOverviewComponent implements OnInit {
 
   toObjectGroups(id){
     console.log("See ObjectGroups..." + id)
-    console.log(this.apiService.viewObjectGroups(id))
-    this.router.navigate(["/groups"])
+    this.apiService.viewObjectGroups(id).then(()=> {
+      this.router.navigate(["/groups"])
+    })
+    
   }
 
  async refreshDatasets(){
