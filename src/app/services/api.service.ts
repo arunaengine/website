@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { ConfigService } from './config.service';
+import * as moment from 'moment';
 
 
 @Injectable({
@@ -185,9 +186,11 @@ export class ApiService {
     return new Promise(resolve => {
       var post_object = new_objgroup
       post_object["datasetId"]= dataset_id
-      console.log(post_object)
+      post_object["includeObjectLink"]= true
+      post_object.generated = moment(post_object.generated).toISOString()
+      //console.log(post_object)
       this.http.post(this.gateway_url + "/objectgroup/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        console.log(res)
+        console.log("Create Object Response",res)
         
         resolve("")
       })

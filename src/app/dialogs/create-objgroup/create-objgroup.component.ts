@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTableDataSource } from '@angular/material/table';
 import { CreateObjectComponent } from '../create-object/create-object.component';
 //import {MatDatepickerModule} from '@angular/material/datepicker';
 
@@ -21,14 +22,23 @@ export class CreateObjgroupComponent implements OnInit {
     metadata: [],
     objects: []
   }
+  
   generated_date: any
   label = {
     key: "",
     value: ""
   }
-  constructor(private snackBar: MatSnackBar, private dialog: MatDialog) { }
+  
+  object_table: any
+  displayedColumns: string[]
+
+  constructor(private snackBar: MatSnackBar, private dialog: MatDialog) {
+    this.displayedColumns=[ "name", "filename","filetype","contentLen", "delete", "uploaded"]
+    this.object_table = new MatTableDataSource(this.new_objgroup.objects)
+   }
 
   ngOnInit(): void {
+    
   }
   logME() {
     console.log(this.new_objgroup, this.generated_date)
@@ -74,6 +84,8 @@ export class CreateObjgroupComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
+        this.new_objgroup.objects.push(result)
+        this.object_table = new MatTableDataSource(this.new_objgroup.objects)
       } else {
         console.log("Dialog dismissed")
       }

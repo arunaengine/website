@@ -10,9 +10,11 @@ export class CreateObjectComponent implements OnInit {
   new_obj = {
     name: "",
     filetype: "",
+    filename: "",
     labels: [],
     //metadata needs function
     metadata: [],
+    contentLen: ""
   }
   fileToUpload: File | null = null;
 
