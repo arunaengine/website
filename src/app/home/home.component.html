@@ -1,24 +1,31 @@
 <mat-toolbar color="primary">
     <span>BioData DB</span>
-    <!--<span class="example-spacer"></span>
-    <button mat-icon-button color="secondary" >
+    <span class="example-spacer"></span>
+    <button mat-icon-button color="secondary" (click)="openProfile()">
         <mat-icon>person</mat-icon>
-    </button>-->
+    </button>
 </mat-toolbar>
 <div class="component">
     <div fxLayout="row wrap" fxLayoutGap="16px grid">
-        <div fxFlex="50%" fxFlex.xs="100%">
+        <div fxFlex="100%" fxFlex.xs="100%">
             <mat-card class="mat-elevation-z4" style=" margin-bottom: 10px;">
                 <mat-card-header>
                     <mat-card-title>Create new Project</mat-card-title>
                 </mat-card-header>
-
+                <mat-card-content>
+                    <mat-list>
+                        <mat-list-item style="height: 20px;">
+                            <mat-icon>bar_chart</mat-icon>
+                            Number of Projects: {{apiService.projects.length}}
+                        </mat-list-item>
+                    </mat-list>
+                </mat-card-content>
                 <mat-card-actions>
                     <button color="primary" mat-raised-button (click)="createProject()">Create</button>
                 </mat-card-actions>
             </mat-card>
         </div>
-        <div fxFlex="50%" fxFlex.xs="100%">
+        <!--<div fxFlex="50%" fxFlex.xs="100%">
             <mat-card class="mat-elevation-z4" style="margin-bottom: 10px;">
                 <mat-card-header>
                     <mat-card-title>Profile</mat-card-title>
@@ -59,7 +66,7 @@
                     <button mat-raised-button color="warn" (click)="logout()">Logout</button>
                 </mat-card-actions>
             </mat-card>
-        </div>
+        </div>-->
     </div>
 </div>
 

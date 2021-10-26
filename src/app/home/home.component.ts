@@ -8,6 +8,7 @@ import { ProjectTokensComponent } from '../dialogs/project-tokens/project-tokens
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { ApiService } from '../services/api.service';
+import { ProfileDialogComponent } from '../dialogs/profile-dialog/profile-dialog.component';
 
 
 @Component({
@@ -42,7 +43,7 @@ export class HomeComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    
+
   }
 
   ngAfterViewInit():void{
@@ -141,6 +142,13 @@ export class HomeComponent implements OnInit {
   refreshProjects(){
     this.apiService.getProjects().then(()=> {
       this.project_table = new MatTableDataSource(this.apiService.projects)
+    })
+  }
+
+  openProfile(){
+    const dialogRef = this.dialog.open(ProfileDialogComponent, {
+      position: {right: "10px", top: "10px"},
+      hasBackdrop: true
     })
   }
 }
