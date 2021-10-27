@@ -127,7 +127,7 @@
                         <ng-container matColumnDef="uploaded">
                             <th mat-header-cell *matHeaderCellDef> Uploaded </th>
                             <td mat-cell *matCellDef="let element">
-                                <mat-icon color="success" *ngIf="element.uploaded == true">
+                                <mat-icon class="success" *ngIf="element.uploaded == true">
                                     check
                                 </mat-icon>
                                 <mat-icon color="warn" *ngIf="element.uploaded == false">
