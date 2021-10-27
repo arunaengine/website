@@ -32,8 +32,14 @@ export class CreateObjgroupComponent implements OnInit {
   object_table: any
   labelColumns: string[]
   displayedColumns: string[]
+  currentData = new Date()
+  notValid = false
+  maxDate =  new Date(this.currentData.getFullYear()+10, this.currentData.getMonth(), this.currentData.getDate())
 
   constructor(private snackBar: MatSnackBar, private dialog: MatDialog) {
+    
+    
+    console.log(this.maxDate)
     this.labelColumns=["key", "value", "delete"]
     this.displayedColumns=[ "name", "filename","filetype","contentLen", "uploaded" , "delete"]
     this.object_table = new MatTableDataSource(this.new_objgroup.objects)
@@ -80,8 +86,12 @@ export class CreateObjgroupComponent implements OnInit {
     //console.log(index)
     this.new_objgroup.labels.splice(index, 1)
     this.label_table = new MatTableDataSource(this.new_objgroup.labels)
-
-    
+  }
+  deleteObj(element) {
+    const index: number = this.new_objgroup.objects.indexOf(element)
+    //console.log(index)
+    this.new_objgroup.objects.splice(index, 1)
+    this.object_table = new MatTableDataSource(this.new_objgroup.objects)
   }
   createObject(){
     const dialogRef = this.dialog.open(CreateObjectComponent,

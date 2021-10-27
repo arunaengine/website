@@ -39,6 +39,7 @@ import { ProfileDialogComponent } from './dialogs/profile-dialog/profile-dialog.
 import { GroupsOverviewComponent } from './groups-overview/groups-overview.component';
 import { CreateObjgroupComponent } from './dialogs/create-objgroup/create-objgroup.component';
 import { CreateObjectComponent } from './dialogs/create-object/create-object.component';
+import { MAT_DATE_LOCALE } from '@angular/material/core'
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -114,6 +115,7 @@ export function storageFactory() : OAuthStorage {
     multi: true
   }],AuthGuardService, AuthService,
     { provide: OAuthStorage, useFactory: storageFactory },
+    {provide: MAT_DATE_LOCALE, useValue: 'de-DE'},
   ],
   bootstrap: [AppComponent]
 })

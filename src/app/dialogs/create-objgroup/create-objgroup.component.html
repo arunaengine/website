@@ -21,7 +21,7 @@
     </mat-form-field>
     <mat-form-field appearance="fill" class="example-form">
         <mat-label>Generated on</mat-label>
-        <input matInput (dateInput)="addtoObject()" [(ngModel)]="generated_date" [matDatepicker]="generated">
+        <input matInput (dateInput)="addtoObject()" [max]="maxDate" [(ngModel)]="generated_date" [matDatepicker]="generated">
         <mat-datepicker-toggle matSuffix [for]="generated"></mat-datepicker-toggle>
         <mat-datepicker #generated></mat-datepicker>
     </mat-form-field>
@@ -94,7 +94,7 @@
 
             <div fxLayout="row wrap" fxLayoutGap="16px grid">
                 <div fxFlex="15%" fxFlex.xs="100%" fxFlex.sm="33%">
-                    <button mat-raised-button color="accent" (click)="createObject()"> Create Object</button>
+                    <button mat-raised-button color="accent" (click)="createObject()"> Add Object</button>
 
                 </div>
                 <div fxFlex="85%" fxFlex.xs="100%" fxFlex.sm="33%">
@@ -119,7 +119,7 @@
                         <ng-container matColumnDef="delete">
                             <th mat-header-cell *matHeaderCellDef> Delete </th>
                             <td mat-cell *matCellDef="let element">
-                                <button mat-icon-button color="warn">
+                                <button mat-icon-button color="warn" (click)="deleteObj(element)">
                                     <mat-icon>delete_forever</mat-icon>
                                 </button>
                             </td>
@@ -127,8 +127,13 @@
                         <ng-container matColumnDef="uploaded">
                             <th mat-header-cell *matHeaderCellDef> Uploaded </th>
                             <td mat-cell *matCellDef="let element">
-
-                                true/false </td>
+                                <mat-icon color="success" *ngIf="element.uploaded == true">
+                                    check
+                                </mat-icon>
+                                <mat-icon color="warn" *ngIf="element.uploaded == false">
+                                    close
+                                </mat-icon>
+                                 </td>
                         </ng-container>
                         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
                         <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
@@ -142,7 +147,7 @@
 
 </div>
 <div mat-dialog-actions>
-    <button mat-raised-button color="primary" [mat-dialog-close]="new_objgroup">Create Object Group</button>
+    <button mat-raised-button color="primary" [disabled]="notValid" [mat-dialog-close]="new_objgroup">Create Object Group</button>
     <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
 
 </div>
