@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpEvent, HttpEventType, HttpHeaders } from '@angular/common/http';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { ConfigService } from './config.service';
 import * as moment from 'moment';
@@ -188,13 +188,21 @@ export class ApiService {
       post_object["datasetId"]= dataset_id
       post_object["includeObjectLink"]= true
       post_object.generated = moment(post_object.generated).toISOString()
-      //console.log(post_object)
+      console.log(post_object)
       this.http.post(this.gateway_url + "/objectgroup/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log("Create Object Response",res)
-        
-        resolve("")
+        resolve(res)
       })
     })
   }
-
+  uploadFile(url, file){
+    console.log(url, file)
+    var data = new FormData()
+    data.append(file.name.split("."[0]),file)
+    var headers = this.configureHeadersAccessKey()
+    headers["reportProgress"] = true
+    headers["observe"]="events"
+    
+    return this.http.put(url, data, headers).pipe()
+  }
 }

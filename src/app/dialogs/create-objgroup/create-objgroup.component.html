@@ -9,11 +9,11 @@
 
     <mat-form-field appearance="fill" class="example-form">
         <mat-label>Name</mat-label>
-        <input type="text" matInput [(ngModel)]="new_objgroup.name" placeholder="Example1">
+        <input type="text" (keyup)="isValid()" matInput [(ngModel)]="new_objgroup.name" placeholder="Example1">
     </mat-form-field>
     <mat-form-field appearance="fill" class="example-form">
         <mat-label>Description</mat-label>
-        <input type="text" matInput [(ngModel)]="new_objgroup.description" placeholder="Example1">
+        <input type="text" (keyup)="isValid()" matInput [(ngModel)]="new_objgroup.description" placeholder="Example1">
     </mat-form-field>
     <mat-form-field appearance="fill" class="example-form">
         <mat-label>UUID</mat-label>

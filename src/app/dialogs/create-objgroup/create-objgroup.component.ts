@@ -33,7 +33,7 @@ export class CreateObjgroupComponent implements OnInit {
   labelColumns: string[]
   displayedColumns: string[]
   currentData = new Date()
-  notValid = false
+  notValid = true
   maxDate =  new Date(this.currentData.getFullYear()+10, this.currentData.getMonth(), this.currentData.getDate())
 
   constructor(private snackBar: MatSnackBar, private dialog: MatDialog) {
@@ -92,6 +92,7 @@ export class CreateObjgroupComponent implements OnInit {
     //console.log(index)
     this.new_objgroup.objects.splice(index, 1)
     this.object_table = new MatTableDataSource(this.new_objgroup.objects)
+    this.isValid()
   }
   createObject(){
     const dialogRef = this.dialog.open(CreateObjectComponent,
@@ -103,9 +104,20 @@ export class CreateObjgroupComponent implements OnInit {
         console.log("Dialog closed: ", result)
         this.new_objgroup.objects.push(result)
         this.object_table = new MatTableDataSource(this.new_objgroup.objects)
+        this.isValid()
       } else {
         console.log("Dialog dismissed")
       }
     })
+  }
+
+  isValid(){
+    if (this.new_objgroup.name != "" && 
+        this.new_objgroup.description!= ""&&
+        this.new_objgroup.objects.length != 0){
+          this.notValid = false
+        } else {
+          this.notValid = true
+        }
   }
 }
