@@ -18,6 +18,7 @@ import {MatDialogModule} from '@angular/material/dialog';
 import {MatDatepickerModule} from '@angular/material/datepicker';
 import {MatNativeDateModule} from '@angular/material/core';
 import {MatExpansionModule} from '@angular/material/expansion';
+import {MatProgressBarModule} from '@angular/material/progress-bar';
 import { CreateProjectComponent } from './dialogs/create-project/create-project.component';
 import { AlertDialogComponent } from './dialogs/alert-dialog/alert-dialog.component';
 import { ProjectTokensComponent } from './dialogs/project-tokens/project-tokens.component';
@@ -100,6 +101,7 @@ export function storageFactory() : OAuthStorage {
     MatDatepickerModule,
     MatNativeDateModule,
     MatExpansionModule,
+    MatProgressBarModule,
     ClipboardModule,
     MatSnackBarModule,
     HttpClientModule,

@@ -16,14 +16,32 @@
         </mat-card-title>
     </mat-card-header>
     <mat-card-content>
-        <mat-list >
-            <mat-list-item style="height: 40px;"><mat-icon>bar_chart</mat-icon>
-                Number of Objects: {{apiService.obj_groups.length}}</mat-list-item>
-            <mat-list-item style="height: 40px;"><mat-icon>bar_chart</mat-icon>
-                Stat 2</mat-list-item>
-            <mat-list-item style="height: 40px;"><mat-icon>bar_chart</mat-icon>
-                Stat 3</mat-list-item>
+        <mat-list>
+            <mat-list-item style="height: 40px;">
+                <mat-icon>bar_chart</mat-icon>
+                Number of Objects: {{apiService.obj_groups.length}}
+            </mat-list-item>
+            <mat-list-item style="height: 40px;">
+                <mat-icon>bar_chart</mat-icon>
+                Stat 2
+            </mat-list-item>
+            <mat-list-item style="height: 40px;">
+                <mat-icon>bar_chart</mat-icon>
+                Stat 3
+            </mat-list-item>
         </mat-list>
+        <div *ngIf="upload" >
+            <mat-list>
+
+            </mat-list>
+            <div *ngFor="let progress of upload_progress, ; let i = index" [attr.data-index]="i">
+                <mat-list-item style="height: 40px;">
+                    File: {{progress.filename}}
+            <mat-progress-bar color="accent" mode="determinate" [value]="upload_progress[i].progress"></mat-progress-bar>
+        </mat-list-item>
+            </div>
+        </div>
+
     </mat-card-content>
     <mat-card-actions>
         <button mat-raised-button color="primary" (click)=newObjectgroup()>New Objectgroup</button>
@@ -40,10 +58,10 @@
 
     <ng-container matColumnDef="id">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> ID </th>
-        <td mat-cell *matCellDef="let element"> {{element.id}} 
+        <td mat-cell *matCellDef="let element"> {{element.id}}
             <button [cdkCopyToClipboard]="element.id" mat-icon-button color="primary" (click)="openSnackBar()">
                 <mat-icon>content_copy</mat-icon>
-                </button>
+            </button>
         </td>
     </ng-container>
     <ng-container matColumnDef="name">
@@ -65,7 +83,8 @@
         <th mat-header-cell *matHeaderCellDef> Delete Dataset </th>
         <td mat-cell *matCellDef="let element">
             <button mat-icon-button color="warn" (click)="deleteObjGroup(element.id)">
-                <mat-icon>delete_forever</mat-icon></button>
+                <mat-icon>delete_forever</mat-icon>
+            </button>
         </td>
     </ng-container>
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>

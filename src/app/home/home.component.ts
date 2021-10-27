@@ -144,6 +144,7 @@ export class HomeComponent implements OnInit {
   refreshProjects(){
     this.apiService.getProjects().then(()=> {
       this.project_table = new MatTableDataSource(this.apiService.projects)
+      this.project_table.sort = this.sort
     })
   }
 
