@@ -30,16 +30,87 @@
                 Stat 3
             </mat-list-item>
         </mat-list>
-        <div *ngIf="upload" >
-            <mat-list>
 
-            </mat-list>
-            <div *ngFor="let progress of upload_progress, ; let i = index" [attr.data-index]="i">
-                <mat-list-item style="height: 40px;">
-                    File: {{progress.filename}}
-            <mat-progress-bar color="accent" mode="determinate" [value]="upload_progress[i].progress"></mat-progress-bar>
-        </mat-list-item>
-            </div>
+        <div *ngIf="uploadPanel">
+            <mat-expansion-panel expanded>
+                <mat-expansion-panel-header>
+                    <mat-panel-title>
+                        File Upload
+                    </mat-panel-title>
+                    <mat-panel-description>
+                        Progress of File Uploads
+                    </mat-panel-description>
+                </mat-expansion-panel-header>
+                <mat-list>
+
+
+                    <div *ngFor="let progress of upload_progress, ; let i = index" [attr.data-index]="i">
+                        <mat-list-item style="height: 40px;">
+                            File Upload: {{progress.filename}}
+                            <mat-progress-bar color="accent" mode="determinate" [value]="upload_progress[i].progress">
+                            </mat-progress-bar>
+                        </mat-list-item>
+                    </div>
+                </mat-list>
+                <div *ngIf="upload_userFiles">
+                    <mat-list>
+                        <mat-list-item>
+                            <mat-label>
+                                File Upload needed for:
+                            </mat-label>
+                        </mat-list-item>
+                        <mat-divider></mat-divider>
+                        <mat-list-item>
+                            <mat-label>
+                                table.json URLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL
+                            </mat-label>
+                        </mat-list-item>
+
+
+                        <mat-label>
+                            <div fxLayout="row wrap" fxLayoutGap="16px grid">
+                                <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <mat-form-field appearance="fill" class="example-form">
+                                        <mat-label>File</mat-label>
+                                        <input type="text" disabled matInput [(ngModel)]="file_name">
+                                    </mat-form-field>
+                                </div>
+
+                                <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <input hidden type="file" #fileInput (input)="onFileInput(fileInput.files)" />
+                                    <button mat-mini-fab color="accent" (click)="fileInput.click()">
+                                        <mat-icon>attach_file</mat-icon>
+                                    </button>
+                                </div>
+                                <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <button mat-mini-fab color="accent" (click)="fileInput.click()">
+                                        <mat-icon>upload</mat-icon>
+                                    </button>
+                                </div>
+                                <div fxFlex="65%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <mat-progress-bar color="accent" mode="determinate" value="40"></mat-progress-bar>
+
+                                </div>
+                                <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <button mat-mini-fab color="warn" (click)="fileInput.click()">
+                                        <mat-icon>close</mat-icon>
+                                    </button>
+
+                                </div>
+                            </div>
+                        </mat-label>
+
+                    </mat-list>
+
+
+
+
+                </div>
+                <button *ngIf="uploadedFinishedButton" mat-raised-button color="primary"
+                    (click)=hideUploadedFiles()>Hide Uploaded Files</button>
+
+            </mat-expansion-panel>
+
         </div>
 
     </mat-card-content>
@@ -59,7 +130,8 @@
     <ng-container matColumnDef="id">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> ID </th>
         <td mat-cell *matCellDef="let element"> {{element.id}}
-            <button [cdkCopyToClipboard]="element.id" mat-icon-button color="primary" (click)="openSnackBar()">
+            <button [cdkCopyToClipboard]="element.id" mat-icon-button color="primary"
+                (click)="openSnackBar('ID copied to Clipboard.', 'success-snackbar')">
                 <mat-icon>content_copy</mat-icon>
             </button>
         </td>

@@ -25,8 +25,13 @@ export class GroupsOverviewComponent implements OnInit {
   obj_groups_table: any
   displayedColumns: string[]
   filelist_forUpload = []
-  upload = false
   upload_progress = []
+  files_userUpload = []
+  uploadPanel = false
+  upload_userFiles = false
+  uploadedFinishedButton = false
+  file: File | null = null;
+  file_name: string
 
   constructor(
     private router: Router,
@@ -73,21 +78,38 @@ export class GroupsOverviewComponent implements OnInit {
       if (result) {
         console.log("Dialog closed: ", result)
         result.objects.forEach((object, index) => {
-          this.filelist_forUpload.push(object.file)
-          this.upload_progress.push({filename: object.file.name, progress: 0})
+          if (object.uploaded){
+            this.filelist_forUpload.push(object.file)
+            this.upload_progress.push({filename: object.file.name, progress: 0, uploaded: false, userUpload: false})
+          } else {
+            this.upload_userFiles = true
+            this.filelist_forUpload.push({userUpload: true, object: object})
+            this.upload_progress.push({filename: object.filename +"." +object.filetype, progress: 0, uploaded: true, userUpload: true})
+          }
+          
           delete result.objects[index].uploaded
           delete result.objects[index].file
         });
         console.log(this.filelist_forUpload)
       
-        this.upload = true
+        this.uploadPanel = true
         console.log(this.upload_progress)
         this.apiService.createObjectGroup(this.apiService.dataset.id, result).then(res => {
           res["objectLinks"].forEach((element, index) => {
-            console.log("UPLOADING FILE " + this.filelist_forUpload[index].name, "Link: ", element)
-                this.uploadFile(element, this.filelist_forUpload[index], index)
-              
-          });   
+            if (this.upload_progress[index].userUpload == false){
+                  console.log("UPLOADING FILE " + this.filelist_forUpload[index].name, "Link: ", element)
+                  this.uploadFile(element, this.filelist_forUpload[index], index).then(()=> {
+                  console.log("Finished Upload "+ this.filelist_forUpload[index].name)
+                  this.upload_progress[index].uploaded = true
+                  this.uploadFinished()
+                })
+                } else {
+                  console.log("User Upload File: ", element)
+                  this.files_userUpload.push({filespecs: this.filelist_forUpload[index], links: element})
+                }
+                
+            
+          })
           
         })
       } else {
@@ -96,10 +118,48 @@ export class GroupsOverviewComponent implements OnInit {
     })
   }
   
+  uploadFinished(){
+    var all_uploaded = true
+    this.upload_progress.forEach(element => {
+      console.log(element)
+      if (element.uploaded == false){
+        all_uploaded = false
+      }
+    })
+    
+    if (all_uploaded){
+      this.uploadedFinishedButton = true
+      this.openSnackBar("Finished Uploading files","success-snackbar")
+      console.log("UPLOAD FINISHED FOR ALL FILES")
+      console.log("Files for user Upload", this.files_userUpload)
+      this.filelist_forUpload = []
+      this.refreshData()
+    }
+  }
+
+  hideUploadedFiles(){
+    this.upload_progress = []
+    if (this.files_userUpload.length == 0){
+      this.uploadedFinishedButton = false
+      this.uploadPanel = false
+    } else {
+
+    }
+  }
+
+  onFileInput(files: FileList | null ){
+    if (files){
+      this.file = files[0]
+      this.file_name = this.file.name
+      console.log(this.file)
+
+    }
+  }
+
   uploadFile(element, file, index) {
     
-    
-      this.apiService.uploadFile(element["link"], file).subscribe((event: HttpEvent<any>) => {
+      return new Promise (resolve => {
+        this.apiService.uploadFile(element["link"], file).subscribe((event: HttpEvent<any>) => {
         switch (event.type) {
           case HttpEventType.Sent:
             console.log('Request has been made!');
@@ -109,17 +169,21 @@ export class GroupsOverviewComponent implements OnInit {
             break;
           case HttpEventType.UploadProgress:
             this.upload_progress[index].progress = Math.round(event.loaded / event.total * 100);
-            console.log("Uploaded! "+this.upload_progress+"% "+ file.name)
+            if (event.loaded == event.total){
+              resolve("")
+            }
             break;
         }
       })
+      })
+      
     
   }
 
-  openSnackBar() {
-    this.snackBar.open("ID copied to Clipboard.", "", {
+  openSnackBar(message, design) {
+    this.snackBar.open(message, "", {
       duration: 3000,
-      panelClass: ["success-snackbar"]
+      panelClass: [design]
     })
   }
   deleteObjGroup(id) {

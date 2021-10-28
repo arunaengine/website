@@ -29,28 +29,21 @@
             <mat-form-field appearance="fill" class="example-form">
                 <mat-label>File</mat-label>
                 <input type="text" disabled matInput [(ngModel)]="file_name">
-            </mat-form-field> 
+            </mat-form-field>
         </div>
 
         <div fxFlex="10%" fxFlex.xs="100%" fxFlex.sm="33%">
             <input hidden type="file" #fileInput (input)="onFileInput(fileInput.files)" />
-                    <button mat-mini-fab color="accent" (click)="fileInput.click()">
-                        <mat-icon>file_upload</mat-icon>
-                    </button>
+            <button mat-mini-fab color="accent" (click)="fileInput.click()">
+                <mat-icon>file_upload</mat-icon>
+            </button>
         </div>
-        
-        </div>
-        
-
-
-        
-
-
-
-
     </div>
 
-    <div mat-dialog-actions>
-        <button mat-raised-button [disabled]="isnotValid" color="primary" [mat-dialog-close]="new_obj">Add to Object Group</button>
-        <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
-    </div>
+</div>
+
+<div mat-dialog-actions>
+    <button mat-raised-button [disabled]="isnotValid" color="primary" [mat-dialog-close]="new_obj">Add to Object
+        Group</button>
+    <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
+</div>
