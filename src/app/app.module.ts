@@ -20,6 +20,7 @@ import {MatNativeDateModule} from '@angular/material/core';
 import {MatExpansionModule} from '@angular/material/expansion';
 import {MatProgressBarModule} from '@angular/material/progress-bar';
 import {MatDividerModule} from '@angular/material/divider';
+import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 import { CreateProjectComponent } from './dialogs/create-project/create-project.component';
 import { AlertDialogComponent } from './dialogs/alert-dialog/alert-dialog.component';
 import { ProjectTokensComponent } from './dialogs/project-tokens/project-tokens.component';
@@ -41,7 +42,8 @@ import { ProfileDialogComponent } from './dialogs/profile-dialog/profile-dialog.
 import { GroupsOverviewComponent } from './groups-overview/groups-overview.component';
 import { CreateObjgroupComponent } from './dialogs/create-objgroup/create-objgroup.component';
 import { CreateObjectComponent } from './dialogs/create-object/create-object.component';
-import { MAT_DATE_LOCALE } from '@angular/material/core'
+import { MAT_DATE_LOCALE } from '@angular/material/core';
+import { LoadingComponent } from './dialogs/loading/loading.component'
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -81,6 +83,7 @@ export function storageFactory() : OAuthStorage {
     GroupsOverviewComponent,
     CreateObjgroupComponent,
     CreateObjectComponent,
+    LoadingComponent,
   ],
   imports: [
     BrowserModule,
@@ -103,6 +106,7 @@ export function storageFactory() : OAuthStorage {
     MatNativeDateModule,
     MatExpansionModule,
     MatProgressBarModule,
+    MatProgressSpinnerModule,
     MatDividerModule,
     ClipboardModule,
     MatSnackBarModule,

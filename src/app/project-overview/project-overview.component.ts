@@ -11,6 +11,7 @@ import { ApiService } from '../services/api.service';
 import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog.component';
 import { ProfileDialogComponent } from '../dialogs/profile-dialog/profile-dialog.component';
 import { AuthService } from '../services/auth.service';
+import { LoadingComponent } from '../dialogs/loading/loading.component';
 
 @Component({
   selector: 'app-project-overview',
@@ -121,6 +122,7 @@ export class ProjectOverviewComponent implements OnInit {
   }
   viewDetails(id){
     console.log("See Details...")
+    
     this.apiService.getDetails(id).then(res => {
       const dialogRef = this.dialog.open(DetailsDialogComponent, {
         data: {
@@ -137,8 +139,15 @@ export class ProjectOverviewComponent implements OnInit {
   }
 
   toObjectGroups(element){
+    
+    const dialogRef = this.dialog.open(LoadingComponent, {
+      hasBackdrop: true,
+      disableClose: true
+    })
+    
     console.log("See ObjectGroups..." + element)
     this.apiService.viewObjectGroups(element).then(()=> {
+      dialogRef.close()
       this.router.navigate(["/groups"])
     })
     

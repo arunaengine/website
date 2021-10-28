@@ -2,7 +2,7 @@
     <button mat-icon-button color="secondary" (click)="goBack()">
         <mat-icon>arrow_back</mat-icon>
     </button>
-    <span>BioData DB - ObjectGroups</span>
+    <span>BioData DB - {{apiService.dataset.name}}</span>
     <span class="example-spacer"></span>
     <button mat-raised-button color="secondary" (click)="openProfile()">
         <mat-icon>person</mat-icon>
@@ -13,7 +13,7 @@
 <mat-card class="mat-elevation-z8">
     <mat-card-header>
         <mat-card-title>
-            Stats about this objectgroup
+            Stats about {{apiService.dataset.name}}
         </mat-card-title>
     </mat-card-header>
     <mat-card-content>
