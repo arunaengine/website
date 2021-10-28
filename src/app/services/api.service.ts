@@ -176,10 +176,21 @@ export class ApiService {
       var post_object = { id: element.id }
       this.http.post(this.gateway_url + "/dataset/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
-        this.obj_groups = res["objectGroups"]
+        this.formatObjGroup(res["objectGroups"]).then(_ => {
+          resolve("")
+        })
+        //this.obj_groups = res["objectGroups"]
         this.dataset = element
-        resolve("")
+        
       })
+    })
+  }
+  formatObjGroup(data: any){
+    return new Promise(resolve => {
+      var new_data = data.map(v => Object.assign(v,{isExpanded: false}))
+      console.log(new_data)
+      this.obj_groups = new_data
+      resolve("")
     })
   }
   createObjectGroup(dataset_id, new_objgroup) {

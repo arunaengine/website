@@ -141,8 +141,14 @@
     <mat-label>Filter</mat-label>
     <input matInput (keyup)="applyFilter($event)" placeholder="Name" #input>
 </mat-form-field>
-<table mat-table [dataSource]="obj_groups_table" matSort class="mat-elevation-z8">
+<table mat-table [dataSource]="obj_groups_table" matSort class="mat-elevation-z8" multiTemplateDataRows >
 
+    
+    <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
+        <td mat-cell *matCellDef="let element">
+            {{element.name}} </td>
+    </ng-container>
     <ng-container matColumnDef="id">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> ID </th>
         <td mat-cell *matCellDef="let element"> {{element.id}}
@@ -151,11 +157,6 @@
                 <mat-icon>content_copy</mat-icon>
             </button>
         </td>
-    </ng-container>
-    <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
-        <td mat-cell *matCellDef="let element">
-            {{element.name}} </td>
     </ng-container>
     <ng-container matColumnDef="description">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Description </th>
@@ -175,8 +176,24 @@
             </button>
         </td>
     </ng-container>
+
+
+    <ng-container matColumnDef="expandedDetail">
+        <td mat-cell *matCellDef="let element" [attr.colspan]="displayedColumns.length">
+  
+          <div class="object-element-detail" [@detailExpand]="element.isExpanded ? 'expanded' : 'collapsed'">
+            test
+          </div>
+
+        </td>
+      </ng-container>
+
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+    class="object-element-row"
+    [class.student-expanded-row]="row.isExpanded" (click)="row.isExpanded = !row.isExpanded"></tr>
+
+    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="object-detail-row"></tr>
 
     <tr class="mat-row" *matNoDataRow>
         <td class="mat-cell" colspan="4">No dataset found matching the filter "{{input.value}}"</td>

@@ -11,12 +11,20 @@ import { MatPaginator } from '@angular/material/paginator';
 import { MatTableDataSource } from '@angular/material/table';
 import { HttpEvent, HttpEventType } from '@angular/common/http';
 import { AuthService } from '../services/auth.service';
+import { animate, state, style, transition, trigger } from '@angular/animations';
 
 
 @Component({
   selector: 'app-groups-overview',
   templateUrl: './groups-overview.component.html',
-  styleUrls: ['./groups-overview.component.scss']
+  styleUrls: ['./groups-overview.component.scss'],
+  animations: [
+    trigger('detailExpand', [
+      state('collapsed', style({ height: '0px', minHeight: '0' })),
+      state('expanded', style({ height: '*' })),
+      transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
+    ]),
+  ],
 })
 export class GroupsOverviewComponent implements OnInit {
 

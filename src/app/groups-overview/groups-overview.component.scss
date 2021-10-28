@@ -4,6 +4,31 @@
   table {
     width: 100%;
   }
+  tr.object-detail-row {
+    height: 0;
+  }
+  
+  tr.object-element-row:not(.object-expanded-row):hover {
+    background: whitesmoke;
+  }
+  
+  tr.object-element-row:not(.object-expanded-row):active {
+    background: #efefef;
+  }
+  
+  .object-element-row td {
+    border-bottom-width: 0;
+  }
+  
+  .object-element-detail {
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+
   .example-form {
     width: 100%;
   }
+ 
