@@ -206,6 +206,7 @@ export class ApiService {
     return this.http.put(url, data, headers).pipe()
   }
   deleteObjectGroup(objectgroup_id){
+    console.log(objectgroup_id)
     return new Promise(resolve => {
       this.http.delete(this.gateway_url + "/objectgroup/" + objectgroup_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
         console.log(res_added)

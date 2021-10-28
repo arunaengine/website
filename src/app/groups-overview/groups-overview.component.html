@@ -42,67 +42,80 @@
                     </mat-panel-description>
                 </mat-expansion-panel-header>
                 <mat-list>
-
-
                     <div *ngFor="let progress of upload_progress, ; let i = index" [attr.data-index]="i">
-                        <mat-list-item style="height: 40px;">
-                            File Upload: {{progress.filename}}
-                            <mat-progress-bar color="accent" mode="determinate" [value]="upload_progress[i].progress">
-                            </mat-progress-bar>
-                        </mat-list-item>
+                        <div *ngIf="upload_progress[i].userUpload == false">
+                            <mat-list-item style="height: 40px;">
+                                File Upload: {{progress.filename}}
+                                <mat-progress-bar color="accent" mode="determinate"
+                                    [value]="upload_progress[i].progress">
+                                </mat-progress-bar>
+                            </mat-list-item>
+                        </div>
                     </div>
                 </mat-list>
+
                 <div *ngIf="upload_userFiles">
+
                     <mat-list>
                         <mat-list-item>
                             <mat-label>
                                 File Upload needed for:
                             </mat-label>
                         </mat-list-item>
-                        <mat-divider></mat-divider>
-                        <mat-list-item>
+                        <div *ngFor="let userFile of files_userUpload; let i=index" [attr.data-index]="i">
+                            <mat-divider></mat-divider>
+                            <mat-list-item>
+                                <mat-label>
+                                    Objectname: {{userFile.filespecs.object.name}}
+                                    <button mat-raised-button color="primary">
+                                        Copy Upload Link
+                                    </button>
+                                </mat-label>
+                            </mat-list-item>
+                            <mat-list-item>
+                                <mat-label>
+                                    Filename: {{userFile.filespecs.object.filename}}.{{userFile.filespecs.object.filetype}}
+                                </mat-label>
+                            </mat-list-item>
+                            
                             <mat-label>
-                                table.json URLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL
+                                <div fxLayout="row wrap" fxLayoutGap="16px grid">
+                                    <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                        <mat-form-field appearance="fill" class="example-form">
+                                            <mat-label>File</mat-label>
+                                            <input type="text" disabled matInput [(ngModel)]="files_userUpload[i].file_name">
+                                        </mat-form-field>
+                                    </div>
+
+                                    <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                        <input hidden type="file" #fileInput (input)="onFileInput(fileInput.files, i)" />
+                                        <button mat-mini-fab color="accent" (click)="fileInput.click()">
+                                            <mat-icon>attach_file</mat-icon>
+                                        </button>
+                                    </div>
+                                    <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                        <button mat-mini-fab color="accent" [disabled]="files_userUpload[i].uploadnotAllowed" (click)="uploadSingleFile(i)">
+                                            <mat-icon>upload</mat-icon>
+                                        </button>
+                                    </div>
+                                    <div fxFlex="65%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                        <mat-progress-bar *ngIf="files_userUpload[i].process.uploading" color="accent" mode="determinate" [value]="files_userUpload[i].process.progress">
+                                        </mat-progress-bar>
+
+                                    </div>
+                                    <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                        <button mat-mini-fab color="warn" (click)="hideFile(userFile)">
+                                            <mat-icon>close</mat-icon>
+                                        </button>
+
+                                    </div>
+                                </div>
                             </mat-label>
-                        </mat-list-item>
 
+                        </div>
 
-                        <mat-label>
-                            <div fxLayout="row wrap" fxLayoutGap="16px grid">
-                                <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                    <mat-form-field appearance="fill" class="example-form">
-                                        <mat-label>File</mat-label>
-                                        <input type="text" disabled matInput [(ngModel)]="file_name">
-                                    </mat-form-field>
-                                </div>
-
-                                <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                    <input hidden type="file" #fileInput (input)="onFileInput(fileInput.files)" />
-                                    <button mat-mini-fab color="accent" (click)="fileInput.click()">
-                                        <mat-icon>attach_file</mat-icon>
-                                    </button>
-                                </div>
-                                <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                    <button mat-mini-fab color="accent" (click)="fileInput.click()">
-                                        <mat-icon>upload</mat-icon>
-                                    </button>
-                                </div>
-                                <div fxFlex="65%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                    <mat-progress-bar color="accent" mode="determinate" value="40"></mat-progress-bar>
-
-                                </div>
-                                <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                    <button mat-mini-fab color="warn" (click)="fileInput.click()">
-                                        <mat-icon>close</mat-icon>
-                                    </button>
-
-                                </div>
-                            </div>
-                        </mat-label>
 
                     </mat-list>
-
-
 
 
                 </div>

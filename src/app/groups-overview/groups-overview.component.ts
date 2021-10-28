@@ -30,8 +30,6 @@ export class GroupsOverviewComponent implements OnInit {
   uploadPanel = false
   upload_userFiles = false
   uploadedFinishedButton = false
-  file: File | null = null;
-  file_name: string
 
   constructor(
     private router: Router,
@@ -82,7 +80,7 @@ export class GroupsOverviewComponent implements OnInit {
             this.filelist_forUpload.push(object.file)
             this.upload_progress.push({filename: object.file.name, progress: 0, uploaded: false, userUpload: false})
           } else {
-            this.upload_userFiles = true
+            
             this.filelist_forUpload.push({userUpload: true, object: object})
             this.upload_progress.push({filename: object.filename +"." +object.filetype, progress: 0, uploaded: true, userUpload: true})
           }
@@ -105,10 +103,14 @@ export class GroupsOverviewComponent implements OnInit {
                 })
                 } else {
                   console.log("User Upload File: ", element)
-                  this.files_userUpload.push({filespecs: this.filelist_forUpload[index], links: element})
+                  this.files_userUpload.push({filespecs: this.filelist_forUpload[index], fromServer: element, file: null, file_name: "", uploadnotAllowed:true, process: {progress: 0, uploaded: false, uploading: false}})
+                  
+                  this.uploadFinished()
                 }
                 
-            
+            if ( res["objectLinks"].length -1 == index){
+              this.upload_userFiles = true
+            }
           })
           
         })
@@ -129,7 +131,13 @@ export class GroupsOverviewComponent implements OnInit {
     
     if (all_uploaded){
       this.uploadedFinishedButton = true
-      this.openSnackBar("Finished Uploading files","success-snackbar")
+      if (this.files_userUpload.length == 0){
+        this.openSnackBar("Finished uploading files","success-snackbar")
+      } else {
+        this.openSnackBar("Finished uploading files, but user input needed","success-snackbar")
+        
+      }
+      
       console.log("UPLOAD FINISHED FOR ALL FILES")
       console.log("Files for user Upload", this.files_userUpload)
       this.filelist_forUpload = []
@@ -142,17 +150,19 @@ export class GroupsOverviewComponent implements OnInit {
     if (this.files_userUpload.length == 0){
       this.uploadedFinishedButton = false
       this.uploadPanel = false
-    } else {
-
+      this.upload_userFiles = false
+      this.files_userUpload= []
     }
   }
 
-  onFileInput(files: FileList | null ){
+  onFileInput(files: FileList | null , index){
     if (files){
-      this.file = files[0]
-      this.file_name = this.file.name
-      console.log(this.file)
-
+      this.files_userUpload[index].file=files[0]
+      this.files_userUpload[index].file_name=this.files_userUpload[index].file.name
+      this.files_userUpload[index].uploadnotAllowed= false
+      console.log(this.files_userUpload[index])
+    } else {
+      this.files_userUpload[index].uploadnotAllowed= true
     }
   }
 
@@ -175,9 +185,39 @@ export class GroupsOverviewComponent implements OnInit {
             break;
         }
       })
+      })    
+  }
+
+  uploadSingleFile(index){
+    this.files_userUpload[index].process.uploading = true
+    return new Promise (resolve => {
+      this.apiService.uploadFile(this.files_userUpload[index].fromServer.link, this.files_userUpload[index].file).subscribe((event: HttpEvent<any>) => {
+        switch (event.type) {
+          case HttpEventType.Sent:
+            console.log('Request has been made!');
+            break;
+          case HttpEventType.ResponseHeader:
+            console.log('Response header has been received!');
+            break;
+          case HttpEventType.UploadProgress:
+            this.files_userUpload[index].process.progress = Math.round(event.loaded / event.total * 100);
+            if (event.loaded == event.total){
+              resolve("")
+            }
+            break;
+        }
       })
-      
-    
+    })
+  }
+
+  hideFile(element){
+    const index: number = this.files_userUpload.indexOf(element)
+    this.files_userUpload.splice(index, 1)
+    if (this.files_userUpload.length == 0){
+      if (this.uploadedFinishedButton){
+        this.hideUploadedFiles()
+      }
+    }
   }
 
   openSnackBar(message, design) {
@@ -194,8 +234,8 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   refreshData(){
-    this.apiService.viewObjectGroups(this.apiService.dataset.id).then(()=> {
-    this.obj_groups_table = new MatTableDataSource(this.apiService.project.datasets)
+    this.apiService.viewObjectGroups(this.apiService.dataset).then(()=> {
+    this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
       this.obj_groups_table.paginator = this.paginator
       this.obj_groups_table.sort = this.sort
     })
