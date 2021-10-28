@@ -1,8 +1,9 @@
 <mat-toolbar color="primary">
     <span>BioData DB</span>
     <span class="example-spacer"></span>
-    <button mat-icon-button color="secondary" (click)="openProfile()">
+    <button mat-raised-button color="secondary" (click)="openProfile()">
         <mat-icon>person</mat-icon>
+        {{authService.user_data.preferred_username}}
     </button>
 </mat-toolbar>
 <div class="component">

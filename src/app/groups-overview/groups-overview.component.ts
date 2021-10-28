@@ -10,6 +10,7 @@ import { MatSort } from '@angular/material/sort';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatTableDataSource } from '@angular/material/table';
 import { HttpEvent, HttpEventType } from '@angular/common/http';
+import { AuthService } from '../services/auth.service';
 
 
 @Component({
@@ -35,7 +36,8 @@ export class GroupsOverviewComponent implements OnInit {
     private router: Router,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
-    public apiService: ApiService
+    public apiService: ApiService,
+    public authService: AuthService
   ) {
     console.log(this.upload_progress)
     console.log(this.apiService.obj_groups)

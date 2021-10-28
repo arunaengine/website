@@ -4,8 +4,9 @@
     </button>
     <span>BioData DB - ObjectGroups</span>
     <span class="example-spacer"></span>
-    <button mat-icon-button color="secondary" (click)=openProfile()>
+    <button mat-raised-button color="secondary" (click)="openProfile()">
         <mat-icon>person</mat-icon>
+        {{authService.user_data.preferred_username}}
     </button>
 </mat-toolbar>
 
@@ -50,6 +51,7 @@
                                     [value]="upload_progress[i].progress">
                                 </mat-progress-bar>
                             </mat-list-item>
+                            <mat-divider></mat-divider>
                         </div>
                     </div>
                 </mat-list>
@@ -67,7 +69,8 @@
                             <mat-list-item>
                                 <mat-label>
                                     Objectname: {{userFile.filespecs.object.name}}
-                                    <button mat-raised-button color="primary">
+                                    <button [cdkCopyToClipboard]="userFile.fromServer.link" mat-raised-button color="primary"
+                                    (click)="openSnackBar('URL copied to Clipboard.', 'success-snackbar')">
                                         Copy Upload Link
                                     </button>
                                 </mat-label>

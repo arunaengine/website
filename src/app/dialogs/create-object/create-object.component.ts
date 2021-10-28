@@ -42,9 +42,9 @@ export class CreateObjectComponent implements OnInit {
       if (this.new_obj.filetype == "") {
         this.new_obj.filetype = this.file_name.split(".")[this.file_name.split(".").length - 1]
       }
-      if (this.new_obj.contentLen == 0) {
-        this.new_obj.contentLen = this.file.size
-      }
+      
+      this.new_obj.contentLen = this.file.size
+      
       this.isNotValid()
       //this.apiService.uploadDummyFile(this.file)
     }

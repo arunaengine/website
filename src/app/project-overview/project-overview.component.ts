@@ -10,6 +10,7 @@ import { MatPaginator } from '@angular/material/paginator';
 import { ApiService } from '../services/api.service';
 import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog.component';
 import { ProfileDialogComponent } from '../dialogs/profile-dialog/profile-dialog.component';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-project-overview',
@@ -30,7 +31,8 @@ export class ProjectOverviewComponent implements OnInit {
     private router: Router,
     public dialog: MatDialog,
     private snackBar: MatSnackBar,
-    public apiService: ApiService
+    public apiService: ApiService,
+    public authService: AuthService
   ) {
     console.log(this.apiService.project)
     this.displayedColumns=[ "name", "description","id","details","version", "delete", "objectgroup"]
