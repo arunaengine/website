@@ -50,8 +50,8 @@ export class GroupsOverviewComponent implements OnInit {
   ) {
     console.log(this.upload_progress)
     console.log(this.apiService.obj_groups)
-    this.displayedColumns = ["name", "description", "id", "created", "delete"]
-    this.inner_displayedColumns = ["filename", "filetype", "id","created", "filesize","delete"]
+    this.displayedColumns = ["name", "description","objectcount","created",  "id", "delete"]
+    this.inner_displayedColumns = ["filename", "filetype","created", "filesize", "id","download"]
     this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
   }
 
@@ -243,6 +243,11 @@ export class GroupsOverviewComponent implements OnInit {
     this.apiService.deleteObjectGroup(id).then(()=> {
       this.refreshData()
     })
+  }
+
+  downloadObject(id){
+    console.log("Downloading Object", id)
+    this.apiService.downloadSingleObject(id)
   }
 
   refreshData(){

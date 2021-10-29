@@ -187,7 +187,7 @@ export class ApiService {
   }
   formatObjGroup(data: any){
     return new Promise(resolve => {
-      var new_data = data.map(v => Object.assign(v,{isExpanded: false}))
+      var new_data = data.map(v => Object.assign(v,{isExpanded: false, objectcount: v["objects"].length}))
       console.log(new_data)
       this.obj_groups = new_data
       resolve("")
@@ -224,5 +224,16 @@ export class ApiService {
         resolve("done")
       })
     }) 
+  }
+
+  downloadSingleObject(object_id){
+    return new Promise(resolve => {
+      this.http.get(this.gateway_url + "/objectload/download/" + object_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
+        console.log(res_added)
+          window.open(res_added["downloadLink"])
+          resolve("done")
+        
+      })
+    })
   }
 }
