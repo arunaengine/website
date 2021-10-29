@@ -4,6 +4,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableDataSource } from '@angular/material/table';
 import { CreateObjectComponent } from '../create-object/create-object.component';
 //import {MatDatepickerModule} from '@angular/material/datepicker';
+import * as moment from 'moment';
 
 @Component({
   selector: 'app-create-objgroup',
@@ -23,7 +24,7 @@ export class CreateObjgroupComponent implements OnInit {
     objects: []
   }
   
-  generated_date: any
+  generated_date = new Date
   label = {
     key: "",
     value: ""
@@ -35,24 +36,49 @@ export class CreateObjgroupComponent implements OnInit {
   currentData = new Date()
   notValid = true
   maxDate =  new Date(this.currentData.getFullYear()+10, this.currentData.getMonth(), this.currentData.getDate())
-
+  /*hours=[]
+  minutes=[]
+  selected_minute: number
+  selected_hour: number*/
+  
   constructor(private snackBar: MatSnackBar, private dialog: MatDialog) {
-    
+  
     
     console.log(this.maxDate)
     this.labelColumns=["key", "value", "delete"]
     this.displayedColumns=[ "name", "filename","filetype","contentLen", "uploaded" , "delete"]
     this.object_table = new MatTableDataSource(this.new_objgroup.objects)
     this.label_table = new MatTableDataSource(this.new_objgroup.labels)
+    /*for (let i=0; i <24; i++ ){
+      this.hours.push(i)
+    }
+    for (let i=0; i <60; i++ ){
+      this.minutes.push(i)
+    }*/
+
    }
 
   ngOnInit(): void {
     
   }
- 
-  addtoObject() {
-    this.new_objgroup.generated = this.generated_date
+  addToDate(){
+    
   }
+  /*addtoObject() {
+    if (this.selected_hour != undefined && this.selected_minute != undefined){
+    var new_Date = new Date(this.generated_date.getFullYear(),this.generated_date.getMonth(), this.generated_date.getDate(),this.selected_hour, this.selected_minute)
+    console.log(new_Date)
+    this.new_objgroup.generated = new_Date.toISOString()
+    console.log(this.new_objgroup.generated)
+    }
+    
+  }*/
+
+  addtoObject(){
+    this.new_objgroup.generated = this.generated_date.toISOString()
+    console.log(this.generated_date )
+  }
+
   addtoLabels() {
     var add = true
     for (let label_inObj of this.new_objgroup.labels) {

@@ -79,8 +79,8 @@
 <table mat-table [dataSource]="dataset_table" matSort class="mat-elevation-z8">
 
     <ng-container matColumnDef="id">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header> ID </th>
-        <td mat-cell *matCellDef="let element"> {{element.id}} 
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Copy ID </th>
+        <td mat-cell *matCellDef="let element">  
             <button [cdkCopyToClipboard]="element.id" mat-icon-button color="primary" (click)="openSnackBar()">
                 <mat-icon>content_copy</mat-icon>
                 </button>

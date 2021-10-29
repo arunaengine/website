@@ -21,6 +21,7 @@ import {MatExpansionModule} from '@angular/material/expansion';
 import {MatProgressBarModule} from '@angular/material/progress-bar';
 import {MatDividerModule} from '@angular/material/divider';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
+import {MatSelectModule} from '@angular/material/select';
 import { CreateProjectComponent } from './dialogs/create-project/create-project.component';
 import { AlertDialogComponent } from './dialogs/alert-dialog/alert-dialog.component';
 import { ProjectTokensComponent } from './dialogs/project-tokens/project-tokens.component';
@@ -108,6 +109,7 @@ export function storageFactory() : OAuthStorage {
     MatProgressBarModule,
     MatProgressSpinnerModule,
     MatDividerModule,
+    MatSelectModule,
     ClipboardModule,
     MatSnackBarModule,
     HttpClientModule,
