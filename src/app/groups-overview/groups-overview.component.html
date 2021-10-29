@@ -69,40 +69,47 @@
                             <mat-list-item>
                                 <mat-label>
                                     Objectname: {{userFile.filespecs.object.name}}
-                                    <button [cdkCopyToClipboard]="userFile.fromServer.link" mat-raised-button color="primary"
-                                    (click)="openSnackBar('URL copied to Clipboard.', 'success-snackbar')">
+                                    <button [cdkCopyToClipboard]="userFile.fromServer.link" mat-raised-button
+                                        color="primary"
+                                        (click)="openSnackBar('URL copied to Clipboard.', 'success-snackbar')">
                                         Copy Upload Link
                                     </button>
                                 </mat-label>
                             </mat-list-item>
                             <mat-list-item>
                                 <mat-label>
-                                    Filename: {{userFile.filespecs.object.filename}}.{{userFile.filespecs.object.filetype}}
+                                    Filename:
+                                    {{userFile.filespecs.object.filename}}.{{userFile.filespecs.object.filetype}}
                                 </mat-label>
                             </mat-list-item>
-                            
+
                             <mat-label>
                                 <div fxLayout="row wrap" fxLayoutGap="16px grid">
                                     <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
                                         <mat-form-field appearance="fill" class="example-form">
                                             <mat-label>File</mat-label>
-                                            <input type="text" disabled matInput [(ngModel)]="files_userUpload[i].file_name">
+                                            <input type="text" disabled matInput
+                                                [(ngModel)]="files_userUpload[i].file_name">
                                         </mat-form-field>
                                     </div>
 
                                     <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <input hidden type="file" #fileInput (input)="onFileInput(fileInput.files, i)" />
+                                        <input hidden type="file" #fileInput
+                                            (input)="onFileInput(fileInput.files, i)" />
                                         <button mat-mini-fab color="accent" (click)="fileInput.click()">
                                             <mat-icon>attach_file</mat-icon>
                                         </button>
                                     </div>
                                     <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <button mat-mini-fab color="accent" [disabled]="files_userUpload[i].uploadnotAllowed" (click)="uploadSingleFile(i)">
+                                        <button mat-mini-fab color="accent"
+                                            [disabled]="files_userUpload[i].uploadnotAllowed"
+                                            (click)="uploadSingleFile(i)">
                                             <mat-icon>upload</mat-icon>
                                         </button>
                                     </div>
                                     <div fxFlex="65%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <mat-progress-bar *ngIf="files_userUpload[i].process.uploading" color="accent" mode="determinate" [value]="files_userUpload[i].process.progress">
+                                        <mat-progress-bar *ngIf="files_userUpload[i].process.uploading" color="accent"
+                                            mode="determinate" [value]="files_userUpload[i].process.progress">
                                         </mat-progress-bar>
 
                                     </div>
@@ -141,9 +148,10 @@
     <mat-label>Filter</mat-label>
     <input matInput (keyup)="applyFilter($event)" placeholder="Name" #input>
 </mat-form-field>
-<table mat-table [dataSource]="obj_groups_table" matSort class="mat-elevation-z8" multiTemplateDataRows >
 
-    
+<table mat-table [dataSource]="obj_groups_table" matSort class="mat-elevation-z8" multiTemplateDataRows>
+
+
     <ng-container matColumnDef="name">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
         <td mat-cell *matCellDef="let element">
@@ -177,24 +185,64 @@
         </td>
     </ng-container>
 
-
     <ng-container matColumnDef="expandedDetail">
         <td mat-cell *matCellDef="let element" [attr.colspan]="displayedColumns.length">
-  
-          <div class="object-element-detail" [@detailExpand]="element.isExpanded ? 'expanded' : 'collapsed'">
-            test
-          </div>
+            <div class="example-element-detail" [@detailExpand]="element.isExpanded ? 'expanded' : 'collapsed'">
+                    <mat-card class="mat-elevation-z4" style="width: 100%;">
+                        <mat-card-content>
+                    <table mat-table [dataSource]="element.objects" class="mat-elevation-z4">
+                            <ng-container matColumnDef="filename">
+                                <th mat-header-cell *matHeaderCellDef> Filename </th>
+                                <td mat-cell *matCellDef="let inner_element">
+                                    {{inner_element.filename}} </td>
+                            </ng-container>
+                            <ng-container matColumnDef="id">
+                                <th mat-header-cell *matHeaderCellDef> ID </th>
+                                <td mat-cell *matCellDef="let inner_element"> {{inner_element.id}}
+                                    <button [cdkCopyToClipboard]="inner_element.id" mat-icon-button color="primary"
+                                        (click)="openSnackBar('ID copied to Clipboard.', 'success-snackbar')">
+                                        <mat-icon>content_copy</mat-icon>
+                                    </button>
+                                </td>
+                            </ng-container>
+                            <ng-container matColumnDef="filetype">
+                                <th mat-header-cell *matHeaderCellDef> Filetype </th>
+                                <td mat-cell *matCellDef="let inner_element">
+                                    {{inner_element.filetype}}</td>
+                            </ng-container>
+                            <ng-container matColumnDef="created">
+                                <th mat-header-cell *matHeaderCellDef> Created </th>
+                                <td mat-cell *matCellDef="let inner_element">
+                                    {{inner_element.created | date: "HH:mm.ss, dd. MMM yyyy"}}</td>
+                            </ng-container>
+                            <ng-container matColumnDef="filesize">
+                                <th mat-header-cell *matHeaderCellDef> Filesize </th>
+                                <td mat-cell *matCellDef="let inner_element">
+                                    {{inner_element.contentLen}} Bytes</td>
+                            </ng-container>
+                            <ng-container matColumnDef="delete">
+                                <th mat-header-cell *matHeaderCellDef> Delete Dataset </th>
+                                <td mat-cell *matCellDef="let inner_element">
+                                    <button mat-icon-button color="warn" (click)="deleteObjGroup(inner_element.id)">
+                                        <mat-icon>delete_forever</mat-icon>
+                                    </button>
+                                </td>
+                            </ng-container>
+                            <tr mat-header-row *matHeaderRowDef="inner_displayedColumns"></tr>
+                            <tr mat-row *matRowDef="let row; columns: inner_displayedColumns;"></tr>
+                        </table>
 
+                    </mat-card-content>
+                </mat-card>
+            </div>
         </td>
-      </ng-container>
+    </ng-container>
+
 
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns;"
-    class="object-element-row"
-    [class.student-expanded-row]="row.isExpanded" (click)="row.isExpanded = !row.isExpanded"></tr>
-
-    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="object-detail-row"></tr>
-
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="example-element-row"
+        [class.example-expanded-row]="row.isExpanded" (click)="row.isExpanded = !row.isExpanded"></tr>
+    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row"></tr>
     <tr class="mat-row" *matNoDataRow>
         <td class="mat-cell" colspan="4">No dataset found matching the filter "{{input.value}}"</td>
     </tr>

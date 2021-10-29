@@ -33,6 +33,7 @@ export class GroupsOverviewComponent implements OnInit {
 
   obj_groups_table: any
   displayedColumns: string[]
+  inner_displayedColumns: string[]
   filelist_forUpload = []
   upload_progress = []
   files_userUpload = []
@@ -50,6 +51,7 @@ export class GroupsOverviewComponent implements OnInit {
     console.log(this.upload_progress)
     console.log(this.apiService.obj_groups)
     this.displayedColumns = ["name", "description", "id", "created", "delete"]
+    this.inner_displayedColumns = ["filename", "filetype", "id","created", "filesize","delete"]
     this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
   }
 
