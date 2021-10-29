@@ -9,10 +9,15 @@ import { AuthService } from 'src/app/services/auth.service';
   styleUrls: ['./profile-dialog.component.scss']
 })
 export class ProfileDialogComponent implements OnInit {
-
-  constructor(public authService: AuthService, private snackBar:MatSnackBar) { }
+  groups= []
+  constructor(public authService: AuthService, private snackBar:MatSnackBar) {
+    for (let group of this.authService.user_data.groups){
+      this.groups.push(group.substring(1)) 
+    }
+   }
 
   ngOnInit(): void {
+    console.log(this.authService.user_data)
   }
 
   logout(){

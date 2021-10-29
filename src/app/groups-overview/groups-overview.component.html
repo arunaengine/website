@@ -242,9 +242,9 @@
                                     {{inner_element.created | date: "dd. MMM yyyy, HH:mm.ss"}}</td>
                             </ng-container>
                             <ng-container matColumnDef="filesize">
-                                <th mat-header-cell *matHeaderCellDef> Filesize </th>
+                                <th mat-header-cell *matHeaderCellDef> Filesize (Bytes)</th>
                                 <td mat-cell *matCellDef="let inner_element">
-                                    {{inner_element.contentLen}} Bytes</td>
+                                    {{inner_element.contentLen}}</td>
                             </ng-container>
                             <!--<ng-container matColumnDef="id">
                                 <th mat-header-cell *matHeaderCellDef> Copy ID </th>

@@ -127,13 +127,13 @@
         <td mat-cell *matCellDef="let element">
             <button mat-icon-button 
             #tooltip="matTooltip" 
-            matTooltip="View Dataset Details"
+            matTooltip="View Details"
             matTooltipPosition="above"
             color="primary" (click)="viewDetails(element.id)">
                 <mat-icon>search</mat-icon></button>
             <button mat-icon-button 
             #tooltip="matTooltip" 
-                matTooltip="View Dataset Versions"
+                matTooltip="View Versions"
                 matTooltipPosition="above"
             color="primary" (click)="viewVersion(element.id)">
                 <mat-icon>history</mat-icon></button>

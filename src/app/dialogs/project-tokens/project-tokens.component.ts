@@ -32,7 +32,7 @@ export class ProjectTokensComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {
     console.log(this.data)
-    this.displayedColumns=["id", "token", "rights", "delete"]
+    this.displayedColumns=["id", "token", "rights", "actions"]
     this.token_table = new MatTableDataSource(this.data.apiKeys)
    }
 

@@ -187,7 +187,7 @@ export class ApiService {
   }
   formatObjGroup(data: any){
     return new Promise(resolve => {
-      var new_data = data.map(v => Object.assign(v,{isExpanded: false, objectcount: v["objects"].length}))
+      var new_data = data.map(v => Object.assign(v,{isExpanded: false, objectcount: v["objects"].length, objects: v.objects.map(o => Object.assign(o, {contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".")}))}))
       console.log(new_data)
       this.obj_groups = new_data
       resolve("")

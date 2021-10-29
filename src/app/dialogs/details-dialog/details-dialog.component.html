@@ -1,5 +1,8 @@
 <h1 mat-dialog-title color="primary">
-    <button mat-icon-button mat-dialog-close color="primary">
+    <button mat-mini-fab mat-dialog-close 
+    #tooltip="matTooltip" 
+            matTooltip="Close"
+            matTooltipPosition="below" color="primary">
         <mat-icon>close</mat-icon>
     </button>
     Details - {{data.details.dataset.name}}
@@ -13,7 +16,10 @@
         <mat-list-item >
             <mat-icon>fingerprint</mat-icon>
             ID: {{data.details.dataset.id}}
-            <button [cdkCopyToClipboard]="data.details.dataset.id" mat-icon-button color="primary" (click)="openSnackBar()">
+            <button [cdkCopyToClipboard]="data.details.dataset.id" mat-icon-button 
+            #tooltip="matTooltip" 
+            matTooltip="Copy ID"
+            matTooltipPosition="above" color="primary" (click)="openSnackBar()">
                 <mat-icon>content_copy</mat-icon>
             </button>
         </mat-list-item>
