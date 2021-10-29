@@ -86,7 +86,7 @@
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Description </th>
         <td mat-cell *matCellDef="let element"> {{element.description}} </td>
     </ng-container>
-    <ng-container matColumnDef="id">
+    <!--<ng-container matColumnDef="id">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Copy ID </th>
         <td mat-cell *matCellDef="let element"> 
             <button [cdkCopyToClipboard]="element.id" mat-icon-button color="primary" (click)="openSnackBar()">
@@ -94,30 +94,62 @@
             </button> </td>
     </ng-container>
 
-    <ng-container matColumnDef="generateKeys">
+   <ng-container matColumnDef="generateKeys">
         <th mat-header-cell *matHeaderCellDef> View API Keys </th>
         <td mat-cell *matCellDef="let element">
             <button mat-icon-button color="primary" (click)="viewKeys(element)">
                 <mat-icon>key</mat-icon>
             </button>
         </td>
-    </ng-container>
-    <ng-container matColumnDef="deleteProjects">
-        <th mat-header-cell *matHeaderCellDef> Delete Project </th>
+    </ng-container>-->
+    <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef> Actions </th>
         <td mat-cell *matCellDef="let element">
-            <button mat-icon-button color="warn" (click)="deleteProject(element.name, element.id)">
+            <button 
+                mat-icon-button 
+                #tooltip="matTooltip" 
+                matTooltip="Copy Project ID"
+                matTooltipPosition="above"
+                color="primary" 
+                [cdkCopyToClipboard]="element.id"
+                (click)="openSnackBar()">
+                <mat-icon>content_copy</mat-icon>
+                </button>
+
+                <button
+                mat-icon-button 
+                #tooltip="matTooltip" 
+                matTooltip="View API Keys"
+                matTooltipPosition="above"
+                color="primary" 
+                (click)="viewKeys(element)">
+                <mat-icon>key</mat-icon>
+                </button>
+            <button mat-icon-button 
+            #tooltip="matTooltip" 
+            matTooltip="Delete Project"
+            matTooltipPosition="above"
+            matTooltipClass="warning-snackbar"
+            color="warn" (click)="deleteProject(element.name, element.id)">
                 <mat-icon>delete_forever</mat-icon>
+            </button>
+            <button mat-icon-button color="primary" 
+            #tooltip="matTooltip" 
+            matTooltip="Go to Project"
+            matTooltipPosition="above"
+            (click)="viewProject(element)">
+                <mat-icon>arrow_forward</mat-icon>
             </button>
         </td>
     </ng-container>
-    <ng-container matColumnDef="details">
+    <!--<ng-container matColumnDef="details">
         <th mat-header-cell *matHeaderCellDef> Go to Project </th>
         <td mat-cell *matCellDef="let element">
             <button mat-icon-button color="primary" (click)="viewProject(element)">
                 <mat-icon>arrow_forward</mat-icon>
             </button>
         </td>
-    </ng-container>
+    </ng-container>-->
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
     <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 

@@ -157,15 +157,7 @@
         <td mat-cell *matCellDef="let element">
             {{element.name}} </td>
     </ng-container>
-    <ng-container matColumnDef="id">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Copy ID </th>
-        <td mat-cell *matCellDef="let element">
-            <button [cdkCopyToClipboard]="element.id" mat-icon-button color="primary"
-                (click)="openSnackBar('ID copied to Clipboard.', 'success-snackbar')">
-                <mat-icon>content_copy</mat-icon>
-            </button>
-        </td>
-    </ng-container>
+    
     <ng-container matColumnDef="description">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Description </th>
         <td mat-cell *matCellDef="let element">
@@ -181,14 +173,50 @@
         <td mat-cell *matCellDef="let element">
             {{element.created}}</td>
     </ng-container>
-    <ng-container matColumnDef="delete">
-        <th mat-header-cell *matHeaderCellDef> Delete Dataset </th>
+    <!--<ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Copy ID </th>
         <td mat-cell *matCellDef="let element">
-            <button mat-icon-button color="warn" (click)="deleteObjGroup(element.id)">
+            <button [cdkCopyToClipboard]="element.id" mat-icon-button color="primary"
+                (click)="openSnackBar('ID copied to Clipboard.', 'success-snackbar')">
+                <mat-icon>content_copy</mat-icon>
+            </button>
+        </td>
+    </ng-container>
+    <ng-container matColumnDef="download">
+        <th mat-header-cell *matHeaderCellDef> Download Object Group </th>
+        <td mat-cell *matCellDef="let element">
+            <button mat-icon-button color="primary" (click)="downloadObjectGroup(element.id)">
+                <mat-icon>file_download</mat-icon>
+            </button>
+        </td>
+    </ng-container>-->
+    <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef> Actions </th>
+        <td mat-cell *matCellDef="let element">
+            <button [cdkCopyToClipboard]="element.id" mat-icon-button 
+            #tooltip="matTooltip" 
+            matTooltip="Copy Object Group ID"
+            matTooltipPosition="above" color="primary"
+                (click)="openSnackBar('ID copied to Clipboard.', 'success-snackbar')">
+                <mat-icon>content_copy</mat-icon>
+            </button>
+            <button mat-icon-button 
+            #tooltip="matTooltip" 
+            matTooltip="Download Object Group"
+            matTooltipPosition="above" color="primary" (click)="downloadObjectGroup(element.id)">
+                <mat-icon>file_download</mat-icon>
+            </button>
+            <button mat-icon-button 
+            #tooltip="matTooltip" 
+            matTooltip="Delete Object Group"
+            matTooltipPosition="above"
+            matTooltipClass="warning-snackbar"
+            color="warn" (click)="deleteObjGroup(element.name, element.id)">
                 <mat-icon>delete_forever</mat-icon>
             </button>
         </td>
     </ng-container>
+    
     
 
     <ng-container matColumnDef="expandedDetail">
@@ -202,15 +230,7 @@
                                 <td mat-cell *matCellDef="let inner_element">
                                     {{inner_element.filename}} </td>
                             </ng-container>
-                            <ng-container matColumnDef="id">
-                                <th mat-header-cell *matHeaderCellDef> Copy ID </th>
-                                <td mat-cell *matCellDef="let inner_element">
-                                    <button [cdkCopyToClipboard]="inner_element.id" mat-icon-button color="primary"
-                                        (click)="openSnackBar('ID copied to Clipboard.', 'success-snackbar')">
-                                        <mat-icon>content_copy</mat-icon>
-                                    </button>
-                                </td>
-                            </ng-container>
+                            
                             <ng-container matColumnDef="filetype">
                                 <th mat-header-cell *matHeaderCellDef> Filetype </th>
                                 <td mat-cell *matCellDef="let inner_element">
@@ -226,10 +246,30 @@
                                 <td mat-cell *matCellDef="let inner_element">
                                     {{inner_element.contentLen}} Bytes</td>
                             </ng-container>
-                            <ng-container matColumnDef="download">
-                                <th mat-header-cell *matHeaderCellDef> Download File </th>
+                            <!--<ng-container matColumnDef="id">
+                                <th mat-header-cell *matHeaderCellDef> Copy ID </th>
                                 <td mat-cell *matCellDef="let inner_element">
-                                    <button mat-icon-button color="primary" (click)="downloadObject(inner_element.id)">
+                                    <button [cdkCopyToClipboard]="inner_element.id" mat-icon-button color="primary"
+                                        (click)="openSnackBar('ID copied to Clipboard.', 'success-snackbar')">
+                                        <mat-icon>content_copy</mat-icon>
+                                    </button>
+                                </td>
+                            </ng-container>-->
+                            <ng-container matColumnDef="actions">
+                                <th mat-header-cell *matHeaderCellDef> Actions </th>
+                                <td mat-cell *matCellDef="let inner_element">
+                                    <button [cdkCopyToClipboard]="inner_element.id" mat-icon-button  
+                                    #tooltip="matTooltip" 
+            matTooltip="Copy Object ID"
+            matTooltipPosition="above"
+                                    color="primary"
+                                        (click)="openSnackBar('ID copied to Clipboard.', 'success-snackbar')">
+                                        <mat-icon>content_copy</mat-icon>
+                                    </button>
+                                    <button mat-icon-button 
+                                    #tooltip="matTooltip" 
+            matTooltip="Download File"
+            matTooltipPosition="above" color="primary" (click)="downloadObject(inner_element.id)">
                                         <mat-icon>file_download</mat-icon>
                                     </button>
                                 </td>

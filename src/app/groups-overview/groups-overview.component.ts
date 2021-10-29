@@ -12,6 +12,7 @@ import { MatTableDataSource } from '@angular/material/table';
 import { HttpEvent, HttpEventType } from '@angular/common/http';
 import { AuthService } from '../services/auth.service';
 import { animate, state, style, transition, trigger } from '@angular/animations';
+import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
 
 
 @Component({
@@ -50,8 +51,8 @@ export class GroupsOverviewComponent implements OnInit {
   ) {
     console.log(this.upload_progress)
     console.log(this.apiService.obj_groups)
-    this.displayedColumns = ["name", "description","objectcount","created",  "id", "delete"]
-    this.inner_displayedColumns = ["filename", "filetype","created", "filesize", "id","download"]
+    this.displayedColumns = ["name", "description","objectcount","created",   "actions"]
+    this.inner_displayedColumns = ["filename", "filetype","created", "filesize", "actions"]
     this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
   }
 
@@ -238,11 +239,27 @@ export class GroupsOverviewComponent implements OnInit {
       panelClass: [design]
     })
   }
-  deleteObjGroup(id) {
+  deleteObjGroup(name,id) {
     console.log("deleting ObjGroup", id)
-    this.apiService.deleteObjectGroup(id).then(()=> {
-      this.refreshData()
+    const dialogRef = this.dialog.open(AlertDialogComponent,{
+      data:{
+        title: "Delete Object Group?",
+        button: "Delete Object Group",
+        message: "Are you sure you want to delete  '"+ name + "' (ID: "+id+")?"
+      },
+      hasBackdrop: true
     })
+    dialogRef.afterClosed().subscribe(result => {
+      if (result){
+        console.log("Dialog closed: ", result)
+        this.apiService.deleteObjectGroup(id).then(()=> {
+      this.refreshData()
+      })
+      } else {
+        console.log("Dialog dismissed")
+      }
+    })
+    
   }
 
   downloadObject(id){
@@ -256,5 +273,9 @@ export class GroupsOverviewComponent implements OnInit {
       this.obj_groups_table.paginator = this.paginator
       this.obj_groups_table.sort = this.sort
     })
+  }
+
+  downloadObjectGroup(id){
+    console.log("Downloading Object group...")
   }
 }

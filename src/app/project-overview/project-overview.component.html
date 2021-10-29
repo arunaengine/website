@@ -96,7 +96,12 @@
         <td mat-cell *matCellDef="let element">
             {{element.description}}</td>
     </ng-container>
-    <ng-container matColumnDef="details">
+    <ng-container matColumnDef="created">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Created </th>
+        <td mat-cell *matCellDef="let element">
+            {{element.created | date: "dd. MMM yyyy, HH:mm.ss"}}</td>
+    </ng-container>
+    <!--<ng-container matColumnDef="details">
         <th mat-header-cell *matHeaderCellDef> View Details </th>
         <td mat-cell *matCellDef="let element">
             <button mat-icon-button color="primary" (click)="viewDetails(element.id)">
@@ -116,11 +121,33 @@
             <button mat-icon-button color="primary" (click)="viewVersion(element.id)">
                 <mat-icon>history</mat-icon></button>
         </td>
-    </ng-container>
-    <ng-container matColumnDef="objectgroup">
-        <th mat-header-cell *matHeaderCellDef> Go to Object Groups </th>
+    </ng-container>-->
+    <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
         <td mat-cell *matCellDef="let element">
-            <button mat-icon-button color="primary" (click)="toObjectGroups(element)">
+            <button mat-icon-button 
+            #tooltip="matTooltip" 
+            matTooltip="View Dataset Details"
+            matTooltipPosition="above"
+            color="primary" (click)="viewDetails(element.id)">
+                <mat-icon>search</mat-icon></button>
+            <button mat-icon-button 
+            #tooltip="matTooltip" 
+                matTooltip="View Dataset Versions"
+                matTooltipPosition="above"
+            color="primary" (click)="viewVersion(element.id)">
+                <mat-icon>history</mat-icon></button>
+                <button mat-icon-button 
+                #tooltip="matTooltip" 
+                matTooltip="Delete Dataset"
+                matTooltipPosition="above"color="warn" 
+                matTooltipClass="warning-snackbar"
+                (click)="deleteDataset(element.name, element.id)">
+                    <mat-icon>delete_forever</mat-icon></button>
+            <button mat-icon-button
+            #tooltip="matTooltip" 
+                matTooltip="Go to Dataset"
+                matTooltipPosition="above" color="primary" (click)="toObjectGroups(element)">
                 <mat-icon>arrow_forward</mat-icon></button>
         </td>
     </ng-container>
