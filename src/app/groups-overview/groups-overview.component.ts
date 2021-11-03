@@ -13,6 +13,7 @@ import { HttpEvent, HttpEventType } from '@angular/common/http';
 import { AuthService } from '../services/auth.service';
 import { animate, state, style, transition, trigger } from '@angular/animations';
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
+import { DownloadlinkDialogComponent } from '../dialogs/downloadlink-dialog/downloadlink-dialog.component';
 
 
 @Component({
@@ -41,6 +42,8 @@ export class GroupsOverviewComponent implements OnInit {
   uploadPanel = false
   upload_userFiles = false
   uploadedFinishedButton = false
+  date_range = {start: new Date, end: new Date}
+
 
   constructor(
     private router: Router,
@@ -274,8 +277,21 @@ export class GroupsOverviewComponent implements OnInit {
       this.obj_groups_table.sort = this.sort
     })
   }
-
-  downloadObjectGroup(id){
+  /*viewSelectedGroups(){
+    console.log(this.date_range)
+    this.apiService.viewSelectedObjectGroups(this.apiService.dataset.id, this.date_range.start.toISOString(), this.date_range.end.toISOString()).then(()=> {
+      this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
+      this.obj_groups_table.paginator = this.paginator
+      this.obj_groups_table.sort = this.sort
+    })
+  }*/
+  downloadObjectGroup(element){
     console.log("Downloading Object group...")
+    this.apiService.downloadObjectGroup(element.id).then(res => {
+    const dialogRef = this.dialog.open(DownloadlinkDialogComponent,{
+        data: {title: "Download Link: "+element.name, link: res["url"]},
+        hasBackdrop: true
+      })
+    })
   }
 }

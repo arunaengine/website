@@ -185,6 +185,20 @@ export class ApiService {
       })
     })
   }
+ /* viewSelectedObjectGroups(dataset_id,start_date, end_date){
+    return new Promise(resolve => {
+      var post_object = { id: dataset_id, start:start_date, end:end_date }
+      console.log(post_object)
+      this.http.post(this.gateway_url + "/objectgroupsindaterange/query", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log("daterange",res)
+        this.formatObjGroup(res["objectGroups"]).then(_ => {
+          resolve("")
+        })
+        //this.obj_groups = res["objectGroups"]       
+      })
+    })
+  }*/
+
   formatObjGroup(data: any){
     return new Promise(resolve => {
       var new_data = data.map(v => Object.assign(v,{isExpanded: false, objectcount: v["objects"].length, objects: v.objects.map(o => Object.assign(o, {contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".")}))}))
@@ -232,6 +246,22 @@ export class ApiService {
         console.log(res_added)
           window.open(res_added["downloadLink"])
           resolve("done")
+        
+      })
+    })
+  }
+
+  downloadObjectGroup(group_id){
+    return new Promise(resolve => {
+      var post_obj = {streamType: "STREAM_TYPE_TARGZ", dataset: {datasetId: this.dataset.id}}
+      //post_obj.groupIds.objectGroups.push(group_id)
+      console.log(post_obj)
+      ///launch dialog -> link copy
+      
+      this.http.post(this.gateway_url + "/objectgroupsstream", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log("Object Group Response",res)
+        resolve(res)
+        window.open(res["url"])
         
       })
     })

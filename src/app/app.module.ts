@@ -45,7 +45,8 @@ import { GroupsOverviewComponent } from './groups-overview/groups-overview.compo
 import { CreateObjgroupComponent } from './dialogs/create-objgroup/create-objgroup.component';
 import { CreateObjectComponent } from './dialogs/create-object/create-object.component';
 import { MAT_DATE_LOCALE } from '@angular/material/core';
-import { LoadingComponent } from './dialogs/loading/loading.component'
+import { LoadingComponent } from './dialogs/loading/loading.component';
+import { DownloadlinkDialogComponent } from './dialogs/downloadlink-dialog/downloadlink-dialog.component'
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -86,6 +87,7 @@ export function storageFactory() : OAuthStorage {
     CreateObjgroupComponent,
     CreateObjectComponent,
     LoadingComponent,
+    DownloadlinkDialogComponent,
   ],
   imports: [
     BrowserModule,

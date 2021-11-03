@@ -17,7 +17,9 @@
         </mat-card-title>
     </mat-card-header>
     <mat-card-content>
-        <mat-list>
+        <div fxLayout="row wrap" fxLayoutGap="16px grid">
+            <div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
+                <mat-list>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
                 Number of Object Groups: {{apiService.obj_groups.length}}
@@ -31,6 +33,27 @@
                 Stat 3
             </mat-list-item>
         </mat-list>
+            </div>
+            <!--<div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
+                <mat-label><h3>View object groups in date range</h3></mat-label>
+                <mat-form-field appearance="fill" class="example-form">
+                    <mat-label>Enter a date range</mat-label>
+                    <mat-date-range-input [rangePicker]="picker">
+                      <input  matStartDate [(ngModel)]="date_range.start" placeholder="Start date">
+                      <input  matEndDate [(ngModel)]="date_range.end" placeholder="End date">
+                    </mat-date-range-input>
+                    <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                    <mat-date-range-picker #picker>
+                        <mat-datepicker-actions>
+                            <button mat-button matDatepickerCancel>Cancel</button>
+                            <button mat-raised-button (click)=viewSelectedGroups() color="primary" matDatepickerApply>Apply</button>
+                          </mat-datepicker-actions>
+                    </mat-date-range-picker>
+                  </mat-form-field> 
+                <button mat-raised-button (click)="refreshData()" color="accent">Reset</button>
+            </div>-->
+        </div>
+        
 
         <div *ngIf="uploadPanel">
             <mat-expansion-panel expanded>
@@ -203,7 +226,7 @@
             <button mat-icon-button 
             #tooltip="matTooltip" 
             matTooltip="Download Object Group"
-            matTooltipPosition="above" color="primary" (click)="downloadObjectGroup(element.id)">
+            matTooltipPosition="above" color="primary" (click)="downloadObjectGroup(element)">
                 <mat-icon>file_download</mat-icon>
             </button>
             <button mat-icon-button 

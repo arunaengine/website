@@ -4,7 +4,6 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableDataSource } from '@angular/material/table';
 import { CreateObjectComponent } from '../create-object/create-object.component';
 //import {MatDatepickerModule} from '@angular/material/datepicker';
-import * as moment from 'moment';
 
 @Component({
   selector: 'app-create-objgroup',
