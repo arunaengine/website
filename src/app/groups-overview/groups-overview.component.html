@@ -162,6 +162,13 @@
     </mat-card-content>
     <mat-card-actions>
         <button mat-raised-button color="primary" (click)=newObjectgroup()>New Object Group</button>
+        <button mat-icon-button 
+        [cdkCopyToClipboard]="share_url"
+            #tooltip="matTooltip" 
+            matTooltip="Share Dataset to create Object Groups"
+            matTooltipPosition="above" color="accent" (click)="shareCreateObjectGroups()">
+                <mat-icon>share</mat-icon>
+            </button>
     </mat-card-actions>
 </mat-card>
 
@@ -229,6 +236,12 @@
             matTooltipPosition="above" color="primary" (click)="downloadObjectGroup(element)">
                 <mat-icon>file_download</mat-icon>
             </button>
+            <!--<button mat-icon-button 
+            #tooltip="matTooltip" 
+            matTooltip="Share Object Group to Upload Files"
+            matTooltipPosition="above" color="primary" (click)="shareObjectGroup(element)">
+                <mat-icon>share</mat-icon>
+            </button>-->
             <button mat-icon-button 
             #tooltip="matTooltip" 
             matTooltip="Delete Object Group"

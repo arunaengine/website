@@ -43,7 +43,7 @@ export class GroupsOverviewComponent implements OnInit {
   upload_userFiles = false
   uploadedFinishedButton = false
   date_range = {start: new Date, end: new Date}
-
+  share_url=""
 
   constructor(
     private router: Router,
@@ -293,5 +293,17 @@ export class GroupsOverviewComponent implements OnInit {
         hasBackdrop: true
       })
     })
+  }
+
+  shareObjectGroup(element){
+
+  }
+
+  shareCreateObjectGroups(){
+    var url = "http://localhost:4200/anonymous_upload/?action=createObjGroup&name="+encodeURI(this.apiService.dataset.name)+
+    "&link=XXX&id="+this.apiService.dataset.id+"&description="+encodeURI(this.apiService.dataset.description)
+    console.log(url)
+    this.share_url = url
+    this.openSnackBar('Share URL copied to Clipboard.', 'success-snackbar')
   }
 }
