@@ -1,7 +1,7 @@
-FROM node:latest as build
+FROM node:14 as build
 WORKDIR /usr/local/app
 COPY ./ /usr/local/app/
-RUN export NODE_OPTIONS=--openssl-legacy-provider
+
 RUN npm install
 RUN npm run build
 RUN rm -r /usr/local/app/dist/BioDataDBWebsite/assets/config/config.json
