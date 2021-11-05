@@ -1,3 +1,64 @@
-<p>anonymous-upload works!</p>
-{{query_content | json}}
-<button mat-raised-button color="primary" (click)=createObjectGroup()>Create Object group</button>
+<mat-toolbar color="primary">
+BioData DB - {{query_content.name}}
+</mat-toolbar>
+<mat-card>
+    <mat-card-content>
+        <mat-list>
+            <mat-list-item>
+                <mat-icon>local_offer</mat-icon>
+                Dataset Name: {{query_content.name}}
+            </mat-list-item>
+            <mat-list-item>
+                <mat-icon>fingerprint</mat-icon>
+                Dataset ID: {{query_content.id}}
+                <button [cdkCopyToClipboard]="query_content.id" mat-icon-button 
+            #tooltip="matTooltip" 
+            matTooltip="Copy ID"
+            matTooltipPosition="above" color="primary" (click)="openSnackBar()">
+                <mat-icon>content_copy</mat-icon>
+            </button>
+            </mat-list-item>
+            <mat-list-item>
+                <mat-icon>description</mat-icon>
+               Object Group Description: {{query_content.description}}
+            </mat-list-item>
+            <mat-list-item>
+                <mat-icon>source</mat-icon>
+               Expected Filetype: .json DUMMY
+            </mat-list-item>
+            <mat-list-item style="padding-top: 20px;">
+                <div fxLayout="row wrap" fxLayoutGap="16px grid">
+                    <div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
+                        <mat-form-field appearance="fill" class="example-form">
+                            <mat-label>File</mat-label>
+                            <input type="text" disabled matInput [(ngModel)]="file_name">
+                        </mat-form-field>
+                    </div>
+            
+                    <div fxFlex="25%" fxFlex.xs="100%" fxFlex.sm="33%">
+                        <input hidden type="file" #fileInput (input)="onFileInput(fileInput.files)" />
+                        <button mat-raised-button color="accent" (click)="fileInput.click()">
+                            Select file
+                        </button>
+                    </div>
+                    <div fxFlex="25%" fxFlex.xs="100%" fxFlex.sm="33%">
+                        <button [disabled]="no_file" mat-raised-button color="accent" (click)=UploadFile()>
+                            Upload File
+                        </button>
+                    </div>
+                </div>
+                
+            </mat-list-item>
+            <mat-list-item *ngIf="uploading">
+                Uploading File: {{file.name}}
+                <mat-progress-bar color="accent" mode="determinate"
+                                    [value]="40">
+                                </mat-progress-bar>
+            </mat-list-item>
+        </mat-list>
+    </mat-card-content>
+    <!--<mat-card-actions>
+      <button *ngIf="query_content.action == 'createObjGroup'" mat-raised-button color="primary" (click)=createObjectGroup()>Create Object group</button>  
+      <button mat-raised-button color="primary">Upload File</button>
+    </mat-card-actions>-->
+</mat-card>

@@ -14,6 +14,7 @@ import { AuthService } from '../services/auth.service';
 import { animate, state, style, transition, trigger } from '@angular/animations';
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
 import { DownloadlinkDialogComponent } from '../dialogs/downloadlink-dialog/downloadlink-dialog.component';
+import { Clipboard } from '@angular/cdk/clipboard';
 
 
 @Component({
@@ -43,14 +44,14 @@ export class GroupsOverviewComponent implements OnInit {
   upload_userFiles = false
   uploadedFinishedButton = false
   date_range = {start: new Date, end: new Date}
-  share_url=""
 
   constructor(
     private router: Router,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     public apiService: ApiService,
-    public authService: AuthService
+    public authService: AuthService,
+    private clipboard: Clipboard
   ) {
     console.log(this.upload_progress)
     console.log(this.apiService.obj_groups)
@@ -296,14 +297,20 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   shareObjectGroup(element){
-
-  }
-
-  shareCreateObjectGroups(){
-    var url = "http://localhost:4200/anonymous_upload/?action=createObjGroup&name="+encodeURI(this.apiService.dataset.name)+
-    "&link=XXX&id="+this.apiService.dataset.id+"&description="+encodeURI(this.apiService.dataset.description)
-    console.log(url)
-    this.share_url = url
+    var url = "http://localhost:4200/anonymous_upload/?action=uploadObject&name="+encodeURI(element.name)+
+    "&link=XXX&id="+element.id+"&description="+encodeURI(element.description)
+    this.clipboard.copy(url)
     this.openSnackBar('Share URL copied to Clipboard.', 'success-snackbar')
   }
+
+ shareCreateObjectGroups(){
+   console.log(this.obj_groups_table)
+    var url = "http://localhost:4200/anonymous_upload/?action=uploadObject&name="+encodeURI(this.apiService.dataset.name)+
+    "&link=XXX&id="+this.apiService.dataset.id+"&description="+encodeURI("Dummy Description first sample upload")
+    console.log(url)
+    this.clipboard.copy(url)
+    this.openSnackBar('Share URL copied to Clipboard.', 'success-snackbar')
+  }
+
+
 }

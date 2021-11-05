@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CreateObjgroupComponent } from '../dialogs/create-objgroup/create-objgroup.component';
 
@@ -10,10 +11,15 @@ import { CreateObjgroupComponent } from '../dialogs/create-objgroup/create-objgr
 })
 export class AnonymousUploadComponent implements OnInit {
   query_content: any
+  file: File
+  file_name = ""
+  uploading = false
+  no_file = true
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar
   ) {
     this.route.queryParams.subscribe(params => {
       if (params.action == undefined){
@@ -48,10 +54,33 @@ export class AnonymousUploadComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
         console.log("Dialog closed: ", result)
+
       } else {
 
         console.log("Dialog dismissed")
       }
     })
   }
+  openSnackBar(){
+    this.snackBar.open("ID copied to Clipboard.","",{
+      duration: 3000,
+      panelClass: ["success-snackbar"]
+    })
+  }
+
+  onFileInput(files: FileList |null){
+    if (files) {
+      this.file = files[0]
+          this.file_name = this.file.name
+          console.log(this.file)
+          this.no_file = false
+    } else {
+      this.no_file = true
+    }
+    
+    }
+
+    async UploadFile(){
+      this.uploading = true
+    }
 }
