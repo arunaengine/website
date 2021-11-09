@@ -3,6 +3,7 @@ import { HttpClient, HttpEvent, HttpEventType, HttpHeaders } from '@angular/comm
 import { OAuthService } from 'angular-oauth2-oidc';
 import { ConfigService } from './config.service';
 import * as moment from 'moment';
+import * as FileSaver from 'file-saver';
 
 
 @Injectable({
@@ -21,7 +22,7 @@ export class ApiService {
   constructor(
     private http: HttpClient,
     private oauthService: OAuthService,
-    private configService: ConfigService
+    private configService: ConfigService,
   ) {
     this.gateway_url = this.configService.gateway_url
     this.projects = []
@@ -223,12 +224,12 @@ export class ApiService {
   uploadFile(url, file){
     console.log(url, file)
     var data = new FormData()
-    data.append(file.name.split("."[0]),file)
+    data.append("file",file)
     var headers = this.configureHeadersAccessKey()
     headers["reportProgress"] = true
     headers["observe"]="events"
     
-    return this.http.put(url, data, headers).pipe()
+    return this.http.put(url, file, headers).pipe()
   }
   deleteObjectGroup(objectgroup_id){
     console.log(objectgroup_id)
@@ -240,11 +241,14 @@ export class ApiService {
     }) 
   }
 
-  downloadSingleObject(object_id){
+  downloadSingleObject(object){
     return new Promise(resolve => {
-      this.http.get(this.gateway_url + "/objectload/download/" + object_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
+      this.http.get(this.gateway_url + "/objectload/download/" + object.id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
         console.log(res_added)
-          window.open(res_added["downloadLink"])
+        this.http.get(res_added["downloadLink"],{responseType:"blob"}).subscribe(res_dl => {
+          FileSaver.saveAs(res_dl, object.filename+"."+object.filetype)
+        })
+          //window.open(res_added["downloadLink"])
           resolve("done")
         
       })
@@ -261,9 +265,42 @@ export class ApiService {
       this.http.post(this.gateway_url + "/objectgroupsstream", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log("Object Group Response",res)
         resolve(res)
+        //FileSaver.saveAs(data, filename)
+        
         window.open(res["url"])
         
       })
     })
   }
+
+  downloadObjectGroupNew(group){
+    console.log(group)
+    for (let object of group.objects){
+      console.log(object)
+      this.http.get(this.gateway_url + "/objectload/download/" + object.id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
+      console.log(res_added)
+      this.http.get(res_added["downloadLink"],{responseType:"blob"}).subscribe(res_dl => {
+        FileSaver.saveAs(res_dl, object.filename +"."+object.filetype)
+      })
+    })
+    }
+    
+  }
+
+  /*saveFile(data){
+    const blob = new Blob([data], {type: "application/json"})
+    const url = window.URL.createObjectURL(blob)
+    window.open(url)
+  }
+  saveFilePerHand(data){
+    const a = document.createElement("a")
+        const objectUrl = URL.createObjectURL(data)
+        a.href = objectUrl
+        a.download = "test.json"
+        a.click()
+        URL.revokeObjectURL(objectUrl)
+  }
+  saveFileFileSaver(data){
+    FileSaver.saveAs(data, "test.json")
+  }*/
 }

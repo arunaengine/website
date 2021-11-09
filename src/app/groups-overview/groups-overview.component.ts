@@ -266,9 +266,9 @@ export class GroupsOverviewComponent implements OnInit {
     
   }
 
-  downloadObject(id){
-    console.log("Downloading Object", id)
-    this.apiService.downloadSingleObject(id)
+  downloadObject(object){
+    console.log("Downloading Object", object)
+    this.apiService.downloadSingleObject(object)
   }
 
   refreshData(){
@@ -288,12 +288,14 @@ export class GroupsOverviewComponent implements OnInit {
   }*/
   downloadObjectGroup(element){
     console.log("Downloading Object group...")
+    this.apiService.downloadObjectGroupNew(element)
+    /*
     this.apiService.downloadObjectGroup(element.id).then(res => {
     const dialogRef = this.dialog.open(DownloadlinkDialogComponent,{
         data: {title: "Download Link: "+element.name, link: res["url"]},
         hasBackdrop: true
       })
-    })
+    })*/
   }
 
   shareObjectGroup(element){
