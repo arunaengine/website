@@ -15,6 +15,7 @@ import { animate, state, style, transition, trigger } from '@angular/animations'
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
 import { DownloadlinkDialogComponent } from '../dialogs/downloadlink-dialog/downloadlink-dialog.component';
 import { Clipboard } from '@angular/cdk/clipboard';
+import { LoadingComponent } from '../dialogs/loading/loading.component';
 
 
 @Component({
@@ -44,6 +45,8 @@ export class GroupsOverviewComponent implements OnInit {
   upload_userFiles = false
   uploadedFinishedButton = false
   date_range = {start: new Date, end: new Date}
+  forward_disabled = false
+  back_disabled = true
 
   constructor(
     private router: Router,
@@ -272,10 +275,15 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   refreshData(){
+    const dialogRef = this.dialog.open(LoadingComponent, {
+      hasBackdrop: true,
+      disableClose: true
+    })
     this.apiService.viewObjectGroups(this.apiService.dataset).then(()=> {
     this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
       this.obj_groups_table.paginator = this.paginator
       this.obj_groups_table.sort = this.sort
+      dialogRef.close()
     })
   }
   /*viewSelectedGroups(){
@@ -314,5 +322,27 @@ export class GroupsOverviewComponent implements OnInit {
     this.openSnackBar('Share URL copied to Clipboard.', 'success-snackbar')
   }
 
+  changePage(action){
+    if (action == "forward"){
+      this.back_disabled = false
+      this.apiService.paginantor_config.activepage +=1
+      if (this.apiService.paginantor_config.activepage +1 == this.apiService.paginantor_config.pagecount){
+        this.forward_disabled = true
+      } else {
+        this.forward_disabled = false
+      }
+    }
+    if (action == "back"){
+      this.forward_disabled = false
+      this.apiService.paginantor_config.activepage -= 1
+      if (this.apiService.paginantor_config.activepage == 0){
+        this.back_disabled = true
+      } else {
+        this.back_disabled = false
+      }
+    }
+    this.refreshData()
+    console.log(this.apiService.paginantor_config)
+  }
 
 }

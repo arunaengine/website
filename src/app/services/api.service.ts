@@ -18,6 +18,7 @@ export class ApiService {
   public users: any
   public dataset: any
   public obj_groups: []
+  public paginantor_config = {groupscount: 0, lastIds: [], pagesize:250, pagecount:0, activepage:0}
 
   constructor(
     private http: HttpClient,
@@ -174,7 +175,11 @@ export class ApiService {
 
   viewObjectGroups(element) {
     return new Promise(resolve => {
-      var post_object = { id: element.id }
+      console.log(this.paginantor_config)
+      var post_object = { id: element.id, pageRequest: {lastUuid:"", pageSize:this.paginantor_config.pagesize.toString()} }
+      if (this.paginantor_config.activepage > 0){
+        post_object.pageRequest.lastUuid = this.paginantor_config.lastIds[this.paginantor_config.activepage-1]
+      }
       this.http.post(this.gateway_url + "/dataset/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         this.formatObjGroup(res["objectGroups"]).then(_ => {
@@ -183,6 +188,26 @@ export class ApiService {
         //this.obj_groups = res["objectGroups"]
         this.dataset = element
         
+      })
+    })
+  }
+
+  getObjectGroupPagination(element){
+    return new Promise(resolve => {
+      var post_obj = { id: element.id}
+      this.http.post(this.gateway_url + "/dataset/list", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        
+        this.paginantor_config.groupscount=res["objectGroups"].length
+        this.paginantor_config.pagecount= Math.ceil(this.paginantor_config.groupscount / this.paginantor_config.pagesize)
+        for (let [i,group] of res["objectGroups"].entries()){
+          if (i%this.paginantor_config.pagesize == this.paginantor_config.pagesize-1){
+            console.log("last element", i, group)
+            this.paginantor_config.lastIds.push(group.id)
+          }
+        }
+        console.log(this.paginantor_config)
+        resolve("")
       })
     })
   }
@@ -223,6 +248,7 @@ export class ApiService {
   }
   uploadFile(url, file){
     console.log(url, file)
+    
     var data = new FormData()
     data.append("file",file)
     var headers = this.configureHeadersAccessKey()

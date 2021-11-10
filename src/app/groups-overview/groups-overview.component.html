@@ -22,7 +22,7 @@
                 <mat-list>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
-                Number of Object Groups: {{apiService.obj_groups.length}}
+                Number of Object Groups: {{apiService.paginantor_config.groupscount}}
             </mat-list-item>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
@@ -31,6 +31,20 @@
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
                 Stat 3
+            </mat-list-item>
+            <mat-list-item style="height: 40px;">
+                <button mat-icon-button #tooltip="matTooltip" 
+                matTooltip="Go back"
+                matTooltipPosition="above" color="accent" (click)="changePage('back')" [disabled]="back_disabled"><mat-icon>
+                    chevron_left
+                </mat-icon></button>
+                          Page {{apiService.paginantor_config.activepage +1}} of {{apiService.paginantor_config.pagecount}}
+                         <button mat-icon-button #tooltip="matTooltip" 
+                         matTooltip="Go forward"
+                         matTooltipPosition="above" color="accent" (click)="changePage('forward')" [disabled]="forward_disabled"><mat-icon>
+                             chevron_right
+                         </mat-icon></button>
+                
             </mat-list-item>
         </mat-list>
             </div>
@@ -169,16 +183,22 @@
     </mat-card-content>
     <mat-card-actions>
         <button mat-raised-button color="primary" (click)=newObjectgroup()>New Object Group</button>
-       <button mat-icon-button 
+       <!--<button mat-icon-button 
             #tooltip="matTooltip" 
             matTooltip="Share Dataset to create Object Groups"
             matTooltipPosition="above" color="accent" (click)="shareCreateObjectGroups()">
                 <mat-icon>share</mat-icon>
-            </button>
+            </button>-->
+          
+            
+                     
+             
     </mat-card-actions>
 </mat-card>
-
 <mat-paginator [pageSizeOptions]="[25, 50, 100, 150]"></mat-paginator>
+
+
+
 
 <mat-form-field appearance="fill" class="example-form">
     <mat-label>Filter</mat-label>

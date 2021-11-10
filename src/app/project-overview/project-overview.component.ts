@@ -146,10 +146,13 @@ export class ProjectOverviewComponent implements OnInit {
     })
     
     console.log("See ObjectGroups..." + element)
-    this.apiService.viewObjectGroups(element).then(()=> {
+    this.apiService.getObjectGroupPagination(element).then(()=> {
+      this.apiService.viewObjectGroups(element).then(()=> {
       dialogRef.close()
       this.router.navigate(["/groups"])
+      })
     })
+    
     
   }
 
@@ -173,4 +176,7 @@ export class ProjectOverviewComponent implements OnInit {
       panelClass: ["success-snackbar"]
     })
   }
+
+ 
+
 }
