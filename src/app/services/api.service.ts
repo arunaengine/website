@@ -200,6 +200,8 @@ export class ApiService {
         
         this.paginantor_config.groupscount=res["objectGroups"].length
         this.paginantor_config.pagecount= Math.ceil(this.paginantor_config.groupscount / this.paginantor_config.pagesize)
+        this.paginantor_config.lastIds = []
+        this.paginantor_config.activepage = 0
         for (let [i,group] of res["objectGroups"].entries()){
           if (i%this.paginantor_config.pagesize == this.paginantor_config.pagesize-1){
             console.log("last element", i, group)

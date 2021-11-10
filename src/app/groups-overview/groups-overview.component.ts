@@ -46,7 +46,7 @@ export class GroupsOverviewComponent implements OnInit {
   uploadedFinishedButton = false
   date_range = {start: new Date, end: new Date}
   forward_disabled = false
-  back_disabled = true
+  back_disabled = false
 
   constructor(
     private router: Router,
@@ -61,6 +61,18 @@ export class GroupsOverviewComponent implements OnInit {
     this.displayedColumns = ["name", "description","objectcount","created",   "actions"]
     this.inner_displayedColumns = ["filename", "filetype","created", "filesize", "actions"]
     this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
+    if (this.apiService.paginantor_config.activepage +1 == this.apiService.paginantor_config.pagecount){
+      this.forward_disabled = true
+    } else {
+      this.forward_disabled = false
+    }
+    if (this.apiService.paginantor_config.activepage == 0){
+      this.back_disabled = true
+    } else {
+      this.back_disabled = false
+    }
+    
+
   }
 
   ngOnInit(): void {
