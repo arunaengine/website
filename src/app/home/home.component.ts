@@ -32,34 +32,29 @@ export class HomeComponent implements OnInit {
     private snackBar: MatSnackBar
   ) { 
     this.apiService.getProjects().then(()=> {
-    
     this.project_table = new MatTableDataSource(this.apiService.projects)
     })
-    
-    this.project_table = new MatTableDataSource(this.apiService.projects)
 
+    this.project_table = new MatTableDataSource(this.apiService.projects)
     this.displayedColumns=["name", "description", "actions"]
-    
-    
     console.log(this.project_table)
   }
 
   ngOnInit(): void {
-
   }
 
   ngAfterViewInit():void{
     this.project_table.sort = this.sort
-    
   }
 
   applyFilter(event: Event) {
-    //filter table
+    //Function for filtering the project table
     const filterValue = (event.target as HTMLInputElement).value;
     this.project_table.filter = filterValue.trim().toLowerCase();
   }
 
   viewKeys(element){
+    //Function to open a Dialog wich shows the API Keys for the selected project
     console.log("View API Keys for ", element.id)
     var project_apiKeys = []
     this.apiService.getApiKeys().then(()=> {
@@ -78,7 +73,7 @@ export class HomeComponent implements OnInit {
         apiKeys: project_apiKeys,
         projectData: element
       }
-       })
+      })
       
     dialogRef.afterClosed().subscribe(result => {
       if (result){
@@ -91,6 +86,7 @@ export class HomeComponent implements OnInit {
   }
 
   deleteProject(name, id){
+    //Function to delete the selected project
     console.log("Delete Project", id)
     const dialogRef = this.dialog.open(AlertDialogComponent,{
       data:{
@@ -112,6 +108,7 @@ export class HomeComponent implements OnInit {
   }
 
   async viewProject(element){
+    //Function to navigate to the selected project
     console.log("View Project", element.id)
     await this.apiService.viewSingleProject(element.id)
     await this.apiService.getDatasetsforProject(element.id)
@@ -121,6 +118,7 @@ export class HomeComponent implements OnInit {
   }
 
   createProject(){
+    //Function for creating a new project
     console.log("Generating Project...")
     const dialogRef = this.dialog.open(CreateProjectComponent, {
       data: {type: "Project"}, 
@@ -138,10 +136,12 @@ export class HomeComponent implements OnInit {
     })
   }
   logout(){
+    //Function to logout
     this.authService.logout()
   }
 
   refreshProjects(){
+    //Function to refresh the data table
     this.apiService.getProjects().then(()=> {
       this.project_table = new MatTableDataSource(this.apiService.projects)
       this.project_table.sort = this.sort
@@ -149,12 +149,14 @@ export class HomeComponent implements OnInit {
   }
 
   openProfile(){
+    //Function to open the profile dialog
     const dialogRef = this.dialog.open(ProfileDialogComponent, {
       position: {right: "10px", top: "10px"},
       hasBackdrop: true
     })
   }
   openSnackBar(){
+    //Function to show a snackbar
     this.snackBar.open("ID copied to Clipboard.","",{
       duration: 3000,
       panelClass: ["success-snackbar"]

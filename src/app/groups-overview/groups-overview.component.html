@@ -22,15 +22,19 @@
                 <mat-list>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
-                Number of Object Groups: {{apiService.paginantor_config.groupscount}}
+                Number of Object Groups: {{apiService.paginantor_config.stats.groupscount}}
             </mat-list-item>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
-                Stat 2
+                Number of Objects: {{apiService.paginantor_config.stats.objectscount}}
             </mat-list-item>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
-                Stat 3
+                Average Object Size: xx
+            </mat-list-item>
+            <mat-list-item style="height: 40px;">
+                <mat-icon>bar_chart</mat-icon>
+                Size of all Objects: xx
             </mat-list-item>
             <mat-list-item style="height: 40px;">
                 <button mat-icon-button #tooltip="matTooltip" 

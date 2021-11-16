@@ -18,7 +18,20 @@ export class ApiService {
   public users: any
   public dataset: any
   public obj_groups: []
-  public paginantor_config = {groupscount: 0, lastIds: [], pagesize:250, pagecount:0, activepage:0}
+  public paginantor_config = {stats: {groupscount: 0, objectscount: 0}, lastIds: [], pagesize:250, pagecount:0, activepage:0}
+  
+  //global vars for multipart upload
+  chunksize = 15000000
+  //threadsQuantity = 5
+  threadsQuantity_ls =[]
+  //chunksQuantity = 0
+  chunksQuantity_ls = []
+  //chunksQueue = new Array()
+  chunksQueue_ls = []
+  //activeConnections = 0
+  activeConnections_ls = []
+  multipart_res_ls = []
+  //file: File
 
   constructor(
     private http: HttpClient,
@@ -198,11 +211,13 @@ export class ApiService {
       this.http.post(this.gateway_url + "/dataset/list", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         
-        this.paginantor_config.groupscount=res["objectGroups"].length
-        this.paginantor_config.pagecount= Math.ceil(this.paginantor_config.groupscount / this.paginantor_config.pagesize)
+        this.paginantor_config.stats.groupscount=res["objectGroups"].length
+        this.paginantor_config.stats.objectscount = 0
+        this.paginantor_config.pagecount= Math.ceil(this.paginantor_config.stats.groupscount / this.paginantor_config.pagesize)
         this.paginantor_config.lastIds = []
         this.paginantor_config.activepage = 0
         for (let [i,group] of res["objectGroups"].entries()){
+          this.paginantor_config.stats.objectscount += group["objects"].length
           if (i%this.paginantor_config.pagesize == this.paginantor_config.pagesize-1){
             console.log("last element", i, group)
             this.paginantor_config.lastIds.push(group.id)
@@ -250,15 +265,14 @@ export class ApiService {
   }
   uploadFile(url, file){
     console.log(url, file)
-    
     var data = new FormData()
     data.append("file",file)
     var headers = this.configureHeadersAccessKey()
     headers["reportProgress"] = true
     headers["observe"]="events"
-    
     return this.http.put(url, file, headers).pipe()
   }
+
   deleteObjectGroup(objectgroup_id){
     console.log(objectgroup_id)
     return new Promise(resolve => {
@@ -312,7 +326,6 @@ export class ApiService {
       })
     })
     }
-    
   }
 
   /*saveFile(data){
@@ -331,4 +344,90 @@ export class ApiService {
   saveFileFileSaver(data){
     FileSaver.saveAs(data, "test.json")
   }*/
+
+  initMultipartUpload(object_id){
+    return new Promise ( resove => {
+      var post_obj = {id: object_id}
+      this.http.post(this.gateway_url+"/objectload/init_multipart/"+object_id, post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res_uploadLink => {
+        console.log("initMultipart: ", res_uploadLink)
+        resove("")
+      })
+    })
+  }
+  initMultipartuploadPart(){
+    //Get upload_multipart_part/{object_id}/{chunkId} --> res["uploadlink"] --> Put uploadMultipartPart()
+  }
+  //chunk, uploadpart, url
+  uploadMultipartPart(chunk, chunkId, objectid, index){
+    return new Promise(resolve => {
+      console.log("Init Upload Part: ",chunkId)
+      //initMultipartuploadPart() -> put Request
+      this.http.get(this.gateway_url+"/objectload/upload_multipart_part/"+objectid+"/"+chunkId, this.configureHeadersAccessKey()).pipe().subscribe(res_url => {
+        console.log(res_url)
+        var headers = this.configureHeadersAccessKey()
+        //headers["reportProgress"] = true
+        //headers["observe"]="events"
+        console.log("Uploading",chunk, chunkId)
+        this.http.put(res_url["uploadLink"], chunk, headers).pipe().subscribe(res_upload => {
+          console.log(res_upload)
+          this.multipart_res_ls[index].push(res_upload)
+          resolve("")
+        })
+      })
+      //Resolve ist server hat request bekommen http progess event ->  HttpEventType.Sent
+      //Resolve -> push part, etag to part_ls
+      
+    })
+  }
+  completeMultipartUpload(object_id, part_ls){
+    // part_ls = [{etag: "", part: ""}]
+    var post_obj={objectId: object_id, parts: part_ls}
+    this.http.post(this.gateway_url+ "/objectload/complete_multipart", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+      console.log(res)
+    })
+  }
+
+  fullMultipattUpload(object, index){
+   
+    this.chunksQuantity_ls[index]  = Math.ceil(object.file.size / this.chunksize)
+    
+    for (let i=1; i <= this.chunksQuantity_ls[index]; i++){this.chunksQueue_ls[index].push(i)}
+    this.chunksQueue_ls[index].reverse()
+
+    
+    this.sendNext(object, index)
+    
+  }
+
+  sendNext(object, index){
+
+    if (this.activeConnections_ls[index] >= this.threadsQuantity_ls[index]){
+      console.log("too many threads")
+      return
+    }
+
+    if(!this.chunksQueue_ls[index].length){
+      console.log("All parts in upload")
+      if (this.activeConnections_ls[index] == 0){
+        console.log("Multipart Upload FINISHED File:", object.file.name)
+        //complete Multipart
+        this.completeMultipartUpload(object.objectid, this.multipart_res_ls[index])
+      }
+      return
+    }
+
+    const chunkId = this.chunksQueue_ls[index].pop()
+    const begin = (chunkId-1) * this.chunksize
+    const chunk = object.file.slice(begin, begin + this.chunksize)
+    this.activeConnections_ls[index] += 1
+
+    this.uploadMultipartPart(chunk, chunkId, object.objectid, index).then(()=> {
+      this.activeConnections_ls[index] -= 1
+      console.log("reduced thread")
+      this.sendNext(object, index)
+    })
+
+    this.sendNext(object, index)
+  }
+
 }

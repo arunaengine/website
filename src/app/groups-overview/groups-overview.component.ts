@@ -71,8 +71,6 @@ export class GroupsOverviewComponent implements OnInit {
     } else {
       this.back_disabled = false
     }
-    
-
   }
 
   ngOnInit(): void {
