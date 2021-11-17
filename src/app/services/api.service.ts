@@ -22,8 +22,8 @@ export class ApiService {
   
   //global vars for multipart upload
   chunksize = 15000000
-  //threadsQuantity = 5
-  threadsQuantity_ls =[]
+  threadsQuantity = 5
+  //threadsQuantity_ls =[]
   //chunksQuantity = 0
   chunksQuantity_ls = []
   //chunksQueue = new Array()
@@ -369,6 +369,7 @@ export class ApiService {
         options["observe"]="events"
         console.log("Uploading",chunk, chunkId, options)
         this.http.put(res_url["uploadLink"], chunk, options).pipe().subscribe(res_upload => {
+          //console.log(res_upload)
           if (res_upload["type"] == 4){
             console.log("PUT Response:",chunkId, res_upload["headers"].get("etag"))
             this.multipart_res_ls[index].push({etag: res_upload["headers"].get("etag"), part: chunkId})
@@ -399,15 +400,13 @@ export class ApiService {
     
     for (let i=1; i <= this.chunksQuantity_ls[index]; i++){this.chunksQueue_ls[index].push(i)}
     this.chunksQueue_ls[index].reverse()
-
-    
     this.sendNext(object, index)
     
   }
 
   sendNext(object, index){
 
-    if (this.activeConnections_ls[index] >= this.threadsQuantity_ls[index]){
+    if (this.activeConnections_ls[index] >= this.threadsQuantity){
       console.log("too many threads")
       return
     }
@@ -417,7 +416,7 @@ export class ApiService {
       if (this.activeConnections_ls[index] == 0){
         console.log("Multipart Upload FINISHED File:", object.file.name)
         //complete Multipart
-        this.completeMultipartUpload(object.objectid, this.multipart_res_ls[index])
+        this.completeMultipartUpload(object.uploadParams.id, this.multipart_res_ls[index])
       }
       return
     }
@@ -427,7 +426,7 @@ export class ApiService {
     const chunk = object.file.slice(begin, begin + this.chunksize)
     this.activeConnections_ls[index] += 1
 
-    this.uploadMultipartPart(chunk, chunkId, object.objectid, index).then(()=> {
+    this.uploadMultipartPart(chunk, chunkId, object.uploadParams.id, index).then(()=> {
       this.activeConnections_ls[index] -= 1
       console.log("reduced thread")
       this.sendNext(object, index)

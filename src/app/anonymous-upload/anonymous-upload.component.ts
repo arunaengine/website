@@ -99,7 +99,7 @@ export class AnonymousUploadComponent implements OnInit {
      console.log(chunklist)*/
     //this.apiService.file
     for (let [index, element] of this.file_list.entries()) {
-      this.apiService.threadsQuantity_ls.push(5)
+      //this.apiService.threadsQuantity_ls.push(5)
       this.apiService.chunksQuantity_ls.push(0)
       this.apiService.chunksQueue_ls.push(new Array())
       this.apiService.activeConnections_ls.push(0)

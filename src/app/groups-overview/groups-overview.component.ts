@@ -38,15 +38,22 @@ export class GroupsOverviewComponent implements OnInit {
   obj_groups_table: any
   displayedColumns: string[]
   inner_displayedColumns: string[]
-  filelist_forUpload = []
+  //filelist_forUpload = []
   upload_progress = []
   files_userUpload = []
   uploadPanel = false
   upload_userFiles = false
   uploadedFinishedButton = false
-  date_range = {start: new Date, end: new Date}
+  date_range = { start: new Date, end: new Date }
   forward_disabled = false
   back_disabled = false
+  userUploadPanel = false
+
+  //Updated Upload
+  auto_upload = []
+  multipart_upload = []
+  user_upload = []
+
 
   constructor(
     private router: Router,
@@ -58,15 +65,15 @@ export class GroupsOverviewComponent implements OnInit {
   ) {
     console.log(this.upload_progress)
     console.log(this.apiService.obj_groups)
-    this.displayedColumns = ["name", "description","objectcount","created",   "actions"]
-    this.inner_displayedColumns = ["filename", "filetype","created", "filesize", "actions"]
+    this.displayedColumns = ["name", "description", "objectcount", "created", "actions"]
+    this.inner_displayedColumns = ["filename", "filetype", "created", "filesize", "actions"]
     this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
-    if (this.apiService.paginantor_config.activepage +1 == this.apiService.paginantor_config.pagecount){
+    if (this.apiService.paginantor_config.activepage + 1 == this.apiService.paginantor_config.pagecount) {
       this.forward_disabled = true
     } else {
       this.forward_disabled = false
     }
-    if (this.apiService.paginantor_config.activepage == 0){
+    if (this.apiService.paginantor_config.activepage == 0) {
       this.back_disabled = true
     } else {
       this.back_disabled = false
@@ -104,28 +111,36 @@ export class GroupsOverviewComponent implements OnInit {
       })
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
+        var filelist_forUpload = []
         console.log("Dialog closed: ", result)
         result.objects.forEach((object, index) => {
-          if (object.uploaded){
-            this.filelist_forUpload.push(object.file)
-            this.upload_progress.push({filename: object.file.name, progress: 0, uploaded: false, userUpload: false})
+          if (object.uploaded) {
+            if (object.file.size < 15000000) {
+              filelist_forUpload.push({ uploadCase: "auto", file: object.file, uploadParams: {} })
+            } else {
+              filelist_forUpload.push({ uploadCase: "multipart", file: object.file, uploadParams: {} })
+            }
+            //this.upload_progress.push({filename: object.file.name, progress: 0, uploaded: false, userUpload: false})
           } else {
-            
-            this.filelist_forUpload.push({userUpload: true, object: object})
-            this.upload_progress.push({filename: object.filename +"." +object.filetype, progress: 0, uploaded: true, userUpload: true})
+
+            filelist_forUpload.push({ uploadCase: "user", file: object, uploadParams: {} })
+            //this.upload_progress.push({filename: object.filename +"." +object.filetype, progress: 0, uploaded: true, userUpload: true})
           }
-          
+
           delete result.objects[index].uploaded
           delete result.objects[index].file
         });
-        console.log(this.filelist_forUpload)
-      
+        console.log(filelist_forUpload)
+
         this.uploadPanel = true
         console.log(this.upload_progress)
         this.apiService.createObjectGroup(this.apiService.dataset.id, result).then(res => {
           res["objectLinks"].forEach((element, index) => {
-            if (this.upload_progress[index].userUpload == false){
-                  console.log("UPLOADING FILE " + this.filelist_forUpload[index].name, "Link: ", element)
+            filelist_forUpload[index].uploadParams["id"] = element.objectId
+            filelist_forUpload[index].uploadParams["link"] = element.link
+            /*if (this.upload_progress[index].userUpload == false){
+
+                  console.log("UPLOADING FILE" + this.filelist_forUpload[index].name, "Link: ", element)
                   this.uploadFile(element, this.filelist_forUpload[index], index).then(()=> {
                   console.log("Finished Upload "+ this.filelist_forUpload[index].name)
                   this.upload_progress[index].uploaded = true
@@ -137,69 +152,54 @@ export class GroupsOverviewComponent implements OnInit {
                   
                   this.uploadFinished()
                 }
-                
             if ( res["objectLinks"].length -1 == index){
               this.upload_userFiles = true
-            }
+            }*/
           })
-          
+          console.log(filelist_forUpload)
+          for (let object of filelist_forUpload){
+            console.log(object)
+            if (object.uploadCase == "auto"){
+              object["htmlKeys"] = {filename: object.file.name, progress: 0} 
+              this.auto_upload.push(object)
+            }
+            if (object.uploadCase == "multipart"){
+              object["htmlKeys"] = {filename: object.file.name} 
+              this.multipart_upload.push(object)
+            }
+            if (object.uploadCase == "user"){
+              object["htmlKeys"] = {
+                filename: object.file.filename +"." +object.file.filetype, 
+                filename_input:"",
+                uploadnotAllowed: true,
+                progress: 0
+              }
+              this.user_upload.push(object)
+            }
+          }
+          console.log(this.auto_upload, this.multipart_upload, this.user_upload)
+          this.uploadAuto()
+          this.uploadMultipart()
+          if ( this.user_upload.length > 0){
+            this.userUploadPanel = true
+          }
         })
       } else {
         console.log("Dialog dismissed")
       }
     })
   }
-  
-  uploadFinished(){
-    var all_uploaded = true
-    this.upload_progress.forEach(element => {
-      console.log(element)
-      if (element.uploaded == false){
-        all_uploaded = false
-      }
-    })
-    
-    if (all_uploaded){
-      this.uploadedFinishedButton = true
-      if (this.files_userUpload.length == 0){
-        this.openSnackBar("Finished uploading files","success-snackbar")
-      } else {
-        this.openSnackBar("Finished uploading files, but user input needed","success-snackbar")
-        
-      }
-      
-      console.log("UPLOAD FINISHED FOR ALL FILES")
-      console.log("Files for user Upload", this.files_userUpload)
-      this.filelist_forUpload = []
-      this.refreshData()
+
+  uploadAuto(){
+    this.uploadPanel = true
+    for (let [index, element] of this.auto_upload.entries()){
+      this.uploadFile(element, index)
     }
   }
 
-  hideUploadedFiles(){
-    this.upload_progress = []
-    if (this.files_userUpload.length == 0){
-      this.uploadedFinishedButton = false
-      this.uploadPanel = false
-      this.upload_userFiles = false
-      this.files_userUpload= []
-    }
-  }
-
-  onFileInput(files: FileList | null , index){
-    if (files){
-      this.files_userUpload[index].file=files[0]
-      this.files_userUpload[index].file_name=this.files_userUpload[index].file.name
-      this.files_userUpload[index].uploadnotAllowed= false
-      console.log(this.files_userUpload[index])
-    } else {
-      this.files_userUpload[index].uploadnotAllowed= true
-    }
-  }
-
-  uploadFile(element, file, index) {
-    
-      return new Promise (resolve => {
-        this.apiService.uploadFile(element["link"], file).subscribe((event: HttpEvent<any>) => {
+  uploadFile(element, index) {
+    return new Promise(resolve => {
+      this.apiService.uploadFile(element.uploadParams.link, element.file).subscribe((event: HttpEvent<any>) => {
         switch (event.type) {
           case HttpEventType.Sent:
             console.log('Request has been made!');
@@ -208,19 +208,82 @@ export class GroupsOverviewComponent implements OnInit {
             console.log('Response header has been received!');
             break;
           case HttpEventType.UploadProgress:
-            this.upload_progress[index].progress = Math.round(event.loaded / event.total * 100);
-            if (event.loaded == event.total){
+           this.auto_upload[index].htmlKeys.progress = Math.round(event.loaded / event.total * 100);
+            if (event.loaded == event.total) {
               resolve("")
             }
             break;
         }
       })
-      })    
+    })
   }
 
-  uploadSingleFile(index){
+  uploadMultipart(){
+    for (let [index, element] of this.multipart_upload.entries()) {
+      //this.apiService.threadsQuantity_ls.push(5)
+      this.apiService.chunksQuantity_ls.push(0)
+      this.apiService.chunksQueue_ls.push(new Array())
+      this.apiService.activeConnections_ls.push(0)
+      this.apiService.multipart_res_ls.push([])
+      console.log(element, index)
+      this.apiService.initMultipartUpload(element.uploadParams.id).then(() => {
+        this.apiService.fullMultipattUpload(element, index)
+      })
+    }
+  }
+
+
+  uploadFinished() {
+    var all_uploaded = true
+    this.upload_progress.forEach(element => {
+      console.log(element)
+      if (element.uploaded == false) {
+        all_uploaded = false
+      }
+    })
+
+    if (all_uploaded) {
+      this.uploadedFinishedButton = true
+      if (this.files_userUpload.length == 0) {
+        this.openSnackBar("Finished uploading files", "success-snackbar")
+      } else {
+        this.openSnackBar("Finished uploading files, but user input needed", "success-snackbar")
+
+      }
+
+      console.log("UPLOAD FINISHED FOR ALL FILES")
+      console.log("Files for user Upload", this.files_userUpload)
+      //this.filelist_forUpload = []
+      this.refreshData()
+    }
+  }
+
+  hideUploadedFiles() {
+    this.upload_progress = []
+    if (this.files_userUpload.length == 0) {
+      this.uploadedFinishedButton = false
+      this.uploadPanel = false
+      this.upload_userFiles = false
+      this.files_userUpload = []
+    }
+  }
+
+  onFileInput(files: FileList | null, index) {
+    if (files) {
+      this.files_userUpload[index].file = files[0]
+      this.files_userUpload[index].file_name = this.files_userUpload[index].file.name
+      this.files_userUpload[index].uploadnotAllowed = false
+      console.log(this.files_userUpload[index])
+    } else {
+      this.files_userUpload[index].uploadnotAllowed = true
+    }
+  }
+
+ 
+
+  uploadSingleFile(index) {
     this.files_userUpload[index].process.uploading = true
-    return new Promise (resolve => {
+    return new Promise(resolve => {
       this.apiService.uploadFile(this.files_userUpload[index].fromServer.link, this.files_userUpload[index].file).subscribe((event: HttpEvent<any>) => {
         switch (event.type) {
           case HttpEventType.Sent:
@@ -231,7 +294,7 @@ export class GroupsOverviewComponent implements OnInit {
             break;
           case HttpEventType.UploadProgress:
             this.files_userUpload[index].process.progress = Math.round(event.loaded / event.total * 100);
-            if (event.loaded == event.total){
+            if (event.loaded == event.total) {
               resolve("")
             }
             break;
@@ -240,11 +303,11 @@ export class GroupsOverviewComponent implements OnInit {
     })
   }
 
-  hideFile(element){
+  hideFile(element) {
     const index: number = this.files_userUpload.indexOf(element)
     this.files_userUpload.splice(index, 1)
-    if (this.files_userUpload.length == 0){
-      if (this.uploadedFinishedButton){
+    if (this.files_userUpload.length == 0) {
+      if (this.uploadedFinishedButton) {
         this.hideUploadedFiles()
       }
     }
@@ -256,41 +319,41 @@ export class GroupsOverviewComponent implements OnInit {
       panelClass: [design]
     })
   }
-  deleteObjGroup(name,id) {
+  deleteObjGroup(name, id) {
     console.log("deleting ObjGroup", id)
-    const dialogRef = this.dialog.open(AlertDialogComponent,{
-      data:{
+    const dialogRef = this.dialog.open(AlertDialogComponent, {
+      data: {
         title: "Delete Object Group?",
         button: "Delete Object Group",
-        message: "Are you sure you want to delete  '"+ name + "' (ID: "+id+")?"
+        message: "Are you sure you want to delete  '" + name + "' (ID: " + id + ")?"
       },
       hasBackdrop: true
     })
     dialogRef.afterClosed().subscribe(result => {
-      if (result){
+      if (result) {
         console.log("Dialog closed: ", result)
-        this.apiService.deleteObjectGroup(id).then(()=> {
-      this.refreshData()
-      })
+        this.apiService.deleteObjectGroup(id).then(() => {
+          this.refreshData()
+        })
       } else {
         console.log("Dialog dismissed")
       }
     })
-    
+
   }
 
-  downloadObject(object){
+  downloadObject(object) {
     console.log("Downloading Object", object)
     this.apiService.downloadSingleObject(object)
   }
 
-  refreshData(){
+  refreshData() {
     const dialogRef = this.dialog.open(LoadingComponent, {
       hasBackdrop: true,
       disableClose: true
     })
-    this.apiService.viewObjectGroups(this.apiService.dataset).then(()=> {
-    this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
+    this.apiService.viewObjectGroups(this.apiService.dataset).then(() => {
+      this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
       this.obj_groups_table.paginator = this.paginator
       this.obj_groups_table.sort = this.sort
       dialogRef.close()
@@ -304,7 +367,7 @@ export class GroupsOverviewComponent implements OnInit {
       this.obj_groups_table.sort = this.sort
     })
   }*/
-  downloadObjectGroup(element){
+  downloadObjectGroup(element) {
     console.log("Downloading Object group...")
     this.apiService.downloadObjectGroupNew(element)
     /*
@@ -316,36 +379,36 @@ export class GroupsOverviewComponent implements OnInit {
     })*/
   }
 
-  shareObjectGroup(element){
-    var url = "http://localhost:4200/anonymous_upload/?action=uploadObject&name="+encodeURI(element.name)+
-    "&link=XXX&id="+element.id+"&description="+encodeURI(element.description)
+  shareObjectGroup(element) {
+    var url = "http://localhost:4200/anonymous_upload/?action=uploadObject&name=" + encodeURI(element.name) +
+      "&link=XXX&id=" + element.id + "&description=" + encodeURI(element.description)
     this.clipboard.copy(url)
     this.openSnackBar('Share URL copied to Clipboard.', 'success-snackbar')
   }
 
- shareCreateObjectGroups(){
-   console.log(this.obj_groups_table)
-    var url = "http://localhost:4200/anonymous_upload/?action=uploadObject&name="+encodeURI(this.apiService.dataset.name)+
-    "&link=XXX&id="+this.apiService.dataset.id+"&description="+encodeURI("Dummy Description first sample upload")
+  shareCreateObjectGroups() {
+    console.log(this.obj_groups_table)
+    var url = "http://localhost:4200/anonymous_upload/?action=uploadObject&name=" + encodeURI(this.apiService.dataset.name) +
+      "&link=XXX&id=" + this.apiService.dataset.id + "&description=" + encodeURI("Dummy Description first sample upload")
     console.log(url)
     this.clipboard.copy(url)
     this.openSnackBar('Share URL copied to Clipboard.', 'success-snackbar')
   }
 
-  changePage(action){
-    if (action == "forward"){
+  changePage(action) {
+    if (action == "forward") {
       this.back_disabled = false
-      this.apiService.paginantor_config.activepage +=1
-      if (this.apiService.paginantor_config.activepage +1 == this.apiService.paginantor_config.pagecount){
+      this.apiService.paginantor_config.activepage += 1
+      if (this.apiService.paginantor_config.activepage + 1 == this.apiService.paginantor_config.pagecount) {
         this.forward_disabled = true
       } else {
         this.forward_disabled = false
       }
     }
-    if (action == "back"){
+    if (action == "back") {
       this.forward_disabled = false
       this.apiService.paginantor_config.activepage -= 1
-      if (this.apiService.paginantor_config.activepage == 0){
+      if (this.apiService.paginantor_config.activepage == 0) {
         this.back_disabled = true
       } else {
         this.back_disabled = false
