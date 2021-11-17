@@ -364,14 +364,19 @@ export class ApiService {
       //initMultipartuploadPart() -> put Request
       this.http.get(this.gateway_url+"/objectload/upload_multipart_part/"+objectid+"/"+chunkId, this.configureHeadersAccessKey()).pipe().subscribe(res_url => {
         console.log(res_url)
-        var headers = this.configureHeadersAccessKey()
-        //headers["reportProgress"] = true
-        //headers["observe"]="events"
-        console.log("Uploading",chunk, chunkId)
-        this.http.put(res_url["uploadLink"], chunk, headers).pipe().subscribe(res_upload => {
-          console.log(res_upload)
-          this.multipart_res_ls[index].push(res_upload)
-          resolve("")
+        var options = this.configureHeadersAccessKey()
+        options["reportProgress"] = true
+        options["observe"]="events"
+        console.log("Uploading",chunk, chunkId, options)
+        this.http.put(res_url["uploadLink"], chunk, options).pipe().subscribe(res_upload => {
+          if (res_upload["type"] == 4){
+            console.log("PUT Response:",chunkId, res_upload["headers"].get("etag"))
+            this.multipart_res_ls[index].push({etag: res_upload["headers"].get("etag"), part: chunkId})
+            resolve("")
+          }
+          
+          
+          
         })
       })
       //Resolve ist server hat request bekommen http progess event ->  HttpEventType.Sent
@@ -381,6 +386,7 @@ export class ApiService {
   }
   completeMultipartUpload(object_id, part_ls){
     // part_ls = [{etag: "", part: ""}]
+    console.log(part_ls)
     var post_obj={objectId: object_id, parts: part_ls}
     this.http.post(this.gateway_url+ "/objectload/complete_multipart", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
       console.log(res)
