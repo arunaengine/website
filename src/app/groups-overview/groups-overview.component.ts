@@ -47,13 +47,14 @@ export class GroupsOverviewComponent implements OnInit {
   date_range = { start: new Date, end: new Date }
   forward_disabled = false
   back_disabled = false
-  userUploadPanel = false
+  
 
   //Updated Upload
   auto_upload = []
   multipart_upload = []
   user_upload = []
-
+  uploadingProgressPanel = false
+  userUploadPanel = false
 
   constructor(
     private router: Router,
@@ -132,7 +133,6 @@ export class GroupsOverviewComponent implements OnInit {
         });
         console.log(filelist_forUpload)
 
-        this.uploadPanel = true
         console.log(this.upload_progress)
         this.apiService.createObjectGroup(this.apiService.dataset.id, result).then(res => {
           res["objectLinks"].forEach((element, index) => {
@@ -160,11 +160,14 @@ export class GroupsOverviewComponent implements OnInit {
           for (let object of filelist_forUpload){
             console.log(object)
             if (object.uploadCase == "auto"){
-              object["htmlKeys"] = {filename: object.file.name, progress: 0} 
+              object["htmlKeys"] = {filename: object.file.name, progress: 0}
+              object["uploadStatus"] = {state: 0} 
               this.auto_upload.push(object)
             }
             if (object.uploadCase == "multipart"){
-              object["htmlKeys"] = {filename: object.file.name} 
+              object["htmlKeys"] = {filename: object.file.name}
+              //Upload state -> 0: not started, 1: uploading, 3: finished
+              object["uploadStatus"] = {state: 0}
               this.multipart_upload.push(object)
             }
             if (object.uploadCase == "user"){
@@ -180,6 +183,9 @@ export class GroupsOverviewComponent implements OnInit {
           console.log(this.auto_upload, this.multipart_upload, this.user_upload)
           this.uploadAuto()
           this.uploadMultipart()
+          if (this.auto_upload.length > 0 ){0
+            this.uploadingProgressPanel = true
+          }
           if ( this.user_upload.length > 0){
             this.userUploadPanel = true
           }
@@ -191,9 +197,13 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   uploadAuto(){
-    this.uploadPanel = true
+    
     for (let [index, element] of this.auto_upload.entries()){
-      this.uploadFile(element, index)
+      if (element.uploadStatus.state == 0){
+            this.auto_upload[index].uploadStatus.state = 1
+              this.uploadFile(element, index)
+              //then += uploadedCount --> if uploadedCount == lenList, fire autoUploadFinished-Event
+      }
     }
   }
 
@@ -204,14 +214,16 @@ export class GroupsOverviewComponent implements OnInit {
           case HttpEventType.Sent:
             console.log('Request has been made!');
             break;
-          case HttpEventType.ResponseHeader:
-            console.log('Response header has been received!');
+          case HttpEventType.Response:
+            console.log('Upload Finished!', element.file.name);
+            resolve("")
             break;
           case HttpEventType.UploadProgress:
+            console.log(event)
            this.auto_upload[index].htmlKeys.progress = Math.round(event.loaded / event.total * 100);
-            if (event.loaded == event.total) {
-              resolve("")
-            }
+            /*if (event.loaded == event.total) {
+              
+            }*/
             break;
         }
       })
@@ -221,17 +233,51 @@ export class GroupsOverviewComponent implements OnInit {
   uploadMultipart(){
     for (let [index, element] of this.multipart_upload.entries()) {
       //this.apiService.threadsQuantity_ls.push(5)
-      this.apiService.chunksQuantity_ls.push(0)
-      this.apiService.chunksQueue_ls.push(new Array())
-      this.apiService.activeConnections_ls.push(0)
-      this.apiService.multipart_res_ls.push([])
-      console.log(element, index)
-      this.apiService.initMultipartUpload(element.uploadParams.id).then(() => {
-        this.apiService.fullMultipattUpload(element, index)
+      if (element.uploadStatus.state == 0){
+        this.multipart_upload[index].uploadStatus.state = 1
+        this.apiService.chunksQuantity_ls.push(0)
+        this.apiService.chunksQueue_ls.push(new Array())
+        this.apiService.activeConnections_ls.push(0)
+        this.apiService.multipart_res_ls.push([])
+        this.apiService.multipart_progress_ls.push([])
+        console.log(element, index)
+        this.apiService.initMultipartUpload(element.uploadParams.id).then(() => {
+          this.apiService.fullMultipattUpload(element, index)
       })
+      }
+      
     }
   }
 
+  onFileInput(files: FileList | null, index) {
+      if (files) {
+        this.user_upload[index].file = files[0]
+        this.user_upload[index].htmlKeys.filename_input = this.user_upload[index].file.name
+        this.user_upload[index].htmlKeys.uploadnotAllowed = false
+      } else {
+        this.user_upload[index].htmlKeys.uploadnotAllowed = true
+      }
+    }
+
+  uploadSingleFile(index) {
+      this.user_upload[index].htmlKeys.uploading = true
+      this.user_upload[index]["uploadStatus"] = {state:0}
+      if (this.user_upload[index].file.size < 15000000){
+        //small Upload
+        this.auto_upload.push(this.user_upload[index])
+        console.log(this.auto_upload)
+        this.uploadAuto()
+      } else {
+        //Multipart Upload
+        this.multipart_upload.push(this.user_upload[index])
+        console.log(this.multipart_upload)
+        this.uploadMultipart()
+      }
+      this.user_upload.splice(index,1)
+      if ( this.user_upload.length == 0){
+        this.userUploadPanel = false
+      }
+    }
 
   uploadFinished() {
     var all_uploaded = true
@@ -268,40 +314,11 @@ export class GroupsOverviewComponent implements OnInit {
     }
   }
 
-  onFileInput(files: FileList | null, index) {
-    if (files) {
-      this.files_userUpload[index].file = files[0]
-      this.files_userUpload[index].file_name = this.files_userUpload[index].file.name
-      this.files_userUpload[index].uploadnotAllowed = false
-      console.log(this.files_userUpload[index])
-    } else {
-      this.files_userUpload[index].uploadnotAllowed = true
-    }
-  }
+ 
 
  
 
-  uploadSingleFile(index) {
-    this.files_userUpload[index].process.uploading = true
-    return new Promise(resolve => {
-      this.apiService.uploadFile(this.files_userUpload[index].fromServer.link, this.files_userUpload[index].file).subscribe((event: HttpEvent<any>) => {
-        switch (event.type) {
-          case HttpEventType.Sent:
-            console.log('Request has been made!');
-            break;
-          case HttpEventType.ResponseHeader:
-            console.log('Response header has been received!');
-            break;
-          case HttpEventType.UploadProgress:
-            this.files_userUpload[index].process.progress = Math.round(event.loaded / event.total * 100);
-            if (event.loaded == event.total) {
-              resolve("")
-            }
-            break;
-        }
-      })
-    })
-  }
+  
 
   hideFile(element) {
     const index: number = this.files_userUpload.indexOf(element)

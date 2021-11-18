@@ -76,7 +76,7 @@
         </div>
 
 
-        <div *ngIf="uploadPanel">
+        <div *ngIf="uploadingProgressPanel">
             <mat-expansion-panel expanded>
                 <mat-expansion-panel-header>
                     <mat-panel-title>
@@ -88,68 +88,83 @@
                 </mat-expansion-panel-header>
                 <mat-list>
                     <div *ngFor="let object of auto_upload ; let i = index" [attr.data-index]="i">
-
+                        <div fxLayout="row wrap" fxLayoutGap="16px grid">
+                            <mat-list-item style="height: 40px;">
+                                <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    {{object.htmlKeys.filename}}
+                                </div>
+                                <div fxFlex="80%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <mat-progress-bar color="accent" mode="determinate"
+                                        [value]="auto_upload[i].htmlKeys.progress">
+                                    </mat-progress-bar>
+                                </div>
+                            </mat-list-item>
+                        </div>
+                        <mat-divider></mat-divider>
+                    </div>
+                    <!--<div *ngFor="let object of auto_upload ; let i = index" [attr.data-index]="i">
                         <mat-list-item style="height: 40px;">
                             File Upload: {{object.htmlKeys.filename}}
                             <mat-progress-bar color="accent" mode="determinate" [value]="object.htmlKeys.progress">
                             </mat-progress-bar>
                         </mat-list-item>
                         <mat-divider></mat-divider>
+                    </div>-->
+                </mat-list>
+            </mat-expansion-panel>
+        </div>
+        <div *ngIf="userUploadPanel">
+            <mat-expansion-panel expanded>
+                <mat-expansion-panel-header>
+                    <mat-panel-title>
+                        User File Upload
+                    </mat-panel-title>
+                    <mat-panel-description>
+                        Input for Files needed
+                    </mat-panel-description>
+                </mat-expansion-panel-header>
+                <mat-list>
+                    <div *ngFor="let object of user_upload; let i = index" [attr.data-index]="i">
+                        <mat-list-item style="height: 40px;">
+                            Filename: {{object.htmlKeys.filename}}
+                        </mat-list-item>
+                        <mat-label>
+                            <div fxLayout="row wrap" fxLayoutGap="16px grid">
+                                <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <mat-form-field appearance="fill" class="example-form">
+                                        <mat-label>File</mat-label>
+                                        <input type="text" disabled matInput
+                                            [(ngModel)]="user_upload[i].htmlKeys.filename_input">
+                                    </mat-form-field>
+                                </div>
 
+                                <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <input hidden type="file" #fileInput (input)="onFileInput(fileInput.files, i)" />
+                                    <button mat-mini-fab color="accent" (click)="fileInput.click()">
+                                        <mat-icon>attach_file</mat-icon>
+                                    </button>
+                                </div>
+                                <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <button mat-mini-fab color="accent"
+                                        [disabled]="user_upload[i].htmlKeys.uploadnotAllowed"
+                                        (click)="uploadSingleFile(i)">
+                                        <mat-icon>upload</mat-icon>
+                                    </button>
+                                </div>
+                                <div fxFlex="65%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <mat-progress-bar *ngIf="user_upload[i].htmlKeys.uploading" color="accent"
+                                        mode="determinate" [value]="user_upload[i].htmlKeys.progress">
+                                    </mat-progress-bar>
+
+                                </div>
+                            </div>
+                        </mat-label>
                     </div>
                 </mat-list>
             </mat-expansion-panel>
-            <!--<div *ngIf="userUploadPanel">
-                <mat-expansion-panel>
-                    <mat-expansion-panel-header>
-                        <mat-panel-title>
-                            User File Upload
-                        </mat-panel-title>
-                        <mat-panel-description>
-                            Input for Files needed
-                        </mat-panel-description>
-                    </mat-expansion-panel-header>
-                    <mat-list>
-                        <div *ngFor="let object of user_upload; let i = index" [attr.data-index]="i">
-                            <mat-list-item style="height: 40px;">
-                                Filename: {{object.htmlKeys.filename}}
-                            </mat-list-item>
-                            <mat-label>
-                                <div fxLayout="row wrap" fxLayoutGap="16px grid">
-                                    <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <mat-form-field appearance="fill" class="example-form">
-                                            <mat-label>File</mat-label>
-                                            <input type="text" disabled matInput
-                                                [(ngModel)]="user_upload[i].htmlKeys.filename_input">
-                                        </mat-form-field>
-                                    </div>
 
-                                    <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <input hidden type="file" #fileInput
-                                            (input)="onFileInput(fileInput.files, i)" />
-                                        <button mat-mini-fab color="accent" (click)="fileInput.click()">
-                                            <mat-icon>attach_file</mat-icon>
-                                        </button>
-                                    </div>
-                                    <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <button mat-mini-fab color="accent"
-                                            [disabled]="user_upload[i].htmlKeys.uploadnotAllowed"
-                                            (click)="uploadSingleFile(i)">
-                                            <mat-icon>upload</mat-icon>
-                                        </button>
-                                    </div>
-                                    <div fxFlex="65%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <mat-progress-bar *ngIf="files_userUpload[i].process.uploading" color="accent"
-                                            mode="determinate" [value]="files_userUpload[i].process.progress">
-                                        </mat-progress-bar>
 
-                                    </div>
-                        </div>
-                    </mat-list>
-                </mat-expansion-panel>
-            </div>-->
-            
-                <!--
+            <!--
                 <div *ngIf="upload_userFiles">
 
                     <mat-list>
@@ -233,7 +248,7 @@
                 <button *ngIf="uploadedFinishedButton" mat-raised-button color="primary"
                     (click)=hideUploadedFiles()>Hide Uploaded Files</button>
             -->
-            
+
 
         </div>
 

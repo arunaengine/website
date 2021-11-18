@@ -6,6 +6,7 @@ import * as moment from 'moment';
 import * as FileSaver from 'file-saver';
 
 
+
 @Injectable({
   providedIn: 'root'
 })
@@ -31,6 +32,7 @@ export class ApiService {
   //activeConnections = 0
   activeConnections_ls = []
   multipart_res_ls = []
+  multipart_progress_ls = []
   //file: File
 
   constructor(
@@ -361,6 +363,7 @@ export class ApiService {
   uploadMultipartPart(chunk, chunkId, objectid, index){
     return new Promise(resolve => {
       console.log("Init Upload Part: ",chunkId)
+      this.multipart_progress_ls[index].push({chunkid: chunkId, loaded: 0, total:0})
       //initMultipartuploadPart() -> put Request
       this.http.get(this.gateway_url+"/objectload/upload_multipart_part/"+objectid+"/"+chunkId, this.configureHeadersAccessKey()).pipe().subscribe(res_url => {
         console.log(res_url)
@@ -368,16 +371,23 @@ export class ApiService {
         options["reportProgress"] = true
         options["observe"]="events"
         console.log("Uploading",chunk, chunkId, options)
-        this.http.put(res_url["uploadLink"], chunk, options).pipe().subscribe(res_upload => {
+        this.http.put(res_url["uploadLink"], chunk, options).pipe().subscribe((event: HttpEvent<any>) => {
           //console.log(res_upload)
-          if (res_upload["type"] == 4){
-            console.log("PUT Response:",chunkId, res_upload["headers"].get("etag"))
-            this.multipart_res_ls[index].push({etag: res_upload["headers"].get("etag"), part: chunkId})
-            resolve("")
+          switch (event.type){
+            case HttpEventType.UploadProgress:
+            //do something
+            
+            console.log("Chunk ", chunkId, " uploaded ", event.loaded/event.total, "%") 
+            break;
+            case HttpEventType.Response:
+        console.log("PUT Response:",chunkId, event)
+                    this.multipart_res_ls[index].push({etag: event["headers"].get("etag"), part: chunkId})
+                    resolve("")
+              break;
           }
-          
-          
-          
+         /* if (res_upload["type"] == 4){
+            
+          }*/
         })
       })
       //Resolve ist server hat request bekommen http progess event ->  HttpEventType.Sent
@@ -416,6 +426,7 @@ export class ApiService {
       if (this.activeConnections_ls[index] == 0){
         console.log("Multipart Upload FINISHED File:", object.file.name)
         //complete Multipart
+        
         this.completeMultipartUpload(object.uploadParams.id, this.multipart_res_ls[index])
       }
       return
