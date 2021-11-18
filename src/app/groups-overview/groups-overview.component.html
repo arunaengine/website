@@ -102,14 +102,15 @@
                         </div>
                         <mat-divider></mat-divider>
                     </div>
-                    <!--<div *ngFor="let object of auto_upload ; let i = index" [attr.data-index]="i">
+                    <div *ngFor="let object of multipart_upload ; let i = index" [attr.data-index]="i">
                         <mat-list-item style="height: 40px;">
                             File Upload: {{object.htmlKeys.filename}}
-                            <mat-progress-bar color="accent" mode="determinate" [value]="object.htmlKeys.progress">
+                            <mat-progress-bar color="accent" mode="determinate" 
+                            [value]="multipart_upload[i].htmlKeys.progress">
                             </mat-progress-bar>
                         </mat-list-item>
                         <mat-divider></mat-divider>
-                    </div>-->
+                    </div>
                 </mat-list>
             </mat-expansion-panel>
         </div>

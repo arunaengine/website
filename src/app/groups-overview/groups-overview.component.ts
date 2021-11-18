@@ -16,6 +16,7 @@ import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.compo
 import { DownloadlinkDialogComponent } from '../dialogs/downloadlink-dialog/downloadlink-dialog.component';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { LoadingComponent } from '../dialogs/loading/loading.component';
+import { BehaviorSubject } from 'rxjs';
 
 
 @Component({
@@ -165,7 +166,7 @@ export class GroupsOverviewComponent implements OnInit {
               this.auto_upload.push(object)
             }
             if (object.uploadCase == "multipart"){
-              object["htmlKeys"] = {filename: object.file.name}
+              object["htmlKeys"] = {filename: object.file.name, progress: 0}
               //Upload state -> 0: not started, 1: uploading, 3: finished
               object["uploadStatus"] = {state: 0}
               this.multipart_upload.push(object)
@@ -183,7 +184,7 @@ export class GroupsOverviewComponent implements OnInit {
           console.log(this.auto_upload, this.multipart_upload, this.user_upload)
           this.uploadAuto()
           this.uploadMultipart()
-          if (this.auto_upload.length > 0 ){0
+          if (this.auto_upload.length > 0 || this.multipart_upload.length > 0){0
             this.uploadingProgressPanel = true
           }
           if ( this.user_upload.length > 0){
@@ -239,14 +240,24 @@ export class GroupsOverviewComponent implements OnInit {
         this.apiService.chunksQueue_ls.push(new Array())
         this.apiService.activeConnections_ls.push(0)
         this.apiService.multipart_res_ls.push([])
-        this.apiService.multipart_progress_ls.push([])
+        this.apiService.multipart_progress_ls.push({})
+        this.apiService.multipart_loaded.push(new BehaviorSubject(0))
         console.log(element, index)
+        this.apiService.multipart_loaded[index].subscribe(progress_value => {
+          console.log("Subscription got",progress_value)
+          this.multipart_upload[index].htmlKeys.progress =Math.round(progress_value / element.file.size *100)
+        })
+        
         this.apiService.initMultipartUpload(element.uploadParams.id).then(() => {
           this.apiService.fullMultipattUpload(element, index)
       })
       }
       
     }
+  }
+
+  listenOnProgress(){
+    
   }
 
   onFileInput(files: FileList | null, index) {

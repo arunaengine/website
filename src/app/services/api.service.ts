@@ -4,6 +4,7 @@ import { OAuthService } from 'angular-oauth2-oidc';
 import { ConfigService } from './config.service';
 import * as moment from 'moment';
 import * as FileSaver from 'file-saver';
+import { BehaviorSubject } from 'rxjs';
 
 
 
@@ -34,7 +35,7 @@ export class ApiService {
   multipart_res_ls = []
   multipart_progress_ls = []
   //file: File
-
+  public multipart_loaded = []
   constructor(
     private http: HttpClient,
     private oauthService: OAuthService,
@@ -363,7 +364,7 @@ export class ApiService {
   uploadMultipartPart(chunk, chunkId, objectid, index){
     return new Promise(resolve => {
       console.log("Init Upload Part: ",chunkId)
-      this.multipart_progress_ls[index].push({chunkid: chunkId, loaded: 0, total:0})
+      //this.multipart_progress_ls[index].push({chunkid: chunkId, loaded: 0, total:0})
       //initMultipartuploadPart() -> put Request
       this.http.get(this.gateway_url+"/objectload/upload_multipart_part/"+objectid+"/"+chunkId, this.configureHeadersAccessKey()).pipe().subscribe(res_url => {
         console.log(res_url)
@@ -376,8 +377,9 @@ export class ApiService {
           switch (event.type){
             case HttpEventType.UploadProgress:
             //do something
-            
-            console.log("Chunk ", chunkId, " uploaded ", event.loaded/event.total, "%") 
+            this.multipart_progress_ls[index][chunkId] = event.loaded
+            //console.log("Chunk ", chunkId, " uploaded ", event.loaded/event.total, "%") 
+            this.getProgress(index)
             break;
             case HttpEventType.Response:
         console.log("PUT Response:",chunkId, event)
@@ -395,6 +397,15 @@ export class ApiService {
       
     })
   }
+
+  getProgress(index){
+    var uploaded_progress = 0
+    for (let chunk in this.multipart_progress_ls[index]){
+      uploaded_progress += this.multipart_progress_ls[index][chunk]
+    }
+    this.multipart_loaded[index].next(uploaded_progress)
+  }
+
   completeMultipartUpload(object_id, part_ls){
     // part_ls = [{etag: "", part: ""}]
     console.log(part_ls)
@@ -436,7 +447,7 @@ export class ApiService {
     const begin = (chunkId-1) * this.chunksize
     const chunk = object.file.slice(begin, begin + this.chunksize)
     this.activeConnections_ls[index] += 1
-
+    
     this.uploadMultipartPart(chunk, chunkId, object.uploadParams.id, index).then(()=> {
       this.activeConnections_ls[index] -= 1
       console.log("reduced thread")
