@@ -40,11 +40,11 @@ export class GroupsOverviewComponent implements OnInit {
   displayedColumns: string[]
   inner_displayedColumns: string[]
   //filelist_forUpload = []
-  upload_progress = []
-  files_userUpload = []
-  uploadPanel = false
-  upload_userFiles = false
-  uploadedFinishedButton = false
+  //upload_progress = []
+  //files_userUpload = []
+  //uploadPanel = false
+  //upload_userFiles = false
+  //uploadedFinishedButton = false
   date_range = { start: new Date, end: new Date }
   forward_disabled = false
   back_disabled = false
@@ -56,6 +56,8 @@ export class GroupsOverviewComponent implements OnInit {
   user_upload = []
   uploadingProgressPanel = false
   userUploadPanel = false
+  auto_upload_count = 0
+  multipart_upload_count = 0
 
   constructor(
     private router: Router,
@@ -65,7 +67,7 @@ export class GroupsOverviewComponent implements OnInit {
     public authService: AuthService,
     private clipboard: Clipboard
   ) {
-    console.log(this.upload_progress)
+    //console.log(this.upload_progress)
     console.log(this.apiService.obj_groups)
     this.displayedColumns = ["name", "description", "objectcount", "created", "actions"]
     this.inner_displayedColumns = ["filename", "filetype", "created", "filesize", "actions"]
@@ -134,7 +136,6 @@ export class GroupsOverviewComponent implements OnInit {
         });
         console.log(filelist_forUpload)
 
-        console.log(this.upload_progress)
         this.apiService.createObjectGroup(this.apiService.dataset.id, result).then(res => {
           res["objectLinks"].forEach((element, index) => {
             filelist_forUpload[index].uploadParams["id"] = element.objectId
@@ -202,7 +203,12 @@ export class GroupsOverviewComponent implements OnInit {
     for (let [index, element] of this.auto_upload.entries()){
       if (element.uploadStatus.state == 0){
             this.auto_upload[index].uploadStatus.state = 1
-              this.uploadFile(element, index)
+              this.uploadFile(element, index).then(()=> {
+                this.auto_upload_count += 1
+                if (this.auto_upload_count == this.auto_upload.length){
+                  this.finishUpload()
+                }
+              })
               //then += uploadedCount --> if uploadedCount == lenList, fire autoUploadFinished-Event
       }
     }
@@ -241,11 +247,20 @@ export class GroupsOverviewComponent implements OnInit {
         this.apiService.activeConnections_ls.push(0)
         this.apiService.multipart_res_ls.push([])
         this.apiService.multipart_progress_ls.push({})
-        this.apiService.multipart_loaded.push(new BehaviorSubject(0))
+        this.apiService.multipart_loaded.push(new BehaviorSubject({progress: 0, finished: false}))
         console.log(element, index)
         this.apiService.multipart_loaded[index].subscribe(progress_value => {
-          console.log("Subscription got",progress_value)
-          this.multipart_upload[index].htmlKeys.progress =Math.round(progress_value / element.file.size *100)
+          //console.log("Subscription got",progress_value)
+          this.multipart_upload[index].htmlKeys.progress =Math.round(progress_value.progress / element.file.size *100)
+          // if progress_value == file.size, uploaded count +1 -> if uploaded count == len multipart_upload, fire finish function
+          if (progress_value.finished){
+            console.log("Finished", element.file.name)
+            this.multipart_upload_count += 1
+            console.log(this.multipart_upload_count, this.multipart_upload)
+            if (this.multipart_upload_count == this.multipart_upload.length){
+              this.finishUpload()
+            }
+          }
         })
         
         this.apiService.initMultipartUpload(element.uploadParams.id).then(() => {
@@ -256,7 +271,28 @@ export class GroupsOverviewComponent implements OnInit {
     }
   }
 
-  listenOnProgress(){
+  finishUpload(){
+    
+      
+      //reset Multipart api vars
+    console.log(this.multipart_upload.length, this.multipart_upload_count, this.auto_upload.length, this.auto_upload_count)
+    if (this.multipart_upload.length == this.multipart_upload_count && this.auto_upload.length == this.auto_upload_count){
+      this.uploadingProgressPanel = false
+      console.log("FINISHED SMALL FILE UPLOAD!", this.auto_upload)
+      this.auto_upload = []
+      this.auto_upload_count = 0
+      console.log("FINSIHED LARGR FILE UPLOAD!", this.multipart_upload)
+      this.multipart_upload = []
+      this.multipart_upload_count = 0
+      this.apiService.chunksQuantity_ls = []
+      this.apiService.chunksQueue_ls = []
+      this.apiService.activeConnections_ls = []
+      this.apiService.multipart_res_ls = []
+      this.apiService.multipart_progress_ls = []
+      this.apiService.multipart_loaded = []
+      
+      this.refreshData()
+    }
     
   }
 
@@ -290,7 +326,7 @@ export class GroupsOverviewComponent implements OnInit {
       }
     }
 
-  uploadFinished() {
+  /*uploadFinished() {
     var all_uploaded = true
     this.upload_progress.forEach(element => {
       console.log(element)
@@ -340,7 +376,7 @@ export class GroupsOverviewComponent implements OnInit {
       }
     }
   }
-
+*/
   openSnackBar(message, design) {
     this.snackBar.open(message, "", {
       duration: 3000,

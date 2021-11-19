@@ -357,9 +357,7 @@ export class ApiService {
       })
     })
   }
-  initMultipartuploadPart(){
-    //Get upload_multipart_part/{object_id}/{chunkId} --> res["uploadlink"] --> Put uploadMultipartPart()
-  }
+  
   //chunk, uploadpart, url
   uploadMultipartPart(chunk, chunkId, objectid, index){
     return new Promise(resolve => {
@@ -379,7 +377,7 @@ export class ApiService {
             //do something
             this.multipart_progress_ls[index][chunkId] = event.loaded
             //console.log("Chunk ", chunkId, " uploaded ", event.loaded/event.total, "%") 
-            this.getProgress(index)
+            this.getMultipartProgress(index)
             break;
             case HttpEventType.Response:
         console.log("PUT Response:",chunkId, event)
@@ -398,20 +396,21 @@ export class ApiService {
     })
   }
 
-  getProgress(index){
+  getMultipartProgress(index){
     var uploaded_progress = 0
     for (let chunk in this.multipart_progress_ls[index]){
       uploaded_progress += this.multipart_progress_ls[index][chunk]
     }
-    this.multipart_loaded[index].next(uploaded_progress)
+    this.multipart_loaded[index].next({progress: uploaded_progress, finished: false})
   }
 
-  completeMultipartUpload(object_id, part_ls){
+  completeMultipartUpload(object_id, part_ls, index, filesize){
     // part_ls = [{etag: "", part: ""}]
     console.log(part_ls)
     var post_obj={objectId: object_id, parts: part_ls}
     this.http.post(this.gateway_url+ "/objectload/complete_multipart", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
       console.log(res)
+      this.multipart_loaded[index].next({progress: filesize, finished: true})
     })
   }
 
@@ -438,7 +437,7 @@ export class ApiService {
         console.log("Multipart Upload FINISHED File:", object.file.name)
         //complete Multipart
         
-        this.completeMultipartUpload(object.uploadParams.id, this.multipart_res_ls[index])
+        this.completeMultipartUpload(object.uploadParams.id, this.multipart_res_ls[index], index, object.file.size)
       }
       return
     }
