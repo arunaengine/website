@@ -39,12 +39,6 @@ export class GroupsOverviewComponent implements OnInit {
   obj_groups_table: any
   displayedColumns: string[]
   inner_displayedColumns: string[]
-  //filelist_forUpload = []
-  //upload_progress = []
-  //files_userUpload = []
-  //uploadPanel = false
-  //upload_userFiles = false
-  //uploadedFinishedButton = false
   date_range = { start: new Date, end: new Date }
   forward_disabled = false
   back_disabled = false
@@ -108,6 +102,9 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   newObjectgroup() {
+    //start the dialog for creating an object group
+    //output handling when dialog closed
+    //automatic file upload of the created objects
     const dialogRef = this.dialog.open(CreateObjgroupComponent,
       {
         hasBackdrop: true,
@@ -119,44 +116,26 @@ export class GroupsOverviewComponent implements OnInit {
         console.log("Dialog closed: ", result)
         result.objects.forEach((object, index) => {
           if (object.uploaded) {
+            // divide output of dialog into 3 upload cases -> File was selected: auto/multipart upload - no File selected: user upload
             if (object.file.size < 15000000) {
               filelist_forUpload.push({ uploadCase: "auto", file: object.file, uploadParams: {} })
             } else {
               filelist_forUpload.push({ uploadCase: "multipart", file: object.file, uploadParams: {} })
             }
-            //this.upload_progress.push({filename: object.file.name, progress: 0, uploaded: false, userUpload: false})
           } else {
-
             filelist_forUpload.push({ uploadCase: "user", file: object, uploadParams: {} })
-            //this.upload_progress.push({filename: object.filename +"." +object.filetype, progress: 0, uploaded: true, userUpload: true})
           }
 
           delete result.objects[index].uploaded
           delete result.objects[index].file
         });
         console.log(filelist_forUpload)
-
+        // exectue api call to create object group and get the upload links and ids as response
         this.apiService.createObjectGroup(this.apiService.dataset.id, result).then(res => {
           res["objectLinks"].forEach((element, index) => {
             filelist_forUpload[index].uploadParams["id"] = element.objectId
             filelist_forUpload[index].uploadParams["link"] = element.link
-            /*if (this.upload_progress[index].userUpload == false){
 
-                  console.log("UPLOADING FILE" + this.filelist_forUpload[index].name, "Link: ", element)
-                  this.uploadFile(element, this.filelist_forUpload[index], index).then(()=> {
-                  console.log("Finished Upload "+ this.filelist_forUpload[index].name)
-                  this.upload_progress[index].uploaded = true
-                  this.uploadFinished()
-                })
-                } else {
-                  console.log("User Upload File: ", element)
-                  this.files_userUpload.push({filespecs: this.filelist_forUpload[index], fromServer: element, file: null, file_name: "", uploadnotAllowed:true, process: {progress: 0, uploaded: false, uploading: false}})
-                  
-                  this.uploadFinished()
-                }
-            if ( res["objectLinks"].length -1 == index){
-              this.upload_userFiles = true
-            }*/
           })
           console.log(filelist_forUpload)
           for (let object of filelist_forUpload){
@@ -199,22 +178,24 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   uploadAuto(){
-    
+    //Upload loop for files < 15mb
     for (let [index, element] of this.auto_upload.entries()){
       if (element.uploadStatus.state == 0){
             this.auto_upload[index].uploadStatus.state = 1
               this.uploadFile(element, index).then(()=> {
                 this.auto_upload_count += 1
+
+                // launch upload finished
                 if (this.auto_upload_count == this.auto_upload.length){
                   this.finishUpload()
                 }
               })
-              //then += uploadedCount --> if uploadedCount == lenList, fire autoUploadFinished-Event
       }
     }
   }
 
   uploadFile(element, index) {
+    //upload for one file < 15mb
     return new Promise(resolve => {
       this.apiService.uploadFile(element.uploadParams.link, element.file).subscribe((event: HttpEvent<any>) => {
         switch (event.type) {
@@ -228,9 +209,6 @@ export class GroupsOverviewComponent implements OnInit {
           case HttpEventType.UploadProgress:
             console.log(event)
            this.auto_upload[index].htmlKeys.progress = Math.round(event.loaded / event.total * 100);
-            /*if (event.loaded == event.total) {
-              
-            }*/
             break;
         }
       })
@@ -238,8 +216,8 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   uploadMultipart(){
+    //upload loop for multipart upload -> files > 15mb
     for (let [index, element] of this.multipart_upload.entries()) {
-      //this.apiService.threadsQuantity_ls.push(5)
       if (element.uploadStatus.state == 0){
         this.multipart_upload[index].uploadStatus.state = 1
         this.apiService.chunksQuantity_ls.push(0)
@@ -250,13 +228,12 @@ export class GroupsOverviewComponent implements OnInit {
         this.apiService.multipart_loaded.push(new BehaviorSubject({progress: 0, finished: false}))
         console.log(element, index)
         this.apiService.multipart_loaded[index].subscribe(progress_value => {
-          //console.log("Subscription got",progress_value)
+          //Subscribe progress event
           this.multipart_upload[index].htmlKeys.progress =Math.round(progress_value.progress / element.file.size *100)
-          // if progress_value == file.size, uploaded count +1 -> if uploaded count == len multipart_upload, fire finish function
+          
+          //launch upload finished
           if (progress_value.finished){
-            console.log("Finished", element.file.name)
             this.multipart_upload_count += 1
-            console.log(this.multipart_upload_count, this.multipart_upload)
             if (this.multipart_upload_count == this.multipart_upload.length){
               this.finishUpload()
             }
@@ -272,9 +249,7 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   finishUpload(){
-    
-      
-      //reset Multipart api vars
+      //reset global upload variables
     console.log(this.multipart_upload.length, this.multipart_upload_count, this.auto_upload.length, this.auto_upload_count)
     if (this.multipart_upload.length == this.multipart_upload_count && this.auto_upload.length == this.auto_upload_count){
       this.uploadingProgressPanel = false
@@ -290,13 +265,14 @@ export class GroupsOverviewComponent implements OnInit {
       this.apiService.multipart_res_ls = []
       this.apiService.multipart_progress_ls = []
       this.apiService.multipart_loaded = []
-      
+      this.openSnackBar("All Files uploaded", "success-snackbar")
       this.refreshData()
     }
     
   }
 
   onFileInput(files: FileList | null, index) {
+    //handling user file input
       if (files) {
         this.user_upload[index].file = files[0]
         this.user_upload[index].htmlKeys.filename_input = this.user_upload[index].file.name
@@ -307,6 +283,7 @@ export class GroupsOverviewComponent implements OnInit {
     }
 
   uploadSingleFile(index) {
+    // uploading single file selected by user
       this.user_upload[index].htmlKeys.uploading = true
       this.user_upload[index]["uploadStatus"] = {state:0}
       if (this.user_upload[index].file.size < 15000000){
@@ -326,57 +303,7 @@ export class GroupsOverviewComponent implements OnInit {
       }
     }
 
-  /*uploadFinished() {
-    var all_uploaded = true
-    this.upload_progress.forEach(element => {
-      console.log(element)
-      if (element.uploaded == false) {
-        all_uploaded = false
-      }
-    })
 
-    if (all_uploaded) {
-      this.uploadedFinishedButton = true
-      if (this.files_userUpload.length == 0) {
-        this.openSnackBar("Finished uploading files", "success-snackbar")
-      } else {
-        this.openSnackBar("Finished uploading files, but user input needed", "success-snackbar")
-
-      }
-
-      console.log("UPLOAD FINISHED FOR ALL FILES")
-      console.log("Files for user Upload", this.files_userUpload)
-      //this.filelist_forUpload = []
-      this.refreshData()
-    }
-  }
-
-  hideUploadedFiles() {
-    this.upload_progress = []
-    if (this.files_userUpload.length == 0) {
-      this.uploadedFinishedButton = false
-      this.uploadPanel = false
-      this.upload_userFiles = false
-      this.files_userUpload = []
-    }
-  }
-
- 
-
- 
-
-  
-
-  hideFile(element) {
-    const index: number = this.files_userUpload.indexOf(element)
-    this.files_userUpload.splice(index, 1)
-    if (this.files_userUpload.length == 0) {
-      if (this.uploadedFinishedButton) {
-        this.hideUploadedFiles()
-      }
-    }
-  }
-*/
   openSnackBar(message, design) {
     this.snackBar.open(message, "", {
       duration: 3000,
@@ -384,6 +311,7 @@ export class GroupsOverviewComponent implements OnInit {
     })
   }
   deleteObjGroup(name, id) {
+    // launch dialog for deleting object group
     console.log("deleting ObjGroup", id)
     const dialogRef = this.dialog.open(AlertDialogComponent, {
       data: {
@@ -407,11 +335,13 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   downloadObject(object) {
+    // download single object
     console.log("Downloading Object", object)
     this.apiService.downloadSingleObject(object)
   }
 
   refreshData() {
+    // refreshes the data table
     const dialogRef = this.dialog.open(LoadingComponent, {
       hasBackdrop: true,
       disableClose: true
@@ -432,6 +362,7 @@ export class GroupsOverviewComponent implements OnInit {
     })
   }*/
   downloadObjectGroup(element) {
+    // download object group
     console.log("Downloading Object group...")
     this.apiService.downloadObjectGroupNew(element)
     /*
@@ -460,6 +391,7 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   changePage(action) {
+    // handling the pagination of the dataset
     if (action == "forward") {
       this.back_disabled = false
       this.apiService.paginantor_config.activepage += 1

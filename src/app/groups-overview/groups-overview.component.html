@@ -103,12 +103,18 @@
                         <mat-divider></mat-divider>
                     </div>
                     <div *ngFor="let object of multipart_upload ; let i = index" [attr.data-index]="i">
+                        <div fxLayout="row wrap" fxLayoutGap="16px grid">
                         <mat-list-item style="height: 40px;">
-                            File Upload: {{object.htmlKeys.filename}}
+                            <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                {{object.htmlKeys.filename}}
+                            </div>
+                            <div fxFlex="80%" fxFlex.xs="100%" fxFlex.sm="33%">
                             <mat-progress-bar color="accent" mode="determinate" 
                             [value]="multipart_upload[i].htmlKeys.progress">
                             </mat-progress-bar>
+                        </div>
                         </mat-list-item>
+                    </div>
                         <mat-divider></mat-divider>
                     </div>
                 </mat-list>
@@ -165,92 +171,6 @@
             </mat-expansion-panel>
 
 
-            <!--
-                <div *ngIf="upload_userFiles">
-
-                    <mat-list>
-                        <mat-list-item>
-                            <mat-label>
-                                File Upload needed for:
-                            </mat-label>
-                        </mat-list-item>
-                        <div *ngFor="let userFile of files_userUpload; let i=index" [attr.data-index]="i">
-                            <mat-divider></mat-divider>
-                            <mat-list-item>
-                                <mat-label>
-                                    Objectname: {{userFile.filespecs.object.name}}
-                                    <button [cdkCopyToClipboard]="userFile.fromServer.link" mat-raised-button
-                                        color="primary"
-                                        (click)="openSnackBar('URL copied to Clipboard.', 'success-snackbar')">
-                                        Copy Upload Link
-                                    </button>
-                                    <button mat-icon-button 
-       
-                                    #tooltip="matTooltip" 
-                                    matTooltip="Share Dataset to create Object Groups"
-                                    matTooltipPosition="above" color="accent" (click)="shareCreateObjectGroups()">
-                                        <mat-icon>share</mat-icon>
-                                    </button>
-                                </mat-label>
-                            </mat-list-item>
-                            <mat-list-item>
-                                <mat-label>
-                                    Filename:
-                                    {{userFile.filespecs.object.filename}}.{{userFile.filespecs.object.filetype}}
-                                </mat-label>
-                            </mat-list-item>
-
-                            <mat-label>
-                                <div fxLayout="row wrap" fxLayoutGap="16px grid">
-                                    <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <mat-form-field appearance="fill" class="example-form">
-                                            <mat-label>File</mat-label>
-                                            <input type="text" disabled matInput
-                                                [(ngModel)]="files_userUpload[i].file_name">
-                                        </mat-form-field>
-                                    </div>
-
-                                    <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <input hidden type="file" #fileInput
-                                            (input)="onFileInput(fileInput.files, i)" />
-                                        <button mat-mini-fab color="accent" (click)="fileInput.click()">
-                                            <mat-icon>attach_file</mat-icon>
-                                        </button>
-                                    </div>
-                                    <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <button mat-mini-fab color="accent"
-                                            [disabled]="files_userUpload[i].uploadnotAllowed"
-                                            (click)="uploadSingleFile(i)">
-                                            <mat-icon>upload</mat-icon>
-                                        </button>
-                                    </div>
-                                    <div fxFlex="65%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <mat-progress-bar *ngIf="files_userUpload[i].process.uploading" color="accent"
-                                            mode="determinate" [value]="files_userUpload[i].process.progress">
-                                        </mat-progress-bar>
-
-                                    </div>
-                                    <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                        <button mat-mini-fab color="warn" (click)="hideFile(userFile)">
-                                            <mat-icon>close</mat-icon>
-                                        </button>
-
-                                    </div>
-                                </div>
-                            </mat-label>
-
-                        </div>
-
-
-                    </mat-list>
-
-
-                </div>
-                <button *ngIf="uploadedFinishedButton" mat-raised-button color="primary"
-                    (click)=hideUploadedFiles()>Hide Uploaded Files</button>
-            -->
-
-
         </div>
 
     </mat-card-content>
@@ -302,23 +222,6 @@
         <td mat-cell *matCellDef="let element">
             {{element.created}}</td>
     </ng-container>
-    <!--<ng-container matColumnDef="id">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Copy ID </th>
-        <td mat-cell *matCellDef="let element">
-            <button [cdkCopyToClipboard]="element.id" mat-icon-button color="primary"
-                (click)="openSnackBar('ID copied to Clipboard.', 'success-snackbar')">
-                <mat-icon>content_copy</mat-icon>
-            </button>
-        </td>
-    </ng-container>
-    <ng-container matColumnDef="download">
-        <th mat-header-cell *matHeaderCellDef> Download Object Group </th>
-        <td mat-cell *matCellDef="let element">
-            <button mat-icon-button color="primary" (click)="downloadObjectGroup(element.id)">
-                <mat-icon>file_download</mat-icon>
-            </button>
-        </td>
-    </ng-container>-->
     <ng-container matColumnDef="actions">
         <th mat-header-cell *matHeaderCellDef> Actions </th>
         <td mat-cell *matCellDef="let element">
@@ -374,15 +277,7 @@
                                 <td mat-cell *matCellDef="let inner_element">
                                     {{inner_element.contentLen}}</td>
                             </ng-container>
-                            <!--<ng-container matColumnDef="id">
-                                <th mat-header-cell *matHeaderCellDef> Copy ID </th>
-                                <td mat-cell *matCellDef="let inner_element">
-                                    <button [cdkCopyToClipboard]="inner_element.id" mat-icon-button color="primary"
-                                        (click)="openSnackBar('ID copied to Clipboard.', 'success-snackbar')">
-                                        <mat-icon>content_copy</mat-icon>
-                                    </button>
-                                </td>
-                            </ng-container>-->
+
                             <ng-container matColumnDef="actions">
                                 <th mat-header-cell *matHeaderCellDef> Actions </th>
                                 <td mat-cell *matCellDef="let inner_element">

@@ -4,7 +4,6 @@ import { OAuthService } from 'angular-oauth2-oidc';
 import { ConfigService } from './config.service';
 import * as moment from 'moment';
 import * as FileSaver from 'file-saver';
-import { BehaviorSubject } from 'rxjs';
 
 
 
@@ -25,17 +24,13 @@ export class ApiService {
   //global vars for multipart upload
   chunksize = 15000000
   threadsQuantity = 5
-  //threadsQuantity_ls =[]
-  //chunksQuantity = 0
   chunksQuantity_ls = []
-  //chunksQueue = new Array()
   chunksQueue_ls = []
-  //activeConnections = 0
   activeConnections_ls = []
   multipart_res_ls = []
   multipart_progress_ls = []
-  //file: File
-  public multipart_loaded = []
+  multipart_loaded = []
+
   constructor(
     private http: HttpClient,
     private oauthService: OAuthService,
@@ -65,7 +60,7 @@ export class ApiService {
   }
 
   createProject(name, description) {
-    //console.log(this.oauthService.getIdentityClaims())
+    
     return new Promise(resolve => {
       var post_object = { name: name, desription: description, metadata: [], labels: [] }
       this.http.post(this.gateway_url + "/project/createproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
@@ -331,23 +326,6 @@ export class ApiService {
     }
   }
 
-  /*saveFile(data){
-    const blob = new Blob([data], {type: "application/json"})
-    const url = window.URL.createObjectURL(blob)
-    window.open(url)
-  }
-  saveFilePerHand(data){
-    const a = document.createElement("a")
-        const objectUrl = URL.createObjectURL(data)
-        a.href = objectUrl
-        a.download = "test.json"
-        a.click()
-        URL.revokeObjectURL(objectUrl)
-  }
-  saveFileFileSaver(data){
-    FileSaver.saveAs(data, "test.json")
-  }*/
-
   initMultipartUpload(object_id){
     return new Promise ( resove => {
       var post_obj = {id: object_id}
@@ -385,9 +363,6 @@ export class ApiService {
                     resolve("")
               break;
           }
-         /* if (res_upload["type"] == 4){
-            
-          }*/
         })
       })
       //Resolve ist server hat request bekommen http progess event ->  HttpEventType.Sent
@@ -435,8 +410,7 @@ export class ApiService {
       console.log("All parts in upload")
       if (this.activeConnections_ls[index] == 0){
         console.log("Multipart Upload FINISHED File:", object.file.name)
-        //complete Multipart
-        
+        //complete Multipart upload
         this.completeMultipartUpload(object.uploadParams.id, this.multipart_res_ls[index], index, object.file.size)
       }
       return
