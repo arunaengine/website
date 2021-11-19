@@ -49,7 +49,7 @@ export class AnonymousUploadComponent implements OnInit {
   ngOnInit(): void {
   }
 
-  createObjectGroup() {
+ /* createObjectGroup() {
     const dialogRef = this.dialog.open(CreateObjgroupComponent,
       {
         hasBackdrop: true,
@@ -64,7 +64,7 @@ export class AnonymousUploadComponent implements OnInit {
         console.log("Dialog dismissed")
       }
     })
-  }
+  }*/
   openSnackBar() {
     this.snackBar.open("ID copied to Clipboard.", "", {
       duration: 3000,
@@ -87,34 +87,7 @@ export class AnonymousUploadComponent implements OnInit {
   }
 
   async UploadFile() {
-    /* this.uploading = true
-     const chunkSize = 15000000
-     var chunklist = []
-     for (let start = 0; start < this.file.size; start+= chunkSize){
-       const chunk = this.file.slice(start, start + chunkSize + 1)
-       //asnyc post chunk to server
-       chunklist.push(chunk)
-       
-     }
-     console.log(chunklist)*/
-    //this.apiService.file
-    for (let [index, element] of this.file_list.entries()) {
-      //this.apiService.threadsQuantity_ls.push(5)
-      this.apiService.chunksQuantity_ls.push(0)
-      this.apiService.chunksQueue_ls.push(new Array())
-      this.apiService.activeConnections_ls.push(0)
-      this.apiService.multipart_res_ls.push([])
-      console.log(element, index)
-      this.apiService.initMultipartUpload(element.objectid).then(() => {
-        this.apiService.fullMultipattUpload(element, index)
-      })
-    }
-
-  }
-  addFile() {
-    this.file_list.push({ file: this.file, objectid: this.objectID })
-    console.log(this.file_list)
-
-  }
+     this.uploading = true
+}
 
 }

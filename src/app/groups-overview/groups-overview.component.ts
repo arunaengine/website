@@ -241,7 +241,7 @@ export class GroupsOverviewComponent implements OnInit {
         })
         
         this.apiService.initMultipartUpload(element.uploadParams.id).then(() => {
-          this.apiService.fullMultipattUpload(element, index)
+          this.apiService.fullMultipartUpload(element, index)
       })
       }
       
