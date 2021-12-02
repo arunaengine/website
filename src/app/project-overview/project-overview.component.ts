@@ -12,6 +12,7 @@ import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog
 import { ProfileDialogComponent } from '../dialogs/profile-dialog/profile-dialog.component';
 import { AuthService } from '../services/auth.service';
 import { LoadingComponent } from '../dialogs/loading/loading.component';
+import { VersionOverviewComponent } from '../version-overview/version-overview.component';
 
 @Component({
   selector: 'app-project-overview',
@@ -133,10 +134,31 @@ export class ProjectOverviewComponent implements OnInit {
     })
   }
 
-  viewVersion(id){
+  viewVersion(element){
     console.log("See versions...")
-    //this.apiService.viewDatasetVersion(id)
-  }
+    this.apiService.viewDatasetVersion(element).then(res => {
+      this.router.navigate(['/version_overview']);
+      /*const dialogRef = this.dialog.open(VersionOverviewComponent, { 
+        hasBackdrop:true,
+        width:"100%",
+        height:"auto",
+        data: {
+          datasetVersions: res["datasetVersions"],
+          projectData: element
+          
+        }
+        })
+        
+      dialogRef.afterClosed().subscribe(result => {
+        if (result){
+          console.log("Dialog closed: ", result)
+        } else {
+          console.log("Dialog dismissed")
+        }
+      })*/
+    })
+    }
+  
 
   toObjectGroups(element){
     

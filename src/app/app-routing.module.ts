@@ -6,12 +6,14 @@ import { HomeComponent } from './home/home.component';
 import { LoginComponent } from './login/login.component';
 import { ProjectOverviewComponent } from './project-overview/project-overview.component';
 import { AuthGuardService } from './services/auth-guard.service';
+import { VersionOverviewComponent } from './version-overview/version-overview.component';
 
 const routes: Routes = [
   {path:"login", component:LoginComponent},
   {path: "home", component:HomeComponent,canActivate: [AuthGuardService] },
   {path:"project_overview", component:ProjectOverviewComponent,canActivate: [AuthGuardService]},
   {path: "groups", component: GroupsOverviewComponent, canActivate: [AuthGuardService]},
+  {path: "version_overview", component: VersionOverviewComponent, canActivate: [AuthGuardService]},
   {path: "anonymous_upload", component: AnonymousUploadComponent},
   {path: "", redirectTo:"login", pathMatch:"full"},
   {path: "auth-callback", redirectTo: "login", pathMatch:"full"},

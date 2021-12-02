@@ -1,0 +1,24 @@
+<h1 mat-dialog-title color="primary">
+    <button mat-mini-fab mat-dialog-close 
+    #tooltip="matTooltip" 
+            matTooltip="Close"
+            matTooltipPosition="below" color="primary">
+        <mat-icon>close</mat-icon>
+    </button>
+    Details - {{data.group.name}}
+</h1>
+<div mat-dialog-content>
+    <mat-list>
+        <mat-list-item>
+            <mat-icon>description</mat-icon>
+            Description: {{data.group.description}}
+        </mat-list-item>
+        <mat-list-item>
+            Object Count: {{data.group.objectcount}}
+        </mat-list-item>
+    </mat-list>
+</div>
+<div mat-dialog-actions>
+    <button mat-raised-button color="primary" [mat-dialog-close]="true">Select</button>
+    <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
+</div>

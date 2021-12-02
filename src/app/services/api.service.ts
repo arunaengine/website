@@ -18,6 +18,7 @@ export class ApiService {
   public project = { project: {}, datasets: [] }
   public users: any
   public dataset: any
+  public datasetVersions: any
   public obj_groups: []
   public paginantor_config = { stats: { groupscount: 0, objectscount: 0 }, lastIds: [], pagesize: 250, pagecount: 0, activepage: 0 }
 
@@ -174,15 +175,53 @@ export class ApiService {
     })
   }
 
-  /*viewDatasetVersion(dataset_id){
+  // Functions for Dataset Versions
+  viewDatasetVersion(element) {
     return new Promise(resolve => {
-      var post_object = { id: dataset_id }
-    this.http.post(this.gateway_url + "/datasetversion/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+      var post_object = { id: element.id }
+    this.http.post(this.gateway_url + "/datasetversions/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
       console.log(res)
+      this.datasetVersions = res["datasetVersions"]
+      this.dataset = element
       resolve(res)
     })
     })
-  }*/
+  }
+
+  getObjectGroupsForVersioning(dataset_id){
+    return new Promise(resolve =>{
+      var post_obj = {id: dataset_id}
+      this.http.post(this.gateway_url + "/dataset/list", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        var formated_res = res["objectGroups"].map(v => Object.assign(v, { isSelected: false, objectcount: v["objects"].length, objects: v.objects.map(o => Object.assign(o, { contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") })) }))
+        console.log(formated_res)
+        resolve(formated_res)
+      })
+    })
+  }
+
+  createDatasetVersion(post_object){
+    return new Promise(resolve => {
+      /*var post_object = {
+          name: input_data.name, datasetId: dataset_id, 
+          version:{},
+          description: input_data.description,
+        }*/
+      this.http.post(this.gateway_url + "/datasetversion/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res =>{
+        console.log(res)
+        resolve("")
+      })
+    })
+  }
+
+  deleteVersion(version_id) {
+    return new Promise(resolve => {
+      this.http.delete(this.gateway_url + "/datasetversion/" + version_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
+        console.log(res_added)
+        resolve("done")
+      })
+    })
+  }
+
   // Functions for Object and Object Group handling
   viewObjectGroups(element) {
     return new Promise(resolve => {

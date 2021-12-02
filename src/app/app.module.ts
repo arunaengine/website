@@ -31,6 +31,9 @@ import { ProjectOverviewComponent } from './project-overview/project-overview.co
 import {MatListModule} from '@angular/material/list';
 import {ClipboardModule} from '@angular/cdk/clipboard';
 import {MatSnackBarModule} from '@angular/material/snack-bar';
+import {MatTabsModule} from '@angular/material/tabs';
+import {MatChipsModule} from '@angular/material/chips';
+import {MatCheckboxModule} from '@angular/material/checkbox';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { OAuthModule, OAuthStorage } from 'angular-oauth2-oidc';
 import { AuthGuardService } from './services/auth-guard.service';
@@ -47,7 +50,10 @@ import { CreateObjectComponent } from './dialogs/create-object/create-object.com
 import { MAT_DATE_LOCALE } from '@angular/material/core';
 import { LoadingComponent } from './dialogs/loading/loading.component';
 import { DownloadlinkDialogComponent } from './dialogs/downloadlink-dialog/downloadlink-dialog.component';
-import { AnonymousUploadComponent } from './anonymous-upload/anonymous-upload.component'
+import { AnonymousUploadComponent } from './anonymous-upload/anonymous-upload.component';
+import { VersionOverviewComponent } from './version-overview/version-overview.component';
+import { CreateVersionComponent } from './dialogs/create-version/create-version.component';
+import { ChipDetailsComponent } from './dialogs/chip-details/chip-details.component'
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -90,6 +96,9 @@ export function storageFactory() : OAuthStorage {
     LoadingComponent,
     DownloadlinkDialogComponent,
     AnonymousUploadComponent,
+    VersionOverviewComponent,
+    CreateVersionComponent,
+    ChipDetailsComponent,
   ],
   imports: [
     BrowserModule,
@@ -116,9 +125,12 @@ export function storageFactory() : OAuthStorage {
     MatDividerModule,
     MatSelectModule,
     MatTooltipModule,
+    MatChipsModule,
+    MatTabsModule,
     ClipboardModule,
     MatSnackBarModule,
     HttpClientModule,
+    MatCheckboxModule,
     OAuthModule.forRoot()
   ],
   providers: [[{
