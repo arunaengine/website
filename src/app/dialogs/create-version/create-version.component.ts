@@ -29,8 +29,13 @@ export class CreateVersionComponent implements OnInit {
   selectedGroups_table: any
   selectedGroups_arr = []
   disabled = true
+  maxDate = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()+1)
+
   //keywordFilter = ""
-  filterObject = {keywords: "", name: "", objectcount: {min: 0, max:0}, onlySelected: false, onlyUnselected: false}
+  filterObject = {keywords: "", name: "", objectcount: {min: 0, max:0}, onlySelected: false, onlyUnselected: false, date_range: { start: null, end: null }}
+
+
+  disableAnimation = true;
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: any,
     private snackBar: MatSnackBar,
@@ -38,17 +43,22 @@ export class CreateVersionComponent implements OnInit {
   ) {
     console.log(this.data);
     this.labelColumns=["key", "value", "delete"]
-    this.selectedTableColums= ["name", "description", "delete"]
+    this.selectedTableColums= ["name", "description","created", "delete"]
     this.new_version.datasetId = this.data.dataset.id
     this.label_table = new MatTableDataSource(this.new_version.labels)
     this.selectedGroups_table = new MatTableDataSource(this.selectedGroups_arr)
     this.displayed_objectGroups = this.data.objectGroups
     console.log(this.objectGroups_data)
+    console.log(this.maxDate)
    }
 
   ngOnInit(): void {
   }
-
+  ngAfterViewInit(): void {
+    //WORKAROUND EXPANDED FLICKER
+    // timeout required to avoid the dreaded 'ExpressionChangedAfterItHasBeenCheckedError'
+    setTimeout(() => this.disableAnimation = false);
+  }
 
   addtoLabels() {
     var add = true
@@ -121,13 +131,20 @@ export class CreateVersionComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
-        this.data.objectGroups[this.data.objectGroups.indexOf(group)].isSelected = true
+        if (result == "select"){
+          this.data.objectGroups[this.data.objectGroups.indexOf(group)].isSelected = true
         if (!this.selectedGroups_arr.includes(group)){
           this.selectedGroups_arr.push(group)
           this.selectedGroups_table = new MatTableDataSource(this.selectedGroups_arr)
+          this.validVersion()
+          console.log(this.data)
         }
-        this.validVersion()
-        console.log(this.data)
+        }
+        if (result =="unselect"){
+          this.removeChip(group)
+        }
+        
+        
       } else {
         console.log("Dialog dismissed")
       }
@@ -156,6 +173,13 @@ export class CreateVersionComponent implements OnInit {
       data_to_filter = data_to_filter.filter(e => e.objectcount >= this.filterObject.objectcount.min && e.objectcount <= this.filterObject.objectcount.max)
     }
     console.log(data_to_filter,this.data)
+
+    if( this.filterObject.date_range.start != null){
+      data_to_filter = data_to_filter.filter(e => e.created >= this.filterObject.date_range.start.toISOString())
+    }
+    if (this.filterObject.date_range.end != null){
+      data_to_filter = data_to_filter.filter(e => e.created <= this.filterObject.date_range.end.toISOString())
+    }
     if (this.filterObject.name != ""){
       data_to_filter = data_to_filter.filter(e => e.name.toLowerCase().includes(this.filterObject.name.toLowerCase()))
     }
@@ -183,7 +207,7 @@ export class CreateVersionComponent implements OnInit {
     }
   }
   resetFilter(){
-    this.filterObject = {keywords: "", name: "", objectcount: {min: 0, max:0}, onlySelected: false, onlyUnselected: false}
+    this.filterObject = {keywords: "", name: "", objectcount: {min: 0, max:0}, onlySelected: false, onlyUnselected: false, date_range: { start: null, end: null }}
     this.displayed_objectGroups = this.data.objectGroups
   }
 

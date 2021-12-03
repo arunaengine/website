@@ -39,7 +39,7 @@ export class CreateObjgroupComponent implements OnInit {
   minutes=[]
   selected_minute: number
   selected_hour: number*/
-  
+  disableAnimation = true;
   constructor(private snackBar: MatSnackBar, private dialog: MatDialog) {
   
     
@@ -60,9 +60,13 @@ export class CreateObjgroupComponent implements OnInit {
   ngOnInit(): void {
     
   }
-  addToDate(){
-    
+
+  ngAfterViewInit(): void {
+    //WORKAROUND EXPANDED FLICKER
+    // timeout required to avoid the dreaded 'ExpressionChangedAfterItHasBeenCheckedError'
+    setTimeout(() => this.disableAnimation = false);
   }
+
   /*addtoObject() {
     if (this.selected_hour != undefined && this.selected_minute != undefined){
     var new_Date = new Date(this.generated_date.getFullYear(),this.generated_date.getMonth(), this.generated_date.getDate(),this.selected_hour, this.selected_minute)

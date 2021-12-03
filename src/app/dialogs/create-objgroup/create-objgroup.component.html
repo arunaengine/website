@@ -5,7 +5,8 @@
     Create Object Group
 </h1>
 
-<div mat-dialog-content>
+<!--[@.disabled]="disableAnimation" -> WORKAROUND FOR EXPANDED FLICKER-->
+<div mat-dialog-content [@.disabled]="disableAnimation">
 
     <mat-form-field appearance="fill" class="example-form">
         <mat-label>Name</mat-label>

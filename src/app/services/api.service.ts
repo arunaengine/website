@@ -192,7 +192,21 @@ export class ApiService {
     return new Promise(resolve =>{
       var post_obj = {id: dataset_id}
       this.http.post(this.gateway_url + "/dataset/list", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        var formated_res = res["objectGroups"].map(v => Object.assign(v, { isSelected: false, objectcount: v["objects"].length, objects: v.objects.map(o => Object.assign(o, { contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") })) }))
+        //remove: created: v["objects"][0].created when creation date issue is fixed
+        var formated_res = res["objectGroups"].map(v => Object.assign(v, { 
+          isSelected: false, 
+          created: v["objects"][0].created,
+          objectcount: v["objects"].length,
+          filetypes: Array.from(new Set(v.objects.map(o => o.filetype))),
+          sumContentLen: String(v.objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
+          objects: v.objects.map(o => Object.assign(o, { 
+            contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") 
+            })) 
+        }))
+       /*for (let [i,object_group] of formated_res.entries()) {
+          //console.log(object)
+          formated_res[i].averageContentLen = object_group.objects.map(o => o.contentLen).reduce((a,b) => a + b,0)/object_group.objectcount
+        }*/
         console.log(formated_res)
         resolve(formated_res)
       })
