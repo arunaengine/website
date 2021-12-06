@@ -2,7 +2,7 @@
     <button mat-icon-button color="secondary" (click)="goBack()">
         <mat-icon>arrow_back</mat-icon>
     </button>
-    <span>BioData DB - {{apiService.dataset.name}}</span>
+    <span>BioData DB - Object Groups Overview - Dataset: {{apiService.dataset.name}} </span>
     <span class="example-spacer"></span>
     <button mat-raised-button color="secondary" (click)="openProfile()">
         <mat-icon>person</mat-icon>
@@ -17,45 +17,61 @@
         </mat-card-title>
     </mat-card-header>
     <mat-card-content>
-        <div fxLayout="row wrap" fxLayoutGap="16px grid">
-            <div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
-                <mat-list>
-                    <mat-list-item style="height: 40px;">
-                        <mat-icon>bar_chart</mat-icon>
-                        Number of Object Groups: {{apiService.paginantor_config.stats.groupscount}}
-                    </mat-list-item>
-                    <mat-list-item style="height: 40px;">
-                        <mat-icon>bar_chart</mat-icon>
-                        Number of Objects: {{apiService.paginantor_config.stats.objectscount}}
-                    </mat-list-item>
-                    <mat-list-item style="height: 40px;">
-                        <mat-icon>bar_chart</mat-icon>
-                        Average Object Size: xx
-                    </mat-list-item>
-                    <mat-list-item style="height: 40px;">
-                        <mat-icon>bar_chart</mat-icon>
-                        Size of all Objects: xx
-                    </mat-list-item>
-                    <mat-list-item style="height: 40px;">
+        <mat-list>
+            <mat-list-item style="height: 40px;">
+                <mat-icon>bar_chart</mat-icon>
+                Number of Object Groups: {{apiService.paginantor_config.stats.groupscount}}
+            </mat-list-item>
+            <mat-list-item style="height: 40px;">
+                <mat-icon>bar_chart</mat-icon>
+                Number of Objects: {{apiService.paginantor_config.stats.objectscount}}
+            </mat-list-item>
+            <mat-list-item style="height: 40px;">
+                <mat-icon>bar_chart</mat-icon>
+                Average Object Size: xx
+            </mat-list-item>
+            <mat-list-item style="height: 40px;">
+                <mat-icon>bar_chart</mat-icon>
+                Size of all Objects: xx
+            </mat-list-item>
+            <mat-list-item style="height: 40px;">
+                <mat-label>
+                    The table below contains the object groups for the dataset "{{apiService.dataset.name}}"".
+                </mat-label>
+            </mat-list-item>
+            <mat-list-item style="height: 40px;">
+                <mat-label>
+                    Each page contains a maximum of 250 object groups in this dataset and is loaded from the
+                    server. <br>
+                    The pagination right above the table is only to make the data more accessable:
+                </mat-label>
+            </mat-list-item>
+        </mat-list>
+                
+                        
+            <div style="float: right;">
                         <button mat-icon-button #tooltip="matTooltip" matTooltip="Go back" matTooltipPosition="above"
                             color="accent" (click)="changePage('back')" [disabled]="back_disabled">
                             <mat-icon>
                                 chevron_left
                             </mat-icon>
                         </button>
-                        Page {{apiService.paginantor_config.activepage +1}} of
-                        {{apiService.paginantor_config.pagecount}}
+               
+                        <mat-label>
+                            Page {{apiService.paginantor_config.activepage +1}} of
+                            {{apiService.paginantor_config.pagecount}}
+                        </mat-label>
+         
                         <button mat-icon-button #tooltip="matTooltip" matTooltip="Go forward" matTooltipPosition="above"
                             color="accent" (click)="changePage('forward')" [disabled]="forward_disabled">
                             <mat-icon>
                                 chevron_right
                             </mat-icon>
                         </button>
+                    </div>
 
-                    </mat-list-item>
-                </mat-list>
-            </div>
-            <!--<div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
+
+        <!--<div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
                 <mat-label><h3>View object groups in date range</h3></mat-label>
                 <mat-form-field appearance="fill" class="example-form">
                     <mat-label>Enter a date range</mat-label>
@@ -73,7 +89,7 @@
                   </mat-form-field> 
                 <button mat-raised-button (click)="refreshData()" color="accent">Reset</button>
             </div>-->
-        </div>
+        
 
 
         <div *ngIf="uploadingProgressPanel">
@@ -104,17 +120,17 @@
                     </div>
                     <div *ngFor="let object of multipart_upload ; let i = index" [attr.data-index]="i">
                         <div fxLayout="row wrap" fxLayoutGap="16px grid">
-                        <mat-list-item style="height: 40px;">
-                            <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
-                                {{object.htmlKeys.filename}}
-                            </div>
-                            <div fxFlex="80%" fxFlex.xs="100%" fxFlex.sm="33%">
-                            <mat-progress-bar color="accent" mode="determinate" 
-                            [value]="multipart_upload[i].htmlKeys.progress">
-                            </mat-progress-bar>
+                            <mat-list-item style="height: 40px;">
+                                <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    {{object.htmlKeys.filename}}
+                                </div>
+                                <div fxFlex="80%" fxFlex.xs="100%" fxFlex.sm="33%">
+                                    <mat-progress-bar color="accent" mode="determinate"
+                                        [value]="multipart_upload[i].htmlKeys.progress">
+                                    </mat-progress-bar>
+                                </div>
+                            </mat-list-item>
                         </div>
-                        </mat-list-item>
-                    </div>
                         <mat-divider></mat-divider>
                     </div>
                 </mat-list>
@@ -188,15 +204,20 @@
 
     </mat-card-actions>
 </mat-card>
-<mat-paginator [pageSizeOptions]="[25, 50, 100, 150]"></mat-paginator>
+
+<div fxLayout="row wrap" fxLayoutGap="16px grid">
+    <div fxFlex="70%" fxFlex.xs="100%">
+        <mat-form-field appearance="fill" class="example-form">
+            <mat-label>Filter</mat-label>
+            <input matInput (keyup)="applyFilter($event)" placeholder="Name" #input>
+        </mat-form-field>
+    </div>
+    <div fxFlex="30%" fxFlex.xs="100%">
+        <mat-paginator [pageSizeOptions]="[25, 50, 100, 150]"></mat-paginator>
+    </div>
+</div>
 
 
-
-
-<mat-form-field appearance="fill" class="example-form">
-    <mat-label>Filter</mat-label>
-    <input matInput (keyup)="applyFilter($event)" placeholder="Name" #input>
-</mat-form-field>
 
 <table mat-table [dataSource]="obj_groups_table" matSort class="mat-elevation-z8" multiTemplateDataRows>
 

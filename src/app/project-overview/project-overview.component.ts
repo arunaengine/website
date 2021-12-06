@@ -13,6 +13,7 @@ import { ProfileDialogComponent } from '../dialogs/profile-dialog/profile-dialog
 import { AuthService } from '../services/auth.service';
 import { LoadingComponent } from '../dialogs/loading/loading.component';
 import { VersionOverviewComponent } from '../version-overview/version-overview.component';
+import { AddUserComponent } from '../dialogs/add-user/add-user.component';
 
 @Component({
   selector: 'app-project-overview',
@@ -95,32 +96,7 @@ export class ProjectOverviewComponent implements OnInit {
       }
     })
   }
-  addUser(){
-    if (this.user_id != ""){
-    console.log("Adding User "+this.user_id+" to project.")
-    const dialogRef = this.dialog.open(AlertDialogComponent,{
-      data:{
-        title: "Add User to Project?",
-        button: "Add User",
-        message: "Are you sure you want to add user '" + this.user_id + "' to "+ this.apiService.project.project["name"]+"?"
-      },
-      hasBackdrop: true
-    })
-    dialogRef.afterClosed().subscribe(result => {
-      if (result){
-        console.log("Dialog closed: ", result)
-        this.apiService.addUsertoProject(this.user_id)
-      } else {
-        console.log("Dialog dismissed")
-      }
-    })
-  } else {
-    this.snackBar.open("Please enter valid user ID!","",{
-      duration: 3000,
-      panelClass: ["warning-snackbar"]
-    })
-  }
-  }
+  
   viewDetails(id){
     console.log("See Details...")
     
@@ -159,6 +135,11 @@ export class ProjectOverviewComponent implements OnInit {
     })
     }
   
+    openUsers(){
+      const dialogRef = this.dialog.open(AddUserComponent, {
+        hasBackdrop: true,
+      })
+    }
 
   toObjectGroups(element){
     

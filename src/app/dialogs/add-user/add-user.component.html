@@ -1,0 +1,37 @@
+<h1 mat-dialog-title color="primary">
+    <button mat-mini-fab mat-dialog-close 
+    #tooltip="matTooltip" 
+            matTooltip="Close"
+            matTooltipPosition="below" color="primary">
+        <mat-icon>close</mat-icon>
+    </button>
+    Users with access to this Project
+</h1>
+<div mat-dialog-content>
+    <div fxLayout="row" fxFlex="100" fxLayoutAlign="space-around start">
+            <div fxLayout="column">
+                <mat-list >
+                    <mat-list-item style="height: 40px;"><mat-icon>person</mat-icon>
+                        User 1</mat-list-item>
+                    <mat-list-item style="height: 40px;"><mat-icon>person</mat-icon>
+                        User 2</mat-list-item>
+                    <mat-list-item style="height: 40px;"><mat-icon>person</mat-icon>
+                        User 3</mat-list-item>
+                </mat-list>
+            </div>
+            <div fxLayout="column">
+                <mat-form-field>
+
+
+                    <mat-label>User ID</mat-label>
+                    <input matInput [(ngModel)]="user_id" placeholder="User ID" #input>
+                </mat-form-field>
+            </div>
+            
+        </div>
+</div>
+
+<div mat-dialog-actions>
+            <button mat-raised-button (click)="addUser()" color="primary">Add User to Project</button>
+            
+</div>

@@ -60,7 +60,7 @@ $dark-theme: mat.define-dark-theme((
 @include mat.all-component-themes($indigo-pink-theme);*/
 
 
-html, body { height: 100%; }
+html, body { height: 100%; width: 100%; margin: 0px; padding: 0px; overflow-x: hidden;}
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 .warning-snackbar {
     background: #da5a5a;

@@ -7,11 +7,12 @@
 </h1>
 <!--[@.disabled]="disableAnimation" -> WORKAROUND FOR EXPANDED FLICKER-->
 <div mat-dialog-content [@.disabled]="disableAnimation">
-
+    
     <mat-tab-group class="mat-elevation-z4">
         <mat-tab label="Overview">
             <mat-card>
                 <mat-card-content>
+                    <br>
                     <mat-accordion multi>
                         <mat-expansion-panel>
                             <mat-expansion-panel-header>
@@ -182,8 +183,6 @@
                 </mat-card-content>
             </mat-card>
         </mat-tab>
-
-
 
 
         <mat-tab label="Select Groups">

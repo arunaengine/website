@@ -39,6 +39,9 @@ export class CreateObjectComponent implements OnInit {
       if (this.new_obj.filename == "") {
         this.new_obj.filename = this.file_name.split(".")[0]
       }
+      if (this.new_obj.name == "") {
+        this.new_obj.name = this.file_name.split(".")[0]
+      }
       if (this.new_obj.filetype == "") {
         this.new_obj.filetype = this.file_name.split(".")[this.file_name.split(".").length - 1]
       }

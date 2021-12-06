@@ -53,7 +53,8 @@ import { DownloadlinkDialogComponent } from './dialogs/downloadlink-dialog/downl
 import { AnonymousUploadComponent } from './anonymous-upload/anonymous-upload.component';
 import { VersionOverviewComponent } from './version-overview/version-overview.component';
 import { CreateVersionComponent } from './dialogs/create-version/create-version.component';
-import { ChipDetailsComponent } from './dialogs/chip-details/chip-details.component'
+import { ChipDetailsComponent } from './dialogs/chip-details/chip-details.component';
+import { AddUserComponent } from './dialogs/add-user/add-user.component'
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -99,6 +100,7 @@ export function storageFactory() : OAuthStorage {
     VersionOverviewComponent,
     CreateVersionComponent,
     ChipDetailsComponent,
+    AddUserComponent,
   ],
   imports: [
     BrowserModule,

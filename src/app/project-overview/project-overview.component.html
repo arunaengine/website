@@ -2,7 +2,7 @@
     <button mat-icon-button color="secondary" (click)="goBack()">
         <mat-icon>arrow_back</mat-icon>
     </button>
-    <span>BioData DB - {{apiService.project.project["name"]}}</span>
+    <span>BioData DB - Dataset Overview - Project: {{apiService.project.project["name"]}} </span>
     <span class="example-spacer"></span>
     <button mat-raised-button color="secondary" (click)="openProfile()">
         <mat-icon>person</mat-icon>
@@ -11,8 +11,6 @@
 </mat-toolbar>
 
 
-<div fxLayout="row wrap" fxLayoutGap="16px grid">
-    <div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
         <mat-card class="mat-elevation-z8">
             <mat-card-header>
                 <mat-card-title>
@@ -27,55 +25,41 @@
                         Stat 2</mat-list-item>
                     <mat-list-item style="height: 40px;"><mat-icon>bar_chart</mat-icon>
                         Stat 3</mat-list-item>
+                        <mat-list-item style="height: 40px;">
+                            x users have access to this project 
+                            <button mat-icon-button color="primary" 
+                            #tooltip="matTooltip" 
+            matTooltip="View users with access"
+            matTooltipPosition="above"
+                            (click)="openUsers()"
+                            ><mat-icon>groups</mat-icon>
+                        </button>
+                        </mat-list-item>
+                        <mat-list-item style="height: 40px;">
+                        <mat-label>
+                            The table below contains the datasets for the project "{{apiService.project.project["name"]}}".
+                        </mat-label>
+                    </mat-list-item>
                 </mat-list>
             </mat-card-content>
             <mat-card-actions>
                 <button mat-raised-button color="primary" (click)=newDataset()>New Dataset</button>
             </mat-card-actions>
         </mat-card>
-    </div>
-    <div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
-        <mat-card class="mat-elevation-z8">
-            <mat-card-header>
-                <mat-card-title>
-                    Users with access to this Project
-                </mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-                <div fxLayout="row" fxFlex="100" fxLayoutAlign="space-around start">
-                    <div fxLayout="column">
-                        <mat-list >
-                            <mat-list-item style="height: 40px;"><mat-icon>person</mat-icon>
-                                User 1</mat-list-item>
-                            <mat-list-item style="height: 40px;"><mat-icon>person</mat-icon>
-                                User 2</mat-list-item>
-                            <mat-list-item style="height: 40px;"><mat-icon>person</mat-icon>
-                                User 3</mat-list-item>
-                        </mat-list>
-                    </div>
-                    <div fxLayout="column">
-                        <mat-form-field>
 
 
-                            <mat-label>User ID</mat-label>
-                            <input matInput [(ngModel)]="user_id" placeholder="User ID" #input>
-                        </mat-form-field>
-                    </div>
-                    
-                </div>
-            </mat-card-content>
-            <mat-card-actions>
-                <button mat-raised-button (click)="addUser()" color="primary">Add User to Project</button>
-            </mat-card-actions>
-        </mat-card>
-    </div>
-</div>
-<mat-paginator [pageSizeOptions]="[10, 25, 50, 100]"></mat-paginator>
-
+<div fxLayout="row wrap" fxLayoutGap="16px grid">
+    <div fxFlex="70%" fxFlex.xs="100%">
 <mat-form-field appearance="fill" class="example-form">
     <mat-label>Filter</mat-label>
     <input matInput (keyup)="applyFilter($event)" placeholder="Name" #input>
 </mat-form-field>
+    </div>
+    <div fxFlex="30%" fxFlex.xs="100%">
+    <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]"></mat-paginator>
+    </div>
+</div>
+
 <table mat-table [dataSource]="dataset_table" matSort class="mat-elevation-z8">
 
     <ng-container matColumnDef="id">

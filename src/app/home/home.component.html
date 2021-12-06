@@ -1,5 +1,5 @@
 <mat-toolbar color="primary">
-    <span>BioData DB</span>
+    <span>BioData DB - Project Overview</span>
     <span class="example-spacer"></span>
     <button mat-raised-button color="secondary" (click)="openProfile()">
         <mat-icon>person</mat-icon>
@@ -15,9 +15,14 @@
                 </mat-card-header>
                 <mat-card-content>
                     <mat-list>
-                        <mat-list-item style="height: 20px;">
+                        <mat-list-item style="height: 40px;">
                             <mat-icon>bar_chart</mat-icon>
                             Number of Projects: {{apiService.projects.length}}
+                        </mat-list-item>
+                        <mat-list-item style="height: 40px;">
+                            <mat-label>
+                                The table below contains the accessable projects for {{authService.user_data.preferred_username}}.
+                            </mat-label>
                         </mat-list-item>
                     </mat-list>
                 </mat-card-content>

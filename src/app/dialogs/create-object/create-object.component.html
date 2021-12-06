@@ -21,7 +21,7 @@
     </mat-form-field>
     <mat-form-field appearance="fill" class="example-form">
         <mat-label>File Size</mat-label>
-        <input type="number" matInput (keyup)=isNotValid() [(ngModel)]="new_obj.contentLen">
+        <input type="number" [disabled]="new_obj.uploaded" matInput (keyup)=isNotValid() [(ngModel)]="new_obj.contentLen">
     </mat-form-field>
 
     <div fxLayout="row wrap" fxLayoutGap="16px grid">
