@@ -122,12 +122,13 @@ export class HomeComponent implements OnInit {
     console.log("Generating Project...")
     const dialogRef = this.dialog.open(CreateProjectComponent, {
       data: {type: "Project"}, 
-      hasBackdrop:true
+      hasBackdrop:true,
+      disableClose: true
        })
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
-        this.apiService.createProject(result.name, result.description).then(()=> {
+        this.apiService.createProject(result).then(()=> {
           this.refreshProjects()
         })
       } else {

@@ -54,7 +54,10 @@ import { AnonymousUploadComponent } from './anonymous-upload/anonymous-upload.co
 import { VersionOverviewComponent } from './version-overview/version-overview.component';
 import { CreateVersionComponent } from './dialogs/create-version/create-version.component';
 import { ChipDetailsComponent } from './dialogs/chip-details/chip-details.component';
-import { AddUserComponent } from './dialogs/add-user/add-user.component'
+import { AddUserComponent } from './dialogs/add-user/add-user.component';
+import { MetadataDetailsComponent } from './dialogs/metadata-details/metadata-details.component';
+import { MetadataAddComponent } from './dialogs/metadata-add/metadata-add.component'
+import { NgxJsonViewerModule } from 'ngx-json-viewer';
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -101,6 +104,8 @@ export function storageFactory() : OAuthStorage {
     CreateVersionComponent,
     ChipDetailsComponent,
     AddUserComponent,
+    MetadataDetailsComponent,
+    MetadataAddComponent,
   ],
   imports: [
     BrowserModule,
@@ -133,6 +138,7 @@ export function storageFactory() : OAuthStorage {
     MatSnackBarModule,
     HttpClientModule,
     MatCheckboxModule,
+    NgxJsonViewerModule,
     OAuthModule.forRoot()
   ],
   providers: [[{

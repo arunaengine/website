@@ -11,6 +11,18 @@
         <input type="text" matInput (keyup)="validProject()" [(ngModel)]="new_project.description"
             placeholder="This is an example {{data.type}}">
     </mat-form-field>
+    <mat-label>
+         <button mat-mini-fab color="accent" (click)="addMetadata()"><mat-icon>add</mat-icon></button>
+         Metadata:
+    </mat-label>
+    <mat-list>
+        <mat-list-item *ngFor="let element of metadata_html">
+            {{element.name}}
+            <button mat-icon-button color="accent" (click)=viewMetadata(element)>
+                <mat-icon>info</mat-icon>
+            </button>
+        </mat-list-item>
+    </mat-list>
 </div>
 <div mat-dialog-actions>
     <button mat-raised-button color="primary" [disabled]="disabled" [mat-dialog-close]="new_project">Generate</button>
