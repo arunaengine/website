@@ -37,7 +37,7 @@ export class CreateProjectComponent implements OnInit {
       this.labelColumns=["key", "value", "delete"]
       this.label_table = new MatTableDataSource(this.new_project.labels)
       this.metaColumns=["name", "actions"]
-      this.label_table = new MatTableDataSource(this.metadata_html)
+      this.meta_table = new MatTableDataSource(this.metadata_html)
      }
 
   ngOnInit(): void {
@@ -70,7 +70,7 @@ export class CreateProjectComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result){
         console.log("Dialog closed: ", result)
-        this.new_project.metadata.push(JSON.stringify(result))
+        this.new_project.metadata.push({metadata: JSON.stringify(result)})
         console.log(this.new_project)
         this.metadata_html.push(result)
         this.meta_table = new MatTableDataSource(this.metadata_html)
@@ -89,7 +89,7 @@ export class CreateProjectComponent implements OnInit {
   deleteMetadata(element){
     //console.log(index)
     this.metadata_html.splice(this.metadata_html.indexOf(element), 1)
-    this.new_project.metadata.splice(this.new_project.metadata.indexOf(JSON.stringify(element)), 1)
+    this.new_project.metadata.splice(this.new_project.metadata.indexOf({metadata: JSON.stringify(element)}), 1)
     this.meta_table = new MatTableDataSource(this.metadata_html)
     console.log(this.new_project, this.metadata_html)
   }

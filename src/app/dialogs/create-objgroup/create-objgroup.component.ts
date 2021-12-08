@@ -3,6 +3,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableDataSource } from '@angular/material/table';
 import { CreateObjectComponent } from '../create-object/create-object.component';
+import { MetadataAddComponent } from '../metadata-add/metadata-add.component';
+import { MetadataDetailsComponent } from '../metadata-details/metadata-details.component';
 //import {MatDatepickerModule} from '@angular/material/datepicker';
 
 @Component({
@@ -39,6 +41,9 @@ export class CreateObjgroupComponent implements OnInit {
   minutes=[]
   selected_minute: number
   selected_hour: number*/
+  metaColumns: string[]
+  meta_table: any
+  metadata_html = []
   disableAnimation = true;
   constructor(private snackBar: MatSnackBar, private dialog: MatDialog) {
   
@@ -48,6 +53,9 @@ export class CreateObjgroupComponent implements OnInit {
     this.displayedColumns=[ "name", "filename","filetype","contentLen", "uploaded" , "delete"]
     this.object_table = new MatTableDataSource(this.new_objgroup.objects)
     this.label_table = new MatTableDataSource(this.new_objgroup.labels)
+    this.metaColumns=["name", "actions"]
+    this.meta_table = new MatTableDataSource(this.metadata_html)
+
     /*for (let i=0; i <24; i++ ){
       this.hours.push(i)
     }
@@ -149,4 +157,39 @@ export class CreateObjgroupComponent implements OnInit {
           this.notValid = true
         }
   }
+
+  addMetadata(){
+    const dialogRef = this.dialog.open(MetadataAddComponent, {
+      hasBackdrop: true,
+      disableClose: true,
+      width: 'auto',
+      data: {}
+    })
+    dialogRef.afterClosed().subscribe(result => {
+      if (result){
+        console.log("Dialog closed: ", result)
+        this.new_objgroup.metadata.push({metadata: JSON.stringify(result)})
+        console.log(this.new_objgroup)
+        this.metadata_html.push(result)
+        this.meta_table = new MatTableDataSource(this.metadata_html)
+      } else {
+        console.log("Dialog dismissed")
+      }
+    })
+  }
+  viewMetadata(element){
+
+    const dialogRef = this.dialog.open(MetadataDetailsComponent, {
+      hasBackdrop: true,
+      data: element
+    })
+  }
+  deleteMetadata(element){
+    //console.log(index)
+    this.metadata_html.splice(this.metadata_html.indexOf(element), 1)
+    this.new_objgroup.metadata.splice(this.new_objgroup.metadata.indexOf({metadata: JSON.stringify(element)}), 1)
+    this.meta_table = new MatTableDataSource(this.metadata_html)
+    console.log(this.new_objgroup, this.metadata_html)
+  }
+
 }

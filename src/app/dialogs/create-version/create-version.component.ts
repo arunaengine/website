@@ -3,6 +3,8 @@ import { MatDialog, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableDataSource } from '@angular/material/table';
 import { ChipDetailsComponent } from '../chip-details/chip-details.component';
+import { MetadataAddComponent } from '../metadata-add/metadata-add.component';
+import { MetadataDetailsComponent } from '../metadata-details/metadata-details.component';
 
 @Component({
   selector: 'app-create-version',
@@ -34,6 +36,9 @@ export class CreateVersionComponent implements OnInit {
   //keywordFilter = ""
   filterObject = {keywords: "", name: "", objectcount: {min: 0, max:0}, onlySelected: false, onlyUnselected: false, date_range: { start: null, end: null }}
 
+  metaColumns: string[]
+  meta_table: any
+  metadata_html = []
 
   disableAnimation = true;
   constructor(
@@ -44,9 +49,11 @@ export class CreateVersionComponent implements OnInit {
     console.log(this.data);
     this.labelColumns=["key", "value", "delete"]
     this.selectedTableColums= ["name", "description","created", "delete"]
+    this.metaColumns=["name", "actions"]
     this.new_version.datasetId = this.data.dataset.id
     this.label_table = new MatTableDataSource(this.new_version.labels)
     this.selectedGroups_table = new MatTableDataSource(this.selectedGroups_arr)
+    this.meta_table = new MatTableDataSource(this.metadata_html)
     this.displayed_objectGroups = this.data.objectGroups
     console.log(this.objectGroups_data)
     console.log(this.maxDate)
@@ -242,6 +249,40 @@ export class CreateVersionComponent implements OnInit {
     } else {
       this.notValid= true
     }
+  }
+
+  addMetadata(){
+    const dialogRef = this.dialog.open(MetadataAddComponent, {
+      hasBackdrop: true,
+      disableClose: true,
+      width: 'auto',
+      data: {}
+    })
+    dialogRef.afterClosed().subscribe(result => {
+      if (result){
+        console.log("Dialog closed: ", result)
+        this.new_version.metadata.push({metadata: JSON.stringify(result)})
+        console.log(this.new_version)
+        this.metadata_html.push(result)
+        this.meta_table = new MatTableDataSource(this.metadata_html)
+      } else {
+        console.log("Dialog dismissed")
+      }
+    })
+  }
+  viewMetadata(element){
+
+    const dialogRef = this.dialog.open(MetadataDetailsComponent, {
+      hasBackdrop: true,
+      data: element
+    })
+  }
+  deleteMetadata(element){
+    //console.log(index)
+    this.metadata_html.splice(this.metadata_html.indexOf(element), 1)
+    this.new_version.metadata.splice(this.new_version.metadata.indexOf({metadata: JSON.stringify(element)}), 1)
+    this.meta_table = new MatTableDataSource(this.metadata_html)
+    console.log(this.new_version, this.metadata_html)
   }
 
 }

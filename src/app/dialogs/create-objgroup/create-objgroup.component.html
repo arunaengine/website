@@ -7,7 +7,13 @@
 
 <!--[@.disabled]="disableAnimation" -> WORKAROUND FOR EXPANDED FLICKER-->
 <div mat-dialog-content [@.disabled]="disableAnimation">
+    <mat-accordion class="example-headers-align" multi>
+        <mat-expansion-panel>
+            <mat-expansion-panel-header>
+                <mat-panel-title>Specs</mat-panel-title>
+                <mat-panel-description>Enter and Edit Name, Description</mat-panel-description>
 
+            </mat-expansion-panel-header>
     <mat-form-field appearance="fill" class="example-form">
         <mat-label>Name</mat-label>
         <input type="text" (keyup)="isValid()" matInput [(ngModel)]="new_objgroup.name" placeholder="Example1">
@@ -23,13 +29,16 @@
 
 
 
-            <mat-form-field appearance="fill" class="example-form">
+    <mat-form-field appearance="fill" class="example-form">
         <mat-label>Generated on</mat-label>
-        <input matInput (dateInput)="addtoObject()" [max]="maxDate" [(ngModel)]="generated_date" [matDatepicker]="generated">
+        <input matInput (dateInput)="addtoObject()" [max]="maxDate" [(ngModel)]="generated_date"
+            [matDatepicker]="generated">
         <mat-datepicker-toggle matSuffix [for]="generated"></mat-datepicker-toggle>
         <mat-datepicker #generated></mat-datepicker>
     </mat-form-field>
-<!--
+        </mat-expansion-panel>
+        
+    <!--
         <div fxFlex="32%" fxFlex.xs="100%" fxFlex.sm="33%">
             <mat-form-field appearance="fill">
                 <mat-label>Hour</mat-label>
@@ -51,13 +60,48 @@
               </mat-form-field>
         </div>
     -->
+
+
+
+    <mat-expansion-panel>
+        <mat-expansion-panel-header>
+            <mat-panel-title>Metadata</mat-panel-title>
+            <mat-panel-description>Add and Delete Metadata</mat-panel-description>
+
+        </mat-expansion-panel-header>
+        <div fxLayout="row wrap" fxLayoutGap="16px grid">
+            <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                <button mat-raised-button color="accent" (click)="addMetadata()">
+                    Add Metadata
+                </button>
+            </div>
+            <div fxFlex="80%" fxFlex.xs="100%" fxFlex.sm="33%">
+                <table mat-table [dataSource]="meta_table" class="mat-elevation-z4">
+
+                    <ng-container matColumnDef="name">
+                        <th mat-header-cell *matHeaderCellDef> name </th>
+                        <td mat-cell *matCellDef="let element"> {{element.name}} </td>
+                    </ng-container>
+                    <ng-container matColumnDef="actions">
+                        <th mat-header-cell *matHeaderCellDef> Actions </th>
+                        <td mat-cell *matCellDef="let element">
+                            <button mat-icon-button color="primary" (click)=viewMetadata(element)>
+                                <mat-icon>info</mat-icon>
+                            </button>
+                            <button mat-icon-button color="warn" (click)=deleteMetadata(element)>
+                                <mat-icon>delete_forever</mat-icon>
+                            </button>
+                        </td>
+                    </ng-container>
+                    <tr mat-header-row *matHeaderRowDef="metaColumns"></tr>
+                    <tr mat-row *matRowDef="let row; columns: metaColumns;"></tr>
+                </table>
+            </div>
+        </div>
+    </mat-expansion-panel>
+
+
     
-    
-
-
-
-
-    <mat-accordion class="example-headers-align" multi>
         <mat-expansion-panel>
             <mat-expansion-panel-header>
                 <mat-panel-title>
@@ -121,11 +165,11 @@
             </mat-expansion-panel-header>
 
             <div fxLayout="row wrap" fxLayoutGap="16px grid">
-                <div fxFlex="15%" fxFlex.xs="100%" fxFlex.sm="33%">
+                <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
                     <button mat-raised-button color="accent" (click)="createObject()"> Add Object</button>
 
                 </div>
-                <div fxFlex="85%" fxFlex.xs="100%" fxFlex.sm="33%">
+                <div fxFlex="80%" fxFlex.xs="100%" fxFlex.sm="33%">
 
                     <table mat-table [dataSource]="object_table" class="mat-elevation-z4">
                         <ng-container matColumnDef="name">
@@ -161,21 +205,22 @@
                                 <mat-icon color="warn" *ngIf="element.uploaded == false">
                                     close
                                 </mat-icon>
-                                 </td>
+                            </td>
                         </ng-container>
                         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
                         <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
                     </table>
                 </div>
-                
+
             </div>
         </mat-expansion-panel>
     </mat-accordion>
-<br>
+    <br>
 
 </div>
 <div mat-dialog-actions>
-    <button mat-raised-button color="primary" [disabled]="notValid" [mat-dialog-close]="new_objgroup">Create Object Group</button>
+    <button mat-raised-button color="primary" [disabled]="notValid" [mat-dialog-close]="new_objgroup">Create Object
+        Group</button>
     <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
 
 </div>
