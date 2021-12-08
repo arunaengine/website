@@ -60,12 +60,11 @@ export class ApiService {
     })
   }
 
-  createProject(post_object) {
+  createProject(new_project) {
 
     return new Promise(resolve => {
-      //var post_object = { name: name, desription: description, metadata: [], labels: [] }
+      var post_object = { name: new_project.name, desription: new_project.description, metadata: new_project.metadata, labels: new_project.labels }
       console.log(post_object)
-      post_object["labels"]=[]
       this.http.post(this.gateway_url + "/project/createproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         resolve("")
@@ -147,9 +146,10 @@ export class ApiService {
     })
   }
   // Funtions for dataset handling
-  createDataset(name, description) {
+  createDataset(new_dataset) {
     return new Promise(resolve => {
-      var post_object = { name: name, desription: description, projectId: this.project.project["id"], metadata: [], labels: [] }
+      var post_object = { name: new_dataset.name, desription: new_dataset.description, projectId: this.project.project["id"], metadata: new_dataset.metadata, labels: new_dataset.labels }
+      console.log(post_object)
       this.http.post(this.gateway_url + "/dataset/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         resolve("")
