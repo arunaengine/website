@@ -9,6 +9,7 @@ import { MatSort } from '@angular/material/sort';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CreateVersionComponent } from '../dialogs/create-version/create-version.component';
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
+import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog.component';
 
 @Component({
   selector: 'app-version-overview',
@@ -78,7 +79,7 @@ export class VersionOverviewComponent implements OnInit {
 
   refreshVersions(){
     //Function to refresh the data table
-    this.apiService.viewDatasetVersion(this.apiService.dataset).then(()=> {
+    this.apiService.viewDatasetVersions(this.apiService.dataset).then(()=> {
       this.table_data = new MatTableDataSource(this.apiService.datasetVersions)
       this.table_data.sort = this.sort
     })
@@ -106,6 +107,7 @@ export class VersionOverviewComponent implements OnInit {
     })
   }
 
+
   openProfile() {
     const dialogRef = this.dialog.open(ProfileDialogComponent, {
       position: { right: "10px", top: "10px" },
@@ -121,6 +123,19 @@ export class VersionOverviewComponent implements OnInit {
     this.snackBar.open("ID copied to Clipboard.","",{
       duration: 3000,
       panelClass: ["success-snackbar"]
+    })
+  }
+
+  viewDetails(element){
+    console.log("See Details...")
+    
+    this.apiService.getDatasetVersion(element.id).then((res:any) => {
+      console.log(res)
+      Object.assign(res, {type: "Version"})
+      const dialogRef = this.dialog.open(DetailsDialogComponent, {
+        data: res,
+        hasBackdrop: true
+      })
     })
   }
 }

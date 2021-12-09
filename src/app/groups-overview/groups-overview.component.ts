@@ -17,6 +17,7 @@ import { DownloadlinkDialogComponent } from '../dialogs/downloadlink-dialog/down
 import { Clipboard } from '@angular/cdk/clipboard';
 import { LoadingComponent } from '../dialogs/loading/loading.component';
 import { BehaviorSubject } from 'rxjs';
+import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog.component';
 
 
 @Component({
@@ -412,6 +413,18 @@ export class GroupsOverviewComponent implements OnInit {
     }
     this.refreshData()
     console.log(this.apiService.paginantor_config)
+  }
+
+  viewDetails(element){
+    console.log("See Details...")    
+    this.apiService.getObjectGroup(element.id).then((res: any) => {
+      console.log(res)
+      Object.assign(res, {type: "Object Group"})
+       const dialogRef = this.dialog.open(DetailsDialogComponent, {
+        data: res,
+        hasBackdrop: true
+      })
+    })
   }
 
 }

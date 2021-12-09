@@ -10,6 +10,7 @@ import { AuthService } from '../services/auth.service';
 import { ApiService } from '../services/api.service';
 import { ProfileDialogComponent } from '../dialogs/profile-dialog/profile-dialog.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog.component';
 
 
 @Component({
@@ -163,4 +164,17 @@ export class HomeComponent implements OnInit {
       panelClass: ["success-snackbar"]
     })
   }
+
+  viewDetails(element){
+    console.log("See Details...")    
+    this.apiService.viewSingleProject(element.id).then((res: any) => {
+      Object.assign(res, {type: "Project"})
+       const dialogRef = this.dialog.open(DetailsDialogComponent, {
+        data: res,
+        hasBackdrop: true
+      })
+    })
+  }
+    
+     
 }

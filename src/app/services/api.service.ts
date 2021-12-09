@@ -87,7 +87,7 @@ export class ApiService {
       this.http.get(this.gateway_url + "/project/" + id, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         this.project.project = res["project"]
-        resolve("done")
+        resolve(res["project"])
       })
     })
   }
@@ -167,18 +167,19 @@ export class ApiService {
     })
   }
 
+  //maybe removeable
   getDetails(dataset_id) {
     return new Promise(resolve => {
       var post_object = { id: dataset_id }
       this.http.post(this.gateway_url + "/dataset/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         //console.log(res)
-        resolve(res)
+        resolve(res["dataset"])
       })
     })
   }
 
   // Functions for Dataset Versions
-  viewDatasetVersion(element) {
+  viewDatasetVersions(element) {
     return new Promise(resolve => {
       var post_object = { id: element.id }
     this.http.post(this.gateway_url + "/datasetversions/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
@@ -187,6 +188,16 @@ export class ApiService {
       this.dataset = element
       resolve(res)
     })
+    })
+  }
+
+  getDatasetVersion(id){
+    return new Promise(resolve => {
+      var post_object = { id: id }
+      console.log(post_object)
+      this.http.post(this.gateway_url + "/datasetversion/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        resolve(res["datasetVersion"])
+      })
     })
   }
 
@@ -258,6 +269,25 @@ export class ApiService {
     })
   }
 
+  getObjectGroup(id){
+    return new Promise(resolve => {
+      var post_object = { id: id }
+      console.log(post_object)
+      this.http.post(this.gateway_url + "/objectgroup/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        var formated_res = Object.assign(res["objectGroup"], { 
+          created: res["objectGroup"]["objects"][0].created,
+          objectcount: res["objectGroup"]["objects"].length,
+          filetypes: Array.from(new Set(res["objectGroup"].objects.map(o => o.filetype))),
+          sumContentLen: String(res["objectGroup"].objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
+          objects: res["objectGroup"].objects.map(o => Object.assign(o, { 
+            contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") 
+            })) 
+        })
+        resolve(res["objectGroup"])
+      })
+    })
+  }
+
   getObjectGroupPagination(element) {
     return new Promise(resolve => {
       var post_obj = { id: element.id }
@@ -297,7 +327,11 @@ export class ApiService {
 
   formatObjGroup(data: any) {
     return new Promise(resolve => {
-      var new_data = data.map(v => Object.assign(v, { isExpanded: false, objectcount: v["objects"].length, objects: v.objects.map(o => Object.assign(o, { contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") })) }))
+      var new_data = data.map(v => Object.assign(v, { 
+        isExpanded: false, 
+        objectcount: v["objects"].length, 
+        created: v["objects"][0].created,
+        objects: v.objects.map(o => Object.assign(o, { contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") })) }))
       console.log(new_data)
       this.obj_groups = new_data
       resolve("")

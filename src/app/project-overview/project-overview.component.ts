@@ -100,11 +100,10 @@ export class ProjectOverviewComponent implements OnInit {
   viewDetails(id){
     console.log("See Details...")
     
-    this.apiService.getDetails(id).then(res => {
+    this.apiService.getDetails(id).then((res:any) => {
+      Object.assign(res, {type: "Dataset"})
       const dialogRef = this.dialog.open(DetailsDialogComponent, {
-        data: {
-          details: res
-        },
+        data: res,
         hasBackdrop: true
       })
     })
@@ -112,7 +111,7 @@ export class ProjectOverviewComponent implements OnInit {
 
   viewVersion(element){
     console.log("See versions...")
-    this.apiService.viewDatasetVersion(element).then(res => {
+    this.apiService.viewDatasetVersions(element).then(res => {
       this.router.navigate(['/version_overview']);
       /*const dialogRef = this.dialog.open(VersionOverviewComponent, { 
         hasBackdrop:true,
