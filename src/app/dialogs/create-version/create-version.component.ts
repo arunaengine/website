@@ -192,7 +192,10 @@ export class CreateVersionComponent implements OnInit {
     }
     console.log(data_to_filter,this.data, this.filterObject.keywords.split(",") )
     if (this.filterObject.keywords != ""){
-      data_to_filter = data_to_filter.filter(e => this.filterObject.keywords.split(",").some(keyword => e.description.toLowerCase().includes(keyword.toLowerCase().trim())))
+     data_to_filter = data_to_filter.filter(e => this.filterObject.keywords.split(",").some(keyword => e.description.toLowerCase().includes(keyword.toLowerCase().trim())))
+      //data_to_filter = data_to_filter.filter(e => this.filterObject.keywords.split(",").some(keyword => e.labels.map(label => label.key.toLowerCase().includes(keyword.toLowerCase().trim()))))
+      // data_to_filter = data_to_filter.filter(e => this.filterObject.keywords.split(",").some(keyword => e.description.toLowerCase().includes(keyword.toLowerCase().trim())))
+
     }
     console.log(data_to_filter,this.data)
     this.displayed_objectGroups = data_to_filter

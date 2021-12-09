@@ -8,16 +8,19 @@ import { MatTableDataSource } from '@angular/material/table';
   styleUrls: ['./chip-details.component.scss']
 })
 export class ChipDetailsComponent implements OnInit {
-
+  objectColumns: string[]
   labelColumns: string[]
   objectTable: any
+  label_table: any
   disableAnimation = true;
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: any,
   ) {
     console.log(this.data)
-    this.labelColumns = ["filename", "filetype", "filesize"]
+    this.objectColumns = ["filename", "filetype", "filesize"]
     this.objectTable = new MatTableDataSource(this.data.group.objects)
+    this.labelColumns = ["key", "value"]
+    this.label_table = new MatTableDataSource(this.data.group.labels)
    }
 
   ngOnInit(): void {

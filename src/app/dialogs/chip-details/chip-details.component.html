@@ -53,11 +53,32 @@
                     <th mat-header-cell *matHeaderCellDef> Filesize </th>
                     <td mat-cell *matCellDef="let element"> {{element.contentLen}} </td>
                 </ng-container>
+                <tr mat-header-row *matHeaderRowDef="objectColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: objectColumns;"></tr>
+            </table>
+        </mat-expansion-panel>
+
+        <mat-expansion-panel [expanded]="false">
+            <mat-expansion-panel-header>
+                <mat-panel-title>
+                    Label Overview
+                </mat-panel-title>
+            </mat-expansion-panel-header>
+            <table mat-table [dataSource]="label_table" class="mat-elevation-z8">
+
+                <ng-container matColumnDef="key">
+                    <th mat-header-cell *matHeaderCellDef> Key </th>
+                    <td mat-cell *matCellDef="let element"> {{element.key}} </td>
+                </ng-container>
+                <ng-container matColumnDef="value">
+                    <th mat-header-cell *matHeaderCellDef> Value </th>
+                    <td mat-cell *matCellDef="let element"> {{element.value}} </td>
+                </ng-container>
                 <tr mat-header-row *matHeaderRowDef="labelColumns"></tr>
                 <tr mat-row *matRowDef="let row; columns: labelColumns;"></tr>
             </table>
-            
         </mat-expansion-panel>
+
     </mat-accordion>
     <br>
 </div>
