@@ -97,10 +97,10 @@ export class ProjectOverviewComponent implements OnInit {
     })
   }
   
-  viewDetails(id){
+  viewDetails(element){
     console.log("See Details...")
     
-    this.apiService.getDetails(id).then((res:any) => {
+    this.apiService.getDatasetDetails(element.id).then((res:any) => {
       Object.assign(res, {type: "Dataset"})
       const dialogRef = this.dialog.open(DetailsDialogComponent, {
         data: res,

@@ -50,7 +50,7 @@ export class CreateObjgroupComponent implements OnInit {
     
     console.log(this.maxDate)
     this.labelColumns=["key", "value", "delete"]
-    this.displayedColumns=[ "name", "filename","filetype","contentLen", "uploaded" , "delete"]
+    this.displayedColumns=["filename","filetype","contentLen", "uploaded" , "delete"]
     this.object_table = new MatTableDataSource(this.new_objgroup.objects)
     this.label_table = new MatTableDataSource(this.new_objgroup.labels)
     this.metaColumns=["name", "actions"]

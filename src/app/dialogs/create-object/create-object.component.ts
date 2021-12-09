@@ -16,7 +16,7 @@ import { MetadataDetailsComponent } from '../metadata-details/metadata-details.c
 export class CreateObjectComponent implements OnInit {
 
   new_obj = {
-    name: "",
+    // name: "",
     filetype: "",
     filename: "",
     labels: [],
@@ -70,9 +70,9 @@ export class CreateObjectComponent implements OnInit {
       if (this.new_obj.filename == "") {
         this.new_obj.filename = this.file_name.split(".")[0]
       }
-      if (this.new_obj.name == "") {
-        this.new_obj.name = this.file_name.split(".")[0]
-      }
+      // if (this.new_obj.name == "") {
+      //   this.new_obj.name = this.file_name.split(".")[0]
+      // }
       if (this.new_obj.filetype == "") {
         this.new_obj.filetype = this.file_name.split(".")[this.file_name.split(".").length - 1]
       }
@@ -85,7 +85,7 @@ export class CreateObjectComponent implements OnInit {
   }
 
   isNotValid(){
-    if (this.new_obj.name != "" && this.new_obj.filename != "" && this.new_obj.filetype != "" && this.new_obj.contentLen !=0){
+    if (this.new_obj.filename != "" && this.new_obj.filetype != "" && this.new_obj.contentLen !=0){
       this.isnotValid = false
     } else {
       this.isnotValid = true

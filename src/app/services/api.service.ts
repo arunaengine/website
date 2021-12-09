@@ -168,7 +168,7 @@ export class ApiService {
   }
 
   //maybe removeable
-  getDetails(dataset_id) {
+  getDatasetDetails(dataset_id) {
     return new Promise(resolve => {
       var post_object = { id: dataset_id }
       this.http.post(this.gateway_url + "/dataset/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
@@ -287,6 +287,10 @@ export class ApiService {
       })
     })
   }
+
+
+
+
 
   getObjectGroupPagination(element) {
     return new Promise(resolve => {
