@@ -43,34 +43,11 @@
                 <mat-label>
                     Each page contains a maximum of 250 object groups in this dataset and is loaded from the
                     server. <br>
-                    The pagination right above the table is only to make the data more accessable:
+                    The pagination right above the table is only to make the data more accessable.
                 </mat-label>
             </mat-list-item>
         </mat-list>
                 
-                        
-            <div style="float: right;">
-                        <button mat-icon-button #tooltip="matTooltip" matTooltip="Go back" matTooltipPosition="above"
-                            color="accent" (click)="changePage('back')" [disabled]="back_disabled">
-                            <mat-icon>
-                                chevron_left
-                            </mat-icon>
-                        </button>
-               
-                        <mat-label>
-                            Page {{apiService.paginantor_config.activepage +1}} of
-                            {{apiService.paginantor_config.pagecount}}
-                        </mat-label>
-         
-                        <button mat-icon-button #tooltip="matTooltip" matTooltip="Go forward" matTooltipPosition="above"
-                            color="accent" (click)="changePage('forward')" [disabled]="forward_disabled">
-                            <mat-icon>
-                                chevron_right
-                            </mat-icon>
-                        </button>
-                    </div>
-
-
         <!--<div fxFlex="50%" fxFlex.xs="100%" fxFlex.sm="33%">
                 <mat-label><h3>View object groups in date range</h3></mat-label>
                 <mat-form-field appearance="fill" class="example-form">
@@ -198,7 +175,26 @@
             matTooltipPosition="above" color="accent" (click)="shareCreateObjectGroups()">
                 <mat-icon>share</mat-icon>
             </button>-->
-
+            <div style="float: right;">
+                <button mat-icon-button #tooltip="matTooltip" matTooltip="Go back" matTooltipPosition="above"
+                    color="accent" (click)="changePage('back')" [disabled]="back_disabled">
+                    <mat-icon>
+                        chevron_left
+                    </mat-icon>
+                </button>
+       
+                <mat-label>
+                    Page {{apiService.paginantor_config.activepage +1}} of
+                    {{apiService.paginantor_config.pagecount}}
+                </mat-label>
+ 
+                <button mat-icon-button #tooltip="matTooltip" matTooltip="Go forward" matTooltipPosition="above"
+                    color="accent" (click)="changePage('forward')" [disabled]="forward_disabled">
+                    <mat-icon>
+                        chevron_right
+                    </mat-icon>
+                </button>
+            </div>
 
 
 

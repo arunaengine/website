@@ -461,8 +461,13 @@ export class ApiService {
               resolve("")
               break;
           }
+        }, err => {
+          console.log("Error:", err)
+          this.uploadMultipartPart(chunk, chunkId, objectid, index)
         })
-      })
+      }, err => {
+          console.log("Error:", err)
+          this.uploadMultipartPart(chunk, chunkId, objectid, index)})
     })
   }
 

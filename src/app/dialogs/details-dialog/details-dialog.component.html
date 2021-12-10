@@ -28,7 +28,10 @@
                         <mat-icon>content_copy</mat-icon>
                     </button>
                 </mat-list-item>
-
+                <mat-list-item *ngIf="data.type =='Version'">
+                    <mat-icon>history</mat-icon>
+                    Version: {{data.version.major}}.{{data.version.minor}}.{{data.version.patch}}-{{data.version.stage}}.{{data.version.revision}}
+                </mat-list-item>
                 <mat-list-item *ngIf="data.type =='Object Group'">
                     <mat-icon>functions</mat-icon>
                     Object Count: {{data.objectcount}}

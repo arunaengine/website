@@ -129,13 +129,14 @@ export class VersionOverviewComponent implements OnInit {
   viewDetails(element){
     console.log("See Details...")
     
-    this.apiService.getDatasetVersion(element.id).then((res:any) => {
-      console.log(res)
+    //this.apiService.getDatasetVersion(element.id).then((res:any) => {
+    var res = element  
+    console.log(res)
       Object.assign(res, {type: "Version"})
       const dialogRef = this.dialog.open(DetailsDialogComponent, {
         data: res,
         hasBackdrop: true
       })
-    })
+    //})
   }
 }

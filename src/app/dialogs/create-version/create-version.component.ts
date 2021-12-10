@@ -103,7 +103,6 @@ export class CreateVersionComponent implements OnInit {
     this.label_table = new MatTableDataSource(this.new_version.labels)
   }
 
-
   isValid(){
     if (this.new_version.name != "" && 
         this.new_version.description!= ""&&
@@ -150,8 +149,6 @@ export class CreateVersionComponent implements OnInit {
         if (result =="unselect"){
           this.removeChip(group)
         }
-        
-        
       } else {
         console.log("Dialog dismissed")
       }
