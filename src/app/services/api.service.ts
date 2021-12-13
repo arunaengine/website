@@ -21,6 +21,7 @@ export class ApiService {
   public datasetVersions: any
   public obj_groups: []
   public paginantor_config = { stats: { groupscount: 0, objectscount: 0 }, lastIds: [], pagesize: 250, pagecount: 0, activepage: 0 }
+  public paginantor_config_versions = { stats: { groupscount: 0, objectscount: 0 }, lastIds: [], pagesize: 250, pagecount: 0, activepage: 0 }
 
   //global vars for multipart upload
   chunksize = 15000000
@@ -155,7 +156,6 @@ export class ApiService {
         resolve("")
       })
     })
-
   }
 
   deleteDataset(dataset_id) {
@@ -186,8 +186,73 @@ export class ApiService {
       console.log(res)
       this.datasetVersions = res["datasetVersions"]
       this.dataset = element
-      resolve(res)
+      resolve("")
     })
+    })
+  }
+
+ /* viewDatasetVersionsPagination(element) {
+    return new Promise(resolve => {
+      console.log(this.paginantor_config_versions)
+      var post_object = { id: element.id, pageRequest: { lastUuid: "", pageSize: this.paginantor_config_versions.pagesize.toString() } }
+      if (this.paginantor_config_versions.activepage > 0) {
+        post_object.pageRequest.lastUuid = this.paginantor_config_versions.lastIds[this.paginantor_config_versions.activepage - 1]
+      }
+      this.http.post(this.gateway_url + "/datasetversions/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        this.datasetVersions = res["datasetVersions"] 
+          resolve("")
+        
+        //this.obj_groups = res["objectGroups"]
+        this.dataset = element
+
+      })
+    })
+  }
+
+  getDatasetVersionsPagination(element) {
+    return new Promise(resolve => {
+      var post_obj = { id: element.id }
+      console.log(post_obj)
+      this.http.post(this.gateway_url + "/datasetversions/list", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+
+        this.paginantor_config_versions.stats.groupscount = res["datasetVersions"].length
+        this.paginantor_config_versions.stats.objectscount = 0
+        this.paginantor_config_versions.pagecount = Math.ceil(this.paginantor_config_versions.stats.groupscount / this.paginantor_config_versions.pagesize)
+        this.paginantor_config_versions.lastIds = []
+        this.paginantor_config_versions.activepage = 0
+        for (let [i, group] of res["datasetVersions"].entries()) {
+          //this.paginantor_config_versions.stats.objectscount += group["objects"].length
+          if (i % this.paginantor_config_versions.pagesize == this.paginantor_config_versions.pagesize - 1) {
+            console.log("last element", i, group)
+            this.paginantor_config_versions.lastIds.push(group.id)
+          }
+        }
+        console.log(this.paginantor_config_versions)
+        resolve("")
+      })
+    })
+  }*/
+
+  getGroupsInVersion(element){
+    return new Promise(resolve => {
+      var post_object = { id: element.id }
+      console.log(post_object)
+      this.http.post(this.gateway_url + "/datasetversion/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        var formated_res = res["objectGroup"].map(v => Object.assign(v, { 
+          isSelected: false, 
+          created: v["objects"][0].created,
+          objectcount: v["objects"].length,
+          filetypes: Array.from(new Set(v.objects.map(o => o.filetype))),
+          sumContentLen: String(v.objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
+          objects: v.objects.map(o => Object.assign(o, { 
+            contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") 
+            }))
+        }))
+        resolve(formated_res);
+      })
     })
   }
 
@@ -225,6 +290,10 @@ export class ApiService {
       })
     })
   }
+
+
+  
+
 
   createDatasetVersion(post_object){
     return new Promise(resolve => {
@@ -295,6 +364,7 @@ export class ApiService {
   getObjectGroupPagination(element) {
     return new Promise(resolve => {
       var post_obj = { id: element.id }
+      console.log(post_obj)
       this.http.post(this.gateway_url + "/dataset/list", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
 

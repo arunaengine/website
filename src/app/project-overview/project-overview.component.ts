@@ -113,25 +113,15 @@ export class ProjectOverviewComponent implements OnInit {
     console.log("See versions...")
     this.apiService.viewDatasetVersions(element).then(res => {
       this.router.navigate(['/version_overview']);
-      /*const dialogRef = this.dialog.open(VersionOverviewComponent, { 
-        hasBackdrop:true,
-        width:"100%",
-        height:"auto",
-        data: {
-          datasetVersions: res["datasetVersions"],
-          projectData: element
-          
-        }
-        })
-        
-      dialogRef.afterClosed().subscribe(result => {
-        if (result){
-          console.log("Dialog closed: ", result)
-        } else {
-          console.log("Dialog dismissed")
-        }
-      })*/
+
     })
+    console.log(element)
+    /*this.apiService.getDatasetVersionsPagination(element).then(()=> {
+      this.apiService.viewDatasetVersionsPagination(element).then(()=> {
+      
+      this.router.navigate(["/version_overview"])
+      })
+    })*/
     }
   
     openUsers(){

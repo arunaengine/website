@@ -3,6 +3,7 @@ import { MatDialog, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableDataSource } from '@angular/material/table';
 import { ChipDetailsComponent } from '../chip-details/chip-details.component';
+import { LoadingComponent } from '../loading/loading.component';
 import { MetadataAddComponent } from '../metadata-add/metadata-add.component';
 import { MetadataDetailsComponent } from '../metadata-details/metadata-details.component';
 
@@ -57,6 +58,10 @@ export class CreateVersionComponent implements OnInit {
     this.displayed_objectGroups = this.data.objectGroups
     console.log(this.objectGroups_data)
     console.log(this.maxDate)
+    if (this.data.fromOld){
+      console.log("from Old version")
+      this.createFromOldVersion()
+    }
    }
 
   ngOnInit(): void {
@@ -286,6 +291,29 @@ export class CreateVersionComponent implements OnInit {
     this.new_version.metadata.splice(this.new_version.metadata.indexOf({metadata: JSON.stringify(element)}), 1)
     this.meta_table = new MatTableDataSource(this.metadata_html)
     console.log(this.new_version, this.metadata_html)
+  }
+
+  createFromOldVersion(){
+   
+    this.new_version.name = "Copy: "+ this.data.fromOld.versionDetails.name
+    this.new_version.description = this.data.fromOld.versionDetails.description
+    this.new_version.version.major = this.data.fromOld.versionDetails.version.major
+    this.new_version.version.minor = this.data.fromOld.versionDetails.version.minor
+    this.new_version.version.patch = this.data.fromOld.versionDetails.version.patch
+    this.new_version.version.revision = this.data.fromOld.versionDetails.version.revision
+    this.new_version.version.stage = this.data.fromOld.versionDetails.version.stage
+    this.new_version.labels = this.data.fromOld.versionDetails.labels
+    this.label_table = new MatTableDataSource(this.new_version.labels)
+    this.new_version.metadata = this.data.fromOld.versionDetails.metadata
+    for (let group of this.data.fromOld.selectedGroups){
+      console.log(group)
+      var real_group = this.data.objectGroups.filter(v => v.id == group.id)[0]
+      console.log(group, real_group)
+      this.data.objectGroups[ this.data.objectGroups.indexOf(real_group)].isSelected = true
+      this.selectedGroups_arr.push(real_group)
+      this.selectedGroups_table = new MatTableDataSource(this.selectedGroups_arr)
+    }
+    this.validVersion()
   }
 
 }

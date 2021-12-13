@@ -16,13 +16,46 @@
         </mat-card-title>
     </mat-card-header>
     <mat-card-content>
+        <!--<mat-list>
+            <mat-list-item style="height: 40px;">
+                <mat-icon>bar_chart</mat-icon>
+                Number of Object Groups: {{apiService.paginantor_config_versions.stats.groupscount}}
+            </mat-list-item>
+            <mat-list-item style="height: 40px;">
+                <mat-icon>bar_chart</mat-icon>
+                Number of Objects: {{apiService.paginantor_config_versions.stats.objectscount}}
+            </mat-list-item>
+        </mat-list>-->
+        
+    
+    </mat-card-content>
+    <mat-card-actions>
         <button mat-mini-fab 
     #tooltip="matTooltip" 
             matTooltip="Generate new Dataset Version"
             matTooltipPosition="right" color="primary" (click)="createDatasetVersion()">
-        <mat-icon>add</mat-icon>
-    </button>
-    </mat-card-content>
+        <mat-icon>add</mat-icon></button>
+       <!-- <div style="float: right;">
+            <button mat-icon-button #tooltip="matTooltip" matTooltip="Go back" matTooltipPosition="above"
+                color="accent" (click)="changePage('back')" [disabled]="back_disabled">
+                <mat-icon>
+                    chevron_left
+                </mat-icon>
+            </button>
+   
+            <mat-label>
+                Page {{apiService.paginantor_config_versions.activepage +1}} of
+                {{apiService.paginantor_config_versions.pagecount}}
+            </mat-label>
+
+            <button mat-icon-button #tooltip="matTooltip" matTooltip="Go forward" matTooltipPosition="above"
+                color="accent" (click)="changePage('forward')" [disabled]="forward_disabled">
+                <mat-icon>
+                    chevron_right
+                </mat-icon>
+            </button>
+        </div>-->
+    </mat-card-actions>
 </mat-card>
 
 <mat-form-field appearance="fill" class="example-form">
@@ -68,6 +101,12 @@
             matTooltipPosition="above"
             color="primary" (click)="viewDetails(element)">
                 <mat-icon>search</mat-icon></button>
+                <button mat-icon-button 
+                #tooltip="matTooltip" 
+                matTooltip="Create new Version from this One"
+                matTooltipPosition="above"color="primary" 
+                (click)="createDatasetVersion(element)">
+                    <mat-icon>note_add</mat-icon></button>
                 <button mat-icon-button 
                 #tooltip="matTooltip" 
                 matTooltip="Delete Dataset"
