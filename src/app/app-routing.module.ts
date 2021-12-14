@@ -11,8 +11,8 @@ import { VersionOverviewComponent } from './version-overview/version-overview.co
 const routes: Routes = [
   {path:"login", component:LoginComponent},
   {path: "home", component:HomeComponent,canActivate: [AuthGuardService] },
-  {path:"project_overview", component:ProjectOverviewComponent,canActivate: [AuthGuardService]},
-  {path: "groups", component: GroupsOverviewComponent, canActivate: [AuthGuardService]},
+  {path:"dataset_overview", component:ProjectOverviewComponent,canActivate: [AuthGuardService]},
+  {path: "group_overview", component: GroupsOverviewComponent, canActivate: [AuthGuardService]},
   {path: "version_overview", component: VersionOverviewComponent, canActivate: [AuthGuardService]},
   {path: "anonymous_upload", component: AnonymousUploadComponent},
   {path: "", redirectTo:"login", pathMatch:"full"},

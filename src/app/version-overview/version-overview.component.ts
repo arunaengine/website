@@ -148,7 +148,7 @@ export class VersionOverviewComponent implements OnInit {
     })
   }
   goBack() {
-    this.router.navigate(["/project_overview"])
+    this.router.navigate(["/dataset_overview"])
   }
   openSnackBar(){
     //Function to show a snackbar

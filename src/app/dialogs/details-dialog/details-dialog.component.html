@@ -34,7 +34,7 @@
                 </mat-list-item>
                 <mat-list-item *ngIf="data.type =='Object Group'">
                     <mat-icon>functions</mat-icon>
-                    Object Count: {{data.objectcount}}
+                    Number of Objects: {{data.objectcount}}
                 </mat-list-item>
 
                 <mat-list-item *ngIf="data.type !='Object'">
@@ -128,7 +128,7 @@
                         {{element.filetypes}}</td>
                 </ng-container>
                 <ng-container matColumnDef="objectcount">
-                    <th mat-header-cell *matHeaderCellDef> Objects in Group</th>
+                    <th mat-header-cell *matHeaderCellDef> Number of Objects</th>
                     <td mat-cell *matCellDef="let element">
                         {{element.objectcount}}</td>
                 </ng-container>
@@ -141,7 +141,7 @@
                     <th mat-header-cell *matHeaderCellDef> Actions </th>
                     <td mat-cell *matCellDef="let element">
                         <button [cdkCopyToClipboard]="element.id" mat-icon-button #tooltip="matTooltip"
-                            matTooltip="Copy Object ID" matTooltipPosition="above" color="primary"
+                            matTooltip="Copy Group ID" matTooltipPosition="above" color="primary"
                             (click)="openSnackBar()">
                             <mat-icon>content_copy</mat-icon>
                         </button>

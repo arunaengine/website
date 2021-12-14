@@ -141,7 +141,7 @@ export class ProjectOverviewComponent implements OnInit {
     this.apiService.getObjectGroupPagination(element).then(()=> {
       this.apiService.viewObjectGroups(element).then(()=> {
       dialogRef.close()
-      this.router.navigate(["/groups"])
+      this.router.navigate(["/group_overview"])
       })
     })
     

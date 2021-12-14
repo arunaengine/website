@@ -113,7 +113,7 @@ export class HomeComponent implements OnInit {
     console.log("View Project", element.id)
     await this.apiService.viewSingleProject(element.id)
     await this.apiService.getDatasetsforProject(element.id)
-    this.router.navigate(["/project_overview"])
+    this.router.navigate(["/dataset_overview"])
     
     
   }

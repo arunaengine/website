@@ -87,7 +87,7 @@ export class GroupsOverviewComponent implements OnInit {
   }
 
   goBack() {
-    this.router.navigate(["/project_overview"])
+    this.router.navigate(["/dataset_overview"])
   }
   openProfile() {
     const dialogRef = this.dialog.open(ProfileDialogComponent, {

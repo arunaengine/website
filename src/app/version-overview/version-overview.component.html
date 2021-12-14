@@ -27,6 +27,28 @@
             </mat-list-item>
         </mat-list>-->
         
+            <mat-list>
+                <mat-list-item style="height: 40px;">
+                    <mat-icon>bar_chart</mat-icon>
+                    Number of Versions: {{apiService.datasetVersions.length}}
+                </mat-list-item>
+                <mat-list-item style="height: 40px;">
+                    <mat-icon>bar_chart</mat-icon>
+                    Stat 2
+                </mat-list-item>
+                <mat-list-item style="height: 40px;">
+                    <mat-icon>bar_chart</mat-icon>
+                    Stat 3
+                </mat-list-item>
+
+                <mat-list-item style="height: 40px;">
+                    <mat-label>
+                        The table below contains the versions for the dataset "{{apiService.dataset.name}}".
+                    </mat-label>
+                </mat-list-item>
+            </mat-list>
+        
+        
     
     </mat-card-content>
     <mat-card-actions>
@@ -74,7 +96,7 @@
         <td mat-cell *matCellDef="let element"> {{element.description}} </td>
     </ng-container>
     <ng-container matColumnDef="version">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header> Version </th>
+        <th mat-header-cell *matHeaderCellDef > Version </th>
         <td mat-cell *matCellDef="let element"> {{element.version.major}}.{{element.version.minor}}.{{element.version.patch}}-{{element.version.stage}}.{{element.version.revision}} </td>
     </ng-container>
     

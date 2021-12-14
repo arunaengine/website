@@ -42,6 +42,7 @@ export class ApiService {
     this.projects = []
   }
 
+  //Creates and retruns a http header with the access token included
   configureHeadersAccessKey() {
     return {
       headers: new HttpHeaders({
@@ -50,7 +51,7 @@ export class ApiService {
     }
   }
 
-
+  //Executes a http get request to get all projects
   getProjects() {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/projects", this.configureHeadersAccessKey()).pipe().subscribe(res => {
@@ -61,8 +62,8 @@ export class ApiService {
     })
   }
 
+  //Executes a http post request to create a new project
   createProject(new_project) {
-
     return new Promise(resolve => {
       var post_object = { name: new_project.name, desription: new_project.description, metadata: new_project.metadata, labels: new_project.labels }
       console.log(post_object)
@@ -74,6 +75,7 @@ export class ApiService {
 
   }
 
+  //Executes a http get request to delete a project
   deleteProject(projcet_id) {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/project/" + projcet_id + "/delete", this.configureHeadersAccessKey()).pipe().subscribe(res => {
@@ -83,6 +85,7 @@ export class ApiService {
     })
   }
 
+  //Executes a http get request to get details of a project and returns them
   viewSingleProject(id) {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/project/" + id, this.configureHeadersAccessKey()).pipe().subscribe(res => {
@@ -92,6 +95,8 @@ export class ApiService {
       })
     })
   }
+
+  // Executes a http get request to get the datasets for a project
   getDatasetsforProject(id) {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/project/" + id + "/projectdatasets", this.configureHeadersAccessKey()).pipe().subscribe(res => {
@@ -102,7 +107,7 @@ export class ApiService {
     })
   }
 
-
+  //Executes a http post request to add a user to a project
   addUsertoProject(user_id) {
     return new Promise(resolve => {
       var post_object = { user_id: user_id, scope: ["READ", "WRITE"], projectId: this.project.project["id"] }
@@ -114,6 +119,7 @@ export class ApiService {
   }
 
   //Functions for apiKey handling
+  //Executed a http get request to get the api keys for a project
   getApiKeys() {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/apitoken", this.configureHeadersAccessKey()).pipe().subscribe(res => {
@@ -124,6 +130,7 @@ export class ApiService {
     })
   }
 
+  //Executes a http get request to create a new api key for a project
   createApiKey(project_id) {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/createapitoken?id=" + project_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
@@ -134,7 +141,7 @@ export class ApiService {
       })
     })
   }
-
+  //Executes a http delete request to delete a api key of a project
   deleteApiKey(token_id) {
     return new Promise(resolve => {
       this.http.delete(this.gateway_url + "/apitoken/" + token_id + "/delete", this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
@@ -147,9 +154,10 @@ export class ApiService {
     })
   }
   // Funtions for dataset handling
+  //Executes a http post request to create a new dataset
   createDataset(new_dataset) {
     return new Promise(resolve => {
-      var post_object = { name: new_dataset.name, desription: new_dataset.description, projectId: this.project.project["id"], metadata: new_dataset.metadata, labels: new_dataset.labels }
+      var post_object = { name: new_dataset.name, description: new_dataset.description, projectId: this.project.project["id"], metadata: new_dataset.metadata, labels: new_dataset.labels }
       console.log(post_object)
       this.http.post(this.gateway_url + "/dataset/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
@@ -158,6 +166,7 @@ export class ApiService {
     })
   }
 
+  //Executes a http delete request to delete a dataset
   deleteDataset(dataset_id) {
     return new Promise(resolve => {
       this.http.delete(this.gateway_url + "/dataset/" + dataset_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
@@ -167,7 +176,7 @@ export class ApiService {
     })
   }
 
-  //maybe removeable
+  //Executes a http post request to get the details of a dataset
   getDatasetDetails(dataset_id) {
     return new Promise(resolve => {
       var post_object = { id: dataset_id }
@@ -179,6 +188,7 @@ export class ApiService {
   }
 
   // Functions for Dataset Versions
+  //Executes a http post request to get all versions of a dataset
   viewDatasetVersions(element) {
     return new Promise(resolve => {
       var post_object = { id: element.id }
@@ -190,7 +200,7 @@ export class ApiService {
     })
     })
   }
-
+  //Functions for Dataset Versions Pagination
  /* viewDatasetVersionsPagination(element) {
     return new Promise(resolve => {
       console.log(this.paginantor_config_versions)
@@ -235,6 +245,7 @@ export class ApiService {
     })
   }*/
 
+  //Executes a http post request to get, format and return the object groups of a version
   getGroupsInVersion(element){
     return new Promise(resolve => {
       var post_object = { id: element.id }
@@ -255,7 +266,7 @@ export class ApiService {
       })
     })
   }
-
+  //Executes a http post request to get and return the details of a version
   getDatasetVersion(id){
     return new Promise(resolve => {
       var post_object = { id: id }
@@ -266,6 +277,7 @@ export class ApiService {
     })
   }
 
+  //Executes a http post request to get, format and return the object groups of a dataset
   getObjectGroupsForVersioning(dataset_id){
     return new Promise(resolve =>{
       var post_obj = {id: dataset_id}
@@ -294,7 +306,7 @@ export class ApiService {
 
   
 
-
+  //Executes a http post request to create a new version
   createDatasetVersion(post_object){
     return new Promise(resolve => {
       /*var post_object = {
@@ -309,6 +321,7 @@ export class ApiService {
     })
   }
 
+  //Executes a http delete request to delete a version
   deleteVersion(version_id) {
     return new Promise(resolve => {
       this.http.delete(this.gateway_url + "/datasetversion/" + version_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
@@ -319,6 +332,7 @@ export class ApiService {
   }
 
   // Functions for Object and Object Group handling
+  //Executes a http request to get all object groups of a dataset with pagination and exectues formatObjGroup
   viewObjectGroups(element) {
     return new Promise(resolve => {
       console.log(this.paginantor_config)
@@ -337,7 +351,7 @@ export class ApiService {
       })
     })
   }
-
+  //Executes a http post request to get, format and return the details of the object group
   getObjectGroup(id){
     return new Promise(resolve => {
       var post_object = { id: id }
@@ -360,7 +374,7 @@ export class ApiService {
 
 
 
-
+  //Executes a http post request to get all object groups of a dataset to create the pagination config
   getObjectGroupPagination(element) {
     return new Promise(resolve => {
       var post_obj = { id: element.id }
@@ -399,6 +413,7 @@ export class ApiService {
      })
    }*/
 
+  //Formats the object group object to get additional stats and functionality 
   formatObjGroup(data: any) {
     return new Promise(resolve => {
       var new_data = data.map(v => Object.assign(v, { 
@@ -411,6 +426,8 @@ export class ApiService {
       resolve("")
     })
   }
+
+  //Executes a http post request to create a new object group and returns the upload link for each object in the group
   createObjectGroup(dataset_id, new_objgroup) {
     return new Promise(resolve => {
       var post_object = new_objgroup
@@ -425,7 +442,7 @@ export class ApiService {
     })
   }
   
-
+  //Executes a http delete request to delete a object group
   deleteObjectGroup(objectgroup_id) {
     console.log(objectgroup_id)
     return new Promise(resolve => {
@@ -438,6 +455,7 @@ export class ApiService {
 
 
   // Functions for uploading and downloading files
+  //Executes a http put request to upload a single file < 4gb
   uploadFile(url, file) {
     console.log(url, file)
     var data = new FormData()
@@ -448,6 +466,7 @@ export class ApiService {
     return this.http.put(url, file, headers).pipe()
   }
 
+  //Executes a http get request to download a single object
   downloadSingleObject(object) {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/objectload/download/" + object.id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
@@ -457,11 +476,11 @@ export class ApiService {
         })
         //window.open(res_added["downloadLink"])
         resolve("done")
-
+        //404 Error => Object not found Snackbar
       })
     })
   }
-
+/*
   downloadObjectGroup(group_id) {
     return new Promise(resolve => {
       var post_obj = { streamType: "STREAM_TYPE_TARGZ", dataset: { datasetId: this.dataset.id } }
@@ -478,8 +497,9 @@ export class ApiService {
 
       })
     })
-  }
+  }*/
 
+  //Executes http get requests to download all objects in the object group
   downloadObjectGroupNew(group) {
     console.log(group)
     for (let object of group.objects) {
@@ -493,8 +513,8 @@ export class ApiService {
     }
   }
 
+  //Executes a http post request to init multipart upload on the server side
   initMultipartUpload(object_id) {
-    //request to init multipart upload on the server side
     return new Promise(resove => {
       var post_obj = { id: object_id }
       this.http.post(this.gateway_url + "/objectload/init_multipart/" + object_id, post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res_uploadLink => {
@@ -504,6 +524,7 @@ export class ApiService {
     })
   }
 
+  //Uploads one chunk
   uploadMultipartPart(chunk, chunkId, objectid, index) {
     // upload chunk
     return new Promise(resolve => {
@@ -540,9 +561,9 @@ export class ApiService {
           this.uploadMultipartPart(chunk, chunkId, objectid, index)})
     })
   }
-
+  
+  // calculating the progress of the multipart upload by adding up the progress of each chunk 
   getMultipartProgress(index) {
-    // calculating the progress of the multipart upload by adding up the progress of each chunk 
     var uploaded_progress = 0
     for (let chunk in this.multipart_progress_ls[index]) {
       uploaded_progress += this.multipart_progress_ls[index][chunk]
