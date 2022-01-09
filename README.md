@@ -25,3 +25,26 @@ Run `ng e2e` to execute the end-to-end tests via [Protractor](http://www.protrac
 ## Further help
 
 To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+
+## Configuration
+
+The website requires the sttings to be provided in JSON format. The config has to be mounted under `/usr/share/nginx/html/assets/config`.
+
+### Endpoints parameters
+
+| Name                              | Description                 | Value       |
+| --------------------------------- | --------------------------- | ----------- |
+| `Endpoints.DatasetHandler.Host`   | Hostname of the API Gateway | `localhost` |
+| `Endpoints.DatasetHandler.Port`   | Port of the API Gateway     | `9000`      |
+| `Endpoints.DatasetHandler.UseTLS` | TLS configuration           | false       |
+
+### Auth parameters
+
+| Name               | Description      | Value |
+| ------------------ | ---------------- | ----- |
+| `Auth.URL`         | Auth URL         | None  |
+| `Auth.CallbackURL` | Callback URL     | None  |
+| `Auth.ClientID`    | OAuth2 client ID | None  |
+| `Auth.AuthURL`     | Auth URL         | None  |
+| `Auth.TokenURL`    | Token URL        | None  |
+| `Auth.UserInfoURL` | UserInfo URL     | None  |
