@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/policy: "force"
+    keel.sh/match-tag: "true" 
+  labels:
+    app.kubernetes.io/name: website
+    app.kubernetes.io/part-of: core-server
+    app.kubernetes.io/version: v0.1.0
+  name: core-server-website
+  namespace: core-storage-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: website
+      app.kubernetes.io/part-of: core-server
+      app.kubernetes.io/version: v0.1.0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: website
+        app.kubernetes.io/part-of: core-server
+        app.kubernetes.io/version: v0.1.0
+    spec:
+      containers:
+        - env:
+          - name: csrfsecret
+            valueFrom:
+              secretKeyRef:
+                key: csrf-secret
+                name: frontend-secrets
+          - name: cookiesecret
+            valueFrom:
+              secretKeyRef:
+                key: cookie-secret
+                name: frontend-secrets
+          - name: Oauth2ClientSecret
+            valueFrom:
+              secretKeyRef:
+                key: oauth2clientsecret
+                name: frontend-secrets
+          image: harbor.computational.bio.uni-giessen.de/scienceobjectsdb/website:angular
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: config
+              mountPath: "/usr/share/nginx/html/assets/config"
+              readOnly: true
+          name: projecthandler
+          ports:
+          - containerPort: 80
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1000Mi
+            requests:
+              cpu: 500m
+              memory: 1000Mi
+      imagePullSecrets:
+        - name: harbor
+      volumes:
+        - name: config
+          configMap:
+            name: corestorageconfigv2
