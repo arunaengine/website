@@ -1,0 +1,7 @@
+<h1 mat-dialog-title color="primary">
+    <button mat-icon-button mat-dialog-close color="primary">
+        <mat-icon>close</mat-icon>
+    </button>
+    Metadata - {{data.name}}
+</h1>
+<ngx-json-viewer [json]="data.metadata"></ngx-json-viewer>
