@@ -62,4 +62,4 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: corestorageconfigv2
+            name: websitestorageconfig
