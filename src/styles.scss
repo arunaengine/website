@@ -4,6 +4,13 @@
 
 @include mat.core();
 
+
+$roboto-font-path: "~roboto-fontface/fonts" !default;
+@import "~roboto-fontface/css/roboto/sass/roboto-fontface";
+
+$material-icons-font-path: '~material-icons/iconfont/';
+@import '~material-icons/iconfont/material-icons.scss';
+
 $my-primary: mat.define-palette(mat.$indigo-palette, 500);
 $my-accent: mat.define-palette(mat.$pink-palette, A200, A100, A400);
 $my-warn: mat.define-palette(mat.$red-palette);
@@ -73,4 +80,3 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 .success {
   color: #1ec907;
 }
-
