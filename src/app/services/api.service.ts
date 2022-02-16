@@ -101,7 +101,7 @@ export class ApiService {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/project/" + id + "/projectdatasets", this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
-        this.project.datasets = res["dataset"]
+        this.project.datasets = res["datasets"]
         resolve("done")
       })
     })
