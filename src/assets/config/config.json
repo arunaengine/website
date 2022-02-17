@@ -2,7 +2,7 @@
     "auth_config":{
         "issuer": "https://keycloak.m1.k8s.computational.bio/auth/realms/NFDI4Biodiversity",
         "loginUrl":"https://keycloak.m1.k8s.computational.bio/auth/realms/NFDI4Biodiversity/protocol/openid-connect/auth",
-        "clientId":"website-angular-local",
+        "clientId":"local-website-dev-client",
         "redirectUri":"http://localhost:4200/auth-callback",
         "responseType":"code",
         "scope":"openid profile email groups",
