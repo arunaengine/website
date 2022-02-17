@@ -65,7 +65,7 @@ export class ApiService {
   //Executes a http post request to create a new project
   createProject(new_project) {
     return new Promise(resolve => {
-      var post_object = { name: new_project.name, desription: new_project.description, metadata: new_project.metadata, labels: new_project.labels }
+      var post_object = { name: new_project.name, description: new_project.description, metadata: new_project.metadata, labels: new_project.labels }
       console.log(post_object)
       this.http.post(this.gateway_url + "/project/createproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)

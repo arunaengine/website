@@ -1,8 +1,8 @@
 {
     "auth_config":{
-        "issuer": "https://keycloak.m1.k8s.computational.bio/auth/realms/NFDI4Biodiversity",
-        "loginUrl":"https://keycloak.m1.k8s.computational.bio/auth/realms/NFDI4Biodiversity/protocol/openid-connect/auth",
-        "clientId":"website-angular-local",
+        "issuer": "https://keycloak.nfdi-svc.gi.denbi.de/auth/realms/NFDI",
+        "loginUrl":"https://keycloak.nfdi-svc.gi.denbi.de/auth/realms/NFDI/protocol/openid-connect/auth",
+        "clientId":"local-website-dev-client",
         "redirectUri":"http://localhost:4200/auth-callback",
         "responseType":"code",
         "scope":"openid profile email groups",
@@ -10,6 +10,6 @@
         "oidc":true
     },
     "api_config": {
-        "gateway_url": "https://gateway.core-server-dev.m1.k8s.computational.bio/api/v1"
+        "gateway_url": "https://gateway.scienceobjectsdb.nfdi-dev.gi.denbi.de/api/v1"
     }
 }
