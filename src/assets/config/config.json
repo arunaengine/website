@@ -10,6 +10,7 @@
         "oidc":true
     },
     "api_config": {
-        "gateway_url": "https://gateway.scienceobjectsdb.nfdi-dev.gi.denbi.de/api/v1"
+        "gateway_url": "https://gateway.scienceobjectsdb.nfdi-dev.gi.denbi.de/api/v1",
+        "swagger_ui": "https://gateway.scienceobjectsdb.nfdi-dev.gi.denbi.de/swagger-ui/#/"
     }
 }

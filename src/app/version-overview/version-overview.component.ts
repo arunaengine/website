@@ -11,6 +11,7 @@ import { CreateVersionComponent } from '../dialogs/create-version/create-version
 import { AlertDialogComponent } from '../dialogs/alert-dialog/alert-dialog.component';
 import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog.component';
 import { LoadingComponent } from '../dialogs/loading/loading.component';
+import { ConfigDetailsDialogComponent } from '../dialogs/config-details-dialog/config-details-dialog.component';
 
 @Component({
   selector: 'app-version-overview',
@@ -139,6 +140,13 @@ export class VersionOverviewComponent implements OnInit {
     })
   }
 
+  openEndpoints(){
+    //Function to open the EndpointURL dialog
+    const dialogRef = this.dialog.open(ConfigDetailsDialogComponent, {
+      position: {right: "10px", top: "10px"},
+      hasBackdrop: true
+    })
+  }
 
   openProfile() {
     const dialogRef = this.dialog.open(ProfileDialogComponent, {

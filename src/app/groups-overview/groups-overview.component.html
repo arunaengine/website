@@ -4,6 +4,15 @@
     </button>
     <span>BioData DB - Object Groups Overview - Dataset: {{apiService.dataset.name}} </span>
     <span class="example-spacer"></span>
+    <button
+        mat-icon-button
+        #tooltip="matTooltip" 
+        matTooltip="Endpoint URLs"
+        matTooltipPosition="below"
+        color="secondary"
+        (click)="openEndpoints()">
+        <mat-icon>build</mat-icon>
+    </button>
     <button mat-raised-button color="secondary" (click)="openProfile()">
         <mat-icon>person</mat-icon>
         {{authService.user_data.preferred_username}}

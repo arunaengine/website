@@ -1,0 +1,27 @@
+<h1 mat-dialog-title color="primary">
+    <button mat-mini-fab mat-dialog-close #tooltip="matTooltip" matTooltip="Close" matTooltipPosition="below"
+        color="primary">
+        <mat-icon>close</mat-icon>
+    </button>
+    Endpoint URLs
+</h1>
+
+<div mat-dialog-content>
+    <mat-list>
+        <mat-list-item>
+            Gateway URL: {{configService.gateway_url}}
+            <button mat-icon-button #tooltip="matTooltip" matTooltip="Open in new tab" matTooltipPosition="above"
+                color="primary" (click)="goToLink(configService.gateway_url)">
+                <mat-icon>logout</mat-icon>
+            </button>
+        </mat-list-item>
+
+        <mat-list-item>
+            Swagger UI URL: {{configService.swagger_ui}}
+            <button mat-icon-button #tooltip="matTooltip" matTooltip="Open in new tab" matTooltipPosition="above"
+                color="primary" (click)="goToLink(configService.swagger_ui)">
+                <mat-icon>logout</mat-icon>
+            </button>
+        </mat-list-item>
+    </mat-list>
+</div>
