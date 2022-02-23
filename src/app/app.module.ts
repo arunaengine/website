@@ -69,6 +69,7 @@ function initialize(http: HttpClient, config: ConfigService) {
              config.auth_config = x.auth_config;
              config.gateway_url = x.api_config.gateway_url
              config.swagger_ui = x.api_config.swagger_ui;
+             config.api_url = x.api_config.api_url;
              console.log(config)
              resolve(true);
            }),
