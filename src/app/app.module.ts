@@ -58,6 +58,7 @@ import { AddUserComponent } from './dialogs/add-user/add-user.component';
 import { MetadataDetailsComponent } from './dialogs/metadata-details/metadata-details.component';
 import { MetadataAddComponent } from './dialogs/metadata-add/metadata-add.component'
 import { NgxJsonViewerModule } from 'ngx-json-viewer';
+import { ConfigDetailsDialogComponent } from './dialogs/config-details-dialog/config-details-dialog.component';
 
 function initialize(http: HttpClient, config: ConfigService) {
 	return (): Promise<boolean> => {
@@ -67,6 +68,7 @@ function initialize(http: HttpClient, config: ConfigService) {
              //console.log(x)
              config.auth_config = x.auth_config;
              config.gateway_url = x.api_config.gateway_url
+             config.swagger_ui = x.api_config.swagger_ui;
              console.log(config)
              resolve(true);
            }),
@@ -106,6 +108,7 @@ export function storageFactory() : OAuthStorage {
     AddUserComponent,
     MetadataDetailsComponent,
     MetadataAddComponent,
+    ConfigDetailsDialogComponent,
   ],
   imports: [
     BrowserModule,

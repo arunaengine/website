@@ -11,6 +11,7 @@ import { ApiService } from '../services/api.service';
 import { ProfileDialogComponent } from '../dialogs/profile-dialog/profile-dialog.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog.component';
+import { ConfigDetailsDialogComponent } from '../dialogs/config-details-dialog/config-details-dialog.component';
 
 
 @Component({
@@ -150,6 +151,13 @@ export class HomeComponent implements OnInit {
     })
   }
 
+  openEndpoints(){
+    //Function to open the EndpointURL dialog
+    const dialogRef = this.dialog.open(ConfigDetailsDialogComponent, {
+      position: {right: "10px", top: "10px"},
+      hasBackdrop: true
+    })
+  }
   openProfile(){
     //Function to open the profile dialog
     const dialogRef = this.dialog.open(ProfileDialogComponent, {
@@ -157,6 +165,7 @@ export class HomeComponent implements OnInit {
       hasBackdrop: true
     })
   }
+
   openSnackBar(){
     //Function to show a snackbar
     this.snackBar.open("ID copied to Clipboard.","",{

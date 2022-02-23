@@ -18,6 +18,7 @@ import { Clipboard } from '@angular/cdk/clipboard';
 import { LoadingComponent } from '../dialogs/loading/loading.component';
 import { BehaviorSubject } from 'rxjs';
 import { DetailsDialogComponent } from '../dialogs/details-dialog/details-dialog.component';
+import { ConfigDetailsDialogComponent } from '../dialogs/config-details-dialog/config-details-dialog.component';
 
 
 @Component({
@@ -89,6 +90,15 @@ export class GroupsOverviewComponent implements OnInit {
   goBack() {
     this.router.navigate(["/dataset_overview"])
   }
+
+  openEndpoints(){
+    //Function to open the EndpointURL dialog
+    const dialogRef = this.dialog.open(ConfigDetailsDialogComponent, {
+      position: {right: "10px", top: "10px"},
+      hasBackdrop: true
+    })
+  }
+
   openProfile() {
     const dialogRef = this.dialog.open(ProfileDialogComponent, {
       position: { right: "10px", top: "10px" },

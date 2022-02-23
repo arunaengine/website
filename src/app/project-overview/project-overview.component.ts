@@ -14,6 +14,7 @@ import { AuthService } from '../services/auth.service';
 import { LoadingComponent } from '../dialogs/loading/loading.component';
 import { VersionOverviewComponent } from '../version-overview/version-overview.component';
 import { AddUserComponent } from '../dialogs/add-user/add-user.component';
+import { ConfigDetailsDialogComponent } from '../dialogs/config-details-dialog/config-details-dialog.component';
 
 @Component({
   selector: 'app-project-overview',
@@ -154,6 +155,14 @@ export class ProjectOverviewComponent implements OnInit {
       this.dataset_table = new MatTableDataSource(this.apiService.project.datasets)
       this.dataset_table.paginator = this.paginator
       this.dataset_table.sort = this.sort
+  }
+
+  openEndpoints(){
+    //Function to open the EndpointURL dialog
+    const dialogRef = this.dialog.open(ConfigDetailsDialogComponent, {
+      position: {right: "10px", top: "10px"},
+      hasBackdrop: true
+    })
   }
 
   openProfile(){
