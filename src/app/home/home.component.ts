@@ -155,7 +155,8 @@ export class HomeComponent implements OnInit {
     //Function to open the EndpointURL dialog
     const dialogRef = this.dialog.open(ConfigDetailsDialogComponent, {
       position: {right: "10px", top: "10px"},
-      hasBackdrop: true
+      hasBackdrop: true,
+      width: "30%"
     })
   }
   openProfile(){
