@@ -433,7 +433,8 @@ export class GroupsOverviewComponent implements OnInit {
       Object.assign(res, {type: "Object Group"})
        const dialogRef = this.dialog.open(DetailsDialogComponent, {
         data: res,
-        hasBackdrop: true
+        hasBackdrop: true,
+        width: "37%"
       })
     })
   }

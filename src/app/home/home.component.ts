@@ -17,7 +17,7 @@ import { ConfigDetailsDialogComponent } from '../dialogs/config-details-dialog/c
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
-  styleUrls: ['./home.component.scss']
+  styleUrls: ['./home.component.scss'] 
 })
 export class HomeComponent implements OnInit {
 
@@ -181,7 +181,8 @@ export class HomeComponent implements OnInit {
       Object.assign(res, {type: "Project"})
        const dialogRef = this.dialog.open(DetailsDialogComponent, {
         data: res,
-        hasBackdrop: true
+        hasBackdrop: true,
+        width: "35%"
       })
     })
   }

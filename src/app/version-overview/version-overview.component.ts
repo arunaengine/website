@@ -177,7 +177,7 @@ export class VersionOverviewComponent implements OnInit {
       const dialogRef = this.dialog.open(DetailsDialogComponent, {
         data: versionDetails,
         hasBackdrop: true,
-        width: "60%",
+        width: "35%"
       })
     })
     

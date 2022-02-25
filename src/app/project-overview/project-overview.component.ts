@@ -105,7 +105,8 @@ export class ProjectOverviewComponent implements OnInit {
       Object.assign(res, {type: "Dataset"})
       const dialogRef = this.dialog.open(DetailsDialogComponent, {
         data: res,
-        hasBackdrop: true
+        hasBackdrop: true,
+        width: "35%"
       })
     })
   }
