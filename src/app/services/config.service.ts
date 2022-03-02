@@ -8,5 +8,6 @@ export class ConfigService {
   auth_config: AuthConfig
   gateway_url: string
   swagger_ui: string
+  api_url: string
   constructor() { }
 }

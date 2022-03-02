@@ -105,7 +105,8 @@ export class ProjectOverviewComponent implements OnInit {
       Object.assign(res, {type: "Dataset"})
       const dialogRef = this.dialog.open(DetailsDialogComponent, {
         data: res,
-        hasBackdrop: true
+        hasBackdrop: true,
+        width: "35%"
       })
     })
   }
@@ -161,7 +162,8 @@ export class ProjectOverviewComponent implements OnInit {
     //Function to open the EndpointURL dialog
     const dialogRef = this.dialog.open(ConfigDetailsDialogComponent, {
       position: {right: "10px", top: "10px"},
-      hasBackdrop: true
+      hasBackdrop: true,
+      width: "30%"
     })
   }
 

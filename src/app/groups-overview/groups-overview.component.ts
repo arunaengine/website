@@ -95,7 +95,8 @@ export class GroupsOverviewComponent implements OnInit {
     //Function to open the EndpointURL dialog
     const dialogRef = this.dialog.open(ConfigDetailsDialogComponent, {
       position: {right: "10px", top: "10px"},
-      hasBackdrop: true
+      hasBackdrop: true,
+      width: "30%"
     })
   }
 
@@ -432,7 +433,8 @@ export class GroupsOverviewComponent implements OnInit {
       Object.assign(res, {type: "Object Group"})
        const dialogRef = this.dialog.open(DetailsDialogComponent, {
         data: res,
-        hasBackdrop: true
+        hasBackdrop: true,
+        width: "37%"
       })
     })
   }

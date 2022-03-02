@@ -8,20 +8,68 @@
 
 <div mat-dialog-content>
     <mat-list>
-        <mat-list-item>
-            Gateway URL: {{configService.gateway_url}}
-            <button mat-icon-button #tooltip="matTooltip" matTooltip="Open in new tab" matTooltipPosition="above"
-                color="primary" (click)="goToLink(configService.gateway_url)">
-                <mat-icon>logout</mat-icon>
-            </button>
-        </mat-list-item>
+        <div fxLayout="row wrap" fxLayoutGap="16px grid">
 
-        <mat-list-item>
-            Swagger UI URL: {{configService.swagger_ui}}
-            <button mat-icon-button #tooltip="matTooltip" matTooltip="Open in new tab" matTooltipPosition="above"
-                color="primary" (click)="goToLink(configService.swagger_ui)">
-                <mat-icon>logout</mat-icon>
-            </button>
-        </mat-list-item>
+            <mat-list-item>
+                <div fxFlex="30%" fxFlex.xs="100%" fxFlex.sm="33%">
+                    Gateway URL:
+                </div>
+                <div fxFlex="55%" fxFlex.xs="100%" fxFlex.sm="33%">
+                    {{configService.gateway_url}}
+                </div>
+                <div fxFlex="15%" fxFlex.xs="100%" fxFlex.sm="33%">
+                    <button [cdkCopyToClipboard]="configService.gateway_url" mat-icon-button #tooltip="matTooltip"
+                        matTooltip="Copy URL" matTooltipPosition="above" color="primary" (click)="openSnackBar()">
+                        <mat-icon>content_copy</mat-icon>
+                    </button>
+                    <button [cdkCopyToClipboard]="configService.gateway_url" mat-icon-button #tooltip="matTooltip"
+                        matTooltip="Open in new tab" matTooltipPosition="above" color="primary"
+                        (click)="goToLink(configService.gateway_url)">
+                        <mat-icon>logout</mat-icon>
+                    </button>
+                </div>
+            </mat-list-item>
+
+            <mat-list-item>
+                <div fxFlex="30%" fxFlex.xs="100%" fxFlex.sm="33%">
+                    Swagger UI URL:
+                </div>
+                <div fxFlex="55%" fxFlex.xs="100%" fxFlex.sm="33%">
+                    {{configService.swagger_ui}}
+                </div>
+                <div fxFlex="15%" fxFlex.xs="100%" fxFlex.sm="33%">
+                    <button [cdkCopyToClipboard]="configService.swagger_ui" mat-icon-button #tooltip="matTooltip"
+                        matTooltip="Copy URL" matTooltipPosition="above" color="primary" (click)="openSnackBar()">
+                        <mat-icon>content_copy</mat-icon>
+                    </button>
+                    <button [cdkCopyToClipboard]="configService.swagger_ui" mat-icon-button #tooltip="matTooltip"
+                        matTooltip="Open in new tab" matTooltipPosition="above" color="primary"
+                        (click)="goToLink(configService.swagger_ui)">
+                        <mat-icon>logout</mat-icon>
+                    </button>
+                </div>
+            </mat-list-item>
+
+            <mat-list-item>
+                <div fxFlex="30%" fxFlex.xs="100%" fxFlex.sm="33%">
+                    API URL:
+                </div>
+                <div fxFlex="55%" fxFlex.xs="100%" fxFlex.sm="33%">
+                    {{configService.api_url}}
+                </div>
+                <div fxFlex="15%" fxFlex.xs="100%" fxFlex.sm="33%">
+                    <button [cdkCopyToClipboard]="configService.api_url" mat-icon-button #tooltip="matTooltip"
+                        matTooltip="Copy URL" matTooltipPosition="above" color="primary" (click)="openSnackBar()">
+                        <mat-icon>content_copy</mat-icon>
+                    </button>
+                    <button mat-icon-button #tooltip="matTooltip" matTooltip="Open in new tab"
+                        matTooltipPosition="above" color="primary" (click)="goToLink(configService.api_url)">
+                        <mat-icon>logout</mat-icon>
+                    </button>
+                </div>
+            </mat-list-item>
+            
+        </div>
     </mat-list>
+    <br>
 </div>

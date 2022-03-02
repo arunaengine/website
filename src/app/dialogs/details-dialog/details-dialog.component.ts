@@ -17,6 +17,7 @@ export class DetailsDialogComponent implements OnInit {
   objectColumns: string[]
   groups_table: any
   groupsColumns: string[]
+  panelClass: 'custom-dialog-container'
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: any,
@@ -56,7 +57,8 @@ export class DetailsDialogComponent implements OnInit {
     
     const dialogRef = this.dialog.open(DetailsDialogComponent, {
       data: element,
-      hasBackdrop: true
+      hasBackdrop: true,
+      width: "35%"
     })
   }
   
@@ -65,9 +67,11 @@ export class DetailsDialogComponent implements OnInit {
       this.apiService.getObjectGroup(element.id).then((res: any) => {
         console.log(res)
         Object.assign(res, {type: "Object Group"})
-         const dialogRef = this.dialog.open(DetailsDialogComponent, {
+         const dialogRef = this.dialog.open(DetailsDialogComponent, {        
           data: res,
-          hasBackdrop: true
+          hasBackdrop: true,
+          width: "35%"
+          
         })
       })
     }
