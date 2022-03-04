@@ -89,7 +89,7 @@ export class ApiService {
   viewSingleProject(id) {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/project/" + id, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        console.log(res)
+        console.log(res)       
         this.project.project = res["project"]
         resolve(res["project"])
       })
@@ -101,7 +101,11 @@ export class ApiService {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/project/" + id + "/projectdatasets", this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
-        this.project.datasets = res["datasets"]
+        var formated_res = res["datasets"].map(v => Object.assign(v, { 
+          status: v.status.split("_")[1].toLowerCase().charAt(0).toUpperCase() 
+          + v.status.split("_")[1].toLowerCase().slice(1)  
+        }))
+        this.project.datasets = formated_res
         resolve("done")
       })
     })
@@ -110,7 +114,7 @@ export class ApiService {
   //Executes a http post request to add a user to a project
   addUsertoProject(user_id) {
     return new Promise(resolve => {
-      var post_object = { user_id: user_id, scope: ["READ", "WRITE"], projectId: this.project.project["id"] }
+      var post_object = { userId: user_id, scope: [ "RIGHT_UNSPECIFIED"], projectId: this.project.project["id"] }
       this.http.post(this.gateway_url + "/project/addusertoproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         resolve("")
@@ -413,13 +417,15 @@ export class ApiService {
      })
    }*/
 
-  //Formats the object group object to get additional stats and functionality 
+  //Formats the object group objects to get additional stats and functionality 
   formatObjGroup(data: any) {
     return new Promise(resolve => {
       var new_data = data.map(v => Object.assign(v, { 
         isExpanded: false, 
         objectcount: v["objects"].length, 
         created: v["objects"][0].created,
+        status: v.status.split("_")[1].toLowerCase().charAt(0).toUpperCase() 
+          + v.status.split("_")[1].toLowerCase().slice(1),  
         objects: v.objects.map(o => Object.assign(o, { contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") })) }))
       console.log(new_data)
       this.obj_groups = new_data

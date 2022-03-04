@@ -65,7 +65,7 @@ export class GroupsOverviewComponent implements OnInit {
   ) {
     //console.log(this.upload_progress)
     console.log(this.apiService.obj_groups)
-    this.displayedColumns = ["name", "description", "objectcount", "created", "actions"]
+    this.displayedColumns = ["name", "description", "objectcount", "created","status", "actions"]
     this.inner_displayedColumns = ["filename", "filetype", "created", "filesize", "actions"]
     this.obj_groups_table = new MatTableDataSource(this.apiService.obj_groups)
     if (this.apiService.paginantor_config.activepage + 1 == this.apiService.paginantor_config.pagecount) {

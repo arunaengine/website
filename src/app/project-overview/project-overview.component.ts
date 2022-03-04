@@ -39,7 +39,7 @@ export class ProjectOverviewComponent implements OnInit {
     public authService: AuthService
   ) {
     console.log(this.apiService.project)
-    this.displayedColumns=[ "name", "description", "created", "actions"]
+    this.displayedColumns=[ "name", "description", "created","status", "actions"]
     this.dataset_table = new MatTableDataSource(this.apiService.project.datasets)
    }
 
