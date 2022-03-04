@@ -114,7 +114,7 @@ export class ApiService {
   //Executes a http post request to add a user to a project
   addUsertoProject(user_id) {
     return new Promise(resolve => {
-      var post_object = { userId: user_id, scope: [ "RIGHT_UNSPECIFIED"], projectId: this.project.project["id"] }
+      var post_object = { userId: user_id, scope: [ "RIGHT_READ", "RIGHT_WRITE"], projectId: this.project.project["id"] }
       this.http.post(this.gateway_url + "/project/addusertoproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         resolve("")
