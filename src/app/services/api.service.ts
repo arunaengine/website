@@ -59,7 +59,8 @@ export class ApiService {
     const dialogRef = this.dialog.open(ErrorDialogComponent,{
       data:{
         title: "A Problem occured, Error-Code: " + error_message.status,
-        message: error_message.error.message,
+        code_message: error_message.error.message,
+        message: error_message.message.split(": "+error_message.status)[0]
       },
       //panelClass: "warning-snackbar",
       hasBackdrop: true
