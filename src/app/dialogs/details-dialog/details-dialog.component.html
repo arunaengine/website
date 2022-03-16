@@ -245,12 +245,12 @@
                 <ng-container matColumnDef="objectcount">
                     <th mat-header-cell *matHeaderCellDef> Number of Objects</th>
                     <td mat-cell *matCellDef="let element">
-                        {{element.objectcount}}</td>
+                        {{element.stats.objectCount}}</td>
                 </ng-container>
                 <ng-container matColumnDef="contentLen">
                     <th mat-header-cell *matHeaderCellDef> Total Size (Bytes)</th>
                     <td mat-cell *matCellDef="let element">
-                        {{element.sumContentLen}}</td>
+                        {{element.stats.accSize}}</td>
                 </ng-container>
                 <ng-container matColumnDef="actions">
                     <th mat-header-cell *matHeaderCellDef> Actions </th>
