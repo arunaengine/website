@@ -2,8 +2,11 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpEvent, HttpEventType, HttpHeaders } from '@angular/common/http';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { ConfigService } from './config.service';
+import {MatDialog} from '@angular/material/dialog';
 import * as moment from 'moment';
 import * as FileSaver from 'file-saver';
+import { ErrorDialogComponent } from '../dialogs/error-dialog/error-dialog.component';
+
 
 
 
@@ -37,6 +40,7 @@ export class ApiService {
     private http: HttpClient,
     private oauthService: OAuthService,
     private configService: ConfigService,
+    private dialog: MatDialog,
   ) {
     this.gateway_url = this.configService.gateway_url
     this.projects = []
@@ -51,6 +55,19 @@ export class ApiService {
     }
   }
 
+  openErrorDialog(error_message){
+    const dialogRef = this.dialog.open(ErrorDialogComponent,{
+      data:{
+        title: "A Problem occured, Error-Code: " + error_message.status,
+        code_message: error_message.error.message,
+        message: error_message.message.split(": "+error_message.status)[0]
+      },
+      //panelClass: "warning-snackbar",
+      hasBackdrop: true
+    })
+  }
+
+
   //Executes a http get request to get all projects
   getProjects() {
     return new Promise(resolve => {
@@ -58,7 +75,10 @@ export class ApiService {
         console.log("Get Projects...", res)
         this.projects = res["projects"]
         resolve("done")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+      )
     })
   }
 
@@ -70,7 +90,10 @@ export class ApiService {
       this.http.post(this.gateway_url + "/project/createproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         resolve("")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+      )
     })
 
   }
@@ -81,7 +104,10 @@ export class ApiService {
       this.http.get(this.gateway_url + "/project/" + projcet_id + "/delete", this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         resolve("done")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}      
+      )
     })
   }
 
@@ -92,7 +118,10 @@ export class ApiService {
         console.log(res)       
         this.project.project = res["project"]
         resolve(res["project"])
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+      )
     })
   }
 
@@ -107,7 +136,10 @@ export class ApiService {
         }))
         this.project.datasets = formated_res
         resolve("done")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -118,7 +150,10 @@ export class ApiService {
       this.http.post(this.gateway_url + "/project/addusertoproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         resolve("")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -130,7 +165,10 @@ export class ApiService {
         console.log(res)
         this.apiKeys = res["token"]
         resolve("done")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -141,7 +179,10 @@ export class ApiService {
         console.log(res_added)
         this.getApiKeys().then(() => {
           resolve("done")
-        })
+        }, err => {
+          console.log(err)
+          this.openErrorDialog(err)}
+          )
       })
     })
   }
@@ -152,7 +193,10 @@ export class ApiService {
         console.log(res_added)
         this.getApiKeys().then(() => {
           resolve("")
-        })
+        }, err => {
+          console.log(err)
+          this.openErrorDialog(err)}
+          )
 
       })
     })
@@ -166,7 +210,10 @@ export class ApiService {
       this.http.post(this.gateway_url + "/dataset/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         resolve("")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -176,7 +223,10 @@ export class ApiService {
       this.http.delete(this.gateway_url + "/dataset/" + dataset_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
         console.log(res_added)
         resolve("done")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -187,7 +237,10 @@ export class ApiService {
       this.http.post(this.gateway_url + "/dataset/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         //console.log(res)
         resolve(res["dataset"])
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -201,7 +254,10 @@ export class ApiService {
       this.datasetVersions = res["datasetVersions"]
       this.dataset = element
       resolve("")
-    })
+    }, err => {
+      console.log(err)
+      this.openErrorDialog(err)}
+      )
     })
   }
   //Functions for Dataset Versions Pagination
@@ -267,7 +323,10 @@ export class ApiService {
             }))
         }))
         resolve(formated_res);
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
   //Executes a http post request to get and return the details of a version
@@ -277,7 +336,10 @@ export class ApiService {
       console.log(post_object)
       this.http.post(this.gateway_url + "/datasetversion/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         resolve(res["datasetVersion"])
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -303,7 +365,10 @@ export class ApiService {
         }*/
         console.log(formated_res)
         resolve(formated_res)
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -321,7 +386,10 @@ export class ApiService {
       this.http.post(this.gateway_url + "/datasetversion/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res =>{
         console.log(res)
         resolve("")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -331,7 +399,10 @@ export class ApiService {
       this.http.delete(this.gateway_url + "/datasetversion/" + version_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
         console.log(res_added)
         resolve("done")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -348,7 +419,10 @@ export class ApiService {
         console.log(res)
         this.formatObjGroup(res["objectGroups"]).then(_ => {
           resolve("")
-        })
+        }, err => {
+          console.log(err)
+          this.openErrorDialog(err)}
+          )
         //this.obj_groups = res["objectGroups"]
         this.dataset = element
 
@@ -371,7 +445,10 @@ export class ApiService {
             })) 
         })
         resolve(res["objectGroup"])
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
@@ -400,7 +477,10 @@ export class ApiService {
         }
         console.log(this.paginantor_config)
         resolve("")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
   /* viewSelectedObjectGroups(dataset_id,start_date, end_date){
@@ -455,7 +535,10 @@ export class ApiService {
       this.http.delete(this.gateway_url + "/objectgroup/" + objectgroup_id, this.configureHeadersAccessKey()).pipe().subscribe(res_added => {
         console.log(res_added)
         resolve("done")
-      })
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)}
+        )
     })
   }
 
