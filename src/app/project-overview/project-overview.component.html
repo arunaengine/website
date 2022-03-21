@@ -34,14 +34,14 @@
             </mat-list-item>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
-                Stat 2
+                Number of Object Groups: {{apiService.project.project["stats"].objectGroupCount}}
             </mat-list-item>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
-                Stat 3
+                Number of Objects: {{apiService.project.project["stats"].objectCount}}
             </mat-list-item>
             <mat-list-item style="height: 40px;">
-                x users have access to this project
+                {{apiService.project.project["stats"].userCount}} users have access to this project
                 <button mat-icon-button color="primary" #tooltip="matTooltip" matTooltip="View users with access"
                     matTooltipPosition="above" (click)="openUsers()">
                     <mat-icon>groups</mat-icon>

@@ -29,19 +29,19 @@
         <mat-list>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
-                Number of Object Groups: {{apiService.paginantor_config.stats.groupscount}}
+                Number of Object Groups: {{apiService.dataset.stats.objectGroupCount}}
             </mat-list-item>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
-                Number of Objects: {{apiService.paginantor_config.stats.objectscount}}
+                Number of Objects: {{apiService.dataset.stats.objectCount}}
             </mat-list-item>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
-                Average Object Size: xx
+                Size of all Objects: {{apiService.dataset.stats.accSize}} Bytes
             </mat-list-item>
             <mat-list-item style="height: 40px;">
                 <mat-icon>bar_chart</mat-icon>
-                Size of all Objects: xx
+                Average Object Size: {{apiService.dataset.stats.avgObjectSize}} Bytes
             </mat-list-item>
             <mat-list-item style="height: 40px;">
                 <mat-label>

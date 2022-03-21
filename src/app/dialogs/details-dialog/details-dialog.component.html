@@ -68,18 +68,6 @@
                         </div>
                     </mat-list-item>
 
-                    <mat-list-item *ngIf="data.type =='Object Group'">
-                        <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                            <mat-icon>functions</mat-icon>
-                        </div>
-                        <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
-                            Number of Objects:
-                        </div>
-                        <div fxFlex="60%" fxFlex.xs="100%" fxFlex.sm="33%">
-                            {{data.objectcount}}
-                        </div>
-                    </mat-list-item>
-
                     <mat-list-item *ngIf="data.type !='Object'">
                         <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
                             <mat-icon>description</mat-icon>
@@ -92,17 +80,6 @@
                         </div>
                     </mat-list-item>
 
-                    <mat-list-item *ngIf="data.type =='Object Group'">
-                        <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
-                            <mat-icon>bar_chart</mat-icon>
-                        </div>
-                        <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
-                            Total Size (Bytes):
-                        </div>
-                        <div fxFlex="60%" fxFlex.xs="100%" fxFlex.sm="33%">
-                            {{data.sumContentLen}}
-                        </div>
-                    </mat-list-item>
 
                     <mat-list-item *ngIf="data.type =='Object'">
                         <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
@@ -127,6 +104,71 @@
                             {{data.filetypes}}
                         </div>
                     </mat-list-item>
+
+
+
+                    <mat-list-item *ngIf="data.type =='Project'">
+                        <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            <mat-icon>groups</mat-icon>
+                        </div>
+                        <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            Users with access:
+                        </div>
+                        <div fxFlex="60%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            {{data.stats.userCount}}
+                        </div>
+                    </mat-list-item>
+
+                    <mat-list-item *ngIf="data.type !='Object Group'">
+                        <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            <mat-icon>functions</mat-icon>
+                        </div>
+                        <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            Number of Object Groups:
+                        </div>
+                        <div fxFlex="60%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            {{data.stats.objectGroupCount}}
+                        </div>
+                    </mat-list-item>
+
+                    <mat-list-item>
+                        <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            <mat-icon>functions</mat-icon>
+                        </div>
+                        <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            Number of Objects:
+                        </div>
+                        <div fxFlex="60%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            {{data.stats.objectCount}}
+                        </div>
+                    </mat-list-item>
+
+                    <mat-list-item>
+                        <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            <mat-icon>bar_chart</mat-icon>
+                        </div>
+                        <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            Total Size (Bytes):
+                        </div>
+                        <div fxFlex="60%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            {{data.stats.accSize}}
+                        </div>
+                    </mat-list-item>
+
+                    <mat-list-item>
+                        <div fxFlex="5%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            <mat-icon>bar_chart</mat-icon>
+                        </div>
+                        <div fxFlex="20%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            Average Object Size (Bytes):
+                        </div>
+                        <div fxFlex="60%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            {{data.stats.avgObjectSize}}
+                        </div>
+                    </mat-list-item>
+
+                    
+
                 </div>
             </mat-list>
             <br>
@@ -203,12 +245,12 @@
                 <ng-container matColumnDef="objectcount">
                     <th mat-header-cell *matHeaderCellDef> Number of Objects</th>
                     <td mat-cell *matCellDef="let element">
-                        {{element.objectcount}}</td>
+                        {{element.stats.objectCount}}</td>
                 </ng-container>
                 <ng-container matColumnDef="contentLen">
                     <th mat-header-cell *matHeaderCellDef> Total Size (Bytes)</th>
                     <td mat-cell *matCellDef="let element">
-                        {{element.sumContentLen}}</td>
+                        {{element.stats.accSize}}</td>
                 </ng-container>
                 <ng-container matColumnDef="actions">
                     <th mat-header-cell *matHeaderCellDef> Actions </th>

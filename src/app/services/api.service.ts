@@ -317,7 +317,7 @@ export class ApiService {
           created: v["objects"][0].created,
           objectcount: v["objects"].length,
           filetypes: Array.from(new Set(v.objects.map(o => o.filetype))),
-          sumContentLen: String(v.objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
+          //sumContentLen: String(v.objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
           objects: v.objects.map(o => Object.assign(o, { 
             contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") 
             }))
@@ -354,7 +354,7 @@ export class ApiService {
           created: v["objects"][0].created,
           objectcount: v["objects"].length,
           filetypes: Array.from(new Set(v.objects.map(o => o.filetype))),
-          sumContentLen: String(v.objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
+          //sumContentLen: String(v.objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
           objects: v.objects.map(o => Object.assign(o, { 
             contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") 
             })) 
@@ -439,7 +439,7 @@ export class ApiService {
           created: res["objectGroup"]["objects"][0].created,
           objectcount: res["objectGroup"]["objects"].length,
           filetypes: Array.from(new Set(res["objectGroup"].objects.map(o => o.filetype))),
-          sumContentLen: String(res["objectGroup"].objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
+          //sumContentLen: String(res["objectGroup"].objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
           objects: res["objectGroup"].objects.map(o => Object.assign(o, { 
             contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") 
             })) 
