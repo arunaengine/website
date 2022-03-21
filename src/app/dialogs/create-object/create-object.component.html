@@ -15,38 +15,41 @@
                         <mat-panel-description>Enter and Edit File specs</mat-panel-description>
 
                     </mat-expansion-panel-header>
-    <!-- <mat-form-field appearance="fill" class="example-form">
+                    <!-- <mat-form-field appearance="fill" class="example-form">
         <mat-label>Name</mat-label>
         <input type="text" matInput (keyup)=isNotValid() [(ngModel)]="new_obj.name" placeholder="Example1">
     </mat-form-field> -->
-    <mat-form-field appearance="fill" class="example-form">
-        <mat-label>Filename</mat-label>
-        <input type="text" matInput (keyup)=isNotValid() [(ngModel)]="new_obj.filename" placeholder="Example1">
-    </mat-form-field>
-    <mat-form-field appearance="fill" class="example-form">
-        <mat-label>Filetype</mat-label>
-        <input type="text" matInput (keyup)=isNotValid() [(ngModel)]="new_obj.filetype" placeholder="Example1">
-    </mat-form-field>
-    <mat-form-field appearance="fill" class="example-form">
-        <mat-label>File Size</mat-label>
-        <input type="number" [disabled]="new_obj.uploaded" matInput (keyup)=isNotValid() [(ngModel)]="new_obj.contentLen">
-    </mat-form-field>
+                    <mat-form-field appearance="fill" class="example-form">
+                        <mat-label>Filename</mat-label>
+                        <input type="text" matInput (keyup)=isNotValid() [(ngModel)]="new_obj.filename"
+                            placeholder="Example1">
+                    </mat-form-field>
+                    <mat-form-field appearance="fill" class="example-form">
+                        <mat-label>Filetype</mat-label>
+                        <input type="text" matInput (keyup)=isNotValid() [(ngModel)]="new_obj.filetype"
+                            placeholder="Example1">
+                    </mat-form-field>
+                    <mat-form-field appearance="fill" class="example-form">
+                        <mat-label>File Size</mat-label>
+                        <input type="number" [disabled]="new_obj.uploaded" matInput (keyup)=isNotValid()
+                            [(ngModel)]="new_obj.contentLen">
+                    </mat-form-field>
 
-    <div fxLayout="row wrap" fxLayoutGap="16px grid">
-        <div fxFlex="90%" fxFlex.xs="100%" fxFlex.sm="33%">
-            <mat-form-field appearance="fill" class="example-form">
-                <mat-label>File</mat-label>
-                <input type="text" disabled matInput [(ngModel)]="file_name">
-            </mat-form-field>
-        </div>
+                    <div fxLayout="row wrap" fxLayoutGap="16px grid">
+                        <div fxFlex="90%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            <mat-form-field appearance="fill" class="example-form">
+                                <mat-label>File</mat-label>
+                                <input type="text" disabled matInput [(ngModel)]="file_name">
+                            </mat-form-field>
+                        </div>
 
-        <div fxFlex="10%" fxFlex.xs="100%" fxFlex.sm="33%">
-            <input hidden type="file" #fileInput (input)="onFileInput(fileInput.files)" />
-            <button mat-mini-fab color="accent" (click)="fileInput.click()">
-                <mat-icon>file_upload</mat-icon>
-            </button>
-        </div>
-    </div>
+                        <div fxFlex="10%" fxFlex.xs="100%" fxFlex.sm="33%">
+                            <input hidden type="file" #fileInput (input)="onFileInput(fileInput.files)" />
+                            <button mat-mini-fab color="accent" (click)="fileInput.click()">
+                                <mat-icon>file_upload</mat-icon>
+                            </button>
+                        </div>
+                    </div>
                 </mat-expansion-panel>
                 <mat-expansion-panel>
                     <mat-expansion-panel-header>
@@ -84,7 +87,7 @@
                         </div>
                     </div>
                 </mat-expansion-panel>
-                
+
                 <mat-expansion-panel>
                     <mat-expansion-panel-header>
                         <mat-panel-title>
@@ -138,11 +141,16 @@
                 </mat-expansion-panel>
             </mat-accordion>
         </mat-card-content>
-    </mat-card>        
+    </mat-card>
+</div>
+
+<div>
+    Please add Specs or upload a File to add to the Object Group.
 </div>
 
 <div mat-dialog-actions>
-    <button mat-raised-button [disabled]="isnotValid" color="primary" [mat-dialog-close]="new_obj">Add to Object
-        Group</button>
+    <button mat-raised-button [disabled]="isnotValid" color="primary" [mat-dialog-close]="new_obj">
+        Add to Object Group
+    </button>
     <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
 </div>

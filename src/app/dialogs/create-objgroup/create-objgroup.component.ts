@@ -24,7 +24,7 @@ export class CreateObjgroupComponent implements OnInit {
     metadata: [],
     objects: []
   }
-  
+
   generated_date = new Date
   label = {
     key: "",
@@ -36,7 +36,9 @@ export class CreateObjgroupComponent implements OnInit {
   displayedColumns: string[]
   currentData = new Date()
   notValid = true
-  maxDate =  new Date(this.currentData.getFullYear()+10, this.currentData.getMonth(), this.currentData.getDate())
+  requirements = [" Name", " Description", " Min. 1 Object"]
+
+  maxDate = new Date(this.currentData.getFullYear() + 10, this.currentData.getMonth(), this.currentData.getDate())
   /*hours=[]
   minutes=[]
   selected_minute: number
@@ -46,14 +48,14 @@ export class CreateObjgroupComponent implements OnInit {
   metadata_html = []
   disableAnimation = true;
   constructor(private snackBar: MatSnackBar, private dialog: MatDialog) {
-  
-    
+
+
     console.log(this.maxDate)
-    this.labelColumns=["key", "value", "delete"]
-    this.displayedColumns=["filename","filetype","contentLen", "uploaded" , "delete"]
+    this.labelColumns = ["key", "value", "delete"]
+    this.displayedColumns = ["filename", "filetype", "contentLen", "uploaded", "delete"]
     this.object_table = new MatTableDataSource(this.new_objgroup.objects)
     this.label_table = new MatTableDataSource(this.new_objgroup.labels)
-    this.metaColumns=["name", "actions"]
+    this.metaColumns = ["name", "actions"]
     this.meta_table = new MatTableDataSource(this.metadata_html)
 
     /*for (let i=0; i <24; i++ ){
@@ -63,10 +65,10 @@ export class CreateObjgroupComponent implements OnInit {
       this.minutes.push(i)
     }*/
 
-   }
+  }
 
   ngOnInit(): void {
-    
+
   }
 
   ngAfterViewInit(): void {
@@ -85,9 +87,9 @@ export class CreateObjgroupComponent implements OnInit {
     
   }*/
 
-  addtoObject(){
+  addtoObject() {
     this.new_objgroup.generated = this.generated_date.toISOString()
-    console.log(this.generated_date )
+    console.log(this.generated_date)
   }
 
   addtoLabels() {
@@ -131,13 +133,14 @@ export class CreateObjgroupComponent implements OnInit {
     this.object_table = new MatTableDataSource(this.new_objgroup.objects)
     this.isValid()
   }
-  createObject(){
+  createObject() {
     const dialogRef = this.dialog.open(CreateObjectComponent,
-      {hasBackdrop: true,
-      disableClose: true
-    })
+      {
+        hasBackdrop: true,
+        disableClose: true
+      })
     dialogRef.afterClosed().subscribe(result => {
-      if (result){
+      if (result) {
         console.log("Dialog closed: ", result)
         this.new_objgroup.objects.push(result)
         this.object_table = new MatTableDataSource(this.new_objgroup.objects)
@@ -148,17 +151,32 @@ export class CreateObjgroupComponent implements OnInit {
     })
   }
 
-  isValid(){
-    if (this.new_objgroup.name != "" && 
-        this.new_objgroup.description!= ""&&
-        this.new_objgroup.objects.length != 0){
-          this.notValid = false
-        } else {
-          this.notValid = true
-        }
+  isValid() {
+    this.requirements = []
+
+    if (this.new_objgroup.name != "" &&
+      this.new_objgroup.description != "" &&
+      this.new_objgroup.objects.length != 0) {
+      this.notValid = false
+      this.requirements = []
+    }
+    else {
+      this.notValid = true
+
+      if (this.new_objgroup.name == "") {
+        this.requirements.push(" Name")
+      }
+      if (this.new_objgroup.description == "") {
+        this.requirements.push(" Description")
+      }
+      if (this.new_objgroup.objects.length == 0) {
+        this.requirements.push(" Min. 1 Object")
+      }
+
+    }
   }
 
-  addMetadata(){
+  addMetadata() {
     const dialogRef = this.dialog.open(MetadataAddComponent, {
       hasBackdrop: true,
       disableClose: true,
@@ -166,9 +184,9 @@ export class CreateObjgroupComponent implements OnInit {
       data: {}
     })
     dialogRef.afterClosed().subscribe(result => {
-      if (result){
+      if (result) {
         console.log("Dialog closed: ", result)
-        this.new_objgroup.metadata.push({metadata: JSON.stringify(result)})
+        this.new_objgroup.metadata.push({ metadata: JSON.stringify(result) })
         console.log(this.new_objgroup)
         this.metadata_html.push(result)
         this.meta_table = new MatTableDataSource(this.metadata_html)
@@ -177,17 +195,17 @@ export class CreateObjgroupComponent implements OnInit {
       }
     })
   }
-  viewMetadata(element){
+  viewMetadata(element) {
 
     const dialogRef = this.dialog.open(MetadataDetailsComponent, {
       hasBackdrop: true,
       data: element
     })
   }
-  deleteMetadata(element){
+  deleteMetadata(element) {
     //console.log(index)
     this.metadata_html.splice(this.metadata_html.indexOf(element), 1)
-    this.new_objgroup.metadata.splice(this.new_objgroup.metadata.indexOf({metadata: JSON.stringify(element)}), 1)
+    this.new_objgroup.metadata.splice(this.new_objgroup.metadata.indexOf({ metadata: JSON.stringify(element) }), 1)
     this.meta_table = new MatTableDataSource(this.metadata_html)
     console.log(this.new_objgroup, this.metadata_html)
   }

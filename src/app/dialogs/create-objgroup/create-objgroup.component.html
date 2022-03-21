@@ -218,9 +218,18 @@
     <br>
 
 </div>
+
+<div *ngIf="notValid">
+    Please add for generation: {{requirements}} 
+</div>
+
+
 <div mat-dialog-actions>
-    <button mat-raised-button color="primary" [disabled]="notValid" [mat-dialog-close]="new_objgroup">Create Object
-        Group</button>
+
+    <button mat-raised-button color="primary" [disabled]="notValid" [mat-dialog-close]="new_objgroup">
+        Create Object Group
+    </button>
+
     <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
 
 </div>
