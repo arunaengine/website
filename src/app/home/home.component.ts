@@ -179,6 +179,7 @@ export class HomeComponent implements OnInit {
     console.log("See Details...")    
     this.apiService.viewSingleProject(element.id).then((res: any) => {
       Object.assign(res, {type: "Project"})
+      console.log(res)
        const dialogRef = this.dialog.open(DetailsDialogComponent, {
         data: res,
         hasBackdrop: true,

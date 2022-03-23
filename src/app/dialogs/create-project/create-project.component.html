@@ -117,8 +117,14 @@
         </mat-card-content>
     </mat-card>
 </div>
-<div mat-dialog-actions>
-    <button mat-raised-button color="primary" [disabled]="disabled" [mat-dialog-close]="new_project">Generate</button>
+
+<div *ngIf="disabled">
+    Please add for generation: {{requirements}} 
+</div>
+
+<div mat-dialog-actions >
+
+    <button mat-raised-button color="primary" [disabled]="disabled" [mat-dialog-close]="new_project" >Generate</button>
     <button mat-raised-button color="warn" mat-dialog-close>Cancel</button>
 
 </div>

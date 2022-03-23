@@ -16,7 +16,7 @@
         </mat-list-item>
         <mat-list-item>
             <mat-icon>functions</mat-icon>
-            Object Count: {{data.group.objectcount}}
+            Object Count: {{data.group.stats.objectCount}}
         </mat-list-item>
         <mat-list-item>
             <mat-icon>attach_file</mat-icon>
@@ -28,7 +28,11 @@
         </mat-list-item>
         <mat-list-item>
             <mat-icon>bar_chart</mat-icon>
-            Total Size (Bytes): {{data.group.sumContentLen}}
+            Total Size (Bytes): {{data.group.stats.accSize}}
+        </mat-list-item>
+        <mat-list-item>
+            <mat-icon>bar_chart</mat-icon>
+            Average Object Size (Bytes): {{data.group.stats.avgObjectSize}}
         </mat-list-item>
         
     </mat-list>

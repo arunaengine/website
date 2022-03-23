@@ -26,6 +26,7 @@ export class VersionOverviewComponent implements OnInit {
   displayedColumns: string[]
   forward_disabled = false
   back_disabled = false
+  noObjGroup = true
 
   constructor(
     private dialog: MatDialog,
@@ -35,6 +36,9 @@ export class VersionOverviewComponent implements OnInit {
     private snackBar: MatSnackBar
   ) {
     console.log(this.apiService.datasetVersions)
+    if (Number(this.apiService.dataset.stats.objectGroupCount) > 0){
+      this.noObjGroup = false
+    }
     this.table_data = new MatTableDataSource(this.apiService.datasetVersions)
     this.displayedColumns=["name", "description","version", "created","actions"]
     /*if (this.apiService.paginantor_config_versions.activepage + 1 == this.apiService.paginantor_config_versions.pagecount) {

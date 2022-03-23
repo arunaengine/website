@@ -30,7 +30,10 @@ export class CreateProjectComponent implements OnInit {
   meta_table: any
   metadata_html = []
   disabled = true
+  requirements = [" Name", " Description"]
+
   disableAnimation = true;
+
   constructor(public dialog: MatDialog,
     private snackBar: MatSnackBar,
     @Inject(MAT_DIALOG_DATA) public data: any) {
@@ -55,9 +58,18 @@ export class CreateProjectComponent implements OnInit {
   validProject(){
     if(this.new_project.name != "" && this.new_project.description != ""){
       this.disabled= false
+      this.requirements = []
     } else {
       this.disabled = true
+      this.requirements = [" Name", " Description"]
+      if(this.new_project.name == "" && this.new_project.description != ""){
+        this.requirements = [" Name"]
+      }
+      if(this.new_project.name != "" && this.new_project.description == ""){
+        this.requirements = [" Description"]
+      }
     }
+    console.log(this.requirements + " is missing")
   }
 
   addMetadata(){

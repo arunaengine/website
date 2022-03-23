@@ -346,6 +346,11 @@
     </mat-tab-group>
     <br>
 </div>
+
+<div *ngIf="notValid">
+    Please add for generation: {{requirements}} 
+</div>
+
 <div mat-dialog-actions>
     <button mat-raised-button color="primary" [disabled]="notValid"
         [mat-dialog-close]="{specs: new_version, groups: selectedGroups_arr}">Create Version</button>
