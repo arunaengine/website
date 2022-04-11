@@ -29,7 +29,7 @@
     "file-saver": "^2.0.5",
     "google-protobuf": "^3.19.0-rc.2",
     "material-icons": "^1.10.6",
-    "moment": "^2.29.1",
+    "moment": "^2.29.2",
     "ngx-json-viewer": "^3.0.2",
     "roboto-fontface": "^0.10.0",
     "rxjs": "~6.6.0",
