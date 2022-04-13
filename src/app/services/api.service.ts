@@ -142,7 +142,11 @@ export class ApiService {
     console.log(rounded_numberToFormat)
     console.log(rounded_numberToFormat_len)
 
-    if (rounded_numberToFormat_len < 4) {
+    if (rounded_numberToFormat == -1) {
+      rounded_numberToFormat = 0
+      var unit = "Bytes"
+    }
+    else if (rounded_numberToFormat_len >= 1 && rounded_numberToFormat_len < 4) {
       var unit = "Bytes"
     }
     else if (rounded_numberToFormat_len >= 4 && rounded_numberToFormat_len < 7) {
@@ -287,7 +291,15 @@ export class ApiService {
       var post_object = { id: dataset_id }
       this.http.post(this.gateway_url + "/dataset/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         //console.log(res)
-        resolve(res["dataset"])
+
+        var formated_dataset = res["dataset"]
+
+        Object.assign(formated_dataset,{formated_avg: this.formatNumber(formated_dataset.stats.avgObjectSize), formated_acc: this.formatNumber(formated_dataset.stats.accSize)})
+
+        console.log(formated_dataset)
+        resolve(formated_dataset)
+
+        //resolve(res["dataset"])
       }, err => {
         console.log(err)
         this.openErrorDialog(err)
@@ -389,7 +401,14 @@ export class ApiService {
       var post_object = { id: id }
       console.log(post_object)
       this.http.post(this.gateway_url + "/datasetversion/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        resolve(res["datasetVersion"])
+
+        var formated_datasetVersion = res["datasetVersion"]
+
+        Object.assign(formated_datasetVersion,{formated_avg: this.formatNumber(formated_datasetVersion.stats.avgObjectSize), formated_acc: this.formatNumber(formated_datasetVersion.stats.accSize)})
+
+        console.log(formated_datasetVersion)
+        resolve(formated_datasetVersion)
+
       }, err => {
         console.log(err)
         this.openErrorDialog(err)
@@ -485,6 +504,8 @@ export class ApiService {
         //this.obj_groups = res["objectGroups"]
         this.dataset = element
 
+        Object.assign(this.dataset,{formated_avg: this.formatNumber(this.dataset.stats.avgObjectSize), formated_acc: this.formatNumber(this.dataset.stats.accSize)})
+
       })
     })
   }
@@ -494,16 +515,21 @@ export class ApiService {
       var post_object = { id: id }
       console.log(post_object)
       this.http.post(this.gateway_url + "/objectgroup/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        var formated_res = Object.assign(res["objectGroup"], {
+        var formated_res = res["objectGroup"]
+        Object.assign(formated_res, {
           created: res["objectGroup"]["objects"][0].created,
           objectcount: res["objectGroup"]["objects"].length,
+
+          formated_avg: this.formatNumber(formated_res.stats.avgObjectSize),
+          formated_acc: this.formatNumber(formated_res.stats.accSize),
+
           filetypes: Array.from(new Set(res["objectGroup"].objects.map(o => o.filetype))),
           //sumContentLen: String(res["objectGroup"].objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
           objects: res["objectGroup"].objects.map(o => Object.assign(o, {
             contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".")
           }))
         })
-        resolve(res["objectGroup"])
+        resolve(formated_res)
       }, err => {
         console.log(err)
         this.openErrorDialog(err)
