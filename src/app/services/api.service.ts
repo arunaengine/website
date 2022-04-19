@@ -151,19 +151,19 @@ export class ApiService {
     }
     else if (rounded_numberToFormat_len >= 4 && rounded_numberToFormat_len < 7) {
       rounded_numberToFormat = rounded_numberToFormat / 1000
-      var unit = "Kilobytes"
+      var unit = "KB"
     }
     else if (rounded_numberToFormat_len >= 7 && rounded_numberToFormat_len < 10) {
       rounded_numberToFormat = rounded_numberToFormat / 1000000
-      var unit = "Megabytes"
+      var unit = "MB"
     }
     else if (rounded_numberToFormat_len >= 10 && rounded_numberToFormat_len < 13) {
       rounded_numberToFormat = rounded_numberToFormat / 1000000000
-      var unit = "Gigabytes"
+      var unit = "GB"
     }
     else if (rounded_numberToFormat_len >= 13 && rounded_numberToFormat_len < 16) {
       rounded_numberToFormat = rounded_numberToFormat / 1000000000000
-      var unit = "Terabytes"
+      var unit = "TB"
     }
 
     var rounded_numberToFormat = Math.round((rounded_numberToFormat) * 100) / 100
