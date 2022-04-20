@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpEvent, HttpEventType, HttpHeaders } from '@angular/common/http';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { ConfigService } from './config.service';
-import {MatDialog} from '@angular/material/dialog';
+import { MatDialog } from '@angular/material/dialog';
 import * as moment from 'moment';
 import * as FileSaver from 'file-saver';
 import { ErrorDialogComponent } from '../dialogs/error-dialog/error-dialog.component';
@@ -55,12 +55,12 @@ export class ApiService {
     }
   }
 
-  openErrorDialog(error_message){
-    const dialogRef = this.dialog.open(ErrorDialogComponent,{
-      data:{
+  openErrorDialog(error_message) {
+    const dialogRef = this.dialog.open(ErrorDialogComponent, {
+      data: {
         title: "A Problem occured, Error-Code: " + error_message.status,
         code_message: error_message.error.message,
-        message: error_message.message.split(": "+error_message.status)[0]
+        message: error_message.message.split(": " + error_message.status)[0]
       },
       //panelClass: "warning-snackbar",
       hasBackdrop: true
@@ -77,7 +77,8 @@ export class ApiService {
         resolve("done")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
+        this.openErrorDialog(err)
+      }
       )
     })
   }
@@ -92,7 +93,8 @@ export class ApiService {
         resolve("")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
+        this.openErrorDialog(err)
+      }
       )
     })
 
@@ -106,7 +108,8 @@ export class ApiService {
         resolve("done")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}      
+        this.openErrorDialog(err)
+      }
       )
     })
   }
@@ -115,45 +118,92 @@ export class ApiService {
   viewSingleProject(id) {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/project/" + id, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        console.log(res)       
+        console.log(res)
         this.project.project = res["project"]
-        resolve(res["project"])
+        var formated_project = res["project"]
+
+        Object.assign(formated_project,{formated_avg: this.formatNumber(formated_project.stats.avgObjectSize), formated_acc: this.formatNumber(formated_project.stats.accSize)})
+
+        console.log(formated_project)
+        resolve(formated_project)
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
+        this.openErrorDialog(err)
+      }
       )
     })
   }
+
+  //Rounds Size Numbers and add suitable units
+  formatNumber(numberToFormat) {
+    var rounded_numberToFormat = Math.round(numberToFormat)
+    var rounded_numberToFormat_len = rounded_numberToFormat.toString().length
+
+    console.log(rounded_numberToFormat)
+    console.log(rounded_numberToFormat_len)
+
+    if (rounded_numberToFormat == -1) {
+      rounded_numberToFormat = 0
+      var unit = "Bytes"
+    }
+    else if (rounded_numberToFormat_len >= 1 && rounded_numberToFormat_len < 4) {
+      var unit = "Bytes"
+    }
+    else if (rounded_numberToFormat_len >= 4 && rounded_numberToFormat_len < 7) {
+      rounded_numberToFormat = rounded_numberToFormat / 1000
+      var unit = "KB"
+    }
+    else if (rounded_numberToFormat_len >= 7 && rounded_numberToFormat_len < 10) {
+      rounded_numberToFormat = rounded_numberToFormat / 1000000
+      var unit = "MB"
+    }
+    else if (rounded_numberToFormat_len >= 10 && rounded_numberToFormat_len < 13) {
+      rounded_numberToFormat = rounded_numberToFormat / 1000000000
+      var unit = "GB"
+    }
+    else if (rounded_numberToFormat_len >= 13 && rounded_numberToFormat_len < 16) {
+      rounded_numberToFormat = rounded_numberToFormat / 1000000000000
+      var unit = "TB"
+    }
+
+    var rounded_numberToFormat = Math.round((rounded_numberToFormat) * 100) / 100
+    console.log(rounded_numberToFormat, unit)
+
+    return rounded_numberToFormat.toString() + " " + unit
+  }
+
 
   // Executes a http get request to get the datasets for a project
   getDatasetsforProject(id) {
     return new Promise(resolve => {
       this.http.get(this.gateway_url + "/project/" + id + "/projectdatasets", this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
-        var formated_res = res["datasets"].map(v => Object.assign(v, { 
-          status: v.status.split("_")[1].toLowerCase().charAt(0).toUpperCase() 
-          + v.status.split("_")[1].toLowerCase().slice(1)  
+        var formated_res = res["datasets"].map(v => Object.assign(v, {
+          status: v.status.split("_")[1].toLowerCase().charAt(0).toUpperCase()
+            + v.status.split("_")[1].toLowerCase().slice(1)
         }))
         this.project.datasets = formated_res
         resolve("done")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
   //Executes a http post request to add a user to a project
   addUsertoProject(user_id) {
     return new Promise(resolve => {
-      var post_object = { userId: user_id, scope: [ "RIGHT_READ", "RIGHT_WRITE"], projectId: this.project.project["id"] }
+      var post_object = { userId: user_id, scope: ["RIGHT_READ", "RIGHT_WRITE"], projectId: this.project.project["id"] }
       this.http.post(this.gateway_url + "/project/addusertoproject", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         resolve("")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
@@ -167,8 +217,9 @@ export class ApiService {
         resolve("done")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
@@ -181,8 +232,9 @@ export class ApiService {
           resolve("done")
         }, err => {
           console.log(err)
-          this.openErrorDialog(err)}
-          )
+          this.openErrorDialog(err)
+        }
+        )
       })
     })
   }
@@ -195,8 +247,9 @@ export class ApiService {
           resolve("")
         }, err => {
           console.log(err)
-          this.openErrorDialog(err)}
-          )
+          this.openErrorDialog(err)
+        }
+        )
 
       })
     })
@@ -212,8 +265,9 @@ export class ApiService {
         resolve("")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
@@ -225,8 +279,9 @@ export class ApiService {
         resolve("done")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
@@ -236,11 +291,20 @@ export class ApiService {
       var post_object = { id: dataset_id }
       this.http.post(this.gateway_url + "/dataset/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         //console.log(res)
-        resolve(res["dataset"])
+
+        var formated_dataset = res["dataset"]
+
+        Object.assign(formated_dataset,{formated_avg: this.formatNumber(formated_dataset.stats.avgObjectSize), formated_acc: this.formatNumber(formated_dataset.stats.accSize)})
+
+        console.log(formated_dataset)
+        resolve(formated_dataset)
+
+        //resolve(res["dataset"])
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
@@ -249,147 +313,159 @@ export class ApiService {
   viewDatasetVersions(element) {
     return new Promise(resolve => {
       var post_object = { id: element.id }
-    this.http.post(this.gateway_url + "/datasetversions/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-      console.log(res)
-      this.datasetVersions = res["datasetVersions"]
-      this.dataset = element
-      resolve("")
-    }, err => {
-      console.log(err)
-      this.openErrorDialog(err)}
+      this.http.post(this.gateway_url + "/datasetversions/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+        console.log(res)
+        this.datasetVersions = res["datasetVersions"]
+        this.dataset = element
+        resolve("")
+      }, err => {
+        console.log(err)
+        this.openErrorDialog(err)
+      }
       )
     })
   }
   //Functions for Dataset Versions Pagination
- /* viewDatasetVersionsPagination(element) {
-    return new Promise(resolve => {
-      console.log(this.paginantor_config_versions)
-      var post_object = { id: element.id, pageRequest: { lastUuid: "", pageSize: this.paginantor_config_versions.pagesize.toString() } }
-      if (this.paginantor_config_versions.activepage > 0) {
-        post_object.pageRequest.lastUuid = this.paginantor_config_versions.lastIds[this.paginantor_config_versions.activepage - 1]
-      }
-      this.http.post(this.gateway_url + "/datasetversions/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        console.log(res)
-        this.datasetVersions = res["datasetVersions"] 
-          resolve("")
-        
-        //this.obj_groups = res["objectGroups"]
-        this.dataset = element
-
-      })
-    })
-  }
-
-  getDatasetVersionsPagination(element) {
-    return new Promise(resolve => {
-      var post_obj = { id: element.id }
-      console.log(post_obj)
-      this.http.post(this.gateway_url + "/datasetversions/list", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        console.log(res)
-
-        this.paginantor_config_versions.stats.groupscount = res["datasetVersions"].length
-        this.paginantor_config_versions.stats.objectscount = 0
-        this.paginantor_config_versions.pagecount = Math.ceil(this.paginantor_config_versions.stats.groupscount / this.paginantor_config_versions.pagesize)
-        this.paginantor_config_versions.lastIds = []
-        this.paginantor_config_versions.activepage = 0
-        for (let [i, group] of res["datasetVersions"].entries()) {
-          //this.paginantor_config_versions.stats.objectscount += group["objects"].length
-          if (i % this.paginantor_config_versions.pagesize == this.paginantor_config_versions.pagesize - 1) {
-            console.log("last element", i, group)
-            this.paginantor_config_versions.lastIds.push(group.id)
-          }
-        }
-        console.log(this.paginantor_config_versions)
-        resolve("")
-      })
-    })
-  }*/
+  /* viewDatasetVersionsPagination(element) {
+     return new Promise(resolve => {
+       console.log(this.paginantor_config_versions)
+       var post_object = { id: element.id, pageRequest: { lastUuid: "", pageSize: this.paginantor_config_versions.pagesize.toString() } }
+       if (this.paginantor_config_versions.activepage > 0) {
+         post_object.pageRequest.lastUuid = this.paginantor_config_versions.lastIds[this.paginantor_config_versions.activepage - 1]
+       }
+       this.http.post(this.gateway_url + "/datasetversions/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+         console.log(res)
+         this.datasetVersions = res["datasetVersions"] 
+           resolve("")
+         
+         //this.obj_groups = res["objectGroups"]
+         this.dataset = element
+ 
+       })
+     })
+   }
+ 
+   getDatasetVersionsPagination(element) {
+     return new Promise(resolve => {
+       var post_obj = { id: element.id }
+       console.log(post_obj)
+       this.http.post(this.gateway_url + "/datasetversions/list", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+         console.log(res)
+ 
+         this.paginantor_config_versions.stats.groupscount = res["datasetVersions"].length
+         this.paginantor_config_versions.stats.objectscount = 0
+         this.paginantor_config_versions.pagecount = Math.ceil(this.paginantor_config_versions.stats.groupscount / this.paginantor_config_versions.pagesize)
+         this.paginantor_config_versions.lastIds = []
+         this.paginantor_config_versions.activepage = 0
+         for (let [i, group] of res["datasetVersions"].entries()) {
+           //this.paginantor_config_versions.stats.objectscount += group["objects"].length
+           if (i % this.paginantor_config_versions.pagesize == this.paginantor_config_versions.pagesize - 1) {
+             console.log("last element", i, group)
+             this.paginantor_config_versions.lastIds.push(group.id)
+           }
+         }
+         console.log(this.paginantor_config_versions)
+         resolve("")
+       })
+     })
+   }*/
 
   //Executes a http post request to get, format and return the object groups of a version
-  getGroupsInVersion(element){
+  getGroupsInVersion(element) {
     return new Promise(resolve => {
       var post_object = { id: element.id }
       console.log(post_object)
       this.http.post(this.gateway_url + "/datasetversion/list", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
-        var formated_res = res["objectGroup"].map(v => Object.assign(v, { 
-          isSelected: false, 
+        var formated_res = res["objectGroup"].map(v => Object.assign(v, {
+          isSelected: false,
           created: v["objects"][0].created,
           objectcount: v["objects"].length,
           filetypes: Array.from(new Set(v.objects.map(o => o.filetype))),
           //sumContentLen: String(v.objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
-          objects: v.objects.map(o => Object.assign(o, { 
-            contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") 
-            }))
+          objects: v.objects.map(o => Object.assign(o, {
+            contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+          }))
         }))
         resolve(formated_res);
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
   //Executes a http post request to get and return the details of a version
-  getDatasetVersion(id){
+  getDatasetVersion(id) {
     return new Promise(resolve => {
       var post_object = { id: id }
       console.log(post_object)
       this.http.post(this.gateway_url + "/datasetversion/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        resolve(res["datasetVersion"])
+
+        var formated_datasetVersion = res["datasetVersion"]
+
+        Object.assign(formated_datasetVersion,{formated_avg: this.formatNumber(formated_datasetVersion.stats.avgObjectSize), formated_acc: this.formatNumber(formated_datasetVersion.stats.accSize)})
+
+        console.log(formated_datasetVersion)
+        resolve(formated_datasetVersion)
+
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
   //Executes a http post request to get, format and return the object groups of a dataset
-  getObjectGroupsForVersioning(dataset_id){
-    return new Promise(resolve =>{
-      var post_obj = {id: dataset_id}
+  getObjectGroupsForVersioning(dataset_id) {
+    return new Promise(resolve => {
+      var post_obj = { id: dataset_id }
       this.http.post(this.gateway_url + "/dataset/list", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         //remove: created: v["objects"][0].created when creation date issue is fixed
-        var formated_res = res["objectGroups"].map(v => Object.assign(v, { 
-          isSelected: false, 
+        var formated_res = res["objectGroups"].map(v => Object.assign(v, {
+          isSelected: false,
           created: v["objects"][0].created,
           objectcount: v["objects"].length,
           filetypes: Array.from(new Set(v.objects.map(o => o.filetype))),
           //sumContentLen: String(v.objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
-          objects: v.objects.map(o => Object.assign(o, { 
-            contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") 
-            })) 
+          objects: v.objects.map(o => Object.assign(o, {
+            contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+          }))
         }))
-       /*for (let [i,object_group] of formated_res.entries()) {
-          //console.log(object)
-          formated_res[i].averageContentLen = object_group.objects.map(o => o.contentLen).reduce((a,b) => a + b,0)/object_group.objectcount
-        }*/
+        /*for (let [i,object_group] of formated_res.entries()) {
+           //console.log(object)
+           formated_res[i].averageContentLen = object_group.objects.map(o => o.contentLen).reduce((a,b) => a + b,0)/object_group.objectcount
+         }*/
         console.log(formated_res)
         resolve(formated_res)
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
 
-  
+
 
   //Executes a http post request to create a new version
-  createDatasetVersion(post_object){
+  createDatasetVersion(post_object) {
     return new Promise(resolve => {
       /*var post_object = {
           name: input_data.name, datasetId: dataset_id, 
           version:{},
           description: input_data.description,
         }*/
-      this.http.post(this.gateway_url + "/datasetversion/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res =>{
+      this.http.post(this.gateway_url + "/datasetversion/create", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
         console.log(res)
         resolve("")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
@@ -401,8 +477,9 @@ export class ApiService {
         resolve("done")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
@@ -421,34 +498,43 @@ export class ApiService {
           resolve("")
         }, err => {
           console.log(err)
-          this.openErrorDialog(err)}
-          )
+          this.openErrorDialog(err)
+        }
+        )
         //this.obj_groups = res["objectGroups"]
         this.dataset = element
+
+        Object.assign(this.dataset,{formated_avg: this.formatNumber(this.dataset.stats.avgObjectSize), formated_acc: this.formatNumber(this.dataset.stats.accSize)})
 
       })
     })
   }
   //Executes a http post request to get, format and return the details of the object group
-  getObjectGroup(id){
+  getObjectGroup(id) {
     return new Promise(resolve => {
       var post_object = { id: id }
       console.log(post_object)
       this.http.post(this.gateway_url + "/objectgroup/get", post_object, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        var formated_res = Object.assign(res["objectGroup"], { 
+        var formated_res = res["objectGroup"]
+        Object.assign(formated_res, {
           created: res["objectGroup"]["objects"][0].created,
           objectcount: res["objectGroup"]["objects"].length,
+
+          formated_avg: this.formatNumber(formated_res.stats.avgObjectSize),
+          formated_acc: this.formatNumber(formated_res.stats.accSize),
+
           filetypes: Array.from(new Set(res["objectGroup"].objects.map(o => o.filetype))),
           //sumContentLen: String(res["objectGroup"].objects.map(o => Number(o.contentLen)).reduce((a,b) => a + b,0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."),
-          objects: res["objectGroup"].objects.map(o => Object.assign(o, { 
-            contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") 
-            })) 
+          objects: res["objectGroup"].objects.map(o => Object.assign(o, {
+            contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+          }))
         })
-        resolve(res["objectGroup"])
+        resolve(formated_res)
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
@@ -479,8 +565,9 @@ export class ApiService {
         resolve("")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
   /* viewSelectedObjectGroups(dataset_id,start_date, end_date){
@@ -500,13 +587,14 @@ export class ApiService {
   //Formats the object group objects to get additional stats and functionality 
   formatObjGroup(data: any) {
     return new Promise(resolve => {
-      var new_data = data.map(v => Object.assign(v, { 
-        isExpanded: false, 
-        objectcount: v["objects"].length, 
+      var new_data = data.map(v => Object.assign(v, {
+        isExpanded: false,
+        objectcount: v["objects"].length,
         created: v["objects"][0].created,
-        status: v.status.split("_")[1].toLowerCase().charAt(0).toUpperCase() 
-          + v.status.split("_")[1].toLowerCase().slice(1),  
-        objects: v.objects.map(o => Object.assign(o, { contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") })) }))
+        status: v.status.split("_")[1].toLowerCase().charAt(0).toUpperCase()
+          + v.status.split("_")[1].toLowerCase().slice(1),
+        objects: v.objects.map(o => Object.assign(o, { contentLen: o["contentLen"].replace(/\B(?=(\d{3})+(?!\d))/g, ".") }))
+      }))
       console.log(new_data)
       this.obj_groups = new_data
       resolve("")
@@ -527,7 +615,7 @@ export class ApiService {
       })
     })
   }
-  
+
   //Executes a http delete request to delete a object group
   deleteObjectGroup(objectgroup_id) {
     console.log(objectgroup_id)
@@ -537,8 +625,9 @@ export class ApiService {
         resolve("done")
       }, err => {
         console.log(err)
-        this.openErrorDialog(err)}
-        )
+        this.openErrorDialog(err)
+      }
+      )
     })
   }
 
@@ -569,24 +658,24 @@ export class ApiService {
       })
     })
   }
-/*
-  downloadObjectGroup(group_id) {
-    return new Promise(resolve => {
-      var post_obj = { streamType: "STREAM_TYPE_TARGZ", dataset: { datasetId: this.dataset.id } }
-      //post_obj.groupIds.objectGroups.push(group_id)
-      console.log(post_obj)
-      ///launch dialog -> link copy
-
-      this.http.post(this.gateway_url + "/objectgroupsstream", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
-        console.log("Object Group Response", res)
-        resolve(res)
-        //FileSaver.saveAs(data, filename)
-
-        window.open(res["url"])
-
+  /*
+    downloadObjectGroup(group_id) {
+      return new Promise(resolve => {
+        var post_obj = { streamType: "STREAM_TYPE_TARGZ", dataset: { datasetId: this.dataset.id } }
+        //post_obj.groupIds.objectGroups.push(group_id)
+        console.log(post_obj)
+        ///launch dialog -> link copy
+  
+        this.http.post(this.gateway_url + "/objectgroupsstream", post_obj, this.configureHeadersAccessKey()).pipe().subscribe(res => {
+          console.log("Object Group Response", res)
+          resolve(res)
+          //FileSaver.saveAs(data, filename)
+  
+          window.open(res["url"])
+  
+        })
       })
-    })
-  }*/
+    }*/
 
   //Executes http get requests to download all objects in the object group
   downloadObjectGroupNew(group) {
@@ -646,11 +735,12 @@ export class ApiService {
           this.uploadMultipartPart(chunk, chunkId, objectid, index)
         })
       }, err => {
-          console.log("Error:", err)
-          this.uploadMultipartPart(chunk, chunkId, objectid, index)})
+        console.log("Error:", err)
+        this.uploadMultipartPart(chunk, chunkId, objectid, index)
+      })
     })
   }
-  
+
   // calculating the progress of the multipart upload by adding up the progress of each chunk 
   getMultipartProgress(index) {
     var uploaded_progress = 0

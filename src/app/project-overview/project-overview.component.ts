@@ -132,22 +132,18 @@ export class ProjectOverviewComponent implements OnInit {
       })
     }
 
-  toObjectGroups(element){
-    
+  toObjectGroups(element){  
     const dialogRef = this.dialog.open(LoadingComponent, {
       hasBackdrop: true,
       disableClose: true
-    })
-    
-    console.log("See ObjectGroups..." + element)
+    })  
+    console.log("See ObjectGroups..." , element)
     this.apiService.getObjectGroupPagination(element).then(()=> {
       this.apiService.viewObjectGroups(element).then(()=> {
       dialogRef.close()
       this.router.navigate(["/group_overview"])
       })
     })
-    
-    
   }
 
  async refreshDatasets(){
