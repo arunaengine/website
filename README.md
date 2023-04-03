@@ -1,61 +1,22 @@
-<picture>
-    <source srcset="https://raw.githubusercontent.com/leptos-rs/leptos/main/docs/logos/Leptos_logo_Solid_White.svg" media="(prefers-color-scheme: dark)">
-    <img src="https://raw.githubusercontent.com/leptos-rs/leptos/main/docs/logos/Leptos_logo_RGB.svg" alt="Leptos Logo">
-</picture>
+# ArunaWeb 3.0
 
-# Leptos Starter Template
+This is a total revised web version for the Aruna Object Storage website. Powered by [tabler.io](https://tabler.io/), [Bootstrap 5](https://getbootstrap.com/), Rust + Wasm via [Leptos](https://github.com/leptos-rs/leptos).
+For now only an experimental rudimentary version is available, this will be expanded further.
 
-This is a template for use with the [Leptos](https://github.com/leptos-rs/leptos) web framework and the [cargo-leptos](https://github.com/akesson/cargo-leptos) tool.
+The web version is a fully integrated website + webserver version including SSR + hydration.
 
-## Creating your template repo
 
-If you don't have `cargo-leptos` installed you can install it with
+## Getting started
 
-`cargo install cargo-leptos`
+- Install [rustup](https://rustup.rs/)
+- Add nightly toolchain and wasm32 target:
 
-Then run
-
-`cargo leptos new --git leptos-rs/start`
-
-to generate a new project template.
-
-`cd {projectname}`
-
-to go to your newly created project.
-
-Of course you should explore around the project structure, but the best place to start with your application code is in `src/app.rs`.
-
-## Running your project
-
-`cargo leptos watch`
-
-## Installing Additional Tools
-
-By default, `cargo-leptos` uses `nightly` Rust, `cargo-generate`, and `sass`. If you run into any trouble, you may need to install one or more of these tools.
-
-1. `rustup toolchain install nightly --allow-downgrade` - make sure you have Rust nightly
-2. `rustup default nightly` - setup nightly as default, or you can use rust-toolchain file later on
-3. `rustup target add wasm32-unknown-unknown` - add the ability to compile Rust to WebAssembly
-4. `cargo install cargo-generate` - install `cargo-generate` binary (should be installed automatically in future)
-5. `npm install -g sass` - install `dart-sass` (should be optional in future)
-
-## Executing a Server on a Remote Machine Without the Toolchain
-After running a `cargo leptos build --release` the minimum files needed are:
-
-1. The server binary located in `target/server/release`
-2. The `site` directory and all files within located in `target/site`
-
-Copy these files to your remote server. The directory structure should be:
-```text
-leptos_start
-site/
 ```
-Set the following enviornment variables (updating for your project as needed):
-```text
-LEPTOS_OUTPUT_NAME="leptos_start"
-LEPTOS_SITE_ROOT="site"
-LEPTOS_SITE_PKG_DIR="pkg"
-LEPTOS_SITE_ADDR="127.0.0.1:3000"
-LEPTOS_RELOAD_PORT="3001"
+rustup toolchain install nightly
+rustup default nightly
+rustup target add wasm32-unknown-unknown
 ```
-Finally, run the server binary.
+
+- Install cargo leptos `cargo install cargo-leptos`
+- Run the development webserver with `cargo leptos watch`
+- The website will be available on `localhost:3000`
