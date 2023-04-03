@@ -1,50 +1,61 @@
-# BioDataDBWebsite
+<picture>
+    <source srcset="https://raw.githubusercontent.com/leptos-rs/leptos/main/docs/logos/Leptos_logo_Solid_White.svg" media="(prefers-color-scheme: dark)">
+    <img src="https://raw.githubusercontent.com/leptos-rs/leptos/main/docs/logos/Leptos_logo_RGB.svg" alt="Leptos Logo">
+</picture>
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 11.2.14.
+# Leptos Starter Template
 
-## Development server
+This is a template for use with the [Leptos](https://github.com/leptos-rs/leptos) web framework and the [cargo-leptos](https://github.com/akesson/cargo-leptos) tool.
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+## Creating your template repo
 
-## Code scaffolding
+If you don't have `cargo-leptos` installed you can install it with
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+`cargo install cargo-leptos`
 
-## Build
+Then run
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory. Use the `--prod` flag for a production build.
+`cargo leptos new --git leptos-rs/start`
 
-## Running unit tests
+to generate a new project template.
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+`cd {projectname}`
 
-## Running end-to-end tests
+to go to your newly created project.
 
-Run `ng e2e` to execute the end-to-end tests via [Protractor](http://www.protractortest.org/).
+Of course you should explore around the project structure, but the best place to start with your application code is in `src/app.rs`.
 
-## Further help
+## Running your project
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+`cargo leptos watch`
 
-## Configuration
+## Installing Additional Tools
 
-The website requires the sttings to be provided in JSON format. The config has to be mounted under `/usr/share/nginx/html/assets/config`.
+By default, `cargo-leptos` uses `nightly` Rust, `cargo-generate`, and `sass`. If you run into any trouble, you may need to install one or more of these tools.
 
-### Endpoints parameters
+1. `rustup toolchain install nightly --allow-downgrade` - make sure you have Rust nightly
+2. `rustup default nightly` - setup nightly as default, or you can use rust-toolchain file later on
+3. `rustup target add wasm32-unknown-unknown` - add the ability to compile Rust to WebAssembly
+4. `cargo install cargo-generate` - install `cargo-generate` binary (should be installed automatically in future)
+5. `npm install -g sass` - install `dart-sass` (should be optional in future)
 
-| Name                              | Description                 | Value       |
-| --------------------------------- | --------------------------- | ----------- |
-| `Endpoints.DatasetHandler.Host`   | Hostname of the API Gateway | `localhost` |
-| `Endpoints.DatasetHandler.Port`   | Port of the API Gateway     | `9000`      |
-| `Endpoints.DatasetHandler.UseTLS` | TLS configuration           | false       |
+## Executing a Server on a Remote Machine Without the Toolchain
+After running a `cargo leptos build --release` the minimum files needed are:
 
-### Auth parameters
+1. The server binary located in `target/server/release`
+2. The `site` directory and all files within located in `target/site`
 
-| Name               | Description      | Value |
-| ------------------ | ---------------- | ----- |
-| `Auth.URL`         | Auth URL         | None  |
-| `Auth.CallbackURL` | Callback URL     | None  |
-| `Auth.ClientID`    | OAuth2 client ID | None  |
-| `Auth.AuthURL`     | Auth URL         | None  |
-| `Auth.TokenURL`    | Token URL        | None  |
-| `Auth.UserInfoURL` | UserInfo URL     | None  |
+Copy these files to your remote server. The directory structure should be:
+```text
+leptos_start
+site/
+```
+Set the following enviornment variables (updating for your project as needed):
+```text
+LEPTOS_OUTPUT_NAME="leptos_start"
+LEPTOS_SITE_ROOT="site"
+LEPTOS_SITE_PKG_DIR="pkg"
+LEPTOS_SITE_ADDR="127.0.0.1:3000"
+LEPTOS_RELOAD_PORT="3001"
+```
+Finally, run the server binary.

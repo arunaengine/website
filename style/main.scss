@@ -1,0 +1,250 @@
+body {
+	font-family: sans-serif;
+	text-align: center;
+}
+
+.btn-primary {
+	color: #f8fafc;
+	background-color: #007bc1;
+	border-color: #007ac19c;
+}
+
+.btn-primary:hover {
+	color: #f8fafc;
+	background-color: #007ac1aa;
+	border-color: #007ac168;
+}
+
+.down {
+	margin-top: 10rem;
+}
+
+.hook {
+	font-size: 4vw;
+}
+
+.ocean {
+	background-color: #007bc1;
+	top: 100%;
+	opacity: .25;
+	width: 200vw;
+	position: absolute;
+	height: 150vh;
+	transform: translateX(-20vw);
+}
+
+
+.bubble {
+	width: 30px;
+	height: 30px;
+	border-radius: 100%;
+	position: absolute;
+	background-color: white;
+	bottom: -30px;
+	top: 230vh;
+	opacity: 0.4;
+	animation: bubble 15s ease-in-out infinite,
+		sideWays 4s ease-in-out infinite alternate;
+	transition: opacity 13s ease-in-out;
+}
+
+@keyframes bubble {
+	0% {
+		transform: translateY(0%);
+		opacity: 0;
+	}
+
+	10% {
+		transform: translateY(-13vh);
+		opacity: 0.2;
+	}
+
+	50% {
+		transform: translateY(-65vh);
+		opacity: 0.3;
+	}
+
+	100% {
+		transform: translateY(-130vh);
+		opacity: 0;
+	}
+}
+
+@keyframes sideWays {
+	0% {
+		margin-left: 0px;
+	}
+
+	100% {
+		margin-left: 200px;
+	}
+}
+
+
+.bubble--1 {
+	left: 10%;
+	animation-delay: 0.5s;
+	animation-duration: 16s;
+	opacity: 0.2;
+	transition: visibility 0s 16s, opacity 16s linear;
+}
+
+.bubble--2 {
+	width: 15px;
+	height: 15px;
+	left: 50%;
+	animation-delay: 1s;
+	animation-duration: 10s;
+	transition: visibility 0s 10s, opacity 10s linear;
+	opacity: 0.1;
+}
+
+.bubble--3 {
+	width: 10px;
+	height: 10px;
+	left: 40%;
+	animation-delay: 5s;
+	animation-duration: 20s;
+	transition: visibility 0s 20s, opacity 20s linear;
+	opacity: 0.3;
+}
+
+.bubble--4 {
+	width: 25px;
+	height: 25px;
+	left: 40%;
+	animation-delay: 8s;
+	animation-duration: 17s;
+	transition: visibility 0s 17s, opacity 17s linear;
+	opacity: 0.2;
+}
+
+.bubble--5 {
+	width: 30px;
+	height: 30px;
+	left: 60%;
+	animation-delay: 10s;
+	animation-duration: 15s;
+	transition: visibility 0s 15s, opacity 15s linear;
+	opacity: 0.1;
+}
+
+.bubble--6 {
+	width: 10px;
+	height: 10px;
+	left: 80%;
+	animation-delay: 3s;
+	animation-duration: 30s;
+	transition: visibility 0s 30s, opacity 30s linear;
+	opacity: 0.4;
+}
+
+.bubble--7 {
+	width: 15px;
+	height: 15px;
+	left: 90%;
+	animation-delay: -7s;
+	animation-duration: 25s;
+	transition: visibility 0s 25s, opacity 25s linear;
+	opacity: 0.3;
+}
+
+.bubble--9 {
+	width: 20px;
+	height: 20px;
+	left: 50%;
+	bottom: 30px;
+	animation-delay: -5s;
+	animation-duration: 19s;
+	transition: visibility 0s 19s, opacity 19s linear;
+	opacity: 0.2;
+}
+
+.bubble--10 {
+	width: 40px;
+	height: 40px;
+	left: 30%;
+	bottom: 30px;
+	animation-delay: -21s;
+	animation-duration: 16s;
+	transition: visibility 0s 16s, opacity 16s linear;
+	opacity: 0.3;
+}
+
+.bubble--11 {
+	width: 30px;
+	height: 30px;
+	left: 60%;
+	bottom: 30px;
+	animation-delay: -13.75s;
+	animation-duration: 20s;
+	transition: opacity 18s ease-in-out;
+	opacity: 0.3;
+}
+
+.bubble--11 {
+	width: 25px;
+	height: 25px;
+	left: 90%;
+	bottom: 30px;
+	animation-delay: -10.5s;
+	animation-duration: 19s;
+	transition: opacity 17s ease-in-out;
+	opacity: 0.3;
+}
+
+
+
+
+@media (min-width: 1200px) {
+	.hook {
+		font-size: 50px;
+	}
+}
+
+@media (max-width: 800px) {
+	.hook {
+		font-size: 30px;
+	}
+}
+
+
+.wave {
+	background: url(../wave.svg) repeat-x;
+	position: absolute;
+	top: 80%;
+	width: 10*100vw;
+	height: 20vh;
+	animation: wave 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) infinite;
+	transform: translate3d(0, 0, 0);
+}
+
+.wave:nth-of-type(2) {
+	top: 85%;
+	animation: wave 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) -.125s infinite, swell 28s ease -1.25s infinite;
+	opacity: 1;
+}
+
+@keyframes wave {
+	0% {
+		margin-left: -400px;
+	}
+
+	100% {
+		margin-left: -2000px;
+	}
+}
+
+@keyframes swell {
+
+	0%,
+	100% {
+		transform: translate3d(0, -4vh, 0);
+		height: 19vh;
+	}
+
+	50% {
+		transform: translate3d(0, 0.1vh, 0);
+		height: 14.95vh;
+	}
+}
