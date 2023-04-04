@@ -1,3 +1,4 @@
+use crate::utils::modal::get_modal_by_id;
 use leptos::*;
 use leptos_meta::*;
 
@@ -6,6 +7,12 @@ use leptos_meta::*;
 pub fn RegisterPage(cx: Scope) -> impl IntoView {
     provide_meta_context(cx);
     // Creates a reactive value to update the button
+
+    let toggle_mod = move |_| {
+        let modal = get_modal_by_id("registerModal");
+        modal.toggle();
+    };
+
     view! {cx,
         // <div class="card m-3 w-75 p-4">
         //     <div class="card-body">
@@ -23,7 +30,7 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
         //     </div>
         // </div>
 
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#registerModal">
+                <button type="button" class="btn btn-primary" on:click=toggle_mod>
                 "Launch modal with form"
                 </button>
 
