@@ -1,5 +1,6 @@
 use leptos::*;
 use leptos_meta::*;
+use leptos_router::*;
 
 /// Renders the home page of your application.
 #[component]
@@ -204,7 +205,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                         <div class="d-none d-md-flex">
                             { dark_light }
                             { notifications }
-                            <button type="button" class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</button>
+                            <A href="/login" class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</A>
                         </div>
                     </div>
                 </div>

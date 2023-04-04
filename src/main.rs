@@ -7,9 +7,9 @@ async fn main() -> std::io::Result<()> {
     use actix_session::{storage::CookieSessionStore, SessionMiddleware};
     use actix_web::web::Data;
     use actix_web::*;
+    use aruna_web::app::*;
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
-    use leptos_start::app::*;
     use server::oidc::Authorizer;
     use std::sync::Mutex;
     //use server::actix_routes;
@@ -33,7 +33,7 @@ async fn main() -> std::io::Result<()> {
                 secret_key.clone(),
             ))
             .app_data(Data::clone(&data))
-            .route("/api/{tail:.*}", leptos_actix::handle_server_fns())
+            .route("/web/{tail:.*}", leptos_actix::handle_server_fns())
             .service(server::actix_routes::login)
             .leptos_routes(
                 leptos_options.to_owned(),
