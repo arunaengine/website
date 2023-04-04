@@ -9,6 +9,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
     provide_meta_context(cx);
 
     cfg_if! { if #[cfg(feature = "hydrate")] {
+        use wasm_bindgen::JsCast;
         let doc = document().unchecked_into::<web_sys::HtmlDocument>();
         log::debug!("{:#?}", doc.cookie());
     }};
