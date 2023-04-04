@@ -61,8 +61,12 @@ fn Login(_cx: Scope) -> impl IntoView {
 #[component]
 fn MainPanel(cx: Scope) -> impl IntoView {
     use crate::components::header::*;
+    use crate::components::panel::*;
     view! { cx,
-        <ArunaHeader/>
+        <div class="page">
+            <ArunaHeader/>
+            <PanelBody/>
+        </div>
     }
 }
 
