@@ -1,5 +1,3 @@
-#[cfg(feature = "hydrate")]
-use crate::utils::modal::*;
 use cfg_if::cfg_if;
 use leptos::*;
 use leptos_meta::*;

@@ -50,7 +50,7 @@ impl Challenge {
 impl Authorizer {
     pub async fn new() -> Result<Self> {
         let provider_metadata = CoreProviderMetadata::discover_async(
-            IssuerUrl::new("https://accounts.example.com".to_string())?,
+            IssuerUrl::new("http://localhost:1998/realms/test".to_string())?,
             async_http_client,
         )
         .await?;
@@ -59,11 +59,15 @@ impl Authorizer {
         // and token URL.
         let client = CoreClient::from_provider_metadata(
             provider_metadata,
-            ClientId::new("client_id".to_string()),
-            Some(ClientSecret::new("client_secret".to_string())),
+            ClientId::new("test".to_string()),
+            Some(ClientSecret::new(
+                "2HLee0hVLNZgWjJVLjiyQZRHf5ir3pfx".to_string(),
+            )),
         )
         // Set the URL the user will be redirected to after the authorization process.
-        .set_redirect_uri(RedirectUrl::new("http://redirect".to_string())?);
+        .set_redirect_uri(RedirectUrl::new(
+            "http://localhost:3000/callback".to_string(),
+        )?);
 
         Ok(Authorizer {
             core_client: client,
@@ -83,8 +87,7 @@ impl Authorizer {
                 Nonce::new_random,
             )
             // Set the desired scopes.
-            .add_scope(Scope::new("read".to_string()))
-            .add_scope(Scope::new("write".to_string()))
+            .add_scope(Scope::new("email".to_string()))
             // Set the PKCE code challenge.
             .set_pkce_challenge(pkce_challenge)
             .url();
@@ -98,7 +101,7 @@ impl Authorizer {
     }
 
     /// Exchange the temp token for a "real one"
-    pub async fn exchange_challenge(&self, session: Session, auth_code: &str) -> Result<String> {
+    pub async fn exchange_challenge(&self, session: Session, auth_code: &str) -> Result<()> {
         // Once the user has been redirected to the redirect URL, you'll have access to the
         // authorization code. For security reasons, your code should verify that the `state`
         // parameter returned by the server matches `csrf_state`.
@@ -138,6 +141,8 @@ impl Authorizer {
             }
         }
 
-        Ok(id_token.to_string())
+        session.insert("token", id_token.to_string())?;
+
+        Ok(())
     }
 }

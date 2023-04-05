@@ -21,20 +21,25 @@ async fn main() -> std::io::Result<()> {
 
     let secret_key = cookie::Key::generate();
 
-    let data = Data::new(Mutex::new(Authorizer::new().await));
+    let data = Data::new(Mutex::new(Authorizer::new().await.unwrap()));
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;
         let site_root = &leptos_options.site_root;
 
         App::new()
-            .wrap(SessionMiddleware::new(
-                CookieSessionStore::default(),
-                secret_key.clone(),
-            ))
-            .app_data(Data::clone(&data))
-            .route("/web/{tail:.*}", leptos_actix::handle_server_fns())
+            .wrap(
+                SessionMiddleware::builder(CookieSessionStore::default(), secret_key.clone())
+                    .session_lifecycle(
+                        actix_session::config::PersistentSession::default()
+                            .session_ttl(cookie::time::Duration::seconds(60 * 60 * 24 * 7)),
+                    )
+                    .build(),
+            )
+            .app_data(data.clone())
             .service(server::actix_routes::login)
+            .service(server::actix_routes::callback)
+            .route("/web/{tail:.*}", leptos_actix::handle_server_fns())
             .leptos_routes(
                 leptos_options.to_owned(),
                 routes.to_owned(),
