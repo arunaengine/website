@@ -1,30 +1,11 @@
-use wasm_bindgen::prelude::*;
-
-#[wasm_bindgen(module = "bootstrap")]
+#[cfg(feature = "hydrate")]
+use wasm_bindgen::prelude::wasm_bindgen;
+#[cfg(feature = "hydrate")]
+#[wasm_bindgen(module = "/js/modal_wrapper.js")]
 extern "C" {
-    #[wasm_bindgen]
-    pub type Modal;
-
-    #[wasm_bindgen(constructor)]
-    pub fn new(e: web_sys::Element) -> Modal;
-
-    #[wasm_bindgen(method)]
-    pub fn toggle(this: &Modal);
-
-    #[wasm_bindgen(method)]
-    pub fn show(this: &Modal);
-
-    #[wasm_bindgen(method)]
-    pub fn hide(this: &Modal);
+    pub fn toggle_modal(id: &str);
 }
 
-pub fn get_modal_by_id(id: &str) -> Modal {
-    let window = web_sys::window().expect("no global `window` exists");
-    let document = window.document().expect("should have a document on window");
-
-    let element = document
-        .get_element_by_id(id)
-        .expect(&format!("no element with id '{}'", id));
-
-    Modal::new(element)
-}
+#[cfg(not(feature = "hydrate"))]
+#[allow(dead_code)]
+pub fn toggle_modal(_id: &str) {}

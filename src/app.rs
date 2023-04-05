@@ -1,3 +1,5 @@
+#[cfg(feature = "hydrate")]
+use crate::utils::modal::*;
 use cfg_if::cfg_if;
 use leptos::*;
 use leptos_meta::*;
@@ -19,6 +21,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
         // injects a stylesheet into the document <head>
         // id=leptos means cargo-leptos will hot-reload this stylesheet
         <Script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/tabler.min.js" />
+        <Script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous"></Script>
         <Stylesheet href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/css/tabler.min.css" />
         <Stylesheet id="leptos" href="/pkg/leptos_start.css"/>
         // sets the document title
