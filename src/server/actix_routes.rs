@@ -2,9 +2,10 @@ use crate::server::oidc::Authorizer;
 use actix_session::Session;
 use actix_web::{
     http::StatusCode,
-    web::{Data, Redirect},
+    web::{Bytes, Data, Redirect},
     *,
 };
+use futures::channel::mpsc;
 use serde::Deserialize;
 use std::sync::Mutex;
 
@@ -48,4 +49,14 @@ pub async fn callback(
         })?;
 
     Ok(Redirect::to("/panel").see_other())
+}
+
+#[get("/api/events")]
+async fn update_events(session: Session) -> Result<impl Responder> {
+    let (tx, rx) = mpsc::unbounded::<Result<Bytes, Error>>();
+    session.insert("user_id", format!("{}", uuid::Uuid::new_v4()))?;
+
+    Ok(HttpResponse::Ok()
+        .insert_header(("Content-Type", "text/event-stream"))
+        .streaming(rx))
 }

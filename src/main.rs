@@ -7,6 +7,7 @@ async fn main() -> std::io::Result<()> {
     use actix_session::{storage::CookieSessionStore, SessionMiddleware};
     use actix_web::web::Data;
     use actix_web::*;
+    use anyhow::Result;
     use aruna_web::app::*;
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
@@ -22,6 +23,8 @@ async fn main() -> std::io::Result<()> {
     let secret_key = cookie::Key::generate();
 
     let data = Data::new(Mutex::new(Authorizer::new().await.unwrap()));
+    let streams: Data<Mutex<Vec<futures::channel::mpsc::Sender<Result<web::Bytes>>>>> =
+        Data::new(Mutex::new(Vec::new()));
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;
@@ -37,6 +40,7 @@ async fn main() -> std::io::Result<()> {
                     .build(),
             )
             .app_data(data.clone())
+            .app_data(streams.clone())
             .service(server::actix_routes::login)
             .service(server::actix_routes::callback)
             .route("/web/{tail:.*}", leptos_actix::handle_server_fns())
