@@ -338,6 +338,7 @@ dependencies = [
  "console_error_panic_hook",
  "console_log",
  "futures 0.3.28",
+ "http",
  "leptos",
  "leptos_actix",
  "leptos_meta",

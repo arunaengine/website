@@ -1,3 +1,4 @@
+mod components;
 pub mod server;
 
 #[cfg(feature = "ssr")]
@@ -20,6 +21,8 @@ async fn main() -> std::io::Result<()> {
     let routes = generate_route_list(|cx| view! { cx, <EntryPoint/> });
 
     let secret_key = cookie::Key::generate();
+
+    crate::components::register_server_functions();
 
     let data = Data::new(Mutex::new(Authorizer::new().await.unwrap()));
 

@@ -8,6 +8,8 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context(cx);
 
+    use crate::components::register::*;
+
     cfg_if! { if #[cfg(feature = "hydrate")] {
         use wasm_bindgen::JsCast;
         let doc = document().unchecked_into::<web_sys::HtmlDocument>();
@@ -33,6 +35,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
                     <Route path="/login" view=|cx| view! { cx,
                         <Login />
                     }/>
+                    <Route path="/register" view=|cx| view! { cx, <MainPage/> <RegisterPage/> }/>
                     <ProtectedRoute path="/panel" redirect_path="/login" condition=|_cx| {true} view=|cx| view! { cx, <MainPanel/> }/>
                     <ProtectedRoute path="/admin" redirect_path="/login" condition=|_cx| {false} view=|cx| view! { cx, <AdminPanel/> }/>
                 </Routes>
