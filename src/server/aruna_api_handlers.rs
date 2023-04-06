@@ -16,7 +16,7 @@ pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T
 }
 
 pub async fn who_am_i(token: &str) -> Result<()> {
-    let endpoint = Channel::from_shared("https://<URL-To-AOS-Instance-gRPC-Gateway>")?;
+    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
     let get_request = tonic::Request::new(GetUserRequest {
         user_id: "".to_string(),
