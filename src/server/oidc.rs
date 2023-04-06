@@ -61,7 +61,7 @@ impl Authorizer {
             provider_metadata,
             ClientId::new("test".to_string()),
             Some(ClientSecret::new(
-                "PVFQoNEvFfWMpKphivhVIAb8g6djUL7s".to_string(),
+                "Ns46QiaYHq8MnPKTo1R8NXkU3VDixdIY".to_string(),
             )),
         )
         // Set the URL the user will be redirected to after the authorization process.
@@ -101,7 +101,7 @@ impl Authorizer {
     }
 
     /// Exchange the temp token for a "real one"
-    pub async fn exchange_challenge(&self, session: Session, auth_code: &str) -> Result<()> {
+    pub async fn exchange_challenge(&self, session: Session, auth_code: &str) -> Result<String> {
         // Once the user has been redirected to the redirect URL, you'll have access to the
         // authorization code. For security reasons, your code should verify that the `state`
         // parameter returned by the server matches `csrf_state`.
@@ -141,8 +141,10 @@ impl Authorizer {
             }
         }
 
-        session.insert("token", id_token.to_string())?;
+        let token = id_token.to_string();
 
-        Ok(())
+        session.insert("token", token.to_string())?;
+
+        Ok(token)
     }
 }

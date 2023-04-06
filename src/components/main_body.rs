@@ -230,14 +230,6 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                 <div class="card-body">
                   <div class="text-muted float-end">{"2 days ago"}</div>
                   <h4>{"+3 Friend Requests"}</h4>
-                  <div class="avatar-list mt-3">
-                    <span class="avatar" style="background-image: url(...)">
-                      <span class="badge bg-success"></span></span>
-                    <span class="avatar">
-                      <span class="badge bg-success"></span>{"JL"}</span>
-                    <span class="avatar" style="background-image: url(...)">
-                      <span class="badge bg-success"></span></span>
-                  </div>
                 </div>
               </div>
             </li>
@@ -252,12 +244,10 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                     <div class="row g-2">
                       <div class="col-6">
                         <div class="media media-2x1 rounded">
-                          <a class="media-content" style="background-image: url(...)"></a>
                         </div>
                       </div>
                       <div class="col-6">
                         <div class="media media-2x1 rounded">
-                          <a class="media-content" style="background-image: url(...)"></a>
                         </div>
                       </div>
                     </div>

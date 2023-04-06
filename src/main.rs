@@ -37,6 +37,7 @@ async fn main() -> std::io::Result<()> {
                         actix_session::config::PersistentSession::default()
                             .session_ttl(cookie::time::Duration::seconds(60 * 60 * 24 * 7)),
                     )
+                    .cookie_name("aruna-session".to_string())
                     .build(),
             )
             .app_data(data.clone())

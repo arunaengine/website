@@ -1,4 +1,4 @@
-use crate::server::oidc::Authorizer;
+use crate::server::{aruna_api_handlers::who_am_i, oidc::Authorizer};
 use actix_session::Session;
 use actix_web::{
     http::StatusCode,
@@ -40,12 +40,16 @@ pub async fn callback(
         .lock()
         .map_err(|_| error::InternalError::new("Poison", StatusCode::INTERNAL_SERVER_ERROR))?;
 
-    my_data
+    let token = my_data
         .exchange_challenge(session, &query_params.code)
         .await
         .map_err(|_| {
             error::InternalError::new("Exchange Code", StatusCode::INTERNAL_SERVER_ERROR)
         })?;
+
+    who_am_i(&token).await.map_err(|_| {
+        error::InternalError::new("API error Code", StatusCode::INTERNAL_SERVER_ERROR)
+    })?;
 
     Ok(Redirect::to("/register").see_other())
 }
