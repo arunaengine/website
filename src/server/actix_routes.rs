@@ -40,16 +40,20 @@ pub async fn callback(
         .lock()
         .map_err(|_| error::InternalError::new("Poison", StatusCode::INTERNAL_SERVER_ERROR))?;
 
-    let token = my_data
-        .exchange_challenge(session, &query_params.code)
+    let _token = my_data
+        .exchange_challenge(session, &query_params.code, &query_params.state)
         .await
         .map_err(|_| {
-            error::InternalError::new("Exchange Code", StatusCode::INTERNAL_SERVER_ERROR)
+            error::InternalError::new(
+                "Unable to exchange OIDC code",
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )
         })?;
 
-    who_am_i(&token).await.map_err(|_| {
-        error::InternalError::new("API error Code", StatusCode::INTERNAL_SERVER_ERROR)
-    })?;
+    // Check who the user is and potentioally exchange for "real" API-Token token
+    // who_am_i(&token).await.map_err(|_| {
+    //     error::InternalError::new("ArunaAPI error", StatusCode::INTERNAL_SERVER_ERROR)
+    // })?;
 
     Ok(Redirect::to("/register").see_other())
 }

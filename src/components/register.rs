@@ -1,7 +1,10 @@
 use cfg_if::cfg_if;
+use gloo_events::EventListener;
+use http::StatusCode;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+use web_sys::{CustomEvent, Event};
 
 #[server(RegisterUser, "/web")]
 pub async fn register_user(
@@ -15,21 +18,26 @@ pub async fn register_user(
     // Test if registered -> SetCookie
     cfg_if! {
         if #[cfg(feature = "ssr")] {
-            use http::{header::SET_COOKIE, HeaderValue};
+            use http::{header::LOCATION, HeaderValue};
             use leptos_actix::ResponseOptions;
-            use actix_web::cookie::{Cookie, SameSite};
-            use actix_web::cookie::time::{Duration, OffsetDateTime};
+            use leptos_actix::ResponseParts;
             let response = use_context::<ResponseOptions>(cx);
 
-            let mut test_cookie = Cookie::build("registered", "true").path("/").finish();
-            test_cookie.set_same_site(SameSite::None);
+            // let mut test_cookie = Cookie::build("registered", "true").path("/").finish();
+            // test_cookie.set_same_site(SameSite::None);
 
-            let expiry = OffsetDateTime::now_utc() + Duration::seconds(60 * 60 * 24 * 7);
-            test_cookie.set_expires(expiry);
+            // let expiry = OffsetDateTime::now_utc() + Duration::seconds(60 * 60 * 24 * 7);
+            // test_cookie.set_expires(expiry);
 
-            if let Some(res_options) = response {
-                res_options.append_header(SET_COOKIE, HeaderValue::from_str(test_cookie.to_string().as_ref()).unwrap())
-            }
+            // if let Some(res_options) = response {
+            //     let mut hmap = actix_web::http::header::HeaderMap::default();
+            //     hmap.insert(LOCATION, HeaderValue::from_str("/test").unwrap());
+            //     res_options.overwrite(
+            //         ResponseParts{
+            //             headers: hmap,
+            //             status: Some(StatusCode::TEMPORARY_REDIRECT)
+            //         });
+            // }
         }
     }
 
@@ -41,23 +49,45 @@ pub async fn register_user(
 pub fn RegisterPage(cx: Scope) -> impl IntoView {
     provide_meta_context(cx);
 
-    let (registered, set_registered) = create_signal(cx, None::<String>);
-    cfg_if! {
-        if #[cfg(feature = "hydrate")] {
-            use wasm_bindgen::JsCast;
-            use crate::utils::modal::toggle_modal;
-            use crate::utils::parse_cookies::parse_cookies;
-            toggle_modal("registerModal");
-            let doc = document().unchecked_into::<web_sys::HtmlDocument>();
-            set_registered(parse_cookies(doc.cookie().unwrap_or_default(), "registered"));
-        }
-    };
+    //let (registered, set_registered) = create_signal(cx, None::<String>);
 
-    let register_user = create_server_multi_action::<RegisterUser>(cx);
+    //use crate::utils::modal::show_modal;
+    //show_modal("registerModal");
 
-    let register_form = view! {cx,
+    //let doc = document().unchecked_into::<web_sys::HtmlDocument>();
+    //set_registered(parse_cookies(doc.cookie().unwrap_or_default(), "registered"));
 
-        <MultiActionForm on:submit=move |ev| {
+    //Attach an event listener
+    //let custom_event = CustomEvent::new("shown.bs.modal").unwrap();
+
+    let nav = use_navigate(cx);
+    let modal_ref = create_node_ref::<html::Div>(cx);
+    modal_ref.on_load(cx, move |loaded| {
+        loaded.on_mount(move |mounted| {
+            cfg_if! {
+                if #[cfg(feature = "hydrate")] {
+                    use crate::utils::modal::show_modal;
+                    show_modal("registerModal");
+            }};
+            let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
+                nav(
+                    "/",
+                    NavigateOptions {
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+            });
+
+            on_cleanup(cx, move || drop(show_modal));
+        });
+    });
+
+    let register_user = create_server_action::<RegisterUser>(cx);
+
+    view! {cx,
+
+        <ActionForm on:submit=move |ev| {
             let data = RegisterUser::from_event(&ev).expect("to parse form data");
             // silly example of validation: if the todo is "nope!", nope it
             if data.displayname == "nope!" {
@@ -67,10 +97,11 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
         }
         action=register_user
     >
-    <div class="modal mt-5" id="registerModal" tabindex="-1">
-        <div class="modal-dialog modal-sm" role="document">
+    <div class="modal mt-5 fade" id="registerModal" _ref=modal_ref tabindex="-1">
+        <div class="modal-dialog modal-sm" role="document" data-bs-config="{backdrop:true}">
             <div class="modal-content">
                 <div class="modal-status bg-info"></div>
+
 
 
                 <div class="modal-body">
@@ -86,27 +117,27 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
                         <h3>"Registration required!"</h3>
                         <div class="text-muted">"Your account is not yet registered, please register first before you can proceed!"</div>
                     </div>
-                    <div class="mx-auto">
+                    <div class="mx-auto text-left import-left">
                         <div class="mb-3">
                             <label class="form-label text-left">"Displayname"</label>
                             <input type="text" class="form-control flex-fill" name="displayname" placeholder="" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label text-left">"Email (optional)"</label>
+                            <label class="form-label text-left import-left">"Email (optional)"</label>
                             <input type="text" class="form-control flex-fill" name="email" placeholder="" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label text-left">"Project (optional)"</label>
+                            <label class="form-label text-left import-left">"Project (optional)"</label>
                             <input type="text" class="form-control flex-fill" name="project" placeholder="" />
                         </div>
                     </div>
                 </div>
 
                 <div class="modal-footer">
-                    <a href="#" class="btn" data-bs-dismiss="modal">
+                    <a href="/" class="btn" data-bs-dismiss="modal" data-bs-target="#registerModal">
                     "Cancel"
                     </a>
-                    <button type="submit" class="btn btn-primary ms-auto" data-bs-dismiss="modal">
+                    <button type="submit" class="btn btn-primary ms-auto" data-bs-dismiss="modal" data-bs-target="#registerModal">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                         <path d="M12 5l0 14"></path>
@@ -118,10 +149,7 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
             </div>
         </div>
     </div>
-    </MultiActionForm>
-    };
-
-    view! {cx,
-        {register_form}
+    </ActionForm>
+    {move || register_user.value().get().is_some().then(|| view!(cx, <Redirect path="/test" />))}
     }
 }

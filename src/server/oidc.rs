@@ -61,7 +61,7 @@ impl Authorizer {
             provider_metadata,
             ClientId::new("test".to_string()),
             Some(ClientSecret::new(
-                "Ns46QiaYHq8MnPKTo1R8NXkU3VDixdIY".to_string(),
+                "PVFQoNEvFfWMpKphivhVIAb8g6djUL7s".to_string(),
             )),
         )
         // Set the URL the user will be redirected to after the authorization process.
@@ -86,6 +86,7 @@ impl Authorizer {
                 CsrfToken::new_random,
                 Nonce::new_random,
             )
+            .add_extra_param("redirect_to", "page")
             // Set the desired scopes.
             .add_scope(Scope::new("email".to_string()))
             // Set the PKCE code challenge.
@@ -101,7 +102,12 @@ impl Authorizer {
     }
 
     /// Exchange the temp token for a "real one"
-    pub async fn exchange_challenge(&self, session: Session, auth_code: &str) -> Result<String> {
+    pub async fn exchange_challenge(
+        &self,
+        session: Session,
+        auth_code: &str,
+        state: &str,
+    ) -> Result<String> {
         // Once the user has been redirected to the redirect URL, you'll have access to the
         // authorization code. For security reasons, your code should verify that the `state`
         // parameter returned by the server matches `csrf_state`.
@@ -112,6 +118,10 @@ impl Authorizer {
             .remove_as::<Challenge>("challenge")
             .ok_or_else(|| anyhow!("Unable to get challenge"))?
             .map_err(|_| anyhow!("Unable to decode session"))?;
+
+        if challenge.csrf_token.secret() != state {
+            return Err(anyhow!("Invalid state, csrf detected"));
+        }
 
         // Now you can exchange it for an access token and ID token.
         let token_response = self
