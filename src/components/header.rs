@@ -10,7 +10,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
     let (dark, toggle_dark) = create_signal(cx, "".to_string());
     let darkmode = move |_| {
         toggle_dark.update(|dark| {
-            if *dark == "" {
+            if dark.is_empty() {
                 *dark = "theme-dark".to_string()
             } else {
                 *dark = "".to_string()

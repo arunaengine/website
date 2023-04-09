@@ -1,9 +1,9 @@
-use std::time::Duration;
 use cfg_if::cfg_if;
 use gloo_events::EventListener;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+use std::time::Duration;
 
 #[server(RegisterUser, "/web")]
 pub async fn register_user(
@@ -12,21 +12,24 @@ pub async fn register_user(
     email: String,
     project: String,
 ) -> Result<(), ServerFnError> {
-    use actix_web::HttpRequest;
-    use actix_session::SessionExt;
     use crate::utils::aruna_api_handlers::aruna_register_user;
+    use actix_session::SessionExt;
+    use actix_web::HttpRequest;
     let req = use_context::<HttpRequest>(cx).unwrap();
 
     let sess = req.get_session();
 
-    let token = sess.get::<String>("token")
+    let token = sess
+        .get::<String>("token")
         .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
         .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
 
+    let resp = aruna_register_user(&token, &displayname, &email, &project)
+        .await
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
 
-    let resp = aruna_register_user(&token, &displayname, &email, &project).await.map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
-
-    sess.insert("user_id", resp).map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
+    sess.insert("user_id", resp)
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
 
     Ok(())
 }
@@ -63,13 +66,7 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
                     show_modal("registerModal");
             }};
             let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
-                nav(
-                    "/",
-                    NavigateOptions {
-                        ..Default::default()
-                    },
-                )
-                .unwrap();
+                nav("/", Default::default()).unwrap();
             });
 
             on_cleanup(cx, move || drop(show_modal));
@@ -141,8 +138,8 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
         </div>
     </div>
     </ActionForm>
-    {move || { 
-        
+    {move || {
+
         match register_user.value().get() {
             Some(v) => {match v {
                 Ok(_) => {
@@ -153,7 +150,7 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
                 }
             }}
             None => ().into_view(cx),
-        }  
+        }
     }
     }}
 }
@@ -169,7 +166,6 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
             .value()
             .get()
             .and_then(|r| r.ok())
-            .map(|r| r)
             .unwrap_or(false)
     };
 
@@ -192,13 +188,7 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
                     show_modal("activateModal");
             }};
             let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
-                nav(
-                    "/",
-                    NavigateOptions {
-                        ..Default::default()
-                    },
-                )
-                .unwrap();
+                nav("/", Default::default()).unwrap();
             });
 
             on_cleanup(cx, move || drop(show_modal));
