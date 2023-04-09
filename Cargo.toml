@@ -37,6 +37,7 @@ http = "0.2.9"
 aruna-rust-api = { version = "1.0.0-rc.15", optional = true }
 tonic = { version = "0.9.1", optional = true }
 gloo-events = "0.1.2"
+gloo-timers = "0.2.6"
 
 
 [features]

@@ -28,6 +28,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
                 <Routes>
                     <Route path="/" view=|cx| view! { cx, <MainPage/> }>
                         <Route path="register" view=|cx| view! { cx, <RegisterPage/> }/>
+                        <Route path="activate" view=|cx| view! { cx, <ActivatePage/> }/>
                         <Route path="" view=|_cx| ()/> // Fallback to make sure MainPage is rendered
                     </Route>
                     <Route path="/login" view=|cx| view! { cx,

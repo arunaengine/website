@@ -71,9 +71,9 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
         </a>
     );
 
-    let notifications = view!(cx,
+    let _notifications = view!(cx,
         <div class="nav-item dropdown d-none d-md-flex me-3">
-            <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1"
+            <a href="#" class="nav-link px-0 disabled" data-bs-toggle="dropdown" tabindex="-1"
                 aria-label="Show notifications">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24"
                     viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
@@ -83,7 +83,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                         d="M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" />
                     <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
                 </svg>
-                <span class="badge bg-red"></span>
+                //<span class="badge bg-red"></span>
             </a>
         </div>
 
@@ -204,7 +204,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                         { github }
                         <div class="d-none d-md-flex">
                             { dark_light }
-                            { notifications }
+                            //{ notifications }
                             <A href="/login" class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</A>
                         </div>
                     </div>
