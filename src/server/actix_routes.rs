@@ -1,4 +1,4 @@
-use crate::server::{aruna_api_handlers::who_am_i, oidc::Authorizer};
+use crate::server::oidc::Authorizer;
 use actix_session::Session;
 use actix_web::{
     http::StatusCode,

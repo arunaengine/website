@@ -1,12 +1,9 @@
 use std::time::Duration;
-
 use cfg_if::cfg_if;
 use gloo_events::EventListener;
-use http::StatusCode;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use web_sys::{CustomEvent, Event};
 
 #[server(RegisterUser, "/web")]
 pub async fn register_user(
@@ -15,33 +12,21 @@ pub async fn register_user(
     email: String,
     project: String,
 ) -> Result<(), ServerFnError> {
-    dbg!(displayname.to_string(), email, project);
+    use actix_web::HttpRequest;
+    use actix_session::SessionExt;
+    use crate::utils::aruna_api_handlers::aruna_register_user;
+    let req = use_context::<HttpRequest>(cx).unwrap();
 
-    // Test if registered -> SetCookie
-    cfg_if! {
-        if #[cfg(feature = "ssr")] {
-            use http::{header::LOCATION, HeaderValue};
-            use leptos_actix::ResponseOptions;
-            use leptos_actix::ResponseParts;
-            let response = use_context::<ResponseOptions>(cx);
+    let sess = req.get_session();
 
-            // let mut test_cookie = Cookie::build("registered", "true").path("/").finish();
-            // test_cookie.set_same_site(SameSite::None);
+    let token = sess.get::<String>("token")
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
+        .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
 
-            // let expiry = OffsetDateTime::now_utc() + Duration::seconds(60 * 60 * 24 * 7);
-            // test_cookie.set_expires(expiry);
 
-            // if let Some(res_options) = response {
-            //     let mut hmap = actix_web::http::header::HeaderMap::default();
-            //     hmap.insert(LOCATION, HeaderValue::from_str("/test").unwrap());
-            //     res_options.overwrite(
-            //         ResponseParts{
-            //             headers: hmap,
-            //             status: Some(StatusCode::TEMPORARY_REDIRECT)
-            //         });
-            // }
-        }
-    }
+    let resp = aruna_register_user(&token, &displayname, &email, &project).await.map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
+
+    sess.insert("user_id", resp).map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
 
     Ok(())
 }
@@ -180,7 +165,7 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
             move || {
                 check_activated.dispatch(CheckActivated {});
             },
-            Duration::from_secs(5),
+            Duration::from_secs(10), // every 10 seconds for now
         );
     }
 
@@ -237,7 +222,6 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
           </div>
         </div>
       </div>
-
-      {activated().then(|| view!(cx, <Redirect path="/panel" />))}
+      {move || activated().then(|| view!(cx, <Redirect path="/panel" />))}
     }
 }
