@@ -180,7 +180,7 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
             move || {
                 check_activated.dispatch(CheckActivated {});
             },
-            Duration::from_millis(2500),
+            Duration::from_secs(5),
         );
     }
 

@@ -11,6 +11,7 @@ cfg_if! {
 
         pub fn register_server_functions() {
             _ = register::RegisterUser::register();
+            _ = register::CheckActivated::register();
         }
 
     }

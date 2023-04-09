@@ -11,6 +11,7 @@ async fn main() -> std::io::Result<()> {
     use aruna_web::app::*;
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
+    //use server::aruna_cache::Cache;
     use server::oidc::Authorizer;
     use std::sync::Mutex;
     //use server::actix_routes;
@@ -24,7 +25,9 @@ async fn main() -> std::io::Result<()> {
 
     crate::components::register_server_functions();
 
-    let data = Data::new(Mutex::new(Authorizer::new().await.unwrap()));
+    let authorizer = Data::new(Mutex::new(Authorizer::new().await.unwrap()));
+
+    //let cache = Data::new(Mutex::new(Cache::new()));
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;
@@ -40,7 +43,7 @@ async fn main() -> std::io::Result<()> {
                     .cookie_name("aruna-session".to_string())
                     .build(),
             )
-            .app_data(data.clone())
+            .app_data(authorizer.clone())
             .service(server::actix_routes::login)
             .service(server::actix_routes::callback)
             .route("/web/{tail:.*}", leptos_actix::handle_server_fns())
