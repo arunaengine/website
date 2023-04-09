@@ -141,8 +141,21 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
         </div>
     </div>
     </ActionForm>
-    {move || register_user.value().get().is_some().then(|| view!(cx, <Redirect path="/activate" />))}
+    {move || { 
+        
+        match register_user.value().get() {
+            Some(v) => {match v {
+                Ok(_) => {
+                    view!{cx, <Redirect path="/activate" />}.into_view(cx)
+                },
+                Err(_) => {
+                    view!{cx, <Redirect path="/" />}.into_view(cx)
+                }
+            }}
+            None => ().into_view(cx),
+        }  
     }
+    }}
 }
 
 /// Renders the home page of your application.
