@@ -3,6 +3,7 @@ pub mod header;
 pub mod main_body;
 pub mod panel;
 pub mod register;
+pub mod panel_nav;
 
 use cfg_if::cfg_if;
 
