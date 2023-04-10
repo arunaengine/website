@@ -2,7 +2,7 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-use crate::utils::structs::UserState;
+use crate::utils::structs::{UserState, UpdateUser};
 
 /// Renders the home page of your application.
 #[component]
@@ -13,6 +13,14 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
     let get_user = use_context::<Resource<bool, Option<UserState>>>(cx)
         .expect("user_state not set");
 
+    // On first load -> Check if user is logged in 
+    let update_user = use_context::<UpdateUser>(cx)
+        .expect("user_state not set");
+
+    // Only check this Once
+    update_user.0.update(|e| *e = !*e);
+
+    let is_logged_memo = create_memo(cx, move |_| get_user.read(cx).flatten().is_some());
     // Creates a reactive value to update the button
     let (dark, toggle_dark) = create_signal(cx, "".to_string());
     let darkmode = move |_| {
@@ -27,11 +35,11 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
 
     let aruna_header = view! { cx,
         <h1 class="navbar-brand navbar-brand-light d-none-navbar-horizontal pe-0 pe-md-3">
-            <a href=".">
+            <A href="/">
                 <img src="aruna_icon.png" width="32" height="32" alt="Aruna"
                     class="navbar-brand-image me-3" />
                 "Aruna Object Storage"
-            </a>
+            </A>
         </h1>
     };
 
@@ -96,54 +104,60 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
 
     );
 
-    let user_elem = move || {
-        match get_user.read(cx).flatten() {
-            Some(u) => {
-                view!{cx,
-                    <div class="nav-item dropdown">
-                        <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown"
-                            aria-label="Open user menu">
-                            <span>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-circle" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>
-                                    <path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"></path>
-                                    <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855"></path>
-                                 </svg>
-                            </span>
-                            <div class="d-none d-xl-block ps-2">
-                                <div>{ u.display_name }</div>
-                                { move || {
-                                        if u.is_admin {
-                                            view!{cx, <div class="mt-1 small text-muted">{ "Admin" }</div>}
-                                        }else{
-                                            view!{cx, <div class="mt-1 small text-muted">{ "User" }</div>}
+    let user_elem = 
+    view! { cx,
+    <Suspense fallback=move || view! {cx, <div class="spinner-border"></div>}>
+        { move || {
+            match get_user.read(cx).flatten() {
+                Some(u) => {
+                    view!{cx,
+                        <div class="nav-item dropdown">
+                            <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown"
+                                aria-label="Open user menu">
+                                <span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-circle" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                        <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>
+                                        <path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"></path>
+                                        <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855"></path>
+                                    </svg>
+                                </span>
+                                <div class="d-none d-xl-block ps-2">
+                                    <div>{ u.display_name }</div>
+                                    { move || {
+                                            if u.is_admin {
+                                                view!{cx, <div class="mt-1 small text-muted">{ "Admin" }</div>}
+                                            }else{
+                                                view!{cx, <div class="mt-1 small text-muted">{ "User" }</div>}
+                                            }
                                         }
                                     }
-                                }
+                                </div>
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                                //<a href="#" class="dropdown-item">{ "Status" }</a>
+                                //<a href="#" class="dropdown-item">{ "Profile" }</a>
+                                //<a href="#" class="dropdown-item">{ "Feedback" }</a>
+                                //<div class="dropdown-divider"></div>
+                                //<a href="#" class="dropdown-item">{ "Settings" }</a>
+                                <a href="#" class="dropdown-item">{ "Logout" }</a>
                             </div>
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                            //<a href="#" class="dropdown-item">{ "Status" }</a>
-                            //<a href="#" class="dropdown-item">{ "Profile" }</a>
-                            //<a href="#" class="dropdown-item">{ "Feedback" }</a>
-                            //<div class="dropdown-divider"></div>
-                            //<a href="#" class="dropdown-item">{ "Settings" }</a>
-                            <a href="#" class="dropdown-item">{ "Logout" }</a>
                         </div>
-                    </div>
-                }.into_view(cx)
+                    }.into_view(cx)
 
-            }
-            None => {
-                    view!{cx, <A href="/login" class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</A>}.into_view(cx)
+                }
+                None => {
+                        view!{cx, <A href="/login" class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</A>}.into_view(cx)
+                    }
                 }
             }
-        };
+        }
+        </Suspense>
+    
+    };
 
     view! {
         cx,
-
         <Body class=dark/>
         <div class="sticky-top">
             <header class="navbar navbar-expand-md navbar-dark d-print-none sticky-top">
@@ -158,7 +172,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                             <div class="container-xl d-block">
                                 <ul class="navbar-nav">
                                     <li class="nav-item active">
-                                        <a class="nav-link" href="./#">
+                                        <A class="nav-link" href="/">
                                             <span
                                                 class="nav-link-icon d-md-none d-lg-inline-block">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -171,10 +185,34 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                                             <span class="nav-link-title">
                                                 { "Home" }
                                             </span>
-                                        </a>
+                                        </A>
                                     </li>
+                                    {move || 
+                                        if is_logged_memo() {
+                                            view!{cx,
+                                                <li class="nav-item">
+                                                    <A class="nav-link" href="/panel">
+                                                        <span
+                                                            class="nav-link-icon d-md-none d-lg-inline-block">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-dashboard" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                                <path d="M12 13m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>
+                                                                <path d="M13.45 11.55l2.05 -2.05"></path>
+                                                                <path d="M6.4 20a9 9 0 1 1 11.2 0z"></path>
+                                                            </svg>
+                                                        </span>
+                                                        <span class="nav-link-title">
+                                                            { "Dashboard" }
+                                                        </span>
+                                                    </A>
+                                                </li>
+                                            }.into_view(cx)
+                                        }else{
+                                            ().into_view(cx)
+                                        }
+                                    }
                                     <li class="nav-item">
-                                        <a class="nav-link" href="./#">
+                                        <A class="nav-link" href="/about">
                                             <span
                                                 class="nav-link-icon d-md-none d-lg-inline-block">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-info-square-rounded" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -187,7 +225,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                                             <span class="nav-link-title">
                                                 { "About" }
                                             </span>
-                                        </a>
+                                        </A>
                                     </li>
                                     <li class="nav-item dropdown">
                                         <a class="nav-link dropdown-toggle" href="#navbar-third" data-bs-toggle="dropdown"

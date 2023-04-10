@@ -11,21 +11,9 @@ pub fn Panel(cx: Scope) -> impl IntoView {
   let update_user = use_context::<UpdateUser>(cx)
         .expect("user_state not set");
 
+  update_user.0.update(|e| *e = !*e);
 
   view! { cx,
-    { move || update_user.0.update(|e| *e = !*e)}
-    <Route path="/some-area" view=move |cx| {
-      view! { cx, <div>
-        <h2>"Some Area"</h2>
-        <Outlet/>
-      </div> }
-    }>
-      <Route path="/path-a/:id" view=move |cx| {
-        view! { cx, <p>"Path A"</p> }
-      }/>
-      <Route path="/path-b/:id" view=move |cx| {
-        view! { cx, <p>"Path B"</p> }
-      }/>
-    </Route>
+    <Route path="panel" view=move |cx| {view! { cx, <div><h2>"Some Area"</h2></div>}}/>
   }
 }

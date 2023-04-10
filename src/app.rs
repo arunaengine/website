@@ -9,26 +9,39 @@ pub async fn get_user_info(#[allow(unused_variables)] cx: Scope) -> Result<crate
     use crate::utils::aruna_api_handlers::who_am_i;
     use actix_session::SessionExt;
     use actix_web::HttpRequest;
-    let req = use_context::<HttpRequest>(cx).ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let req = use_context::<HttpRequest>(cx).ok_or_else(|| 
+        ServerFnError::Request("Invalid context".to_string())
+    )?;
 
     let sess = req.get_session();
 
     let user_info = sess
         .get::<crate::utils::structs::UserState>("user_info")
-        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
-
-    let token = sess
-        .get::<String>("token")
-        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
-        .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+        .map_err(|_| {
+            log::debug!("Unable to query session with user_state");
+            ServerFnError::Request("Invalid request".to_string())
+        })?;
 
 
     match user_info {
       Some(i) => Ok(i),
       None => {
+        let token = sess
+            .get::<String>("token")
+            .map_err(|_| {
+                log::debug!("Unable to query token from session 1");
+                ServerFnError::Request("Invalid request".to_string())})?
+            .ok_or_else(|| {
+                log::debug!("Unable to query token from session 1");
+                ServerFnError::Request("Invalid request".to_string())
+            })?;
           match who_am_i(&token).await {
             Ok(i) => Ok(i),
-            Err(_) => return Err(ServerFnError::Request("Failed to get user_state".to_string())),
+            Err(_) => {
+                
+                log::debug!("Who am i request error");
+                return Err(ServerFnError::Request("Failed to get user_state".to_string()))
+            },
           }
       }
     }
@@ -49,8 +62,6 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
         update_user.0,
         move |_| async move {
             let user = get_user_info(cx).await.ok(); // this is the ServerFn that is called by the GetUser Action above
-            log::debug!("updating user data: {user:#?}");
-
             user
         }
     );
@@ -69,20 +80,17 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
         <Title text="Aruna Object Storage"/>
         <Router>
             <main>
-                <ArunaHeader/>
                 <Routes>
-                    <Route path="/" view=move |cx| view! { cx, <MainPage/> }>
-                        <Route path="register" view=move |cx| view! { cx, <RegisterPage/> }/>
-                        <Route path="activate" view=move |cx| view! { cx, <ActivatePage/> }/>
-                        <Route path="" view=|_cx| ()/> // Fallback to make sure MainPage is rendered
-                    </Route>
-                    <Route path="/login" view=|cx| view! { cx,
-                        <Login />
-                    }/>
-                    <ProtectedRoute path="/panel" redirect_path="/login" condition=|_cx| {true} view=move |cx| view! { cx,
-                        //<ArunaHeader/>
+                    <Route path="/" view=move |cx| view! { cx, 
+                        <ArunaHeader/>
+                        <Outlet/>
+                    }>
+                        <Route path="register" view=move |cx| view! { cx, <MainPage/><RegisterPage/> }/>
+                        <Route path="activate" view=move |cx| view! { cx, <MainPage/><ActivatePage/> }/>
+                        <Route path="login" view=|cx| view! { cx, <Login />}/>
                         <Panel/> 
-                    }/>
+                        <Route path="" view=move |cx| view!{cx, <MainPage/>}/>
+                    </Route>                        
                 </Routes>
             </main>
         </Router>

@@ -81,7 +81,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
             <div class="mt-5">
                 <div class="section-header w-100">
                     <h2 class="section-title text-center lg:text-left">
-                        {"Benefit from Tablers top-notch features"}
+                        {"Benefit from Arunas super-duper features"}
                     </h2>
                 </div>
                 <div class="row">
@@ -91,7 +91,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                                 <path d="M5 12l5 5l10 -10"></path>
                             </svg>
                         </div>
-                        {"Fully responsive"}
+                        {"Store data"}
                     </div>
                         <div class="sm:col-6 md:col-4 lg:col-6">
                             <div class="shape shape-green shape-sm shape-rounded mr-3">
@@ -99,7 +99,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                                     <path d="M5 12l5 5l10 -10"></path>
                                 </svg>
                             </div>
-                            {"Based on Bootstrap 5"}
+                            {"And get data back"}
                         </div>
                             <div class="sm:col-6 md:col-4 lg:col-6">
                                 <div class="shape shape-green shape-sm shape-rounded mr-3">
@@ -107,7 +107,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                                         <path d="M5 12l5 5l10 -10"></path>
                                     </svg>
                                 </div>
-                                {"Built with Sass"}
+                                {"Find data"}
                             </div>
                             <div class="sm:col-6 md:col-4 lg:col-6">
                                 <div class="shape shape-green shape-sm shape-rounded mr-3">
@@ -115,7 +115,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                                         <path d="M5 12l5 5l10 -10"></path>
                                     </svg>
                                 </div>
-                                {"Detailed documentation"}
+                                {"Or forget about it"}
                             </div>
                             <div class="sm:col-6 md:col-4 lg:col-6">
                                 <div class="shape shape-green shape-sm shape-rounded mr-3">
@@ -139,7 +139,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                                         <path d="M5 12l5 5l10 -10"></path>
                                     </svg>
                                 </div>
-                                {"100+ UI components"}
+                                {"Nice features"}
                             </div>
                             <div class="sm:col-6 md:col-4 lg:col-6">
                                 <div class="shape shape-green shape-sm shape-rounded mr-3">
@@ -147,7 +147,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                                         <path d="M5 12l5 5l10 -10"></path>
                                     </svg>
                                 </div>
-                                {"Multiple layouts"}
+                                {"Nice guys"}
                             </div>
                             <div class="sm:col-6 md:col-4 lg:col-6">
                                 <div class="shape shape-green shape-sm shape-rounded mr-3">
@@ -163,7 +163,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                                         <path d="M5 12l5 5l10 -10"></path>
                                     </svg>
                                 </div>
-                                {"Premium vector icons"}
+                                {"Blazingly fast!"}
                             </div>
                         </div>
                     </div>
