@@ -31,12 +31,12 @@ pub async fn who_am_i(token: &str) -> Result<UserState> {
         .get_user(add_token(get_request, token))
         .await?
         .into_inner();
-    Ok(
-        UserState{
-            user: response.user.ok_or(anyhow!("Unable to get user_info"))?,
-            permissions: response.project_permissions
-        }
-    )
+
+
+    let mut user_state = UserState::from(response.user.ok_or(anyhow!("Unable to get user_info"))?);
+    user_state.permissions = response.project_permissions.into_iter().map(|e| e.into()).collect::<Vec<_>>();
+
+    Ok(user_state)
 }
 
 pub async fn aruna_register_user(

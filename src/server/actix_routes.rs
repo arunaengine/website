@@ -42,7 +42,7 @@ pub async fn callback(
         .map_err(|_| error::InternalError::new("Poison", StatusCode::INTERNAL_SERVER_ERROR))?;
 
     let token = my_data
-        .exchange_challenge(session, &query_params.code, &query_params.state)
+        .exchange_challenge(&session, &query_params.code, &query_params.state)
         .await
         .map_err(|_| {
             error::InternalError::new(
@@ -51,9 +51,12 @@ pub async fn callback(
             )
         })?;
 
-    //Check who the user is and potentioally exchange for "real" API-Token token
+    //Check who the user is and potentially exchange for "real" API-Token token
     match who_am_i(&token).await {
-        Ok(_) => return Ok(Redirect::to("/panel").see_other()),
+        Ok(val) => {
+            session.insert("user_info", val)?;
+            return Ok(Redirect::to("/panel").see_other())
+        },
         Err(e) => {
             if e.to_string().contains("not activated") {
                 return Ok(Redirect::to("/activate").see_other());

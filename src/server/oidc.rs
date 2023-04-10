@@ -102,7 +102,7 @@ impl Authorizer {
     /// Exchange the temp token for a "real one"
     pub async fn exchange_challenge(
         &self,
-        session: Session,
+        session: &Session,
         auth_code: &str,
         state: &str,
     ) -> Result<String> {

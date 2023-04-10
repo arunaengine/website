@@ -112,9 +112,9 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                                  </svg>
                             </span>
                             <div class="d-none d-xl-block ps-2">
-                                <div>{ u.user.display_name }</div>
+                                <div>{ u.display_name }</div>
                                 { move || {
-                                        if u.user.is_admin {
+                                        if u.is_admin {
                                             view!{cx, <div class="mt-1 small text-muted">{ "Admin" }</div>}
                                         }else{
                                             view!{cx, <div class="mt-1 small text-muted">{ "User" }</div>}
