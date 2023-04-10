@@ -6,8 +6,13 @@ use crate::utils::structs::UserState;
 
 /// Renders the home page of your application.
 #[component]
-pub fn ArunaHeader(cx: Scope, get_user: ReadSignal<Option<UserState>>) -> impl IntoView {
+pub fn ArunaHeader(cx: Scope) -> impl IntoView {
     provide_meta_context(cx);
+
+
+    let get_user = use_context::<ReadSignal<Option<UserState>>>(cx)
+        .expect("user_state not set");
+
     // Creates a reactive value to update the button
     let (dark, toggle_dark) = create_signal(cx, "".to_string());
     let darkmode = move |_| {
@@ -91,33 +96,50 @@ pub fn ArunaHeader(cx: Scope, get_user: ReadSignal<Option<UserState>>) -> impl I
 
     );
 
-    let _user = view!(cx,
-        <div class="nav-item dropdown">
-            <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown"
-                aria-label="Open user menu">
-                <span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-circle" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                        <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>
-                        <path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"></path>
-                        <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855"></path>
-                     </svg>
-                </span>
-                <div class="d-none d-xl-block ps-2">
-                    <div>{ "ArunaUser" }</div>
-                    <div class="mt-1 small text-muted">{ "Admin" }</div>
-                </div>
-            </a>
-            <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                //<a href="#" class="dropdown-item">{ "Status" }</a>
-                //<a href="#" class="dropdown-item">{ "Profile" }</a>
-                //<a href="#" class="dropdown-item">{ "Feedback" }</a>
-                //<div class="dropdown-divider"></div>
-                //<a href="#" class="dropdown-item">{ "Settings" }</a>
-                <a href="#" class="dropdown-item">{ "Logout" }</a>
-            </div>
-        </div>
-    );
+    let user_elem = move || {
+        match get_user() {
+            Some(u) => {
+                view!{cx,
+                    <div class="nav-item dropdown">
+                        <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown"
+                            aria-label="Open user menu">
+                            <span>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-circle" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>
+                                    <path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"></path>
+                                    <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855"></path>
+                                 </svg>
+                            </span>
+                            <div class="d-none d-xl-block ps-2">
+                                <div>{ u.user.display_name }</div>
+                                { move || {
+                                        if u.user.is_admin {
+                                            view!{cx, <div class="mt-1 small text-muted">{ "Admin" }</div>}
+                                        }else{
+                                            view!{cx, <div class="mt-1 small text-muted">{ "User" }</div>}
+                                        }
+                                    }
+                                }
+                            </div>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            //<a href="#" class="dropdown-item">{ "Status" }</a>
+                            //<a href="#" class="dropdown-item">{ "Profile" }</a>
+                            //<a href="#" class="dropdown-item">{ "Feedback" }</a>
+                            //<div class="dropdown-divider"></div>
+                            //<a href="#" class="dropdown-item">{ "Settings" }</a>
+                            <a href="#" class="dropdown-item">{ "Logout" }</a>
+                        </div>
+                    </div>
+                }.into_view(cx)
+
+            }
+            None => {
+                    view!{cx, <A href="/login" class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</A>}.into_view(cx)
+                }
+            }
+        };
 
     view! {
         cx,
@@ -207,7 +229,7 @@ pub fn ArunaHeader(cx: Scope, get_user: ReadSignal<Option<UserState>>) -> impl I
                         <div class="d-none d-md-flex">
                             { dark_light }
                             { notifications }
-                            <A href="/login" class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</A>
+                            { user_elem }
                         </div>
                     </div>
                 </div>

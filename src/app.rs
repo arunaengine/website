@@ -17,6 +17,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
     let (read_user, set_user) = create_signal(cx, None::<UserState>);
     // share `set_user` with all children of this component
     provide_context(cx, set_user);
+    provide_context(cx, read_user);
 
     view! {
         cx,
@@ -29,7 +30,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
         <Title text="Aruna Object Storage"/>
         <Router>
             <main>
-                <ArunaHeader get_user=read_user/>
+                <ArunaHeader/>
                 <Routes>
                     <Route path="/" view=move |cx| view! { cx, <MainPage/> }>
                         <Route path="register" view=move |cx| view! { cx, <RegisterPage/> }/>
@@ -40,7 +41,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
                         <Login />
                     }/>
                     <ProtectedRoute path="/panel" redirect_path="/login" condition=|_cx| {true} view=move |cx| view! { cx,
-                        <ArunaHeader get_user=read_user/>
+                        <ArunaHeader/>
                         <Panel/> 
                     }/>
                 </Routes>
