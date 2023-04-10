@@ -5,6 +5,7 @@ use actix_web::{
     web::{Data, Redirect},
     *,
 };
+use aruna_web::utils::aruna_api_handlers::who_am_i;
 use serde::Deserialize;
 use std::sync::Mutex;
 
@@ -40,7 +41,7 @@ pub async fn callback(
         .lock()
         .map_err(|_| error::InternalError::new("Poison", StatusCode::INTERNAL_SERVER_ERROR))?;
 
-    let _token = my_data
+    let token = my_data
         .exchange_challenge(session, &query_params.code, &query_params.state)
         .await
         .map_err(|_| {
@@ -50,10 +51,17 @@ pub async fn callback(
             )
         })?;
 
-    // Check who the user is and potentioally exchange for "real" API-Token token
-    // who_am_i(&token).await.map_err(|_| {
-    //     error::InternalError::new("ArunaAPI error", StatusCode::INTERNAL_SERVER_ERROR)
-    // })?;
-
-    Ok(Redirect::to("/register").see_other())
+    //Check who the user is and potentioally exchange for "real" API-Token token
+    match who_am_i(&token).await {
+        Ok(_) => return Ok(Redirect::to("/panel").see_other()),
+        Err(e) => {
+            if e.to_string().contains("not activated") {
+                return Ok(Redirect::to("/activate").see_other());
+            }else if e.to_string().contains("Not registered"){
+                return Ok(Redirect::to("/register").see_other());
+            }else{
+                return Ok(Redirect::to("/error").see_other());
+            };
+    }
+    }
 }

@@ -121,7 +121,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
         cx,
 
         <Body class=dark/>
-        <div class="mb-3 sticky-top">
+        <div class="sticky-top">
             <header class="navbar navbar-expand-md navbar-dark d-print-none sticky-top">
                 <div class="container-xl">
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu"

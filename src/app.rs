@@ -9,6 +9,8 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
 
     use crate::components::header::*;
     use crate::components::register::*;
+    use crate::components::panel::*;
+
 
     view! {
         cx,
@@ -33,7 +35,10 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
                     <Route path="/login" view=|cx| view! { cx,
                         <Login />
                     }/>
-                    <ProtectedRoute path="/panel" redirect_path="/login" condition=|_cx| {true} view=|cx| view! { cx, <MainPanel/> }/>
+                    <ProtectedRoute path="/panel" redirect_path="/login" condition=|_cx| {true} view=|cx| view! { cx,
+                        <ArunaHeader/>
+                        <Panel/> 
+                    }/>
                 </Routes>
             </main>
         </Router>
@@ -54,15 +59,4 @@ fn MainPage(cx: Scope) -> impl IntoView {
 #[component]
 fn Login(_cx: Scope) -> impl IntoView {
     let _ = window().location().set_href("http://localhost:3000/login");
-}
-
-/// Renders the home page of your application.
-#[component]
-fn MainPanel(cx: Scope) -> impl IntoView {
-    use crate::components::panel::*;
-    view! { cx,
-        <div class="page">
-            <PanelBody/>
-        </div>
-    }
 }

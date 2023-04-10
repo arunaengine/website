@@ -1,6 +1,6 @@
 mod components;
-pub mod server;
 pub mod utils;
+pub mod server;
 
 #[cfg(feature = "ssr")]
 #[actix_web::main]

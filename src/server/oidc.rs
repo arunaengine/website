@@ -85,9 +85,7 @@ impl Authorizer {
                 CoreAuthenticationFlow::AuthorizationCode,
                 CsrfToken::new_random,
                 Nonce::new_random,
-            )
-            .add_extra_param("redirect_to", "page")
-            // Set the desired scopes.
+            )            // Set the desired scopes.
             .add_scope(Scope::new("email".to_string()))
             // Set the PKCE code challenge.
             .set_pkce_challenge(pkce_challenge)

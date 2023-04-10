@@ -29,8 +29,6 @@ pub async fn who_am_i(token: &str) -> Result<()> {
         .get_user(add_token(get_request, token))
         .await?
         .into_inner();
-
-    dbg!(response);
     Ok(())
 }
 

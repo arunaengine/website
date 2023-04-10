@@ -3,7 +3,9 @@ use gloo_events::EventListener;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+#[allow(unused_imports)]
 use std::time::Duration;
+
 
 #[server(RegisterUser, "/web")]
 pub async fn register_user(
@@ -35,8 +37,24 @@ pub async fn register_user(
 }
 
 #[server(CheckActivated, "/web")]
-pub async fn check_activated() -> Result<bool, ServerFnError> {
-    Ok(false)
+pub async fn check_activated(#[allow(unused_variables)] cx: Scope) -> Result<bool, ServerFnError> {
+    use crate::utils::aruna_api_handlers::who_am_i;
+    use actix_session::SessionExt;
+    use actix_web::HttpRequest;
+    let req = use_context::<HttpRequest>(cx).unwrap();
+
+    let sess = req.get_session();
+
+    let token = sess
+        .get::<String>("token")
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
+        .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+
+    match who_am_i(&token)
+        .await {
+            Ok(_) => Ok(true),
+            _ => Ok(false)
+        }
 }
 
 /// Renders the home page of your application.
@@ -169,14 +187,13 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
             .unwrap_or(false)
     };
 
-    if cfg!(not(feature = "ssr")) {
-        let _ = set_interval_with_handle(
-            move || {
-                check_activated.dispatch(CheckActivated {});
-            },
-            Duration::from_secs(10), // every 10 seconds for now
-        );
-    }
+    #[cfg(feature = "hydrate")]
+    let handle = set_interval_with_handle(
+        move || {
+            check_activated.dispatch(CheckActivated {});
+        },
+        Duration::from_secs(10), // every 10 seconds for now
+    ).unwrap();
 
     let nav = use_navigate(cx);
     let activate_ref = create_node_ref::<html::Div>(cx);
@@ -188,12 +205,15 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
                     show_modal("activateModal");
             }};
             let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
+                #[cfg(feature = "hydrate")]
+                handle.clear();
                 nav("/", Default::default()).unwrap();
             });
 
             on_cleanup(cx, move || drop(show_modal));
         });
     });
+
 
     view! {cx,
     <div class="modal fade" id="activateModal" tabindex="-1" _ref=activate_ref style="display: block; padding-left: 0px;">
