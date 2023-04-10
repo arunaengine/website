@@ -2,6 +2,8 @@ use leptos::*;
 //use leptos_meta::*;
 use leptos_router::*;
 
+use crate::utils::structs::UserState;
+
 #[server(GetUserInfo, "/web")]
 pub async fn get_user_info(#[allow(unused_variables)] cx: Scope) -> Result<crate::utils::structs::UserState, ServerFnError> {
     use crate::utils::aruna_api_handlers::who_am_i;
@@ -35,7 +37,32 @@ pub async fn get_user_info(#[allow(unused_variables)] cx: Scope) -> Result<crate
 /// Renders the home page of your application.
 #[component(transparent)]
 pub fn Panel(cx: Scope) -> impl IntoView {
+
+  let register_user = create_server_action::<GetUserInfo>(cx);
+  register_user.dispatch(GetUserInfo{});
+
+  let get_user = use_context::<WriteSignal<Option<UserState>>>(cx)
+        .expect("user_state not set");
+
+
+  let res = move || match register_user.value().get() {
+    Some(s) => {
+      match s {
+        Ok(u) => {
+
+          get_user.set(Some(u));
+          None
+
+        },
+        Err(_) => None::<()>
+      }
+    }
+    None => None
+  };
+
+
   view! { cx,
+    { res }
     <Route path="/some-area" view=move |cx| {
       view! { cx, <div>
         <h2>"Some Area"</h2>
