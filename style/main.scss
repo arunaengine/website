@@ -1,7 +1,11 @@
+html,
 body {
+	max-width: 100%;
+	overflow-x: hidden;
 	font-family: sans-serif;
 	text-align: center;
 }
+
 
 .btn-primary {
 	color: #f8fafc;
