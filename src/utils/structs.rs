@@ -1,4 +1,5 @@
 use aruna_rust_api::api::storage::{models::v1::{ProjectPermission, User}};
+use leptos::RwSignal;
 use serde::{Deserialize, Serialize};
 
 
@@ -37,3 +38,6 @@ impl From<User> for UserState {
         }
     }
 }
+
+#[derive(Clone, Copy)]
+pub struct UpdateUser(pub RwSignal<bool>);

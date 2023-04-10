@@ -2,7 +2,37 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-use crate::utils::structs::UserState;
+use crate::utils::structs::UpdateUser;
+
+#[server(GetUserInfo, "/web")]
+pub async fn get_user_info(#[allow(unused_variables)] cx: Scope) -> Result<crate::utils::structs::UserState, ServerFnError> {
+    use crate::utils::aruna_api_handlers::who_am_i;
+    use actix_session::SessionExt;
+    use actix_web::HttpRequest;
+    let req = use_context::<HttpRequest>(cx).ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+
+    let sess = req.get_session();
+
+    let user_info = sess
+        .get::<crate::utils::structs::UserState>("user_info")
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
+
+    let token = sess
+        .get::<String>("token")
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
+        .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+
+
+    match user_info {
+      Some(i) => Ok(i),
+      None => {
+          match who_am_i(&token).await {
+            Ok(i) => Ok(i),
+            Err(_) => return Err(ServerFnError::Request("Failed to get user_state".to_string())),
+          }
+      }
+    }
+}
 
 #[component]
 pub fn EntryPoint(cx: Scope) -> impl IntoView {
@@ -13,11 +43,20 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
     use crate::components::register::*;
     use crate::components::panel::*;
 
+    let update_user: UpdateUser = UpdateUser(create_rw_signal(cx, true));
 
-    let (read_user, set_user) = create_signal(cx, None::<UserState>);
-    // share `set_user` with all children of this component
-    provide_context(cx, set_user);
-    provide_context(cx, read_user);
+    let res = create_resource(cx,
+        update_user.0,
+        move |_| async move {
+            let user = get_user_info(cx).await.ok(); // this is the ServerFn that is called by the GetUser Action above
+            log::debug!("updating user data: {user:#?}");
+
+            user
+        }
+    );
+    provide_context(cx, res);
+    provide_context(cx, update_user);
+
 
     view! {
         cx,
@@ -41,7 +80,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
                         <Login />
                     }/>
                     <ProtectedRoute path="/panel" redirect_path="/login" condition=|_cx| {true} view=move |cx| view! { cx,
-                        <ArunaHeader/>
+                        //<ArunaHeader/>
                         <Panel/> 
                     }/>
                 </Routes>

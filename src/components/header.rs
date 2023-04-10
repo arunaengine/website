@@ -10,7 +10,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
     provide_meta_context(cx);
 
 
-    let get_user = use_context::<ReadSignal<Option<UserState>>>(cx)
+    let get_user = use_context::<Resource<bool, Option<UserState>>>(cx)
         .expect("user_state not set");
 
     // Creates a reactive value to update the button
@@ -97,7 +97,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
     );
 
     let user_elem = move || {
-        match get_user() {
+        match get_user.read(cx).flatten() {
             Some(u) => {
                 view!{cx,
                     <div class="nav-item dropdown">

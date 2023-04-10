@@ -5,13 +5,16 @@ pub mod panel;
 pub mod register;
 
 use cfg_if::cfg_if;
+
 cfg_if! {
     if #[cfg(feature = "ssr")] {
         use leptos::ServerFn;
+        use crate::app::GetUserInfo;
 
         pub fn register_server_functions() {
             _ = register::RegisterUser::register();
             _ = register::CheckActivated::register();
+            _ = GetUserInfo::register();
         }
 
     }
