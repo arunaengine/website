@@ -2,6 +2,8 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
+use crate::utils::structs::UserState;
+
 #[component]
 pub fn EntryPoint(cx: Scope) -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
@@ -12,6 +14,10 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
     use crate::components::panel::*;
 
 
+    let (read_user, set_user) = create_signal(cx, None::<UserState>);
+    // share `set_user` with all children of this component
+    provide_context(cx, set_user);
+
     view! {
         cx,
         // injects a stylesheet into the document <head>
@@ -21,22 +27,20 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
         <Script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/tabler.min.js" />
         // sets the document title
         <Title text="Aruna Object Storage"/>
-
-        // content for this welcome page
         <Router>
             <main>
-                <ArunaHeader/>
+                <ArunaHeader get_user=read_user/>
                 <Routes>
-                    <Route path="/" view=|cx| view! { cx, <MainPage/> }>
-                        <Route path="register" view=|cx| view! { cx, <RegisterPage/> }/>
-                        <Route path="activate" view=|cx| view! { cx, <ActivatePage/> }/>
+                    <Route path="/" view=move |cx| view! { cx, <MainPage/> }>
+                        <Route path="register" view=move |cx| view! { cx, <RegisterPage/> }/>
+                        <Route path="activate" view=move |cx| view! { cx, <ActivatePage/> }/>
                         <Route path="" view=|_cx| ()/> // Fallback to make sure MainPage is rendered
                     </Route>
                     <Route path="/login" view=|cx| view! { cx,
                         <Login />
                     }/>
-                    <ProtectedRoute path="/panel" redirect_path="/login" condition=|_cx| {true} view=|cx| view! { cx,
-                        <ArunaHeader/>
+                    <ProtectedRoute path="/panel" redirect_path="/login" condition=|_cx| {true} view=move |cx| view! { cx,
+                        <ArunaHeader get_user=read_user/>
                         <Panel/> 
                     }/>
                 </Routes>

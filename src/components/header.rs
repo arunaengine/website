@@ -2,9 +2,11 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
+use crate::utils::structs::UserState;
+
 /// Renders the home page of your application.
 #[component]
-pub fn ArunaHeader(cx: Scope) -> impl IntoView {
+pub fn ArunaHeader(cx: Scope, get_user: ReadSignal<Option<UserState>>) -> impl IntoView {
     provide_meta_context(cx);
     // Creates a reactive value to update the button
     let (dark, toggle_dark) = create_signal(cx, "".to_string());
@@ -71,11 +73,11 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
         </a>
     );
 
-    let _notifications = view!(cx,
+    let notifications = view!(cx,
         <div class="nav-item dropdown d-none d-md-flex me-3">
             <a href="#" class="nav-link px-0 disabled" data-bs-toggle="dropdown" tabindex="-1"
-                aria-label="Show notifications">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24"
+                aria-label="Coming soon">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon text-gray" width="24" height="24"
                     viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
                     stroke-linecap="round" stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -107,11 +109,11 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                 </div>
             </a>
             <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                <a href="#" class="dropdown-item">{ "Status" }</a>
-                <a href="#" class="dropdown-item">{ "Profile" }</a>
-                <a href="#" class="dropdown-item">{ "Feedback" }</a>
-                <div class="dropdown-divider"></div>
-                <a href="#" class="dropdown-item">{ "Settings" }</a>
+                //<a href="#" class="dropdown-item">{ "Status" }</a>
+                //<a href="#" class="dropdown-item">{ "Profile" }</a>
+                //<a href="#" class="dropdown-item">{ "Feedback" }</a>
+                //<div class="dropdown-divider"></div>
+                //<a href="#" class="dropdown-item">{ "Settings" }</a>
                 <a href="#" class="dropdown-item">{ "Logout" }</a>
             </div>
         </div>
@@ -204,7 +206,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                         { github }
                         <div class="d-none d-md-flex">
                             { dark_light }
-                            //{ notifications }
+                            { notifications }
                             <A href="/login" class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</A>
                         </div>
                     </div>

@@ -1,11 +1,13 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use aruna_rust_api::api::storage::services::v1::{
-    user_service_client, GetUserRequest, RegisterUserRequest, RegisterUserResponse,
+    user_service_client, GetUserRequest, RegisterUserRequest, RegisterUserResponse, GetUserResponse,
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
     transport::Channel,
 };
+
+use super::structs::UserState;
 
 #[allow(dead_code)]
 pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T> {
@@ -17,7 +19,7 @@ pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T
     req
 }
 
-pub async fn who_am_i(token: &str) -> Result<()> {
+pub async fn who_am_i(token: &str) -> Result<UserState> {
     let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
     let get_request = tonic::Request::new(GetUserRequest {
@@ -25,11 +27,16 @@ pub async fn who_am_i(token: &str) -> Result<()> {
     });
     let mut client = user_service_client::UserServiceClient::new(channel);
     // Send the request to the AOS instance gRPC gateway
-    let response = client
+    let response: GetUserResponse = client
         .get_user(add_token(get_request, token))
         .await?
         .into_inner();
-    Ok(())
+    Ok(
+        UserState{
+            user: response.user.ok_or(anyhow!("Unable to get user_info"))?,
+            permissions: response.project_permissions
+        }
+    )
 }
 
 pub async fn aruna_register_user(
