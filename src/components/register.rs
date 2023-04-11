@@ -6,7 +6,6 @@ use leptos_router::*;
 #[allow(unused_imports)]
 use std::time::Duration;
 
-
 #[server(RegisterUser, "/web")]
 pub async fn register_user(
     #[allow(unused_variables)] cx: Scope,
@@ -50,11 +49,10 @@ pub async fn check_activated(#[allow(unused_variables)] cx: Scope) -> Result<boo
         .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
         .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
 
-    match who_am_i(&token)
-        .await {
-            Ok(_) => Ok(true),
-            _ => Ok(false)
-        }
+    match who_am_i(&token).await {
+        Ok(_) => Ok(true),
+        _ => Ok(false),
+    }
 }
 
 /// Renders the home page of your application.
@@ -193,7 +191,8 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
             check_activated.dispatch(CheckActivated {});
         },
         Duration::from_secs(10), // every 10 seconds for now
-    ).unwrap();
+    )
+    .unwrap();
 
     let nav = use_navigate(cx);
     let activate_ref = create_node_ref::<html::Div>(cx);
@@ -213,7 +212,6 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
             on_cleanup(cx, move || drop(show_modal));
         });
     });
-
 
     view! {cx,
     <div class="modal fade" id="activateModal" tabindex="-1" _ref=activate_ref style="display: block; padding-left: 0px;">
@@ -235,7 +233,7 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
               <div class="w-100">
                 <div class="row">
                     <div class="col">
-                        <a href="/" class="btn w-100" data-bs-dismiss="modal" data-bs-target="#activateModal">
+                        <a class="btn w-100" data-bs-dismiss="modal" data-bs-target="#activateModal">
                             "Back"
                         </a>
                     </div>

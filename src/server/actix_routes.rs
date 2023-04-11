@@ -44,9 +44,9 @@ pub async fn callback(
     let token = my_data
         .exchange_challenge(&session, &query_params.code, &query_params.state)
         .await
-        .map_err(|_| {
+        .map_err(|e| {
             error::InternalError::new(
-                "Unable to exchange OIDC code",
+                format!("Unable to exchange OIDC code {e}"),
                 StatusCode::INTERNAL_SERVER_ERROR,
             )
         })?;
@@ -55,16 +55,16 @@ pub async fn callback(
     match who_am_i(&token).await {
         Ok(val) => {
             session.insert("user_info", val)?;
-            return Ok(Redirect::to("/panel").see_other())
-        },
+            return Ok(Redirect::to("/panel").see_other());
+        }
         Err(e) => {
             if e.to_string().contains("not activated") {
                 return Ok(Redirect::to("/activate").see_other());
-            }else if e.to_string().contains("Not registered"){
+            } else if e.to_string().contains("Not registered") {
                 return Ok(Redirect::to("/register").see_other());
-            }else{
+            } else {
                 return Ok(Redirect::to("/error").see_other());
             };
-    }
+        }
     }
 }

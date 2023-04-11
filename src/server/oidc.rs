@@ -61,7 +61,7 @@ impl Authorizer {
             provider_metadata,
             ClientId::new("test".to_string()),
             Some(ClientSecret::new(
-                "PVFQoNEvFfWMpKphivhVIAb8g6djUL7s".to_string(),
+                "Ns46QiaYHq8MnPKTo1R8NXkU3VDixdIY".to_string(),
             )),
         )
         // Set the URL the user will be redirected to after the authorization process.
@@ -85,7 +85,7 @@ impl Authorizer {
                 CoreAuthenticationFlow::AuthorizationCode,
                 CsrfToken::new_random,
                 Nonce::new_random,
-            )            // Set the desired scopes.
+            ) // Set the desired scopes.
             .add_scope(Scope::new("email".to_string()))
             // Set the PKCE code challenge.
             .set_pkce_challenge(pkce_challenge)
