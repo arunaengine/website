@@ -46,8 +46,8 @@ pub fn PanelNav(cx: Scope) -> impl IntoView {
                             </span>
                         </A>
                         </li>
-                        <li class="nav-item dropdown" class:active=move || {path().contains("tokens")}>
-                        <a class="nav-link dropdown-toggle" href="#navbar-third" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+                        <li class="nav-item dropdown" id="access-dropdown" class:active=move || {path().contains("tokens")}>
+                        <a class="nav-link dropdown-toggle" href="#navbar-third" data-bs-toggle="dropdown" data-bs-target="#access-dropdown" data-bs-auto-close="true" role="button" aria-expanded="false">
                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-key" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>

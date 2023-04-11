@@ -5,6 +5,7 @@ pub mod panel;
 pub mod panel_nav;
 pub mod projects;
 pub mod register;
+pub mod tokens;
 
 use cfg_if::cfg_if;
 
