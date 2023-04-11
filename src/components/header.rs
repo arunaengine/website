@@ -2,20 +2,18 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-use crate::utils::structs::{UserState, UpdateUser};
+use crate::utils::structs::{UpdateUser, UserState};
 
 /// Renders the home page of your application.
 #[component]
 pub fn ArunaHeader(cx: Scope) -> impl IntoView {
     provide_meta_context(cx);
 
+    let get_user =
+        use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
 
-    let get_user = use_context::<Resource<bool, Option<UserState>>>(cx)
-        .expect("user_state not set");
-
-    // On first load -> Check if user is logged in 
-    let update_user = use_context::<UpdateUser>(cx)
-        .expect("user_state not set");
+    // On first load -> Check if user is logged in
+    let update_user = use_context::<UpdateUser>(cx).expect("user_state not set");
 
     // Only check this Once
     update_user.0.update(|e| *e = !*e);
@@ -36,7 +34,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
     let aruna_header = view! { cx,
         <h1 class="navbar-brand navbar-brand-light d-none-navbar-horizontal pe-0 pe-md-3">
             <A href="/">
-                <img src="aruna_icon.png" width="32" height="32" alt="Aruna"
+                <img src="/aruna_icon.png" width="32" height="32" alt="Aruna"
                     class="navbar-brand-image me-3" />
                 "Aruna Object Storage"
             </A>
@@ -104,8 +102,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
 
     );
 
-    let user_elem = 
-    view! { cx,
+    let user_elem = view! { cx,
     <Suspense fallback=move || view! {cx, <div class="spinner-border"></div>}>
         { move || {
             match get_user.read(cx).flatten() {
@@ -153,7 +150,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
             }
         }
         </Suspense>
-    
+
     };
 
     view! {
@@ -187,7 +184,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                                             </span>
                                         </A>
                                     </li>
-                                    {move || 
+                                    {move ||
                                         if is_logged_memo() {
                                             view!{cx,
                                                 <li class="nav-item">

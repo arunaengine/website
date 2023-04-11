@@ -257,3 +257,14 @@ body {
 		height: 14.95vh;
 	}
 }
+
+
+.my-accordion-icon[aria-expanded="false"] {
+    transform: rotate(0deg) !important;
+	transition: 0.3s
+}
+
+.my-accordion-icon[aria-expanded="true"] {
+    transform: rotate(180deg) !important;
+	transition: 0.3s
+}
