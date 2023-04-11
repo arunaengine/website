@@ -13,7 +13,7 @@ pub fn Token(cx: Scope) -> impl IntoView {
             <td>"02/04/2017 12:50"</td>
             <td>
                 <div class="d-flex">
-                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" aria-label="Button" data-bs-toggle="collapse" data-bs-target="#r1" aria-expanded="false">
+                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target="#r1" aria-expanded="false">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                             <path d="M12 5l0 14"></path>
@@ -21,7 +21,7 @@ pub fn Token(cx: Scope) -> impl IntoView {
                             <path d="M6 13l6 6"></path>
                         </svg>
                     </a>
-                    <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button">
+                    <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                             <path d="M4 7l16 0"></path>
