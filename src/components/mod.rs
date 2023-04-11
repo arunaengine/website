@@ -1,3 +1,4 @@
+pub mod create_token;
 pub mod greeter;
 pub mod header;
 pub mod main_body;
@@ -5,6 +6,7 @@ pub mod panel;
 pub mod panel_nav;
 pub mod projects;
 pub mod register;
+pub mod token;
 pub mod tokens;
 
 use cfg_if::cfg_if;
