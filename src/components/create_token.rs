@@ -17,22 +17,35 @@ pub async fn create_token_server(
     selectexpiry: String,
     customdate: Option<String>,
 ) -> Result<TokenResponse, ServerFnError> {
-    dbg!(
-        tokenname,
-        selecttype,
-        resid,
-        selectperm,
-        selectexpiry,
-        customdate
-    );
-    Ok(TokenResponse{
-        id: "44be88e2-516e-45d9-9ae7-ee946397b68b".to_string(),
-        name: "My gigantic tokenName".to_string(),
-        token_secret: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c".to_string(),
-        access_key: "44be88e2-516e-45d9-9ae7-ee946397b68b".to_string(),
-        secret_key: "asdasdasdasdasdasdasdasdasdasd".to_string(),
-    }
-    )
+
+    use crate::utils::aruna_api_handlers::aruna_create_token;
+    use crate::utils::aruna_api_helpers::to_create_token_req;
+    use actix_session::SessionExt;
+    use actix_web::HttpRequest;
+    let req = use_context::<HttpRequest>(cx).unwrap();
+
+    let sess = req.get_session();
+
+    let token = sess
+        .get::<String>("token")
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
+        .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+
+
+    aruna_create_token(
+        to_create_token_req(
+            tokenname,
+            selecttype, 
+            resid,
+            selectperm,
+            selectexpiry, 
+            customdate
+        ), &token).await
+        .map_err(|_| 
+            ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))?
+        .try_into()
+        .map_err(|_| 
+            ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))
 }
 
 #[component]
