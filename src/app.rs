@@ -23,21 +23,20 @@ pub async fn get_user_info(
             ServerFnError::Request("Invalid request".to_string())
         })?;
 
-    match user_info {
-        Some(i) => Ok(i),
-        None => {
-            let token = sess
-                .get::<String>("token")
-                .map_err(|_| {
-                    log::debug!("Unable to query token from session 1");
-                    ServerFnError::Request("Invalid request".to_string())
-                })?
-                .ok_or_else(|| {
-                    log::debug!("Unable to query token from session 1");
-                    ServerFnError::Request("Invalid request".to_string())
-                })?;
+    let token = sess
+        .get::<String>("token")
+        .map_err(|_| {
+            log::debug!("Unable to query token from session 1");
+            ServerFnError::Request("Invalid request".to_string())
+        })?
+        .ok_or_else(|| {
+            log::debug!("Unable to query token from session 1");
+            ServerFnError::Request("Invalid request".to_string())
+        })?;
 
-            let is_oidc = sess
+    match user_info {
+        Some(i) => {
+            let token_type = sess
                 .get::<String>("token-type")
                 .map_err(|_| {
                     log::debug!("Unable to query token from session 1");
@@ -48,7 +47,47 @@ pub async fn get_user_info(
                     ServerFnError::Request("Invalid request".to_string())
                 })?;
 
-            if is_oidc.as_str() == "oidc" {
+            if token_type.as_str() != "aruna" {
+                let create_resp =
+                    aruna_create_token(crate::utils::aruna_api_helpers::new_session_req(), &token)
+                        .await
+                        .map_err(|_| {
+                            log::debug!("Failed create_api_token");
+                            ServerFnError::Request("Invalid request".to_string())
+                        })?;
+
+                sess.insert("token", create_resp.token_secret.to_string())
+                    .map_err(|_| {
+                        log::debug!("Unable to insert aruna token to session 1");
+                        ServerFnError::Request("Invalid request".to_string())
+                    })?;
+
+                sess.insert("token-type", "aruna").map_err(|_| {
+                    log::debug!("Unable to insert aruna token-type to session 2");
+                    ServerFnError::Request("Invalid request".to_string())
+                })?;
+
+                sess.insert("token-id", create_resp.token.unwrap_or_default().id)
+                    .map_err(|_| {
+                        log::debug!("Unable to insert aruna token-id to session 2");
+                        ServerFnError::Request("Invalid request".to_string())
+                    })?;
+            };
+            Ok(i)
+        }
+        None => {
+            let token_type = sess
+                .get::<String>("token-type")
+                .map_err(|_| {
+                    log::debug!("Unable to query token from session 1");
+                    ServerFnError::Request("Invalid request".to_string())
+                })?
+                .ok_or_else(|| {
+                    log::debug!("Unable to query token from session 2");
+                    ServerFnError::Request("Invalid request".to_string())
+                })?;
+
+            if token_type.as_str() != "aruna" {
                 let create_resp =
                     aruna_create_token(crate::utils::aruna_api_helpers::new_session_req(), &token)
                         .await
