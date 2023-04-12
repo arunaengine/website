@@ -59,6 +59,10 @@ pub async fn get_user_info(#[allow(unused_variables)] cx: Scope) -> Result<crate
             sess.insert("token-type", "aruna").map_err(|_| {
                 log::debug!("Unable to insert aruna token-type to session 2");
                 ServerFnError::Request("Invalid request".to_string())})?;
+
+            sess.insert("token-id", create_resp.token.unwrap_or_default().id).map_err(|_| {
+                log::debug!("Unable to insert aruna token-type to session 2");
+                ServerFnError::Request("Invalid request".to_string())})?;
         }
 
         match who_am_i(&token).await {
