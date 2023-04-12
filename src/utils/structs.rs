@@ -1,9 +1,11 @@
 use anyhow::anyhow;
 use aruna_rust_api::api::storage::{
-    models::v1::{ProjectPermission, User},
+    models::v1::{ProjectPermission, Token, User},
     services::v1::CreateApiTokenResponse,
 };
+use chrono::Local;
 use leptos::RwSignal;
+use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
@@ -67,4 +69,71 @@ impl TryFrom<CreateApiTokenResponse> for TokenResponse {
             secret_key: value.s3_secret_key,
         })
     }
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub enum TokenType {
+    #[default]
+    PERSONAL,
+    COLLECTION(String, String),
+    PROJECT(String, String),
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct TokenStats {
+    id: String,
+    name: String,
+    token_type: TokenType,
+    created_at: String,
+    expires_at: String,
+    is_session: bool,
+    used_at: String,
+}
+
+impl From<Token> for TokenStats {
+    fn from(value: Token) -> Self {
+        let perm = match value.permission() {
+            aruna_rust_api::api::storage::models::v1::Permission::Read => "READ".to_string(),
+            aruna_rust_api::api::storage::models::v1::Permission::Append => "APPEND".to_string(),
+            aruna_rust_api::api::storage::models::v1::Permission::Modify => "MODIFY".to_string(),
+            aruna_rust_api::api::storage::models::v1::Permission::Admin => "ADMIN".to_string(),
+            _ => "NONE".to_string(),
+        };
+
+        let token_type = match value.token_type() {
+            aruna_rust_api::api::storage::models::v1::TokenType::Unspecified => TokenType::PERSONAL,
+            aruna_rust_api::api::storage::models::v1::TokenType::Personal => TokenType::PERSONAL,
+            aruna_rust_api::api::storage::models::v1::TokenType::Scoped => {
+                if !value.collection_id.is_empty() {
+                    TokenType::COLLECTION(value.collection_id, perm)
+                } else if !value.project_id.is_empty() {
+                    TokenType::COLLECTION(value.project_id, perm)
+                } else {
+                    TokenType::PERSONAL
+                }
+            }
+        };
+
+        TokenStats {
+            id: value.id,
+            name: value.name,
+            token_type,
+            created_at: format_time_stamp(value.created_at),
+            expires_at: format_time_stamp(value.expires_at),
+            is_session: value.is_session,
+            used_at: format_time_stamp(value.used_at),
+        }
+    }
+}
+
+pub fn format_time_stamp(ts: Option<Timestamp>) -> String {
+    let raw_ts = ts.unwrap_or_default();
+    let as_ndt = chrono::NaiveDateTime::from_timestamp_opt(raw_ts.seconds, raw_ts.nanos as u32)
+        .unwrap_or_default();
+    as_ndt
+        .and_local_timezone(Local)
+        .latest()
+        .unwrap_or_default()
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
 }
