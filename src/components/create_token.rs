@@ -5,7 +5,7 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-use crate::utils::structs::TokenResponse;
+use crate::utils::{modal::hide_modal, structs::TokenResponse};
 
 #[server(CreateTokenServer, "/web")]
 pub async fn create_token_server(
@@ -29,10 +29,73 @@ pub async fn create_token_server(
 }
 
 #[component]
+pub fn CreateTokenSuccess(cx: Scope, create_token_resp: TokenResponse) -> impl IntoView {
+    provide_meta_context(cx);
+
+    let nav = use_navigate(cx);
+    let modal_ref = create_node_ref::<html::Div>(cx);
+    modal_ref.on_load(cx, move |loaded| {
+        loaded.on_mount(move |mounted| {
+            cfg_if! {
+                if #[cfg(feature = "hydrate")] {
+                    use crate::utils::modal::show_modal;
+                    hide_modal("createToken");
+                    show_modal("createTokenResult");
+            }};
+            let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
+                nav("/panel/tokens", Default::default()).unwrap();
+            });
+
+            on_cleanup(cx, move || drop(show_modal));
+        });
+    });
+
+    view! {cx,
+        <div class="modal mt-5 fade" id="createTokenResult" _ref=modal_ref tabindex="-1">
+        <div class="modal-dialog modal-sm" role="document">
+            <div class="modal-content">
+                <div class="modal-status bg-success"></div>
+
+                <div class="modal-body">
+
+                    <div class="text-center py-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-api-app mb-2 text-blue icon-lg" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            <path d="M12 15h-6.5a2.5 2.5 0 1 1 0 -5h.5"></path>
+                            <path d="M15 12v6.5a2.5 2.5 0 1 1 -5 0v-.5"></path>
+                            <path d="M12 9h6.5a2.5 2.5 0 1 1 0 5h-.5"></path>
+                            <path d="M9 12v-6.5a2.5 2.5 0 0 1 5 0v.5"></path>
+                        </svg>
+                        <h3>"Success, a new token was created!"</h3>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <a href="/" class="btn" data-bs-dismiss="modal" data-bs-target="#createToken">
+                    "Cancel"
+                    </a>
+                    <button type="submit" class="btn btn-primary ms-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                        <path d="M12 5l0 14"></path>
+                        <path d="M5 12l14 0"></path>
+                    </svg>
+                    "Create"
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    }
+}
+
+#[component]
 pub fn CreateToken(cx: Scope) -> impl IntoView {
     provide_meta_context(cx);
 
     let nav = use_navigate(cx);
+    let loc = use_location(cx);
     let modal_ref = create_node_ref::<html::Div>(cx);
     modal_ref.on_load(cx, move |loaded| {
         loaded.on_mount(move |mounted| {
@@ -48,6 +111,9 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
             on_cleanup(cx, move || drop(show_modal));
         });
     });
+
+    let query_map = loc.query;
+    let contains_success = move || query_map().get("success").is_some();
 
     let token_name = create_node_ref::<html::Input>(cx);
     let token_type = create_node_ref::<html::Select>(cx);
@@ -205,5 +271,19 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
             </div>
         </div>
     </div>
+
+    {
+        move || {
+            match create_token_action.value().get(){
+                Some(Ok(resp)) => view!{cx,
+                    <CreateTokenSuccess create_token_resp=resp/>
+                }.into_view(cx),
+                Some(Err(_)) => view!{cx,
+                    "Something went wrong"
+                }.into_view(cx),
+                None => ().into_view(cx)
+                }
+            }
+        }
     }
 }
