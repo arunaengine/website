@@ -47,11 +47,11 @@ pub struct UpdateUser(pub RwSignal<bool>);
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct TokenResponse {
-    id: String,
-    name: String,
-    token_secret: String,
-    access_key: String,
-    secret_key: String,
+    pub id: String,
+    pub name: String,
+    pub token_secret: String,
+    pub access_key: String,
+    pub secret_key: String,
 }
 
 impl TryFrom<CreateApiTokenResponse> for TokenResponse {

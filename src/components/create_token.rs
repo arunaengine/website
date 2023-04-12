@@ -25,12 +25,27 @@ pub async fn create_token_server(
         selectexpiry,
         customdate
     );
-    Ok(TokenResponse::default())
+    Ok(TokenResponse{
+        id: "44be88e2-516e-45d9-9ae7-ee946397b68b".to_string(),
+        name: "My gigantic tokenName".to_string(),
+        token_secret: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c".to_string(),
+        access_key: "44be88e2-516e-45d9-9ae7-ee946397b68b".to_string(),
+        secret_key: "asdasdasdasdasdasdasdasdasdasd".to_string(),
+    }
+    )
 }
 
 #[component]
 pub fn CreateTokenSuccess(cx: Scope, create_token_resp: TokenResponse) -> impl IntoView {
     provide_meta_context(cx);
+
+    let TokenResponse {
+        id,
+        name,
+        token_secret,
+        access_key,
+        secret_key,
+    } = create_token_resp;
 
     let nav = use_navigate(cx);
     let modal_ref = create_node_ref::<html::Div>(cx);
@@ -39,7 +54,6 @@ pub fn CreateTokenSuccess(cx: Scope, create_token_resp: TokenResponse) -> impl I
             cfg_if! {
                 if #[cfg(feature = "hydrate")] {
                     use crate::utils::modal::show_modal;
-                    hide_modal("createToken");
                     show_modal("createTokenResult");
             }};
             let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
@@ -50,39 +64,68 @@ pub fn CreateTokenSuccess(cx: Scope, create_token_resp: TokenResponse) -> impl I
         });
     });
 
+    let id_clone = id.clone();
+    let name_clone = name.clone();
+    let token_secret_clone = token_secret.clone();
+    let access_key_clone = access_key.clone();
+    let secret_key_clone = secret_key.clone();
+
+    let to_clipboard = move |cp: &str| _ = window().navigator().clipboard().unwrap().write_text(cp);
+
     view! {cx,
         <div class="modal mt-5 fade" id="createTokenResult" _ref=modal_ref tabindex="-1">
-        <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-dialog modal-md" role="document">
             <div class="modal-content">
                 <div class="modal-status bg-success"></div>
 
                 <div class="modal-body">
 
                     <div class="text-center py-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-api-app mb-2 text-blue icon-lg" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-circle-key text-green mb-2 icon-lg" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                            <path d="M12 15h-6.5a2.5 2.5 0 1 1 0 -5h.5"></path>
-                            <path d="M15 12v6.5a2.5 2.5 0 1 1 -5 0v-.5"></path>
-                            <path d="M12 9h6.5a2.5 2.5 0 1 1 0 5h-.5"></path>
-                            <path d="M9 12v-6.5a2.5 2.5 0 0 1 5 0v.5"></path>
+                            <path d="M14 10m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>
+                            <path d="M21 12a9 9 0 1 1 -18 0a9 9 0 0 1 18 0z"></path>
+                            <path d="M12.5 11.5l-4 4l1.5 1.5"></path>
+                            <path d="M12 15l-1.5 -1.5"></path>
                         </svg>
-                        <h3>"Success, a new token was created!"</h3>
+                        <h3>"Success! "</h3>
+                        <div class="text-muted">"A new token got created!"</div>
+                    </div>
+                    <div class="text-start">
+                        <div class="list-group m-0">
+                            <label class="form-label">"ID"</label>
+                            <li class="list-group-item list-group-item-action text-break" on:click=move |_| to_clipboard(&id)>
+                                {id_clone}
+                            </li>
+                            <label class="form-label">"Name"</label>
+                            <li class="list-group-item list-group-item-action text-break" on:click=move |_| to_clipboard(&name)>
+                                {name_clone}
+                            </li>
+                            <label class="form-label">"S3 Access Key"</label>
+                            <li class="list-group-item list-group-item-action text-break" on:click=move |_| to_clipboard(&access_key)>
+                                {access_key_clone}
+                            </li>
+                            <div class="alert alert-warning mt-3" role="alert">
+                                <h4 class="alert-title">"Make sure to copy (click) your secrets below!"</h4>
+                                <div class="text-muted">"These secrets can not be recreated, if lost, a new token must be generated!"</div>
+                            </div>
+                            <label class="form-label">"S3 Secret Key"</label>
+                            <li class="list-group-item list-group-item-action text-break" on:click=move |_| to_clipboard(&secret_key)>
+                                {secret_key_clone}
+                            </li>
+                            <label class="form-label">"Secret"</label>
+                            <li class="list-group-item list-group-item-action text-break" on:click=move |_| to_clipboard(&token_secret)>
+                                {token_secret_clone}
+                            </li>
+                        </div>
                     </div>
 
                 </div>
 
                 <div class="modal-footer">
                     <a href="/" class="btn" data-bs-dismiss="modal" data-bs-target="#createToken">
-                    "Cancel"
+                    "Close"
                     </a>
-                    <button type="submit" class="btn btn-primary ms-auto">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                        <path d="M12 5l0 14"></path>
-                        <path d="M5 12l14 0"></path>
-                    </svg>
-                    "Create"
-                    </button>
                 </div>
             </div>
         </div>
@@ -91,11 +134,13 @@ pub fn CreateTokenSuccess(cx: Scope, create_token_resp: TokenResponse) -> impl I
 }
 
 #[component]
-pub fn CreateToken(cx: Scope) -> impl IntoView {
+pub fn CreateToken(
+    cx: Scope,
+    create_token_action: Action<CreateTokenServer, Result<TokenResponse, ServerFnError>>,
+) -> impl IntoView {
     provide_meta_context(cx);
-
     let nav = use_navigate(cx);
-    let loc = use_location(cx);
+    //let loc = use_location(cx);
     let modal_ref = create_node_ref::<html::Div>(cx);
     modal_ref.on_load(cx, move |loaded| {
         loaded.on_mount(move |mounted| {
@@ -112,8 +157,8 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
         });
     });
 
-    let query_map = loc.query;
-    let contains_success = move || query_map().get("success").is_some();
+    //let query_map = loc.query;
+    //let contains_success = move || query_map().get("success").is_some();
 
     let token_name = create_node_ref::<html::Input>(cx);
     let token_type = create_node_ref::<html::Select>(cx);
@@ -123,7 +168,6 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
     let custom_date = create_node_ref::<html::Input>(cx);
     let form = create_node_ref::<html::Form>(cx);
 
-    let create_token_action = create_server_action::<CreateTokenServer>(cx);
     let (needs_id, write_needs_id) = create_signal(cx, false);
     let (needs_custom_date, write_custom_date) = create_signal(cx, false);
     let needs_val = create_rw_signal(cx, false);
@@ -138,10 +182,11 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
                     log::debug!("{:?}", data);
                     needs_val.update(|nval| *nval = !*nval);
                     if !form.get().unwrap().check_validity() {
-                        ev.prevent_default();
+                        return
                     }
                    _  = &create_token_action.dispatch(data);
-                    }
+                   hide_modal("createToken");
+                }
                     class="needs-validation"
                     class:was-validated=move || needs_val()
                     novalidate
@@ -271,19 +316,5 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
             </div>
         </div>
     </div>
-
-    {
-        move || {
-            match create_token_action.value().get(){
-                Some(Ok(resp)) => view!{cx,
-                    <CreateTokenSuccess create_token_resp=resp/>
-                }.into_view(cx),
-                Some(Err(_)) => view!{cx,
-                    "Something went wrong"
-                }.into_view(cx),
-                None => ().into_view(cx)
-                }
-            }
-        }
     }
 }

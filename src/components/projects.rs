@@ -1,7 +1,6 @@
 use leptos::*;
 use leptos_meta::*;
 
-/// Renders the home page of your application.
 #[component]
 pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
     provide_meta_context(cx);

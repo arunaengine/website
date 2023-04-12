@@ -14,6 +14,10 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
 
     let contains_create = move || query_map().get("create").is_some();
 
+    let create_token_action = create_server_action::<CreateTokenServer>(cx);
+
+    let current_action_version = create_rw_signal(cx, 0);
+
     view! {cx,
         <div class="page-header d-print-none my-3">
             <div class="container-xl">
@@ -90,12 +94,29 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
         </div>
     </div>
 
-    {move ||
-        if contains_create(){
-            view!{cx, <CreateToken />}.into_view(cx)
-        }else{
-            ().into_view(cx)
+        {
+            move ||
+                if contains_create(){
+                    view!{cx, <CreateToken create_token_action/>}.into_view(cx)
+                }else{
+                    {   // This guarantees that every result can only be seen once
+                        if create_token_action.version()() > current_action_version() {
+                            current_action_version.set(create_token_action.version()());
+                            match create_token_action.value().get(){
+                                Some(Ok(resp)) => view!{cx,
+                                    <CreateTokenSuccess create_token_resp=resp/>
+                                }.into_view(cx),
+                                Some(Err(_)) => view!{cx,
+                                    "Something went wrong"
+                                }.into_view(cx),
+                                None => ().into_view(cx)
+                            }
+                        }else{
+                            ().into_view(cx)
+                        }
+
+                    }
+                }
         }
     }
-        }
 }
