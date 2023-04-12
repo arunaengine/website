@@ -13,7 +13,7 @@ pub async fn create_token_server(
     tokenname: String,
     selecttype: String,
     resid: Option<String>,
-    selectperm: String,
+    selectperm: Option<String>,
     selectexpiry: String,
     customdate: Option<String>,
 ) -> Result<TokenResponse, ServerFnError> {
@@ -129,23 +129,23 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
                                     "Invalid UUIDv4 expected format: '12345678-1234-4234-8234-123456789abc'"
                                     </div>
                                 </div>
+                                <div class="form-floating mb-3">
+                                    <select class="form-select" id="selectperm" name="selectperm" aria-label="Token permissions"
+                                        _ref=res_perm required>
+                                        <option value="NONE" selected>"NONE"</option>
+                                        <option value="READ">"READ"</option>
+                                        <option value="APPEND">"APPEND"</option>
+                                        <option value="MODIFY">"MODIFY"</option>
+                                        <option value="ADMIN">"ADMIN"</option>
+                                    </select>
+                                    <label for="selectperm">"Token permissions"</label>
+                                </div>
                             }.into_view(cx)
 
                             }else{
                                 ().into_view(cx)
                             }
                         }
-                        <div class="form-floating mb-3">
-                            <select class="form-select" id="selectperm" name="selectperm" aria-label="Token permissions"
-                                _ref=res_perm required>
-                                <option value="NONE" selected>"NONE"</option>
-                                <option value="READ">"READ"</option>
-                                <option value="APPEND">"APPEND"</option>
-                                <option value="MODIFY">"MODIFY"</option>
-                                <option value="ADMIN">"ADMIN"</option>
-                            </select>
-                            <label for="selectperm">"Token permissions"</label>
-                        </div>
                         <div class="form-floating mb-3">
                             <select class="form-select" id="selectexpiry" name="selectexpiry" aria-label="Token expiry" _ref=expiry
                                 on:input=move |_| {

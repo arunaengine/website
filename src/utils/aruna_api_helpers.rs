@@ -5,7 +5,7 @@ pub fn to_create_token_req(
     tokenname: String,
     selecttype: String,
     resid: Option<String>,
-    selectperm: String,
+    selectperm: Option<String>,
     selectexpiry: String,
     customdate: Option<String>,
 ) -> CreateApiTokenRequest {
@@ -32,13 +32,16 @@ pub fn to_create_token_req(
         },
     };
 
-    let permission = match selectperm.as_str() {
-        "NONE" => 1,
-        "READ" => 2,
-        "APPEND" => 3,
-        "MODIFY" => 4,
-        "ADMIN" => 5,
-        _ => 1,
+    let permission = match selectperm {
+        Some(perm) => match perm.as_str() {
+            "NONE" => 1,
+            "READ" => 2,
+            "APPEND" => 3,
+            "MODIFY" => 4,
+            "ADMIN" => 5,
+            _ => 1,
+        },
+        None => 1,
     };
 
     CreateApiTokenRequest {
