@@ -1,6 +1,6 @@
 use aruna_rust_api::api::storage::services::v1::{CreateApiTokenRequest, ExpiresAt};
 use chrono::{Datelike, Days, Months, NaiveDate, Timelike, Utc};
-use rand::{thread_rng, distributions::Alphanumeric, Rng};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
 pub fn to_create_token_req(
     tokenname: String,
@@ -67,32 +67,33 @@ pub fn to_create_token_req(
     }
 }
 
-
 pub fn new_session_req() -> CreateApiTokenRequest {
     let chrono_time = Utc::now().naive_utc() + Days::new(7);
-    CreateApiTokenRequest{ 
-        project_id: "".to_string(), 
-        collection_id: "".to_string(), 
-        name: format!("SESSION-{}",  
-                thread_rng()
-                    .sample_iter(&Alphanumeric)
-                    .take(8)
-                    .map(char::from)
-                    .collect::<String>()
-                ),
-        expires_at: Some(ExpiresAt{timestamp: Some(
-            prost_types::Timestamp::date_time(
-                chrono_time.date().year().into(),
-                chrono_time.date().month() as u8,
-                chrono_time.date().day() as u8,
-                chrono_time.time().hour() as u8,
-                chrono_time.time().minute() as u8,
-                chrono_time.time().second() as u8,
-            )
-            .unwrap())
-        },
-        ), 
+    CreateApiTokenRequest {
+        project_id: "".to_string(),
+        collection_id: "".to_string(),
+        name: format!(
+            "SESSION-{}",
+            thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(8)
+                .map(char::from)
+                .collect::<String>()
+        ),
+        expires_at: Some(ExpiresAt {
+            timestamp: Some(
+                prost_types::Timestamp::date_time(
+                    chrono_time.date().year().into(),
+                    chrono_time.date().month() as u8,
+                    chrono_time.date().day() as u8,
+                    chrono_time.time().hour() as u8,
+                    chrono_time.time().minute() as u8,
+                    chrono_time.time().second() as u8,
+                )
+                .unwrap(),
+            ),
+        }),
         permission: 1, // Does not matter -> Personal
-        is_session: true
+        is_session: true,
     }
 }

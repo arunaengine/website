@@ -1,7 +1,7 @@
-mod components;
-pub mod utils;
-pub mod server;
 pub mod app;
+mod components;
+pub mod server;
+pub mod utils;
 
 #[cfg(feature = "ssr")]
 #[actix_web::main]
@@ -23,7 +23,8 @@ async fn main() -> std::io::Result<()> {
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(|cx| view! { cx, <EntryPoint/> });
 
-    let secret_key = cookie::Key::from(b"V958suBe8ahDpZ2GisN2WdczagtojTwzHX5DZ53b9x5XCbVfG8DAUUfqpnXUDDMx");
+    let secret_key =
+        cookie::Key::from(b"V958suBe8ahDpZ2GisN2WdczagtojTwzHX5DZ53b9x5XCbVfG8DAUUfqpnXUDDMx");
 
     crate::components::register_server_functions();
 

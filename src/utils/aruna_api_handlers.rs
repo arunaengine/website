@@ -1,6 +1,8 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use aruna_rust_api::api::storage::services::v1::{
-    user_service_client, GetUserRequest, RegisterUserRequest, RegisterUserResponse, GetUserResponse, CreateApiTokenRequest, CreateApiTokenResponse, GetApiTokensResponse, GetApiTokensRequest, DeleteApiTokenRequest,
+    user_service_client, CreateApiTokenRequest, CreateApiTokenResponse, DeleteApiTokenRequest,
+    GetApiTokensRequest, GetApiTokensResponse, GetUserRequest, GetUserResponse,
+    RegisterUserRequest, RegisterUserResponse,
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
@@ -32,9 +34,12 @@ pub async fn who_am_i(token: &str) -> Result<UserState> {
         .await?
         .into_inner();
 
-
     let mut user_state = UserState::from(response.user.ok_or(anyhow!("Unable to get user_info"))?);
-    user_state.permissions = response.project_permissions.into_iter().map(|e| e.into()).collect::<Vec<_>>();
+    user_state.permissions = response
+        .project_permissions
+        .into_iter()
+        .map(|e| e.into())
+        .collect::<Vec<_>>();
 
     Ok(user_state)
 }
@@ -61,8 +66,10 @@ pub async fn aruna_register_user(
     Ok(response.user_id)
 }
 
-
-pub async fn aruna_create_token(req: CreateApiTokenRequest, token: &str) -> Result<CreateApiTokenResponse> {
+pub async fn aruna_create_token(
+    req: CreateApiTokenRequest,
+    token: &str,
+) -> Result<CreateApiTokenResponse> {
     let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
     let create_token_req = tonic::Request::new(req);
@@ -78,7 +85,7 @@ pub async fn aruna_create_token(req: CreateApiTokenRequest, token: &str) -> Resu
 pub async fn get_api_tokens(token: &str) -> Result<GetApiTokensResponse> {
     let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
-    let get_tokens_req = tonic::Request::new(GetApiTokensRequest{});
+    let get_tokens_req = tonic::Request::new(GetApiTokensRequest {});
     let mut client = user_service_client::UserServiceClient::new(channel);
     // Send the request to the AOS instance gRPC gateway
     let response: GetApiTokensResponse = client
@@ -88,11 +95,10 @@ pub async fn get_api_tokens(token: &str) -> Result<GetApiTokensResponse> {
     Ok(response)
 }
 
-
 pub async fn delete_api_token(token_id: String, token: &str) -> Result<()> {
     let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
-    let delete_tokens_req = tonic::Request::new(DeleteApiTokenRequest{token_id});
+    let delete_tokens_req = tonic::Request::new(DeleteApiTokenRequest { token_id });
     let mut client = user_service_client::UserServiceClient::new(channel);
     // Send the request to the AOS instance gRPC gateway
     _ = client
@@ -101,5 +107,3 @@ pub async fn delete_api_token(token_id: String, token: &str) -> Result<()> {
         .into_inner();
     Ok(())
 }
-
-

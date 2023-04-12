@@ -17,7 +17,6 @@ pub async fn create_token_server(
     selectexpiry: String,
     customdate: Option<String>,
 ) -> Result<TokenResponse, ServerFnError> {
-
     use crate::utils::aruna_api_handlers::aruna_create_token;
     use crate::utils::aruna_api_helpers::to_create_token_req;
     use actix_session::SessionExt;
@@ -31,21 +30,21 @@ pub async fn create_token_server(
         .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
         .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
 
-
     aruna_create_token(
         to_create_token_req(
             tokenname,
-            selecttype, 
+            selecttype,
             resid,
             selectperm,
-            selectexpiry, 
-            customdate
-        ), &token).await
-        .map_err(|_| 
-            ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))?
-        .try_into()
-        .map_err(|_| 
-            ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))
+            selectexpiry,
+            customdate,
+        ),
+        &token,
+    )
+    .await
+    .map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))?
+    .try_into()
+    .map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))
 }
 
 #[component]
@@ -197,7 +196,7 @@ pub fn CreateToken(
                    hide_modal("createToken");
                 }
                     class="needs-validation"
-                    class:was-validated=move || needs_val()
+                    class:was-validated=needs_val
                     novalidate
                     _ref=form
                 >

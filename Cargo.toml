@@ -41,14 +41,14 @@ aruna-rust-api = { version = "1.0.0-rc.15.1", default-features = false }
 tonic = { version = "0.9.1", optional = true }
 gloo-events = "0.1.2"
 gloo-timers = "0.2.6"
-chrono = { version = "0.4.24", feature = ["clock"], optional = true }
+chrono = { version = "0.4.24", feature = ["clock"] }
 prost-types = "0.11.8"
 rand = "0.8.5"
 
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
-ssr = ["dep:actix-files", "dep:actix-web", "dep:actix-session", "dep:leptos_actix", "leptos/ssr", "leptos_meta/ssr", "leptos_router/ssr", "aruna-rust-api/transport", "dep:tonic", "dep:chrono"]
+ssr = ["dep:actix-files", "dep:actix-web", "dep:actix-session", "dep:leptos_actix", "leptos/ssr", "leptos_meta/ssr", "leptos_router/ssr", "aruna-rust-api/transport", "dep:tonic"]
 
 [package.metadata.leptos]
 # The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name   
