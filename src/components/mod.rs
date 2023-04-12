@@ -20,6 +20,7 @@ cfg_if! {
             _ = register::RegisterUser::register();
             _ = register::CheckActivated::register();
             _ = GetUserInfo::register();
+            _ = create_token::CreateTokenServer::register();
         }
 
     }

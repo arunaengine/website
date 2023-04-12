@@ -1,13 +1,31 @@
+use anyhow::Result;
 use cfg_if::cfg_if;
 use gloo_events::EventListener;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
+use crate::utils::structs::TokenResponse;
 
 #[server(CreateTokenServer, "/web")]
-pub async fn create_token_server(#[allow(unused_variables)] cx: Scope) -> Result<(), ServerFnError> {
-    Ok(())
+pub async fn create_token_server(
+    #[allow(unused_variables)] cx: Scope,
+    tokenname: String,
+    selecttype: String,
+    resid: Option<String>,
+    selectperm: String,
+    selectexpiry: String,
+    customdate: Option<String>,
+) -> Result<TokenResponse, ServerFnError> {
+    dbg!(
+        tokenname,
+        selecttype,
+        resid,
+        selectperm,
+        selectexpiry,
+        customdate
+    );
+    Ok(TokenResponse::default())
 }
 
 #[component]
@@ -31,7 +49,6 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
         });
     });
 
-
     let token_name = create_node_ref::<html::Input>(cx);
     let token_type = create_node_ref::<html::Select>(cx);
     let res_id = create_node_ref::<html::Input>(cx);
@@ -40,23 +57,24 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
     let custom_date = create_node_ref::<html::Input>(cx);
     let form = create_node_ref::<html::Form>(cx);
 
-
-    //let create_token_action = create_server_action::<CreateTokenServer>(cx);
+    let create_token_action = create_server_action::<CreateTokenServer>(cx);
     let (needs_id, write_needs_id) = create_signal(cx, false);
     let (needs_custom_date, write_custom_date) = create_signal(cx, false);
     let needs_val = create_rw_signal(cx, false);
-
 
     view! {cx,
         <div class="modal mt-5 fade" id="createToken" _ref=modal_ref tabindex="-1">
         <div class="modal-dialog modal-sm" role="document">
             <div class="modal-content">
                 <form on:submit=move |ev| {
-                    let _data = CreateTokenServer::from_event(&ev).expect("to parse form data");
+                    ev.prevent_default();
+                    let data = CreateTokenServer::from_event(&ev).expect("to parse form data");
+                    log::debug!("{:?}", data);
                     needs_val.update(|nval| *nval = !*nval);
                     if !form.get().unwrap().check_validity() {
                         ev.prevent_default();
                     }
+                   _  = &create_token_action.dispatch(data);
                     }
                     class="needs-validation"
                     class:was-validated=move || needs_val()
@@ -77,14 +95,14 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
                         </svg>
                         <h3>"Create new token!"</h3>
                     </div>
-                   
+
                     <div class="form-floating mb-3">
-                            <input type="text" class="form-control" id="floatingTokenName" placeholder="Your token name"
+                            <input type="text" class="form-control" id="tokenname" name="tokenname" placeholder="Your token name"
                                 _ref=token_name/>
-                            <label for="floatingInput">"Token name"</label>
+                            <label for="tokenname">"Token name"</label>
                         </div>
                         <div class="form-floating mb-3">
-                            <select class="form-select" id="floatingSelectType" aria-label="Token type" _ref=token_type on:input=move |_| {
+                            <select class="form-select" id="selecttype" name="selecttype" aria-label="Token type" _ref=token_type on:input=move |_| {
                                 let needs_update = match token_type() {
                                     Some(t) => {
                                         t.value() != "0"
@@ -97,16 +115,16 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
                                 <option value="1">"Collection"</option>
                                 <option value="2">"Project"</option>
                             </select>
-                            <label for="floatingSelect">"Select a tokentype"</label>
+                            <label for="selecttype">"Select a tokentype"</label>
                         </div>
                         {move || if needs_id() {
                             view!{cx,
                                 <div class="form-floating mb-3">
                                     <input type="text" class="form-control text-lowercase"
                                        pattern={{"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}}
-                                        id="floatingResourceUUID" placeholder="Resource UUID v4" _ref=res_id
+                                        id="resid" name="resid" placeholder="Resource UUID v4" _ref=res_id
                                         required />
-                                    <label for="floatingInput">"UUIDv4"</label>
+                                    <label for="resid">"UUIDv4"</label>
                                     <div class="invalid-feedback">
                                     "Invalid UUIDv4 expected format: '12345678-1234-4234-8234-123456789abc'"
                                     </div>
@@ -117,8 +135,8 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
                                 ().into_view(cx)
                             }
                         }
-                        <div class="form-floating mb-3" v-if="notPersonal">
-                            <select class="form-select" id="floatingSelectPermission" aria-label="Token permissions"
+                        <div class="form-floating mb-3">
+                            <select class="form-select" id="selectperm" name="selectperm" aria-label="Token permissions"
                                 _ref=res_perm required>
                                 <option value="NONE" selected>"NONE"</option>
                                 <option value="READ">"READ"</option>
@@ -126,12 +144,12 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
                                 <option value="MODIFY">"MODIFY"</option>
                                 <option value="ADMIN">"ADMIN"</option>
                             </select>
-                            <label for="floatingSelect">"Token permissions"</label>
+                            <label for="selectperm">"Token permissions"</label>
                         </div>
                         <div class="form-floating mb-3">
-                            <select class="form-select" id="floatingSelectExpiration" aria-label="Token expiry" _ref=expiry 
+                            <select class="form-select" id="selectexpiry" name="selectexpiry" aria-label="Token expiry" _ref=expiry
                                 on:input=move |_| {
-                                    
+
                                     let needs_date = match expiry() {
                                         Some(t) => {
                                             log::debug!("{}", t.value());
@@ -149,13 +167,13 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
                                 <option value="4">"365 Days"</option>
                                 <option value="5">"Custom"</option>
                             </select>
-                            <label for="floatingSelect">"Token expiry time"</label>
+                            <label for="selectexpiry">"Token expiry time"</label>
                         </div>
                         {move || if needs_custom_date() {
                             view!{cx,
                                 <div class="form-floating mb-3">
-                                    <input type="date" class="form-control" id="floatingTokenName" _ref=custom_date required />
-                                    <label for="floatingInput">"Choose a custom date"</label>
+                                    <input type="date" class="form-control" id="customdate" name="customdate" _ref=custom_date required />
+                                    <label for="customdate">"Choose a custom date"</label>
                                     <div class="invalid-feedback">
                                         "Required date for custom expiry"
                                     </div>
@@ -164,10 +182,10 @@ pub fn CreateToken(cx: Scope) -> impl IntoView {
                             }else{
                                 ().into_view(cx)
                             }
-                        
+
                         }
-                        
-                        
+
+
                 </div>
 
                 <div class="modal-footer">

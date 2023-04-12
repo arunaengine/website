@@ -61,7 +61,7 @@ impl Authorizer {
             provider_metadata,
             ClientId::new("test".to_string()),
             Some(ClientSecret::new(
-                "PVFQoNEvFfWMpKphivhVIAb8g6djUL7s".to_string(),
+                "Ns46QiaYHq8MnPKTo1R8NXkU3VDixdIY".to_string(),
             )),
         )
         // Set the URL the user will be redirected to after the authorization process.
