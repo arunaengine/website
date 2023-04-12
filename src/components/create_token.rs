@@ -173,12 +173,8 @@ pub fn CreateToken(
     //let query_map = loc.query;
     //let contains_success = move || query_map().get("success").is_some();
 
-    let token_name = create_node_ref::<html::Input>(cx);
     let token_type = create_node_ref::<html::Select>(cx);
-    let res_id = create_node_ref::<html::Input>(cx);
-    let res_perm = create_node_ref::<html::Select>(cx);
     let expiry = create_node_ref::<html::Select>(cx);
-    let custom_date = create_node_ref::<html::Input>(cx);
     let form = create_node_ref::<html::Form>(cx);
 
     let (needs_id, write_needs_id) = create_signal(cx, false);
@@ -221,8 +217,7 @@ pub fn CreateToken(
                     </div>
 
                     <div class="form-floating mb-3">
-                            <input type="text" class="form-control" id="tokenname" name="tokenname" placeholder="Your token name"
-                                _ref=token_name/>
+                            <input type="text" class="form-control" id="tokenname" name="tokenname" placeholder="Your token name"/>
                             <label for="tokenname">"Token name"</label>
                         </div>
                         <div class="form-floating mb-3">
@@ -246,7 +241,7 @@ pub fn CreateToken(
                                 <div class="form-floating mb-3">
                                     <input type="text" class="form-control text-lowercase"
                                        pattern={{"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}}
-                                        id="resid" name="resid" placeholder="Resource UUID v4" _ref=res_id
+                                        id="resid" name="resid" placeholder="Resource UUID v4"
                                         required />
                                     <label for="resid">"UUIDv4"</label>
                                     <div class="invalid-feedback">
@@ -255,7 +250,7 @@ pub fn CreateToken(
                                 </div>
                                 <div class="form-floating mb-3">
                                     <select class="form-select" id="selectperm" name="selectperm" aria-label="Token permissions"
-                                        _ref=res_perm required>
+                                        required>
                                         <option value="NONE" selected>"NONE"</option>
                                         <option value="READ">"READ"</option>
                                         <option value="APPEND">"APPEND"</option>

@@ -1,5 +1,4 @@
 pub mod create_token;
-pub mod greeter;
 pub mod header;
 pub mod main_body;
 pub mod panel;

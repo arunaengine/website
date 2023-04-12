@@ -6,7 +6,7 @@ use crate::utils::structs::UpdateUser;
 
 #[server(GetUserInfo, "/web")]
 pub async fn get_user_info(#[allow(unused_variables)] cx: Scope) -> Result<crate::utils::structs::UserState, ServerFnError> {
-    use crate::utils::aruna_api_handlers::who_am_i;
+    use crate::utils::aruna_api_handlers::{who_am_i, aruna_create_token};
     use actix_session::SessionExt;
     use actix_web::HttpRequest;
     let req = use_context::<HttpRequest>(cx).ok_or_else(|| 
@@ -35,14 +35,39 @@ pub async fn get_user_info(#[allow(unused_variables)] cx: Scope) -> Result<crate
                 log::debug!("Unable to query token from session 1");
                 ServerFnError::Request("Invalid request".to_string())
             })?;
-          match who_am_i(&token).await {
+
+        let is_oidc = sess.get::<String>("token-type").map_err(|_| {
+            log::debug!("Unable to query token from session 1");
+            ServerFnError::Request("Invalid request".to_string())})?
+        .ok_or_else(|| {
+            log::debug!("Unable to query token from session 2");
+            ServerFnError::Request("Invalid request".to_string())
+        })?;
+
+        if is_oidc.as_str() == "oidc" {
+            let create_resp = aruna_create_token(
+                crate::utils::aruna_api_helpers::new_session_req(),
+                &token
+            ).await.map_err(|_| {
+                log::debug!("Failed create_api_token");
+                ServerFnError::Request("Invalid request".to_string())})?;
+
+            sess.insert("token", create_resp.token_secret.to_string()).map_err(|_| {
+                log::debug!("Unable to insert aruna token to session 1");
+                ServerFnError::Request("Invalid request".to_string())})?;
+
+            sess.insert("token-type", "aruna").map_err(|_| {
+                log::debug!("Unable to insert aruna token-type to session 2");
+                ServerFnError::Request("Invalid request".to_string())})?;
+        }
+
+        match who_am_i(&token).await {
             Ok(i) => Ok(i),
             Err(_) => {
-                
                 log::debug!("Who am i request error");
                 return Err(ServerFnError::Request("Failed to get user_state".to_string()))
             },
-          }
+            }
       }
     }
 }

@@ -152,6 +152,7 @@ impl Authorizer {
         let token = id_token.to_string();
 
         session.insert("token", token.to_string())?;
+        session.insert("token-type", "oidc".to_string())?;
 
         Ok(token)
     }
