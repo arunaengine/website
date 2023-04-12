@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use aruna_rust_api::api::storage::services::v1::{
-    user_service_client, GetUserRequest, RegisterUserRequest, RegisterUserResponse, GetUserResponse, CreateApiTokenRequest, CreateApiTokenResponse, GetApiTokensResponse, GetApiTokensRequest,
+    user_service_client, GetUserRequest, RegisterUserRequest, RegisterUserResponse, GetUserResponse, CreateApiTokenRequest, CreateApiTokenResponse, GetApiTokensResponse, GetApiTokensRequest, DeleteApiTokenRequest,
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
@@ -87,4 +87,19 @@ pub async fn get_api_tokens(token: &str) -> Result<GetApiTokensResponse> {
         .into_inner();
     Ok(response)
 }
+
+
+pub async fn delete_api_token(token_id: String, token: &str) -> Result<()> {
+    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let channel = endpoint.connect().await?;
+    let delete_tokens_req = tonic::Request::new(DeleteApiTokenRequest{token_id});
+    let mut client = user_service_client::UserServiceClient::new(channel);
+    // Send the request to the AOS instance gRPC gateway
+    _ = client
+        .delete_api_token(add_token(delete_tokens_req, token))
+        .await?
+        .into_inner();
+    Ok(())
+}
+
 
