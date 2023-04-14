@@ -5,7 +5,7 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-use crate::utils::{modal::hide_modal, structs::TokenResponse};
+use crate::utils::{modal::hide_modal, structs::{TokenResponse, UpdateTokens}};
 
 #[server(CreateTokenServer, "/web")]
 pub async fn create_token_server(
@@ -50,6 +50,9 @@ pub async fn create_token_server(
 #[component]
 pub fn CreateTokenSuccess(cx: Scope, create_token_resp: TokenResponse) -> impl IntoView {
     provide_meta_context(cx);
+
+    let update_tokens = use_context::<UpdateTokens>(cx).expect("user_state not set");
+    update_tokens.0.update(|e| *e = !*e);
 
     let TokenResponse {
         id,

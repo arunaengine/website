@@ -114,26 +114,22 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                         <tbody>
                         <tr>
                         </tr>
+                        <Transition fallback=move || view! { cx, <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
                         {
                             move || if !tokens().is_empty() {
-                                view!{cx,
-                                <For
-                                    // a function that returns the items we're iterating over; a signal is fine
-                                    each=tokens
-                                    // a unique key for each item
-                                    key=|tok| tok.id.clone()
-                                    // renders each item to a view
-                                    view=move |cx, tok: TokenStats| {
-                                    view! {
-                                        cx,
-                                        <Token token_info=tok/>
-                                    }
-                                    }
-                                />}.into_view(cx)
+                                tokens().into_iter()
+                                .map(|item| view! {
+                                    cx,
+                                    <Token token_info=item/>
+                                })
+                                .collect::<Vec<_>>().into_view(cx)
+                            
+                                
                             }else{
                                 view!{cx, <tr><td colspan="4" class="text-center">"Looks like you currently have no active tokens!"</td></tr>}.into_view(cx)
                             }
                         }
+                        </Transition>
                         </tbody>
                     </table>
                 </div>
@@ -175,26 +171,20 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                     </tr>
                     </thead>
                     <tbody>
+                    <Transition fallback=move || view! { cx, <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
                         {
                             move || if !sessions().is_empty() {
-                                view!{cx,
-                                <For
-                                    // a function that returns the items we're iterating over; a signal is fine
-                                    each=sessions
-                                    // a unique key for each item
-                                    key=|sess| sess.id.clone()
-                                    // renders each item to a view
-                                    view=move |cx, sess: TokenStats| {
-                                    view! {
-                                        cx,
-                                        <Session token_info=sess is_current=true/>
-                                    }
-                                    }
-                                />}.into_view(cx)
+                                sessions().into_iter()
+                                .map(|item| view! {
+                                    cx,
+                                    <Session token_info=item is_current=true/>
+                                })
+                                .collect::<Vec<_>>().into_view(cx)
                             }else{
                                 view!{cx, <tr><td colspan="4" class="text-center">"Looks like you currently have no active sessions!"</td></tr>}.into_view(cx)
                             }
                         }
+                    </Transition>
                     </tbody>
                 </table>
             </div>

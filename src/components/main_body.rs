@@ -7,8 +7,8 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
         <div class="px-4 pt-5 my-5 text-center">
             <div class="overflow-hidden" style="max-height: 30vh;">
                 <div class="container px-5">
-                  <img src="aruna_light.png" class="img-fluid mb-4 hide-theme-dark" alt="Aruna Logo" width="700" height="500" />
-                  <img src="aruna_dark.png" class="img-fluid mb-4 hide-theme-light" alt="Aruna Logo" width="700" height="500" />
+                  <img src="/aruna_light.png" class="img-fluid mb-4 hide-theme-dark" alt="Aruna Logo" width="700" height="500" />
+                  <img src="/aruna_dark.png" class="img-fluid mb-4 hide-theme-light" alt="Aruna Logo" width="700" height="500" />
                 </div>
             </div>
             <h1 class="fw-bold hook pb-2">{"Your geo-redundant scientific data lake"}</h1>
