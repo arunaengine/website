@@ -95,7 +95,7 @@ pub async fn aruna_get_api_tokens(token: &str) -> Result<GetApiTokensResponse> {
     Ok(response)
 }
 
-pub async fn delete_api_token(token_id: String, token: &str) -> Result<()> {
+pub async fn aruna_delete_api_token(token_id: String, token: &str) -> Result<()> {
     let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
     let delete_tokens_req = tonic::Request::new(DeleteApiTokenRequest { token_id });

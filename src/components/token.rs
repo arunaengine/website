@@ -1,12 +1,59 @@
 use leptos::*;
 use leptos_meta::*;
 
-use crate::utils::structs::TokenStats;
+use crate::utils::structs::{TokenStats, UpdateTokens};
+
+#[server(DeleteToken, "/web")]
+pub async fn delete_token(
+    #[allow(unused_variables)] cx: Scope,
+    token_id: String
+) -> Result<(), ServerFnError> {
+    use crate::utils::aruna_api_handlers::aruna_delete_api_token;
+    use actix_session::SessionExt;
+    use actix_web::HttpRequest;
+    let req = use_context::<HttpRequest>(cx)
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+
+    let sess = req.get_session();
+
+    let token = sess
+        .get::<String>("token")
+        .map_err(|_| {
+            log::debug!("Unable to query token from session 1");
+            ServerFnError::Request("Invalid request".to_string())
+        })?
+        .ok_or_else(|| {
+            log::debug!("Unable to query token from session 1");
+            ServerFnError::Request("Invalid request".to_string())
+        })?;
+
+    _ = aruna_delete_api_token(token_id, &token).await.map_err(|_| {
+        log::debug!("Unable to query token from session 1");
+        ServerFnError::Request("Invalid request".to_string())
+    })?;
+
+    Ok(())
+}
+
 
 /// Renders the home page of your application.
 #[component]
 pub fn Token(cx: Scope, token_info: TokenStats) -> impl IntoView {
     provide_meta_context(cx);
+
+    let token_id = store_value(cx, token_info.id.to_string());
+
+    let update_tokens = use_context::<UpdateTokens>(cx).expect("user_state not set");
+
+    let (deleting, set_deleting) = create_signal(cx, "".to_string());
+
+    let dispatch_delete = create_resource(cx, deleting, move |del| async move {
+        // this is the ServerFn that is called by the GetUser Action above
+        if !del.is_empty() {
+            delete_token(cx, del).await.ok();
+            update_tokens.0.update(move |e| *e = !*e)
+        }
+    });
 
     view! {cx,
         <tr>
@@ -15,7 +62,7 @@ pub fn Token(cx: Scope, token_info: TokenStats) -> impl IntoView {
             <td>{token_info.used_at.clone()}</td>
             <td>
                 <div class="d-flex">
-                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target="#r1" aria-expanded="false">
+                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target=format!(r##""#{}""##, token_info.id) aria-expanded="false">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                             <path d="M12 5l0 14"></path>
@@ -23,20 +70,27 @@ pub fn Token(cx: Scope, token_info: TokenStats) -> impl IntoView {
                             <path d="M6 13l6 6"></path>
                         </svg>
                     </a>
-                    <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                            <path d="M4 7l16 0"></path>
-                            <path d="M10 11l0 6"></path>
-                            <path d="M14 11l0 6"></path>
-                            <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
-                            <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
-                        </svg>
+                    <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" on:click=move |_| {set_deleting.set(token_id.get_value())}>
+                    <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
+                        {move || {
+                            let _ = dispatch_delete.read(cx);
+                            view!{cx, 
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M4 7l16 0"></path>
+                                    <path d="M10 11l0 6"></path>
+                                    <path d="M14 11l0 6"></path>
+                                    <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
+                                    <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
+                                </svg>
+                            }
+                        }}
+                        </Suspense>
                     </a>
                 </div>
             </td>
         </tr>
-        <tr class="accordion-collapse collapse" id="r1" data-bs-parent="#tokenTable">
+        <tr class="accordion-collapse collapse" id=token_info.id.clone() data-bs-parent="#tokenTable">
             <td colspan="4">
                 <div class="card card-borderless">
                     <div class="card-body accordion-body">
@@ -86,34 +140,53 @@ pub fn Token(cx: Scope, token_info: TokenStats) -> impl IntoView {
 pub fn Session(cx: Scope, token_info: TokenStats, is_current: bool) -> impl IntoView {
     provide_meta_context(cx);
 
+    let token_id = store_value(cx, token_info.id.to_string());
+
+    let update_tokens = use_context::<UpdateTokens>(cx).expect("user_state not set");
+
+    let (deleting, set_deleting) = create_signal(cx, "".to_string());
+
+    let dispatch_delete = create_resource(cx, deleting, move |del| async move {
+        // this is the ServerFn that is called by the GetUser Action above
+        if !del.is_empty() {
+            delete_token(cx, del).await.ok();
+            update_tokens.0.update(move |e| *e = !*e)
+        }
+    });
+
     view! {cx,
         <tr>
-            <td>{token_info.id}</td>
+            <td>{token_info.id.clone()}</td>
             <td>{token_info.expires_at}</td>
             <td>{token_info.used_at}</td>
             <td>
                 <div class="d-flex">
                     {move || if is_current {
                         view!{cx,
-                            <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon disabled text-green" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target="#r1" aria-expanded="false">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-activity" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    <path d="M3 12h4l3 8l4 -16l3 8h4"></path>
-                                </svg>
-                            </a>
+                            <span class="status status-green">
+                                <span class="status-dot status-dot-animated"></span>
+                                "current"
+                            </span>
                         }.into_view(cx)
                     }else{
                         ().into_view(cx)
                     }}
-                    <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                            <path d="M4 7l16 0"></path>
-                            <path d="M10 11l0 6"></path>
-                            <path d="M14 11l0 6"></path>
-                            <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
-                            <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
-                        </svg>
+                    <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" on:click=move |_| {set_deleting.set(token_id.get_value())}>
+                    <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
+                        {move || {
+                            let _ = dispatch_delete.read(cx);
+                            view!{cx, 
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M4 7l16 0"></path>
+                                    <path d="M10 11l0 6"></path>
+                                    <path d="M14 11l0 6"></path>
+                                    <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
+                                    <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
+                                </svg>
+                            }
+                        }}
+                        </Suspense>
                     </a>
                 </div>
             </td>

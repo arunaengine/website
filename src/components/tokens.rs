@@ -55,6 +55,8 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
 
     update_tokens.0.update(|e| *e = !*e);
 
+    provide_context(cx, update_tokens);
+
     let sessions = move || {
         get_tokens_res
             .read(cx)
