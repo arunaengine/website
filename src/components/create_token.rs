@@ -239,12 +239,12 @@ pub fn CreateToken(
                             view!{cx,
                                 <div class="form-floating mb-3">
                                     <input type="text" class="form-control text-lowercase"
-                                       pattern={{"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}}
-                                        id="resid" name="resid" placeholder="Resource UUID v4"
+                                       pattern={{"^[0-7][0-9A-HJKMNP-TV-Z]{25}$"}}
+                                        id="resid" name="resid" placeholder="Resource ID"
                                         required />
-                                    <label for="resid">"UUIDv4"</label>
+                                    <label for="resid">"ULID"</label>
                                     <div class="invalid-feedback">
-                                    "Invalid UUIDv4 expected format: '12345678-1234-4234-8234-123456789abc'"
+                                    "Invalid ULID expected format: '01BX5ZZKBKACTAV9WEVGEMMVRY'"
                                     </div>
                                 </div>
                                 <div class="form-floating mb-3">
