@@ -82,7 +82,7 @@ pub async fn aruna_create_token(
     Ok(response)
 }
 
-pub async fn get_api_tokens(token: &str) -> Result<GetApiTokensResponse> {
+pub async fn aruna_get_api_tokens(token: &str) -> Result<GetApiTokensResponse> {
     let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
     let get_tokens_req = tonic::Request::new(GetApiTokensRequest {});

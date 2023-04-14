@@ -28,13 +28,13 @@ pub async fn logout(session: Session, data: Data<Mutex<Authorizer>>) -> Result<i
         .lock()
         .map_err(|_| error::InternalError::new("Poison", StatusCode::INTERNAL_SERVER_ERROR))?;
 
+    // TODO: REMOVE token from backend
     session.clear();
 
     Ok(Redirect::to(format!(
-        "{}/{}{}",
+        "{}/{}",
         my_data.get_keycloak_url(),
-        "protocol/openid-connect/logout?redirect_uri=",
-        "localhost%3A3000"
+        "protocol/openid-connect/logout?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3000%2F&client_id=test"
     ))
     .see_other())
 }

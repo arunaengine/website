@@ -134,14 +134,14 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                                 //<a href="#" class="dropdown-item">{ "Feedback" }</a>
                                 //<div class="dropdown-divider"></div>
                                 //<a href="#" class="dropdown-item">{ "Settings" }</a>
-                                <a href="/logout" class="dropdown-item">{ "Logout" }</a>
+                                <a href="/logout" on:click=move |_| {let _ = window().location().set_href("/logout");} class="dropdown-item">{ "Logout" }</a>
                             </div>
                         </div>
                     }.into_view(cx)
 
                 }
                 None => {
-                        view!{cx, <A href="/login" class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</A>}.into_view(cx)
+                        view!{cx, <a href="/login" on:click=move |_| {let _ = window().location().set_href("/login");} class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</a>}.into_view(cx)
                     }
                 }
             }

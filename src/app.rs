@@ -163,7 +163,6 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
                     }>
                         <Route path="register" view=move |cx| view! { cx, <MainPage/><RegisterPage/> }/>
                         <Route path="activate" view=move |cx| view! { cx, <MainPage/><ActivatePage/> }/>
-                        <Route path="login" view=|cx| view! { cx, <Login />}/>
                         <Panel/>
                         <Route path="" view=move |cx| view!{cx, <MainPage/>}/>
                     </Route>
@@ -181,10 +180,4 @@ fn MainPage(cx: Scope) -> impl IntoView {
         <MainBody />
         <Outlet/>
     }
-}
-
-/// Renders the home page of your application.
-#[component]
-fn Login(_cx: Scope) -> impl IntoView {
-    let _ = window().location().set_href("http://localhost:3000/login");
 }

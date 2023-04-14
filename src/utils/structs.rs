@@ -47,6 +47,9 @@ impl From<User> for UserState {
 #[derive(Clone, Copy)]
 pub struct UpdateUser(pub RwSignal<bool>);
 
+#[derive(Clone, Copy)]
+pub struct UpdateTokens(pub RwSignal<bool>);
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct TokenResponse {
     pub id: String,
@@ -79,15 +82,41 @@ pub enum TokenType {
     PROJECT(String, String),
 }
 
+impl TokenType {
+    pub fn get_type_variant(&self) -> String {
+        match self {
+            TokenType::PERSONAL => "PERSONAL".to_string(),
+            TokenType::COLLECTION(_, _) => "COLLECTION".to_string(),
+            TokenType::PROJECT(_, _) => "PROJECT".to_string(),
+        }
+    }
+
+    pub fn get_target_id(&self) -> String {
+        match self {
+            TokenType::PERSONAL => "-".to_string(),
+            TokenType::COLLECTION(a, _) => a.to_string(),
+            TokenType::PROJECT(a, _) => a.to_string(),
+        }
+    }
+
+    pub fn get_permission(&self) -> String {
+        match self {
+            TokenType::PERSONAL => "-".to_string(),
+            TokenType::COLLECTION(_, a) => a.to_string(),
+            TokenType::PROJECT(_, a) => a.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct TokenStats {
-    id: String,
-    name: String,
-    token_type: TokenType,
-    created_at: String,
-    expires_at: String,
-    is_session: bool,
-    used_at: String,
+    pub id: String,
+    pub name: String,
+    pub token_type: TokenType,
+    pub created_at: String,
+    pub expires_at: String,
+    pub is_session: bool,
+    pub used_at: String,
 }
 
 impl From<Token> for TokenStats {

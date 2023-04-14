@@ -2,6 +2,43 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
+use crate::utils::structs::{TokenStats, UpdateTokens};
+
+#[server(GetTokens, "/web")]
+pub async fn get_tokens(
+    #[allow(unused_variables)] cx: Scope,
+) -> Result<Vec<TokenStats>, ServerFnError> {
+    use crate::utils::aruna_api_handlers::aruna_get_api_tokens;
+    use actix_session::SessionExt;
+    use actix_web::HttpRequest;
+    let req = use_context::<HttpRequest>(cx)
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+
+    let sess = req.get_session();
+
+    let token = sess
+        .get::<String>("token")
+        .map_err(|_| {
+            log::debug!("Unable to query token from session 1");
+            ServerFnError::Request("Invalid request".to_string())
+        })?
+        .ok_or_else(|| {
+            log::debug!("Unable to query token from session 1");
+            ServerFnError::Request("Invalid request".to_string())
+        })?;
+
+    let result = aruna_get_api_tokens(&token).await.map_err(|_| {
+        log::debug!("Unable to query token from session 1");
+        ServerFnError::Request("Invalid request".to_string())
+    })?;
+
+    Ok(result
+        .token
+        .into_iter()
+        .map(TokenStats::from)
+        .collect::<Vec<TokenStats>>())
+}
+
 #[component]
 pub fn TokensOverview(cx: Scope) -> impl IntoView {
     use crate::components::create_token::*;
@@ -9,13 +46,41 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
 
     provide_meta_context(cx);
 
+    let update_tokens: UpdateTokens = UpdateTokens(create_rw_signal(cx, true));
+
+    let get_tokens_res = create_resource(cx, update_tokens.0, move |_| async move {
+        // this is the ServerFn that is called by the GetUser Action above
+        get_tokens(cx).await.ok()
+    });
+
+    let sessions = move || {
+        get_tokens_res
+            .read(cx)
+            .flatten()
+            .map(|ve| {
+                ve.into_iter()
+                    .filter_map(|elem| if elem.is_session { Some(elem) } else { None })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+    };
+
+    let tokens = move || {
+        get_tokens_res
+            .read(cx)
+            .flatten()
+            .map(|ve| {
+                ve.into_iter()
+                    .filter_map(|elem| if !elem.is_session { Some(elem) } else { None })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+    };
+
     let location = use_location(cx);
     let query_map = location.query;
-
     let contains_create = move || query_map().get("create").is_some();
-
     let create_token_action = create_server_action::<CreateTokenServer>(cx);
-
     let current_action_version = create_rw_signal(cx, 0);
 
     view! {cx,
@@ -43,7 +108,26 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                         </tr>
                         </thead>
                         <tbody>
-                            <Token />
+                        {
+                            move || if !tokens().is_empty() {
+                                view!{cx,
+                                <For
+                                    // a function that returns the items we're iterating over; a signal is fine
+                                    each=tokens
+                                    // a unique key for each item
+                                    key=|tok| tok.id.clone()
+                                    // renders each item to a view
+                                    view=move |cx, tok: TokenStats| {
+                                    view! {
+                                        cx,
+                                        <Token token_info=tok/>
+                                    }
+                                    }
+                                />}.into_view(cx)
+                            }else{
+                                view!{cx, <td colspan="4" class="text-center">"Looks like you currently have no active tokens!"</td>}.into_view(cx)
+                            }
+                        }
                         </tbody>
                     </table>
                 </div>
@@ -81,12 +165,31 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                         <th>"Id"</th>
                         <th>"Expires"</th>
                         <th>"Last used"</th>
-                        <th class="w-1">"Actions"</th>
+                        <th class="w-3 text-center">"Actions"</th>
                     </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td colspan="4" class="text-center">"Looks like you currently have no active sessions!"</td>
+                        {
+                            move || if !sessions().is_empty() {
+                                view!{cx,
+                                <For
+                                    // a function that returns the items we're iterating over; a signal is fine
+                                    each=sessions
+                                    // a unique key for each item
+                                    key=|sess| sess.id.clone()
+                                    // renders each item to a view
+                                    view=move |cx, sess: TokenStats| {
+                                    view! {
+                                        cx,
+                                        <Session token_info=sess is_current=true/>
+                                    }
+                                    }
+                                />}.into_view(cx)
+                            }else{
+                                view!{cx, <td colspan="4" class="text-center">"Looks like you currently have no active sessions!"</td>}.into_view(cx)
+                            }
+                        }
                         </tr>
                     </tbody>
                 </table>
