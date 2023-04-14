@@ -290,7 +290,7 @@ pub fn CreateToken(
                         {move || if needs_custom_date() {
                             view!{cx,
                                 <div class="form-floating mb-3">
-                                    <input type="date" class="form-control" id="customdate" name="customdate" _ref=custom_date required />
+                                    <input type="date" class="form-control" id="customdate" name="customdate" required />
                                     <label for="customdate">"Choose a custom date"</label>
                                     <div class="invalid-feedback">
                                         "Required date for custom expiry"
