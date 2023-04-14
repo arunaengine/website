@@ -53,6 +53,8 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
         get_tokens(cx).await.ok()
     });
 
+    update_tokens.0.update(|e| *e = !*e);
+
     let sessions = move || {
         get_tokens_res
             .read(cx)
@@ -108,6 +110,8 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                         </tr>
                         </thead>
                         <tbody>
+                        <tr>
+                        </tr>
                         {
                             move || if !tokens().is_empty() {
                                 view!{cx,
@@ -125,7 +129,7 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                                     }
                                 />}.into_view(cx)
                             }else{
-                                view!{cx, <td colspan="4" class="text-center">"Looks like you currently have no active tokens!"</td>}.into_view(cx)
+                                view!{cx, <tr><td colspan="4" class="text-center">"Looks like you currently have no active tokens!"</td></tr>}.into_view(cx)
                             }
                         }
                         </tbody>
@@ -169,7 +173,6 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                     </tr>
                     </thead>
                     <tbody>
-                        <tr>
                         {
                             move || if !sessions().is_empty() {
                                 view!{cx,
@@ -187,10 +190,9 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                                     }
                                 />}.into_view(cx)
                             }else{
-                                view!{cx, <td colspan="4" class="text-center">"Looks like you currently have no active sessions!"</td>}.into_view(cx)
+                                view!{cx, <tr><td colspan="4" class="text-center">"Looks like you currently have no active sessions!"</td></tr>}.into_view(cx)
                             }
                         }
-                        </tr>
                     </tbody>
                 </table>
             </div>
