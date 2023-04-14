@@ -365,6 +365,7 @@ dependencies = [
  "openidconnect",
  "prost-types",
  "rand",
+ "regex",
  "serde",
  "serde_json",
  "simple_logger",

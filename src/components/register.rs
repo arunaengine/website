@@ -3,6 +3,7 @@ use gloo_events::EventListener;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+use regex::Regex;
 #[allow(unused_imports)]
 use std::time::Duration;
 
@@ -60,6 +61,8 @@ pub async fn check_activated(#[allow(unused_variables)] cx: Scope) -> Result<boo
 /// Renders the home page of your application.
 #[component]
 pub fn RegisterPage(cx: Scope) -> impl IntoView {
+    // Email regex
+    let regex = Regex::new(r"(?m)^((?!\.)[\w-_.]*[^.])(@\w+)(\.\w+(\.\w+)?[^.\W])$").unwrap();
     provide_meta_context(cx);
 
     //let (registered, set_registered) = create_signal(cx, None::<String>);
@@ -96,8 +99,10 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
         <ActionForm on:submit=move |ev| {
             let data = RegisterUser::from_event(&ev).expect("to parse form data");
             // silly example of validation: if the todo is "nope!", nope it
-            if data.displayname == "nope!" {
+            if !data.email.is_empty() && !regex.is_match(&data.email)  {
                 // ev.prevent_default() will prevent form submission
+                // Cheap validation -> will be fixed when https://github.com/leptos-rs/leptos/issues/851 is upstream
+                window().alert_with_message("Email must be valid or empty").unwrap();
                 ev.prevent_default();
             }
         }
