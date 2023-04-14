@@ -15,9 +15,6 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
     // On first load -> Check if user is logged in
     let update_user = use_context::<UpdateUser>(cx).expect("user_state not set");
 
-    // Only check this Once
-    update_user.0.update(|e| *e = !*e);
-
     let is_logged_memo = create_memo(cx, move |_| get_user.read(cx).flatten().is_some());
     // Creates a reactive value to update the button
     let (dark, toggle_dark) = create_signal(cx, "".to_string());

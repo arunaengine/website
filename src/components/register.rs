@@ -6,6 +6,8 @@ use leptos_router::*;
 #[allow(unused_imports)]
 use std::time::Duration;
 
+use crate::utils::modal::hide_modal;
+
 #[server(RegisterUser, "/web")]
 pub async fn register_user(
     #[allow(unused_variables)] cx: Scope,
@@ -243,6 +245,6 @@ pub fn ActivatePage(cx: Scope) -> impl IntoView {
           </div>
         </div>
       </div>
-      {move || activated().then(|| view!(cx, <Redirect path="/panel" />))}
+      {move || activated().then(|| {hide_modal("activateModal"); view!(cx, <Redirect path="/panel" />)})}
     }
 }
