@@ -22,6 +22,23 @@ pub async fn login(session: Session, data: Data<Mutex<Authorizer>>) -> Result<im
     Ok(Redirect::to(url.to_string()).see_other())
 }
 
+#[get("/logout")]
+pub async fn logout(session: Session, data: Data<Mutex<Authorizer>>) -> Result<impl Responder> {
+    let my_data = data
+        .lock()
+        .map_err(|_| error::InternalError::new("Poison", StatusCode::INTERNAL_SERVER_ERROR))?;
+
+    session.clear();
+
+    Ok(Redirect::to(format!(
+        "{}/{}{}",
+        my_data.get_keycloak_url(),
+        "protocol/openid-connect/logout?redirect_uri=",
+        "localhost%3A3000"
+    ))
+    .see_other())
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Params {
     pub state: String,

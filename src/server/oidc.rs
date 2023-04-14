@@ -10,8 +10,10 @@ use openidconnect::{
 use actix_session::Session;
 use openidconnect::reqwest::async_http_client;
 use serde::{Deserialize, Serialize};
+use url::Url;
 pub struct Authorizer {
     core_client: CoreClient,
+    key_cloak_url: Url,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -48,12 +50,10 @@ impl Challenge {
 }
 
 impl Authorizer {
-    pub async fn new() -> Result<Self> {
-        let provider_metadata = CoreProviderMetadata::discover_async(
-            IssuerUrl::new("http://localhost:1998/realms/test".to_string())?,
-            async_http_client,
-        )
-        .await?;
+    pub async fn new(url: String) -> Result<Self> {
+        let provider_metadata =
+            CoreProviderMetadata::discover_async(IssuerUrl::new(url.clone())?, async_http_client)
+                .await?;
 
         // Create an OpenID Connect client by specifying the client ID, client secret, authorization URL
         // and token URL.
@@ -71,7 +71,12 @@ impl Authorizer {
 
         Ok(Authorizer {
             core_client: client,
+            key_cloak_url: url::Url::parse(&url).unwrap(),
         })
+    }
+
+    pub fn get_keycloak_url(&self) -> String {
+        self.key_cloak_url.to_string()
     }
 
     pub fn get_challenge(&self, session: Session) -> Result<url::Url> {

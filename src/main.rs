@@ -28,7 +28,11 @@ async fn main() -> std::io::Result<()> {
 
     crate::components::register_server_functions();
 
-    let authorizer = Data::new(Mutex::new(Authorizer::new().await.unwrap()));
+    let authorizer = Data::new(Mutex::new(
+        Authorizer::new("http://localhost:1998/realms/test".to_string())
+            .await
+            .unwrap(),
+    ));
 
     //let cache = Data::new(Mutex::new(Cache::new()));
 
@@ -48,6 +52,7 @@ async fn main() -> std::io::Result<()> {
             )
             .app_data(authorizer.clone())
             .service(server::actix_routes::login)
+            .service(server::actix_routes::logout)
             .service(server::actix_routes::callback)
             .route("/web/{tail:.*}", leptos_actix::handle_server_fns())
             .leptos_routes(

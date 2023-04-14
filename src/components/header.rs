@@ -13,7 +13,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
         use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
 
     // On first load -> Check if user is logged in
-    let update_user = use_context::<UpdateUser>(cx).expect("user_state not set");
+    let _update_user = use_context::<UpdateUser>(cx).expect("user_state not set");
 
     let is_logged_memo = create_memo(cx, move |_| get_user.read(cx).flatten().is_some());
     // Creates a reactive value to update the button
@@ -134,7 +134,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                                 //<a href="#" class="dropdown-item">{ "Feedback" }</a>
                                 //<div class="dropdown-divider"></div>
                                 //<a href="#" class="dropdown-item">{ "Settings" }</a>
-                                <a href="#" class="dropdown-item">{ "Logout" }</a>
+                                <a href="/logout" class="dropdown-item">{ "Logout" }</a>
                             </div>
                         </div>
                     }.into_view(cx)
