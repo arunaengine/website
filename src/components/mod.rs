@@ -21,6 +21,7 @@ cfg_if! {
             _ = GetUserInfo::register();
             _ = create_token::CreateTokenServer::register();
             _ = tokens::GetTokens::register();
+            _ = token::DeleteToken::register();
         }
 
     }

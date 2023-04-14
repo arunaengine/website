@@ -62,7 +62,7 @@ pub fn Token(cx: Scope, token_info: TokenStats) -> impl IntoView {
             <td>{token_info.used_at.clone()}</td>
             <td>
                 <div class="d-flex">
-                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target=format!(r##""#{}""##, token_info.id) aria-expanded="false">
+                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target=format!(r##""#S{}""##, token_info.id) aria-expanded="false">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                             <path d="M12 5l0 14"></path>
@@ -90,7 +90,7 @@ pub fn Token(cx: Scope, token_info: TokenStats) -> impl IntoView {
                 </div>
             </td>
         </tr>
-        <tr class="accordion-collapse collapse" id=token_info.id.clone() data-bs-parent="#tokenTable">
+        <tr class="accordion-collapse collapse" id=format!("S{}", token_info.id.clone()) data-bs-parent="#tokenTable">
             <td colspan="4">
                 <div class="card card-borderless">
                     <div class="card-body accordion-body">
@@ -163,7 +163,7 @@ pub fn Session(cx: Scope, token_info: TokenStats, is_current: bool) -> impl Into
                 <div class="d-flex">
                     {move || if is_current {
                         view!{cx,
-                            <span class="status status-green">
+                            <span class="status status-green me-2">
                                 <span class="status-dot status-dot-animated"></span>
                                 "current"
                             </span>

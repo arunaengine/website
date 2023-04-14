@@ -62,7 +62,7 @@ pub async fn check_activated(#[allow(unused_variables)] cx: Scope) -> Result<boo
 #[component]
 pub fn RegisterPage(cx: Scope) -> impl IntoView {
     // Email regex
-    let regex = Regex::new(r"(?m)^((?!\.)[\w-_.]*[^.])(@\w+)(\.\w+(\.\w+)?[^.\W])$").unwrap();
+    let regex = Regex::new(r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})").unwrap();
     provide_meta_context(cx);
 
     //let (registered, set_registered) = create_signal(cx, None::<String>);
