@@ -26,7 +26,7 @@ pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
         </div>
         </div>
     </div>
-    <div class="container-xl mt-2">
+    <div class="container-xl mt-2 text-start">
         <div class="card">
             <div class="table-responsive">
                 <table class="table table-vcenter card-table">
@@ -47,9 +47,7 @@ pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
                                     cx,
                                     <Project project=item/>
                                 })
-                                .collect::<Vec<_>>().into_view(cx)
-                            
-                                
+                                .collect::<Vec<_>>().into_view(cx) 
                             }else{
                                 view!{cx, <tr><td colspan="4" class="text-center">"Looks like you are currently not associated with any project!"</td></tr>}.into_view(cx)
                             }

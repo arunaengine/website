@@ -2,6 +2,8 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
+use crate::utils::structs::UserState;
+
 /// Renders the home page of your application.
 #[component]
 pub fn PanelNav(cx: Scope) -> impl IntoView {
@@ -10,6 +12,14 @@ pub fn PanelNav(cx: Scope) -> impl IntoView {
     let loc = use_location(cx);
 
     let path = loc.pathname;
+
+
+    let get_user =
+        use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
+
+    let is_admin = create_memo(cx, move |_| {
+        get_user.read(cx).unwrap_or_default().unwrap_or_default().is_admin
+    });
 
     view! {cx,
         <header class="navbar-expand-md">
@@ -69,7 +79,7 @@ pub fn PanelNav(cx: Scope) -> impl IntoView {
                         </div>
                         </li>
                         <li class="nav-item" class:active=move || {path().contains("admin")}>
-                        <A class="nav-link disabled" href="admin">
+                        <a class="nav-link" class:disabled=move || {!is_admin()} href="admin">
                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-cog" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -87,11 +97,11 @@ pub fn PanelNav(cx: Scope) -> impl IntoView {
                             <span class="nav-link-title">
                             "Admin"
                             </span>
-                        </A>
+                        </a>
                         </li>
                     </ul>
                     <div class="my-2 my-md-0 flex-grow-1 flex-md-grow-0 order-first order-md-last">
-                        <select type="text" class="form-select ts-hidden-accessible" id="select-project" value="" tabindex="-1" hidden>
+                        <select hidden type="text" class="form-select ts-hidden-accessible" id="select-project" value="" tabindex="-1">
                             <option value="project_1">"Project_1"</option>
                             <option value="jQuery">"jQuery"</option>
                             <option value="Bootstrap">"Bootstrap"</option>

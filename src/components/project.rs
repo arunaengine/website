@@ -11,7 +11,7 @@ pub fn Project(cx: Scope, project: SimplePermission) -> impl IntoView {
         <tr>
             <td>{project.project_id.clone()}</td>
             <td>"-"</td>
-            <td>{project.permission}</td>
+            <td>{project.to_permission_string()}</td>
             <td>
                 <div class="d-flex justify-content-end">
                     <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target=format!(r##"#S{}"##, project.project_id.clone()) aria-expanded="false">

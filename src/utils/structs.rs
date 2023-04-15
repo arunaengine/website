@@ -14,6 +14,19 @@ pub struct SimplePermission {
     pub permission: i32,
 }
 
+impl SimplePermission{
+    pub fn to_permission_string(&self) -> String {
+        match self.permission {
+            0 => "-".to_string(),
+            2 => "READ".to_string(),
+            3 => "APPEND".to_string(),
+            4 => "MODIFY".to_string(),
+            5 => "ADMIN".to_string(),
+            _ => "NONE".to_string(),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct UserState {
     pub user_id: String,
