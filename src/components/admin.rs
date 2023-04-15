@@ -20,6 +20,7 @@ pub fn AdminOverview(cx: Scope) -> impl IntoView {
     });
 
     if is_admin() == false {
+        #[cfg(not(feature = "ssr"))]
         window().location().set_href("/").unwrap();
     }
 

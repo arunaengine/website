@@ -157,10 +157,13 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(cx, true));
 
+    
+
     let res = create_resource(cx, update_user.0, move |_| async move {
         // this is the ServerFn that is called by the GetUser Action above
         get_user_info(cx).await.ok()
     });
+
     provide_context(cx, res);
     provide_context(cx, update_user);
 

@@ -9,6 +9,7 @@ pub mod projects;
 pub mod register;
 pub mod token;
 pub mod tokens;
+pub mod alert_modal;
 
 use cfg_if::cfg_if;
 

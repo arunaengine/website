@@ -27,7 +27,7 @@ pub async fn delete_token(
             ServerFnError::Request("Invalid request".to_string())
         })?;
 
-    _ = aruna_delete_api_token(token_id, &token).await.map_err(|_| {
+    _ = aruna_delete_api_token(token_id.clone(), &token).await.map_err(|_| {
         log::debug!("Unable to query token from session 1");
         ServerFnError::Request("Invalid request".to_string())
     })?;
@@ -140,6 +140,8 @@ pub fn Token(cx: Scope, token_info: TokenStats) -> impl IntoView {
 pub fn Session(cx: Scope, token_info: TokenStats) -> impl IntoView {
     provide_meta_context(cx);
 
+    use crate::components::alert_modal::*;
+
 
     let get_user =
         use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
@@ -153,16 +155,36 @@ pub fn Session(cx: Scope, token_info: TokenStats) -> impl IntoView {
     let update_tokens = use_context::<UpdateTokens>(cx).expect("user_state not set");
 
     let (deleting, set_deleting) = create_signal(cx, "".to_string());
+    let (blocking, set_blocking) = create_signal(cx, true);
 
-    let dispatch_delete = create_resource(cx, deleting, move |del| async move {
+    let dispatch_delete = create_resource(cx, blocking, move |del| async move {
         // this is the ServerFn that is called by the GetUser Action above
-        if !del.is_empty() {
-            delete_token(cx, del).await.ok();
+        if !deleting().is_empty() && !del{
+            delete_token(cx, deleting()).await.ok();
             update_tokens.0.update(move |e| *e = !*e)
         }
     });
 
+    create_effect(cx, move |_| {
+        if is_current() && !deleting().is_empty() && !blocking() && dispatch_delete.read(cx).is_some() {
+            let _ = window().location().set_href("/logout");
+        }
+    });
+
+    let message = if is_current() {
+        "Are you sure to delete the session that is currently in use ? This will automatically forward you to the logout page."
+    }else{
+        "Do you really want to delete this session ?"
+    };
+
     view! {cx,
+        <AlertModal 
+            header="Deleting session".to_string()
+            message=message.to_string()
+            modal_id=format!("mod-{}", token_id.get_value())
+            action_name="Delete".to_string()
+            action=move |_| {set_deleting.set(token_id.get_value()); set_blocking.set(false)}
+        />
         <tr>
             <td>{token_info.id.clone()}</td>
             <td>{token_info.expires_at}</td>
@@ -179,7 +201,7 @@ pub fn Session(cx: Scope, token_info: TokenStats) -> impl IntoView {
                     }else{
                         ().into_view(cx)
                     }}
-                    <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" on:click=move |_| {set_deleting.set(token_id.get_value())}>
+                    <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" data-bs-toggle="modal" data-bs-target=format!("#mod-{}", token_id.get_value())>
                     <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                         {move || {
                             let _ = dispatch_delete.read(cx);
@@ -194,7 +216,8 @@ pub fn Session(cx: Scope, token_info: TokenStats) -> impl IntoView {
                                 </svg>
                             }
                         }}
-                        </Suspense>
+                    </Suspense>
+                    
                     </a>
                 </div>
             </td>
