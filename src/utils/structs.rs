@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use aruna_rust_api::api::storage::{
     models::v1::{ProjectPermission, Token, User},
-    services::v1::CreateApiTokenResponse,
+    services::v1::{CreateApiTokenResponse, UserWithPerms},
 };
 use chrono::Local;
 use leptos::RwSignal;
@@ -32,6 +32,7 @@ pub struct UserState {
     pub user_id: String,
     pub display_name: String,
     pub email: String,
+    pub is_active: bool,
     pub is_admin: bool,
     pub permissions: Vec<SimplePermission>,
     pub session_id: String,
@@ -52,8 +53,25 @@ impl From<User> for UserState {
             user_id: value.id,
             display_name: value.display_name,
             email: value.email,
+            is_active: value.active,
             is_admin: value.is_admin,
             permissions: vec![],
+            session_id: "".to_string(),
+        }
+    }
+}
+
+impl From<UserWithPerms> for UserState {
+    fn from(value: UserWithPerms) -> Self {
+        let user = value.user.unwrap_or_default();
+        let perms = value.project_perms.into_iter().map(|p| p.into()).collect::<Vec<_>>();
+        UserState {
+            user_id: user.id,
+            display_name: user.display_name,
+            email: user.email,
+            is_active: user.active,
+            is_admin: user.is_admin,
+            permissions: perms,
             session_id: "".to_string(),
         }
     }
