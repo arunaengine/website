@@ -1,7 +1,7 @@
 use leptos::*;
 use leptos_meta::*;
 
-use crate::utils::structs::{TokenStats, UpdateTokens};
+use crate::utils::structs::{TokenStats, UpdateTokens, UserState};
 
 #[server(DeleteToken, "/web")]
 pub async fn delete_token(
@@ -137,10 +137,18 @@ pub fn Token(cx: Scope, token_info: TokenStats) -> impl IntoView {
 
 /// Renders the home page of your application.
 #[component]
-pub fn Session(cx: Scope, token_info: TokenStats, is_current: bool) -> impl IntoView {
+pub fn Session(cx: Scope, token_info: TokenStats) -> impl IntoView {
     provide_meta_context(cx);
 
+
+    let get_user =
+        use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
+
+    let session_id = move || get_user.read(cx).unwrap_or_default().unwrap_or_default().session_id;
+
     let token_id = store_value(cx, token_info.id.to_string());
+
+    let is_current = move || session_id() == token_id();
 
     let update_tokens = use_context::<UpdateTokens>(cx).expect("user_state not set");
 
@@ -156,27 +164,23 @@ pub fn Session(cx: Scope, token_info: TokenStats, is_current: bool) -> impl Into
 
     view! {cx,
         <tr>
-            <td>{token_info.id.clone()}</td>
-            <td>{token_info.expires_at}</td>
-            <td>{token_info.used_at}</td>
-            <td>
-                <div class="d-flex">
-                    {move || if is_current {
+            <td>{move || if is_current() {
                         view!{cx,
-                            <span class="status status-green me-2">
-                                <span class="status-dot status-dot-animated"></span>
-                                "current"
-                            </span>
+                            <span class="status-dot status-dot-animated status-green"></span>
                         }.into_view(cx)
                     }else{
                         ().into_view(cx)
-                    }}
+                    }}{token_info.id.clone()}</td>
+            <td>{token_info.expires_at}</td>
+            <td>{token_info.used_at}</td>
+            <td>
+                <div class="d-flex text-center">
                     <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" on:click=move |_| {set_deleting.set(token_id.get_value())}>
                     <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                         {move || {
                             let _ = dispatch_delete.read(cx);
                             view!{cx, 
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash text-end" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                     <path d="M4 7l16 0"></path>
                                     <path d="M10 11l0 6"></path>

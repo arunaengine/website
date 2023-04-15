@@ -89,7 +89,7 @@ pub fn CreateTokenSuccess(cx: Scope, create_token_resp: TokenResponse) -> impl I
 
     view! {cx,
         <div class="modal mt-5 fade" id="createTokenResult" _ref=modal_ref tabindex="-1">
-        <div class="modal-dialog modal-md" role="document">
+        <div class="modal-dialog modal-md modal-dialog-scrollable" role="document">
             <div class="modal-content">
                 <div class="modal-status bg-success"></div>
 

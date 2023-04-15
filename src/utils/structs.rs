@@ -21,6 +21,7 @@ pub struct UserState {
     pub email: String,
     pub is_admin: bool,
     pub permissions: Vec<SimplePermission>,
+    pub session_id: String,
 }
 
 impl From<ProjectPermission> for SimplePermission {
@@ -40,6 +41,7 @@ impl From<User> for UserState {
             email: value.email,
             is_admin: value.is_admin,
             permissions: vec![],
+            session_id: "".to_string(),
         }
     }
 }

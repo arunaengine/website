@@ -177,7 +177,7 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                                 sessions().into_iter()
                                 .map(|item| view! {
                                     cx,
-                                    <Session token_info=item is_current=true/>
+                                    <Session token_info=item/>
                                 })
                                 .collect::<Vec<_>>().into_view(cx)
                             }else{

@@ -34,8 +34,10 @@ pub async fn get_user_info(
             ServerFnError::Request("Invalid request".to_string())
         })?;
 
+    let session_id;
+
     match user_info {
-        Some(i) => {
+        Some(mut i) => {
             let token_type = sess
                 .get::<String>("token-type")
                 .map_err(|_| {
@@ -67,13 +69,23 @@ pub async fn get_user_info(
                     ServerFnError::Request("Invalid request".to_string())
                 })?;
 
+                session_id = create_resp.token.clone().unwrap_or_default().id;
+
                 sess.insert("token-id", create_resp.token.unwrap_or_default().id)
                     .map_err(|_| {
                         log::debug!("Unable to insert aruna token-id to session 2");
                         ServerFnError::Request("Invalid request".to_string())
                     })?;
+            }else{
+                session_id = sess.get::<String>("token-id").unwrap_or_default().unwrap_or_default();
             };
-            Ok(i)
+
+            if i.session_id.is_empty() {
+                i.session_id = session_id;
+                Ok(i)
+            }else{
+                Ok(i)
+            }
         }
         None => {
             let token_type = sess
@@ -107,15 +119,22 @@ pub async fn get_user_info(
                     ServerFnError::Request("Invalid request".to_string())
                 })?;
 
+                session_id = create_resp.token.clone().unwrap_or_default().id;
+
                 sess.insert("token-id", create_resp.token.unwrap_or_default().id)
                     .map_err(|_| {
                         log::debug!("Unable to insert aruna token-id to session 2");
                         ServerFnError::Request("Invalid request".to_string())
                     })?;
-            }
+            }else{
+                session_id = sess.get::<String>("token-id").unwrap_or_default().unwrap_or_default();
+            };
 
             match who_am_i(&token).await {
-                Ok(i) => Ok(i),
+                Ok(mut i) => {
+                    i.session_id = session_id;
+                    Ok(i)
+                },
                 Err(_) => {
                     log::debug!("Who am i request error");
                     return Err(ServerFnError::Request(
