@@ -61,7 +61,7 @@ pub fn Token(cx: Scope, token_info: TokenStats) -> impl IntoView {
             <td>{token_info.name.clone()}</td>
             <td>{token_info.used_at.clone()}</td>
             <td>
-                <div class="d-flex">
+                <div class="d-flex justify-content-end">
                     <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target=format!(r##"#S{}"##, token_info.id) aria-expanded="false">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -164,23 +164,27 @@ pub fn Session(cx: Scope, token_info: TokenStats) -> impl IntoView {
 
     view! {cx,
         <tr>
-            <td>{move || if is_current() {
-                        view!{cx,
-                            <span class="status-dot status-dot-animated status-green"></span>
-                        }.into_view(cx)
-                    }else{
-                        ().into_view(cx)
-                    }}{token_info.id.clone()}</td>
+            <td>{token_info.id.clone()}</td>
             <td>{token_info.expires_at}</td>
             <td>{token_info.used_at}</td>
             <td>
-                <div class="d-flex text-center">
+                <div class="d-flex justify-content-end">
+                    {move || if is_current() {
+                        view!{cx,
+                            <span class="status status-green me-2">
+                                <span class="status-dot status-dot-animated"></span>
+                                "current"
+                            </span>
+                        }.into_view(cx)
+                    }else{
+                        ().into_view(cx)
+                    }}
                     <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" on:click=move |_| {set_deleting.set(token_id.get_value())}>
                     <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                         {move || {
                             let _ = dispatch_delete.read(cx);
                             view!{cx, 
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash text-end" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                     <path d="M4 7l16 0"></path>
                                     <path d="M10 11l0 6"></path>

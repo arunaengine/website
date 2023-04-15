@@ -3,6 +3,7 @@ pub mod header;
 pub mod main_body;
 pub mod panel;
 pub mod panel_nav;
+pub mod project;
 pub mod projects;
 pub mod register;
 pub mod token;

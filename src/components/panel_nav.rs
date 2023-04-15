@@ -91,7 +91,7 @@ pub fn PanelNav(cx: Scope) -> impl IntoView {
                         </li>
                     </ul>
                     <div class="my-2 my-md-0 flex-grow-1 flex-md-grow-0 order-first order-md-last">
-                        <select type="text" class="form-select ts-hidden-accessible" id="select-project" value="" tabindex="-1">
+                        <select type="text" class="form-select ts-hidden-accessible" id="select-project" value="" tabindex="-1" hidden>
                             <option value="project_1">"Project_1"</option>
                             <option value="jQuery">"jQuery"</option>
                             <option value="Bootstrap">"Bootstrap"</option>

@@ -108,7 +108,7 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                             <th>"Id"</th>
                             <th>"Name"</th>
                             <th>"Last used"</th>
-                            <th class="w-3 text-center">"Actions"</th>
+                            <th class="w-3 text-end">"Actions"</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -167,7 +167,7 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                         <th>"Id"</th>
                         <th>"Expires"</th>
                         <th>"Last used"</th>
-                        <th class="w-3 text-center">"Actions"</th>
+                        <th class="w-3 text-end">"Actions"</th>
                     </tr>
                     </thead>
                     <tbody>
