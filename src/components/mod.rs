@@ -10,6 +10,7 @@ pub mod register;
 pub mod token;
 pub mod tokens;
 pub mod alert_modal;
+pub mod user;
 
 use cfg_if::cfg_if;
 

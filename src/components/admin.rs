@@ -30,7 +30,7 @@ pub fn AdminOverview(cx: Scope) -> impl IntoView {
         <div class="row g-2 align-items-center">
             <div class="col">
             <h2 class="page-title">
-                "Admin Panel!"
+                "Admin"
             </h2>
             </div>
         </div>
@@ -44,7 +44,8 @@ pub fn AdminOverview(cx: Scope) -> impl IntoView {
                     <tr>
                         <th>"Id"</th>
                         <th>"Name"</th>
-                        <th>"Role"</th>
+                        <th>"Email"</th>
+                        <th>"GlobalRole"</th>
                         <th class="w-1">"Actions"</th>
                     </tr>
                     </thead>
