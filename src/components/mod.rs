@@ -26,6 +26,7 @@ cfg_if! {
             _ = create_token::CreateTokenServer::register();
             _ = tokens::GetTokens::register();
             _ = token::DeleteToken::register();
+            _ = admin::GetUsers::register();
         }
 
     }

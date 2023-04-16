@@ -4,7 +4,7 @@ use crate::utils::structs::UserState;
 
 /// Renders the home page of your application.
 #[component]
-pub fn Project(cx: Scope, user: UserState) -> impl IntoView {
+pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
     provide_meta_context(cx);
 
 

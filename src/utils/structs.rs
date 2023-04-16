@@ -83,6 +83,9 @@ pub struct UpdateUser(pub RwSignal<bool>);
 #[derive(Clone, Copy)]
 pub struct UpdateTokens(pub RwSignal<bool>);
 
+#[derive(Clone, Copy)]
+pub struct UpdateAdmin(pub RwSignal<bool>);
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct TokenResponse {
     pub id: String,

@@ -112,7 +112,7 @@ pub async fn aruna_delete_api_token(token_id: String, token: &str) -> Result<()>
 pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
     let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
-    let get_users_req = tonic::Request::new(GetAllUsersRequest {});
+    let get_users_req = tonic::Request::new(GetAllUsersRequest {include_permissions: true});
     let mut client = user_service_client::UserServiceClient::new(channel);
     // Send the request to the AOS instance gRPC gateway
     let response: GetAllUsersResponse = client
