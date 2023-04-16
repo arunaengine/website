@@ -7,16 +7,6 @@ use crate::utils::structs::UserState;
 pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
     provide_meta_context(cx);
 
-
-    //
-    // pub user_id: String,
-    // pub display_name: String,
-    // pub email: String,
-    // pub is_active: bool,
-    // pub is_admin: bool,
-    // pub permissions: Vec<SimplePermission>,
-    // pub session_id: String,
-
     let is_active = user.is_active.clone(); 
 
 
@@ -125,48 +115,33 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
             </td>
         </tr>
         <tr class="accordion-collapse collapse" id=format!("U{}", user.user_id.clone()) data-bs-parent="#adminTable">
-            <td colspan="4"> "User Projects"
-                <div class="table-responsive">
-                    <table class="table table-vcenter card-table">
-                        <thead>
-                        <tr>
-                            <th>"Project_id"</th>
-                            <th>"Permission"</th>
-                            <th>""</th>
-                            <th class="w-1">"Actions"</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                            <Transition fallback=move || view! { cx, <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
-                            {
-                                move || if !stored_permission.get_value().is_empty() {
-                                    stored_permission.get_value().into_iter()
-                                    .map(|item| view! {
-                                        cx,
-                                        <td>{item.project_id.to_string()}</td>
-                                        <td>{item.to_permission_string()}</td>
-                                        <td>""</td>
-                                        <div class="d-flex justify-content-end">
-                                            <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                                    <path d="M12 5l0 14"></path>
-                                                    <path d="M18 13l-6 6"></path>
-                                                    <path d="M6 13l6 6"></path>
-                                                </svg>
-                                            </a>
-                                        </div>
-                                    })
-                                    .collect::<Vec<_>>().into_view(cx) 
-                                }else{
-                                    view!{cx, <tr><td colspan="4" class="text-center">"Looks like this user is currently not member in any project!"</td></tr>}.into_view(cx)
-                                }
-                            }
-                            </Transition>
-                        </tbody>
-                    </table>
-                </div>
-            </td>
+            <Transition fallback=move || view! { cx, <tr><td colspan="5" class="text-center"><div class="spinner-border"></div></td></tr> }>
+            {
+                move || if !stored_permission.get_value().is_empty() {
+                    stored_permission.get_value().into_iter()
+                    .map(|item| view! {
+                        cx,
+                        <td>"PID:"</td>
+                        <td>{item.project_id.to_string()}</td>
+                        <td>"Role:"</td>
+                        <td>{item.to_permission_string()}</td>
+                        <div class="d-flex justify-content-end">
+                            <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M12 5l0 14"></path>
+                                    <path d="M18 13l-6 6"></path>
+                                    <path d="M6 13l6 6"></path>
+                                </svg>
+                            </a>
+                        </div>
+                    })
+                    .collect::<Vec<_>>().into_view(cx) 
+                }else{
+                    view!{cx, <tr><td colspan="4" class="text-center">"Looks like this user is currently not member in any project!"</td></tr>}.into_view(cx)
+                }
+            }
+            </Transition>
         </tr>
     }
 }

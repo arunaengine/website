@@ -6,7 +6,7 @@ use crate::utils::structs::{UserState, UpdateAdmin};
 pub async fn get_users(
     #[allow(unused_variables)] cx: Scope,
 ) -> Result<Vec<UserState>, ServerFnError> {
-    use crate::utils::aruna_api_handlers::aruna_get_api_tokens;
+    use crate::utils::aruna_api_handlers::aruna_get_all_users;
     use actix_session::SessionExt;
     use actix_web::HttpRequest;
     let req = use_context::<HttpRequest>(cx)
@@ -31,7 +31,7 @@ pub async fn get_users(
     })?;
 
     Ok(result
-        .token
+        .user_with_perms
         .into_iter()
         .map(UserState::from)
         .collect::<Vec<UserState>>())
