@@ -156,7 +156,6 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
     use crate::components::register::*;
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(cx, true));
-
     
 
     let res = create_resource(cx, update_user.0, move |_| async move {

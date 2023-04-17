@@ -5,6 +5,9 @@ use crate::utils::structs::UserState;
 /// Renders the home page of your application.
 #[component]
 pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
+
+    use crate::components::activate_modal::*;
+
     provide_meta_context(cx);
 
     let is_active = user.is_active.clone(); 
@@ -59,9 +62,10 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
     }};
 
     let stored_permission = store_value(cx, user.permissions);
-    
+    let store_user = store_value(cx, user.user_id.clone());
 
     view! {cx,
+        <ActivateModal user_id=store_user.get_value()/>
         <tr>
             <td>{user.user_id.clone()}</td>
             <td>{user.display_name.clone()}</td>
@@ -69,7 +73,7 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
             <td>{create_active_badges}{create_role_badges}</td>
             <td>
                 <div class="d-flex justify-content-end">
-                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target=format!(r##"#U{}"##, user.user_id.clone()) aria-expanded="false">
+                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target=format!(r##"#U{}"##, store_user.get_value()) aria-expanded="false">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                             <path d="M12 5l0 14"></path>
@@ -92,10 +96,10 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                                     }}
                                     </Suspense>
                                 </a>
-                                }
+                                }.into_view(cx)
                             }else{
                                 view!{cx,
-                                <a href="#" class="btn btn-success btn-icon btn-sm" aria-label="Button" role="button" >//on:click=move |_| {set_deleting.set(token_id.get_value())}>
+                                <a href="#" class="btn btn-success btn-icon btn-sm" aria-label="Button" role="button" data-bs-toggle="modal" data-bs-target=format!("#AV{}", store_user.get_value())>//on:click=move |_| {set_deleting.set(token_id.get_value())}>
                                 <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                                     {move || {
                                         view!{cx, 
@@ -104,17 +108,18 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                                                 <path d="M12 5l0 14"></path>
                                                 <path d="M5 12l14 0"></path>
                                             </svg>
-                                        }
+                                           
+                                        }.into_view(cx)
                                     }}
                                     </Suspense>
                                 </a>
-                                }
+                                }.into_view(cx)
                             }
                     }
                 </div>
             </td>
         </tr>
-        <tr class="accordion-collapse collapse" id=format!("U{}", user.user_id.clone()) data-bs-parent="#adminTable">
+        <tr class="accordion-collapse collapse" id=format!("U{}", store_user.get_value()) data-bs-parent="#adminTable">
             <Transition fallback=move || view! { cx, <tr><td colspan="5" class="text-center"><div class="spinner-border"></div></td></tr> }>
             {
                 move || if !stored_permission.get_value().is_empty() {

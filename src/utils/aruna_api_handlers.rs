@@ -2,8 +2,10 @@ use anyhow::{anyhow, Result};
 use aruna_rust_api::api::storage::services::v1::{
     user_service_client, CreateApiTokenRequest, CreateApiTokenResponse, DeleteApiTokenRequest,
     GetApiTokensRequest, GetApiTokensResponse, GetUserRequest, GetUserResponse,
-    RegisterUserRequest, RegisterUserResponse, GetAllUsersRequest, GetAllUsersResponse
+    RegisterUserRequest, RegisterUserResponse, GetAllUsersRequest, GetAllUsersResponse,
+    ActivateUserRequest
 };
+use aruna_rust_api::api::storage::models::v1::ProjectPermission;
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
     transport::Channel,
@@ -121,3 +123,24 @@ pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
         .into_inner();
     Ok(response)
 }
+
+pub async fn aruna_activate_user(token: &str, user_id: &str, project_ulid: &str, perm: i32) -> Result<()> {
+    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let channel = endpoint.connect().await?;
+    let act_user_req = tonic::Request::new(ActivateUserRequest {user_id: user_id.to_string(),  project_perms: Some(ProjectPermission{
+        user_id: user_id.to_string(),
+        permission: perm,
+        project_id: project_ulid.to_string(),
+        service_account: false,
+    })});
+    let mut client = user_service_client::UserServiceClient::new(channel);
+    // Send the request to the AOS instance gRPC gateway
+    client
+        .activate_user(add_token(act_user_req, token))
+        .await?
+        .into_inner();
+    Ok(())
+}
+
+
+
