@@ -30,11 +30,16 @@ pub async fn get_users(
         ServerFnError::Request("Invalid request".to_string())
     })?;
 
-    Ok(result
-        .user_with_perms
-        .into_iter()
-        .map(UserState::from)
-        .collect::<Vec<UserState>>())
+
+    let mut vector = result
+    .user_with_perms
+    .into_iter()
+    .map(UserState::from)
+    .collect::<Vec<UserState>>();
+
+    vector.sort_by(|a, b| a.is_active.cmp(&b.is_active));
+
+    Ok(vector)
 }
 
 #[component]

@@ -1,15 +1,60 @@
 use leptos::*;
 use leptos_meta::*;
+use leptos_router::*;
+
+
+#[server(ActivateUser, "/web")]
+pub async fn activate_user(
+    #[allow(unused_variables)] cx: Scope,
+    user_id: String,
+    project_id: Option<String>,
+    perm: Option<i32>,
+) -> Result<(), ServerFnError> {
+    use crate::utils::aruna_api_handlers::aruna_activate_user;
+    use actix_session::SessionExt;
+    use actix_web::HttpRequest;
+    let req = use_context::<HttpRequest>(cx).unwrap();
+
+    let sess = req.get_session();
+
+    let token = sess
+        .get::<String>("token")
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
+        .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+
+    let _resp = aruna_activate_user(&token, &user_id, project_id, perm)
+        .await
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
+
+    Ok(())
+}
+
+
 
 /// Renders the home page of your application.
 #[component]
 pub fn ActivateModal(cx: Scope, user_id: String) -> impl IntoView {
     provide_meta_context(cx);
 
+
+    let activate_user = create_server_action::<ActivateUser>(cx);
+
     view! {cx,
-        <div class="modal" id=format!("AV{}", user_id.clone()) tabindex="-1">
+      <div class="modal" id=format!("AV{}", user_id.clone()) tabindex="-1">
         <div class="modal-dialog modal-sm" role="document">
           <div class="modal-content">
+              <ActionForm on:submit=move |ev| {
+                let data = ActivateUser::from_event(&ev).expect("to parse form data");
+                // silly example of validation: if the todo is "nope!", nope it
+                if !data.user_id.is_empty()  {
+                    // ev.prevent_default() will prevent form submission
+                    // Cheap validation -> will be fixed when https://github.com/leptos-rs/leptos/issues/851 is upstream
+                    window().alert_with_message("Email must be valid or empty").unwrap();
+                    ev.prevent_default();
+                }
+              }
+              action=activate_user
+              >
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             <div class="modal-status bg-success"></div>
             <div class="modal-body text-center py-4">
@@ -23,21 +68,22 @@ pub fn ActivateModal(cx: Scope, user_id: String) -> impl IntoView {
               <div class="text-muted mb-3">{format!("ID: {user_id}")}</div>
               <div class="form-floating mb-3">
                   <input type="text" class="form-control text-lowercase"
-                      id="projid" name="projid" placeholder="Project ID"
-                      required />
+                      id="projid" name="project_id" placeholder="Project ID"
+                    />
                   <label for="projid">"Project ULID"</label>
                   <div class="invalid-feedback">
                   "Invalid ULID expected format: '01BX5ZZKBKACTAV9WEVGEMMVRY'"
                   </div>
               </div>
+              <input type="hidden" id="userId" name="user_id" value=user_id.clone()>
               <div class="form-floating mb-3">
-                  <select class="form-select" id="selectperm" name="selectperm" aria-label="Token permissions"
+                  <select class="form-select" id="selectperm" name="perm" aria-label="Token permissions"
                       required>
-                      <option value="NONE" selected>"NONE"</option>
-                      <option value="READ">"READ"</option>
-                      <option value="APPEND">"APPEND"</option>
-                      <option value="MODIFY">"MODIFY"</option>
-                      <option value="ADMIN">"ADMIN"</option>
+                      <option value=1 selected>"NONE"</option>
+                      <option value=2>"READ"</option>
+                      <option value=3>"APPEND"</option>
+                      <option value=4>"MODIFY"</option>
+                      <option value=5>"ADMIN"</option>
                   </select>
                   <label for="selectperm">"Project permissions"</label>
               </div>
@@ -48,12 +94,13 @@ pub fn ActivateModal(cx: Scope, user_id: String) -> impl IntoView {
                   <div class="col"><a href="#" class="btn w-100" data-bs-dismiss="modal">
                       "Cancel"
                     </a></div>
-                  <div class="col"><a href="#" class="btn btn-success w-100" data-bs-dismiss="modal" on:click=move |_| {}>
+                <div class="col"><button href="#" type="submit" class="btn btn-success w-100">
                       "Activate"
-                    </a></div>
+                    </button></div>
                 </div>
               </div>
             </div>
+            </ActionForm>
           </div>
         </div>
       </div>

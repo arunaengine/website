@@ -124,15 +124,29 @@ pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
     Ok(response)
 }
 
-pub async fn aruna_activate_user(token: &str, user_id: &str, project_ulid: &str, perm: i32) -> Result<()> {
+pub async fn aruna_activate_user(token: &str, user_id: &str, project_ulid: Option<String>, perm: Option<i32>) -> Result<()> {
+
+
+    let perm = match project_ulid {
+        Some(pul) => {
+            match perm {
+                Some(pe) => {
+                    Some(ProjectPermission{
+                        user_id: user_id.to_string(),
+                        permission: pe,
+                        project_id: pul,
+                        service_account: false,
+                    })
+                }
+                None => None,
+            }
+        }
+        None => None,
+    };
+
     let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
-    let act_user_req = tonic::Request::new(ActivateUserRequest {user_id: user_id.to_string(),  project_perms: Some(ProjectPermission{
-        user_id: user_id.to_string(),
-        permission: perm,
-        project_id: project_ulid.to_string(),
-        service_account: false,
-    })});
+    let act_user_req = tonic::Request::new(ActivateUserRequest {user_id: user_id.to_string(),  project_perms: perm});
     let mut client = user_service_client::UserServiceClient::new(channel);
     // Send the request to the AOS instance gRPC gateway
     client
