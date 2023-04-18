@@ -165,3 +165,27 @@ pub async fn aruna_deactivate_user(token: &str, user_id: &str) -> Result<()> {
 }
 
 
+pub async fn aruna_add_user_to_proj(token: &str, user_id: &str, project_id: &str, perm: i32) -> Result<()> {
+
+    let projperm = ProjectPermission{
+        user_id: user_id.to_string(),
+        permission: perm,
+        project_id: project_id.to_string(),
+        service_account: false,
+    };
+
+    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let channel = endpoint.connect().await?;
+    let add_user_proj = tonic::Request::new(AddUserToProjectRequest {project_id: project_id.to_string(),  user_permission: projperm});
+    let mut client = project_service_client::ProjectServiceClient::new(channel);
+    // Send the request to the AOS instance gRPC gateway
+    client
+        .add_user_to_project(add_token(add_user_proj, token))
+        .await?
+        .into_inner();
+    Ok(())
+}
+
+
+
+
