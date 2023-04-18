@@ -29,6 +29,7 @@ cfg_if! {
             _ = token::DeleteToken::register();
             _ = admin::GetUsers::register();
             _ = activate_modal::ActivateUser::register();
+            _ = user::DeactivateUser::register();
         }
 
     }

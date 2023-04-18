@@ -1,6 +1,6 @@
 use leptos::*;
 use leptos_meta::*;
-use crate::utils::structs::UserState;
+use crate::utils::structs::{UserState, UpdateAdmin};
 
 
 #[server(DeactivateUser, "/web")]
@@ -20,7 +20,7 @@ pub async fn deactivate_user(
         .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
         .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
 
-    let _resp = aruna_deactivate_user(&token, &user_id, project_id, perm)
+    let _resp = aruna_deactivate_user(&token, &user_id)
         .await
         .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
 
@@ -36,6 +36,22 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
     provide_meta_context(cx);
 
     let is_active = user.is_active.clone(); 
+
+
+    let deactivate_action = create_server_action::<DeactivateUser>(cx);
+    let last_version = create_rw_signal(cx, 0);
+
+    let update_admin = use_context::<UpdateAdmin>(cx).expect("user_state not set");
+
+    create_effect(cx, move |_| {
+        if last_version() < deactivate_action.version()() {
+
+            update_admin.0.update(|e| *e = !*e);
+
+            last_version.set_untracked(deactivate_action.version()())
+        }
+
+    });
 
 
     let create_active_badges = {move || {
@@ -109,7 +125,7 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                     {move || 
                         if is_active {
                             view!{cx,
-                                <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" >//on:click=move |_| {set_deleting.set(token_id.get_value())}>
+                                <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" on:click=move |_| {deactivate_action.dispatch(DeactivateUser { user_id: store_user.get_value() })}>
                                 <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                                     {move || {
                                         view!{cx, 

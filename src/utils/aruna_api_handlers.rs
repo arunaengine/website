@@ -3,7 +3,7 @@ use aruna_rust_api::api::storage::services::v1::{
     user_service_client, CreateApiTokenRequest, CreateApiTokenResponse, DeleteApiTokenRequest,
     GetApiTokensRequest, GetApiTokensResponse, GetUserRequest, GetUserResponse,
     RegisterUserRequest, RegisterUserResponse, GetAllUsersRequest, GetAllUsersResponse,
-    ActivateUserRequest
+    ActivateUserRequest, DeactivateUserRequest
 };
 use aruna_rust_api::api::storage::models::v1::ProjectPermission;
 use tonic::{
