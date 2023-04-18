@@ -2,6 +2,31 @@ use leptos::*;
 use leptos_meta::*;
 use crate::utils::structs::UserState;
 
+
+#[server(DeactivateUser, "/web")]
+pub async fn deactivate_user(
+    #[allow(unused_variables)] cx: Scope,
+    user_id: String,
+) -> Result<(), ServerFnError> {
+    use crate::utils::aruna_api_handlers::aruna_deactivate_user;
+    use actix_session::SessionExt;
+    use actix_web::HttpRequest;
+    let req = use_context::<HttpRequest>(cx).unwrap();
+
+    let sess = req.get_session();
+
+    let token = sess
+        .get::<String>("token")
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
+        .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+
+    let _resp = aruna_deactivate_user(&token, &user_id, project_id, perm)
+        .await
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
+
+    Ok(())
+}
+
 /// Renders the home page of your application.
 #[component]
 pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {

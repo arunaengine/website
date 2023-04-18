@@ -126,7 +126,6 @@ pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
 
 pub async fn aruna_activate_user(token: &str, user_id: &str, project_ulid: Option<String>, perm: i32) -> Result<()> {
 
-
     let perm = match project_ulid {
         Some(pul) => {
             Some(ProjectPermission{
@@ -151,5 +150,18 @@ pub async fn aruna_activate_user(token: &str, user_id: &str, project_ulid: Optio
     Ok(())
 }
 
+pub async fn aruna_deactivate_user(token: &str, user_id: &str) -> Result<()> {
+
+    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let channel = endpoint.connect().await?;
+    let dact_user_req = tonic::Request::new(DeactivateUserRequest {user_id: user_id.to_string()});
+    let mut client = user_service_client::UserServiceClient::new(channel);
+    // Send the request to the AOS instance gRPC gateway
+    client
+        .deactivate_user(add_token(dact_user_req, token))
+        .await?
+        .into_inner();
+    Ok(())
+}
 
 
