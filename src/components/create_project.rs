@@ -5,11 +5,10 @@ use leptos_router::*;
 #[server(CreateProjectRequest, "/web")]
 pub async fn creat_project_req(
     #[allow(unused_variables)] cx: Scope,
-    user_id: String,
-    project_id: String,
-    perm: i32,
+    name: String,
+    description: String,
 ) -> Result<(), ServerFnError> {
-    use crate::utils::aruna_api_handlers::aruna_add_user_to_proj;
+    use crate::utils::aruna_api_handlers::aruna_create_project;
     use actix_session::SessionExt;
     use actix_web::HttpRequest;
     let req = use_context::<HttpRequest>(cx).unwrap();
@@ -21,7 +20,7 @@ pub async fn creat_project_req(
         .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
         .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
 
-    let _resp = aruna_add_user_to_proj(&token, &user_id, &project_id, perm)
+    let _resp = aruna_create_project(&token, &name, &description)
         .await
         .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
 
@@ -34,26 +33,23 @@ pub async fn creat_project_req(
 pub fn CreateProject(cx: Scope) -> impl IntoView {
     provide_meta_context(cx);
 
-    let activate_user = create_server_action::<CreateProjectRequest>(cx);
+    let create_project_action = create_server_action::<CreateProjectRequest>(cx);
 
     view! {cx,
       <div class="modal" id="createProject" tabindex="-1">
         <div class="modal-dialog modal-sm" role="document">
           <div class="modal-content">
               <ActionForm on:submit=move |ev| {
-                ev.prevent_default();
                 let data = CreateProjectRequest::from_event(&ev).expect("to parse form data");
                 // silly example of validation: if the todo is "nope!", nope it
-                if data.user_id.is_empty()  {
+                if data.name.is_empty()  {
                     // ev.prevent_default() will prevent form submission
                     // Cheap validation -> will be fixed when https://github.com/leptos-rs/leptos/issues/851 is upstream
-                    window().alert_with_message("UserID must be valid").unwrap();
+                    window().alert_with_message("Name must be valid").unwrap();
                     ev.prevent_default();
                 }
-
-
               }
-              action=activate_user
+              action=create_project_action
               >
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             <div class="modal-status bg-success"></div>
