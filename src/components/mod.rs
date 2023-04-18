@@ -13,6 +13,7 @@ pub mod alert_modal;
 pub mod user;
 pub mod activate_modal;
 pub mod add_user;
+pub mod create_project;
 
 use cfg_if::cfg_if;
 

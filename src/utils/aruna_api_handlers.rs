@@ -202,4 +202,18 @@ pub async fn aruna_remove_user_from_project(token: &str, user_id: &str, project_
     Ok(())
 }
 
+pub async fn aruna_create_project(token: &str, project_name: &str, project_description: &str) -> Result<()> {
+
+    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let channel = endpoint.connect().await?;
+    let create_project = tonic::Request::new(CreateProjectRequest {project_name: project_name.to_string, project_description: project_description.to_string()});
+    let mut client = project_service_client::CreateProject::new(channel);
+    // Send the request to the AOS instance gRPC gateway
+    client
+        .remove_user_from_project(add_token(create_project, token))
+        .await?
+        .into_inner();
+    Ok(())
+}
+
 
