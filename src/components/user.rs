@@ -32,6 +32,7 @@ pub async fn deactivate_user(
 pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
 
     use crate::components::activate_modal::*;
+    use crate::components::add_user::*;
 
     provide_meta_context(cx);
 
@@ -107,6 +108,7 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
 
     view! {cx,
         <ActivateModal user_id=store_user.get_value()/>
+        <AddUserProject user_id=store_user.get_value()/>
         <tr>
             <td>{user.user_id.clone()}</td>
             <td>{user.display_name.clone()}</td>
@@ -132,6 +134,22 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-minus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                                 <path d="M5 12l14 0"></path>
+                                            </svg>
+                                        }
+                                    }}
+                                    </Suspense>
+                                </a>
+                                <a href="#" class="btn btn-success btn-icon btn-sm ms-2" aria-label="Button" role="button" data-bs-toggle="modal" data-bs-target=format!("ACU{}", store_user.get_value())>
+                                <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
+                                    {move || {
+                                        view!{cx, 
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users-plus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                <path d="M5 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"></path>
+                                                <path d="M3 21v-2a4 4 0 0 1 4 -4h4c.96 0 1.84 .338 2.53 .901"></path>
+                                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                                <path d="M16 19h6"></path>
+                                                <path d="M19 16v6"></path>
                                             </svg>
                                         }
                                     }}
@@ -173,11 +191,11 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                         <td>{item.to_permission_string()}</td>
                         <div class="d-flex justify-content-end">
                             <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-minus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    <path d="M12 5l0 14"></path>
-                                    <path d="M18 13l-6 6"></path>
-                                    <path d="M6 13l6 6"></path>
+                                    <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                                    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                                    <path d="M9 14l6 0"></path>
                                 </svg>
                             </a>
                         </div>

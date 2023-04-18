@@ -12,6 +12,7 @@ pub mod tokens;
 pub mod alert_modal;
 pub mod user;
 pub mod activate_modal;
+pub mod add_user;
 
 use cfg_if::cfg_if;
 

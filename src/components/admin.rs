@@ -102,7 +102,7 @@ pub fn AdminOverview(cx: Scope) -> impl IntoView {
                     </tr>
                     </thead>
                     <tbody>
-                        <Transition fallback=move || view! { cx, <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
+                        <Transition fallback=move || view! { cx, <tr><td colspan="5" class="text-center"><div class="spinner-border"></div></td></tr> }>
                         {
                             move || if !user_states().is_empty() {
                                 user_states().into_iter()
@@ -112,7 +112,7 @@ pub fn AdminOverview(cx: Scope) -> impl IntoView {
                                 })
                                 .collect::<Vec<_>>().into_view(cx) 
                             }else{
-                                view!{cx, <tr><td colspan="4" class="text-center">"Looks like you are currently not associated with any project!"</td></tr>}.into_view(cx)
+                                view!{cx, <tr><td colspan="5" class="text-center">"Looks like you are currently not associated with any project!"</td></tr>}.into_view(cx)
                             }
                         }
                         </Transition>
