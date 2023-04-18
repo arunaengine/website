@@ -1,3 +1,4 @@
+use crate::utils::structs::UpdateAdmin;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -8,7 +9,7 @@ pub async fn activate_user(
     #[allow(unused_variables)] cx: Scope,
     user_id: String,
     project_id: Option<String>,
-    perm: Option<i32>,
+    perm: i32,
 ) -> Result<(), ServerFnError> {
     use crate::utils::aruna_api_handlers::aruna_activate_user;
     use actix_session::SessionExt;
@@ -38,6 +39,17 @@ pub fn ActivateModal(cx: Scope, user_id: String) -> impl IntoView {
 
 
     let activate_user = create_server_action::<ActivateUser>(cx);
+    let update_admin = use_context::<UpdateAdmin>(cx).expect("user_state not set");
+
+    let current_state = create_rw_signal(cx, 0);
+
+    create_effect(cx, move |_| {
+      if activate_user.version()() > current_state() {
+
+        update_admin.0.update(|e| *e = !*e);
+        current_state.set_untracked(activate_user.version()())
+      }
+    });
 
     view! {cx,
       <div class="modal" id=format!("AV{}", user_id.clone()) tabindex="-1">
@@ -46,12 +58,14 @@ pub fn ActivateModal(cx: Scope, user_id: String) -> impl IntoView {
               <ActionForm on:submit=move |ev| {
                 let data = ActivateUser::from_event(&ev).expect("to parse form data");
                 // silly example of validation: if the todo is "nope!", nope it
-                if !data.user_id.is_empty()  {
+                if data.user_id.is_empty()  {
                     // ev.prevent_default() will prevent form submission
                     // Cheap validation -> will be fixed when https://github.com/leptos-rs/leptos/issues/851 is upstream
-                    window().alert_with_message("Email must be valid or empty").unwrap();
+                    window().alert_with_message("UserID must be valid").unwrap();
                     ev.prevent_default();
                 }
+
+
               }
               action=activate_user
               >
@@ -75,7 +89,7 @@ pub fn ActivateModal(cx: Scope, user_id: String) -> impl IntoView {
                   "Invalid ULID expected format: '01BX5ZZKBKACTAV9WEVGEMMVRY'"
                   </div>
               </div>
-              <input type="hidden" id="userId" name="user_id" value=user_id.clone()>
+              <input type="hidden" id="userId" name="user_id" value=user_id.clone() />
               <div class="form-floating mb-3">
                   <select class="form-select" id="selectperm" name="perm" aria-label="Token permissions"
                       required>
@@ -94,9 +108,11 @@ pub fn ActivateModal(cx: Scope, user_id: String) -> impl IntoView {
                   <div class="col"><a href="#" class="btn w-100" data-bs-dismiss="modal">
                       "Cancel"
                     </a></div>
-                <div class="col"><button href="#" type="submit" class="btn btn-success w-100">
+                  <div class="col">
+                    <button href="#" type="submit" class="btn btn-success w-100" data-bs-dismiss="modal">
                       "Activate"
-                    </button></div>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
