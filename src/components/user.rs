@@ -27,6 +27,31 @@ pub async fn deactivate_user(
     Ok(())
 }
 
+#[server(RemoveUser, "/web")]
+pub async fn remove_user_project(
+    #[allow(unused_variables)] cx: Scope,
+    user_id: String,
+    project_id: String,
+) -> Result<(), ServerFnError> {
+    use crate::utils::aruna_api_handlers::aruna_remove_user_from_project;
+    use actix_session::SessionExt;
+    use actix_web::HttpRequest;
+    let req = use_context::<HttpRequest>(cx).unwrap();
+
+    let sess = req.get_session();
+
+    let token = sess
+        .get::<String>("token")
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
+        .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+
+    let _resp = aruna_remove_user_from_project(&token, &user_id, &project_id)
+        .await
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
+
+    Ok(())
+}
+
 /// Renders the home page of your application.
 #[component]
 pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
@@ -36,24 +61,27 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
 
     provide_meta_context(cx);
 
-    let is_active = user.is_active.clone(); 
-
-
+    let is_active = user.is_active.clone();
     let deactivate_action = create_server_action::<DeactivateUser>(cx);
+    let remove_user_action = create_server_action::<RemoveUser>(cx);
     let last_version = create_rw_signal(cx, 0);
-
     let update_admin = use_context::<UpdateAdmin>(cx).expect("user_state not set");
 
     create_effect(cx, move |_| {
         if last_version() < deactivate_action.version()() {
-
             update_admin.0.update(|e| *e = !*e);
-
             last_version.set_untracked(deactivate_action.version()())
         }
-
     });
 
+
+    let remove_action_count = create_rw_signal(cx, 0);
+    create_effect(cx, move |_| {
+        if remove_action_count() < remove_user_action.version()() {
+            update_admin.0.update(|e| *e = !*e);
+            remove_action_count.set_untracked(remove_user_action.version()())
+        }
+    });
 
     let create_active_badges = {move || {
         if is_active {
@@ -139,7 +167,7 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                                     }}
                                     </Suspense>
                                 </a>
-                                <a href="#" class="btn btn-success btn-icon btn-sm ms-2" aria-label="Button" role="button" data-bs-toggle="modal" data-bs-target=format!("ACU{}", store_user.get_value())>
+                                <a href="#" class="btn btn-success btn-icon btn-sm ms-2" aria-label="Button" role="button" data-bs-toggle="modal" data-bs-target=format!("#ACU{}", store_user.get_value())>
                                 <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                                     {move || {
                                         view!{cx, 
@@ -189,20 +217,22 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                         <td>{item.project_id.to_string()}</td>
                         <td>"Role:"</td>
                         <td>{item.to_permission_string()}</td>
-                        <div class="d-flex justify-content-end">
-                            <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-minus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
-                                    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
-                                    <path d="M9 14l6 0"></path>
-                                </svg>
-                            </a>
-                        </div>
+                        <td>
+                            <div class="d-flex justify-content-end">
+                                <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon text-danger" role="button" aria-label="Button" on:click=move |_| {remove_user_action.dispatch(RemoveUser { user_id: store_user.get_value(), project_id: item.project_id.to_string() })}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-minus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                        <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                                        <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                                        <path d="M9 14l6 0"></path>
+                                    </svg>
+                                </a>
+                            </div>
+                        </td>
                     })
                     .collect::<Vec<_>>().into_view(cx) 
                 }else{
-                    view!{cx, <tr><td colspan="4" class="text-center">"Looks like this user is currently not member in any project!"</td></tr>}.into_view(cx)
+                    view!{cx, <td colspan="5" class="text-center">"Looks like this user is currently not member in any project!"</td>}.into_view(cx)
                 }
             }
             </Transition>

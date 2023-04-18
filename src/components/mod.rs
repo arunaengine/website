@@ -31,6 +31,8 @@ cfg_if! {
             _ = admin::GetUsers::register();
             _ = activate_modal::ActivateUser::register();
             _ = user::DeactivateUser::register();
+            _ = add_user::AddUserProject::register();
+            _ = user::RemoveUser::register();
         }
 
     }

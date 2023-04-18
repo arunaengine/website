@@ -11,7 +11,7 @@ pub async fn add_user_project(
     project_id: String,
     perm: i32,
 ) -> Result<(), ServerFnError> {
-    use crate::utils::aruna_api_handlers::aruna_activate_user;
+    use crate::utils::aruna_api_handlers::aruna_add_user_to_proj;
     use actix_session::SessionExt;
     use actix_web::HttpRequest;
     let req = use_context::<HttpRequest>(cx).unwrap();
@@ -23,13 +23,12 @@ pub async fn add_user_project(
         .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
         .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
 
-    let _resp = aruna_activate_user(&token, &user_id, project_id, perm)
+    let _resp = aruna_add_user_to_proj(&token, &user_id, &project_id, perm)
         .await
         .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
 
     Ok(())
 }
-
 
 
 /// Renders the home page of your application.

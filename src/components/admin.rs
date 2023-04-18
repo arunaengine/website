@@ -30,7 +30,6 @@ pub async fn get_users(
         ServerFnError::Request("Invalid request".to_string())
     })?;
 
-
     let mut vector = result
     .user_with_perms
     .into_iter()

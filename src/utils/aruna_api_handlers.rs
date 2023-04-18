@@ -3,9 +3,11 @@ use aruna_rust_api::api::storage::services::v1::{
     user_service_client, CreateApiTokenRequest, CreateApiTokenResponse, DeleteApiTokenRequest,
     GetApiTokensRequest, GetApiTokensResponse, GetUserRequest, GetUserResponse,
     RegisterUserRequest, RegisterUserResponse, GetAllUsersRequest, GetAllUsersResponse,
-    ActivateUserRequest, DeactivateUserRequest
+    ActivateUserRequest, DeactivateUserRequest, RemoveUserFromProjectRequest
 };
 use aruna_rust_api::api::storage::models::v1::ProjectPermission;
+use aruna_rust_api::api::storage::services::v1::AddUserToProjectRequest;
+use aruna_rust_api::api::storage::services::v1::project_service_client;
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
     transport::Channel,
@@ -176,7 +178,7 @@ pub async fn aruna_add_user_to_proj(token: &str, user_id: &str, project_id: &str
 
     let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
-    let add_user_proj = tonic::Request::new(AddUserToProjectRequest {project_id: project_id.to_string(),  user_permission: projperm});
+    let add_user_proj = tonic::Request::new(AddUserToProjectRequest {project_id: project_id.to_string(),  user_permission: Some(projperm)});
     let mut client = project_service_client::ProjectServiceClient::new(channel);
     // Send the request to the AOS instance gRPC gateway
     client
@@ -186,6 +188,18 @@ pub async fn aruna_add_user_to_proj(token: &str, user_id: &str, project_id: &str
     Ok(())
 }
 
+pub async fn aruna_remove_user_from_project(token: &str, user_id: &str, project_id: &str) -> Result<()> {
 
+    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let channel = endpoint.connect().await?;
+    let remove_user_proj = tonic::Request::new(RemoveUserFromProjectRequest {project_id: project_id.to_string(), user_id: user_id.to_string()});
+    let mut client = project_service_client::ProjectServiceClient::new(channel);
+    // Send the request to the AOS instance gRPC gateway
+    client
+        .remove_user_from_project(add_token(remove_user_proj, token))
+        .await?
+        .into_inner();
+    Ok(())
+}
 
 
