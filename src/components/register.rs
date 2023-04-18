@@ -65,16 +65,6 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
     let regex = Regex::new(r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})").unwrap();
     provide_meta_context(cx);
 
-    //let (registered, set_registered) = create_signal(cx, None::<String>);
-
-    //use crate::utils::modal::show_modal;
-    //show_modal("registerModal");
-
-    //let doc = document().unchecked_into::<web_sys::HtmlDocument>();
-    //set_registered(parse_cookies(doc.cookie().unwrap_or_default(), "registered"));
-
-    //Attach an event listener
-    //let custom_event = CustomEvent::new("shown.bs.modal").unwrap();
     let register_user = create_server_action::<RegisterUser>(cx);
 
     let nav = use_navigate(cx);

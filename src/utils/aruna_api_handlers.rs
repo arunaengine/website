@@ -4,7 +4,7 @@ use aruna_rust_api::api::storage::services::v1::{
     GetApiTokensRequest, GetApiTokensResponse, GetUserRequest, GetUserResponse,
     RegisterUserRequest, RegisterUserResponse, GetAllUsersRequest, GetAllUsersResponse,
     ActivateUserRequest, DeactivateUserRequest, RemoveUserFromProjectRequest,
-    CreateProjectRequest
+    CreateProjectRequest, GetProjectsRequest, GetProjectsResponse,
 };
 use aruna_rust_api::api::storage::models::v1::ProjectPermission;
 use aruna_rust_api::api::storage::services::v1::AddUserToProjectRequest;
@@ -204,7 +204,6 @@ pub async fn aruna_remove_user_from_project(token: &str, user_id: &str, project_
 }
 
 pub async fn aruna_create_project(token: &str, project_name: &str, description: &str) -> Result<()> {
-
     let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
     let channel = endpoint.connect().await?;
     let create_project_req = tonic::Request::new(CreateProjectRequest {name: project_name.to_string(), description: description.to_string()});
@@ -216,5 +215,21 @@ pub async fn aruna_create_project(token: &str, project_name: &str, description: 
         .into_inner();
     Ok(())
 }
+
+
+pub async fn aruna_get_all_projects(token: &str) -> Result<GetProjectsResponse> {
+    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let channel = endpoint.connect().await?;
+    let create_project_req = tonic::Request::new(GetProjectsRequest {});
+    let mut client = project_service_client::ProjectServiceClient::new(channel);
+    // Send the request to the AOS instance gRPC gateway
+    let resp: GetProjectsResponse = client
+        .get_projects(add_token(create_project_req, token))
+        .await?
+        .into_inner();
+    Ok(resp)
+}
+
+
 
 

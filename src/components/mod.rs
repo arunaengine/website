@@ -14,6 +14,7 @@ pub mod user;
 pub mod activate_modal;
 pub mod add_user;
 pub mod create_project;
+pub mod project_admin;
 
 use cfg_if::cfg_if;
 
@@ -34,6 +35,7 @@ cfg_if! {
             _ = user::DeactivateUser::register();
             _ = add_user::AddUserProject::register();
             _ = user::RemoveUser::register();
+            _ = create_project::CreateProjectRequest::register();
         }
 
     }

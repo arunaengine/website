@@ -3,6 +3,29 @@ use leptos_meta::*;
 use crate::utils::structs::UserState;
 use crate::components::project::*;
 use crate::components::create_project::*;
+use crate::components::project_admin::*;
+use crate::utils::structs::ProjectOverviewWeb;
+
+
+#[server(AdminAllProjects, "/web")]
+pub async fn admin_all_projects(#[allow(unused_variables)] cx: Scope) -> Result<Vec<ProjectOverviewWeb>, ServerFnError> {
+    use crate::utils::aruna_api_handlers::aruna_get_all_projects;
+    
+    use actix_session::SessionExt;
+    use actix_web::HttpRequest;
+    let req = use_context::<HttpRequest>(cx).unwrap();
+
+    let sess = req.get_session();
+
+    let token = sess
+        .get::<String>("token")
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
+        .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+
+    Ok(aruna_get_all_projects(&token)
+        .await
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?.projects.into_iter().map(|pov| pov.into()).collect::<Vec<_>>()) 
+}
 
 
 #[component]
@@ -19,6 +42,22 @@ pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
 
     let is_admin = create_memo(cx, move |_| {
         get_user.read(cx).unwrap_or_default().unwrap_or_default().is_admin
+    });
+
+    let admin_project_value = create_rw_signal(cx, 0);
+    let admin_get_proj_action = create_server_action::<AdminAllProjects>(cx);
+
+
+    let admin_user = create_memo(cx, move |_| admin_get_proj_action.value().get().unwrap_or(Ok(Vec::new())).unwrap_or_default());
+
+
+    provide_context(cx, admin_get_proj_action);
+
+
+    create_effect(cx, move |_| {
+        if admin_project_value() < admin_get_proj_action.version()() {
+
+        }
     });
 
     view! {cx,
@@ -52,7 +91,7 @@ pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
                                 permissions().into_iter()
                                 .map(|item| view! {
                                     cx,
-                                    <Project project=item from_admin=false/>
+                                    <Project project=item/>
                                 })
                                 .collect::<Vec<_>>().into_view(cx) 
                             }else{
@@ -97,11 +136,11 @@ pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
                             <tbody>
                                 <Transition fallback=move || view! { cx, <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
                                 {
-                                    move || if !permissions().is_empty() {
-                                        permissions().into_iter()
+                                    move || if !admin_user().is_empty() {
+                                        admin_user().into_iter()
                                         .map(|item| view! {
                                             cx,
-                                            <Project project=item from_admin=true/>
+                                            <ProjectAdmin project=item/>
                                         })
                                         .collect::<Vec<_>>().into_view(cx) 
                                     }else{

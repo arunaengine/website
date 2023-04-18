@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use aruna_rust_api::api::storage::{
-    models::v1::{ProjectPermission, Token, User},
+    models::v1::{ProjectPermission, Token, User, ProjectOverview},
     services::v1::{CreateApiTokenResponse, UserWithPerms},
 };
 use chrono::Local;
@@ -85,6 +85,9 @@ pub struct UpdateTokens(pub RwSignal<bool>);
 
 #[derive(Clone, Copy)]
 pub struct UpdateAdmin(pub RwSignal<bool>);
+
+#[derive(Clone, Copy)]
+pub struct UpdateAdminProjects(pub RwSignal<bool>);
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct TokenResponse {
@@ -201,4 +204,25 @@ pub fn format_time_stamp(ts: Option<Timestamp>) -> String {
         .unwrap_or_default()
         .format("%Y-%m-%d %H:%M:%S")
         .to_string()
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ProjectOverviewWeb{
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub collection_ids: Vec<String>,
+    pub user_ids: Vec<String>,
+}
+
+impl From<ProjectOverview> for ProjectOverviewWeb {
+    fn from(value: ProjectOverview) -> Self {
+        ProjectOverviewWeb {
+            id: value.id,
+            name: value.name,
+            description: value.description,
+            collection_ids: value.collection_ids,
+            user_ids: value.user_ids
+        }
+    }
 }

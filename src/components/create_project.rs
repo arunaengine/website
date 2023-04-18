@@ -40,6 +40,7 @@ pub fn CreateProject(cx: Scope) -> impl IntoView {
         <div class="modal-dialog modal-sm" role="document">
           <div class="modal-content">
               <ActionForm on:submit=move |ev| {
+                log::debug!("was here!");
                 let data = CreateProjectRequest::from_event(&ev).expect("to parse form data");
                 // silly example of validation: if the todo is "nope!", nope it
                 if data.name.is_empty()  {
@@ -72,7 +73,7 @@ pub fn CreateProject(cx: Scope) -> impl IntoView {
                   <textarea type="text" class="form-control text-lowercase"
                       id="description" name="description" placeholder="Project Description" required
                     />
-                  <label for="projid">"Project Description"</label>
+                  <label for="description">"Project Description"</label>
               </div>
             </div>
             <div class="modal-footer">
@@ -82,7 +83,7 @@ pub fn CreateProject(cx: Scope) -> impl IntoView {
                       "Cancel"
                     </a></div>
                   <div class="col">
-                    <button href="#" type="submit" class="btn btn-success w-100" data-bs-dismiss="modal">
+                    <button type="submit" class="btn btn-success w-100" data-bs-dismiss="modal">
                       "Create"
                     </button>
                   </div>
