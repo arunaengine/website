@@ -13,8 +13,8 @@ pub fn ProjectAdmin(cx: Scope, project: ProjectOverviewWeb) -> impl IntoView {
     view! {cx,
         <tr>
             <td>{project.id.clone()}</td>
-            <td>"-"</td>
             <td>{project.name}</td>
+            <td>""</td>
             <td>
                 <div class="d-flex justify-content-end">
                     <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target=format!(r##"#SAD{}"##, store_project.get_value()) aria-expanded="false">
@@ -45,7 +45,7 @@ pub fn ProjectAdmin(cx: Scope, project: ProjectOverviewWeb) -> impl IntoView {
             </td>
         </tr>
         <tr class="accordion-collapse collapse" id=format!("SAD{}", project.id.clone()) data-bs-parent="#projectTable">
-            <td colspan="4">
+            <td colspan="4" class="text-center">
                 {project.description}
             </td>
         </tr>

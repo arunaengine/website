@@ -36,6 +36,7 @@ cfg_if! {
             _ = add_user::AddUserProject::register();
             _ = user::RemoveUser::register();
             _ = create_project::CreateProjectRequest::register();
+            _ = projects::AdminAllProjects::register();
         }
 
     }

@@ -106,9 +106,8 @@ pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
     </div>
     {move || {
         if is_admin.get() {
-
+            admin_get_proj_action.dispatch(AdminAllProjects {});
             view!{cx,
-
                 <CreateProject />
                 <div class="page-header d-print-none my-3">
                 <div class="container-xl">
@@ -136,7 +135,9 @@ pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
                             <tbody>
                                 <Transition fallback=move || view! { cx, <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
                                 {
-                                    move || if !admin_user().is_empty() {
+                                    move || 
+                                    
+                                    if !admin_user().is_empty() {
                                         admin_user().into_iter()
                                         .map(|item| view! {
                                             cx,

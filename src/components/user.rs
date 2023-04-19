@@ -191,6 +191,7 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                                     {move || {
                                         view!{cx, 
                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                                 <path d="M12 5l0 14"></path>
                                                 <path d="M5 12l14 0"></path>
@@ -210,26 +211,31 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
             <Transition fallback=move || view! { cx, <tr><td colspan="5" class="text-center"><div class="spinner-border"></div></td></tr> }>
             {
                 move || if !stored_permission.get_value().is_empty() {
+
                     stored_permission.get_value().into_iter()
-                    .map(|item| view! {
+                    .map(|item| {
+                        let item_clone = item.clone();
+                        view! {
                         cx,
-                        <td>"PID:"</td>
-                        <td>{item.project_id.to_string()}</td>
-                        <td>"Role:"</td>
-                        <td>{item.to_permission_string()}</td>
-                        <td>
-                            <div class="d-flex justify-content-end">
-                                <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon text-danger" role="button" aria-label="Button" on:click=move |_| {remove_user_action.dispatch(RemoveUser { user_id: store_user.get_value(), project_id: item.project_id.to_string() })}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-minus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                        <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
-                                        <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
-                                        <path d="M9 14l6 0"></path>
-                                    </svg>
-                                </a>
-                            </div>
-                        </td>
-                    })
+                        <tr colspan="5">
+                            <td>"PID:"</td>
+                            <td>{item_clone.project_id.to_string()}</td>
+                            <td>"Role:"</td>
+                            <td>{item_clone.to_permission_string()}</td>
+                            <td>
+                                <div class="d-flex justify-content-end">
+                                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon text-danger" role="button" aria-label="Button" on:click=move |_| {remove_user_action.dispatch(RemoveUser { user_id: store_user.get_value(), project_id: item.project_id.to_string() })}>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-minus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                            <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                                            <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                                            <path d="M9 14l6 0"></path>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }})
                     .collect::<Vec<_>>().into_view(cx) 
                 }else{
                     view!{cx, <td colspan="5" class="text-center">"Looks like this user is currently not member in any project!"</td>}.into_view(cx)

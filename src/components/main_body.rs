@@ -431,33 +431,28 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
         <div class="row items-center text-center lg:g-6">
             <div class="col">
                 <div class="shape shape-primary shape-md mb-3">
-                    <img src="biodiv.png" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
+                    <img src="/biodiv.png" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
                 </div>
-                <h2 class="h3">{"PartnerA"}</h2>
             </div>
             <div class="col">
                 <div class="shape shape-primary shape-md mb-3">
-                    <img src="jlu.png" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
+                    <img src="/jlu.png" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
                 </div>
-                <h2 class="h3">{"PartnerB"}</h2>
             </div>
             <div class="col">
                 <div class="shape shape-primary shape-md mb-3">
-                    <img src="elixir.jpg" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
+                    <img src="/elixir.jpg" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
                 </div>
-                <h2 class="h3">{"PartnerC"}</h2>
             </div>
             <div class="col">
                 <div class="shape shape-primary shape-md mb-3">
-                    <img src="microbiota.png" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
+                    <img src="/microbiota.png" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
                 </div>
-                <h2 class="h3">{"PartnerD"}</h2>
             </div>
             <div class="col">
                 <div class="shape shape-primary shape-md mb-3">
-                    <img src="denbi.svg" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
+                    <img src="/denbi.svg" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
                 </div>
-                <h2 class="h3">{"PartnerE"}</h2>
             </div>
         </div>
     );
