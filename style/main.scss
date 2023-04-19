@@ -260,15 +260,48 @@ body {
 
 
 .my-accordion-icon[aria-expanded="false"] {
-    transform: rotate(0deg) !important;
+	transform: rotate(0deg) !important;
 	transition: 0.1s
 }
 
 .my-accordion-icon[aria-expanded="true"] {
-    transform: rotate(180deg) !important;
+	transform: rotate(180deg) !important;
 	transition: 0.1s
 }
 
 .collapsing {
 	transition: 0.1s ease-out;
+}
+
+.cookie-consent {
+	position: fixed;
+	bottom: 8px;
+	left: 20px;
+	width: 100%;
+	padding-top: 7px;
+	height: 70px;
+	color: #fff;
+	line-height: 20px;
+	padding-left: 10px;
+	padding-right: 10px;
+	font-size: 14px;
+	background: #292929;
+	z-index: 120;
+	cursor: pointer;
+	border-radius: 3px;
+}
+
+.allow-button {
+	height: 20px;
+	width: 104px;
+	color: #fff;
+	font-size: 12px;
+	line-height: 10px;
+	border-radius: 3px;
+	border: 1px solid green;
+	background-color: green;
+}
+
+.hidden {
+	display: none;
 }

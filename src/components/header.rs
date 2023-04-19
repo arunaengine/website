@@ -1,6 +1,7 @@
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+use cfg_if::cfg_if;
 
 use crate::utils::structs::{UpdateUser, UserState};
 
@@ -28,6 +29,17 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
         });
     };
 
+    let hide_cookies = create_rw_signal(cx, false);
+
+    cfg_if! {
+        if #[cfg(feature = "hydrate")] {
+            if let Ok(Some(storage)) = window().local_storage() {
+                if let Ok(Some(_)) = storage.get_item("allow-cookie"){
+                    hide_cookies.set(true);
+                }
+            }
+        }
+    };        
     let aruna_header = view! { cx,
         <h1 class="navbar-brand navbar-brand-light d-none-navbar-horizontal pe-0 pe-md-3">
             <A href="/">
@@ -98,6 +110,18 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
         </div>
 
     );
+
+
+    let class_cookie = move || {
+        format!(
+        "cookie-consent {}",
+          if hide_cookies() {
+            "hidden"
+          } else {
+            ""
+          }
+        )
+      };
 
     let user_elem = view! { cx,
     <Suspense fallback=move || view! {cx, <div class="spinner-border"></div>}>
@@ -267,5 +291,26 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                 </div>
             </header>
         </div>
+
+        {move || view!{cx, 
+            <div class=class_cookie>
+                <span>"This site uses cookies to enhance user experience. see"<a href="/privacy" class="ms-2 text-decoration-none">"privacy policy"</a></span>
+                <div class="mt-2 d-flex align-items-center justify-content-center g-2">
+                <button class="allow-button me-1" on:click=move |_| {
+                    if let Ok(Some(storage)) = window().local_storage() {
+                        _ = storage.set("allow-cookie", "true");
+                        hide_cookies.set(true);
+                    }
+                }>"Allow cookies"</button>
+                <button class="allow-button ms-1" on:click=move |_| {
+                    if let Ok(Some(storage)) = window().local_storage() {
+                        _ = storage.set("allow-cookie", "false");
+                        hide_cookies.set(true);
+                    }
+                }>"cancel"</button>
+                </div>
+            </div>
+            }.into_view(cx)
+        }
     }
 }
