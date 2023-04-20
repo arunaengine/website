@@ -196,7 +196,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
 
     let faq = view!(cx,
         <div class="page-body">
-            <div class="container-xl">
+            <div class="container-xl text-start">
               <div class="card card-lg">
                 <div class="card-body">
                   <div class="space-y-4">
@@ -205,13 +205,14 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                       <div id="faq-1" class="accordion" role="tablist" aria-multiselectable="true">
                         <div class="accordion-item">
                           <div class="accordion-header" role="tab">
-                            <button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq-1-1">{"Welcome to our service!"}</button>
+                            <button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq-1-1">{"What is Aruna ?"}</button>
                           </div>
                           <div id="faq-1-1" class="accordion-collapse collapse show" role="tabpanel" data-bs-parent="#faq-1">
                             <div class="accordion-body pt-0">
                               <div>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                                <p>{"Aruna Object Storage (AOS) is an open source data storage platform that enables scientists to store, annotate and share their data according to "}<a href="https://www.go-fair.org/fair-principles/">{"FAIR"}</a>{" principles."}</p>
+                                <p>{"The name Aruna originates from the god of the sea in hittite mythology and their name for the sea and bodies of water in general. 
+                                     We choose this name to symbolize our vision of a revolutionary cloud-native data lake."}</p>
                               </div>
                             </div>
                           </div>
@@ -223,7 +224,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                           <div id="faq-1-2" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-1">
                             <div class="accordion-body pt-0">
                               <div>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                                <p>{"Aruna is developed by a small team at Justus-Liebig-University Giessen for the NFDI project, as well as the GAIA-X connector project FAIR-Dataspaces"}</p>
                                 <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
                               </div>
                             </div>
@@ -231,7 +232,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                         </div>
                         <div class="accordion-item">
                           <div class="accordion-header" role="tab">
-                            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-1-3">{"What are our values?"}</button>
+                            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-1-3">{"Why should I use Aruna for my project?"}</button>
                           </div>
                           <div id="faq-1-3" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-1">
                             <div class="accordion-body pt-0">
@@ -245,24 +246,11 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                       </div>
                     </div>
                     <div>
-                      <h2 class="mb-3">{"2. Functionality"}</h2>
+                      <h2 class="mb-3">{"2. Technical information"}</h2>
                       <div id="faq-2" class="accordion" role="tablist" aria-multiselectable="true">
                         <div class="accordion-item">
                           <div class="accordion-header" role="tab">
-                            <button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq-2-1">{"What are the key features?"}</button>
-                          </div>
-                          <div id="faq-2-1" class="accordion-collapse collapse show" role="tabpanel" data-bs-parent="#faq-2">
-                            <div class="accordion-body pt-0">
-                              <div>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="accordion-item">
-                          <div class="accordion-header" role="tab">
-                            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-2-2">{"Does your App support mobile devices?"}</button>
+                            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-2-2">{"How can I log in?"}</button>
                           </div>
                           <div id="faq-2-2" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-2">
                             <div class="accordion-body pt-0">
@@ -275,7 +263,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                         </div>
                         <div class="accordion-item">
                           <div class="accordion-header" role="tab">
-                            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-2-3">{"Why should I choose your service?"}</button>
+                            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-2-3">{"How many projects can I create?"}</button>
                           </div>
                           <div id="faq-2-3" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-2">
                             <div class="accordion-body pt-0">
@@ -288,7 +276,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                         </div>
                         <div class="accordion-item">
                           <div class="accordion-header" role="tab">
-                            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-2-4">{"Is my data secure?"}</button>
+                            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-2-4">{"Is there a maximum storage capacity?"}</button>
                           </div>
                           <div id="faq-2-4" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-2">
                             <div class="accordion-body pt-0">
@@ -299,14 +287,9 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                    <div>
-                      <h2 class="mb-3">{"3. Payments"}</h2>
-                      <div id="faq-3" class="accordion" role="tablist" aria-multiselectable="true">
                         <div class="accordion-item">
                           <div class="accordion-header" role="tab">
-                            <button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq-3-1">{"Is there any free plan?"}</button>
+                            <button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq-3-1">{"Who can see my data?"}</button>
                           </div>
                           <div id="faq-3-1" class="accordion-collapse collapse show" role="tabpanel" data-bs-parent="#faq-3">
                             <div class="accordion-body pt-0">
@@ -317,6 +300,24 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                             </div>
                           </div>
                         </div>
+                        <div class="accordion-item">
+                        <div class="accordion-header" role="tab">
+                          <button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq-4-1">{"Is my data secure?"}</button>
+                        </div>
+                        <div id="faq-4-1" class="accordion-collapse collapse show" role="tabpanel" data-bs-parent="#faq-4">
+                          <div class="accordion-body pt-0">
+                            <div>
+                              <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                              <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      </div>
+                    </div>
+                    <div>
+                      <h2 class="mb-3">{"3. Goals"}</h2>
+                      <div id="faq-3" class="accordion" role="tablist" aria-multiselectable="true">
                         <div class="accordion-item">
                           <div class="accordion-header" role="tab">
                             <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-3-2">{"What are the available payment options?"}</button>
