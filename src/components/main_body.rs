@@ -15,8 +15,8 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
             <div class="col-lg-6 mx-auto">
               <p class="mb-4 lead">{"Fast, secure, geo-redundant data storage with sophisticated metadata management according to "}<a href="https://www.go-fair.org/fair-principles/">{"FAIR"}</a>{" principles. Store and organize your data in new ways, share it with your colleagues and partners. Transparent data management made easy."}</p>
               <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-5">
-                <button type="button" class="btn btn-primary btn-lg px-4 me-sm-3">{"Get started!"}</button>
-                <button type="button" class="btn btn-outline-secondary btn-lg px-4">{"Contact us"}</button>
+                <button type="button" class="btn btn-primary btn-lg px-4 me-sm-3" on:click=move |_| {let _ = window().location().set_href("https://arunastorage.github.io/Documentation");}>{"Get started!"}</button>
+                <button type="button" class="btn btn-outline-secondary btn-lg px-4" on:click=move |_| {let _ = window().location().set_href("mailto:support@aruna-storage.org");}>{"Contact us"}</button>
               </div>
             </div>
           </div>
@@ -224,7 +224,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                           <div id="faq-1-2" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-1">
                             <div class="accordion-body pt-0">
                               <div>
-                                <p>{"Aruna is developed by a small team at Justus-Liebig-University Giessen for the NFDI project, as well as the GAIA-X connector project FAIR-Dataspaces"}</p>
+                                <p>{"Aruna is developed by a small team at "}<a href="https://www.uni-giessen.de/de">"Justus-Liebig-University Giessen"</a>{" for the NFDI4Biodiversity and NFDI4Microbiota projects, as well as the GAIA-X connector project FAIR-Dataspaces"}</p>
                               </div>
                             </div>
                           </div>
@@ -236,7 +236,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                           <div id="faq-1-3" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-1">
                             <div class="accordion-body pt-0">
                               <div>
-                                <p>{"Storing data in localized specific data silos can limit collaboration, reuse, and analysis of data. The Aruna platform can bring great benefits for your research data such as improved collaboration, compliance with FAIR principles, scalability, data security, and easy integration with existing systems and workflows, ultimately accelerating scientific progress and improving research quality."}</p>
+                                <p>{"Storing data in localized domain specific data silos can limit collaboration, reuse, and analysis of data. The Aruna platform can bring great benefits for your research data such as improved collaboration, compliance with FAIR principles, scalability, data security, and easy integration with existing systems and workflow systems, ultimately accelerating scientific progress and improving research quality."}</p>
                               </div>
                             </div>
                           </div>
@@ -253,8 +253,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                           <div id="faq-2-2" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-2">
                             <div class="accordion-body pt-0">
                               <div>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                                <p>{"Currently our service is an invitation only platform for members of the NFDI consortia. In the future we plan to open our platform for a broader audience."}</p>
                               </div>
                             </div>
                           </div>
@@ -266,8 +265,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                           <div id="faq-2-3" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-2">
                             <div class="accordion-body pt-0">
                               <div>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                                <p>{"Projects are used to organize users on a per institution or research project basis. They are created on demand, contact us and we will figure out how to organize your specific request."}</p>
                               </div>
                             </div>
                           </div>
@@ -279,8 +277,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                           <div id="faq-2-4" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-2">
                             <div class="accordion-body pt-0">
                               <div>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                                <p>{"Currently we do not enforce storage quotas, but as always their is a physical limit in storage capacity. If you plan to store large amounts of data (>1 TB) contact us and we will figure out a solution."}</p>
                               </div>
                             </div>
                           </div>
@@ -292,8 +289,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                           <div id="faq-2-5" class="accordion-collapse collapse show" role="tabpanel" data-bs-parent="#faq-2">
                             <div class="accordion-body pt-0">
                               <div>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                                <p>{"You can decide how your data is shared, we provide a wide variety of access models, from strongly confidential data to public datasets that can be seen by everyone. By default all your data is private and only accessible by people you grand access to."}</p>
                               </div>
                             </div>
                           </div>
@@ -305,45 +301,44 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                         <div id="faq-4-1" class="accordion-collapse collapse show" role="tabpanel" data-bs-parent="#faq-4">
                           <div class="accordion-body pt-0">
                             <div>
-                              <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                              <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                              <p>{"Data is stored via our custom data-proxy component, that encrypts, compresses and anonymizes all user-provided data by default. This way your data is always secure while stored on disk."}</p>
                             </div>
                           </div>
                         </div>
                       </div>
                       </div>
                     </div>
-                    <div>
-                      <h2 class="mb-3">{"3. Goals"}</h2>
-                      <div id="faq-3" class="accordion" role="tablist" aria-multiselectable="true">
-                        <div class="accordion-item">
-                          <div class="accordion-header" role="tab">
-                            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-3-2">{"What are the available payment options?"}</button>
-                          </div>
-                          <div id="faq-3-2" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-3">
-                            <div class="accordion-body pt-0">
-                              <div>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="accordion-item">
-                          <div class="accordion-header" role="tab">
-                            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-3-3">{"Can I get a refund?"}</button>
-                          </div>
-                          <div id="faq-3-3" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-3">
-                            <div class="accordion-body pt-0">
-                              <div>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    // <div>
+                    //   <h2 class="mb-3">{"3. Goals"}</h2>
+                    //   <div id="faq-3" class="accordion" role="tablist" aria-multiselectable="true">
+                    //     <div class="accordion-item">
+                    //       <div class="accordion-header" role="tab">
+                    //         <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-3-2">{"What are the available payment options?"}</button>
+                    //       </div>
+                    //       <div id="faq-3-2" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-3">
+                    //         <div class="accordion-body pt-0">
+                    //           <div>
+                    //             <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                    //             <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                    //           </div>
+                    //         </div>
+                    //       </div>
+                    //     </div>
+                    //     <div class="accordion-item">
+                    //       <div class="accordion-header" role="tab">
+                    //         <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#faq-3-3">{"Can I get a refund?"}</button>
+                    //       </div>
+                    //       <div id="faq-3-3" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-3">
+                    //         <div class="accordion-body pt-0">
+                    //           <div>
+                    //             <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                    //             <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                    //           </div>
+                    //         </div>
+                    //       </div>
+                    //     </div>
+                    //   </div>
+                    // </div>
                   </div>
                 </div>
               </div>

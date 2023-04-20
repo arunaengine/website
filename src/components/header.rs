@@ -274,17 +274,14 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                                             </span>
                                         </a>
                                         <div class="dropdown-menu">
-                                            <a class="dropdown-item" href="./#">
-                                                { "Rust" }
+                                            <a class="dropdown-item" href="https://arunastorage.github.io/Documentation#aos-components">
+                                                { "Components" }
                                             </a>
-                                            <a class="dropdown-item" href="./#">
-                                                { "Python" }
+                                            <a class="dropdown-item" href="https://arunastorage.github.io/Documentation/v1.0.x/">
+                                                { "Getting started" }
                                             </a>
-                                            <a class="dropdown-item" href="./#">
-                                                { "cURL" }
-                                            </a>
-                                            <a class="dropdown-item" href="./#">
-                                                { "Go" }
+                                            <a class="dropdown-item" href="https://github.com/ArunaStorage/ArunaAPI">
+                                                { "API" }
                                             </a>
                                         </div>
                                     </li>
@@ -304,7 +301,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
 
         {move || view!{cx, 
             <div class=class_cookie>
-                <span>"This site uses cookies to store user sessions, without these login for internal dashboard will be unavailable. see "<a href="/privacy" class="ms-2 text-decoration-none">" privacy policy"</a> "for more information"</span>
+                <span>"This site uses cookies to store user sessions, without these login for internal dashboard will be unavailable. see "<a href="/imprint" class="ms-2 text-decoration-none">" privacy policy"</a> "for more information"</span>
                 <div class="mt-2 d-flex align-items-center justify-content-center g-2">
                 <button class="allow-button me-1" on:click=move |_| {
                     if let Ok(Some(storage)) = window().local_storage() {
