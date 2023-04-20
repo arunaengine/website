@@ -156,6 +156,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
     use crate::components::register::*;
     use crate::components::about::*;
     use crate::components::footer::*;
+    use crate::components::imprint::*;
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(cx, true));
     
@@ -188,6 +189,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
                         <Route path="register" view=move |cx| view! { cx, <MainPage/><RegisterPage/> }/>
                         <Route path="activate" view=move |cx| view! { cx, <MainPage/><ActivatePage/> }/>
                         <Route path="about" view=move |cx| view! { cx, <About/>}/>
+                        <Route path="imprint" view=move |cx| view! { cx, <Imprint/>}/>
                         <Panel/>
                         <Route path="" view=move |cx| view!{cx, <MainPage/>}/>
                     </Route>

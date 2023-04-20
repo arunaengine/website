@@ -225,7 +225,6 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                             <div class="accordion-body pt-0">
                               <div>
                                 <p>{"Aruna is developed by a small team at Justus-Liebig-University Giessen for the NFDI project, as well as the GAIA-X connector project FAIR-Dataspaces"}</p>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
                               </div>
                             </div>
                           </div>
@@ -237,8 +236,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                           <div id="faq-1-3" class="accordion-collapse collapse" role="tabpanel" data-bs-parent="#faq-1">
                             <div class="accordion-body pt-0">
                               <div>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
-                                <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>
+                                <p>{"Storing data in localized specific data silos can limit collaboration, reuse, and analysis of data. The Aruna platform can bring great benefits for your research data such as improved collaboration, compliance with FAIR principles, scalability, data security, and easy integration with existing systems and workflows, ultimately accelerating scientific progress and improving research quality."}</p>
                               </div>
                             </div>
                           </div>
@@ -289,9 +287,9 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                         </div>
                         <div class="accordion-item">
                           <div class="accordion-header" role="tab">
-                            <button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq-3-1">{"Who can see my data?"}</button>
+                            <button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#faq-2-5">{"Who can see my data?"}</button>
                           </div>
-                          <div id="faq-3-1" class="accordion-collapse collapse show" role="tabpanel" data-bs-parent="#faq-3">
+                          <div id="faq-2-5" class="accordion-collapse collapse show" role="tabpanel" data-bs-parent="#faq-2">
                             <div class="accordion-body pt-0">
                               <div>
                                 <p>{"Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium alias dignissimos dolorum ea est eveniet, excepturi illum in iste iure maiores nemo recusandae rerum saepe sed, sunt totam! Explicabo, ipsa?"}</p>

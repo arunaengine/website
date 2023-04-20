@@ -17,6 +17,7 @@ pub mod create_project;
 pub mod project_admin;
 pub mod about;
 pub mod footer;
+pub mod imprint;
 
 use cfg_if::cfg_if;
 
