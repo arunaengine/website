@@ -1,7 +1,7 @@
 
 [package]
 name = "aruna_web"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 [lib]
@@ -37,7 +37,7 @@ tokio = "1.27.0"
 uuid = {version = "1.3.0", features = ["v4", "fast-rng", "macro-diagnostics", "serde"]}
 futures = "0.3.28"
 http = "0.2.9"
-aruna-rust-api = { version = "1.0.0-rc.15.1", default-features = false }
+aruna-rust-api = { version = "1.0.0", default-features = false }
 tonic = { version = "0.9.1", optional = true }
 gloo-events = "0.1.2"
 gloo-timers = "0.2.6"
