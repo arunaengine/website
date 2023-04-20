@@ -154,6 +154,8 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
     use crate::components::header::*;
     use crate::components::panel::*;
     use crate::components::register::*;
+    use crate::components::about::*;
+    use crate::components::footer::*;
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(cx, true));
     
@@ -181,9 +183,11 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
                     <Route path="/" view=move |cx| view! { cx,
                         <ArunaHeader/>
                         <Outlet/>
+                        <Footer/>
                     }>
                         <Route path="register" view=move |cx| view! { cx, <MainPage/><RegisterPage/> }/>
                         <Route path="activate" view=move |cx| view! { cx, <MainPage/><ActivatePage/> }/>
+                        <Route path="about" view=move |cx| view! { cx, <About/>}/>
                         <Panel/>
                         <Route path="" view=move |cx| view!{cx, <MainPage/>}/>
                     </Route>

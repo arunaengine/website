@@ -77,106 +77,31 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
 
     let section2 = view!(cx,
 
-        <div class="items-center down card">
-            <div class="mt-5">
-                <div class="section-header w-100">
-                    <h2 class="section-title text-center lg:text-left">
-                        {"Benefit from Arunas super-duper features"}
+        <div class="items-center down card mx-auto">
+            <div class="mt-5 d-flex">
+                <div class="card-body">
+                    <h2 class="section-title text-left">
+                        {"Features"}
                     </h2>
-                </div>
                 <div class="row">
-                    <div class="sm:col-6 md:col-4 lg:col-6">
-                        <div class="shape shape-green shape-sm shape-rounded mr-3">
+                    <div class="col-6">
+                        <div class="text-green mr-3">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M5 12l5 5l10 -10"></path>
                             </svg>
                         </div>
                         {"Store data"}
                     </div>
-                        <div class="sm:col-6 md:col-4 lg:col-6">
-                            <div class="shape shape-green shape-sm shape-rounded mr-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M5 12l5 5l10 -10"></path>
-                                </svg>
-                            </div>
-                            {"And get data back"}
-                        </div>
-                            <div class="sm:col-6 md:col-4 lg:col-6">
-                                <div class="shape shape-green shape-sm shape-rounded mr-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M5 12l5 5l10 -10"></path>
-                                    </svg>
-                                </div>
-                                {"Find data"}
-                            </div>
-                            <div class="sm:col-6 md:col-4 lg:col-6">
-                                <div class="shape shape-green shape-sm shape-rounded mr-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M5 12l5 5l10 -10"></path>
-                                    </svg>
-                                </div>
-                                {"Or forget about it"}
-                            </div>
-                            <div class="sm:col-6 md:col-4 lg:col-6">
-                                <div class="shape shape-green shape-sm shape-rounded mr-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M5 12l5 5l10 -10"></path>
-                                    </svg>
-                                </div>
-                                {"MIT license"}
-                            </div>
-                            <div class="sm:col-6 md:col-4 lg:col-6">
-                                <div class="shape shape-green shape-sm shape-rounded mr-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M5 12l5 5l10 -10"></path>
-                                    </svg>
-                                </div>
-                                {"Customizable"}
-                            </div>
-                            <div class="sm:col-6 md:col-4 lg:col-6">
-                                <div class="shape shape-green shape-sm shape-rounded mr-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M5 12l5 5l10 -10"></path>
-                                    </svg>
-                                </div>
-                                {"Nice features"}
-                            </div>
-                            <div class="sm:col-6 md:col-4 lg:col-6">
-                                <div class="shape shape-green shape-sm shape-rounded mr-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M5 12l5 5l10 -10"></path>
-                                    </svg>
-                                </div>
-                                {"Nice guys"}
-                            </div>
-                            <div class="sm:col-6 md:col-4 lg:col-6">
-                                <div class="shape shape-green shape-sm shape-rounded mr-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M5 12l5 5l10 -10"></path>
-                                    </svg>
-                                </div>
-                                {"Dark mode"}
-                            </div>
-                            <div class="sm:col-6 md:col-4 lg:col-6">
-                                <div class="shape shape-green shape-sm shape-rounded mr-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M5 12l5 5l10 -10"></path>
-                                    </svg>
-                                </div>
-                                {"Blazingly fast!"}
-                            </div>
-                        </div>
+                    <div class="col-6">
+                      <img src="/concept_aruna.png" class="img-fluid" alt="ConceptAruna" />
                     </div>
-                    <div class="lg:col-6">
-                    </div>
-
+                  </div>
                 </div>
-
-
-
+             </div>
+          </div>
     );
 
-    let timeline = view!(cx,
+    let _timeline = view!(cx,
 
         <ul class="timeline">
             <li class="timeline-event">
@@ -428,50 +353,33 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
     );
 
     let partners = view!(cx,
-        <div class="row items-center text-center lg:g-6">
-            <div class="col">
+        <div class="row d-flex items-center text-center align-items-center">
+            <a class="col" href="https://www.nfdi4biodiversity.org/en/">
                 <div class="shape shape-primary shape-md mb-3">
-                    <img src="/biodiv.png" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
+                    <img src="/biodiv.png" class="img-fluid rounded-3 mb-4" alt="Biodiv" width="150" height="100" />
                 </div>
-            </div>
-            <div class="col">
-                <div class="shape shape-primary shape-md mb-3">
-                    <img src="/jlu.png" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
-                </div>
-            </div>
-            <div class="col">
-                <div class="shape shape-primary shape-md mb-3">
-                    <img src="/elixir.jpg" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
-                </div>
-            </div>
-            <div class="col">
-                <div class="shape shape-primary shape-md mb-3">
-                    <img src="/microbiota.png" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
-                </div>
-            </div>
-            <div class="col">
-                <div class="shape shape-primary shape-md mb-3">
-                    <img src="/denbi.svg" class="img-fluid rounded-3 mb-4 hide-theme-dark" alt="NFDI4Biodiversity" width="150" height="100" />
-                </div>
-            </div>
-        </div>
-    );
-
-    let footer = view!(cx,
-
-        <footer class="container-xl d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top">
-            <p class="col-md-4 mb-0 text-muted">{"© 2023 Aruna Storage Team"}</p>
-
-            <a href="/" class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-dark text-decoration-none">
             </a>
-
-            <ul class="nav col-md-4 justify-content-end">
-              <li class="nav-item"><a href="#" class="nav-link px-2 text-muted">{"Home"}</a></li>
-              <li class="nav-item"><a href="#" class="nav-link px-2 text-muted">{"FAQs"}</a></li>
-              <li class="nav-item"><a href="#" class="nav-link px-2 text-muted">{"About"}</a></li>
-              <li class="nav-item"><a href="#" class="nav-link px-2 text-muted">{"Imprint"}</a></li>
-            </ul>
-          </footer>
+            <a class="col" href="https://www.uni-giessen.de/de/fbz/fb08/Inst/bioinformatik/software/aruna">
+                <div class="shape shape-primary shape-md mb-3">
+                    <img src="/jlu.png" class="img-fluid rounded-3 mb-4" alt="JLU" width="150" height="100" />
+                </div>
+            </a>
+            <a class="col" href="https://elixir-europe.org/about-us/who-we-are/nodes/germany">
+                <div class="shape shape-primary shape-md mb-3">
+                    <img src="/elixir.png" class="img-fluid rounded-3 mb-4" alt="Elixir" width="150" height="100" />
+                </div>
+            </a>
+            <a class="col" href="https://nfdi4microbiota.de/">
+                <div class="shape shape-primary shape-md mb-3">
+                    <img src="/microbiota.png" class="img-fluid rounded-3 mb-4" alt="Microbiota" width="150" height="100" />
+                </div>
+            </a>
+            <a class="col" href="https://www.denbi.de/">
+                <div class="shape shape-primary shape-md mb-3">
+                    <img src="/denbi.svg" class="img-fluid rounded-3 mb-4" alt="deNBI" width="150" height="100" />
+                </div>
+            </a>
+        </div>
     );
 
     view!(cx,
@@ -482,15 +390,14 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
             <section class="section container-xl mt-5">
             {section2}
             </section>
-            <section class="section container-xl mt-5">
-            {timeline}
-            </section>
-            <section class="section container-xl mt-5">
+            //<section class="section container-xl mt-5">
+            //{timeline}
+            //</section>
+            <section id="faq" class="section container-xl mt-5">
             {faq}
             </section>
             <section class="section container-xl mt-5">
             {partners}
             </section>
-            {footer}
     )
 }

@@ -153,11 +153,6 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                                 </div>
                             </a>
                             <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                                //<a href="#" class="dropdown-item">{ "Status" }</a>
-                                //<a href="#" class="dropdown-item">{ "Profile" }</a>
-                                //<a href="#" class="dropdown-item">{ "Feedback" }</a>
-                                //<div class="dropdown-divider"></div>
-                                //<a href="#" class="dropdown-item">{ "Settings" }</a>
                                 <a href="/logout" on:click=move |_| {let _ = window().location().set_href("/logout");} class="dropdown-item">{ "Logout" }</a>
                             </div>
                         </div>
@@ -165,7 +160,22 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
 
                 }
                 None => {
-                        view!{cx, <a href="/login" on:click=move |_| {let _ = window().location().set_href("/login");} class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</a>}.into_view(cx)
+                        view!{cx, <a href="/login" on:click=move |_| {
+
+                            if let Ok(Some(storage)) = window().local_storage() {
+                                if let Ok(Some(cookie_value)) = storage.get_item("allow-cookie"){
+                                    if cookie_value == "false" {
+                                        storage.clear().unwrap_or_default();
+                                        let _ = window().location().set_href("/");
+                                    }else{
+                                        let _ = window().location().set_href("/login");
+                                    }
+                                }else{
+                                    storage.clear().unwrap_or_default();
+                                    let _ = window().location().set_href("/");
+                                }
+                            }
+                        } class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2">{"Login"}</a>}.into_view(cx)
                     }
                 }
             }
@@ -294,7 +304,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
 
         {move || view!{cx, 
             <div class=class_cookie>
-                <span>"This site uses cookies to enhance user experience. see"<a href="/privacy" class="ms-2 text-decoration-none">"privacy policy"</a></span>
+                <span>"This site uses cookies to store user sessions, without these login for internal dashboard will be unavailable. see "<a href="/privacy" class="ms-2 text-decoration-none">" privacy policy"</a> "for more information"</span>
                 <div class="mt-2 d-flex align-items-center justify-content-center g-2">
                 <button class="allow-button me-1" on:click=move |_| {
                     if let Ok(Some(storage)) = window().local_storage() {
@@ -307,7 +317,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                         _ = storage.set("allow-cookie", "false");
                         hide_cookies.set(true);
                     }
-                }>"cancel"</button>
+                }>"Disallow"</button>
                 </div>
             </div>
             }.into_view(cx)
