@@ -27,7 +27,8 @@ pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T
 }
 
 pub async fn who_am_i(token: &str) -> Result<UserState> {
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let get_request = tonic::Request::new(GetUserRequest {
         user_id: "".to_string(),
@@ -55,7 +56,8 @@ pub async fn aruna_register_user(
     email: &str,
     project: &str,
 ) -> Result<String> {
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let register_req = tonic::Request::new(RegisterUserRequest {
         display_name: display_name.to_string(),
@@ -75,7 +77,8 @@ pub async fn aruna_create_token(
     req: CreateApiTokenRequest,
     token: &str,
 ) -> Result<CreateApiTokenResponse> {
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let create_token_req = tonic::Request::new(req);
     let mut client = user_service_client::UserServiceClient::new(channel);
@@ -88,7 +91,8 @@ pub async fn aruna_create_token(
 }
 
 pub async fn aruna_get_api_tokens(token: &str) -> Result<GetApiTokensResponse> {
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let get_tokens_req = tonic::Request::new(GetApiTokensRequest {});
     let mut client = user_service_client::UserServiceClient::new(channel);
@@ -101,7 +105,8 @@ pub async fn aruna_get_api_tokens(token: &str) -> Result<GetApiTokensResponse> {
 }
 
 pub async fn aruna_delete_api_token(token_id: String, token: &str) -> Result<()> {
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let delete_tokens_req = tonic::Request::new(DeleteApiTokenRequest { token_id });
     let mut client = user_service_client::UserServiceClient::new(channel);
@@ -115,7 +120,8 @@ pub async fn aruna_delete_api_token(token_id: String, token: &str) -> Result<()>
 
 
 pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let get_users_req = tonic::Request::new(GetAllUsersRequest {include_permissions: true});
     let mut client = user_service_client::UserServiceClient::new(channel);
@@ -131,17 +137,22 @@ pub async fn aruna_activate_user(token: &str, user_id: &str, project_ulid: Optio
 
     let perm = match project_ulid {
         Some(pul) => {
-            Some(ProjectPermission{
-                user_id: user_id.to_string(),
-                permission: perm,
-                project_id: pul,
-                service_account: false,
-            })
+            if pul.is_empty(){
+                None
+            }else{
+                Some(ProjectPermission{
+                    user_id: user_id.to_string(),
+                    permission: perm,
+                    project_id: pul,
+                    service_account: false,
+                })
+            }
         }
         None => None,
     };
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
 
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let act_user_req = tonic::Request::new(ActivateUserRequest {user_id: user_id.to_string(),  project_perms: perm});
     let mut client = user_service_client::UserServiceClient::new(channel);
@@ -155,7 +166,8 @@ pub async fn aruna_activate_user(token: &str, user_id: &str, project_ulid: Optio
 
 pub async fn aruna_deactivate_user(token: &str, user_id: &str) -> Result<()> {
 
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let dact_user_req = tonic::Request::new(DeactivateUserRequest {user_id: user_id.to_string()});
     let mut client = user_service_client::UserServiceClient::new(channel);
@@ -176,8 +188,8 @@ pub async fn aruna_add_user_to_proj(token: &str, user_id: &str, project_id: &str
         project_id: project_id.to_string(),
         service_account: false,
     };
-
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let add_user_proj = tonic::Request::new(AddUserToProjectRequest {project_id: project_id.to_string(),  user_permission: Some(projperm)});
     let mut client = project_service_client::ProjectServiceClient::new(channel);
@@ -190,8 +202,8 @@ pub async fn aruna_add_user_to_proj(token: &str, user_id: &str, project_id: &str
 }
 
 pub async fn aruna_remove_user_from_project(token: &str, user_id: &str, project_id: &str) -> Result<()> {
-
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let remove_user_proj = tonic::Request::new(RemoveUserFromProjectRequest {project_id: project_id.to_string(), user_id: user_id.to_string()});
     let mut client = project_service_client::ProjectServiceClient::new(channel);
@@ -204,7 +216,8 @@ pub async fn aruna_remove_user_from_project(token: &str, user_id: &str, project_
 }
 
 pub async fn aruna_create_project(token: &str, project_name: &str, description: &str) -> Result<()> {
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let create_project_req = tonic::Request::new(CreateProjectRequest {name: project_name.to_string(), description: description.to_string()});
     let mut client = project_service_client::ProjectServiceClient::new(channel);
@@ -218,7 +231,8 @@ pub async fn aruna_create_project(token: &str, project_name: &str, description: 
 
 
 pub async fn aruna_get_all_projects(token: &str) -> Result<GetProjectsResponse> {
-    let endpoint = Channel::from_shared("http://0.0.0.0:50051")?;
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let create_project_req = tonic::Request::new(GetProjectsRequest {});
     let mut client = project_service_client::ProjectServiceClient::new(channel);

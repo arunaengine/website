@@ -6,6 +6,10 @@ pub mod utils;
 #[cfg(feature = "ssr")]
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    use dotenv::dotenv;
+
+    dotenv().ok();
+
     use actix_files::Files;
     use actix_session::{storage::CookieSessionStore, SessionMiddleware};
     use actix_web::web::Data;
@@ -23,13 +27,19 @@ async fn main() -> std::io::Result<()> {
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(|cx| view! { cx, <EntryPoint/> });
 
+
+    let cookie_secret = std::env::var("COOKIE_SECRET").expect("Keycloak URL must be set!");
+
     let secret_key =
-        cookie::Key::from(b"V958suBe8ahDpZ2GisN2WdczagtojTwzHX5DZ53b9x5XCbVfG8DAUUfqpnXUDDMx");
+        cookie::Key::from(cookie_secret.as_bytes());
 
     crate::components::register_server_functions();
 
+
+    let key_cloak_url = std::env::var("KEYCLOAK_URL").expect("Keycloak URL must be set!");
+
     let authorizer = Data::new(Mutex::new(
-        Authorizer::new("http://localhost:1998/realms/test".to_string())
+        Authorizer::new(key_cloak_url)
             .await
             .unwrap(),
     ));
