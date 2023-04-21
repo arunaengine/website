@@ -1,31 +1,28 @@
 use leptos::*;
-use leptos_meta::*;
+//use leptos_meta::*;
+use leptos_router::*;
+
+use crate::utils::structs::UpdateUser;
 
 /// Renders the home page of your application.
-#[component]
-pub fn PanelBody(cx: Scope) -> impl IntoView {
-    use super::greeter::*;
-    use super::register::*;
+#[component(transparent)]
+pub fn Panel(cx: Scope) -> impl IntoView {
+    use crate::components::panel_nav::*;
+    use crate::components::projects::*;
+    use crate::components::tokens::*;
+    use crate::components::admin::*;
 
-    provide_meta_context(cx);
-    // Creates a reactive value to update the button
+    let update_user = use_context::<UpdateUser>(cx).expect("user_state not set");
 
-    let logged_in = true;
+    update_user.0.update(|e| *e = !*e);
 
-    view! {cx,
-        <div class="page-wrapper">
-            <div class="page-body">
-                <div class="container">
-                    <div class="row row-deck row-cards">
-                        <div class="col-lg-12 ms-auto">
-                            <Greeter/>
-                        </div>
-                        <div class="col-lg-12 ms-auto">
-                            <Show when=move || logged_in fallback=|_cx| ()><RegisterPage/></Show>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    view! { cx,
+      <Route path="panel" view=move |cx| {view! { cx, <PanelNav /><Outlet/>}}>
+        <Route path="projects" view=move |cx| view! { cx, <ProjectsOverview /> }/>
+        <Route path="collection" view=move |cx| "Collections".into_view(cx)/>
+        <Route path="admin" view=move |cx| view! { cx, <AdminOverview/> }/>
+        <Route path="tokens" view=move |cx| view! { cx, <TokensOverview/> }/>
+        <Route path="" view=move |cx| ().into_view(cx)/>
+      </Route>
     }
 }
