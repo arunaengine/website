@@ -27,22 +27,15 @@ async fn main() -> std::io::Result<()> {
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(|cx| view! { cx, <EntryPoint/> });
 
-
     let cookie_secret = std::env::var("COOKIE_SECRET").expect("Keycloak URL must be set!");
 
-    let secret_key =
-        cookie::Key::from(cookie_secret.as_bytes());
+    let secret_key = cookie::Key::from(cookie_secret.as_bytes());
 
     crate::components::register_server_functions();
 
-
     let key_cloak_url = std::env::var("KEYCLOAK_URL").expect("Keycloak URL must be set!");
 
-    let authorizer = Data::new(Mutex::new(
-        Authorizer::new(key_cloak_url)
-            .await
-            .unwrap(),
-    ));
+    let authorizer = Data::new(Mutex::new(Authorizer::new(key_cloak_url).await.unwrap()));
 
     //let cache = Data::new(Mutex::new(Cache::new()));
 

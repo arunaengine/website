@@ -1,7 +1,6 @@
+use crate::utils::structs::{UpdateAdmin, UserState};
 use leptos::*;
 use leptos_meta::*;
-use crate::utils::structs::{UserState, UpdateAdmin};
-
 
 #[server(DeactivateUser, "/web")]
 pub async fn deactivate_user(
@@ -55,13 +54,12 @@ pub async fn remove_user_project(
 /// Renders the home page of your application.
 #[component]
 pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
-
     use crate::components::activate_modal::*;
     use crate::components::add_user::*;
 
     provide_meta_context(cx);
 
-    let is_active = user.is_active.clone();
+    let is_active = user.is_active;
     let deactivate_action = create_server_action::<DeactivateUser>(cx);
     let remove_user_action = create_server_action::<RemoveUser>(cx);
     let last_version = create_rw_signal(cx, 0);
@@ -74,7 +72,6 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
         }
     });
 
-
     let remove_action_count = create_rw_signal(cx, 0);
     create_effect(cx, move |_| {
         if remove_action_count() < remove_user_action.version()() {
@@ -83,45 +80,47 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
         }
     });
 
-    let create_active_badges = {move || {
-        if is_active {
-            view!{cx, 
-                <span class="status status-green">
-                    <span class="status-dot"></span>
-                    "active"
-                </span>
-            }
-        }else{
-            view!{cx, 
-                <span class="status status-yellow">
-                    <span class="status-dot"></span>
-                    "inactive"
-                </span>
+    let create_active_badges = {
+        move || {
+            if is_active {
+                view! {cx,
+                    <span class="status status-green">
+                        <span class="status-dot"></span>
+                        "active"
+                    </span>
+                }
+            } else {
+                view! {cx,
+                    <span class="status status-yellow">
+                        <span class="status-dot"></span>
+                        "inactive"
+                    </span>
+                }
             }
         }
-    }};
+    };
 
-    let is_admin = user.is_admin.clone();
-    let is_p_admin = user.permissions.clone().iter().any(|u| u.permission == 5);
+    let is_admin = user.is_admin;
+    let is_p_admin = user.permissions.iter().any(|u| u.permission == 5);
 
-    let create_role_badges = {move || {
-        if is_admin {
-            view!{cx, 
-                <span class="status status-red">
-                    <span class="status-dot"></span>
-                    "admin"
-                </span>
-            }
-        }else{
-            if is_p_admin {
-                view!{cx, 
+    let create_role_badges = {
+        move || {
+            if is_admin {
+                view! {cx,
+                    <span class="status status-red">
+                        <span class="status-dot"></span>
+                        "admin"
+                    </span>
+                }
+            } else if is_p_admin {
+                view! {cx,
                     <span class="status status-purple">
                         <span class="status-dot"></span>
                         "p-admin"
                     </span>
                 }
-            }else{
-                view!{cx, 
+            } else {
+                view! {cx,
                     <span class="status status-blue">
                         <span class="status-dot"></span>
                         "user"
@@ -129,7 +128,7 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                 }
             }
         }
-    }};
+    };
 
     let stored_permission = store_value(cx, user.permissions);
     let store_user = store_value(cx, user.user_id.clone());
@@ -152,13 +151,13 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                             <path d="M6 13l6 6"></path>
                         </svg>
                     </a>
-                    {move || 
+                    {move ||
                         if is_active {
                             view!{cx,
                                 <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" on:click=move |_| {deactivate_action.dispatch(DeactivateUser { user_id: store_user.get_value() })}>
                                 <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                                     {move || {
-                                        view!{cx, 
+                                        view!{cx,
                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-minus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                                 <path d="M5 12l14 0"></path>
@@ -170,7 +169,7 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                                 <a href="#" class="btn btn-success btn-icon btn-sm ms-2" aria-label="Button" role="button" data-bs-toggle="modal" data-bs-target=format!("#ACU{}", store_user.get_value())>
                                 <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                                     {move || {
-                                        view!{cx, 
+                                        view!{cx,
                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users-plus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                                 <path d="M5 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"></path>
@@ -189,14 +188,14 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                                 <a href="#" class="btn btn-success btn-icon btn-sm" aria-label="Button" role="button" data-bs-toggle="modal" data-bs-target=format!("#AV{}", store_user.get_value())>//on:click=move |_| {set_deleting.set(token_id.get_value())}>
                                 <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                                     {move || {
-                                        view!{cx, 
+                                        view!{cx,
                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                
+
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                                 <path d="M12 5l0 14"></path>
                                                 <path d="M5 12l14 0"></path>
                                             </svg>
-                                           
+
                                         }.into_view(cx)
                                     }}
                                     </Suspense>
@@ -236,7 +235,7 @@ pub fn AdminUser(cx: Scope, user: UserState) -> impl IntoView {
                             </td>
                         </tr>
                     }})
-                    .collect::<Vec<_>>().into_view(cx) 
+                    .collect::<Vec<_>>().into_view(cx)
                 }else{
                     view!{cx, <td colspan="5" class="text-center">"Looks like this user is currently not member in any project!"</td>}.into_view(cx)
                 }

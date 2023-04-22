@@ -1,23 +1,23 @@
+pub mod about;
+pub mod activate_modal;
+pub mod add_user;
 pub mod admin;
+pub mod alert_modal;
+pub mod create_project;
 pub mod create_token;
+pub mod footer;
 pub mod header;
+pub mod imprint;
 pub mod main_body;
 pub mod panel;
 pub mod panel_nav;
 pub mod project;
+pub mod project_admin;
 pub mod projects;
 pub mod register;
 pub mod token;
 pub mod tokens;
-pub mod alert_modal;
 pub mod user;
-pub mod activate_modal;
-pub mod add_user;
-pub mod create_project;
-pub mod project_admin;
-pub mod about;
-pub mod footer;
-pub mod imprint;
 
 use cfg_if::cfg_if;
 

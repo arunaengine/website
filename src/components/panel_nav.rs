@@ -13,12 +13,15 @@ pub fn PanelNav(cx: Scope) -> impl IntoView {
 
     let path = loc.pathname;
 
-
     let get_user =
         use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
 
     let is_admin = create_memo(cx, move |_| {
-        get_user.read(cx).unwrap_or_default().unwrap_or_default().is_admin
+        get_user
+            .read(cx)
+            .unwrap_or_default()
+            .unwrap_or_default()
+            .is_admin
     });
 
     view! {cx,

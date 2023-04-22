@@ -7,10 +7,10 @@ use crate::utils::structs::UpdateUser;
 /// Renders the home page of your application.
 #[component(transparent)]
 pub fn Panel(cx: Scope) -> impl IntoView {
+    use crate::components::admin::*;
     use crate::components::panel_nav::*;
     use crate::components::projects::*;
     use crate::components::tokens::*;
-    use crate::components::admin::*;
 
     let update_user = use_context::<UpdateUser>(cx).expect("user_state not set");
 

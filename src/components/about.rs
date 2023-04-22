@@ -3,11 +3,10 @@ use leptos_meta::*;
 
 #[component]
 pub fn About(cx: Scope) -> impl IntoView {
-
     provide_meta_context(cx);
 
-    view!{cx,
-    
+    view! {cx,
+
     <div class="card px-4 my-5 text-center col-10 mx-auto">
         <img class="d-block mx-auto" src="/aruna_icon.png" alt="" width="72" />
         <div class="card-body">

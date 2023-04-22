@@ -3,13 +3,21 @@ use leptos_meta::*;
 
 /// Renders the home page of your application.
 #[component]
-pub fn AlertModal<F>(cx: Scope, header: String, message: String, modal_id: String, action_name: String, action: F) -> impl IntoView 
-    where F: FnMut(ev::MouseEvent,) + 'static
+pub fn AlertModal<F>(
+    cx: Scope,
+    header: String,
+    message: String,
+    modal_id: String,
+    action_name: String,
+    action: F,
+) -> impl IntoView
+where
+    F: FnMut(ev::MouseEvent) + 'static,
 {
     provide_meta_context(cx);
 
     view! {cx,
-        <div class="modal" id=modal_id.clone() tabindex="-1">
+        <div class="modal" id=modal_id tabindex="-1">
         <div class="modal-dialog modal-sm" role="document">
           <div class="modal-content">
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

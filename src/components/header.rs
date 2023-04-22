@@ -1,7 +1,7 @@
+use cfg_if::cfg_if;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use cfg_if::cfg_if;
 
 use crate::utils::structs::{UpdateUser, UserState};
 
@@ -39,7 +39,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
                 }
             }
         }
-    };        
+    };
     let aruna_header = view! { cx,
         <h1 class="navbar-brand navbar-brand-light d-none-navbar-horizontal pe-0 pe-md-3">
             <A href="/">
@@ -111,17 +111,12 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
 
     );
 
-
     let class_cookie = move || {
         format!(
-        "cookie-consent {}",
-          if hide_cookies() {
-            "hidden"
-          } else {
-            ""
-          }
+            "cookie-consent {}",
+            if hide_cookies() { "hidden" } else { "" }
         )
-      };
+    };
 
     let user_elem = view! { cx,
     <Suspense fallback=move || view! {cx, <div class="spinner-border"></div>}>
@@ -299,7 +294,7 @@ pub fn ArunaHeader(cx: Scope) -> impl IntoView {
             </header>
         </div>
 
-        {move || view!{cx, 
+        {move || view!{cx,
             <div class=class_cookie>
                 <span>"This site uses cookies to store user sessions, without these login for internal dashboard will be unavailable. see "<a href="/imprint" class="ms-2 text-decoration-none">" privacy policy"</a> "for more information"</span>
                 <div class="mt-2 d-flex align-items-center justify-content-center g-2">

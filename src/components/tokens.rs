@@ -123,8 +123,8 @@ pub fn TokensOverview(cx: Scope) -> impl IntoView {
                                     <Token token_info=item/>
                                 })
                                 .collect::<Vec<_>>().into_view(cx)
-                            
-                                
+
+
                             }else{
                                 view!{cx, <tr><td colspan="4" class="text-center">"Looks like you currently have no active tokens!"</td></tr>}.into_view(cx)
                             }

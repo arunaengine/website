@@ -1,6 +1,6 @@
+use crate::utils::structs::{UpdateAdmin, UserState};
 use leptos::*;
 use leptos_meta::*;
-use crate::utils::structs::{UserState, UpdateAdmin};
 
 #[server(GetUsers, "/web")]
 pub async fn get_users(
@@ -31,10 +31,10 @@ pub async fn get_users(
     })?;
 
     let mut vector = result
-    .user_with_perms
-    .into_iter()
-    .map(UserState::from)
-    .collect::<Vec<UserState>>();
+        .user_with_perms
+        .into_iter()
+        .map(UserState::from)
+        .collect::<Vec<UserState>>();
 
     vector.sort_by(|a, b| a.is_active.cmp(&b.is_active));
 
@@ -43,20 +43,22 @@ pub async fn get_users(
 
 #[component]
 pub fn AdminOverview(cx: Scope) -> impl IntoView {
-
     use crate::components::user::*;
 
     provide_meta_context(cx);
 
     let get_user =
-    use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
-
+        use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
 
     let is_admin = create_memo(cx, move |_| {
-        get_user.read(cx).unwrap_or_default().unwrap_or_default().is_admin
+        get_user
+            .read(cx)
+            .unwrap_or_default()
+            .unwrap_or_default()
+            .is_admin
     });
 
-    if is_admin() == false {
+    if !is_admin() {
         #[cfg(not(feature = "ssr"))]
         window().location().set_href("/").unwrap();
     }
@@ -71,7 +73,6 @@ pub fn AdminOverview(cx: Scope) -> impl IntoView {
     update_admin.0.update(|e| *e = !*e);
 
     provide_context(cx, update_admin);
-
 
     let user_states = move || get_users_res.read(cx).flatten().unwrap_or_default();
 
@@ -109,7 +110,7 @@ pub fn AdminOverview(cx: Scope) -> impl IntoView {
                                     cx,
                                     <AdminUser user=item/>
                                 })
-                                .collect::<Vec<_>>().into_view(cx) 
+                                .collect::<Vec<_>>().into_view(cx)
                             }else{
                                 view!{cx, <tr><td colspan="5" class="text-center">"Looks like you are currently not associated with any project!"</td></tr>}.into_view(cx)
                             }

@@ -3,7 +3,6 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-
 #[server(AddUserProject, "/web")]
 pub async fn add_user_project(
     #[allow(unused_variables)] cx: Scope,
@@ -30,12 +29,10 @@ pub async fn add_user_project(
     Ok(())
 }
 
-
 /// Renders the home page of your application.
 #[component]
 pub fn AddUserProject(cx: Scope, user_id: String) -> impl IntoView {
     provide_meta_context(cx);
-
 
     let activate_user = create_server_action::<AddUserProject>(cx);
     let update_admin = use_context::<UpdateAdmin>(cx).expect("user_state not set");
@@ -43,15 +40,14 @@ pub fn AddUserProject(cx: Scope, user_id: String) -> impl IntoView {
     let current_state = create_rw_signal(cx, 0);
 
     create_effect(cx, move |_| {
-      if activate_user.version()() > current_state() {
-
-        update_admin.0.update(|e| *e = !*e);
-        current_state.set_untracked(activate_user.version()())
-      }
+        if activate_user.version()() > current_state() {
+            update_admin.0.update(|e| *e = !*e);
+            current_state.set_untracked(activate_user.version()())
+        }
     });
 
     view! {cx,
-      <div class="modal" id=format!("ACU{}", user_id.clone()) tabindex="-1">
+      <div class="modal" id=format!("ACU{}", user_id) tabindex="-1">
         <div class="modal-dialog modal-sm" role="document">
           <div class="modal-content">
               <ActionForm on:submit=move |ev| {

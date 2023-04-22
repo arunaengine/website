@@ -76,14 +76,17 @@ pub async fn get_user_info(
                         log::debug!("Unable to insert aruna token-id to session 2");
                         ServerFnError::Request("Invalid request".to_string())
                     })?;
-            }else{
-                session_id = sess.get::<String>("token-id").unwrap_or_default().unwrap_or_default();
+            } else {
+                session_id = sess
+                    .get::<String>("token-id")
+                    .unwrap_or_default()
+                    .unwrap_or_default();
             };
 
             if i.session_id.is_empty() {
                 i.session_id = session_id;
                 Ok(i)
-            }else{
+            } else {
                 Ok(i)
             }
         }
@@ -126,15 +129,18 @@ pub async fn get_user_info(
                         log::debug!("Unable to insert aruna token-id to session 2");
                         ServerFnError::Request("Invalid request".to_string())
                     })?;
-            }else{
-                session_id = sess.get::<String>("token-id").unwrap_or_default().unwrap_or_default();
+            } else {
+                session_id = sess
+                    .get::<String>("token-id")
+                    .unwrap_or_default()
+                    .unwrap_or_default();
             };
 
             match who_am_i(&token).await {
                 Ok(mut i) => {
                     i.session_id = session_id;
                     Ok(i)
-                },
+                }
                 Err(_) => {
                     log::debug!("Who am i request error");
                     return Err(ServerFnError::Request(
@@ -151,15 +157,14 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context(cx);
 
-    use crate::components::header::*;
-    use crate::components::panel::*;
-    use crate::components::register::*;
     use crate::components::about::*;
     use crate::components::footer::*;
+    use crate::components::header::*;
     use crate::components::imprint::*;
+    use crate::components::panel::*;
+    use crate::components::register::*;
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(cx, true));
-    
 
     let res = create_resource(cx, update_user.0, move |_| async move {
         // this is the ServerFn that is called by the GetUser Action above
@@ -173,9 +178,9 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
         cx,
         // injects a stylesheet into the document <head>
         // id=leptos means cargo-leptos will hot-reload this stylesheet
-        <Stylesheet href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/css/tabler.min.css" />
+        <Stylesheet href="/tabler.min.css" />
         <Stylesheet id="leptos" href="/pkg/leptos_start.css"/>
-        <Script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/tabler.min.js" />
+        <Script src="/tabler.min.js" />
         // sets the document title
         <Title text="Aruna Object Storage"/>
         <Router>
