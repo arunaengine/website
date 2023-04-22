@@ -1,12 +1,11 @@
+use crate::utils::structs::SimplePermission;
 use leptos::*;
 use leptos_meta::*;
-use crate::utils::structs::SimplePermission;
 
 /// Renders the home page of your application.
 #[component]
 pub fn Project(cx: Scope, project: SimplePermission) -> impl IntoView {
     provide_meta_context(cx);
-
 
     let store_project = store_value(cx, project.project_id.clone());
 
@@ -28,7 +27,7 @@ pub fn Project(cx: Scope, project: SimplePermission) -> impl IntoView {
                     <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" >//on:click=move |_| {set_deleting.set(token_id.get_value())}>
                     <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                         {move || {
-                            view!{cx, 
+                            view!{cx,
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                     <path d="M4 7l16 0"></path>

@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use aruna_rust_api::api::storage::{
-    models::v1::{ProjectPermission, Token, User, ProjectOverview},
+    models::v1::{ProjectOverview, ProjectPermission, Token, User},
     services::v1::{CreateApiTokenResponse, UserWithPerms},
 };
 use chrono::Local;
@@ -14,7 +14,7 @@ pub struct SimplePermission {
     pub permission: i32,
 }
 
-impl SimplePermission{
+impl SimplePermission {
     pub fn to_permission_string(&self) -> String {
         match self.permission {
             0 => "-".to_string(),
@@ -64,7 +64,11 @@ impl From<User> for UserState {
 impl From<UserWithPerms> for UserState {
     fn from(value: UserWithPerms) -> Self {
         let user = value.user.unwrap_or_default();
-        let perms = value.project_perms.into_iter().map(|p| p.into()).collect::<Vec<_>>();
+        let perms = value
+            .project_perms
+            .into_iter()
+            .map(|p| p.into())
+            .collect::<Vec<_>>();
         UserState {
             user_id: user.id,
             display_name: user.display_name,
@@ -207,7 +211,7 @@ pub fn format_time_stamp(ts: Option<Timestamp>) -> String {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ProjectOverviewWeb{
+pub struct ProjectOverviewWeb {
     pub id: String,
     pub name: String,
     pub description: String,
@@ -222,7 +226,7 @@ impl From<ProjectOverview> for ProjectOverviewWeb {
             name: value.name,
             description: value.description,
             collection_ids: value.collection_ids,
-            user_ids: value.user_ids
+            user_ids: value.user_ids,
         }
     }
 }

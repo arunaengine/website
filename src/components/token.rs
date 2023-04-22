@@ -6,7 +6,7 @@ use crate::utils::structs::{TokenStats, UpdateTokens, UserState};
 #[server(DeleteToken, "/web")]
 pub async fn delete_token(
     #[allow(unused_variables)] cx: Scope,
-    token_id: String
+    token_id: String,
 ) -> Result<(), ServerFnError> {
     use crate::utils::aruna_api_handlers::aruna_delete_api_token;
     use actix_session::SessionExt;
@@ -27,14 +27,15 @@ pub async fn delete_token(
             ServerFnError::Request("Invalid request".to_string())
         })?;
 
-    _ = aruna_delete_api_token(token_id.clone(), &token).await.map_err(|_| {
-        log::debug!("Unable to query token from session 1");
-        ServerFnError::Request("Invalid request".to_string())
-    })?;
+    _ = aruna_delete_api_token(token_id.clone(), &token)
+        .await
+        .map_err(|_| {
+            log::debug!("Unable to query token from session 1");
+            ServerFnError::Request("Invalid request".to_string())
+        })?;
 
     Ok(())
 }
-
 
 /// Renders the home page of your application.
 #[component]
@@ -74,7 +75,7 @@ pub fn Token(cx: Scope, token_info: TokenStats) -> impl IntoView {
                     <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                         {move || {
                             let _ = dispatch_delete.read(cx);
-                            view!{cx, 
+                            view!{cx,
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                     <path d="M4 7l16 0"></path>
@@ -142,11 +143,16 @@ pub fn Session(cx: Scope, token_info: TokenStats) -> impl IntoView {
 
     use crate::components::alert_modal::*;
 
-
     let get_user =
         use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
 
-    let session_id = move || get_user.read(cx).unwrap_or_default().unwrap_or_default().session_id;
+    let session_id = move || {
+        get_user
+            .read(cx)
+            .unwrap_or_default()
+            .unwrap_or_default()
+            .session_id
+    };
 
     let token_id = store_value(cx, token_info.id.to_string());
 
@@ -159,26 +165,30 @@ pub fn Session(cx: Scope, token_info: TokenStats) -> impl IntoView {
 
     let dispatch_delete = create_resource(cx, blocking, move |del| async move {
         // this is the ServerFn that is called by the GetUser Action above
-        if !deleting().is_empty() && !del{
+        if !deleting().is_empty() && !del {
             delete_token(cx, deleting()).await.ok();
             update_tokens.0.update(move |e| *e = !*e)
         }
     });
 
     create_effect(cx, move |_| {
-        if is_current() && !deleting().is_empty() && !blocking() && dispatch_delete.read(cx).is_some() {
+        if is_current()
+            && !deleting().is_empty()
+            && !blocking()
+            && dispatch_delete.read(cx).is_some()
+        {
             let _ = window().location().set_href("/logout");
         }
     });
 
     let message = if is_current() {
         "Are you sure to delete the session that is currently in use ? This will automatically forward you to the logout page."
-    }else{
+    } else {
         "Do you really want to delete this session ?"
     };
 
     view! {cx,
-        <AlertModal 
+        <AlertModal
             header="Deleting session".to_string()
             message=message.to_string()
             modal_id=format!("mod-{}", token_id.get_value())
@@ -205,7 +215,7 @@ pub fn Session(cx: Scope, token_info: TokenStats) -> impl IntoView {
                     <Suspense fallback=move || view! { cx, <div class="spinner-border"></div> }>
                         {move || {
                             let _ = dispatch_delete.read(cx);
-                            view!{cx, 
+                            view!{cx,
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                     <path d="M4 7l16 0"></path>
@@ -217,7 +227,7 @@ pub fn Session(cx: Scope, token_info: TokenStats) -> impl IntoView {
                             }
                         }}
                     </Suspense>
-                    
+
                     </a>
                 </div>
             </td>

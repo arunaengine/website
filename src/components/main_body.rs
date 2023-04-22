@@ -273,7 +273,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                             <div class="accordion-body pt-0">
                               <div>
                                 <p>{"Aruna Object Storage (AOS) is an open source data storage platform that enables scientists to store, annotate and share their data according to "}<a href="https://www.go-fair.org/fair-principles/">{"FAIR"}</a>{" principles."}</p>
-                                <p>{"The name Aruna originates from the god of the sea in hittite mythology and their name for the sea and bodies of water in general. 
+                                <p>{"The name Aruna originates from the god of the sea in hittite mythology and their name for the sea and bodies of water in general.
                                      We choose this name to symbolize our vision of a revolutionary cloud-native data lake."}</p>
                               </div>
                             </div>

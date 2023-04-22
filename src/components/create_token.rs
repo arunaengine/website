@@ -5,7 +5,10 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-use crate::utils::{modal::hide_modal, structs::{TokenResponse, UpdateTokens}};
+use crate::utils::{
+    modal::hide_modal,
+    structs::{TokenResponse, UpdateTokens},
+};
 
 #[server(CreateTokenServer, "/web")]
 pub async fn create_token_server(

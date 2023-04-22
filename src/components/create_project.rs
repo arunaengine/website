@@ -27,7 +27,6 @@ pub async fn creat_project_req(
     Ok(())
 }
 
-
 /// Renders the home page of your application.
 #[component]
 pub fn CreateProject(cx: Scope) -> impl IntoView {

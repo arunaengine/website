@@ -1,16 +1,17 @@
-use leptos::*;
-use leptos_meta::*;
-use crate::utils::structs::UserState;
-use crate::components::project::*;
 use crate::components::create_project::*;
+use crate::components::project::*;
 use crate::components::project_admin::*;
 use crate::utils::structs::ProjectOverviewWeb;
-
+use crate::utils::structs::UserState;
+use leptos::*;
+use leptos_meta::*;
 
 #[server(AdminAllProjects, "/web")]
-pub async fn admin_all_projects(#[allow(unused_variables)] cx: Scope) -> Result<Vec<ProjectOverviewWeb>, ServerFnError> {
+pub async fn admin_all_projects(
+    #[allow(unused_variables)] cx: Scope,
+) -> Result<Vec<ProjectOverviewWeb>, ServerFnError> {
     use crate::utils::aruna_api_handlers::aruna_get_all_projects;
-    
+
     use actix_session::SessionExt;
     use actix_web::HttpRequest;
     let req = use_context::<HttpRequest>(cx).unwrap();
@@ -24,40 +25,51 @@ pub async fn admin_all_projects(#[allow(unused_variables)] cx: Scope) -> Result<
 
     Ok(aruna_get_all_projects(&token)
         .await
-        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?.projects.into_iter().map(|pov| pov.into()).collect::<Vec<_>>()) 
+        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
+        .projects
+        .into_iter()
+        .map(|pov| pov.into())
+        .collect::<Vec<_>>())
 }
-
 
 #[component]
 pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
-
     provide_meta_context(cx);
 
     let get_user =
-    use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
+        use_context::<Resource<bool, Option<UserState>>>(cx).expect("user_state not set");
 
     let permissions = create_memo(cx, move |_| {
-        get_user.read(cx).unwrap_or_default().unwrap_or_default().permissions
+        get_user
+            .read(cx)
+            .unwrap_or_default()
+            .unwrap_or_default()
+            .permissions
     });
 
     let is_admin = create_memo(cx, move |_| {
-        get_user.read(cx).unwrap_or_default().unwrap_or_default().is_admin
+        get_user
+            .read(cx)
+            .unwrap_or_default()
+            .unwrap_or_default()
+            .is_admin
     });
 
     let admin_project_value = create_rw_signal(cx, 0);
     let admin_get_proj_action = create_server_action::<AdminAllProjects>(cx);
 
-
-    let admin_user = create_memo(cx, move |_| admin_get_proj_action.value().get().unwrap_or(Ok(Vec::new())).unwrap_or_default());
-
+    let admin_user = create_memo(cx, move |_| {
+        admin_get_proj_action
+            .value()
+            .get()
+            .unwrap_or(Ok(Vec::new()))
+            .unwrap_or_default()
+    });
 
     provide_context(cx, admin_get_proj_action);
 
-
     create_effect(cx, move |_| {
-        if admin_project_value() < admin_get_proj_action.version()() {
-
-        }
+        if admin_project_value() < admin_get_proj_action.version()() {}
     });
 
     view! {cx,
@@ -93,7 +105,7 @@ pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
                                     cx,
                                     <Project project=item/>
                                 })
-                                .collect::<Vec<_>>().into_view(cx) 
+                                .collect::<Vec<_>>().into_view(cx)
                             }else{
                                 view!{cx, <tr><td colspan="4" class="text-center">"Looks like you are currently not associated with any project!"</td></tr>}.into_view(cx)
                             }
@@ -135,15 +147,15 @@ pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
                             <tbody>
                                 <Transition fallback=move || view! { cx, <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
                                 {
-                                    move || 
-                                    
+                                    move ||
+
                                     if !admin_user().is_empty() {
                                         admin_user().into_iter()
                                         .map(|item| view! {
                                             cx,
                                             <ProjectAdmin project=item/>
                                         })
-                                        .collect::<Vec<_>>().into_view(cx) 
+                                        .collect::<Vec<_>>().into_view(cx)
                                     }else{
                                         view!{cx, <tr><td colspan="4" class="text-center">"Looks like you are currently not associated with any project!"</td></tr>}.into_view(cx)
                                     }
@@ -166,8 +178,8 @@ pub fn ProjectsOverview(cx: Scope) -> impl IntoView {
                 </div>
                 </div>
             </div>
-            
-            
+
+
             }.into_view(cx)
 
         }else{
