@@ -11,15 +11,13 @@ WORKDIR /app
 COPY . .
 RUN cargo leptos build --release -vv
 
-FROM rust:slim-bullseye as runner
+FROM harbor.computational.bio.uni-giessen.de/docker_hub_cache/library/ubuntu
 COPY --from=builder /app/target/server/release/aruna_web /app/
 COPY --from=builder /app/target/site /app/site
 COPY --from=builder /app/Cargo.toml /app/
 COPY --from=builder /app/.env /app/
 RUN apt-get -y update && apt-get -y upgrade
 RUN apt-get -y install ca-certificates openssl
-RUN rustup toolchain install nightly
-RUN rustup default nightly
 WORKDIR /app
 ENV RUST_LOG="info"
 ENV LEPTOS_OUTPUT_NAME="aruna_web"
