@@ -31,6 +31,6 @@ jobs:
           echo IMAGE_ID=$IMAGE_ID
           echo VERSION=$VERSION
           echo "${{ secrets.HARBORPW }}" | docker login harbor.computational.bio.uni-giessen.de -u '${{ secrets.HARBORUSER }}' --password-stdin
-          HARBOR_IMAGE_ID=harbor.computational.bio.uni-giessen.de/aruna/arunadataproxy
+          HARBOR_IMAGE_ID=harbor.computational.bio.uni-giessen.de/aruna/arunaweb
           docker tag $IMAGE_NAME $HARBOR_IMAGE_ID:$VERSION
           docker push $HARBOR_IMAGE_ID:$VERSION
