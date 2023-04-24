@@ -4,7 +4,7 @@ use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetada
 use openidconnect::PkceCodeVerifier;
 use openidconnect::{
     AccessTokenHash, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
-    PkceCodeChallenge, RedirectUrl, Scope,
+    PkceCodeChallenge, RedirectUrl,
 };
 
 use actix_session::Session;
@@ -94,7 +94,6 @@ impl Authorizer {
                 CsrfToken::new_random,
                 Nonce::new_random,
             ) // Set the desired scopes.
-            .add_scope(Scope::new("openid".to_string()))
             // Set the PKCE code challenge.
             .set_pkce_challenge(pkce_challenge)
             .url();
