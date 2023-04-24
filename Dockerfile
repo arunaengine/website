@@ -11,7 +11,7 @@ WORKDIR /app
 COPY . .
 RUN cargo leptos build --release -vv
 
-FROM harbor.computational.bio.uni-giessen.de/docker_hub_cache/library/ubuntu
+FROM debian:bullseye-slim
 COPY --from=builder /app/target/server/release/aruna_web /app/
 COPY --from=builder /app/target/site /app/site
 COPY --from=builder /app/Cargo.toml /app/
