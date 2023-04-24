@@ -34,7 +34,7 @@ pub async fn logout(session: Session, data: Data<Mutex<Authorizer>>) -> Result<i
     Ok(Redirect::to(format!(
         "{}/{}",
         my_data.get_keycloak_url(),
-        "protocol/openid-connect/logout?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3000%2F&client_id=test"
+        "protocol/openid-connect/logout?redirect_uri=https%3A%2F%2Faruna-storage.org"
     ))
     .see_other())
 }
