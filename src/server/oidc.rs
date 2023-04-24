@@ -94,7 +94,7 @@ impl Authorizer {
                 CsrfToken::new_random,
                 Nonce::new_random,
             ) // Set the desired scopes.
-            .add_scope(Scope::new("email".to_string()))
+            .add_scope(Scope::new("openid".to_string()))
             // Set the PKCE code challenge.
             .set_pkce_challenge(pkce_challenge)
             .url();
