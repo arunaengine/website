@@ -179,7 +179,7 @@ pub fn EntryPoint(cx: Scope) -> impl IntoView {
         // injects a stylesheet into the document <head>
         // id=leptos means cargo-leptos will hot-reload this stylesheet
         <Stylesheet href="/tabler.min.css" />
-        <Stylesheet id="leptos" href="/pkg/leptos_start.css"/>
+        <Stylesheet id="leptos" href="/pkg/aruna_web.css"/>
         <Script src="/tabler.min.js" />
         // sets the document title
         <Title text="Aruna Object Storage"/>
