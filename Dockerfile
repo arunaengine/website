@@ -17,7 +17,7 @@ COPY --from=builder /app/target/site /app/site
 COPY --from=builder /app/Cargo.toml /app/
 COPY --from=builder /app/.env /app/
 RUN apt-get -y update && apt-get -y upgrade
-RUN apt-get -y install ca-certificates openssl
+RUN apt-get -y install ca-certificates libssl-dev
 WORKDIR /app
 ENV RUST_LOG="info"
 ENV LEPTOS_OUTPUT_NAME="aruna_web"
