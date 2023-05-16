@@ -56,16 +56,13 @@ pub fn Imprint(cx: Scope) -> impl IntoView {
 
                 <h3 class="mt-2">"8. Data Protection Officer"</h3>
 
-                <div>"The data protection officers of the Justus Liebig University Giessen are:"</div>
-                <div>"Axel P. Globuschütz"</div>
-                <div>"Ludwigstraße 23, Raum 227"</div>
+                <div><b>"The contact details of the official data protection officers at Justus Liebig University are:"</b></div>
+                <div>"Justus-Liebig-Universität Gießen"</div>
+                <div>"Der behördliche Datenschutzbeauftragte"</div>
+                <div>"Ludwigstraße 23"</div>
                 <div>"35390 Gießen"</div>
-                <a href="mailto:Datenschutz@uni-giessen.de">"Datenschutz@uni-giessen.de"</a>
-                <div>"Tel. 0641-99 12230"</div>
-                <div class="h-25 mt-2"></div>
-                <div>"Carl Philip Bolldorf"</div>
-                <a href="mailto:Datenschutz@uni-giessen.de">"Datenschutz@uni-giessen.de"</a>
-                <div>"Tel. 0641-99 12270"</div>
+                <div>"Tel: 0641-99 122 30 / 0641-99 122 70"</div>
+                <a href="mailto:Datenschutz@uni-giessen.de">"datenschutz@uni-giessen.de"</a>
                 <div>"Stand: 20. April 2023"</div>
                 <div></div>
                 <div class="mt-2">"Please note that this privacy policy may be changed at any time. You can find the current version on this website."</div>
@@ -121,18 +118,13 @@ pub fn Imprint(cx: Scope) -> impl IntoView {
 
             <h3 class="mt-2">"8. Datenschutzbeauftragte"</h3>
 
-            <div>"Die Datenschutzbeauftragten der Universität sind:"</div>
-            <div>"Axel P. Globuschütz"</div>
-            <div>"Ludwigstraße 23, Raum 227"</div>
+            <div><b>"Die Kontaktdaten des behördlichen Datenschutzbeauftragten der Justus-Liebig-Universität sind:"</b></div>
+            <div>"Justus-Liebig-Universität Gießen"</div>
+            <div>"Der behördliche Datenschutzbeauftragte"</div>
+            <div>"Ludwigstraße 23"</div>
             <div>"35390 Gießen"</div>
-            <a href="mailto:Datenschutz@uni-giessen.de">"Datenschutz@uni-giessen.de"</a>
-            <div>"Tel. 0641-99 12230"</div>
-            <div class="h-25 mt-2"></div>
-            <div>"Carl Philip Bolldorf"</div>
-            <a href="mailto:Datenschutz@uni-giessen.de">"Datenschutz@uni-giessen.de"</a>
-            <div>"Tel. 0641-99 12270"</div>
-            <div>"Stand: 20. April 2023"</div>
-            <div></div>
+            <div>"Tel: 0641-99 122 30 / 0641-99 122 70"</div>
+            <a href="mailto:Datenschutz@uni-giessen.de">"datenschutz@uni-giessen.de"</a>
             <div class="mt-2">"Bitte beachten Sie, dass diese Datenschutzerklärung jederzeit geändert werden kann. Eine jeweils aktuelle Version finden Sie auf unserer Website."</div>
             </div>
         </div>

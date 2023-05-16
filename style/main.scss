@@ -39,6 +39,7 @@ body {
 	width: 200vw;
 	position: absolute;
 	height: 150vh;
+	z-index: -2;
 	transform: translateX(-20vw);
 }
 
@@ -51,6 +52,7 @@ body {
 	background-color: white;
 	bottom: -30px;
 	top: 230vh;
+	z-index: -1;
 	opacity: 0.4;
 	animation: bubble 15s ease-in-out infinite,
 		sideWays 4s ease-in-out infinite alternate;
