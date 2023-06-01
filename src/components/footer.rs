@@ -18,6 +18,7 @@ pub fn Footer(cx: Scope) -> impl IntoView {
         <li class="nav-item"><a href="/#faq" class="nav-link px-2 text-muted">{"FAQs"}</a></li>
         <li class="nav-item"><a href="/about" class="nav-link px-2 text-muted">{"About"}</a></li>
         <li class="nav-item"><a href="/imprint" class="nav-link px-2 text-muted">{"Imprint"}</a></li>
+        <li class="nav-item"><a href="/tos" class="nav-link px-2 text-muted">{"Terms of Service"}</a></li>
         </ul>
         </footer>
     }

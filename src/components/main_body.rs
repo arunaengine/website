@@ -11,7 +11,7 @@ pub fn MainBody(cx: Scope) -> impl IntoView {
                   <img src="/aruna_dark.png" class="img-fluid mb-4 hide-theme-light" alt="Aruna Logo" width="700" height="500" />
                 </div>
             </div>
-            <h1 class="fw-bold hook pb-2">{"Your geo-redundant scientific data lake"}</h1>
+            <h1 class="fw-bold hook pb-2">{"Your geo-redundant scientific data mesh"}</h1>
             <div class="col-lg-6 mx-auto">
               <p class="mb-4 lead">{"Fast, secure, geo-redundant data storage with sophisticated metadata management according to "}<a href="https://www.go-fair.org/fair-principles/">{"FAIR"}</a>{" principles. Store and organize your data in new ways, share it with your colleagues and partners. Transparent data management made easy."}</p>
               <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-5">

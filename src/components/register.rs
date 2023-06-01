@@ -119,7 +119,7 @@ pub fn RegisterPage(cx: Scope) -> impl IntoView {
                             <path d="M9 12v-6.5a2.5 2.5 0 0 1 5 0v.5"></path>
                         </svg>
                         <h3>"Registration required!"</h3>
-                        <div class="text-muted">"Your account is not yet registered, please register first before you can proceed!"</div>
+                        <div class="text-muted">"Your account is not yet registered, you must register first before you can proceed! Registering indicates your acceptance to our "<a href="/tos" class="nav-link px-2 text-muted">{"Terms of Service"}</a></div>
                     </div>
                     <div class="mx-auto text-left import-left">
                         <div class="mb-3">

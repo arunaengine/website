@@ -17,6 +17,7 @@ pub mod projects;
 pub mod register;
 pub mod token;
 pub mod tokens;
+pub mod tos;
 pub mod user;
 
 use cfg_if::cfg_if;
