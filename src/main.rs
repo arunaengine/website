@@ -57,6 +57,7 @@ async fn main() -> std::io::Result<()> {
             .service(server::actix_routes::login)
             .service(server::actix_routes::logout)
             .service(server::actix_routes::callback)
+            .service(server::actix_routes::oidccallback)
             .route("/web/{tail:.*}", leptos_actix::handle_server_fns())
             .leptos_routes(
                 leptos_options.to_owned(),
