@@ -10,6 +10,7 @@ pub mod header;
 pub mod imprint;
 pub mod main_body;
 pub mod panel;
+pub mod panel_content;
 pub mod panel_nav;
 pub mod project;
 pub mod project_admin;
