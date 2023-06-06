@@ -8,6 +8,7 @@ use crate::utils::structs::UpdateUser;
 #[component(transparent)]
 pub fn Panel(cx: Scope) -> impl IntoView {
     use crate::components::admin::*;
+    use crate::components::panel_content::*;
     use crate::components::panel_nav::*;
     use crate::components::projects::*;
     use crate::components::tokens::*;
@@ -22,7 +23,7 @@ pub fn Panel(cx: Scope) -> impl IntoView {
         <Route path="collection" view=move |cx| "Collections".into_view(cx)/>
         <Route path="admin" view=move |cx| view! { cx, <AdminOverview/> }/>
         <Route path="tokens" view=move |cx| view! { cx, <TokensOverview/> }/>
-        <Route path="" view=move |cx| ().into_view(cx)/>
+        <Route path="" view=move |cx| view! { cx, <PanelContent/> }/>
       </Route>
     }
 }
