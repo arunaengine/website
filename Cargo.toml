@@ -32,13 +32,13 @@ wasm-bindgen = "=0.2.87"
 # that are used together frontend (lib) & server (bin)
 [[workspace.metadata.leptos]]
 # this name is used for the wasm, js and css file names
-name = "start-axum-workspace"
+name = "aruna_web_workspace"
 
 # the package in the workspace that contains the server binary (binary crate)
-bin-package = "server"
+bin-package = "aruna_web_server"
 
 # the package in the workspace that contains the frontend wasm binary (library crate)
-lib-package = "frontend"
+lib-package = "aruna_web_frontend"
 
 # The site root folder is where cargo-leptos generate all output. WARNING: all content of this folder will be erased on a rebuild. Use it in your server setup.
 site-root = "target/site"

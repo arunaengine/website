@@ -1,5 +1,5 @@
-use app::error_template::AppError;
-use app::error_template::ErrorTemplate;
+use aruna_web_app::error_template::AppError;
+use aruna_web_app::error_template::ErrorTemplate;
 use axum::response::Response as AxumResponse;
 use axum::{
     body::{boxed, Body, BoxBody},

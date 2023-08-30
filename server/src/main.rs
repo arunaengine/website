@@ -1,4 +1,4 @@
-use app::*;
+use aruna_web_app::*;
 use axum::{routing::post, Router};
 use fileserv::file_and_error_handler;
 use leptos::*;
@@ -18,12 +18,12 @@ async fn main() {
     let conf = get_configuration(None).await.unwrap();
     let leptos_options = conf.leptos_options;
     let addr = leptos_options.site_addr;
-    let routes = generate_route_list(|| view! { <App/> }).await;
+    let routes = generate_route_list(|| view! { <EntryPoint/> }).await;
 
     // build our application with a route
     let app = Router::new()
         .route("/api/*fn_name", post(leptos_axum::handle_server_fns))
-        .leptos_routes(&leptos_options, routes, || view! { <App/> })
+        .leptos_routes(&leptos_options, routes, || view! { <EntryPoint/> })
         .fallback(file_and_error_handler)
         .with_state(leptos_options);
 
