@@ -17,16 +17,20 @@ pub fn ArunaHeader() -> impl IntoView {
 
     let is_logged_memo = create_memo(move |_| get_user.get().flatten().is_some());
     // Creates a reactive value to update the button
-    let (dark, toggle_dark) = create_signal("".to_string());
+    let (dark, toggle_dark) = create_signal("light".to_string());
     let darkmode = move |_| {
         toggle_dark.update(|dark| {
-            if dark.is_empty() {
-                *dark = "theme-dark".to_string()
+            if dark == "light" {
+                *dark = "dark".to_string()
             } else {
-                *dark = "".to_string()
+                *dark = "light".to_string()
             }
         });
     };
+
+    let loc = use_location();
+
+    let path = loc.pathname;
 
     // let hide_cookies = create_rw_signal(false);
 
@@ -56,7 +60,7 @@ pub fn ArunaHeader() -> impl IntoView {
 
     let github = view! {
         <div class="nav-item d-none d-md-flex me-3">
-            <div class="btn-list theme-dark">
+            <div class="btn-list">
                 <a
                     href="https://github.com/ArunaStorage/ArunaServer"
                     class="btn"
@@ -270,10 +274,17 @@ pub fn ArunaHeader() -> impl IntoView {
         </Suspense>
     };
 
+    let html = {
+        move || {
+            view! {<Body attributes=AdditionalAttributes::from(
+            vec![("data-bs-theme", dark.get())])/>}
+        }
+    };
+
     view! {
-        <Body class=dark/>
+        {html}
         <div class="sticky-top">
-            <header class="navbar navbar-expand-md navbar-dark d-print-none sticky-top">
+            <header class="navbar navbar-expand-md d-print-none sticky-top" data-bs-theme="dark">
                 <div class="container-xl">
                     <button
                         class="navbar-toggler"
@@ -292,7 +303,7 @@ pub fn ArunaHeader() -> impl IntoView {
 
                             <div class="container-xl d-block">
                                 <ul class="navbar-nav">
-                                    <li class="nav-item active">
+                                    <li class="nav-item" class:active=move || { path() == "/" }>
                                         <A class="nav-link" href="/">
                                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                 <svg
@@ -317,7 +328,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                         </A>
                                     </li>
 
-                                    <li class="nav-item active">
+                                    <li class="nav-item" class:active=move || { path().contains("search") }>
                                         <A class="nav-link" href="/search">
                                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                 <svg
@@ -343,8 +354,8 @@ pub fn ArunaHeader() -> impl IntoView {
                                     {move || {
                                         if is_logged_memo() {
                                             view! {
-                                                <li class="nav-item">
-                                                    <A class="nav-link" href="/panel">
+                                                <li class="nav-item" class:active=move || { path().contains("panel") }>
+                                                    <A class="nav-link" href="/panel" >
                                                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                             <svg
                                                                 xmlns="http://www.w3.org/2000/svg"
@@ -374,7 +385,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                         }
                                     }}
 
-                                    <li class="nav-item">
+                                    <li class="nav-item" class:active=move || { path().contains("about") }>
                                         <A class="nav-link" href="/about">
                                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                 <svg

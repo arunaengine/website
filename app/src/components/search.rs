@@ -140,16 +140,23 @@ pub fn Search() -> impl IntoView {
                                         </span>
                                     </div>
                                     <div class="col border-start me-4">
-                                        <div class="pb-2 mb-2 border-bottom">
-                                            <span class="status status-cyan m-1">
-                                                experiment | Plasmidhunter
-                                            </span>
-                                            <span class="status status-cyan m-1">
-                                                project | SRE-20001
-                                            </span>
-                                            <span class="status status-cyan m-1">
-                                                validated | TRUE
-                                            </span>
+                                        <div class="d-flex border-bottom pb-3 mb-2 row">
+                                            <div class="tag col-4">
+                                                <div class="key text-secondary">experiment</div>
+                                                <div class="value">Plasmidhunter</div>
+                                            </div>
+                                            <div class="tag col-4">
+                                                <div class="key text-secondary">experiment</div>
+                                                <div class="value">Plasmidhunter</div>
+                                            </div>
+                                            <div class="tag col-4">
+                                                <div class="key text-secondary">experiment</div>
+                                                <div class="value">Plasmidhunter</div>
+                                            </div>
+                                            <div class="tag col-4">
+                                                <div class="key text-secondary">project</div>
+                                                <div class="value">SRE-20001</div>
+                                            </div>
                                         </div>
                                         <div class="row">
                                             <h4 class="subheader mb-0">"Description"</h4>

@@ -306,3 +306,38 @@ body {
 .hidden {
 	display: none;
 }
+
+.tag {
+	line-height: normal;
+	background: var(--tblr-body-bg);
+	margin-right: 8px;
+	border-radius: 8px;
+	display: block;
+	flex-wrap: nowrap;
+	height: auto;
+	cursor: pointer;
+}
+
+.key, .value {
+   	padding: .8em;
+    padding-top: .2em;
+    padding-bottom: .2em;
+}
+
+
+.value {
+	--tblr-status-color: #17a2b8;
+	--tblr-status-color-rgb: 23,162,184;
+	color: var(--tblr-status-color);
+	border-radius: 0 8px 8px 0;
+	margin-right: -8px;
+	background: rgba(var(--tblr-status-color-rgb),.1)
+}
+
+.row-labels {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	height: 100%;
+	border-radius: 0 0 3px 3px;
+}
