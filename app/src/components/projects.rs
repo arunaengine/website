@@ -73,115 +73,160 @@ pub fn ProjectsOverview() -> impl IntoView {
     );
 
     view! {
-    <div class="page-header d-print-none my-3">
-        <div class="container-xl">
-        <div class="row g-2 align-items-center">
-            <div class="col">
-            <h2 class="page-title">
-                "Personal Projects"
-            </h2>
-            </div>
-        </div>
-        </div>
-    </div>
-    <div class="container-xl mt-2 text-start">
-        <div class="card">
-            <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                    <thead>
-                    <tr>
-                        <th>"Id"</th>
-                        <th>"Name"</th>
-                        <th>"Role"</th>
-                        <th class="w-1">"Actions"</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                        <Transition fallback=move || view! { , <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
-                        {
-                            move || if !permissions().is_empty() {
-                                permissions().into_iter()
-                                .map(|item| view! {
-                                    <Project project=item/>
-                                })
-                                .collect::<Vec<_>>().into_view()
-                            }else{
-                                view!{<tr><td colspan="4" class="text-center">"Looks like you are currently not associated with any project!"</td></tr>}.into_view()
-                            }
-                        }
-                        </Transition>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    {move || {
-        if is_admin.get() {
-            admin_get_proj_action.dispatch(AdminAllProjects {});
-            view!{
-                <CreateProject />
-                <div class="page-header d-print-none my-3">
-                <div class="container-xl">
+        <div class="page-header d-print-none my-3">
+            <div class="container-xl">
                 <div class="row g-2 align-items-center">
                     <div class="col">
-                    <h2 class="page-title">
-                        "All Projects"
-                    </h2>
+                        <h2 class="page-title">"Personal Projects"</h2>
                     </div>
                 </div>
-                </div>
             </div>
-            <div class="container-xl mt-2 text-start">
-                <div class="card">
-                    <div class="table-responsive">
-                        <table class="table table-vcenter card-table">
-                            <thead>
+        </div>
+        <div class="container-xl mt-2 text-start">
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
                             <tr>
                                 <th>"Id"</th>
                                 <th>"Name"</th>
-                                <th>""</th>
+                                <th>"Role"</th>
                                 <th class="w-1">"Actions"</th>
                             </tr>
-                            </thead>
-                            <tbody>
-                                <Transition fallback=move || view! { , <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
-                                {
-                                    move ||
-
-                                    if !admin_user().is_empty() {
-                                        admin_user().into_iter()
-                                        .map(|item| view! {
-                                            <ProjectAdmin project=item/>
-                                        })
-                                        .collect::<Vec<_>>().into_view()
-                                    }else{
-                                        view!{<tr><td colspan="4" class="text-center">"Looks like you are currently not associated with any project!"</td></tr>}.into_view()
-                                    }
+                        </thead>
+                        <tbody>
+                            <Transition fallback=move || {
+                                view! {
+                                    ,
+                                    <tr>
+                                        <td colspan="4" class="text-center">
+                                            <div class="spinner-border"></div>
+                                        </td>
+                                    </tr>
                                 }
-                                </Transition>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="card-footer p-0">
-                    <div class="d-flex">
-                        <button class="btn btn-primary ms-auto m-1" type="button" data-bs-toggle="modal" data-bs-target="#createProject">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path d="M12 5l0 14"></path>
-                                <path d="M5 12l14 0"></path>
-                            </svg>
-                            "Create Project"
-                        </button>
-                    </div>
-                </div>
+                            }>
+
+                                {move || {
+                                    if !permissions().is_empty() {
+                                        permissions()
+                                            .into_iter()
+                                            .map(|item| view! { <Project project=item/> })
+                                            .collect::<Vec<_>>()
+                                            .into_view()
+                                    } else {
+                                        view! {
+                                            <tr>
+                                                <td colspan="4" class="text-center">
+                                                    "Looks like you are currently not associated with any project!"
+                                                </td>
+                                            </tr>
+                                        }
+                                            .into_view()
+                                    }
+                                }}
+
+                            </Transition>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            }.into_view()
+        </div>
+        {move || {
+            if is_admin.get() {
+                admin_get_proj_action.dispatch(AdminAllProjects {});
+                view! {
+                    <CreateProject/>
+                    <div class="page-header d-print-none my-3">
+                        <div class="container-xl">
+                            <div class="row g-2 align-items-center">
+                                <div class="col">
+                                    <h2 class="page-title">"All Projects"</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="container-xl mt-2 text-start">
+                        <div class="card">
+                            <div class="table-responsive">
+                                <table class="table table-vcenter card-table">
+                                    <thead>
+                                        <tr>
+                                            <th>"Id"</th>
+                                            <th>"Name"</th>
+                                            <th>""</th>
+                                            <th class="w-1">"Actions"</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <Transition fallback=move || {
+                                            view! {
+                                                ,
+                                                <tr>
+                                                    <td colspan="4" class="text-center">
+                                                        <div class="spinner-border"></div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }>
 
-        }else{
-            ().into_view()
-        }
+                                            {move || {
+                                                if !admin_user().is_empty() {
+                                                    admin_user()
+                                                        .into_iter()
+                                                        .map(|item| view! { <ProjectAdmin project=item/> })
+                                                        .collect::<Vec<_>>()
+                                                        .into_view()
+                                                } else {
+                                                    view! {
+                                                        <tr>
+                                                            <td colspan="4" class="text-center">
+                                                                "Looks like you are currently not associated with any project!"
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                        .into_view()
+                                                }
+                                            }}
 
-    }}
+                                        </Transition>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="card-footer p-0">
+                                <div class="d-flex">
+                                    <button
+                                        class="btn btn-primary ms-auto m-1"
+                                        type="button"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#createProject"
+                                    >
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            class="icon icon-tabler icon-tabler-plus"
+                                            width="24"
+                                            height="24"
+                                            viewBox="0 0 24 24"
+                                            stroke-width="2"
+                                            stroke="currentColor"
+                                            fill="none"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        >
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                            <path d="M12 5l0 14"></path>
+                                            <path d="M5 12l14 0"></path>
+                                        </svg>
+                                        "Create Project"
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                    .into_view()
+            } else {
+                ().into_view()
+            }
+        }}
     }
 }

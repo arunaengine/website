@@ -90,13 +90,11 @@ pub fn TokensOverview() -> impl IntoView {
     view! {
         <div class="page-header d-print-none my-3">
             <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                <h2 class="page-title">
-                    "Tokens"
-                </h2>
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">"Tokens"</h2>
+                    </div>
                 </div>
-            </div>
             </div>
         </div>
         <div class="container-xl mt-2 text-start">
@@ -104,39 +102,70 @@ pub fn TokensOverview() -> impl IntoView {
                 <div class="table-responsive">
                     <table class="table table-vcenter card-table accordion" id="tokenTable">
                         <thead>
-                        <tr>
-                            <th>"Id"</th>
-                            <th>"Name"</th>
-                            <th>"Last used"</th>
-                            <th class="w-3 text-end">"Actions"</th>
-                        </tr>
+                            <tr>
+                                <th>"Id"</th>
+                                <th>"Name"</th>
+                                <th>"Last used"</th>
+                                <th class="w-3 text-end">"Actions"</th>
+                            </tr>
                         </thead>
                         <tbody>
-                        <tr>
-                        </tr>
-                        <Transition fallback=move || view! { , <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
-                        {
-                            move || if !tokens().is_empty() {
-                                tokens().into_iter()
-                                .map(|item| view! {
+                            <tr></tr>
+                            <Transition fallback=move || {
+                                view! {
                                     ,
-                                    <Token token_info=item/>
-                                })
-                                .collect::<Vec<_>>().into_view()
+                                    <tr>
+                                        <td colspan="4" class="text-center">
+                                            <div class="spinner-border"></div>
+                                        </td>
+                                    </tr>
+                                }
+                            }>
 
+                                {move || {
+                                    if !tokens().is_empty() {
+                                        tokens()
+                                            .into_iter()
+                                            .map(|item| {
+                                                view! {
+                                                    ,
+                                                    <Token token_info=item/>
+                                                }
+                                            })
+                                            .collect::<Vec<_>>()
+                                            .into_view()
+                                    } else {
+                                        view! {
+                                            ,
+                                            <tr>
+                                                <td colspan="4" class="text-center">
+                                                    "Looks like you currently have no active tokens!"
+                                                </td>
+                                            </tr>
+                                        }
+                                            .into_view()
+                                    }
+                                }}
 
-                            }else{
-                                view!{, <tr><td colspan="4" class="text-center">"Looks like you currently have no active tokens!"</td></tr>}.into_view()
-                            }
-                        }
-                        </Transition>
+                            </Transition>
                         </tbody>
                     </table>
                 </div>
                 <div class="card-footer p-0">
                     <div class="d-flex">
                         <A href="?create" class="btn btn-primary ms-auto m-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="icon icon-tabler icon-tabler-plus"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                 <path d="M12 5l0 14"></path>
                                 <path d="M5 12l14 0"></path>
@@ -147,73 +176,106 @@ pub fn TokensOverview() -> impl IntoView {
                 </div>
             </div>
         </div>
-    <div class="page-header d-print-none my-2">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">
-                        "Sessions"
-                    </h2>
+        <div class="page-header d-print-none my-2">
+            <div class="container-xl">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">"Sessions"</h2>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="container-xl mt-2 text-start">
-        <div class="card">
-            <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                    <thead>
-                    <tr>
-                        <th>"Id"</th>
-                        <th>"Expires"</th>
-                        <th>"Last used"</th>
-                        <th class="w-3 text-end">"Actions"</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <Transition fallback=move || view! { , <tr><td colspan="4" class="text-center"><div class="spinner-border"></div></td></tr> }>
-                        {
-                            move || if !sessions().is_empty() {
-                                sessions().into_iter()
-                                .map(|item| view! {
+        <div class="container-xl mt-2 text-start">
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                            <tr>
+                                <th>"Id"</th>
+                                <th>"Expires"</th>
+                                <th>"Last used"</th>
+                                <th class="w-3 text-end">"Actions"</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <Transition fallback=move || {
+                                view! {
                                     ,
-                                    <Session token_info=item/>
-                                })
-                                .collect::<Vec<_>>().into_view()
-                            }else{
-                                view!{, <tr><td colspan="4" class="text-center">"Looks like you currently have no active sessions!"</td></tr>}.into_view()
-                            }
-                        }
-                    </Transition>
-                    </tbody>
-                </table>
+                                    <tr>
+                                        <td colspan="4" class="text-center">
+                                            <div class="spinner-border"></div>
+                                        </td>
+                                    </tr>
+                                }
+                            }>
+
+                                {move || {
+                                    if !sessions().is_empty() {
+                                        sessions()
+                                            .into_iter()
+                                            .map(|item| {
+                                                view! {
+                                                    ,
+                                                    <Session token_info=item/>
+                                                }
+                                            })
+                                            .collect::<Vec<_>>()
+                                            .into_view()
+                                    } else {
+                                        view! {
+                                            ,
+                                            <tr>
+                                                <td colspan="4" class="text-center">
+                                                    "Looks like you currently have no active sessions!"
+                                                </td>
+                                            </tr>
+                                        }
+                                            .into_view()
+                                    }
+                                }}
+
+                            </Transition>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
 
-        {
-            move ||
-                if contains_create(){
-                    view!{, <CreateToken create_token_action/>}.into_view()
-                }else{
-                    {   // This guarantees that every result can only be seen once
-                        if create_token_action.version()() > current_action_version() {
-                            current_action_version.set(create_token_action.version()());
-                            match create_token_action.value().get(){
-                                Some(Ok(resp)) => view!{,
+        {move || {
+            if contains_create() {
+                view! {
+                    ,
+                    <CreateToken create_token_action/>
+                }
+                    .into_view()
+            } else {
+                {
+                    if create_token_action.version()() > current_action_version() {
+                        current_action_version.set(create_token_action.version()());
+                        match create_token_action.value().get() {
+                            Some(Ok(resp)) => {
+                                view! {
+                                    // This guarantees that every result can only be seen once
+                                    ,
                                     <CreateTokenSuccess create_token_resp=resp/>
-                                }.into_view(),
-                                Some(Err(_)) => view!{,
-                                    "Something went wrong"
-                                }.into_view(),
-                                None => ().into_view()
+                                }
+                                    .into_view()
                             }
-                        }else{
-                            ().into_view()
+                            Some(Err(_)) => {
+                                view! {
+                                    // This guarantees that every result can only be seen once
+                                    ,
+                                    "Something went wrong"
+                                }
+                                    .into_view()
+                            }
+                            None => ().into_view(),
                         }
-
+                    } else {
+                        ().into_view()
                     }
                 }
-        }
+            }
+        }}
     }
 }

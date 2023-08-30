@@ -17,6 +17,7 @@ pub fn EntryPoint() -> impl IntoView {
     use crate::components::imprint::*;
     use crate::components::panel::*;
     use crate::components::register::*;
+    use crate::components::search::*;
     use crate::components::tos::*;
     use crate::utils::structs::*;
 
@@ -35,28 +36,56 @@ pub fn EntryPoint() -> impl IntoView {
     provide_context(update_user);
 
     view! {
-        // injects a stylesheet into the document <head>
-        // id=leptos means cargo-leptos will hot-reload this stylesheet
-        <Stylesheet href="/tabler.min.css" />
+        <Stylesheet href="/tabler.min.css"/>
         <Stylesheet id="leptos" href="/pkg/aruna_web_workspace.css"/>
-        <Script src="/tabler.min.js" />
+        <Script src="/tabler.min.js"/>
         // sets the document title
         <Title text="Aruna Object Storage"/>
         <Router>
             <main>
                 <Routes>
-                    <Route path="/" view=move || view! {
-                        <ArunaHeader/>
-                        <Outlet/>
-                        <Footer/>
-                    }>
-                        <Route path="register" view=move || view! {<MainPage/><RegisterPage/> }/>
-                        <Route path="activate" view=move || view! {<MainPage/><ActivatePage/> }/>
-                        <Route path="about" view=move || view! {<About/>}/>
-                        <Route path="imprint" view=move || view! {<Imprint/>}/>
-                        <Route path="tos" view=move || view! {<Tos/>}/>
+                    <Route
+                        path="/"
+                        view=move || {
+                            view! {
+                                <ArunaHeader/>
+                                <Outlet/>
+                                <Footer/>
+                            }
+                        }
+                    >
+                        <Route
+                            path="register"
+                            view=move || {
+                                view! {
+                                    <MainPage/>
+                                    <RegisterPage/>
+                                }
+                            }
+                        />
+                        <Route
+                            path="activate"
+                            view=move || {
+                                view! {
+                                    <MainPage/>
+                                    <ActivatePage/>
+                                }
+                            }
+                        />
+                        <Route path="about" view=move || view! { <About/> }/>
+                        <Route path="imprint" view=move || view! { <Imprint/> }/>
+                        <Route path="search" view=move || view! { <Search/> }/>
+                        <Route path="tos" view=move || view! { <Tos/> }/>
                         <Panel/>
-                        <Route path="" view=move || view!{, <MainPage/>}/>
+                        <Route
+                            path=""
+                            view=move || {
+                                view! {
+                                    ,
+                                    <MainPage/>
+                                }
+                            }
+                        />
                     </Route>
                 </Routes>
             </main>
@@ -69,7 +98,7 @@ pub fn EntryPoint() -> impl IntoView {
 fn MainPage() -> impl IntoView {
     use crate::components::main_body::*;
     view! {
-        <MainBody />
+        <MainBody/>
         <Outlet/>
     }
 }

@@ -17,13 +17,22 @@ pub fn Panel() -> impl IntoView {
 
     update_user.0.update(|e| *e = !*e);
 
-    view! { ,
-      <Route path="panel" view=move || {view! {<PanelNav /><Outlet/>}}>
-        <Route path="projects" view=move || view! {<ProjectsOverview /> }/>
-        <Route path="collection" view=move || "Collections".into_view()/>
-        <Route path="admin" view=move || view! {<AdminOverview/> }/>
-        <Route path="tokens" view=move || view! {<TokensOverview/> }/>
-        <Route path="" view=move || view! {<PanelContent/> }/>
-      </Route>
+    view! {
+        ,
+        <Route
+            path="panel"
+            view=move || {
+                view! {
+                    <PanelNav/>
+                    <Outlet/>
+                }
+            }
+        >
+            <Route path="projects" view=move || view! { <ProjectsOverview/> }/>
+            <Route path="collection" view=move || "Collections".into_view()/>
+            <Route path="admin" view=move || view! { <AdminOverview/> }/>
+            <Route path="tokens" view=move || view! { <TokensOverview/> }/>
+            <Route path="" view=move || view! { <PanelContent/> }/>
+        </Route>
     }
 }

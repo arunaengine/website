@@ -1,5 +1,6 @@
 [workspace]
 members = ["app", "frontend", "server"]
+resolver = "2"
 
 # need to be applied only to wasm build
 [profile.release]

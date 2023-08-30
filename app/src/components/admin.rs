@@ -73,48 +73,63 @@ pub fn AdminOverview() -> impl IntoView {
     let user_states = move || get_users_res.get().flatten().unwrap_or_default();
 
     view! {
-    <div class="page-header d-print-none my-3">
-        <div class="container-xl">
-        <div class="row g-2 align-items-center">
-            <div class="col">
-            <h2 class="page-title">
-                "Admin"
-            </h2>
+        <div class="page-header d-print-none my-3">
+            <div class="container-xl">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">"Admin"</h2>
+                    </div>
+                </div>
             </div>
         </div>
-        </div>
-    </div>
-    <div class="container-xl mt-2 text-start">
-        <div class="card">
-            <div class="table-responsive">
-                <table class="table table-vcenter card-table" id="adminTable">
-                    <thead>
-                    <tr>
-                        <th>"Id"</th>
-                        <th>"Name"</th>
-                        <th>"Email"</th>
-                        <th>"Status"</th>
-                        <th class="w-1">"Actions"</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                        <Transition fallback=move || view! {<tr><td colspan="5" class="text-center"><div class="spinner-border"></div></td></tr> }>
-                        {
-                            move || if !user_states().is_empty() {
-                                user_states().into_iter()
-                                .map(|item| view! {
-                                    <AdminUser user=item/>
-                                })
-                                .collect::<Vec<_>>().into_view()
-                            }else{
-                                view!{<tr><td colspan="5" class="text-center">"Looks like you are currently not associated with any project!"</td></tr>}.into_view()
-                            }
-                        }
-                        </Transition>
-                    </tbody>
-                </table>
+        <div class="container-xl mt-2 text-start">
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table" id="adminTable">
+                        <thead>
+                            <tr>
+                                <th>"Id"</th>
+                                <th>"Name"</th>
+                                <th>"Email"</th>
+                                <th>"Status"</th>
+                                <th class="w-1">"Actions"</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <Transition fallback=move || {
+                                view! {
+                                    <tr>
+                                        <td colspan="5" class="text-center">
+                                            <div class="spinner-border"></div>
+                                        </td>
+                                    </tr>
+                                }
+                            }>
+
+                                {move || {
+                                    if !user_states().is_empty() {
+                                        user_states()
+                                            .into_iter()
+                                            .map(|item| view! { <AdminUser user=item/> })
+                                            .collect::<Vec<_>>()
+                                            .into_view()
+                                    } else {
+                                        view! {
+                                            <tr>
+                                                <td colspan="5" class="text-center">
+                                                    "Looks like you are currently not associated with any project!"
+                                                </td>
+                                            </tr>
+                                        }
+                                            .into_view()
+                                    }
+                                }}
+
+                            </Transition>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
     }
 }

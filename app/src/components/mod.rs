@@ -16,6 +16,7 @@ pub mod project;
 pub mod project_admin;
 pub mod projects;
 pub mod register;
+pub mod search;
 pub mod token;
 pub mod tokens;
 pub mod tos;

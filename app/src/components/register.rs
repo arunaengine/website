@@ -88,85 +88,139 @@ pub fn RegisterPage() -> impl IntoView {
     });
 
     view! {
-        <ActionForm on:submit=move |ev| {
-            let _data = RegisterUser::from_event(&ev).expect("to parse form data");
-            // if !data.email.is_empty() && !regex.is_match(&data.email)  {
-            //     // ev.prevent_default() will prevent form submission
-            //     // Cheap validation -> will be fixed when https://github.com/leptos-rs/leptos/issues/851 is upstream
-            //     window().alert_with_message("Email must be valid or empty").unwrap();
-            //     ev.prevent_default();
-            // }
-        }
-        action=register_user
-    >
-    <div class="modal mt-5 fade" id="registerModal" _ref=modal_ref tabindex="-1">
-        <div class="modal-dialog modal-sm" role="document">
-            <div class="modal-content">
-                <div class="modal-status bg-info"></div>
+        <ActionForm
+            on:submit=move |ev| {
+                let _data = RegisterUser::from_event(&ev).expect("to parse form data");
+            }
 
+            action=register_user
+        >
+            <div class="modal mt-5 fade" id="registerModal" _ref=modal_ref tabindex="-1">
+                <div class="modal-dialog modal-sm" role="document">
+                    <div class="modal-content">
+                        <div class="modal-status bg-info"></div>
 
+                        <div class="modal-body">
 
-                <div class="modal-body">
+                            <div class="text-center py-4">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="icon icon-tabler icon-tabler-api-app mb-2 text-blue icon-lg"
+                                    width="40"
+                                    height="40"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="1"
+                                    stroke="currentColor"
+                                    fill="none"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M12 15h-6.5a2.5 2.5 0 1 1 0 -5h.5"></path>
+                                    <path d="M15 12v6.5a2.5 2.5 0 1 1 -5 0v-.5"></path>
+                                    <path d="M12 9h6.5a2.5 2.5 0 1 1 0 5h-.5"></path>
+                                    <path d="M9 12v-6.5a2.5 2.5 0 0 1 5 0v.5"></path>
+                                </svg>
+                                <h3>"Registration required!"</h3>
+                                <div class="text-muted">
+                                    "Your account is not yet registered, you must register first before you can proceed! Registering indicates your acceptance to our "
+                                    <a href="/tos" class="nav-link px-2 text-muted">
+                                        {"Terms of Service"}
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="mx-auto text-left import-left">
+                                <div class="mb-3">
+                                    <label class="form-label text-left">"Displayname"</label>
+                                    <input
+                                        type="text"
+                                        class="form-control flex-fill"
+                                        name="displayname"
+                                        placeholder=""
+                                    />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-left import-left">
+                                        "Email (optional)"
+                                    </label>
+                                    <input
+                                        type="text"
+                                        class="form-control flex-fill"
+                                        name="email"
+                                        placeholder=""
+                                    />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-left import-left">
+                                        "Project (optional)"
+                                    </label>
+                                    <input
+                                        type="text"
+                                        class="form-control flex-fill"
+                                        name="project"
+                                        placeholder=""
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
-                    <div class="text-center py-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-api-app mb-2 text-blue icon-lg" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                            <path d="M12 15h-6.5a2.5 2.5 0 1 1 0 -5h.5"></path>
-                            <path d="M15 12v6.5a2.5 2.5 0 1 1 -5 0v-.5"></path>
-                            <path d="M12 9h6.5a2.5 2.5 0 1 1 0 5h-.5"></path>
-                            <path d="M9 12v-6.5a2.5 2.5 0 0 1 5 0v.5"></path>
-                        </svg>
-                        <h3>"Registration required!"</h3>
-                        <div class="text-muted">"Your account is not yet registered, you must register first before you can proceed! Registering indicates your acceptance to our "<a href="/tos" class="nav-link px-2 text-muted">{"Terms of Service"}</a></div>
+                        <div class="modal-footer">
+                            <a
+                                href="/"
+                                class="btn"
+                                data-bs-dismiss="modal"
+                                data-bs-target="#registerModal"
+                            >
+                                "Cancel"
+                            </a>
+                            <button type="submit" class="btn btn-primary ms-auto">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="icon icon-tabler icon-tabler-plus"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="1"
+                                    stroke="currentColor"
+                                    fill="none"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M12 5l0 14"></path>
+                                    <path d="M5 12l14 0"></path>
+                                </svg>
+                                "Register"
+                            </button>
+                        </div>
                     </div>
-                    <div class="mx-auto text-left import-left">
-                        <div class="mb-3">
-                            <label class="form-label text-left">"Displayname"</label>
-                            <input type="text" class="form-control flex-fill" name="displayname" placeholder="" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label text-left import-left">"Email (optional)"</label>
-                            <input type="text" class="form-control flex-fill" name="email" placeholder="" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label text-left import-left">"Project (optional)"</label>
-                            <input type="text" class="form-control flex-fill" name="project" placeholder="" />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <a href="/" class="btn" data-bs-dismiss="modal" data-bs-target="#registerModal">
-                    "Cancel"
-                    </a>
-                    <button type="submit" class="btn btn-primary ms-auto">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                        <path d="M12 5l0 14"></path>
-                        <path d="M5 12l14 0"></path>
-                    </svg>
-                    "Register"
-                    </button>
                 </div>
             </div>
-        </div>
-    </div>
-    </ActionForm>
-    {move || {
-
-        match register_user.value().get() {
-            Some(v) => {match v {
-                Ok(_) => {
-                    view!{, <Redirect path="/activate" />}.into_view()
-                },
-                Err(_) => {
-                    view!{, <Redirect path="/" />}.into_view()
+        </ActionForm>
+        {move || {
+            match register_user.value().get() {
+                Some(v) => {
+                    match v {
+                        Ok(_) => {
+                            view! {
+                                ,
+                                <Redirect path="/activate"/>
+                            }
+                                .into_view()
+                        }
+                        Err(_) => {
+                            view! {
+                                ,
+                                <Redirect path="/"/>
+                            }
+                                .into_view()
+                        }
+                    }
                 }
-            }}
-            None => ().into_view(),
-        }
+                None => ().into_view(),
+            }
+        }}
     }
-    }}
 }
 
 /// Renders the home page of your application.
@@ -212,35 +266,70 @@ pub fn ActivatePage() -> impl IntoView {
     });
 
     view! {
-    <div class="modal fade" id="activateModal" tabindex="-1" _ref=activate_ref style="display: block; padding-left: 0px;">
-        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
-          <div class="modal-content">
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" data-bs-target="#activateModal"></button>
-            <div class="modal-status bg-success"></div>
-            <div class="modal-body text-center py-4">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user-check icon-lg text-green" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <div
+            class="modal fade"
+            id="activateModal"
+            tabindex="-1"
+            _ref=activate_ref
+            style="display: block; padding-left: 0px;"
+        >
+            <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"
+                        data-bs-target="#activateModal"
+                    ></button>
+                    <div class="modal-status bg-success"></div>
+                    <div class="modal-body text-center py-4">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            class="icon icon-tabler icon-tabler-user-check icon-lg text-green"
+                            width="40"
+                            height="40"
+                            viewBox="0 0 24 24"
+                            stroke-width="1"
+                            stroke="currentColor"
+                            fill="none"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                             <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"></path>
                             <path d="M6 21v-2a4 4 0 0 1 4 -4h4"></path>
                             <path d="M15 19l2 2l4 -4"></path>
                         </svg>
-              <h3 class="pt-4">"Registration complete!"</h3>
-              <div class="text-muted">"Your account will be reviewed and activated by an administrator. If your account gets activated this page will automatically forward you to the management panel and (if specified) you will receive an e-mail notification."</div>
-            </div>
-            <div class="modal-footer">
-              <div class="w-100">
-                <div class="row">
-                    <div class="col">
-                        <a class="btn w-100" data-bs-dismiss="modal" data-bs-target="#activateModal">
-                            "Back"
-                        </a>
+                        <h3 class="pt-4">"Registration complete!"</h3>
+                        <div class="text-muted">
+                            "Your account will be reviewed and activated by an administrator. If your account gets activated this page will automatically forward you to the management panel and (if specified) you will receive an e-mail notification."
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="w-100">
+                            <div class="row">
+                                <div class="col">
+                                    <a
+                                        class="btn w-100"
+                                        data-bs-dismiss="modal"
+                                        data-bs-target="#activateModal"
+                                    >
+                                        "Back"
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-              </div>
             </div>
-          </div>
         </div>
-      </div>
-      {move || activated().then(|| {hide_modal("activateModal"); view!(<Redirect path="/panel" />)})}
+        {move || {
+            activated()
+                .then(|| {
+                    hide_modal("activateModal");
+                    view! { <Redirect path="/panel"/> }
+                })
+        }}
     }
 }

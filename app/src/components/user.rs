@@ -136,105 +136,244 @@ pub fn AdminUser(user: UserState) -> impl IntoView {
             <td>{user.user_id.clone()}</td>
             <td>{user.display_name.clone()}</td>
             <td>{user.email.clone()}</td>
-            <td>{create_active_badges}{create_role_badges}</td>
+            <td>{create_active_badges} {create_role_badges}</td>
             <td>
                 <div class="d-flex justify-content-end">
-                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon" role="button" aria-label="Button" data-bs-toggle="collapse" data-bs-target=format!(r##"#U{}"##, store_user.get_value()) aria-expanded="false">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <a
+                        href="#"
+                        class="btn btn btn-icon mx-2 btn-sm my-accordion-icon"
+                        role="button"
+                        aria-label="Button"
+                        data-bs-toggle="collapse"
+                        data-bs-target=format!(r##"#U{}"##, store_user.get_value())
+                        aria-expanded="false"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            class="icon icon-tabler icon-tabler-arrow-down"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            stroke-width="2"
+                            stroke="currentColor"
+                            fill="none"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                             <path d="M12 5l0 14"></path>
                             <path d="M18 13l-6 6"></path>
                             <path d="M6 13l6 6"></path>
                         </svg>
                     </a>
-                    {move ||
+                    {move || {
                         if is_active {
-                            view!{
-                                <a href="#" class="btn btn-danger btn-icon btn-sm" aria-label="Button" role="button" on:click=move |_| {deactivate_action.dispatch(DeactivateUser { _user_id: store_user.get_value() })}>
-                                <Suspense fallback=move || view! { , <div class="spinner-border"></div> }>
-                                    {move || {
-                                        view!{
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-minus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                                <path d="M5 12l14 0"></path>
-                                            </svg>
+                            view! {
+                                <a
+                                    href="#"
+                                    class="btn btn-danger btn-icon btn-sm"
+                                    aria-label="Button"
+                                    role="button"
+                                    on:click=move |_| {
+                                        deactivate_action
+                                            .dispatch(DeactivateUser {
+                                                _user_id: store_user.get_value(),
+                                            })
+                                    }
+                                >
+                                    <Suspense fallback=move || {
+                                        view! {
+                                            ,
+                                            <div class="spinner-border"></div>
                                         }
-                                    }}
-                                    </Suspense>
-                                </a>
-                                <a href="#" class="btn btn-success btn-icon btn-sm ms-2" aria-label="Button" role="button" data-bs-toggle="modal" data-bs-target=format!("#ACU{}", store_user.get_value())>
-                                <Suspense fallback=move || view! {<div class="spinner-border"></div> }>
-                                    {move || {
-                                        view!{
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users-plus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                                <path d="M5 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"></path>
-                                                <path d="M3 21v-2a4 4 0 0 1 4 -4h4c.96 0 1.84 .338 2.53 .901"></path>
-                                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                                <path d="M16 19h6"></path>
-                                                <path d="M19 16v6"></path>
-                                            </svg>
-                                        }
-                                    }}
-                                    </Suspense>
-                                </a>
-                                }.into_view()
-                            }else{
-                                view!{
-                                <a href="#" class="btn btn-success btn-icon btn-sm" aria-label="Button" role="button" data-bs-toggle="modal" data-bs-target=format!("#AV{}", store_user.get_value())>//on:click=move |_| {set_deleting.set(token_id.get_value())}>
-                                <Suspense fallback=move || view! {<div class="spinner-border"></div> }>
-                                    {move || {
-                                        view!{,
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    }>
+                                        {move || {
+                                            view! {
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    class="icon icon-tabler icon-tabler-minus"
+                                                    width="40"
+                                                    height="40"
+                                                    viewBox="0 0 24 24"
+                                                    stroke-width="1"
+                                                    stroke="currentColor"
+                                                    fill="none"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                >
+                                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                    <path d="M5 12l14 0"></path>
+                                                </svg>
+                                            }
+                                        }}
 
-                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                                <path d="M12 5l0 14"></path>
-                                                <path d="M5 12l14 0"></path>
-                                            </svg>
-
-                                        }.into_view()
-                                    }}
                                     </Suspense>
                                 </a>
-                                }.into_view()
+                                <a
+                                    href="#"
+                                    class="btn btn-success btn-icon btn-sm ms-2"
+                                    aria-label="Button"
+                                    role="button"
+                                    data-bs-toggle="modal"
+                                    data-bs-target=format!("#ACU{}", store_user.get_value())
+                                >
+                                    <Suspense fallback=move || {
+                                        view! { <div class="spinner-border"></div> }
+                                    }>
+                                        {move || {
+                                            view! {
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    class="icon icon-tabler icon-tabler-users-plus"
+                                                    width="40"
+                                                    height="40"
+                                                    viewBox="0 0 24 24"
+                                                    stroke-width="1"
+                                                    stroke="currentColor"
+                                                    fill="none"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                >
+                                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                    <path d="M5 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"></path>
+                                                    <path d="M3 21v-2a4 4 0 0 1 4 -4h4c.96 0 1.84 .338 2.53 .901"></path>
+                                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                                    <path d="M16 19h6"></path>
+                                                    <path d="M19 16v6"></path>
+                                                </svg>
+                                            }
+                                        }}
+
+                                    </Suspense>
+                                </a>
                             }
-                    }
+                                .into_view()
+                        } else {
+                            view! {
+                                // on:click=move |_| {set_deleting.set(token_id.get_value())}>
+                                <a
+                                    href="#"
+                                    class="btn btn-success btn-icon btn-sm"
+                                    aria-label="Button"
+                                    role="button"
+                                    data-bs-toggle="modal"
+                                    data-bs-target=format!("#AV{}", store_user.get_value())
+                                >
+                                    <Suspense fallback=move || {
+                                        view! { <div class="spinner-border"></div> }
+                                    }>
+                                        {move || {
+                                            view! {
+                                                ,
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    class="icon icon-tabler icon-tabler-plus"
+                                                    width="40"
+                                                    height="40"
+                                                    viewBox="0 0 24 24"
+                                                    stroke-width="1"
+                                                    stroke="currentColor"
+                                                    fill="none"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                >
+
+                                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                    <path d="M12 5l0 14"></path>
+                                                    <path d="M5 12l14 0"></path>
+                                                </svg>
+                                            }
+                                                .into_view()
+                                        }}
+
+                                    </Suspense>
+                                </a>
+                            }
+                                .into_view()
+                        }
+                    }}
+
                 </div>
             </td>
         </tr>
-        <tr class="accordion-collapse collapse" id=format!("U{}", store_user.get_value()) data-bs-parent="#adminTable">
-            <Transition fallback=move || view! {<tr><td colspan="5" class="text-center"><div class="spinner-border"></div></td></tr> }>
-            {
-                move || if !stored_permission.get_value().is_empty() {
-
-                    stored_permission.get_value().into_iter()
-                    .map(|item| {
-                        let item_clone = item.clone();
-                        view! {
-                        <tr colspan="5">
-                            <td>"PID:"</td>
-                            <td>{item_clone.project_id.to_string()}</td>
-                            <td>"Role:"</td>
-                            <td>{item_clone.to_permission_string()}</td>
-                            <td>
-                                <div class="d-flex justify-content-end">
-                                    <a href="#" class="btn btn btn-icon mx-2 btn-sm my-accordion-icon text-danger" role="button" aria-label="Button" on:click=move |_| {remove_user_action.dispatch(RemoveUser { _user_id: store_user.get_value(), _project_id: item.project_id.to_string() })}>
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-minus" width="40" height="40" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                            <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
-                                            <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
-                                            <path d="M9 14l6 0"></path>
-                                        </svg>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                    }})
-                    .collect::<Vec<_>>().into_view()
-                }else{
-                    view!{<td colspan="5" class="text-center">"Looks like this user is currently not member in any project!"</td>}.into_view()
+        <tr
+            class="accordion-collapse collapse"
+            id=format!("U{}", store_user.get_value())
+            data-bs-parent="#adminTable"
+        >
+            <Transition fallback=move || {
+                view! {
+                    <tr>
+                        <td colspan="5" class="text-center">
+                            <div class="spinner-border"></div>
+                        </td>
+                    </tr>
                 }
-            }
+            }>
+
+                {move || {
+                    if !stored_permission.get_value().is_empty() {
+                        stored_permission
+                            .get_value()
+                            .into_iter()
+                            .map(|item| {
+                                let item_clone = item.clone();
+                                view! {
+                                    <tr colspan="5">
+                                        <td>"PID:"</td>
+                                        <td>{item_clone.project_id.to_string()}</td>
+                                        <td>"Role:"</td>
+                                        <td>{item_clone.to_permission_string()}</td>
+                                        <td>
+                                            <div class="d-flex justify-content-end">
+                                                <a
+                                                    href="#"
+                                                    class="btn btn btn-icon mx-2 btn-sm my-accordion-icon text-danger"
+                                                    role="button"
+                                                    aria-label="Button"
+                                                    on:click=move |_| {
+                                                        remove_user_action
+                                                            .dispatch(RemoveUser {
+                                                                _user_id: store_user.get_value(),
+                                                                _project_id: item.project_id.to_string(),
+                                                            })
+                                                    }
+                                                >
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        class="icon icon-tabler icon-tabler-file-minus"
+                                                        width="40"
+                                                        height="40"
+                                                        viewBox="0 0 24 24"
+                                                        stroke-width="1"
+                                                        stroke="currentColor"
+                                                        fill="none"
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                    >
+                                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                        <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                                                        <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                                                        <path d="M9 14l6 0"></path>
+                                                    </svg>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .into_view()
+                    } else {
+                        view! {
+                            <td colspan="5" class="text-center">
+                                "Looks like this user is currently not member in any project!"
+                            </td>
+                        }
+                            .into_view()
+                    }
+                }}
+
             </Transition>
         </tr>
     }
