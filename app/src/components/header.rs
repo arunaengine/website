@@ -225,6 +225,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                         on:click=move |_| {
                                             let _ = window().location().set_href("/logout");
                                         }
+
                                         class="dropdown-item"
                                     >
                                         {"Logout"}
@@ -255,6 +256,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                         }
                                     }
                                 }
+
                                 class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2"
                             >
                                 {"Login"}

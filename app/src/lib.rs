@@ -54,6 +54,7 @@ pub fn EntryPoint() -> impl IntoView {
                             }
                         }
                     >
+
                         <Route
                             path="register"
                             view=move || {
@@ -63,6 +64,7 @@ pub fn EntryPoint() -> impl IntoView {
                                 }
                             }
                         />
+
                         <Route
                             path="activate"
                             view=move || {
@@ -72,6 +74,7 @@ pub fn EntryPoint() -> impl IntoView {
                                 }
                             }
                         />
+
                         <Route path="about" view=move || view! { <About/> }/>
                         <Route path="imprint" view=move || view! { <Imprint/> }/>
                         <Route path="search" view=move || view! { <Search/> }/>
@@ -86,6 +89,7 @@ pub fn EntryPoint() -> impl IntoView {
                                 }
                             }
                         />
+
                     </Route>
                 </Routes>
             </main>

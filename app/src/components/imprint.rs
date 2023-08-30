@@ -66,9 +66,7 @@ pub fn Imprint() -> impl IntoView {
                     "If you have any questions about the collection, processing or use of your personal data, please contact us by email at "
                     <a href="mailto:datenschutz@aruna-storage.org">
                         "datenschutz@aruna-storage.org"
-                    </a> "."
-                    <h3 class="mt-2">"8. Data Protection Officer"</h3>
-                    <div>
+                    </a> "." <h3 class="mt-2">"8. Data Protection Officer"</h3> <div>
                         <b>
                             "The contact details of the official data protection officers at Justus Liebig University are:"
                         </b>
@@ -144,9 +142,7 @@ pub fn Imprint() -> impl IntoView {
                     "Wenn Sie Fragen zur Erhebung, Verarbeitung oder Nutzung Ihrer personenbezogenen Daten haben, kontaktieren Sie uns bitte per E-Mail unter "
                     <a href="mailto:datenschutz@aruna-storage.org">
                         "datenschutz@aruna-storage.org"
-                    </a> "."
-                    <h3 class="mt-2">"8. Datenschutzbeauftragte"</h3>
-                    <div>
+                    </a> "." <h3 class="mt-2">"8. Datenschutzbeauftragte"</h3> <div>
                         <b>
                             "Die Kontaktdaten des behördlichen Datenschutzbeauftragten der Justus-Liebig-Universität sind:"
                         </b>

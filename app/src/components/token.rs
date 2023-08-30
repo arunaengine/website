@@ -244,6 +244,7 @@ pub fn Session(token_info: TokenStats) -> impl IntoView {
                 set_blocking.set(false)
             }
         />
+
         <tr>
             <td>{token_info.id.clone()}</td>
             <td>{token_info.expires_at}</td>

@@ -181,6 +181,7 @@ pub fn AdminUser(user: UserState) -> impl IntoView {
                                             })
                                     }
                                 >
+
                                     <Suspense fallback=move || {
                                         view! {
                                             ,
@@ -339,6 +340,7 @@ pub fn AdminUser(user: UserState) -> impl IntoView {
                                                             })
                                                     }
                                                 >
+
                                                     <svg
                                                         xmlns="http://www.w3.org/2000/svg"
                                                         class="icon icon-tabler icon-tabler-file-minus"

@@ -28,6 +28,7 @@ pub fn Panel() -> impl IntoView {
                 }
             }
         >
+
             <Route path="projects" view=move || view! { <ProjectsOverview/> }/>
             <Route path="collection" view=move || "Collections".into_view()/>
             <Route path="admin" view=move || view! { <AdminOverview/> }/>

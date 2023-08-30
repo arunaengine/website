@@ -40,6 +40,7 @@ pub fn MainBody() -> impl IntoView {
                                 .set_href("https://arunastorage.github.io/Documentation");
                         }
                     >
+
                         {"Get started!"}
                     </button>
                     <button
@@ -51,6 +52,7 @@ pub fn MainBody() -> impl IntoView {
                                 .set_href("mailto:support@aruna-storage.org");
                         }
                     >
+
                         {"Contact us"}
                     </button>
                 </div>
@@ -431,7 +433,7 @@ pub fn MainBody() -> impl IntoView {
                                                     </p>
                                                     <p>
                                                         {"The name Aruna originates from the god of the sea in hittite mythology and their name for the sea and bodies of water in general.
-                                                         We choose this name to symbolize our vision of a revolutionary cloud-native data lake."}
+                                                        We choose this name to symbolize our vision of a revolutionary cloud-native data lake."}
                                                     </p>
                                                 </div>
                                             </div>

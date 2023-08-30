@@ -283,6 +283,7 @@ pub fn CreateToken(
                                         write_needs_id(needs_update);
                                     }
                                 >
+
                                     <option value="0" selected>
                                         "Personal"
                                     </option>
@@ -294,12 +295,11 @@ pub fn CreateToken(
                             {move || {
                                 if needs_id() {
                                     view! {
-                                        ,
                                         <div class="form-floating mb-3">
                                             <input
                                                 type="text"
                                                 class="form-control text-lowercase"
-                                                pattern="^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+                                                pattern={"^[0-7][0-9A-HJKMNP-TV-Z]{25}$"}
                                                 id="resid"
                                                 name="resid"
                                                 placeholder="Resource ID"
