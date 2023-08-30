@@ -1,9 +1,11 @@
-# ArunaWeb 3.0
+# ArunaWeb 4.0
 
 This is a total revised web version for the Aruna Object Storage website. Powered by [tabler.io](https://tabler.io/), [Bootstrap 5](https://getbootstrap.com/), Rust + Wasm via [Leptos](https://github.com/leptos-rs/leptos).
 For now only an experimental rudimentary version is available, this will be expanded further.
 
 The web version is a fully integrated website + webserver version including SSR + hydration.
+
+This version uses leptos 0.5.0 and is inteded to be used with version 2.x.x of the Aruna Object Storage server.
 
 
 ## Getting started
