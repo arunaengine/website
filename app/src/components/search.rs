@@ -1,20 +1,17 @@
-use crate::utils::structs::SearchResultEntry;
-use aruna_rust_api::api::storage::models::v2::{
-    generic_resource::Resource, Collection, Dataset, KeyValue, Object, Project, Stats,
-};
+use crate::utils::{mocks::get_demo_data, structs::SearchResultEntry};
+use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
 use leptos::*;
-use leptos_meta::*;
+//use leptos_meta::*;
 use leptos_router::*;
 
 #[component]
 pub fn SearchResult(res: Resource) -> impl IntoView {
     let entry = SearchResultEntry::from(res);
     view! {
-        <div class="card mt-2">
+        <div class="card m-1">
             {entry.get_card_status()}
             <div class="card-body d-flex container flex-column">
-                {entry.get_ribbon()}
-                <div class="row">
+                {entry.get_ribbon()} <div class="row">
                     <div class="col-4">
                         <div>
                             <h3 class="text-primary">{entry.name.to_string()}</h3>
@@ -38,125 +35,6 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 
 #[component]
 pub fn Search() -> impl IntoView {
-    let resources = vec![
-        Resource::Collection(Collection {
-            id: "SRE-20001-22000".to_string(),
-            name: "SRE-20001-22000".to_string(),
-            description: "A metagenomic dataset from somewhere!".to_string(),
-            key_values: vec![KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            }],
-            stats: Some(Stats {
-                count: 1,
-                size: 882131238,
-                last_updated: None,
-            }),
-            data_class: 1,
-            ..Default::default()
-        }),
-        Resource::Object(Object {
-            id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
-            name: "SRE-123123-1231231231".to_string(),
-            description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
-            key_values: vec![
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-            ],
-            content_len: 10,
-            data_class: 2,
-            ..Default::default()
-        }),
-        Resource::Object(Object {
-            id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
-            name: "SRE-123123-1231231231".to_string(),
-            description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
-            key_values: vec![
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-            ],
-            content_len: 123123123123123123,
-            data_class: 2,
-            ..Default::default()
-        }),
-        Resource::Project(Project {
-            id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
-            name: "SRE-123123-1231231231".to_string(),
-            description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
-            key_values: vec![
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-            ],
-            stats: Some(Stats {
-                count: 1123123,
-                size: 123,
-                last_updated: None,
-            }),
-            data_class: 2,
-            ..Default::default()
-        }),
-        Resource::Object(Object {
-            id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
-            name: "SRE-123123-1231231231".to_string(),
-            description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
-            key_values: vec![
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-                KeyValue {
-                    key: "experiment".to_string(),
-                    value: "Plasmidhunter".to_string(),
-                    ..Default::default()
-                },
-            ],
-            content_len: 123123123,
-            data_class: 2,
-            ..Default::default()
-        }),
-    ];
-
     let (query_class, query_set_class_p) = create_query_signal::<String>("class");
     let (query_res, query_set_res_p) = create_query_signal::<String>("filter_res");
 
@@ -170,6 +48,123 @@ pub fn Search() -> impl IntoView {
 
     // let is_class = move |class: &str| query_class() == Some(class.to_string());
     let is_res = move |res: &str| query_res() == Some(res.to_string());
+
+    let (read_range, set_range) = create_signal(1..=5);
+
+    let (results, set_results) = create_signal::<i32>(1337);
+    let max_pages = move || (results() / 50) + 1;
+    let get_range_iter = {
+        move |current: i32| {
+            let max = max_pages();
+            let from = if current > 3 { current - 2 } else { 1 };
+            let to = if current + 2 < max { current + 2 } else { max };
+            if to < 5 {
+                return 1..=5;
+            }
+
+            if to + 2 > max {
+                return (max - 4)..=max;
+            }
+
+            from..=to
+        }
+    };
+
+    let (query_page, query_set_page_p) = create_query_signal::<i32>("page");
+    let query_set_page = move |size: i32| {
+        set_range(get_range_iter(size));
+        query_set_page_p(Some(size));
+    };
+
+    let inc_page = move || {
+        let page = query_page().unwrap_or(1);
+        if page == max_pages() {
+            return;
+        }
+        set_range(get_range_iter(page + 1));
+        query_set_page(page + 1);
+    };
+
+    let dec_page = move || {
+        let page = query_page().unwrap_or(1);
+        if page == 1 {
+            return;
+        }
+        query_set_page(page - 1);
+    };
+
+    let current_page = move || query_page().unwrap_or(1);
+
+    let pagination = move || {
+        view! {
+            <div class="mt-1 align-items-end">
+                <ul class="pagination">
+                    <li class=move || {
+                        if current_page() == 1 { "page-item disabled" } else { "page-item" }
+                    }>
+                        <button
+                            class="page-link"
+                            on:click=move |_| dec_page()
+                            aria-disabled=move || if current_page() == 1 { "true" } else { "false" }
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="icon"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M15 6l-6 6l6 6"></path>
+                            </svg>
+                        </button>
+                    </li>
+
+                    <For
+                        each=move || { read_range() }
+                        key=|num| *num
+                        view=move |num| {
+                            view! {
+                                <li class=move ||  if query_page().unwrap_or(1) == num { "page-item active" } else { "page-item" }>
+                                    <button
+                                        class="page-link"
+                                        on:click=move |_| query_set_page(num)
+                                    >
+                                        {num}
+                                    </button>
+                                </li>
+                            }
+                        }
+                    />
+
+                    <li class="page-item">
+                        <button class="page-link" on:click=move |_| inc_page()>
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="icon"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M9 6l6 6l-6 6"></path>
+                            </svg>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        }
+    };
 
     view! {
         <div class="container-xl text-start mt-4">
@@ -214,21 +209,34 @@ pub fn Search() -> impl IntoView {
                             data-bs-toggle="dropdown"
                             aria-expanded="false"
                         >
-                            { move || query_class().unwrap_or("All".to_string()) }
+                            {move || {
+                                let s = query_class().unwrap_or("all".to_string());
+                                format!("{}{}", (& s[..1].to_string()).to_uppercase(), & s[1..])
+                            }}
+
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li>
-                                <button on:click=move |_| query_set_class("All") class="dropdown-item" >
+                                <button
+                                    on:click=move |_| query_set_class("all")
+                                    class="dropdown-item"
+                                >
                                     All
                                 </button>
                             </li>
                             <li>
-                                <button on:click=move |_| query_set_class("Public") class="dropdown-item" >
+                                <button
+                                    on:click=move |_| query_set_class("public")
+                                    class="dropdown-item"
+                                >
                                     Public
                                 </button>
                             </li>
                             <li>
-                                <button on:click=move |_| query_set_class("Private") class="dropdown-item" >
+                                <button
+                                    on:click=move |_| query_set_class("private")
+                                    class="dropdown-item"
+                                >
                                     Private
                                 </button>
                             </li>
@@ -237,59 +245,75 @@ pub fn Search() -> impl IntoView {
                 </div>
                 <div class="row mt-4">
                     <div class="col-3">
-                            <h3 class="text-muted">"Filters"</h3>
-                            <div class="subheader mb-2">"Resource"</div>
-                            <div class="list-group list-group-transparent mb-3">
-                                <button
-                                    on:click=move |_| query_set_res("All")
-                                    class=move || {
-                                        "list-group-item list-group-item-action d-flex align-items-center"
-                                            .to_owned() + if is_res("All") || query_res().is_none() { " active" } else { "" }
-                                    }
-                                >
-                                    "All"
-                                </button>
-                                <button
-                                    on:click=move |_| query_set_res("Projects")
-                                    class=move || {
-                                        "list-group-item list-group-item-action d-flex align-items-center"
-                                            .to_owned() + if is_res("Projects") { " active" } else { "" }
-                                    }
-                                >
-                                    "Projects"
-                                </button>
-                                <button
-                                    on:click=move |_| query_set_res("Collections")
-                                    class=move || {
-                                        "list-group-item list-group-item-action d-flex align-items-center"
-                                            .to_owned() + if is_res("Collections") { " active" } else { "" }
-                                    }
-                                >
-                                    "Collections"
-                                </button>
-                                <button
-                                    on:click=move |_| query_set_res("Datasets")
-                                    class=move || {
-                                        "list-group-item list-group-item-action d-flex align-items-center"
-                                            .to_owned() + if is_res("Datasets") { " active" } else { "" }
-                                    }
-                                >
-                                    "Datasets"
-                                </button>
-                                <button
-                                    on:click=move |_| query_set_res("Objects")
-                                    class=move || {
-                                        "list-group-item list-group-item-action d-flex align-items-center"
-                                            .to_owned() + if is_res("Objects") { " active" } else { "" }
-                                    }
-                                >
-                                    "Objects"
-                                </button>
-                            </div>
+                        <h3 class="text-muted">"Filters"</h3>
+                        <div class="subheader mb-2">"Resource"</div>
+                        <div class="list-group list-group-transparent mb-3">
+                            <button
+                                on:click=move |_| query_set_res("all")
+                                class=move || {
+                                    "list-group-item list-group-item-action d-flex align-items-center"
+                                        .to_owned()
+                                        + if is_res("all") || query_res().is_none() {
+                                            " active"
+                                        } else {
+                                            ""
+                                        }
+                                }
+                            >
+
+                                "All"
+                            </button>
+                            <button
+                                on:click=move |_| query_set_res("projects")
+                                class=move || {
+                                    "list-group-item list-group-item-action d-flex align-items-center"
+                                        .to_owned()
+                                        + if is_res("projects") { " active" } else { "" }
+                                }
+                            >
+
+                                "Projects"
+                            </button>
+                            <button
+                                on:click=move |_| query_set_res("collections")
+                                class=move || {
+                                    "list-group-item list-group-item-action d-flex align-items-center"
+                                        .to_owned()
+                                        + if is_res("collections") { " active" } else { "" }
+                                }
+                            >
+
+                                "Collections"
+                            </button>
+                            <button
+                                on:click=move |_| query_set_res("datasets")
+                                class=move || {
+                                    "list-group-item list-group-item-action d-flex align-items-center"
+                                        .to_owned()
+                                        + if is_res("datasets") { " active" } else { "" }
+                                }
+                            >
+
+                                "Datasets"
+                            </button>
+                            <button
+                                on:click=move |_| query_set_res("objects")
+                                class=move || {
+                                    "list-group-item list-group-item-action d-flex align-items-center"
+                                        .to_owned() + if is_res("objects") { " active" } else { "" }
+                                }
+                            >
+
+                                "Objects"
+                            </button>
+                        </div>
+                        <div class="subheader mb-2">"Query filters"</div>
                     </div>
                     <div class="col-9 ps-3">
+
+                        {pagination}
                         <For
-                            each=move || { resources.clone().into_iter() }
+                            each=move || { get_demo_data().clone().into_iter() }
                             key=|res| {
                                 match res {
                                     Resource::Collection(c) => c.id.clone(),
