@@ -390,40 +390,40 @@ impl From<generic_resource::Resource> for SearchResultEntry {
 impl SearchResultEntry {
     pub fn get_card_status(&self) -> impl IntoView {
         match self.data_class.as_str() {
-            "Public" => view! {
-                <div class="card-status-start bg-green"></div>
-            },
-            "Private" => view! {
-                <div class="card-status-start bg-orange"></div>
-            },
-            "Workspace" => view! {
-                <div class="card-status-start bg-cyan"></div>
-            },
-            "Confidential" => view! {
-                <div class="card-status-start bg-red"></div>
-            },
-            _ => view! {
-                <div class="card-status-start bg-red"></div>
-            },
+            "Public" => view! { <div class="card-status-start bg-green"></div> },
+            "Private" => view! { <div class="card-status-start bg-orange"></div> },
+            "Workspace" => view! { <div class="card-status-start bg-cyan"></div> },
+            "Confidential" => view! { <div class="card-status-start bg-red"></div> },
+            _ => view! { <div class="card-status-start bg-red"></div> },
         }
     }
 
     pub fn get_ribbon(&self) -> impl IntoView {
         match self.variant.as_str() {
             "Project" => view! {
-                <div class="ribbon bg-red">Project</div>
+                <div class="ribbon bg-red">
+                    Project
+                </div>
             },
             "Collection" => view! {
-                <div class="ribbon bg-orange">Collection</div>
+                <div class="ribbon bg-orange">
+                    Collection
+                </div>
             },
             "Dataset" => view! {
-                <div class="ribbon bg-green">Dataset</div>
+                <div class="ribbon bg-green">
+                    Dataset
+                </div>
             },
             "Object" => view! {
-                <div class="ribbon">Object</div>
+                <div class="ribbon">
+                    Object
+                </div>
             },
             _ => view! {
-                <div class="ribbon bg-red">Unknown</div>
+                <div class="ribbon bg-red">
+                    Unknown
+                </div>
             },
         }
     }
@@ -461,11 +461,10 @@ impl SearchResultEntry {
     pub fn get_stats(&self) -> impl IntoView {
         view! {
             <span class="status status-yellow m-1">
-            Count: { self.stats.count }
+                Count:
+                {self.stats.count}
             </span>
-            <span class="status status-cyan m-1">
-                { self.stats.size.to_string() }
-            </span>
+            <span class="status status-cyan m-1">{self.stats.size.to_string()}</span>
         }
     }
 
@@ -478,12 +477,8 @@ impl SearchResultEntry {
                 view=move |kv| {
                     view! {
                         <div class="d-inline-flex tag">
-                            <div class="key text-secondary">
-                                { kv.1.0 }
-                            </div>
-                            <div class="value">
-                                { kv.1.1 }
-                            </div>
+                            <div class="key text-secondary">{kv.1.0}</div>
+                            <div class="value">{kv.1.1}</div>
                         </div>
                     }
                 }

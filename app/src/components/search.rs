@@ -11,27 +11,23 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
     let entry = SearchResultEntry::from(res);
     view! {
         <div class="card mt-2">
-            { entry.get_card_status() }
+            {entry.get_card_status()}
             <div class="card-body d-flex container flex-column">
-                { entry.get_ribbon() }
+                {entry.get_ribbon()}
                 <div class="row">
                     <div class="col-4">
                         <div>
                             <h3 class="text-primary">{entry.name.to_string()}</h3>
                             <h4 class="subheader">{entry.id.to_string()}</h4>
                         </div>
-                        { entry.get_status() }
-                        { entry.get_stats() }
+                        {entry.get_status()}
+                        {entry.get_stats()}
                     </div>
                     <div class="col border-start me-4 container">
-                        <div class="border-bottom pb-3 mb-2">
-                            { entry.get_key_values() }
-                        </div>
+                        <div class="border-bottom pb-3 mb-2">{entry.get_key_values()}</div>
                         <div class="row">
                             <h4 class="subheader mb-0">"Description"</h4>
-                            <p class="text-secondary mb-0">
-                                { entry.description }
-                            </p>
+                            <p class="text-secondary mb-0">{entry.description}</p>
                         </div>
                     </div>
                 </div>
@@ -42,126 +38,138 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 
 #[component]
 pub fn Search() -> impl IntoView {
-    let col_1 = Resource::Collection(Collection {
-        id: "SRE-20001-22000".to_string(),
-        name: "SRE-20001-22000".to_string(),
-        description: "A metagenomic dataset from somewhere!".to_string(),
-        key_values: vec![KeyValue {
-            key: "experiment".to_string(),
-            value: "Plasmidhunter".to_string(),
+    let resources = vec![
+        Resource::Collection(Collection {
+            id: "SRE-20001-22000".to_string(),
+            name: "SRE-20001-22000".to_string(),
+            description: "A metagenomic dataset from somewhere!".to_string(),
+            key_values: vec![KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            }],
+            stats: Some(Stats {
+                count: 1,
+                size: 882131238,
+                last_updated: None,
+            }),
+            data_class: 1,
             ..Default::default()
-        }],
-        stats: Some(Stats {
-            count: 1,
-            size: 1231231231,
-            last_updated: None,
         }),
-        data_class: 1,
-        ..Default::default()
-    });
-
-    let obj_1 = Resource::Object(Object {
-        id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
-        name: "SRE-123123-1231231231".to_string(),
-        description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
-        key_values: vec![
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-        ],
-        content_len: 10,
-        data_class: 2,
-        ..Default::default()
-    });
-
-    let obj_2 = Resource::Object(Object {
-        id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
-        name: "SRE-123123-1231231231".to_string(),
-        description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
-        key_values: vec![
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-        ],
-        content_len: 123123123123123123,
-        data_class: 2,
-        ..Default::default()
-    });
-
-    let obj_2 = Resource::Project(Project {
-        id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
-        name: "SRE-123123-1231231231".to_string(),
-        description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
-        key_values: vec![
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-        ],
-        stats: Some(Stats {
-            count: 1123123,
-            size: 123,
-            last_updated: None,
+        Resource::Object(Object {
+            id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+            name: "SRE-123123-1231231231".to_string(),
+            description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
+            key_values: vec![
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+            ],
+            content_len: 10,
+            data_class: 2,
+            ..Default::default()
         }),
-        data_class: 2,
-        ..Default::default()
-    });
+        Resource::Object(Object {
+            id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+            name: "SRE-123123-1231231231".to_string(),
+            description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
+            key_values: vec![
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+            ],
+            content_len: 123123123123123123,
+            data_class: 2,
+            ..Default::default()
+        }),
+        Resource::Project(Project {
+            id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+            name: "SRE-123123-1231231231".to_string(),
+            description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
+            key_values: vec![
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+            ],
+            stats: Some(Stats {
+                count: 1123123,
+                size: 123,
+                last_updated: None,
+            }),
+            data_class: 2,
+            ..Default::default()
+        }),
+        Resource::Object(Object {
+            id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+            name: "SRE-123123-1231231231".to_string(),
+            description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
+            key_values: vec![
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+                KeyValue {
+                    key: "experiment".to_string(),
+                    value: "Plasmidhunter".to_string(),
+                    ..Default::default()
+                },
+            ],
+            content_len: 123123123,
+            data_class: 2,
+            ..Default::default()
+        }),
+    ];
 
-    let obj_3 = Resource::Object(Object {
-        id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
-        name: "SRE-123123-1231231231".to_string(),
-        description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
-        key_values: vec![
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-            KeyValue {
-                key: "experiment".to_string(),
-                value: "Plasmidhunter".to_string(),
-                ..Default::default()
-            },
-        ],
-        content_len: 123123123,
-        data_class: 2,
-        ..Default::default()
-    });
+    let (query_class, query_set_class_p) = create_query_signal::<String>("class");
+    let (query_res, query_set_res_p) = create_query_signal::<String>("filter_res");
+
+    let query_set_class = move |class: &str| {
+        query_set_class_p(Some(class.to_string()));
+    };
+
+    let query_set_res = move |res: &str| {
+        query_set_res_p(Some(res.to_string()));
+    };
+
+    // let is_class = move |class: &str| query_class() == Some(class.to_string());
+    let is_res = move |res: &str| query_res() == Some(res.to_string());
 
     view! {
         <div class="container-xl text-start mt-4">
@@ -198,7 +206,7 @@ pub fn Search() -> impl IntoView {
                             placeholder="Search Aruna objects"
                         />
                         <span class="input-group-text" id="inputGroup-sizing-default">
-                            Resources
+                            Dataclass
                         </span>
                         <button
                             class="btn btn-outline-secondary dropdown-toggle"
@@ -206,80 +214,96 @@ pub fn Search() -> impl IntoView {
                             data-bs-toggle="dropdown"
                             aria-expanded="false"
                         >
-                            All
+                            { move || query_class().unwrap_or("All".to_string()) }
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li>
-                                <a class="dropdown-item" href="#">
-                                    Projects
-                                </a>
+                                <button on:click=move |_| query_set_class("All") class="dropdown-item" >
+                                    All
+                                </button>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="#">
-                                    Collections
-                                </a>
+                                <button on:click=move |_| query_set_class("Public") class="dropdown-item" >
+                                    Public
+                                </button>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="#">
-                                    Datasets
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="#">
-                                    Objects
-                                </a>
+                                <button on:click=move |_| query_set_class("Private") class="dropdown-item" >
+                                    Private
+                                </button>
                             </li>
                         </ul>
                     </div>
                 </div>
                 <div class="row mt-4">
                     <div class="col-3">
-                        <form action="./" method="get" autocomplete="off" novalidate="">
+                            <h3 class="text-muted">"Filters"</h3>
                             <div class="subheader mb-2">"Resource"</div>
                             <div class="list-group list-group-transparent mb-3">
-                                <a
-                                    class="list-group-item list-group-item-action d-flex align-items-center active"
-                                    href="#"
+                                <button
+                                    on:click=move |_| query_set_res("All")
+                                    class=move || {
+                                        "list-group-item list-group-item-action d-flex align-items-center"
+                                            .to_owned() + if is_res("All") || query_res().is_none() { " active" } else { "" }
+                                    }
                                 >
                                     "All"
-                                    <small class="text-secondary ms-auto">"24"</small>
-                                </a>
-                                <a
-                                    class="list-group-item list-group-item-action d-flex align-items-center"
-                                    href="#"
+                                </button>
+                                <button
+                                    on:click=move |_| query_set_res("Projects")
+                                    class=move || {
+                                        "list-group-item list-group-item-action d-flex align-items-center"
+                                            .to_owned() + if is_res("Projects") { " active" } else { "" }
+                                    }
                                 >
                                     "Projects"
-                                    <small class="text-secondary ms-auto">"149"</small>
-                                </a>
-                                <a
-                                    class="list-group-item list-group-item-action d-flex align-items-center"
-                                    href="#"
+                                </button>
+                                <button
+                                    on:click=move |_| query_set_res("Collections")
+                                    class=move || {
+                                        "list-group-item list-group-item-action d-flex align-items-center"
+                                            .to_owned() + if is_res("Collections") { " active" } else { "" }
+                                    }
                                 >
                                     "Collections"
-                                    <small class="text-secondary ms-auto">"88"</small>
-                                </a>
-                                <a
-                                    class="list-group-item list-group-item-action d-flex align-items-center"
-                                    href="#"
+                                </button>
+                                <button
+                                    on:click=move |_| query_set_res("Datasets")
+                                    class=move || {
+                                        "list-group-item list-group-item-action d-flex align-items-center"
+                                            .to_owned() + if is_res("Datasets") { " active" } else { "" }
+                                    }
                                 >
                                     "Datasets"
-                                    <small class="text-secondary ms-auto">"54"</small>
-                                </a>
-                                <a
-                                    class="list-group-item list-group-item-action d-flex align-items-center"
-                                    href="#"
+                                </button>
+                                <button
+                                    on:click=move |_| query_set_res("Objects")
+                                    class=move || {
+                                        "list-group-item list-group-item-action d-flex align-items-center"
+                                            .to_owned() + if is_res("Objects") { " active" } else { "" }
+                                    }
                                 >
                                     "Objects"
-                                    <small class="text-secondary ms-auto">"54"</small>
-                                </a>
+                                </button>
                             </div>
-                        </form>
                     </div>
                     <div class="col-9 ps-3">
-                        <SearchResult res=col_1/>
-                        <SearchResult res=obj_1/>
-                        <SearchResult res=obj_2/>
-                        <SearchResult res=obj_3/>
+                        <For
+                            each=move || { resources.clone().into_iter() }
+                            key=|res| {
+                                match res {
+                                    Resource::Collection(c) => c.id.clone(),
+                                    Resource::Dataset(d) => d.id.clone(),
+                                    Resource::Object(o) => o.id.clone(),
+                                    Resource::Project(p) => p.id.clone(),
+                                }
+                            }
+
+                            view=move |res| {
+                                view! { <SearchResult res=res/> }
+                            }
+                        />
+
                     </div>
                 </div>
             </div>
