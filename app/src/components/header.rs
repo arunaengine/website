@@ -276,8 +276,7 @@ pub fn ArunaHeader() -> impl IntoView {
 
     let html = {
         move || {
-            view! {<Body attributes=AdditionalAttributes::from(
-            vec![("data-bs-theme", dark.get())])/>}
+            view! { <Body attributes=AdditionalAttributes::from(vec![("data-bs-theme", dark.get())])/> }
         }
     };
 
@@ -328,7 +327,10 @@ pub fn ArunaHeader() -> impl IntoView {
                                         </A>
                                     </li>
 
-                                    <li class="nav-item" class:active=move || { path().contains("search") }>
+                                    <li
+                                        class="nav-item"
+                                        class:active=move || { path().contains("search") }
+                                    >
                                         <A class="nav-link" href="/search">
                                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                 <svg
@@ -354,8 +356,11 @@ pub fn ArunaHeader() -> impl IntoView {
                                     {move || {
                                         if is_logged_memo() {
                                             view! {
-                                                <li class="nav-item" class:active=move || { path().contains("panel") }>
-                                                    <A class="nav-link" href="/panel" >
+                                                <li
+                                                    class="nav-item"
+                                                    class:active=move || { path().contains("panel") }
+                                                >
+                                                    <A class="nav-link" href="/panel">
                                                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                             <svg
                                                                 xmlns="http://www.w3.org/2000/svg"
@@ -385,7 +390,10 @@ pub fn ArunaHeader() -> impl IntoView {
                                         }
                                     }}
 
-                                    <li class="nav-item" class:active=move || { path().contains("about") }>
+                                    <li
+                                        class="nav-item"
+                                        class:active=move || { path().contains("about") }
+                                    >
                                         <A class="nav-link" href="/about">
                                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                 <svg

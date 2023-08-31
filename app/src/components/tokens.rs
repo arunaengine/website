@@ -264,6 +264,10 @@ pub fn TokensOverview() -> impl IntoView {
                             Some(Err(_)) => {
                                 view! {
                                     // This guarantees that every result can only be seen once
+
+                                    // This guarantees that every result can only be seen once
+
+                                    // This guarantees that every result can only be seen once
                                     "Something went wrong"
                                 }
                                     .into_view()

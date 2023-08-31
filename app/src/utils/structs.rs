@@ -1,10 +1,14 @@
+use aruna_rust_api::api::storage::models::v2::{
+    generic_resource, Collection, DataClass, Dataset, KeyValue, Object, Project, Stats,
+};
+use leptos::IntoView;
 //use anyhow::anyhow;
 // use aruna_rust_api::api::storage::{
 //     models::v1::{ProjectOverview, ProjectPermission, Token, User},
 //     services::v1::{CreateApiTokenResponse, UserWithPerms},
 // };
 //use chrono::Local;
-use leptos::RwSignal;
+use leptos::*;
 //use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
 
@@ -230,3 +234,260 @@ pub struct ProjectOverviewWeb {
 //         }
 //     }
 // }
+
+pub struct SearchResultEntry {
+    pub id: String,
+    pub name: String,
+    pub variant: String,
+    pub description: String,
+    pub key_values: Vec<(String, String)>,
+    pub stats: VisualizedStats,
+    pub data_class: String,
+    pub created_at: String,
+}
+
+pub struct VisualizedStats {
+    pub count: u64,
+    pub size: String,
+}
+
+impl From<Option<Stats>> for VisualizedStats {
+    fn from(value: Option<Stats>) -> Self {
+        match value {
+            Some(val) => VisualizedStats {
+                count: val.count as u64,
+                size: bytesize::ByteSize(val.size as u64).to_string_as(true),
+            },
+            None => VisualizedStats {
+                count: 0,
+                size: "-".to_string(),
+            },
+        }
+    }
+}
+
+impl From<i64> for VisualizedStats {
+    fn from(value: i64) -> Self {
+        VisualizedStats {
+            count: 1,
+            size: bytesize::ByteSize(value as u64).to_string_as(true),
+        }
+    }
+}
+
+pub fn data_class_to_string(class: i32) -> String {
+    match class {
+        1 => "Public".to_string(),
+        2 => "Private".to_string(),
+        4 => "Workspace".to_string(),
+        5 => "Confidential".to_string(),
+        _ => "Unknown".to_string(),
+    }
+}
+
+pub fn timestamp_to_string(ts: Option<prost_wkt_types::Timestamp>) -> String {
+    match ts {
+        Some(ts) => serde_json::to_string_pretty(&ts).expect("Failed to serialize request"),
+        None => "Unknown".to_string(),
+    }
+}
+
+impl From<generic_resource::Resource> for SearchResultEntry {
+    fn from(value: generic_resource::Resource) -> Self {
+        match value {
+            generic_resource::Resource::Project(Project {
+                id,
+                name,
+                description,
+                key_values,
+                stats,
+                data_class,
+                created_at,
+                ..
+            }) => SearchResultEntry {
+                id: id.to_string(),
+                name,
+                variant: "Project".to_string(),
+                description: description,
+                key_values: key_values
+                    .into_iter()
+                    .map(|kv| (kv.key, kv.value))
+                    .collect::<Vec<_>>(),
+                stats: VisualizedStats::from(stats),
+                data_class: data_class_to_string(data_class),
+                created_at: timestamp_to_string(created_at),
+            },
+            generic_resource::Resource::Collection(Collection {
+                id,
+                name,
+                description,
+                key_values,
+                stats,
+                data_class,
+                created_at,
+                ..
+            }) => SearchResultEntry {
+                id: id.to_string(),
+                name,
+                variant: "Collection".to_string(),
+                description: description,
+                key_values: key_values
+                    .into_iter()
+                    .map(|kv| (kv.key, kv.value))
+                    .collect::<Vec<_>>(),
+                stats: VisualizedStats::from(stats),
+                data_class: data_class_to_string(data_class),
+                created_at: timestamp_to_string(created_at),
+            },
+            generic_resource::Resource::Dataset(Dataset {
+                id,
+                name,
+                description,
+                key_values,
+                stats,
+                data_class,
+                created_at,
+                ..
+            }) => SearchResultEntry {
+                id: id.to_string(),
+                name,
+                variant: "Dataset".to_string(),
+                description: description,
+                key_values: key_values
+                    .into_iter()
+                    .map(|kv| (kv.key, kv.value))
+                    .collect::<Vec<_>>(),
+                stats: VisualizedStats::from(stats),
+                data_class: data_class_to_string(data_class),
+                created_at: timestamp_to_string(created_at),
+            },
+            generic_resource::Resource::Object(Object {
+                id,
+                name,
+                description,
+                key_values,
+                content_len,
+                data_class,
+                created_at,
+                ..
+            }) => SearchResultEntry {
+                id: id.to_string(),
+                name,
+                variant: "Object".to_string(),
+                description: description,
+                key_values: key_values
+                    .into_iter()
+                    .map(|kv| (kv.key, kv.value))
+                    .collect::<Vec<_>>(),
+                stats: VisualizedStats::from(content_len),
+                data_class: data_class_to_string(data_class),
+                created_at: timestamp_to_string(created_at),
+            },
+        }
+    }
+}
+
+impl SearchResultEntry {
+    pub fn get_card_status(&self) -> impl IntoView {
+        match self.data_class.as_str() {
+            "Public" => view! {
+                <div class="card-status-start bg-green"></div>
+            },
+            "Private" => view! {
+                <div class="card-status-start bg-orange"></div>
+            },
+            "Workspace" => view! {
+                <div class="card-status-start bg-cyan"></div>
+            },
+            "Confidential" => view! {
+                <div class="card-status-start bg-red"></div>
+            },
+            _ => view! {
+                <div class="card-status-start bg-red"></div>
+            },
+        }
+    }
+
+    pub fn get_ribbon(&self) -> impl IntoView {
+        match self.variant.as_str() {
+            "Project" => view! {
+                <div class="ribbon bg-red">Project</div>
+            },
+            "Collection" => view! {
+                <div class="ribbon bg-orange">Collection</div>
+            },
+            "Dataset" => view! {
+                <div class="ribbon bg-green">Dataset</div>
+            },
+            "Object" => view! {
+                <div class="ribbon">Object</div>
+            },
+            _ => view! {
+                <div class="ribbon bg-red">Unknown</div>
+            },
+        }
+    }
+
+    pub fn get_status(&self) -> impl IntoView {
+        match self.data_class.as_str() {
+            "Public" => view! {
+                <span class="status status-green m-1">
+                    Public
+                </span>
+            },
+            "Private" => view! {
+                <span class="status status-orange m-1">
+                    Private
+                </span>
+            },
+            "Workspace" => view! {
+                <span class="status status-cyan m-1">
+                    Workspace
+                </span>
+            },
+            "Confidential" => view! {
+                <span class="status status-red m-1">
+                    Confidential
+                </span>
+            },
+            _ => view! {
+                <span class="status status-red m-1">
+                    Unknown
+                </span>
+            },
+        }
+    }
+
+    pub fn get_stats(&self) -> impl IntoView {
+        view! {
+            <span class="status status-yellow m-1">
+            Count: { self.stats.count }
+            </span>
+            <span class="status status-cyan m-1">
+                { self.stats.size.to_string() }
+            </span>
+        }
+    }
+
+    pub fn get_key_values(&self) -> impl IntoView {
+        let kv = self.key_values.clone();
+        view! {
+            <For
+                each=move || { kv.clone().into_iter().enumerate() }
+                key=|(index, _k)| *index
+                view=move |kv| {
+                    view! {
+                        <div class="d-inline-flex tag">
+                            <div class="key text-secondary">
+                                { kv.1.0 }
+                            </div>
+                            <div class="value">
+                                { kv.1.1 }
+                            </div>
+                        </div>
+                    }
+                }
+            />
+        }
+    }
+}

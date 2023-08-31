@@ -83,9 +83,7 @@ pub fn EntryPoint() -> impl IntoView {
                         <Route
                             path=""
                             view=move || {
-                                view! {
-                                    <MainPage/>
-                                }
+                                view! { <MainPage/> }
                             }
                         />
 

@@ -1,9 +1,168 @@
+use crate::utils::structs::SearchResultEntry;
+use aruna_rust_api::api::storage::models::v2::{
+    generic_resource::Resource, Collection, Dataset, KeyValue, Object, Project, Stats,
+};
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
 #[component]
+pub fn SearchResult(res: Resource) -> impl IntoView {
+    let entry = SearchResultEntry::from(res);
+    view! {
+        <div class="card mt-2">
+            { entry.get_card_status() }
+            <div class="card-body d-flex container flex-column">
+                { entry.get_ribbon() }
+                <div class="row">
+                    <div class="col-4">
+                        <div>
+                            <h3 class="text-primary">{entry.name.to_string()}</h3>
+                            <h4 class="subheader">{entry.id.to_string()}</h4>
+                        </div>
+                        { entry.get_status() }
+                        { entry.get_stats() }
+                    </div>
+                    <div class="col border-start me-4 container">
+                        <div class="border-bottom pb-3 mb-2">
+                            { entry.get_key_values() }
+                        </div>
+                        <div class="row">
+                            <h4 class="subheader mb-0">"Description"</h4>
+                            <p class="text-secondary mb-0">
+                                { entry.description }
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+#[component]
 pub fn Search() -> impl IntoView {
+    let col_1 = Resource::Collection(Collection {
+        id: "SRE-20001-22000".to_string(),
+        name: "SRE-20001-22000".to_string(),
+        description: "A metagenomic dataset from somewhere!".to_string(),
+        key_values: vec![KeyValue {
+            key: "experiment".to_string(),
+            value: "Plasmidhunter".to_string(),
+            ..Default::default()
+        }],
+        stats: Some(Stats {
+            count: 1,
+            size: 1231231231,
+            last_updated: None,
+        }),
+        data_class: 1,
+        ..Default::default()
+    });
+
+    let obj_1 = Resource::Object(Object {
+        id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+        name: "SRE-123123-1231231231".to_string(),
+        description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
+        key_values: vec![
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+        ],
+        content_len: 10,
+        data_class: 2,
+        ..Default::default()
+    });
+
+    let obj_2 = Resource::Object(Object {
+        id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+        name: "SRE-123123-1231231231".to_string(),
+        description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
+        key_values: vec![
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+        ],
+        content_len: 123123123123123123,
+        data_class: 2,
+        ..Default::default()
+    });
+
+    let obj_2 = Resource::Project(Project {
+        id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+        name: "SRE-123123-1231231231".to_string(),
+        description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
+        key_values: vec![
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+        ],
+        stats: Some(Stats {
+            count: 1123123,
+            size: 123,
+            last_updated: None,
+        }),
+        data_class: 2,
+        ..Default::default()
+    });
+
+    let obj_3 = Resource::Object(Object {
+        id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+        name: "SRE-123123-1231231231".to_string(),
+        description: "A biodiversic biodiversity experiment from somewhere!".to_string(),
+        key_values: vec![
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+            KeyValue {
+                key: "experiment".to_string(),
+                value: "Plasmidhunter".to_string(),
+                ..Default::default()
+            },
+        ],
+        content_len: 123123123,
+        data_class: 2,
+        ..Default::default()
+    });
+
     view! {
         <div class="container-xl text-start mt-4">
             <div class="row mt-2">
@@ -117,228 +276,10 @@ pub fn Search() -> impl IntoView {
                         </form>
                     </div>
                     <div class="col-9 ps-3">
-                        <div class="card mt-2">
-                            <div class="card-status-start bg-green"></div>
-                            <div class="card-body d-flex container flex-column">
-                                <div class="ribbon">
-                                    Object
-                                </div>
-                                <div class="row">
-                                    <div class="col-4">
-                                        <div>
-                                            <h3 class="text-primary">"SRE-20001-22000"</h3>
-                                            <h4 class="subheader">"01H93FNJEPN2DQFP2G8MBTK2XD"</h4>
-                                        </div>
-                                        <span class="status status-green m-1">
-                                            Public
-                                        </span>
-                                        <span class="status status-yellow m-1">
-                                            Count: 1
-                                        </span>
-                                        <span class="status status-cyan m-1">
-                                            1.2 GB
-                                        </span>
-                                    </div>
-                                    <div class="col border-start me-4">
-                                        <div class="d-flex border-bottom pb-3 mb-2 row">
-                                            <div class="tag col-4">
-                                                <div class="key text-secondary">experiment</div>
-                                                <div class="value">Plasmidhunter</div>
-                                            </div>
-                                            <div class="tag col-4">
-                                                <div class="key text-secondary">experiment</div>
-                                                <div class="value">Plasmidhunter</div>
-                                            </div>
-                                            <div class="tag col-4">
-                                                <div class="key text-secondary">experiment</div>
-                                                <div class="value">Plasmidhunter</div>
-                                            </div>
-                                            <div class="tag col-4">
-                                                <div class="key text-secondary">project</div>
-                                                <div class="value">SRE-20001</div>
-                                            </div>
-                                        </div>
-                                        <div class="row">
-                                            <h4 class="subheader mb-0">"Description"</h4>
-                                            <p class="text-secondary mb-0">
-                                            "A metagenomic dataset from somewhere!"
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card mt-2">
-                        <div class="card-status-start bg-green"></div>
-                        <div class="card-body d-flex container flex-column">
-                            <div class="ribbon">
-                                Object
-                            </div>
-                            <div class="row">
-                                <div class="col-4">
-                                    <div>
-                                        <h3 class="text-primary">"SRE-123123-1231231231"</h3>
-                                        <h4 class="subheader">"01H93HDRV1ZAJH8AT880CH8C0R"</h4>
-                                    </div>
-                                    <span class="status status-green m-1">
-                                        Public
-                                    </span>
-                                    <span class="status status-yellow m-1">
-                                        Count: 1
-                                    </span>
-                                    <span class="status status-cyan m-1">
-                                        3.4 MB
-                                    </span>
-                                </div>
-                                <div class="col border-start me-4">
-                                    <div class="pb-2 mb-2 border-bottom">
-                                        <span class="status status-cyan m-1">
-                                            experiment | Plasmidhunter
-                                        </span>
-                                        <span class="status status-cyan m-1">
-                                            project | SRE-123123123
-                                        </span>
-                                        <span class="status status-cyan m-1">
-                                            validated | FALSE
-                                        </span>
-                                    </div>
-                                    <div class="row">
-                                        <h4 class="subheader mb-0">"Description"</h4>
-                                        <p class="text-secondary mb-0">
-                                        "A metagenomic dataset from somewhere!"
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card mt-2">
-                        <div class="card-status-start bg-orange"></div>
-                        <div class="card-body d-flex container flex-column">
-                            <div class="ribbon bg-red">
-                                Project
-                            </div>
-                            <div class="row">
-                                <div class="col-4">
-                                    <div>
-                                        <h3 class="text-primary">"Biodiv-demo-project"</h3>
-                                        <h4 class="subheader">"01H93HDRV1ZAJH8AT880CH8C0R"</h4>
-                                    </div>
-                                    <span class="status status-orange m-1">
-                                        Private
-                                    </span>
-                                    <span class="status status-yellow m-1">
-                                        Count: 11231
-                                    </span>
-                                    <span class="status status-cyan m-1">
-                                        - MB
-                                    </span>
-                                </div>
-                                <div class="col border-start me-4">
-                                    <div class="pb-2 mb-2 border-bottom">
-                                        <span class="status status-cyan m-1">
-                                            experiment | Fischsuppe
-                                        </span>
-                                        <span class="status status-cyan m-1">
-                                            project | SRE-123123
-                                        </span>
-                                        <span class="status status-cyan m-1">
-                                            validated | FALSE
-                                        </span>
-                                    </div>
-                                    <div class="row">
-                                        <h4 class="subheader mb-0">"Description"</h4>
-                                        <p class="text-secondary mb-0">
-                                        "A biodiversic biodiversity experiment from somewhere!"
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card mt-2">
-                        <div class="card-status-start bg-orange"></div>
-                        <div class="card-body d-flex container flex-column">
-                            <div class="ribbon bg-cyan">
-                                Dataset
-                            </div>
-                            <div class="row">
-                                <div class="col-4">
-                                    <div>
-                                        <h3 class="text-primary">"Oma ernas krebsdaten"</h3>
-                                        <h4 class="subheader">"01H93HRFXEVZT8B5QDC43YV9G2"</h4>
-                                    </div>
-                                    <span class="status status-orange m-1">
-                                        Private
-                                    </span>
-                                    <span class="status status-yellow m-1">
-                                        Count: 2
-                                    </span>
-                                    <span class="status status-cyan m-1">
-                                        2.6 GB
-                                    </span>
-                                </div>
-                                <div class="col border-start me-4">
-                                    <div class="pb-2 mb-2 border-bottom">
-                                        <span class="status status-cyan m-1">
-                                            experiment | Oma erna
-                                        </span>
-                                        <span class="status status-cyan m-1">
-                                            project | OE
-                                        </span>
-                                        <span class="status status-cyan m-1">
-                                            validated | FALSE
-                                        </span>
-                                    </div>
-                                    <div class="row">
-                                        <h4 class="subheader mb-0">"Description"</h4>
-                                        <p class="text-secondary mb-0">
-                                        "Security through obscurity!"
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                        <div class="card mt-2">
-                            <div class="card-status-start bg-orange"></div>
-                            <div class="card-body">
-                                <div class="ribbon bg-red">
-                                    Project
-                                </div>
-                                <div class="row d-flex">
-                                    <div class="col-4">
-                                        <div>
-                                            <h3 class="text-primary">"Biodiv-demo-project"</h3>
-                                            <div class="subheader">"01H93FP6RHJCAWW5ZZNWK1TXWG"</div>
-                                        </div>
-                                        <p class="text-secondary">
-                                            "Demonstrator project for something with biodiversity"
-                                        </p>
-                                        <span class="status status-orange m-1">
-                                            Private
-                                        </span>
-                                        <span class="status status-yellow m-1">
-                                            Objects: 10233
-                                        </span>
-                                        <span class="status status-cyan m-1">
-                                            - GB
-                                        </span>
-                                    </div>
-                                    <div class="col border-start d-flex">
-                                        <span class="status status-cyan m-1">
-                                            experiment | Plasmidhunter
-                                        </span>
-                                        <span class="status status-cyan m-1">
-                                            project | SRE-20001
-                                        </span>
-                                        <span class="status status-cyan m-1">
-                                            validated | TRUE
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <SearchResult res=col_1/>
+                        <SearchResult res=obj_1/>
+                        <SearchResult res=obj_2/>
+                        <SearchResult res=obj_3/>
                     </div>
                 </div>
             </div>

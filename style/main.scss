@@ -308,13 +308,10 @@ body {
 }
 
 .tag {
-	line-height: normal;
 	background: var(--tblr-body-bg);
 	margin-right: 8px;
+	margin-bottom: .5em;
 	border-radius: 8px;
-	display: block;
-	flex-wrap: nowrap;
-	height: auto;
 	cursor: pointer;
 }
 
@@ -332,12 +329,4 @@ body {
 	border-radius: 0 8px 8px 0;
 	margin-right: -8px;
 	background: rgba(var(--tblr-status-color-rgb),.1)
-}
-
-.row-labels {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	height: 100%;
-	border-radius: 0 0 3px 3px;
 }
