@@ -1,5 +1,6 @@
 use aruna_rust_api::api::storage::models::v2::{
-    generic_resource, Collection, Dataset, Object, Project, Stats,
+    generic_resource, relation, Collection, Dataset, ExternalRelation, ExternalRelationVariant,
+    InternalRelation, InternalRelationVariant, Object, Project, Relation, RelationDirection, Stats,
 };
 use leptos::IntoView;
 //use anyhow::anyhow;
@@ -235,6 +236,7 @@ pub struct ProjectOverviewWeb {
 //     }
 // }
 
+#[derive(Debug, Default, Clone)]
 pub struct SearchResultEntry {
     pub id: String,
     pub name: String,
@@ -244,8 +246,10 @@ pub struct SearchResultEntry {
     pub stats: VisualizedStats,
     pub data_class: String,
     pub created_at: String,
+    pub relations: Vec<WebRelation>,
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct VisualizedStats {
     pub count: u64,
     pub size: String,
@@ -273,6 +277,68 @@ impl From<i64> for VisualizedStats {
             size: bytesize::ByteSize(value as u64).to_string_as(true),
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum WebRelation {
+    Internal(RelationVariant),
+    External(RelationVariant),
+}
+
+#[derive(Debug, Clone)]
+pub struct RelationVariant {
+    pub target: String,
+    pub target_name: String,
+    pub relation_type: String,
+    pub inbound: bool,
+}
+
+impl From<InternalRelation> for RelationVariant {
+    fn from(value: InternalRelation) -> Self {
+        let relation_type = match value.defined_variant() {
+            InternalRelationVariant::Unspecified => value.custom_variant().to_string(),
+            _ => format!("{:?}", value.defined_variant()),
+        };
+
+        RelationVariant {
+            target: value.resource_id.clone(),
+            target_name: format!("{:?}", value.resource_variant()),
+            relation_type,
+            inbound: value.direction() == RelationDirection::Inbound,
+        }
+    }
+}
+
+impl From<ExternalRelation> for RelationVariant {
+    fn from(value: ExternalRelation) -> Self {
+        let relation_type = match value.defined_variant() {
+            ExternalRelationVariant::Unspecified => value.custom_variant().to_string(),
+            _ => format!("{:?}", value.defined_variant()),
+        };
+
+        RelationVariant {
+            target: value.identifier,
+            target_name: "External".to_string(),
+            relation_type,
+            inbound: true,
+        }
+    }
+}
+
+impl From<relation::Relation> for WebRelation {
+    fn from(value: relation::Relation) -> Self {
+        match value {
+            relation::Relation::Internal(r) => WebRelation::Internal(r.into()),
+            relation::Relation::External(r) => WebRelation::External(r.into()),
+        }
+    }
+}
+
+pub fn from_relation_vec(relations: Vec<Relation>) -> Vec<WebRelation> {
+    relations
+        .into_iter()
+        .filter_map(|r| r.relation.map(|e| e.into()))
+        .collect::<Vec<_>>()
 }
 
 pub fn data_class_to_string(class: i32) -> String {
@@ -303,6 +369,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 stats,
                 data_class,
                 created_at,
+                relations,
                 ..
             }) => SearchResultEntry {
                 id: id.to_string(),
@@ -316,6 +383,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 stats: VisualizedStats::from(stats),
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
+                relations: from_relation_vec(relations),
             },
             generic_resource::Resource::Collection(Collection {
                 id,
@@ -325,6 +393,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 stats,
                 data_class,
                 created_at,
+                relations,
                 ..
             }) => SearchResultEntry {
                 id: id.to_string(),
@@ -338,6 +407,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 stats: VisualizedStats::from(stats),
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
+                relations: from_relation_vec(relations),
             },
             generic_resource::Resource::Dataset(Dataset {
                 id,
@@ -347,6 +417,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 stats,
                 data_class,
                 created_at,
+                relations,
                 ..
             }) => SearchResultEntry {
                 id: id.to_string(),
@@ -360,6 +431,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 stats: VisualizedStats::from(stats),
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
+                relations: from_relation_vec(relations),
             },
             generic_resource::Resource::Object(Object {
                 id,
@@ -369,6 +441,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 content_len,
                 data_class,
                 created_at,
+                relations,
                 ..
             }) => SearchResultEntry {
                 id: id.to_string(),
@@ -382,6 +455,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 stats: VisualizedStats::from(content_len),
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
+                relations: from_relation_vec(relations),
             },
         }
     }

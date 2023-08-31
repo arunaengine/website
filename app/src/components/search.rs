@@ -7,6 +7,10 @@ use leptos_router::*;
 #[component]
 pub fn SearchResult(res: Resource) -> impl IntoView {
     let entry = SearchResultEntry::from(res);
+    let entry_clone = entry.clone();
+    let name = move || entry_clone.name.to_string();
+    let id = move || entry_clone.id.to_string();
+    let absolute_link = || "/objects/".to_owned() + &id();
     view! {
         <div class="card m-1">
             {entry.get_card_status()}
@@ -14,8 +18,8 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
                 {entry.get_ribbon()} <div class="row">
                     <div class="col-4">
                         <div>
-                            <h3 class="text-primary">{entry.name.to_string()}</h3>
-                            <h4 class="subheader">{entry.id.to_string()}</h4>
+                            <A class="text-primary" href=absolute_link() replace=true><h3>{name}</h3></A>
+                            <A class="subheader"  href=absolute_link() replace=true><h4>{id}</h4></A>
                         </div>
                         {entry.get_status()}
                         {entry.get_stats()}
@@ -51,7 +55,7 @@ pub fn Search() -> impl IntoView {
 
     let (read_range, set_range) = create_signal(1..=5);
 
-    let (results, set_results) = create_signal::<i32>(1337);
+    let (results, _set_results) = create_signal::<i32>(1337);
     let max_pages = move || (results() / 50) + 1;
     let get_range_iter = {
         move |current: i32| {
@@ -171,7 +175,7 @@ pub fn Search() -> impl IntoView {
             <div class="row mt-2">
                 <div class="col-3">
                     <h2 class="text-primary">"Search results"</h2>
-                    <div class="text-secondary">"About 2,410 result (0.19 seconds)"</div>
+                    <div class="text-secondary">"About " { results } " result (0.19 seconds)"</div>
                 </div>
                 <div class="col-9 pe-4">
                     <div class="input-group">
@@ -307,7 +311,18 @@ pub fn Search() -> impl IntoView {
                                 "Objects"
                             </button>
                         </div>
-                        <div class="subheader mb-2">"Query filters"</div>
+                        <div class="subheader mb-4">"Query filters"</div>
+
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" placeholder="Query string" aria-label="Query string" />
+                        </div>
+
+                        <div class="alert alert-success" role="alert">
+                            <div class="alert-title">A query string to filter arguments.</div>
+                            <div class="text-secondary">Current parameters are:</div>
+                            <div class="text-secondary"><b>size</b>, <b>labels.key</b>, <b>labels.value</b>, <b>created_at</b></div>
+                            <div class="text-muted">Examples: <b>size>100</b>, <b>labels.key=akey</b> ...</div>
+                        </div>
                     </div>
                     <div class="col-9 ps-3">
 
