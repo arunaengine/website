@@ -1,6 +1,7 @@
 use aruna_rust_api::api::storage::models::v2::{
     generic_resource, relation, Collection, Dataset, ExternalRelation, ExternalRelationVariant,
-    InternalRelation, InternalRelationVariant, Object, Project, Relation, RelationDirection, Stats,
+    InternalRelation, InternalRelationVariant, KeyValue, Object, Project, Relation,
+    RelationDirection, Stats,
 };
 //use anyhow::anyhow;
 // use aruna_rust_api::api::storage::{
@@ -242,7 +243,7 @@ pub struct SearchResultEntry {
     pub name: String,
     pub variant: String,
     pub description: String,
-    pub key_values: Vec<(String, String)>,
+    pub key_values: Vec<WebKV>,
     pub stats: VisualizedStats,
     pub data_class: String,
     pub created_at: String,
@@ -279,6 +280,88 @@ impl From<i64> for VisualizedStats {
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct WebKV {
+    pub key: String,
+    pub value: String,
+    pub variant: i32,
+    pub status: i32,
+}
+
+impl WebKV {
+    pub fn get_key(&self) -> String {
+        self.key.to_string()
+    }
+
+    pub fn get_value(&self) -> String {
+        self.value.to_string()
+    }
+
+    pub fn is_hook(&self) -> bool {
+        self.variant == 3
+    }
+
+    pub fn is_label(&self) -> bool {
+        self.variant == 1 || self.variant == 2
+    }
+
+    pub fn is_static(&self) -> bool {
+        self.variant == 2
+    }
+
+    pub fn into_table_view(self) -> impl IntoView {
+        view! {
+        <tr>
+            <td class="text-start">
+                { self.get_key() }
+            </td>
+
+            <td>
+                { self.get_value() }
+            </td>
+
+            <td>
+                { if self.is_static() && self.status == 3{
+                    view! {
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            <path d="M5 12l5 5l10 -10"></path>
+                        </svg>
+                    }.into_view()
+                } else if self.status == 1 {
+                    view! {
+                        <span class="status status-green">Running</span>
+                    }
+                .into_view() }
+                else if self.status == 2 {
+                    view!{ <span class="status status-red">Error</span> }.into_view()
+                }else{
+                    ().into_view()
+                }
+                }
+            </td>
+        </tr>
+        }
+    }
+}
+
+impl From<KeyValue> for WebKV {
+    fn from(value: KeyValue) -> Self {
+        WebKV {
+            key: value.key.to_string(),
+            value: value.value.to_string(),
+            variant: value.variant,
+            status: if &value.key == "plasmidhunter.mash" {
+                1
+            } else if &value.key == "plasmidhunter.count_kmers" {
+                2
+            } else {
+                3
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum WebRelation {
     Internal(RelationVariant),
@@ -300,26 +383,13 @@ impl WebRelation {
                 view! {
                     <tr>
                         <td class="text-start">
-                            <A href={format!("/objects/{}", r.target.to_string())} exact=true class="ms-1">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    class="icon"
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    stroke-width="2"
-                                    stroke="currentColor"
-                                    fill="none"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                >
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    <path d="M9 15l6 -6"></path>
-                                    <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"></path>
-                                    <path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"></path>
-                                </svg>
+                            <A href={format!("/objects/{}", r.target.to_string())} exact=true class="">
                                 { r.target.to_string() }
                             </A>
+                        </td>
+
+                        <td>
+                            { r_2.get_inbound_icon() }
                         </td>
 
                         <td>
@@ -340,7 +410,7 @@ impl WebRelation {
                             <A href={format!("{}", r.target.to_string())} exact=true class="ms-1">
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
-                                    class="icon"
+                                    class="icon me-2"
                                     width="24"
                                     height="24"
                                     viewBox="0 0 24 24"
@@ -358,6 +428,7 @@ impl WebRelation {
                                 { r.target.to_string() }
                             </A>
                         </td>
+
                         <td>
                             { r_2.external_relation_type_status() }
                         </td>
@@ -377,40 +448,62 @@ pub struct RelationVariant {
 }
 
 impl RelationVariant {
+    pub fn get_inbound_icon(&self) -> impl IntoView {
+        if self.inbound {
+            view! {
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-big-right-lines" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <path d="M12 9v-3.586a1 1 0 0 1 1.707 -.707l6.586 6.586a1 1 0 0 1 0 1.414l-6.586 6.586a1 1 0 0 1 -1.707 -.707v-3.586h-3v-6h3z"></path>
+                    <path d="M3 9v6"></path>
+                    <path d="M6 9v6"></path>
+                </svg>
+            }
+        } else {
+            view! {
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-big-left-lines" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <path d="M12 15v3.586a1 1 0 0 1 -1.707 .707l-6.586 -6.586a1 1 0 0 1 0 -1.414l6.586 -6.586a1 1 0 0 1 1.707 .707v3.586h3v6h-3z"></path>
+                    <path d="M21 15v-6"></path>
+                    <path d="M18 15v-6"></path>
+                </svg>
+            }
+        }
+    }
+
     pub fn get_object_batch(&self) -> impl IntoView {
         match self.target_name.as_str() {
-            "RESOURCE_VARIANT_PROJECT" => {
+            "Project" => {
                 view! {
-                    <span class="status status-red">
-                        PROJECT
+                   <span class="text-muted">
+                        Project
                     </span>
                 }
             }
-            "RESOURCE_VARIANT_COLLECTION" => {
+            "Collection" => {
                 view! {
-                    <span class="status status-orange">
-                        COLLECTION
-                    </span>
+                   <span class="text-muted">
+                        Collection
+                   </span>
                 }
             }
-            "RESOURCE_VARIANT_DATASET" => {
+            "Dataset" => {
                 view! {
-                    <span class="status status-green">
-                        DATASET
-                    </span>
+                   <span class="text-muted">
+                        Dataset
+                   </span>
                 }
             }
-            "RESOURCE_VARIANT_OBJECT" => {
+            "Object" => {
                 view! {
-                    <span class="status status-blue">
-                        OBJECT
+                    <span class="text-muted">
+                        Object
                     </span>
                 }
             }
             _ => {
                 view! {
-                    <span class="status status-pink">
-                        UNKNOWN
+                    <span class="text-muted">
+                        Unknown
                     </span>
                 }
             }
@@ -419,44 +512,52 @@ impl RelationVariant {
 
     pub fn internal_relation_type_status(&self) -> impl IntoView {
         match self.relation_type.as_str() {
-            "INTERNAL_RELATION_VARIANT_BELONGS_TO" => {
+            "BelongsTo" => {
+                if self.inbound {
+                    view! {
+                        <span class="text-muted">
+                            Parent
+                        </span>
+                    }
+                } else {
+                    view! {
+                        <span class="text-muted">
+                            Child
+                        </span>
+                    }
+                }
+            }
+            "Origin" => {
                 view! {
-                    <span class="status status-green">
-                        BELONGSTO
+                    <span class="text-muted">
+                        Origin
                     </span>
                 }
             }
-            "INTERNAL_RELATION_VARIANT_ORIGIN" => {
-                view! {
-                    <span class="status status-cyan">
-                        ORIGIN
-                    </span>
-                }
-            }
-            "INTERNAL_RELATION_VARIANT_VERSION" => {
+            "Version" => {
                 view! {
                     <span class="status status-orange">
-                        VERSION
+                        Version
                     </span>
                 }
             }
-            "INTERNAL_RELATION_VARIANT_METADATA" => {
+            "Metadata" => {
                 view! {
-                    <span class="status status-yellow">
-                        METADATA
+                    <span class="text-muted">
+                        Metadata
                     </span>
                 }
             }
-            "INTERNAL_RELATION_VARIANT_POLICY" => {
+            "Policy" => {
                 view! {
-                    <span class="status status-red">
-                        METADATA
+                    <span class="text-muted">
+                        Policy
                     </span>
                 }
             }
             _ => {
                 view! {
-                    <span class="status status-purple">
+                    <span class="text-muted">
                         { self.relation_type.to_ascii_uppercase() }
                     </span>
                 }
@@ -466,24 +567,24 @@ impl RelationVariant {
 
     pub fn external_relation_type_status(&self) -> impl IntoView {
         match self.relation_type.as_str() {
-            "EXTERNAL_RELATION_VARIANT_URL" => {
+            "Url" => {
                 view! {
-                    <span class="status status-blue">
-                        IDENTIFIER
+                    <span class="text-muted">
+                        Identifier
                     </span>
                 }
             }
 
-            "EXTERNAL_RELATION_VARIANT_IDENTIFIER" => {
+            "Identifier" => {
                 view! {
-                    <span class="status status-orange">
-                        URL
+                    <span class="text-muted">
+                        Url
                     </span>
                 }
             }
             _ => {
                 view! {
-                    <span class="status status-purple">
+                    <span class="text-muted">
                         { self.relation_type.to_ascii_uppercase() }
                     </span>
                 }
@@ -581,7 +682,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 description: description,
                 key_values: key_values
                     .into_iter()
-                    .map(|kv| (kv.key, kv.value))
+                    .map(|kv| kv.into())
                     .collect::<Vec<_>>(),
                 stats: VisualizedStats::from(stats),
                 data_class: data_class_to_string(data_class),
@@ -605,7 +706,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 description: description,
                 key_values: key_values
                     .into_iter()
-                    .map(|kv| (kv.key, kv.value))
+                    .map(|kv| kv.into())
                     .collect::<Vec<_>>(),
                 stats: VisualizedStats::from(stats),
                 data_class: data_class_to_string(data_class),
@@ -629,7 +730,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 description: description,
                 key_values: key_values
                     .into_iter()
-                    .map(|kv| (kv.key, kv.value))
+                    .map(|kv| kv.into())
                     .collect::<Vec<_>>(),
                 stats: VisualizedStats::from(stats),
                 data_class: data_class_to_string(data_class),
@@ -653,7 +754,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 description: description,
                 key_values: key_values
                     .into_iter()
-                    .map(|kv| (kv.key, kv.value))
+                    .map(|kv| kv.into())
                     .collect::<Vec<_>>(),
                 stats: VisualizedStats::from(content_len),
                 data_class: data_class_to_string(data_class),
@@ -747,15 +848,22 @@ impl SearchResultEntry {
 
     pub fn get_key_values(&self) -> impl IntoView {
         let kv = self.key_values.clone();
+
+        let only_labels = kv
+            .iter()
+            .filter(|kv| kv.variant == 1)
+            .cloned()
+            .collect::<Vec<_>>();
+
         view! {
             <For
-                each=move || { kv.clone().into_iter().enumerate() }
+                each=move || { only_labels.clone().into_iter().enumerate() }
                 key=|(index, _k)| *index
                 view=move |kv| {
                     view! {
                         <div class="d-inline-flex tag">
-                            <div class="key text-secondary">{kv.1.0}</div>
-                            <div class="value">{kv.1.1}</div>
+                            <div class="key text-secondary">{kv.1.get_key()}</div>
+                            <div class="value">{kv.1.get_value()}</div>
                         </div>
                     }
                 }
