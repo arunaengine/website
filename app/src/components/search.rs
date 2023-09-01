@@ -18,8 +18,12 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
                 {entry.get_ribbon()} <div class="row">
                     <div class="col-4">
                         <div>
-                            <A class="text-primary" href=absolute_link() replace=true><h3>{name}</h3></A>
-                            <A class="subheader"  href=absolute_link() replace=true><h4>{id}</h4></A>
+                            <A class="text-primary" href=absolute_link() replace=true>
+                                <h3>{name}</h3>
+                            </A>
+                            <A class="subheader" href=absolute_link() replace=true>
+                                <h4>{id}</h4>
+                            </A>
                         </div>
                         {entry.get_status()}
                         {entry.get_stats()}
@@ -134,11 +138,14 @@ pub fn Search() -> impl IntoView {
                         key=|num| *num
                         view=move |num| {
                             view! {
-                                <li class=move ||  if query_page().unwrap_or(1) == num { "page-item active" } else { "page-item" }>
-                                    <button
-                                        class="page-link"
-                                        on:click=move |_| query_set_page(num)
-                                    >
+                                <li class=move || {
+                                    if query_page().unwrap_or(1) == num {
+                                        "page-item active"
+                                    } else {
+                                        "page-item"
+                                    }
+                                }>
+                                    <button class="page-link" on:click=move |_| query_set_page(num)>
                                         {num}
                                     </button>
                                 </li>
@@ -175,7 +182,7 @@ pub fn Search() -> impl IntoView {
             <div class="row mt-2">
                 <div class="col-3">
                     <h2 class="text-primary">"Search results"</h2>
-                    <div class="text-secondary">"About " { results } " result (0.19 seconds)"</div>
+                    <div class="text-secondary">"About " {results} " result (0.19 seconds)"</div>
                 </div>
                 <div class="col-9 pe-4">
                     <div class="input-group">
@@ -314,14 +321,49 @@ pub fn Search() -> impl IntoView {
                         <div class="subheader mb-4">"Query filters"</div>
 
                         <div class="input-group mb-3">
-                            <input type="text" class="form-control" placeholder="Query string" aria-label="Query string" />
+                            <input
+                                type="text"
+                                class="form-control"
+                                placeholder="Query string"
+                                aria-label="Query string"
+                            />
                         </div>
 
                         <div class="alert alert-success" role="alert">
-                            <div class="alert-title">A query string to filter arguments.</div>
-                            <div class="text-secondary">Current parameters are:</div>
-                            <div class="text-secondary"><b>size</b>, <b>labels.key</b>, <b>labels.value</b>, <b>created_at</b></div>
-                            <div class="text-muted">Examples: <b>size>100</b>, <b>labels.key=akey</b> ...</div>
+                            <div class="alert-title">
+                                A query string to filter arguments.
+                            </div>
+                            <div class="text-secondary">
+                                Current parameters are:
+                            </div>
+                            <div class="text-secondary">
+                                <b>
+                                    size
+                                </b>
+                                ,
+                                <b>
+                                    labels.key
+                                </b>
+                                ,
+                                <b>
+                                    labels.value
+                                </b>
+                                ,
+                                <b>
+                                    created_at
+                                </b>
+                            </div>
+                            <div class="text-muted">
+                                Examples:
+                                <b>
+                                    size>100
+                                </b>
+                                ,
+                                <b>
+                                    labels.key=akey
+                                </b>
+                                ...
+                            </div>
                         </div>
                     </div>
                     <div class="col-9 ps-3">

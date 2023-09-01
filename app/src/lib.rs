@@ -1,4 +1,4 @@
-use leptos::*;
+use leptos::{html::Div, *};
 use leptos_meta::*;
 use leptos_router::*;
 
@@ -15,6 +15,7 @@ pub fn EntryPoint() -> impl IntoView {
     use crate::components::footer::*;
     use crate::components::header::*;
     use crate::components::imprint::*;
+    use crate::components::objects::*;
     use crate::components::panel::*;
     use crate::components::register::*;
     use crate::components::search::*;
@@ -41,11 +42,11 @@ pub fn EntryPoint() -> impl IntoView {
         <Script src="/tabler.min.js"/>
         // sets the document title
         <Title text="Aruna Object Storage"/>
-        <Router>
-            <main>
+        <div class="page">
+            <Router>
                 <Routes>
                     <Route
-                        path="/"
+                        path=""
                         view=move || {
                             view! {
                                 <ArunaHeader/>
@@ -79,18 +80,21 @@ pub fn EntryPoint() -> impl IntoView {
                         <Route path="imprint" view=move || view! { <Imprint/> }/>
                         <Route path="search" view=move || view! { <Search/> }/>
                         <Route path="tos" view=move || view! { <Tos/> }/>
+                        <Route path="objects/:id" view=move || view! { <ObjectOverview /> }/>
                         <Panel/>
                         <Route
                             path=""
                             view=move || {
-                                view! { <MainPage/> }
+                                view! {
+                                    <MainPage/>
+                                }
                             }
                         />
 
                     </Route>
                 </Routes>
-            </main>
-        </Router>
+            </Router>
+        </div>
     }
 }
 

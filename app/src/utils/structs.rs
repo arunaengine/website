@@ -2,7 +2,6 @@ use aruna_rust_api::api::storage::models::v2::{
     generic_resource, relation, Collection, Dataset, ExternalRelation, ExternalRelationVariant,
     InternalRelation, InternalRelationVariant, Object, Project, Relation, RelationDirection, Stats,
 };
-use leptos::IntoView;
 //use anyhow::anyhow;
 // use aruna_rust_api::api::storage::{
 //     models::v1::{ProjectOverview, ProjectPermission, Token, User},

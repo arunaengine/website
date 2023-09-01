@@ -32,9 +32,15 @@ body {
 	font-size: 4vw;
 }
 
+.top {
+	position: absolute;
+	z-index: -100vh;
+	margin-top: 40vh;
+}
+
 .ocean {
 	background-color: #007bc1;
-	top: 100%;
+	top: 30vh;
 	opacity: .25;
 	width: 200vw;
 	position: absolute;
@@ -222,26 +228,26 @@ body {
 .wave {
 	background: url(../wave.svg) repeat-x;
 	position: absolute;
-	top: 80%;
+	top: 10vh;
 	width: 10*100vw;
 	height: 20vh;
 	animation: wave 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) infinite;
-	transform: translate3d(0, 0, 0);
 }
 
 .wave:nth-of-type(2) {
-	top: 85%;
+	top: 12vh;
 	animation: wave 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) -.125s infinite, swell 28s ease -1.25s infinite;
 	opacity: 1;
+	display: hidden;
 }
 
 @keyframes wave {
 	0% {
-		margin-left: -400px;
+		transform: translate3d(-100vw, 0, 0);
 	}
 
 	100% {
-		margin-left: -2000px;
+		transform: translate3d(-300vw, 0, 0);
 	}
 }
 
@@ -249,13 +255,12 @@ body {
 
 	0%,
 	100% {
-		transform: translate3d(0, -4vh, 0);
-		height: 19vh;
+		transform: translate3d(-100vw, -4vh, 0);
+		scale: .7333;
 	}
-
 	50% {
-		transform: translate3d(0, 0.1vh, 0);
-		height: 14.95vh;
+		transform: translate3d(-2000px, 0.1vh, 0);
+		scale: 1;
 	}
 }
 

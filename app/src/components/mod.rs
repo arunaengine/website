@@ -9,6 +9,7 @@ pub mod footer;
 pub mod header;
 pub mod imprint;
 pub mod main_body;
+pub mod objects;
 pub mod panel;
 pub mod panel_content;
 pub mod panel_nav;

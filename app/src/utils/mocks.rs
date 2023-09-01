@@ -123,3 +123,17 @@ pub fn get_demo_data() -> Vec<Resource> {
     ];
     resources
 }
+
+pub fn get_mock_by_id(id: String) -> Resource {
+    let from_mocks = get_demo_data();
+    let res = from_mocks
+        .iter()
+        .find(|x| match x {
+            Resource::Object(obj) => obj.id == id,
+            Resource::Collection(col) => col.id == id,
+            Resource::Dataset(ds) => ds.id == id,
+            Resource::Project(proj) => proj.id == id,
+        })
+        .unwrap();
+    res.clone()
+}
