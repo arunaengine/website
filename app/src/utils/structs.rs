@@ -9,6 +9,7 @@ use aruna_rust_api::api::storage::models::v2::{
 // };
 //use chrono::Local;
 use leptos::*;
+use leptos_router::*;
 //use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
 
@@ -291,6 +292,80 @@ impl WebRelation {
             WebRelation::External(_) => true,
         }
     }
+
+    pub fn into_table_view(self) -> impl IntoView {
+        match self {
+            WebRelation::Internal(r) => {
+                let r_2 = r.clone();
+                view! {
+                    <tr>
+                        <td class="text-start">
+                            <A href={format!("/objects/{}", r.target.to_string())} exact=true class="ms-1">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="icon"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="2"
+                                    stroke="currentColor"
+                                    fill="none"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M9 15l6 -6"></path>
+                                    <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"></path>
+                                    <path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"></path>
+                                </svg>
+                                { r.target.to_string() }
+                            </A>
+                        </td>
+
+                        <td>
+                            { r_2.get_object_batch() }
+                        </td>
+
+                        <td>
+                            { r_2.internal_relation_type_status() }
+                        </td>
+                    </tr>
+                }
+            }
+            WebRelation::External(r) => {
+                let r_2 = r.clone();
+                view! {
+                    <tr>
+                        <td class="text-start">
+                            <A href={format!("{}", r.target.to_string())} exact=true class="ms-1">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="icon"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="2"
+                                    stroke="currentColor"
+                                    fill="none"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M9 15l6 -6"></path>
+                                    <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"></path>
+                                    <path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"></path>
+                                </svg>
+                                { r.target.to_string() }
+                            </A>
+                        </td>
+                        <td>
+                            { r_2.external_relation_type_status() }
+                        </td>
+                    </tr>
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -301,10 +376,128 @@ pub struct RelationVariant {
     pub inbound: bool,
 }
 
+impl RelationVariant {
+    pub fn get_object_batch(&self) -> impl IntoView {
+        match self.target_name.as_str() {
+            "RESOURCE_VARIANT_PROJECT" => {
+                view! {
+                    <span class="status status-red">
+                        PROJECT
+                    </span>
+                }
+            }
+            "RESOURCE_VARIANT_COLLECTION" => {
+                view! {
+                    <span class="status status-orange">
+                        COLLECTION
+                    </span>
+                }
+            }
+            "RESOURCE_VARIANT_DATASET" => {
+                view! {
+                    <span class="status status-green">
+                        DATASET
+                    </span>
+                }
+            }
+            "RESOURCE_VARIANT_OBJECT" => {
+                view! {
+                    <span class="status status-blue">
+                        OBJECT
+                    </span>
+                }
+            }
+            _ => {
+                view! {
+                    <span class="status status-pink">
+                        UNKNOWN
+                    </span>
+                }
+            }
+        }
+    }
+
+    pub fn internal_relation_type_status(&self) -> impl IntoView {
+        match self.relation_type.as_str() {
+            "INTERNAL_RELATION_VARIANT_BELONGS_TO" => {
+                view! {
+                    <span class="status status-green">
+                        BELONGSTO
+                    </span>
+                }
+            }
+            "INTERNAL_RELATION_VARIANT_ORIGIN" => {
+                view! {
+                    <span class="status status-cyan">
+                        ORIGIN
+                    </span>
+                }
+            }
+            "INTERNAL_RELATION_VARIANT_VERSION" => {
+                view! {
+                    <span class="status status-orange">
+                        VERSION
+                    </span>
+                }
+            }
+            "INTERNAL_RELATION_VARIANT_METADATA" => {
+                view! {
+                    <span class="status status-yellow">
+                        METADATA
+                    </span>
+                }
+            }
+            "INTERNAL_RELATION_VARIANT_POLICY" => {
+                view! {
+                    <span class="status status-red">
+                        METADATA
+                    </span>
+                }
+            }
+            _ => {
+                view! {
+                    <span class="status status-purple">
+                        { self.relation_type.to_ascii_uppercase() }
+                    </span>
+                }
+            }
+        }
+    }
+
+    pub fn external_relation_type_status(&self) -> impl IntoView {
+        match self.relation_type.as_str() {
+            "EXTERNAL_RELATION_VARIANT_URL" => {
+                view! {
+                    <span class="status status-blue">
+                        IDENTIFIER
+                    </span>
+                }
+            }
+
+            "EXTERNAL_RELATION_VARIANT_IDENTIFIER" => {
+                view! {
+                    <span class="status status-orange">
+                        URL
+                    </span>
+                }
+            }
+            _ => {
+                view! {
+                    <span class="status status-purple">
+                        { self.relation_type.to_ascii_uppercase() }
+                    </span>
+                }
+            }
+        }
+    }
+}
+
 impl From<InternalRelation> for RelationVariant {
     fn from(value: InternalRelation) -> Self {
         let relation_type = match value.defined_variant() {
-            InternalRelationVariant::Unspecified => value.custom_variant().to_string(),
+            InternalRelationVariant::Unspecified | InternalRelationVariant::Custom => {
+                value.custom_variant().to_string()
+            }
             _ => format!("{:?}", value.defined_variant()),
         };
 
@@ -320,7 +513,9 @@ impl From<InternalRelation> for RelationVariant {
 impl From<ExternalRelation> for RelationVariant {
     fn from(value: ExternalRelation) -> Self {
         let relation_type = match value.defined_variant() {
-            ExternalRelationVariant::Unspecified => value.custom_variant().to_string(),
+            ExternalRelationVariant::Unspecified | ExternalRelationVariant::Custom => {
+                value.custom_variant().to_string()
+            }
             _ => format!("{:?}", value.defined_variant()),
         };
 
@@ -503,7 +698,7 @@ impl SearchResultEntry {
                 </div>
             },
             _ => view! {
-                <div class="ribbon bg-red">
+                <div class="ribbon bg-pink">
                     Unknown
                 </div>
             },
