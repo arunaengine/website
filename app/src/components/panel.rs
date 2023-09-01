@@ -18,7 +18,6 @@ pub fn Panel() -> impl IntoView {
     update_user.0.update(|e| *e = !*e);
 
     view! {
-        ,
         <Route
             path="panel"
             view=move || {

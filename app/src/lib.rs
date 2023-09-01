@@ -46,7 +46,7 @@ pub fn EntryPoint() -> impl IntoView {
             <Router>
                 <Routes>
                     <Route
-                        path=""
+                        path="/"
                         view=move || {
                             view! {
                                 <ArunaHeader/>
@@ -80,14 +80,12 @@ pub fn EntryPoint() -> impl IntoView {
                         <Route path="imprint" view=move || view! { <Imprint/> }/>
                         <Route path="search" view=move || view! { <Search/> }/>
                         <Route path="tos" view=move || view! { <Tos/> }/>
-                        <Route path="objects/:id" view=move || view! { <ObjectOverview /> }/>
+                        <Route path="objects/:id" view=move || view! { <ObjectOverview/> }/>
                         <Panel/>
                         <Route
                             path=""
                             view=move || {
-                                view! {
-                                    <MainPage/>
-                                }
+                                view! { <MainPage/> }
                             }
                         />
 

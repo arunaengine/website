@@ -284,6 +284,15 @@ pub enum WebRelation {
     External(RelationVariant),
 }
 
+impl WebRelation {
+    pub fn is_external(&self) -> bool {
+        match self {
+            WebRelation::Internal(_) => false,
+            WebRelation::External(_) => true,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RelationVariant {
     pub target: String,
