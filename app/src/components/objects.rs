@@ -351,7 +351,7 @@ pub fn ObjectOverview() -> impl IntoView {
 
         view! {
             <div class="col-xl-12 col-xxl-6">
-                <div class="card">
+                <div class="card card-body-scrollable card-body-scrollable-shadow">
                     <div class="card-header m-0">
                         <span class="text-secondary icon-lg me-2 mt-1">
                             <svg
@@ -376,7 +376,7 @@ pub fn ObjectOverview() -> impl IntoView {
                             Labels
                         </h3>
                     </div>
-                    <div class="card-table table-responsive ">
+                    <div class="card-table table-responsive">
                         <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
@@ -472,7 +472,7 @@ pub fn ObjectOverview() -> impl IntoView {
 
         view! {
             <div class="col-xl-12 col-xxl-6">
-                <div class="card">
+                <div class="card card-body-scrollable card-body-scrollable-shadow">
                     <div class="card-header m-0">
                         <span class="text-secondary icon-lg me-2 mt-1">
                             <svg
@@ -548,7 +548,7 @@ pub fn ObjectOverview() -> impl IntoView {
                             Internal relations
                         </h3>
                     </div>
-                    <div class="card-table table-responsive ">
+                    <div class="card-table table-responsive">
                         <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>

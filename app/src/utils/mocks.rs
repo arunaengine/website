@@ -52,6 +52,240 @@ pub fn get_demo_data() -> Vec<Resource> {
                     relation: Some(
                         aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
                             InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
+                                resource_id: "01H93HDRV1ZAJH8AT880CH8C0R".to_string(),
+                                resource_variant: 2,
+                                defined_variant: 1,
+                                custom_variant: None,
+                                direction: 2,
+                            },
+                        ),
+                    ),
+                },
+                Relation {
+                    relation: Some(
+                        aruna_rust_api::api::storage::models::v2::relation::Relation::Internal(
+                            InternalRelation {
                                 resource_id: "01H992S0HP3JPMJQK86593F16T".to_string(),
                                 resource_variant: 1,
                                 defined_variant: 2,
