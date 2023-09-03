@@ -26,11 +26,11 @@ pub fn MainBody() -> impl IntoView {
                 </div>
                 <h1 class="fw-bold hook pb-2">{"Your geo-redundant scientific data mesh"}</h1>
                 <div class="col-lg-10 mx-auto">
-                    <p class="mb-4 lead">
+                    <h3 class="lead mb-4">
                         {"Fast, secure, geo-redundant data storage with sophisticated metadata management according to "}
                         <a href="https://www.go-fair.org/fair-principles/">{"FAIR"}</a>
                         {" principles. Store and organize your data in new ways, share it with your colleagues and partners. Transparent data management made easy."}
-                    </p>
+                    </h3>
                     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
                         <button
                             type="button"
@@ -294,7 +294,7 @@ pub fn MainBody() -> impl IntoView {
                         </div>
 
                         <div
-                            class="align-self-center d-inline-flex col-lg-4 border-opacity-50 mt-2"
+                            class="align-self-center d-inline-flex d-none d-lg-block col-lg-4 border-opacity-50 mt-2"
                             style="border: 1px dashed #999; padding: 15px;"
                         >
                             <img

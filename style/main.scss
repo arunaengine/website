@@ -306,7 +306,6 @@ body {
 }
 
 .tag {
-	background: var(--tblr-body-bg);
 	margin-right: 8px;
 	margin-bottom: .5em;
 	border-radius: 8px;
@@ -321,8 +320,8 @@ body {
 
 
 .value {
-	--tblr-status-color: #17a2b8;
-	--tblr-status-color-rgb: 23,162,184;
+	--tblr-status-color: #0054a6;
+	--tblr-status-color-rgb: 0,84,166;
 	color: var(--tblr-status-color);
 	border-radius: 0 8px 8px 0;
 	margin-right: -8px;
