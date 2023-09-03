@@ -3,6 +3,7 @@ pub mod activate_modal;
 pub mod add_user;
 pub mod admin;
 pub mod alert_modal;
+pub mod create_object;
 pub mod create_project;
 pub mod create_token;
 pub mod footer;

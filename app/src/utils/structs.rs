@@ -319,26 +319,26 @@ impl WebKV {
             <tr>
                 <td class="text-start">
                     <A
-                    href=format!("/search?filter_key={}&filter_value={}", key.clone(), value.clone())
-                    exact=true
-                    class=""
-                >
-                    <div>
-                        { key_2 }
-                    </div>
-                </A>
+                        href=format!(
+                            "/search?filter_key={}&filter_value={}", key.clone(), value.clone()
+                        )
+                        exact=true
+                        class=""
+                    >
+                        <div>{key_2}</div>
+                    </A>
 
                 </td>
 
                 <td>
                     <A
-                    href=format!("/search?filter_key={}&filter_value={}", key.clone(), value.clone())
-                    exact=true
-                    class=""
+                        href=format!(
+                            "/search?filter_key={}&filter_value={}", key.clone(), value.clone()
+                        )
+                        exact=true
+                        class=""
                     >
-                        <div>
-                            { value.clone() }
-                        </div>
+                        <div>{value.clone()}</div>
                     </A>
                 </td>
 
@@ -430,8 +430,8 @@ impl WebRelation {
                                 class=""
                             >
                                 <div>
-                                    { r.get_inbound_icon() }
-                                    <span class="ms-2">{ r.target.to_string() }</span>
+                                    {r.get_inbound_icon()}
+                                    <span class="ms-2">{r.target.to_string()}</span>
                                 </div>
                             </A>
                         </td>
@@ -496,7 +496,18 @@ impl RelationVariant {
     pub fn get_inbound_icon(&self) -> impl IntoView {
         if !self.inbound {
             view! {
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-big-right-lines" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="icon icon-tabler icon-tabler-arrow-big-right-lines"
+                    width="40"
+                    height="40"
+                    viewBox="0 0 24 24"
+                    stroke-width="2"
+                    stroke="currentColor"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                     <path d="M12 9v-3.586a1 1 0 0 1 1.707 -.707l6.586 6.586a1 1 0 0 1 0 1.414l-6.586 6.586a1 1 0 0 1 -1.707 -.707v-3.586h-3v-6h3z"></path>
                     <path d="M3 9v6"></path>
@@ -505,7 +516,18 @@ impl RelationVariant {
             }
         } else {
             view! {
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-big-left-lines" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="icon icon-tabler icon-tabler-arrow-big-left-lines"
+                    width="40"
+                    height="40"
+                    viewBox="0 0 24 24"
+                    stroke-width="2"
+                    stroke="currentColor"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                     <path d="M12 15v3.586a1 1 0 0 1 -1.707 .707l-6.586 -6.586a1 1 0 0 1 0 -1.414l6.586 -6.586a1 1 0 0 1 1.707 .707v3.586h3v6h-3z"></path>
                     <path d="M21 15v-6"></path>
@@ -883,39 +905,19 @@ impl SearchResultEntry {
     pub fn get_data_class_badge(&self) -> impl IntoView {
         match self.data_class.as_str() {
             "Public" => {
-                view! {
-                    <span class="badge badge-outline text-green">
-                        {self.data_class.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-green">{self.data_class.to_string()}</span> }
             }
             "Private" => {
-                view! {
-                    <span class="badge badge-outline text-orange">
-                        {self.data_class.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-orange">{self.data_class.to_string()}</span> }
             }
             "Workspace" => {
-                view! {
-                    <span class="badge badge-outline text-cyan">
-                        {self.data_class.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-cyan">{self.data_class.to_string()}</span> }
             }
             "Confidential" => {
-                view! {
-                    <span class="badge badge-outline text-red">
-                        {self.data_class.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-red">{self.data_class.to_string()}</span> }
             }
             _ => {
-                view! {
-                    <span class="badge badge-outline text-red">
-                        {self.data_class.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-red">{self.data_class.to_string()}</span> }
             }
         }
     }
@@ -923,39 +925,19 @@ impl SearchResultEntry {
     pub fn get_type_badge(&self) -> impl IntoView {
         match self.variant.as_str() {
             "Project" => {
-                view! {
-                    <span class="badge badge-outline text-blue">
-                        {self.variant.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-blue">{self.variant.to_string()}</span> }
             }
             "Collection" => {
-                view! {
-                    <span class="badge badge-outline text-orange">
-                        {self.variant.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-orange">{self.variant.to_string()}</span> }
             }
             "Dataset" => {
-                view! {
-                    <span class="badge badge-outline text-cyan">
-                        {self.variant.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-cyan">{self.variant.to_string()}</span> }
             }
             "Object" => {
-                view! {
-                    <span class="badge badge-outline text-blue">
-                        {self.variant.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-blue">{self.variant.to_string()}</span> }
             }
             _ => {
-                view! {
-                    <span class="badge badge-outline text-blue">
-                        {self.variant.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-blue">{self.variant.to_string()}</span> }
             }
         }
     }
@@ -963,25 +945,13 @@ impl SearchResultEntry {
     pub fn get_status_badge(&self) -> impl IntoView {
         match self.object_status.as_str() {
             "Available" => {
-                view! {
-                    <span class="badge badge-outline text-green">
-                        {self.object_status.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-green">{self.object_status.to_string()}</span> }
             }
             "Error" => {
-                view! {
-                    <span class="badge badge-outline text-red">
-                        {self.object_status.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-red">{self.object_status.to_string()}</span> }
             }
             _ => {
-                view! {
-                    <span class="badge badge-outline text-blue">
-                        {self.object_status.to_string()}
-                    </span>
-                }
+                view! { <span class="badge badge-outline text-blue">{self.object_status.to_string()}</span> }
             }
         }
     }

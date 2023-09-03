@@ -365,7 +365,6 @@ pub fn CreateToken(
                             {move || {
                                 if needs_custom_date() {
                                     view! {
-                                        ,
                                         <div class="form-floating mb-3">
                                             <input
                                                 type="date"

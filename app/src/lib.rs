@@ -12,6 +12,7 @@ pub fn EntryPoint() -> impl IntoView {
     provide_meta_context();
 
     use crate::components::about::*;
+    use crate::components::create_object::*;
     use crate::components::footer::*;
     use crate::components::header::*;
     use crate::components::imprint::*;
@@ -80,6 +81,7 @@ pub fn EntryPoint() -> impl IntoView {
                         <Route path="imprint" view=move || view! { <Imprint/> }/>
                         <Route path="search" view=move || view! { <Search/> }/>
                         <Route path="tos" view=move || view! { <Tos/> }/>
+                        <Route path="objects/create" view=move || view! { <CreateObjectPage/> }/>
                         <Route path="objects/:id" view=move || view! { <ObjectOverview/> }/>
                         <Panel/>
                         <Route

@@ -81,11 +81,14 @@ pub fn ErrorTemplate(
                                         "Oops… You just found an error page"
                                     </p>
                                     <p class="empty-subtitle text-secondary">
-                                          We are sorry but something went wrong:
+                                          We are sorry but something went wron
                                         {error_string.to_string()}
                                     </p>
                                     <div class="empty-action">
-                                        <a class="btn btn-primary" onclick="window.location.reload(history.back());">
+                                        <a
+                                            class="btn btn-primary"
+                                            onclick="window.location.reload(history.back());"
+                                        >
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 class="icon"
@@ -103,7 +106,7 @@ pub fn ErrorTemplate(
                                                 <path d="M5 12l6 6"></path>
                                                 <path d="M5 12l6 -6"></path>
                                             </svg>
-                                              Take me home
+                                              Take me ho
                                         </a>
                                     </div>
                                 </div>

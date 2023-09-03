@@ -403,7 +403,6 @@ pub fn ObjectOverview() -> impl IntoView {
                     </div>
                 </div>
             </div>
-
         }
     };
     let hooks = move || {
@@ -535,9 +534,6 @@ pub fn ObjectOverview() -> impl IntoView {
                     </div>
                 </div>
             </div>
-
-
-
         }
     };
 
@@ -747,26 +743,20 @@ pub fn ObjectOverview() -> impl IntoView {
     let top_tags = move || {
         view! {
             <div class="row">
-            <div class="col-auto">
-                {entry().get_type_badge()}
+                <div class="col-auto">{entry().get_type_badge()}</div>
+                <div class="col-auto">{entry().get_data_class_badge()}</div>
+                <div class="col-auto">{entry().get_status_badge()}</div>
+                <div class="col-auto">
+                    <span class="badge badge-outline text-primary">
+                        CC-BY-SA 4.0
+                    </span>
+                </div>
+                <div class="col-auto">
+                    <span class="badge badge-outline text-orange">
+                        WRITE
+                    </span>
+                </div>
             </div>
-            <div class="col-auto">
-                {entry().get_data_class_badge()}
-            </div>
-            <div class="col-auto">
-                {entry().get_status_badge()}
-            </div>
-            <div class="col-auto">
-                <span class="badge badge-outline text-primary">
-                    CC-BY-SA 4.0
-                </span>
-            </div>
-            <div class="col-auto">
-                <span class="badge badge-outline text-orange">
-                    WRITE
-                </span>
-            </div>
-        </div>
         }
     };
 
@@ -775,7 +765,7 @@ pub fn ObjectOverview() -> impl IntoView {
             <div class="row row-deck row-cards">
                 {small_card(("ID".to_string(), id(), Colors::Primary, Some(Colors::Primary)))}
                 {small_card(("Name".to_string(), _name(), Colors::Primary, Some(Colors::Primary)))}
-                {stats_card(entry().stats)} {full_card(entry().description)} {labels}{hooks}
+                {stats_card(entry().stats)} {full_card(entry().description)} {labels} {hooks}
                 {ext_relations} {int_relations} {endpoints}
             </div>
         }
