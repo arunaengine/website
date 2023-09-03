@@ -149,13 +149,13 @@ pub fn MainBody() -> impl IntoView {
                                 class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 mb-2"
                                 style="border: 1px dashed #999"
                             >
-                                <div class="text-body-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0 me-3">
+                                <div class="text-body-emphasis d-inline-flex align-self-center flex-shrink-0 me-3">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         width="48"
                                         height="48"
                                         fill="#888"
-                                        class="bi bi-database mx-auto my-auto"
+                                        class="bi bi-database m-auto"
                                         viewBox="0 0 16 16"
                                     >
                                         <path d="M4.318 2.687C5.234 2.271 6.536 2 8 2s2.766.27 3.682.687C12.644 3.125 13 3.627 13 4c0 .374-.356.875-1.318 1.313C10.766 5.729 9.464 6 8 6s-2.766-.27-3.682-.687C3.356 4.875 3 4.373 3 4c0-.374.356-.875 1.318-1.313ZM13 5.698V7c0 .374-.356.875-1.318 1.313C10.766 8.729 9.464 9 8 9s-2.766-.27-3.682-.687C3.356 7.875 3 7.373 3 7V5.698c.271.202.58.378.904.525C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777A4.92 4.92 0 0 0 13 5.698ZM14 4c0-1.007-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1s-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4v9c0 1.007.875 1.755 1.904 2.223C4.978 15.71 6.427 16 8 16s3.022-.289 4.096-.777C13.125 14.755 14 14.007 14 13V4Zm-1 4.698V10c0 .374-.356.875-1.318 1.313C10.766 11.729 9.464 12 8 12s-2.766-.27-3.682-.687C3.356 10.875 3 10.373 3 10V8.698c.271.202.58.378.904.525C4.978 9.71 6.427 10 8 10s3.022-.289 4.096-.777A4.92 4.92 0 0 0 13 8.698Zm0 3V13c0 .374-.356.875-1.318 1.313C10.766 14.729 9.464 15 8 15s-2.766-.27-3.682-.687C3.356 13.875 3 13.373 3 13v-1.302c.271.202.58.378.904.525C4.978 12.71 6.427 13 8 13s3.022-.289 4.096-.777c.324-.147.633-.323.904-.525Z"></path>
@@ -164,7 +164,7 @@ pub fn MainBody() -> impl IntoView {
                                 <div>
                                     <h3 class="fw-bold mb-0 mt-1">{"Data storage"}</h3>
                                     <p class="text-muted mb-1">
-                                        {"Easily store large volumes of arbitrary data."}
+                                        {"Store data of any size, use our managed service or participate via a self-hosted proxy instance"}
                                     </p>
                                 </div>
                             </div>
@@ -173,13 +173,13 @@ pub fn MainBody() -> impl IntoView {
                                 class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 my-2"
                                 style="border: 1px dashed #999"
                             >
-                                <div class="text-body-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0 me-3">
+                                <div class="text-body-emphasis d-inline-flex align-self-center flex-shrink-0 me-3">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         width="48"
                                         height="48"
                                         fill="#888"
-                                        class="bi bi-file-earmark-medical mx-auto my-auto"
+                                        class="bi bi-file-earmark-medical m-auto"
                                         viewBox="0 0 16 16"
                                     >
                                         <path d="M7.5 5.5a.5.5 0 0 0-1 0v.634l-.549-.317a.5.5 0 1 0-.5.866L6 7l-.549.317a.5.5 0 1 0 .5.866l.549-.317V8.5a.5.5 0 1 0 1 0v-.634l.549.317a.5.5 0 1 0 .5-.866L8 7l.549-.317a.5.5 0 1 0-.5-.866l-.549.317V5.5zm-2 4.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zm0 2a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5z"></path>
@@ -189,7 +189,7 @@ pub fn MainBody() -> impl IntoView {
                                 <div>
                                     <h3 class="fw-bold mb-0 mt-1">{"Metadata enrichment"}</h3>
                                     <p class="text-muted mb-1">
-                                        {"Enrich and group a user's data and metadata together for easier access and better organization."}
+                                        {"Enrich, group and organize data and metadata, thanks to a flexible and powerful multi-standard metadata management system."}
                                     </p>
                                 </div>
                             </div>
@@ -198,32 +198,7 @@ pub fn MainBody() -> impl IntoView {
                                 class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 my-2"
                                 style="border: 1px dashed #999"
                             >
-                                <div class="text-body-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0 me-3">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="48"
-                                        height="48"
-                                        fill="#888"
-                                        class="bi bi-shield-lock mx-auto my-auto"
-                                        viewBox="0 0 16 16"
-                                    >
-                                        <path d="M5.338 1.59a61.44 61.44 0 0 0-2.837.856.481.481 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.725 10.725 0 0 0 2.287 2.233c.346.244.652.42.893.533.12.057.218.095.293.118a.55.55 0 0 0 .101.025.615.615 0 0 0 .1-.025c.076-.023.174-.061.294-.118.24-.113.547-.29.893-.533a10.726 10.726 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.524zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.775 11.775 0 0 1-2.517 2.453 7.159 7.159 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7.158 7.158 0 0 1-1.048-.625 11.777 11.777 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 62.456 62.456 0 0 1 5.072.56z"></path>
-                                        <path d="M9.5 6.5a1.5 1.5 0 0 1-1 1.415l.385 1.99a.5.5 0 0 1-.491.595h-.788a.5.5 0 0 1-.49-.595l.384-1.99a1.5 1.5 0 1 1 2-1.415z"></path>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 class="fw-bold mb-0 mt-1">{"Secure Storage"}</h3>
-                                    <p class="text-muted mb-1">
-                                        {"Secure data storage from the moment of upload."}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div
-                                class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 my-2"
-                                style="border: 1px dashed #999"
-                            >
-                                <div class="text-body-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0 me-3">
+                                <div class="text-body-emphasis d-inline-flex align-self-center flex-shrink-0 me-3">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         width="48"
@@ -238,7 +213,7 @@ pub fn MainBody() -> impl IntoView {
                                 <div>
                                     <h3 class="fw-bold mb-0 mt-1">{"FAIR"}</h3>
                                     <p class="text-muted mb-1">
-                                        {"All data is managed according to the FAIR principles."}
+                                        {"All data is treated similar to FAIR Digital objects, with a globally unique persistent identifier for each resource."}
                                     </p>
                                 </div>
                             </div>
@@ -247,7 +222,7 @@ pub fn MainBody() -> impl IntoView {
                                 class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 my-2"
                                 style="border: 1px dashed #999"
                             >
-                                <div class="text-body-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0 me-3">
+                                <div class="text-body-emphasis d-inline-flex align-self-center flex-shrink-0 me-3">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         width="48"
@@ -262,7 +237,7 @@ pub fn MainBody() -> impl IntoView {
                                 <div>
                                     <h3 class="fw-bold mb-0 mt-1">{"Easy Sharing"}</h3>
                                     <p class="text-muted mb-1">
-                                        {"Flexible data sharing made easy with flexible presigned URLs."}
+                                        {"Flexible data sharing via the widely accepted S3 compatible interface, including pre-authenticated up- and download URLs."}
                                     </p>
                                 </div>
                             </div>
@@ -271,7 +246,7 @@ pub fn MainBody() -> impl IntoView {
                                 class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 mt-2"
                                 style="border: 1px dashed #999"
                             >
-                                <div class="text-body-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0 me-3">
+                                <div class="text-body-emphasis d-inline-flex align-self-center flex-shrink-0 me-3">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         width="48"
@@ -288,17 +263,42 @@ pub fn MainBody() -> impl IntoView {
                                 <div>
                                     <h3 class="fw-bold mb-0 mt-1">{"Effortless Migration"}</h3>
                                     <p class="text-muted">
-                                        {"Effortless migration from AWS thanks to S3 compatible interface."}
+                                        {"Existing storage systems can be easily ingested into the system, without the need to move the data at all."}
                                     </p>
                                 </div>
                             </div>
+                            <div
+                            class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 my-2"
+                            style="border: 1px dashed #999"
+                        >
+                            <div class="text-body-emphasis d-inline-flex align-self-center flex-shrink-0 me-3">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="48"
+                                    height="48"
+                                    fill="#888"
+                                    class="bi bi-shield-lock m-auto"
+                                    viewBox="0 0 16 16"
+                                >
+                                    <path d="M5.338 1.59a61.44 61.44 0 0 0-2.837.856.481.481 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.725 10.725 0 0 0 2.287 2.233c.346.244.652.42.893.533.12.057.218.095.293.118a.55.55 0 0 0 .101.025.615.615 0 0 0 .1-.025c.076-.023.174-.061.294-.118.24-.113.547-.29.893-.533a10.726 10.726 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.524zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.775 11.775 0 0 1-2.517 2.453 7.159 7.159 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7.158 7.158 0 0 1-1.048-.625 11.777 11.777 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 62.456 62.456 0 0 1 5.072.56z"></path>
+                                    <path d="M9.5 6.5a1.5 1.5 0 0 1-1 1.415l.385 1.99a.5.5 0 0 1-.491.595h-.788a.5.5 0 0 1-.49-.595l.384-1.99a1.5 1.5 0 1 1 2-1.415z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="fw-bold mb-0 mt-1">{"Secure Storage"}</h3>
+                                <p class="text-muted mb-1">
+                                    {"Secure managed data storage with advanced encryption from the moment of upload."}
+                                </p>
+                            </div>
                         </div>
+                        </div>
+
                         <div
-                            class="col-lg-4 border-opacity-50"
+                            class="align-self-center d-inline-flex col-lg-4 border-opacity-50 mt-2"
                             style="border: 1px dashed #999; padding: 15px;"
                         >
                             <img
-                                src="/concept_aruna.png"
+                                src="/aruna_components.svg"
                                 class="img-fluid my-auto"
                                 alt="ConceptAruna"
                             />
@@ -584,7 +584,7 @@ pub fn MainBody() -> impl IntoView {
                                     <div class="accordion-item">
                                         <div class="accordion-header" role="tab">
                                             <button
-                                                class="accordion-button"
+                                                class="accordion-button collapsed"
                                                 data-bs-toggle="collapse"
                                                 data-bs-target="#faq-2-5"
                                             >
@@ -593,7 +593,7 @@ pub fn MainBody() -> impl IntoView {
                                         </div>
                                         <div
                                             id="faq-2-5"
-                                            class="accordion-collapse collapse show"
+                                            class="accordion-collapse collapse"
                                             role="tabpanel"
                                             data-bs-parent="#faq-2"
                                         >
@@ -609,18 +609,18 @@ pub fn MainBody() -> impl IntoView {
                                     <div class="accordion-item">
                                         <div class="accordion-header" role="tab">
                                             <button
-                                                class="accordion-button"
+                                                class="accordion-button collapsed"
                                                 data-bs-toggle="collapse"
-                                                data-bs-target="#faq-4-1"
+                                                data-bs-target="#faq-2-6"
                                             >
                                                 {"Is my data secure?"}
                                             </button>
                                         </div>
                                         <div
-                                            id="faq-4-1"
-                                            class="accordion-collapse collapse show"
+                                            id="faq-2-6"
+                                            class="accordion-collapse collapse"
                                             role="tabpanel"
-                                            data-bs-parent="#faq-4"
+                                            data-bs-parent="#faq-2"
                                         >
                                             <div class="accordion-body pt-0">
                                                 <div>
@@ -710,7 +710,7 @@ pub fn MainBody() -> impl IntoView {
             <div class="top">
                 <div class="wave"></div>
                 <div class="wave"></div>
-                <div class="wave"></div>
+                //<div class="wave"></div>
                 <div class="ocean"></div>
 
                 {(1..=12)

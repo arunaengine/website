@@ -337,7 +337,7 @@ pub fn ObjectOverview() -> impl IntoView {
         (a, b)
     };
 
-    let labels = move || {
+    let get_labels = move || {
         let (a, b): (Vec<_>, Vec<_>) = entry()
             .key_values
             .clone()
@@ -346,8 +346,8 @@ pub fn ObjectOverview() -> impl IntoView {
         (a, b)
     };
 
-    let labels_hooks = move || {
-        let (external, internal) = labels();
+    let labels = move || {
+        let (hooks, _) = get_labels();
 
         view! {
             <div class="col-xl-12 col-xxl-6">
@@ -393,8 +393,8 @@ pub fn ObjectOverview() -> impl IntoView {
                             </thead>
                             <tbody>
                                 <For
-                                    each=move || external.clone().into_iter().enumerate()
-                                    key=|(id, _)| format!("external_{}", * id)
+                                    each=move || hooks.clone().into_iter().enumerate()
+                                    key=|(id, _)| format!("hooks_{}", * id)
                                     view=move |(_, rel)| { rel.into_table_view() }
                                 />
 
@@ -403,6 +403,13 @@ pub fn ObjectOverview() -> impl IntoView {
                     </div>
                 </div>
             </div>
+
+        }
+    };
+    let hooks = move || {
+        let (_, label) = get_labels();
+
+        view! {
             <div class="col-xl-12 col-xxl-6">
                 <div class="card">
                     <div class="card-header m-0">
@@ -446,8 +453,8 @@ pub fn ObjectOverview() -> impl IntoView {
                             </thead>
                             <tbody>
                                 <For
-                                    each=move || internal.clone().into_iter().enumerate()
-                                    key=|(id, _)| format!("internal_{}", * id)
+                                    each=move || label.clone().into_iter().enumerate()
+                                    key=|(id, _)| format!("label_{}", * id)
                                     view=move |(_, rel)| { rel.into_table_view() }
                                 />
 
@@ -459,6 +466,13 @@ pub fn ObjectOverview() -> impl IntoView {
         }
     };
 
+    //
+    //
+    //
+    //
+    //
+    //
+    //
     let splitted_relations = move || {
         let (ext, int) = relations();
 
@@ -467,8 +481,8 @@ pub fn ObjectOverview() -> impl IntoView {
         (ext, inc, out)
     };
 
-    let relations = move || {
-        let (external, internal_inc, internal_ext) = splitted_relations();
+    let ext_relations = move || {
+        let (external, _, _) = splitted_relations();
 
         view! {
             <div class="col-xl-12 col-xxl-6">
@@ -521,6 +535,16 @@ pub fn ObjectOverview() -> impl IntoView {
                     </div>
                 </div>
             </div>
+
+
+
+        }
+    };
+
+    let int_relations = move || {
+        let (_, internal_inc, internal_ext) = splitted_relations();
+
+        view! {
             <div class="col-xl-12 col-xxl-6">
                 <div class="card">
                     <div class="card-header m-0">
@@ -720,13 +744,39 @@ pub fn ObjectOverview() -> impl IntoView {
         }
     };
 
+    let top_tags = move || {
+        view! {
+            <div class="row">
+            <div class="col-auto">
+                {entry().get_type_badge()}
+            </div>
+            <div class="col-auto">
+                {entry().get_data_class_badge()}
+            </div>
+            <div class="col-auto">
+                {entry().get_status_badge()}
+            </div>
+            <div class="col-auto">
+                <span class="badge badge-outline text-primary">
+                    CC-BY-SA 4.0
+                </span>
+            </div>
+            <div class="col-auto">
+                <span class="badge badge-outline text-orange">
+                    WRITE
+                </span>
+            </div>
+        </div>
+        }
+    };
+
     let card_deck = move || {
         view! {
             <div class="row row-deck row-cards">
                 {small_card(("ID".to_string(), id(), Colors::Primary, Some(Colors::Primary)))}
                 {small_card(("Name".to_string(), _name(), Colors::Primary, Some(Colors::Primary)))}
-                {stats_card(entry().stats)} {full_card(entry().description)} {labels_hooks}
-                {relations} {endpoints}
+                {stats_card(entry().stats)} {full_card(entry().description)} {labels}{hooks}
+                {ext_relations} {int_relations} {endpoints}
             </div>
         }
     };
@@ -735,35 +785,7 @@ pub fn ObjectOverview() -> impl IntoView {
         <div class="page-wrapper d-print-none">
             <div class="page-header">{header}</div>
             <div class="page-body mt-2">
-                <div class="container-xl mb-2">
-                    <div class="row">
-                        <div class="col-auto">
-                            <span class="badge badge-outline text-blue">
-                                PROJECT
-                            </span>
-                        </div>
-                        <div class="col-auto">
-                            <span class="badge badge-outline text-green">
-                                PUBLIC
-                            </span>
-                        </div>
-                        <div class="col-auto">
-                            <span class="badge badge-outline text-green">
-                                AVAILABLE
-                            </span>
-                        </div>
-                        <div class="col-auto">
-                            <span class="badge badge-outline text-primary">
-                                CC-BY-SA
-                            </span>
-                        </div>
-                        <div class="col-auto">
-                            <span class="badge badge-outline text-orange">
-                                WRITE
-                            </span>
-                        </div>
-                    </div>
-                </div>
+                <div class="container-xl mb-2">{top_tags}</div>
                 <div class="container-xl">{card_deck}</div>
             </div>
         </div>

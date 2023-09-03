@@ -11,7 +11,7 @@ pub fn Footer() -> impl IntoView {
 
             <a
                 href="https://tabler.io/"
-                class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-dark text-decoration-none"
+                class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-dark text-muted"
             >
                 "Built with tabler.io"
             </a>

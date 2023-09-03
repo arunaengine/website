@@ -1,7 +1,7 @@
 use aruna_rust_api::api::storage::models::v2::{
     generic_resource, relation, Collection, Dataset, ExternalRelation, ExternalRelationVariant,
     InternalRelation, InternalRelationVariant, KeyValue, Object, Project, Relation,
-    RelationDirection, Stats,
+    RelationDirection, Stats, Status,
 };
 //use anyhow::anyhow;
 // use aruna_rust_api::api::storage::{
@@ -248,6 +248,7 @@ pub struct SearchResultEntry {
     pub data_class: String,
     pub created_at: String,
     pub relations: Vec<WebRelation>,
+    pub object_status: String,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -310,14 +311,39 @@ impl WebKV {
     }
 
     pub fn into_table_view(self) -> impl IntoView {
+        let WebKV {
+            key, value, status, ..
+        } = self.clone();
+        let key_2 = key.clone();
         view! {
             <tr>
-                <td class="text-start">{self.get_key()}</td>
+                <td class="text-start">
+                    <A
+                    href=format!("/search?filter_key={}&filter_value={}", key.clone(), value.clone())
+                    exact=true
+                    class=""
+                >
+                    <div>
+                        { key_2 }
+                    </div>
+                </A>
 
-                <td>{self.get_value()}</td>
+                </td>
+
+                <td>
+                    <A
+                    href=format!("/search?filter_key={}&filter_value={}", key.clone(), value.clone())
+                    exact=true
+                    class=""
+                    >
+                        <div>
+                            { value.clone() }
+                        </div>
+                    </A>
+                </td>
 
                 <td class="align-self-end p-1">
-                    {if self.is_static() && self.status == 3 {
+                    {if self.is_static() && status == 3 {
                         view! {
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -336,14 +362,14 @@ impl WebKV {
                             </svg>
                         }
                             .into_view()
-                    } else if self.status == 1 {
+                    } else if status == 1 {
                         view! {
                             <span class="status status-green">
                                 Running
                             </span>
                         }
                             .into_view()
-                    } else if self.status == 2 {
+                    } else if status == 2 {
                         view! {
                             <span class="status status-red">
                                 Error
@@ -699,6 +725,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
                 relations: from_relation_vec(relations),
+                object_status: "Available".to_string(),
             },
             generic_resource::Resource::Collection(Collection {
                 id,
@@ -723,6 +750,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
                 relations: from_relation_vec(relations),
+                object_status: "Available".to_string(),
             },
             generic_resource::Resource::Dataset(Dataset {
                 id,
@@ -747,6 +775,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
                 relations: from_relation_vec(relations),
+                object_status: "Available".to_string(),
             },
             generic_resource::Resource::Object(Object {
                 id,
@@ -757,6 +786,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 data_class,
                 created_at,
                 relations,
+                status,
                 ..
             }) => SearchResultEntry {
                 id: id.to_string(),
@@ -771,6 +801,9 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
                 relations: from_relation_vec(relations),
+                object_status: Status::from_i32(status)
+                    .map(|s| format!("{:?}", s))
+                    .unwrap_or_else(|| "Unknown".to_string()),
             },
         }
     }
@@ -790,7 +823,7 @@ impl SearchResultEntry {
     pub fn get_ribbon(&self) -> impl IntoView {
         match self.variant.as_str() {
             "Project" => view! {
-                <div class="ribbon bg-red">
+                <div class="ribbon bg-blue">
                     Project
                 </div>
             },
@@ -800,12 +833,12 @@ impl SearchResultEntry {
                 </div>
             },
             "Dataset" => view! {
-                <div class="ribbon bg-green">
+                <div class="ribbon bg-cyan">
                     Dataset
                 </div>
             },
             "Object" => view! {
-                <div class="ribbon">
+                <div class="ribbon bg-green">
                     Object
                 </div>
             },
@@ -844,6 +877,112 @@ impl SearchResultEntry {
                     Unknown
                 </span>
             },
+        }
+    }
+
+    pub fn get_data_class_badge(&self) -> impl IntoView {
+        match self.data_class.as_str() {
+            "Public" => {
+                view! {
+                    <span class="badge badge-outline text-green">
+                        {self.data_class.to_string()}
+                    </span>
+                }
+            }
+            "Private" => {
+                view! {
+                    <span class="badge badge-outline text-orange">
+                        {self.data_class.to_string()}
+                    </span>
+                }
+            }
+            "Workspace" => {
+                view! {
+                    <span class="badge badge-outline text-cyan">
+                        {self.data_class.to_string()}
+                    </span>
+                }
+            }
+            "Confidential" => {
+                view! {
+                    <span class="badge badge-outline text-red">
+                        {self.data_class.to_string()}
+                    </span>
+                }
+            }
+            _ => {
+                view! {
+                    <span class="badge badge-outline text-red">
+                        {self.data_class.to_string()}
+                    </span>
+                }
+            }
+        }
+    }
+
+    pub fn get_type_badge(&self) -> impl IntoView {
+        match self.variant.as_str() {
+            "Project" => {
+                view! {
+                    <span class="badge badge-outline text-blue">
+                        {self.variant.to_string()}
+                    </span>
+                }
+            }
+            "Collection" => {
+                view! {
+                    <span class="badge badge-outline text-orange">
+                        {self.variant.to_string()}
+                    </span>
+                }
+            }
+            "Dataset" => {
+                view! {
+                    <span class="badge badge-outline text-cyan">
+                        {self.variant.to_string()}
+                    </span>
+                }
+            }
+            "Object" => {
+                view! {
+                    <span class="badge badge-outline text-blue">
+                        {self.variant.to_string()}
+                    </span>
+                }
+            }
+            _ => {
+                view! {
+                    <span class="badge badge-outline text-blue">
+                        {self.variant.to_string()}
+                    </span>
+                }
+            }
+        }
+    }
+
+    pub fn get_status_badge(&self) -> impl IntoView {
+        match self.object_status.as_str() {
+            "Available" => {
+                view! {
+                    <span class="badge badge-outline text-green">
+                        {self.object_status.to_string()}
+                    </span>
+                }
+            }
+            "Error" => {
+                view! {
+                    <span class="badge badge-outline text-red">
+                        {self.object_status.to_string()}
+                    </span>
+                }
+            }
+            _ => {
+                view! {
+                    <span class="badge badge-outline text-blue">
+                        {self.object_status.to_string()}
+                    </span>
+                }
+            }
         }
     }
 
