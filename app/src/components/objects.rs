@@ -43,16 +43,27 @@ pub fn ObjectOverview() -> impl IntoView {
                         <div class="btn-list">
 
                             <a
-                            href="#"
-                            class="btn btn-green d-none d-sm-inline-block"
-                            data-bs-toggle="modal"
-                            data-bs-target="#modal-report"
+                                href="#"
+                                class="btn btn-green d-none d-sm-inline-block"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modal-report"
                             >
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-pencil" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                        <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path>
-                                        <path d="M13.5 6.5l4 4"></path>
-                                    </svg>
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="icon icon-tabler icon-tabler-pencil"
+                                    width="40"
+                                    height="40"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="2"
+                                    stroke="currentColor"
+                                    fill="none"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path>
+                                    <path d="M13.5 6.5l4 4"></path>
+                                </svg>
                                 Edit
                             </a>
                             <a
@@ -280,7 +291,18 @@ pub fn ObjectOverview() -> impl IntoView {
                 <div class="card card">
                     <div class="card-header m-0">
                         <span class="text-secondary icon-lg me-2 mt-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-info" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="icon icon-tabler icon-tabler-file-info"
+                                width="40"
+                                height="40"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                 <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
                                 <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
@@ -332,7 +354,18 @@ pub fn ObjectOverview() -> impl IntoView {
                 <div class="card">
                     <div class="card-header m-0">
                         <span class="text-secondary icon-lg me-2 mt-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-tags" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="icon icon-tabler icon-tabler-tags"
+                                width="40"
+                                height="40"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                 <path d="M7.859 6h-2.834a2.025 2.025 0 0 0 -2.025 2.025v2.834c0 .537 .213 1.052 .593 1.432l6.116 6.116a2.025 2.025 0 0 0 2.864 0l2.834 -2.834a2.025 2.025 0 0 0 0 -2.864l-6.117 -6.116a2.025 2.025 0 0 0 -1.431 -.593z"></path>
                                 <path d="M17.573 18.407l2.834 -2.834a2.025 2.025 0 0 0 0 -2.864l-7.117 -7.116"></path>
@@ -359,13 +392,12 @@ pub fn ObjectOverview() -> impl IntoView {
                                 </tr>
                             </thead>
                             <tbody>
-                                    <For
+                                <For
                                     each=move || external.clone().into_iter().enumerate()
-                                    key=|(id, _)| format!("external_{}", *id)
-                                    view=move |(_, rel)| {
-                                        rel.into_table_view()
-                                    }
-                                    />
+                                    key=|(id, _)| format!("external_{}", * id)
+                                    view=move |(_, rel)| { rel.into_table_view() }
+                                />
+
                             </tbody>
                         </table>
                     </div>
@@ -375,7 +407,18 @@ pub fn ObjectOverview() -> impl IntoView {
                 <div class="card">
                     <div class="card-header m-0">
                         <span class="text-secondary icon-lg me-2 mt-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-webhook" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="icon icon-tabler icon-tabler-webhook"
+                                width="40"
+                                height="40"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                 <path d="M4.876 13.61a4 4 0 1 0 6.124 3.39h6"></path>
                                 <path d="M15.066 20.502a4 4 0 1 0 1.934 -7.502c-.706 0 -1.424 .179 -2 .5l-3 -5.5"></path>
@@ -403,12 +446,11 @@ pub fn ObjectOverview() -> impl IntoView {
                             </thead>
                             <tbody>
                                 <For
-                                each=move || internal.clone().into_iter().enumerate()
-                                key=|(id, _)| format!("internal_{}", *id)
-                                view=move |(_, rel)| {
-                                    rel.into_table_view()
-                                }
+                                    each=move || internal.clone().into_iter().enumerate()
+                                    key=|(id, _)| format!("internal_{}", * id)
+                                    view=move |(_, rel)| { rel.into_table_view() }
                                 />
+
                             </tbody>
                         </table>
                     </div>
@@ -468,13 +510,12 @@ pub fn ObjectOverview() -> impl IntoView {
                                 </tr>
                             </thead>
                             <tbody>
-                                    <For
+                                <For
                                     each=move || external.clone().into_iter().enumerate()
-                                    key=|(id, _)| format!("external_{}", *id)
-                                    view=move |(_, rel)| {
-                                        rel.into_table_view()
-                                    }
-                                    />
+                                    key=|(id, _)| format!("external_{}", * id)
+                                    view=move |(_, rel)| { rel.into_table_view() }
+                                />
+
                             </tbody>
                         </table>
                     </div>
@@ -484,7 +525,18 @@ pub fn ObjectOverview() -> impl IntoView {
                 <div class="card">
                     <div class="card-header m-0">
                         <span class="text-secondary icon-lg me-2 mt-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrows-split" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="icon icon-tabler icon-tabler-arrows-split"
+                                width="40"
+                                height="40"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                 <path d="M21 17h-8l-3.5 -5h-6.5"></path>
                                 <path d="M21 7h-8l-3.495 5"></path>
@@ -522,12 +574,11 @@ pub fn ObjectOverview() -> impl IntoView {
 
                             <tbody>
                                 <For
-                                each=move || internal_inc.clone().into_iter().enumerate()
-                                key=|(id, _)| format!("internal_inc_{}", *id)
-                                view=move |(_, rel)| {
-                                    rel.into_table_view()
-                                }
+                                    each=move || internal_inc.clone().into_iter().enumerate()
+                                    key=|(id, _)| format!("internal_inc_{}", * id)
+                                    view=move |(_, rel)| { rel.into_table_view() }
                                 />
+
                             </tbody>
                             <thead>
                                 <tr>
@@ -537,15 +588,14 @@ pub fn ObjectOverview() -> impl IntoView {
                                 </tr>
                             </thead>
                             <tbody>
-                            <For
-                            each=move || internal_ext.clone().into_iter().enumerate()
-                            key=|(id, _)| format!("internal_ext_{}", *id)
-                            view=move |(_, rel)| {
-                                rel.into_table_view()
-                            }
-                            />
-                        </tbody>
-                    </table>
+                                <For
+                                    each=move || internal_ext.clone().into_iter().enumerate()
+                                    key=|(id, _)| format!("internal_ext_{}", * id)
+                                    view=move |(_, rel)| { rel.into_table_view() }
+                                />
+
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -599,7 +649,18 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <tr>
                                     <td class="text-start">
                                         <span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-bucket" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                class="icon icon-tabler icon-tabler-bucket"
+                                                width="40"
+                                                height="40"
+                                                viewBox="0 0 24 24"
+                                                stroke-width="2"
+                                                stroke="currentColor"
+                                                fill="none"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                            >
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                                 <path d="M12 7m-8 0a8 4 0 1 0 16 0a8 4 0 1 0 -16 0"></path>
                                                 <path d="M4 7c0 .664 .088 1.324 .263 1.965l2.737 10.035c.5 1.5 2.239 2 5 2s4.5 -.5 5 -2c.333 -1 1.246 -4.345 2.737 -10.035a7.45 7.45 0 0 0 .263 -1.965"></path>
@@ -610,18 +671,29 @@ pub fn ObjectOverview() -> impl IntoView {
                                         </A>
                                     </td>
                                     <td>
-                                        <A href="">
-                                            "s3://objects/01H93HDRV1ZAJH8AT880CH8C0R"
-                                        </A>
+                                        <A href="">"s3://objects/01H93HDRV1ZAJH8AT880CH8C0R"</A>
                                     </td>
                                     <td>
-                                        <span class="status status-green">Available</span>
+                                        <span class="status status-green">
+                                            Available
+                                        </span>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="text-start">
                                         <span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-bucket" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                class="icon icon-tabler icon-tabler-bucket"
+                                                width="40"
+                                                height="40"
+                                                viewBox="0 0 24 24"
+                                                stroke-width="2"
+                                                stroke="currentColor"
+                                                fill="none"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                            >
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                                 <path d="M12 7m-8 0a8 4 0 1 0 16 0a8 4 0 1 0 -16 0"></path>
                                                 <path d="M4 7c0 .664 .088 1.324 .263 1.965l2.737 10.035c.5 1.5 2.239 2 5 2s4.5 -.5 5 -2c.333 -1 1.246 -4.345 2.737 -10.035a7.45 7.45 0 0 0 .263 -1.965"></path>
@@ -632,12 +704,12 @@ pub fn ObjectOverview() -> impl IntoView {
                                         </A>
                                     </td>
                                     <td>
-                                        <A href="">
-                                            "s3://objects/01H93HDRV1ZAJH8AT880CH8C0R"
-                                        </A>
+                                        <A href="">"s3://objects/01H93HDRV1ZAJH8AT880CH8C0R"</A>
                                     </td>
                                     <td>
-                                        <span class="status status-red">Unavailable</span>
+                                        <span class="status status-red">
+                                            Unavailable
+                                        </span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -651,13 +723,10 @@ pub fn ObjectOverview() -> impl IntoView {
     let card_deck = move || {
         view! {
             <div class="row row-deck row-cards">
-                { small_card(("ID".to_string(), id(), Colors::Primary, Some(Colors::Primary))) }
-                { small_card(("Name".to_string(), _name(), Colors::Primary, Some(Colors::Primary))) }
-                { stats_card(entry().stats) }
-                { full_card(entry().description) }
-                { labels_hooks }
-                { relations }
-                { endpoints }
+                {small_card(("ID".to_string(), id(), Colors::Primary, Some(Colors::Primary)))}
+                {small_card(("Name".to_string(), _name(), Colors::Primary, Some(Colors::Primary)))}
+                {stats_card(entry().stats)} {full_card(entry().description)} {labels_hooks}
+                {relations} {endpoints}
             </div>
         }
     };
@@ -669,19 +738,29 @@ pub fn ObjectOverview() -> impl IntoView {
                 <div class="container-xl mb-2">
                     <div class="row">
                         <div class="col-auto">
-                            <span class="badge badge-outline text-blue">PROJECT</span>
+                            <span class="badge badge-outline text-blue">
+                                PROJECT
+                            </span>
                         </div>
                         <div class="col-auto">
-                            <span class="badge badge-outline text-green">PUBLIC</span>
+                            <span class="badge badge-outline text-green">
+                                PUBLIC
+                            </span>
                         </div>
                         <div class="col-auto">
-                            <span class="badge badge-outline text-green">AVAILABLE</span>
+                            <span class="badge badge-outline text-green">
+                                AVAILABLE
+                            </span>
                         </div>
                         <div class="col-auto">
-                            <span class="badge badge-outline text-primary">CC-BY-SA</span>
+                            <span class="badge badge-outline text-primary">
+                                CC-BY-SA
+                            </span>
                         </div>
                         <div class="col-auto">
-                            <span class="badge badge-outline text-orange">WRITE</span>
+                            <span class="badge badge-outline text-orange">
+                                WRITE
+                            </span>
                         </div>
                     </div>
                 </div>

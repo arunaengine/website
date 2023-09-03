@@ -1,6 +1,7 @@
 use cfg_if::cfg_if;
 use http::status::StatusCode;
 use leptos::*;
+use leptos_meta::*;
 use thiserror::Error;
 
 #[cfg(feature = "ssr")]
@@ -54,8 +55,11 @@ pub fn ErrorTemplate(
     }}
 
     view! {
-        ,
-        <h1>{if errors.len() > 1 { "Errors" } else { "Error" }}</h1>
+        <Stylesheet href="/tabler.min.css"/>
+        <Stylesheet id="leptos" href="/pkg/aruna_web_workspace.css"/>
+        <Script src="/tabler.min.js"/>
+        // sets the document title
+        <Title text="Aruna Object Storage"/>
         <For
             // a function that returns the items we're iterating over; a signal is fine
             each=move || { errors.clone().into_iter().enumerate() }
@@ -66,23 +70,46 @@ pub fn ErrorTemplate(
                 let error_string = error.1.to_string();
                 let error_code = error.1.status_code();
                 view! {
-                    <div class="page page-center">
-                        <div class="container-tight py-4">
-                            <div class="empty">
-                        <div class="empty-header">{error_code.to_string()}</div>
-                        <p class="empty-title">"Oops… You just found an error page"</p>
-                        <p class="empty-subtitle text-secondary">
-                            We are sorry but something went wrong: {error_string.to_string()}
-                        </p>
-                    <div class="empty-action">
-                        <a href="./." class="btn btn-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M5 12l14 0"></path><path d="M5 12l6 6"></path><path d="M5 12l6 -6"></path></svg>
-                        Take me home
-                        </a>
-                    </div>
-                    </div>
-                </div>
-                </div>
+                    <body class=" border-top-wide border-primary d-flex flex-column">
+                        <div class="page page-center">
+                            <div class="container-tight py-4">
+                                <div class="empty">
+                                    <div class="empty-header">
+                                        {error_code.as_u16().to_string()}
+                                    </div>
+                                    <p class="empty-title">
+                                        "Oops… You just found an error page"
+                                    </p>
+                                    <p class="empty-subtitle text-secondary">
+                                          We are sorry but something went wrong:
+                                        {error_string.to_string()}
+                                    </p>
+                                    <div class="empty-action">
+                                        <a class="btn btn-primary" onclick="window.location.reload(history.back());">
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                class="icon"
+                                                width="24"
+                                                height="24"
+                                                viewBox="0 0 24 24"
+                                                stroke-width="2"
+                                                stroke="currentColor"
+                                                fill="none"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                            >
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                <path d="M5 12l14 0"></path>
+                                                <path d="M5 12l6 6"></path>
+                                                <path d="M5 12l6 -6"></path>
+                                            </svg>
+                                              Take me home
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </body>
                 }
             }
         />

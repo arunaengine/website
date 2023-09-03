@@ -335,13 +335,9 @@ pub fn Search() -> impl IntoView {
                             </div>
                             <div class="text-muted mt-2">
                                 E.g:
-                                <b>
-                                    "size > 100"
-                                </b>
+                                <b>"size > 100"</b>
                                 ,
-                                <b>
-                                    "labels.key = akey"
-                                </b>
+                                <b>"labels.key = akey"</b>
                             </div>
                             <div class="text-secondary mt-2 mb-2">
                                 Current available parameters are:
