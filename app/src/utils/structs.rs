@@ -316,7 +316,7 @@ impl WebKV {
 
                 <td>{self.get_value()}</td>
 
-                <td class="align-self-end">
+                <td class="align-self-end p-1">
                     {if self.is_static() && self.status == 3 {
                         view! {
                             <svg
@@ -403,7 +403,10 @@ impl WebRelation {
                                 exact=true
                                 class=""
                             >
-                                {r.target.to_string()}
+                                <div>
+                                    { r.get_inbound_icon() }
+                                    <span class="ms-2">{ r.target.to_string() }</span>
+                                </div>
                             </A>
                         </td>
 
@@ -464,6 +467,28 @@ pub struct RelationVariant {
 }
 
 impl RelationVariant {
+    pub fn get_inbound_icon(&self) -> impl IntoView {
+        if !self.inbound {
+            view! {
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-big-right-lines" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <path d="M12 9v-3.586a1 1 0 0 1 1.707 -.707l6.586 6.586a1 1 0 0 1 0 1.414l-6.586 6.586a1 1 0 0 1 -1.707 -.707v-3.586h-3v-6h3z"></path>
+                    <path d="M3 9v6"></path>
+                    <path d="M6 9v6"></path>
+                </svg>
+            }
+        } else {
+            view! {
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-big-left-lines" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <path d="M12 15v3.586a1 1 0 0 1 -1.707 .707l-6.586 -6.586a1 1 0 0 1 0 -1.414l6.586 -6.586a1 1 0 0 1 1.707 .707v3.586h3v6h-3z"></path>
+                    <path d="M21 15v-6"></path>
+                    <path d="M18 15v-6"></path>
+                </svg>
+            }
+        }
+    }
+
     pub fn get_object_batch(&self) -> impl IntoView {
         match self.target_name.as_str() {
             "Project" => {
