@@ -1,6 +1,6 @@
 use crate::utils::{
     mocks::get_mock_by_id,
-    structs::{SearchResultEntry, VisualizedStats, WebRelation},
+    structs::{SearchResultEntry, VisualizedStats},
     tabler_utils::{add_bg_color, add_text_color, Colors},
 };
 use leptos::*;
@@ -278,13 +278,24 @@ pub fn ObjectOverview() -> impl IntoView {
         view! {
             <div class="col-lg-12 col-sm-12">
                 <div class="card card">
+                    <div class="card-header m-0">
+                        <span class="text-secondary icon-lg me-2 mt-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-info" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                                <path d="M11 14h1v4h1"></path>
+                                <path d="M12 11h.01"></path>
+                            </svg>
+                        </span>
+                        <h3 class="h2 text-secondary mb-0 align-items-top">
+                            Description
+                        </h3>
+                    </div>
                     <div class="card-body">
                         <div class="align-items-center">
                             <div class="col-auto me-6">
                                 <div class="text-start card-text align-items-center">
-                                    <h3 class="h2 text-secondary">
-                                        Description
-                                    </h3>
                                     <div class="text-muted">{description}</div>
                                 </div>
                             </div>
@@ -333,7 +344,7 @@ pub fn ObjectOverview() -> impl IntoView {
                         </h3>
                     </div>
                     <div class="card-table table-responsive ">
-                        <table class="table table-vcenter">
+                        <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
                                     <th class="text-start">
@@ -376,7 +387,7 @@ pub fn ObjectOverview() -> impl IntoView {
                         </h3>
                     </div>
                     <div class="card-table table-responsive ">
-                        <table class="table table-vcenter">
+                        <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
                                     <th class="text-start">
@@ -406,8 +417,16 @@ pub fn ObjectOverview() -> impl IntoView {
         }
     };
 
+    let splitted_relations = move || {
+        let (ext, int) = relations();
+
+        let (inc, out): (Vec<_>, Vec<_>) = int.into_iter().partition(|x| x.is_incoming());
+
+        (ext, inc, out)
+    };
+
     let relations = move || {
-        let (external, internal) = relations();
+        let (external, internal_inc, internal_ext) = splitted_relations();
 
         view! {
             <div class="col-xl-12 col-xxl-6">
@@ -437,7 +456,7 @@ pub fn ObjectOverview() -> impl IntoView {
                         </h3>
                     </div>
                     <div class="card-table table-responsive ">
-                        <table class="table table-vcenter">
+                        <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
                                     <th class="text-start">
@@ -478,14 +497,11 @@ pub fn ObjectOverview() -> impl IntoView {
                         </h3>
                     </div>
                     <div class="card-table table-responsive ">
-                        <table class="table table-vcenter">
+                        <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
                                     <th class="text-start">
                                         ID
-                                    </th>
-                                    <th>
-                                        DIRECTION
                                     </th>
                                     <th>
                                         RESOURCE
@@ -495,16 +511,41 @@ pub fn ObjectOverview() -> impl IntoView {
                                     </th>
                                 </tr>
                             </thead>
+
+                            <thead>
+                                <tr>
+                                    <th colspan="3">
+                                        incoming
+                                    </th>
+                                </tr>
+                            </thead>
+
                             <tbody>
                                 <For
-                                each=move || internal.clone().into_iter().enumerate()
-                                key=|(id, _)| format!("internal_{}", *id)
+                                each=move || internal_inc.clone().into_iter().enumerate()
+                                key=|(id, _)| format!("internal_inc_{}", *id)
                                 view=move |(_, rel)| {
                                     rel.into_table_view()
                                 }
                                 />
                             </tbody>
-                        </table>
+                            <thead>
+                                <tr>
+                                    <th colspan="3">
+                                        outgoing
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <For
+                            each=move || internal_ext.clone().into_iter().enumerate()
+                            key=|(id, _)| format!("internal_ext_{}", *id)
+                            view=move |(_, rel)| {
+                                rel.into_table_view()
+                            }
+                            />
+                        </tbody>
+                    </table>
                     </div>
                 </div>
             </div>
@@ -540,7 +581,7 @@ pub fn ObjectOverview() -> impl IntoView {
                         </h3>
                     </div>
                     <div class="card-table table-responsive ">
-                        <table class="table table-vcenter">
+                        <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
                                     <th class="text-start">

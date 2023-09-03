@@ -59,7 +59,7 @@ pub fn Search() -> impl IntoView {
 
     let (read_range, set_range) = create_signal(1..=5);
 
-    let (results, _set_results) = create_signal::<i32>(1337);
+    let (results, _set_results) = create_signal::<i32>(18838);
     let max_pages = move || (results() / 50) + 1;
     let get_range_iter = {
         move |current: i32| {
@@ -318,23 +318,33 @@ pub fn Search() -> impl IntoView {
                                 "Objects"
                             </button>
                         </div>
-                        <div class="subheader mb-4">"Query filters"</div>
+                        <div class="subheader mb-4">"Filters"</div>
 
                         <div class="input-group mb-3">
                             <input
                                 type="text"
                                 class="form-control"
-                                placeholder="Query string"
-                                aria-label="Query string"
+                                placeholder="Filter string"
+                                aria-label="Filter string"
                             />
                         </div>
 
                         <div class="alert alert-success" role="alert">
                             <div class="alert-title">
-                                A query string to filter arguments.
+                                Filter arguments by value.
                             </div>
-                            <div class="text-secondary">
-                                Current parameters are:
+                            <div class="text-muted mt-2">
+                                E.g:
+                                <b>
+                                    "size > 100"
+                                </b>
+                                ,
+                                <b>
+                                    "labels.key = akey"
+                                </b>
+                            </div>
+                            <div class="text-secondary mt-2 mb-2">
+                                Current available parameters are:
                             </div>
                             <div class="text-secondary">
                                 <b>
@@ -352,17 +362,6 @@ pub fn Search() -> impl IntoView {
                                 <b>
                                     created_at
                                 </b>
-                            </div>
-                            <div class="text-muted">
-                                Examples:
-                                <b>
-                                    size>100
-                                </b>
-                                ,
-                                <b>
-                                    labels.key=akey
-                                </b>
-                                ...
                             </div>
                         </div>
                     </div>

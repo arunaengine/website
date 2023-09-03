@@ -320,7 +320,7 @@ impl WebKV {
                 { self.get_value() }
             </td>
 
-            <td>
+            <td class="align-self-end">
                 { if self.is_static() && self.status == 3{
                     view! {
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -351,9 +351,9 @@ impl From<KeyValue> for WebKV {
             key: value.key.to_string(),
             value: value.value.to_string(),
             variant: value.variant,
-            status: if &value.key == "plasmidhunter.mash" {
+            status: if &value.key == "plastrack.mash" {
                 1
-            } else if &value.key == "plasmidhunter.count_kmers" {
+            } else if &value.key == "plastrack.count_kmers" {
                 2
             } else {
                 3
@@ -386,10 +386,6 @@ impl WebRelation {
                             <A href={format!("/objects/{}", r.target.to_string())} exact=true class="">
                                 { r.target.to_string() }
                             </A>
-                        </td>
-
-                        <td>
-                            { r_2.get_inbound_icon() }
                         </td>
 
                         <td>
@@ -437,6 +433,13 @@ impl WebRelation {
             }
         }
     }
+
+    pub fn is_incoming(&self) -> bool {
+        match self {
+            WebRelation::Internal(r) => r.inbound,
+            WebRelation::External(r) => r.inbound,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -448,28 +451,6 @@ pub struct RelationVariant {
 }
 
 impl RelationVariant {
-    pub fn get_inbound_icon(&self) -> impl IntoView {
-        if self.inbound {
-            view! {
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-big-right-lines" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                    <path d="M12 9v-3.586a1 1 0 0 1 1.707 -.707l6.586 6.586a1 1 0 0 1 0 1.414l-6.586 6.586a1 1 0 0 1 -1.707 -.707v-3.586h-3v-6h3z"></path>
-                    <path d="M3 9v6"></path>
-                    <path d="M6 9v6"></path>
-                </svg>
-            }
-        } else {
-            view! {
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-big-left-lines" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                    <path d="M12 15v3.586a1 1 0 0 1 -1.707 .707l-6.586 -6.586a1 1 0 0 1 0 -1.414l6.586 -6.586a1 1 0 0 1 1.707 .707v3.586h3v6h-3z"></path>
-                    <path d="M21 15v-6"></path>
-                    <path d="M18 15v-6"></path>
-                </svg>
-            }
-        }
-    }
-
     pub fn get_object_batch(&self) -> impl IntoView {
         match self.target_name.as_str() {
             "Project" => {

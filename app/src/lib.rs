@@ -1,4 +1,4 @@
-use leptos::{html::Div, *};
+use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
