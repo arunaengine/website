@@ -25,6 +25,32 @@ pub fn EntryPoint() -> impl IntoView {
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(true));
 
+    let _cookies = move || {
+        view! {
+            <div class="offcanvas offcanvas-bottom h-auto show" tabindex="-1" id="offcanvasBottom" aria-modal="true" role="dialog">
+              <div class="offcanvas-body">
+                <div class="container">
+                  <div class="row align-items-center">
+                    <div class="col">
+                      <strong>Do you like cookies?</strong>"🍪 We use cookies to ensure you get the best experience on our website." <a href="./terms-of-service.html" target="_blank">Learn more</a>
+                    </div>
+                    <div class="col-auto">
+                      <button type="button" class="btn btn-primary" data-bs-dismiss="offcanvas">
+                        Essential Cookies Only
+                      </button>
+                    </div>
+                    <div class="col-auto">
+                      <button type="button" class="btn btn-primary" data-bs-dismiss="offcanvas">
+                        Allow All Cookies
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+        }
+    };
+
     let res: Resource<bool, Option<UserState>> =
         create_resource(update_user.0, move |_| async move {
             // this is the ServerFn that is called by the GetUser Action above
@@ -44,6 +70,7 @@ pub fn EntryPoint() -> impl IntoView {
         // sets the document title
         <Title text="Aruna Object Storage"/>
         <div class="page">
+            //{ cookies }
             <Router>
                 <Routes>
                     <Route
