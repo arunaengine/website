@@ -25,6 +25,27 @@ pub fn EntryPoint() -> impl IntoView {
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(true));
 
+    let cordi = move || {
+        view! {
+            <div class="offcanvas offcanvas-top h-10 show" tabindex="-1" id="offcanvasBottom" aria-modal="true" role="dialog">
+              <div class="offcanvas-body">
+                <div class="container">
+                  <div class="row align-items-center">
+                    <div class="col">
+                      <strong>"Meet us @ CORDI 2023"</strong>"🍪 We use cookies to ensure you get the best experience on our website." <a href="./terms-of-service.html" target="_blank">Learn more</a>
+                    </div>
+                    <div class="col-auto">
+                      <button type="button" class="btn btn-primary" data-bs-dismiss="offcanvas">
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+        }
+    };
+
     let _cookies = move || {
         view! {
             <div class="offcanvas offcanvas-bottom h-auto show" tabindex="-1" id="offcanvasBottom" aria-modal="true" role="dialog">
@@ -70,6 +91,7 @@ pub fn EntryPoint() -> impl IntoView {
         // sets the document title
         <Title text="Aruna Object Storage"/>
         <div class="page">
+            { cordi }
             //{ cookies }
             <Router>
                 <Routes>
