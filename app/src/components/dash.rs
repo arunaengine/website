@@ -27,11 +27,12 @@ pub fn Dash() -> impl IntoView {
                 }
             }
         >
+            <Route path="news" view=move || view! { <DashLanding/> }/>
             <Route path="search" view=move || view! { <Search/> }/>
             <Route path="resources" view=move || "Resources".into_view()/>
             <Route path="admin" view=move || view! { <AdminOverview/> }/>
             <Route path="tokens" view=move || view! { <TokensOverview/> }/>
-            <Route path="" view=move || view! { <DashLanding/> }/>
+            <Route path="" view=move || view! { <Redirect path="news"/> }/>
         </Route>
     }
 }
