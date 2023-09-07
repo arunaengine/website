@@ -338,7 +338,7 @@ pub fn ArunaHeader() -> impl IntoView {
 
                                     <li
                                         class="nav-item"
-                                        class:active=move || { path().contains("search") }
+                                        class:active=move || { path().contains("dash") }
                                     >
                                         <A class="nav-link" href=move || if is_logged_memo()() { "/dash".to_string() }else{"/dash/search".to_string()}>
                                             <span class="nav-link-icon d-md-none d-lg-inline-block">

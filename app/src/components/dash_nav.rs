@@ -37,7 +37,7 @@ pub fn DashNav() -> impl IntoView {
                                     class="nav-item"
                                     class:active=move || { path().contains("news") }
                                 >
-                                    <A class="nav-link" href="news">
+                                    <A class="nav-link" href="/dash/news">
                                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-news" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -54,7 +54,7 @@ pub fn DashNav() -> impl IntoView {
                                     class="nav-item"
                                     class:active=move || { path().contains("search") }
                                 >
-                                    <A class="nav-link" href="search">
+                                    <A class="nav-link" href="/dash/search">
                                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -67,9 +67,9 @@ pub fn DashNav() -> impl IntoView {
                                 </li>
                                 <li
                                     class="nav-item"
-                                    class:active=move || { path().contains("resources") }
+                                    class:active=move || { path().contains("objects") }
                                 >
-                                    <A class="nav-link disabled" href="resources">
+                                    <A class="nav-link" href="/objects">
                                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
@@ -126,12 +126,12 @@ pub fn DashNav() -> impl IntoView {
                                         <span class="nav-link-title">"Access"</span>
                                     </a>
                                     <div class="dropdown-menu">
-                                        <A class="dropdown-item" href="tokens">
+                                        <A class="dropdown-item" href="/dash/tokens">
                                             "Tokens"
                                         </A>
-                                        <a class="dropdown-item disabled" href="./#">
+                                        <A class="dropdown-item disabled" href="/dash/service_accounts">
                                             "Service accounts"
-                                        </a>
+                                        </A>
                                     </div>
                                 </li>
                                 <Suspense fallback=move || ().into_view()>

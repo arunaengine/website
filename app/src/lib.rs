@@ -14,10 +14,12 @@ pub fn EntryPoint() -> impl IntoView {
     use crate::components::about::*;
     use crate::components::create_object::*;
     use crate::components::dash::*;
+    use crate::components::dash_nav::*;
     use crate::components::footer::*;
     use crate::components::header::*;
     use crate::components::imprint::*;
     use crate::components::objects::*;
+    use crate::components::personal_resources::*;
     use crate::components::register::*;
     use crate::components::search::*;
     use crate::components::tos::*;
@@ -139,9 +141,20 @@ pub fn EntryPoint() -> impl IntoView {
                         <Route path="imprint" view=move || view! { <Imprint/> }/>
                         <Route path="search" view=move || view! { <Search/> }/>
                         <Route path="tos" view=move || view! { <Tos/> }/>
-                        <Route path="objects/create" view=move || view! { <CreateObjectPage/> }/>
-                        <Route path="objects/:id" view=move || view! { <ObjectOverview/> }/>
                         <Dash/>
+                        <Route
+                            path="objects"
+                            view=move || {
+                                view! {
+                                    <DashNav/>
+                                    <Outlet/>
+                                }
+                            }
+                        >
+                            <Route path="create" view=move || view! { <CreateObjectPage/> }/>
+                            <Route path=":id" view=move || view! { <ObjectOverview/> }/>
+                            <Route path="" view=move || view!{ <PersonalResources /> } />
+                        </Route>
                         <Route
                             path=""
                             view=move || {

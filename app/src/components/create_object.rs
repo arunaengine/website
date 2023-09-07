@@ -1,7 +1,5 @@
 use leptos::{html::Input, *};
 
-use crate::utils::tabler_utils::custom_select;
-
 #[component]
 pub fn CreateObjectPage() -> impl IntoView {
     let header = move || {

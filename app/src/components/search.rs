@@ -10,7 +10,7 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
     let entry_clone = entry.clone();
     let name = move || entry_clone.name.to_string();
     let id = move || entry_clone.id.to_string();
-    let absolute_link = || "dash/objects/".to_owned() + &id();
+    let absolute_link = || "/objects/".to_owned() + &id();
     view! {
         <div class="card m-1">
             {entry.get_card_status()}
@@ -18,10 +18,10 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
                 {entry.get_ribbon()} <div class="row">
                     <div class="col-4">
                         <div>
-                            <A class="text-primary" href=absolute_link() replace=true>
+                            <A class="text-primary" href=absolute_link()>
                                 <h3>{name}</h3>
                             </A>
-                            <A class="subheader" href=absolute_link() replace=true>
+                            <A class="subheader" href=absolute_link()>
                                 <h4>{id}</h4>
                             </A>
                         </div>

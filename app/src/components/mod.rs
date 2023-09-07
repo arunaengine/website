@@ -14,6 +14,7 @@ pub mod header;
 pub mod imprint;
 pub mod main_body;
 pub mod objects;
+pub mod personal_resources;
 pub mod project;
 pub mod project_admin;
 pub mod projects;
