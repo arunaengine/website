@@ -55,7 +55,7 @@ pub fn EntryPoint() -> impl IntoView {
                                     class="btn btn-primary"
                                     data-bs-dismiss="offcanvas"
                                 >
-                                       Cl
+                                       Close
                                 </button>
                             </div>
                         </div>
@@ -113,16 +113,16 @@ pub fn EntryPoint() -> impl IntoView {
         create_local_resource(update_user.0, move |_| async move {
             // this is the ServerFn that is called by the GetUser Action above
 
-            Some(UserState {
-                user_id: "A_iD".to_string(),
-                display_name: "Gott".to_string(),
-                email: "A".to_string(),
-                is_active: true,
-                is_admin: true,
-                permissions: vec![],
-                session_id: "A".to_string(),
-            })
-            //None::<UserState>
+            // Some(UserState {
+            //     user_id: "A_iD".to_string(),
+            //     display_name: "Gott".to_string(),
+            //     email: "A".to_string(),
+            //     is_active: true,
+            //     is_admin: true,
+            //     permissions: vec![],
+            //     session_id: "A".to_string(),
+            // })
+            None::<UserState>
 
             //get_user_info().await.ok()
         });
