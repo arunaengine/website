@@ -29,47 +29,82 @@ pub fn EntryPoint() -> impl IntoView {
 
     let cordi = move || {
         view! {
-            <div class="offcanvas offcanvas-top show" style="max-height: 90px;" tabindex="-1" id="offcanvasBottom" aria-modal="true" role="dialog">
-              <div class="offcanvas-body">
-                <div class="container">
-                  <div class="row align-items-center">
-                    <div class="col">
-                      <strong>"👋 Meet us @"<a href="https://www.nfdi.de/cordi-2023/?lang=en">"CORDI 2023"</a></strong>": We are proud to announce that we will be presenting our project at the Enabling RDM II session on September 13th, 2023"
+            <div
+                class="offcanvas offcanvas-top show"
+                style="max-height: 90px;"
+                tabindex="-1"
+                id="offcanvasBottom"
+                aria-modal="true"
+                role="dialog"
+            >
+                <div class="offcanvas-body">
+                    <div class="container">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <strong>
+                                    "👋 Meet us @"
+                                    <a href="https://www.nfdi.de/cordi-2023/?lang=en">
+                                        "CORDI 2023"
+                                    </a>
+                                </strong>
+                                ": We are proud to announce that we will be presenting our project at the Enabling RDM II session on September 13th, 2023"
+                            </div>
+                            <div class="col-auto">
+                                <button
+                                    type="button"
+                                    class="btn btn-primary"
+                                    data-bs-dismiss="offcanvas"
+                                >
+                                       Cl
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-auto">
-                      <button type="button" class="btn btn-primary" data-bs-dismiss="offcanvas">
-                        Close
-                      </button>
-                    </div>
-                  </div>
                 </div>
-              </div>
             </div>
         }
     };
 
     let _cookies = move || {
         view! {
-            <div class="offcanvas offcanvas-bottom h-auto show" tabindex="-1" id="offcanvasBottom" aria-modal="true" role="dialog">
-              <div class="offcanvas-body">
-                <div class="container">
-                  <div class="row align-items-center">
-                    <div class="col">
-                      <strong>Do you like cookies?</strong>"🍪 We use cookies to ensure you get the best experience on our website." <a href="./terms-of-service.html" target="_blank">Learn more</a>
+            <div
+                class="offcanvas offcanvas-bottom h-auto show"
+                tabindex="-1"
+                id="offcanvasBottom"
+                aria-modal="true"
+                role="dialog"
+            >
+                <div class="offcanvas-body">
+                    <div class="container">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <strong>
+                                    ng>Do you like cooki
+                                </strong>
+                                "🍪 We use cookies to ensure you get the best experience on our website."
+                                <a href="./terms-of-service.html" target="_blank">Learn more</a>
+                            </div>
+                            <div class="col-auto">
+                                <button
+                                    type="button"
+                                    class="btn btn-primary"
+                                    data-bs-dismiss="offcanvas"
+                                >
+                                          Essential Cookie
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button
+                                    type="button"
+                                    class="btn btn-primary"
+                                    data-bs-dismiss="offcanvas"
+                                >
+                                          Allow All C
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-auto">
-                      <button type="button" class="btn btn-primary" data-bs-dismiss="offcanvas">
-                        Essential Cookies Only
-                      </button>
-                    </div>
-                    <div class="col-auto">
-                      <button type="button" class="btn btn-primary" data-bs-dismiss="offcanvas">
-                        Allow All Cookies
-                      </button>
-                    </div>
-                  </div>
                 </div>
-              </div>
             </div>
         }
     };
@@ -102,8 +137,7 @@ pub fn EntryPoint() -> impl IntoView {
         // sets the document title
         <Title text="Aruna Object Storage"/>
         <div class="page">
-            { cordi }
-            //{ cookies }
+            {cordi} // { cookies }
             <Router>
                 <Routes>
                     <Route
@@ -151,9 +185,10 @@ pub fn EntryPoint() -> impl IntoView {
                                 }
                             }
                         >
+
                             <Route path="create" view=move || view! { <CreateObjectPage/> }/>
                             <Route path=":id" view=move || view! { <ObjectOverview/> }/>
-                            <Route path="" view=move || view!{ <PersonalResources /> } />
+                            <Route path="" view=move || view! { <PersonalResources/> }/>
                         </Route>
                         <Route
                             path=""

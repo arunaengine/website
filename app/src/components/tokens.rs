@@ -57,18 +57,6 @@ pub fn TokensOverview() -> impl IntoView {
 
     provide_context(update_tokens);
 
-    let sessions = move || {
-        get_tokens_res
-            .get()
-            .flatten()
-            .map(|ve| {
-                ve.into_iter()
-                    .filter_map(|elem| if elem.is_session { Some(elem) } else { None })
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default()
-    };
-
     let tokens = move || {
         get_tokens_res
             .get()
@@ -88,12 +76,15 @@ pub fn TokensOverview() -> impl IntoView {
     let current_action_version = create_rw_signal(0);
 
     view! {
-        <div class="page-header d-print-none my-3">
-            <div class="container-xl">
-                <div class="row g-2 align-items-center">
-                    <div class="col">
-                        <h2 class="page-title">"Tokens"</h2>
+        <div class="container-xl mt-3">
+            <div class="row mb-4">
+                <div class="col">
+                    <div class="page-pretitle text-start">
+                        Personal Permissions
                     </div>
+                    <h2 class="page-title">
+                        Tokens
+                    </h2>
                 </div>
             </div>
         </div>
@@ -113,7 +104,6 @@ pub fn TokensOverview() -> impl IntoView {
                             <tr></tr>
                             <Transition fallback=move || {
                                 view! {
-                                    ,
                                     <tr>
                                         <td colspan="4" class="text-center">
                                             <div class="spinner-border"></div>
@@ -127,16 +117,12 @@ pub fn TokensOverview() -> impl IntoView {
                                         tokens()
                                             .into_iter()
                                             .map(|item| {
-                                                view! {
-                                                    ,
-                                                    <Token token_info=item/>
-                                                }
+                                                view! { <Token token_info=item/> }
                                             })
                                             .collect::<Vec<_>>()
                                             .into_view()
                                     } else {
                                         view! {
-                                            ,
                                             <tr>
                                                 <td colspan="4" class="text-center">
                                                     "Looks like you currently have no active tokens!"
@@ -176,70 +162,6 @@ pub fn TokensOverview() -> impl IntoView {
                 </div>
             </div>
         </div>
-        <div class="page-header d-print-none my-2">
-            <div class="container-xl">
-                <div class="row g-2 align-items-center">
-                    <div class="col">
-                        <h2 class="page-title">"Sessions"</h2>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="container-xl mt-2 text-start">
-            <div class="card">
-                <div class="table-responsive">
-                    <table class="table table-vcenter card-table">
-                        <thead>
-                            <tr>
-                                <th>"Id"</th>
-                                <th>"Expires"</th>
-                                <th>"Last used"</th>
-                                <th class="w-3 text-end">"Actions"</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <Transition fallback=move || {
-                                view! {
-                                    ,
-                                    <tr>
-                                        <td colspan="4" class="text-center">
-                                            <div class="spinner-border"></div>
-                                        </td>
-                                    </tr>
-                                }
-                            }>
-
-                                {move || {
-                                    if !sessions().is_empty() {
-                                        sessions()
-                                            .into_iter()
-                                            .map(|item| {
-                                                view! {
-                                                    ,
-                                                    <Session token_info=item/>
-                                                }
-                                            })
-                                            .collect::<Vec<_>>()
-                                            .into_view()
-                                    } else {
-                                        view! {
-                                            ,
-                                            <tr>
-                                                <td colspan="4" class="text-center">
-                                                    "Looks like you currently have no active sessions!"
-                                                </td>
-                                            </tr>
-                                        }
-                                            .into_view()
-                                    }
-                                }}
-
-                            </Transition>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
 
         {move || {
             if contains_create() {
@@ -263,32 +185,6 @@ pub fn TokensOverview() -> impl IntoView {
                             }
                             Some(Err(_)) => {
                                 view! {
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
-
                                     // This guarantees that every result can only be seen once
 
                                     // This guarantees that every result can only be seen once

@@ -340,7 +340,16 @@ pub fn ArunaHeader() -> impl IntoView {
                                         class="nav-item"
                                         class:active=move || { path().contains("dash") }
                                     >
-                                        <A class="nav-link" href=move || if is_logged_memo()() { "/dash".to_string() }else{"/dash/search".to_string()}>
+                                        <A
+                                            class="nav-link"
+                                            href=move || {
+                                                if is_logged_memo()() {
+                                                    "/dash".to_string()
+                                                } else {
+                                                    "/dash/search".to_string()
+                                                }
+                                            }
+                                        >
                                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
@@ -363,44 +372,44 @@ pub fn ArunaHeader() -> impl IntoView {
                                         </A>
                                     </li>
                                     // <Suspense fallback=move || {
-                                    //     view! { cx, <div class="spinner-border"></div> }
+                                    // view! { cx, <div class="spinner-border"></div> }
                                     // }>
-                                    //     {move || {
-                                    //         if is_logged_memo()() {
-                                    //             view! {
-                                    //                 <li
-                                    //                     class="nav-item"
-                                    //                     class:active=move || { path().contains("panel") }
-                                    //                 >
-                                    //                     <A class="nav-link" href="/panel">
-                                    //                         <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                    //                             <svg
-                                    //                                 xmlns="http://www.w3.org/2000/svg"
-                                    //                                 class="icon icon-tabler icon-tabler-dashboard"
-                                    //                                 width="40"
-                                    //                                 height="40"
-                                    //                                 viewBox="0 0 24 24"
-                                    //                                 stroke-width="1"
-                                    //                                 stroke="currentColor"
-                                    //                                 fill="none"
-                                    //                                 stroke-linecap="round"
-                                    //                                 stroke-linejoin="round"
-                                    //                             >
-                                    //                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    //                                 <path d="M12 13m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>
-                                    //                                 <path d="M13.45 11.55l2.05 -2.05"></path>
-                                    //                                 <path d="M6.4 20a9 9 0 1 1 11.2 0z"></path>
-                                    //                             </svg>
-                                    //                         </span>
-                                    //                         <span class="nav-link-title">{"Dashboard"}</span>
-                                    //                     </A>
-                                    //                 </li>
-                                    //             }
-                                    //                 .into_view()
-                                    //         } else {
-                                    //             ().into_view()
-                                    //         }
-                                    //     }}
+                                    // {move || {
+                                    // if is_logged_memo()() {
+                                    // view! {
+                                    // <li
+                                    // class="nav-item"
+                                    // class:active=move || { path().contains("panel") }
+                                    // >
+                                    // <A class="nav-link" href="/panel">
+                                    // <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    // <svg
+                                    // xmlns="http://www.w3.org/2000/svg"
+                                    // class="icon icon-tabler icon-tabler-dashboard"
+                                    // width="40"
+                                    // height="40"
+                                    // viewBox="0 0 24 24"
+                                    // stroke-width="1"
+                                    // stroke="currentColor"
+                                    // fill="none"
+                                    // stroke-linecap="round"
+                                    // stroke-linejoin="round"
+                                    // >
+                                    // <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    // <path d="M12 13m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>
+                                    // <path d="M13.45 11.55l2.05 -2.05"></path>
+                                    // <path d="M6.4 20a9 9 0 1 1 11.2 0z"></path>
+                                    // </svg>
+                                    // </span>
+                                    // <span class="nav-link-title">{"Dashboard"}</span>
+                                    // </A>
+                                    // </li>
+                                    // }
+                                    // .into_view()
+                                    // } else {
+                                    // ().into_view()
+                                    // }
+                                    // }}
 
                                     // </Suspense>
 

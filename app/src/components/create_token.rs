@@ -75,7 +75,7 @@ pub fn CreateTokenSuccess(create_token_resp: TokenResponse) -> impl IntoView {
                     show_modal("createTokenResult");
             }};
             let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
-                nav("/panel/tokens", Default::default());
+                nav("/dash/tokens", Default::default());
             });
 
             on_cleanup(move || drop(show_modal));
@@ -192,7 +192,7 @@ pub fn CreateToken(
                     show_modal("createToken");
             }};
             let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
-                nav("/panel/tokens", Default::default());
+                nav("/dash/tokens", Default::default());
             });
 
             on_cleanup(move || drop(show_modal));

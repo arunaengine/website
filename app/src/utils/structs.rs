@@ -322,6 +322,7 @@ impl WebKV {
                         href=format!(
                             "/search?filter_key={}&filter_value={}", key.clone(), value.clone()
                         )
+
                         exact=true
                         class=""
                     >
@@ -335,6 +336,7 @@ impl WebKV {
                         href=format!(
                             "/search?filter_key={}&filter_value={}", key.clone(), value.clone()
                         )
+
                         exact=true
                         class=""
                     >

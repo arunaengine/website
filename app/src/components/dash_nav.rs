@@ -24,10 +24,7 @@ pub fn DashNav() -> impl IntoView {
     });
 
     view! {
-        <Show
-        when=move || get_user().map(|e| e.is_some()).unwrap_or_default()
-            fallback=|| ()
-        >
+        <Show when=move || get_user().map(|e| e.is_some()).unwrap_or_default() fallback=|| ()>
             <header class="navbar-expand-md">
                 <div class="collapse navbar-collapse" id="navbar-menu">
                     <div class="navbar navbar-light">
@@ -39,7 +36,18 @@ pub fn DashNav() -> impl IntoView {
                                 >
                                     <A class="nav-link" href="/dash/news">
                                         <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-news" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                class="icon icon-tabler icon-tabler-news"
+                                                width="40"
+                                                height="40"
+                                                viewBox="0 0 24 24"
+                                                stroke-width="2"
+                                                stroke="currentColor"
+                                                fill="none"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                            >
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                                 <path d="M16 6h3a1 1 0 0 1 1 1v11a2 2 0 0 1 -4 0v-13a1 1 0 0 0 -1 -1h-10a1 1 0 0 0 -1 1v12a3 3 0 0 0 3 3h11"></path>
                                                 <path d="M8 8l4 0"></path>
@@ -55,8 +63,19 @@ pub fn DashNav() -> impl IntoView {
                                     class:active=move || { path().contains("search") }
                                 >
                                     <A class="nav-link" href="/dash/search">
-                                            <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                class="icon icon-tabler icon-tabler-search"
+                                                width="40"
+                                                height="40"
+                                                viewBox="0 0 24 24"
+                                                stroke-width="2"
+                                                stroke="currentColor"
+                                                fill="none"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                            >
                                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                                 <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path>
                                                 <path d="M21 21l-6 -6"></path>
@@ -129,13 +148,19 @@ pub fn DashNav() -> impl IntoView {
                                         <A class="dropdown-item" href="/dash/tokens">
                                             "Tokens"
                                         </A>
-                                        <A class="dropdown-item disabled" href="/dash/service_accounts">
+                                        <A
+                                            class="dropdown-item disabled"
+                                            href="/dash/service_accounts"
+                                        >
                                             "Service accounts"
                                         </A>
                                     </div>
                                 </li>
                                 <Suspense fallback=move || ().into_view()>
-                                    <li class="nav-item" class:active=move || { path().contains("admin") }>
+                                    <li
+                                        class="nav-item"
+                                        class:active=move || { path().contains("admin") }
+                                    >
                                         <a
                                             class="nav-link"
                                             class:disabled=move || { !is_admin() }

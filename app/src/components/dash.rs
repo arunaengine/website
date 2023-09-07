@@ -27,6 +27,7 @@ pub fn Dash() -> impl IntoView {
                 }
             }
         >
+
             <Route path="news" view=move || view! { <DashLanding/> }/>
             <Route path="search" view=move || view! { <Search/> }/>
             <Route path="resources" view=move || "Resources".into_view()/>

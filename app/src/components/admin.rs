@@ -77,7 +77,12 @@ pub fn AdminOverview() -> impl IntoView {
             <div class="container-xl">
                 <div class="row g-2 align-items-center">
                     <div class="col">
-                        <h2 class="page-title">"Admin"</h2>
+                        <div class="page-pretitle text-start">
+                            Global Permissions
+                        </div>
+                        <h2 class="page-title">
+                            Users
+                        </h2>
                     </div>
                 </div>
             </div>

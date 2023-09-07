@@ -81,7 +81,7 @@ pub fn ErrorTemplate(
                                         "Oops… You just found an error page"
                                     </p>
                                     <p class="empty-subtitle text-secondary">
-                                          We are sorry but something went wron
+                                          We are sorry but something went wr
                                         {error_string.to_string()}
                                     </p>
                                     <div class="empty-action">
@@ -106,7 +106,7 @@ pub fn ErrorTemplate(
                                                 <path d="M5 12l6 6"></path>
                                                 <path d="M5 12l6 -6"></path>
                                             </svg>
-                                              "Take me home!"
+                                            "Take me home!"
                                         </a>
                                     </div>
                                 </div>
