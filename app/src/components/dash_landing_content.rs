@@ -1,7 +1,7 @@
 use leptos::*;
 
 #[component]
-pub fn PanelContent() -> impl IntoView {
+pub fn DashLanding() -> impl IntoView {
     view! {
         <div class="page-body">
             <div class="card text-start mt-3 col-6 mx-auto">

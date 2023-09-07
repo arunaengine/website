@@ -106,7 +106,7 @@ pub fn ErrorTemplate(
                                                 <path d="M5 12l6 6"></path>
                                                 <path d="M5 12l6 -6"></path>
                                             </svg>
-                                              Take me ho
+                                              "Take me home!"
                                         </a>
                                     </div>
                                 </div>

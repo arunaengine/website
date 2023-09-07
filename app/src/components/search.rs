@@ -10,7 +10,7 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
     let entry_clone = entry.clone();
     let name = move || entry_clone.name.to_string();
     let id = move || entry_clone.id.to_string();
-    let absolute_link = || "/objects/".to_owned() + &id();
+    let absolute_link = || "dash/objects/".to_owned() + &id();
     view! {
         <div class="card m-1">
             {entry.get_card_status()}

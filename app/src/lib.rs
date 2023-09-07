@@ -13,11 +13,11 @@ pub fn EntryPoint() -> impl IntoView {
 
     use crate::components::about::*;
     use crate::components::create_object::*;
+    use crate::components::dash::*;
     use crate::components::footer::*;
     use crate::components::header::*;
     use crate::components::imprint::*;
     use crate::components::objects::*;
-    use crate::components::panel::*;
     use crate::components::register::*;
     use crate::components::search::*;
     use crate::components::tos::*;
@@ -27,12 +27,12 @@ pub fn EntryPoint() -> impl IntoView {
 
     let cordi = move || {
         view! {
-            <div class="offcanvas offcanvas-top h-10 show" tabindex="-1" id="offcanvasBottom" aria-modal="true" role="dialog">
+            <div class="offcanvas offcanvas-top show" style="max-height: 90px;" tabindex="-1" id="offcanvasBottom" aria-modal="true" role="dialog">
               <div class="offcanvas-body">
                 <div class="container">
                   <div class="row align-items-center">
                     <div class="col">
-                      <strong>"Meet us @ CORDI 2023"</strong>"🍪 We use cookies to ensure you get the best experience on our website." <a href="./terms-of-service.html" target="_blank">Learn more</a>
+                      <strong>"👋 Meet us @"<a href="https://www.nfdi.de/cordi-2023/?lang=en">"CORDI 2023"</a></strong>": We are proud to announce that we will be presenting our project at the Enabling RDM II session on September 13th, 2023"
                     </div>
                     <div class="col-auto">
                       <button type="button" class="btn btn-primary" data-bs-dismiss="offcanvas">
@@ -73,9 +73,18 @@ pub fn EntryPoint() -> impl IntoView {
     };
 
     let res: Resource<bool, Option<UserState>> =
-        create_resource(update_user.0, move |_| async move {
+        create_local_resource(update_user.0, move |_| async move {
             // this is the ServerFn that is called by the GetUser Action above
 
+            // Some(UserState {
+            //     user_id: "A_iD".to_string(),
+            //     display_name: "Gott".to_string(),
+            //     email: "A".to_string(),
+            //     is_active: true,
+            //     is_admin: true,
+            //     permissions: vec![],
+            //     session_id: "A".to_string(),
+            // })
             None::<UserState>
 
             //get_user_info().await.ok()
@@ -132,7 +141,7 @@ pub fn EntryPoint() -> impl IntoView {
                         <Route path="tos" view=move || view! { <Tos/> }/>
                         <Route path="objects/create" view=move || view! { <CreateObjectPage/> }/>
                         <Route path="objects/:id" view=move || view! { <ObjectOverview/> }/>
-                        <Panel/>
+                        <Dash/>
                         <Route
                             path=""
                             view=move || {

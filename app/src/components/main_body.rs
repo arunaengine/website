@@ -5,7 +5,7 @@ use leptos::{html::Div, *};
 pub fn MainBody() -> impl IntoView {
     let hook = move || {
         view! {
-            <div class="px-4 pt-5 my-5 mt-4 text-center">
+            <div class="px-4 pt-5 my-5 mt-6 text-center">
                 <div class="overflow-hidden" style="max-height: 30vh;">
                     <div class="container px-5">
                         <img
@@ -144,7 +144,7 @@ pub fn MainBody() -> impl IntoView {
             <div class="row">
                 <div class="card text-start px-4 py-5 col-lg-12" id="icon-grid">
                     <div class="row">
-                        <div class="col-lg-8">
+                        <div class="col-xl-6">
                             <div
                                 class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 mb-2"
                                 style="border: 1px dashed #999"
@@ -294,7 +294,7 @@ pub fn MainBody() -> impl IntoView {
                         </div>
 
                         <div
-                            class="align-self-center d-inline-flex d-none d-lg-block col-lg-4 border-opacity-50 mt-2"
+                            class="align-self-center d-inline-flex col-xl-6 border-opacity-50 mt-1"
                             style="border: 1px dashed #999; padding: 15px;"
                         >
                             <img
