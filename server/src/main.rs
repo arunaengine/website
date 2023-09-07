@@ -49,6 +49,7 @@ async fn main() {
         .route("/api/*fn_name", post(leptos_axum::handle_server_fns))
         .route("/login", get(login))
         .route("/callback", get(callback))
+        .route("/oidc-callback", get(callback))
         .leptos_routes(&server_state, routes, || view! { <EntryPoint/> })
         .fallback(file_and_error_handler)
         .with_state(server_state);

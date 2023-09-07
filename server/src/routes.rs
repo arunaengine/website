@@ -55,5 +55,6 @@ pub async fn callback(
         .http_only(true)
         .finish();
 
-    Ok((jar.add(cookie), Redirect::to("/")))
+    let jar = jar.add(cookie).add(Cookie::new("logged_in", "true"));
+    Ok((jar, Redirect::to("/")))
 }
