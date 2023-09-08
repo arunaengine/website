@@ -105,6 +105,7 @@ version = "4.0.0"
 dependencies = [
  "anyhow",
  "aruna-rust-api",
+ "axum-extra",
  "bytesize",
  "cfg-if",
  "chrono",
@@ -156,6 +157,7 @@ dependencies = [
  "serde",
  "serde_json",
  "simple_logger",
+ "time",
  "tokio",
  "tower",
  "tower-http",

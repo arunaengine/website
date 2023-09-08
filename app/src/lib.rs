@@ -2,7 +2,6 @@ use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use utils::aruna_api_handlers::who_am_i;
 
 pub mod components;
 pub mod error_template;
@@ -29,29 +28,42 @@ pub fn EntryPoint() -> impl IntoView {
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(true));
 
-    #[server(GetUserInfo)]
-    pub async fn get_user_info() -> Result<User, ServerFnError> {
+    #[server(GetUserInfo, "/api", "GetJson")]
+    pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
+        use axum_extra::extract::CookieJar;
+        use http::header;
+        use utils::aruna_api_handlers::who_am_i;
         let req_parts = use_context::<leptos_axum::RequestParts>()
             .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-        let token = req_parts
-            .headers
-            .get("token")
-            .ok_or_else(|| {
+        let jar = CookieJar::from_headers(&req_parts.headers);
+
+        match jar.get("logged_in") {
+            Some(l) if l.value() == "false" => return Ok(None),
+            None => return Ok(None),
+            _ => {}
+        }
+
+        if let Some(cookie) = jar.get("token") {
+            let user = who_am_i(cookie.value()).await.map_err(|_| {
                 leptos::log!("Unable to query token from session");
-                ServerFnError::Request("Invalid request".to_string())
-            })?
-            .to_str()
-            .map_err(|e| {
-                leptos::log!("Unable to parse token string session {e}");
-                ServerFnError::Request("Invalid request".to_string())
+                ServerFnError::Request("Invalid request, who_i_am".to_string())
             })?;
+            return Ok(Some(user));
+        } else {
+            if let Some(response_options) = use_context::<ResponseOptions>() {
+                response_options.set_status(StatusCode::FOUND);
+                response_options.insert_header(
+                    header::LOCATION,
+                    header::HeaderValue::from_str("/login").expect("Failed to create HeaderValue"),
+                );
+                response_options.insert_header(
+                    header::SAMESITE,
+                    header::HeaderValue::from_str("/login").expect("Failed to create HeaderValue"),
+                );
+            }
+        };
 
-        let user = who_am_i(token).await.map_err(|_| {
-            leptos::log!("Unable to query token from session");
-            ServerFnError::Request("Invalid request".to_string())
-        })?;
-
-        Ok(user)
+        Ok(None)
     }
 
     let cordi = move || {
@@ -138,20 +150,7 @@ pub fn EntryPoint() -> impl IntoView {
 
     let res: Resource<bool, Option<User>> =
         create_local_resource(update_user.0, move |_| async move {
-            // this is the ServerFn that is called by the GetUser Action above
-
-            // Some(UserState {
-            //     user_id: "A_iD".to_string(),
-            //     display_name: "Gott".to_string(),
-            //     email: "A".to_string(),
-            //     is_active: true,
-            //     is_admin: true,
-            //     permissions: vec![],
-            //     session_id: "A".to_string(),
-            // })
-            None::<User>
-
-            //get_user_info().await.ok()
+            get_user_info().await.ok().flatten()
         });
 
     provide_context(res);

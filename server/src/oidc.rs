@@ -1,8 +1,14 @@
+use std::time::Duration;
+
 use anyhow::anyhow;
 use anyhow::Result;
 use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
 use openidconnect::reqwest::async_http_client;
+use openidconnect::AccessToken;
+use openidconnect::IdToken;
+use openidconnect::OAuth2TokenResponse;
 use openidconnect::PkceCodeVerifier;
+use openidconnect::RefreshToken;
 use openidconnect::{
     AccessTokenHash, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
     PkceCodeChallenge, RedirectUrl,
@@ -107,7 +113,7 @@ impl Authorizer {
         challenge: Challenge,
         auth_code: &str,
         state: &str,
-    ) -> Result<String> {
+    ) -> Result<(String, Duration, String)> {
         // Once the user has been redirected to the redirect URL, you'll have access to the
         // authorization code. For security reasons, your code should verify that the `state`
         // parameter returned by the server matches `csrf_state`.
@@ -127,10 +133,18 @@ impl Authorizer {
             .request_async(async_http_client)
             .await?;
 
+        let expires = token_response.expires_in().unwrap_or_default();
         // Extract the ID token claims after verifying its authenticity and nonce.
         let id_token = token_response
             .id_token()
-            .ok_or_else(|| anyhow!("Server did not return an ID token"))?;
+            .ok_or_else(|| anyhow!("Server did not return an ID token"))?
+            .clone();
+
+        let refresh_token = token_response
+            .refresh_token()
+            .ok_or_else(|| anyhow!("Server did not return a refresh token"))?
+            .clone();
+
         let claims =
             id_token.claims(&self.core_client.id_token_verifier(), challenge.get_nonce())?;
 
@@ -146,8 +160,24 @@ impl Authorizer {
             }
         }
 
-        let token = id_token.to_string();
+        Ok((
+            id_token.to_string(),
+            expires,
+            refresh_token.secret().to_string(),
+        ))
+    }
 
-        Ok(token)
+    pub async fn refresh(&self, token: &str) -> (String, Duration) {
+        let token = self
+            .core_client
+            .exchange_refresh_token(&RefreshToken::new(token.to_string()))
+            .request_async(async_http_client)
+            .await
+            .unwrap();
+
+        (
+            token.access_token().secret().to_string(),
+            token.expires_in().unwrap_or_default(),
+        )
     }
 }

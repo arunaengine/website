@@ -1,3 +1,5 @@
+use std::{fmt, str::FromStr};
+
 use crate::{oidc::Challenge, ServerState};
 use axum::{
     extract::{Query, State},
@@ -5,6 +7,8 @@ use axum::{
     response::Redirect,
 };
 use axum_extra::extract::{cookie::Cookie, CookieJar};
+use serde::{de, Deserialize, Deserializer};
+use time::OffsetDateTime;
 
 pub async fn login(
     State(state): State<ServerState>,
@@ -40,7 +44,7 @@ pub async fn callback(
 
     let jar = jar.remove(Cookie::named("challenge"));
 
-    let token = state
+    let (token, expires, refresh) = state
         .oidc
         .exchange_challenge(challenge, &query.code, &query.state)
         .await
@@ -49,12 +53,65 @@ pub async fn callback(
             StatusCode::UNAUTHORIZED
         })?;
 
-    let cookie = Cookie::build("token", token.clone())
+    let expires = OffsetDateTime::now_utc() + expires;
+
+    let token_cookie = Cookie::build("token", token.clone())
+        .path("/")
+        .secure(true)
+        .http_only(true)
+        .expires(expires)
+        .finish();
+
+    let refresh_cookie = Cookie::build("refresh", refresh.clone())
         .path("/")
         .secure(true)
         .http_only(true)
         .finish();
 
-    let jar = jar.add(cookie).add(Cookie::new("logged_in", "true"));
+    let jar = jar
+        .add(token_cookie)
+        .add(refresh_cookie)
+        .add(Cookie::new("logged_in", "true"));
     Ok((jar, Redirect::to("/")))
+}
+
+#[derive(serde::Deserialize)]
+pub struct FromQuery {
+    #[serde(default, deserialize_with = "empty_string_as_none")]
+    pub from: Option<String>,
+}
+
+/// Serde deserialization decorator to map empty Strings to None,
+fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr,
+    T::Err: fmt::Display,
+{
+    let opt = Option::<String>::deserialize(de)?;
+    match opt.as_deref() {
+        None | Some("") => Ok(None),
+        Some(s) => FromStr::from_str(s).map_err(de::Error::custom).map(Some),
+    }
+}
+
+pub async fn refresh(
+    State(state): State<ServerState>,
+    jar: CookieJar,
+    Query(query): Query<FromQuery>,
+) -> Result<(CookieJar, Redirect), StatusCode> {
+    let challenge = jar.get("refresh").ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let (new_token, expires) = state.oidc.refresh(challenge.value()).await;
+    let expires = OffsetDateTime::now_utc() + expires;
+
+    let token_cookie = Cookie::build("token", new_token.clone())
+        .path("/")
+        .secure(true)
+        .http_only(true)
+        .expires(expires)
+        .finish();
+
+    let jar = jar.add(token_cookie).add(Cookie::new("logged_in", "true"));
+    Ok((jar, Redirect::to(&query.from.unwrap_or("/".to_string()))))
 }

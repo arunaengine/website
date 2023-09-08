@@ -339,6 +339,7 @@ pub fn AdminUser(user: User) -> impl IntoView {
                             .map(|item| {
                                 let item_clone = item.clone();
                                 let (id, _) = extract_type_id(item.resource_id);
+                                let id_clone = id.clone();
                                 view! {
                                     <tr colspan="5">
                                         <td>"PID:"</td>
@@ -356,7 +357,7 @@ pub fn AdminUser(user: User) -> impl IntoView {
                                                         remove_user_action
                                                             .dispatch(RemoveUser {
                                                                 _user_id: store_user.get_value(),
-                                                                _project_id: id.to_string(),
+                                                                _project_id: id_clone.clone(),
                                                             })
                                                     }
                                                 >

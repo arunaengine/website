@@ -1,14 +1,16 @@
 use aruna_web_app::*;
 use axum::{
     extract::FromRef,
+    http::Method,
     routing::{get, post},
     Router,
 };
 use fileserv::file_and_error_handler;
 use leptos::*;
 use leptos_axum::{generate_route_list, LeptosRoutes};
+use tower_http::cors::{Any, CorsLayer};
 
-use crate::routes::{callback, login};
+use crate::routes::{callback, login, refresh};
 
 pub mod fileserv;
 pub mod oidc;
@@ -44,14 +46,25 @@ async fn main() {
     let addr = leptos_options.site_addr;
     let routes = generate_route_list(|| view! { <EntryPoint/> }).await;
 
+    let cors = CorsLayer::new()
+        // allow `GET` and `POST` when accessing the resource
+        .allow_methods([Method::GET, Method::POST])
+        // allow requests from any origin
+        .allow_origin(Any);
+
     // build our application with a route
     let app = Router::new()
-        .route("/api/*fn_name", post(leptos_axum::handle_server_fns))
+        .route(
+            "/api/*fn_name",
+            post(leptos_axum::handle_server_fns).get(leptos_axum::handle_server_fns),
+        )
         .route("/login", get(login))
         .route("/callback", get(callback))
         .route("/oidc-callback", get(callback))
+        .route("/refresh", get(refresh))
         .leptos_routes(&server_state, routes, || view! { <EntryPoint/> })
         .fallback(file_and_error_handler)
+        .layer(cors)
         .with_state(server_state);
 
     // run our app with hyper
