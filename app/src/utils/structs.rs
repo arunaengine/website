@@ -33,16 +33,16 @@ impl SimplePermission {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
-pub struct UserState {
-    pub user_id: String,
-    pub display_name: String,
-    pub email: String,
-    pub is_active: bool,
-    pub is_admin: bool,
-    pub permissions: Vec<SimplePermission>,
-    pub session_id: String,
-}
+// #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+// pub struct UserState {
+//     pub user_id: String,
+//     pub display_name: String,
+//     pub email: String,
+//     pub is_active: bool,
+//     pub is_admin: bool,
+//     pub permissions: Vec<SimplePermission>,
+//     pub session_id: String,
+// }
 
 // impl From<ProjectPermission> for SimplePermission {
 //     fn from(value: ProjectPermission) -> Self {

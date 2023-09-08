@@ -1,6 +1,8 @@
+use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+use utils::aruna_api_handlers::who_am_i;
 
 pub mod components;
 pub mod error_template;
@@ -26,6 +28,31 @@ pub fn EntryPoint() -> impl IntoView {
     use crate::utils::structs::*;
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(true));
+
+    #[server(GetUserInfo)]
+    pub async fn get_user_info() -> Result<User, ServerFnError> {
+        let req_parts = use_context::<leptos_axum::RequestParts>()
+            .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+        let token = req_parts
+            .headers
+            .get("token")
+            .ok_or_else(|| {
+                leptos::log!("Unable to query token from session");
+                ServerFnError::Request("Invalid request".to_string())
+            })?
+            .to_str()
+            .map_err(|e| {
+                leptos::log!("Unable to parse token string session {e}");
+                ServerFnError::Request("Invalid request".to_string())
+            })?;
+
+        let user = who_am_i(token).await.map_err(|_| {
+            leptos::log!("Unable to query token from session");
+            ServerFnError::Request("Invalid request".to_string())
+        })?;
+
+        Ok(user)
+    }
 
     let cordi = move || {
         view! {
@@ -109,7 +136,7 @@ pub fn EntryPoint() -> impl IntoView {
         }
     };
 
-    let res: Resource<bool, Option<UserState>> =
+    let res: Resource<bool, Option<User>> =
         create_local_resource(update_user.0, move |_| async move {
             // this is the ServerFn that is called by the GetUser Action above
 
@@ -122,7 +149,7 @@ pub fn EntryPoint() -> impl IntoView {
             //     permissions: vec![],
             //     session_id: "A".to_string(),
             // })
-            None::<UserState>
+            None::<User>
 
             //get_user_info().await.ok()
         });

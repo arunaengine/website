@@ -1,7 +1,7 @@
 use leptos::*;
 use leptos_meta::*;
 
-use crate::utils::structs::{TokenStats, UpdateTokens, UserState};
+use crate::utils::structs::{TokenStats, UpdateTokens};
 
 #[server(DeleteToken, "/web")]
 pub async fn delete_token(_token_id: String) -> Result<(), ServerFnError> {
@@ -180,132 +180,6 @@ pub fn Token(token_info: TokenStats) -> impl IntoView {
                             </div>
                         </div>
                     </div>
-                </div>
-            </td>
-        </tr>
-    }
-}
-
-/// Renders the home page of your application.
-#[component]
-pub fn Session(token_info: TokenStats) -> impl IntoView {
-    provide_meta_context();
-
-    use crate::components::alert_modal::*;
-
-    let get_user = use_context::<Resource<bool, Option<UserState>>>().expect("user_state not set");
-
-    let session_id = move || {
-        get_user
-            .get()
-            .unwrap_or_default()
-            .unwrap_or_default()
-            .session_id
-    };
-
-    let token_id = store_value(token_info.id.to_string());
-
-    let is_current = move || session_id() == token_id();
-
-    let update_tokens = use_context::<UpdateTokens>().expect("user_state not set");
-
-    let (deleting, set_deleting) = create_signal("".to_string());
-    let (blocking, set_blocking) = create_signal(true);
-
-    let dispatch_delete = create_resource(blocking, move |del| async move {
-        // this is the ServerFn that is called by the GetUser Action above
-        if !deleting().is_empty() && !del {
-            delete_token(deleting()).await.ok();
-            update_tokens.0.update(move |e| *e = !*e)
-        }
-    });
-
-    create_effect(move |_| {
-        if is_current() && !deleting().is_empty() && !blocking() && dispatch_delete.get().is_some()
-        {
-            let _ = window().location().set_href("/logout");
-        }
-    });
-
-    let message = if is_current() {
-        "Are you sure to delete the session that is currently in use ? This will automatically forward you to the logout page."
-    } else {
-        "Do you really want to delete this session ?"
-    };
-
-    view! {
-        <AlertModal
-            header="Deleting session".to_string()
-            message=message.to_string()
-            modal_id=format!("mod-{}", token_id.get_value())
-            action_name="Delete".to_string()
-            action=move |_| {
-                set_deleting.set(token_id.get_value());
-                set_blocking.set(false)
-            }
-        />
-
-        <tr>
-            <td>{token_info.id.clone()}</td>
-            <td>{token_info.expires_at}</td>
-            <td>{token_info.used_at}</td>
-            <td>
-                <div class="d-flex justify-content-end">
-                    {move || {
-                        if is_current() {
-                            view! {
-                                <span class="status status-green me-2">
-                                    <span class="status-dot status-dot-animated"></span>
-                                    "current"
-                                </span>
-                            }
-                                .into_view()
-                        } else {
-                            ().into_view()
-                        }
-                    }}
-                    <a
-                        href="#"
-                        class="btn btn-danger btn-icon btn-sm"
-                        aria-label="Button"
-                        role="button"
-                        data-bs-toggle="modal"
-                        data-bs-target=format!("#mod-{}", token_id.get_value())
-                    >
-                        <Suspense fallback=move || {
-                            view! {
-                                ,
-                                <div class="spinner-border"></div>
-                            }
-                        }>
-                            {move || {
-                                let _ = dispatch_delete.get();
-                                view! {
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        class="icon icon-tabler icon-tabler-trash"
-                                        width="24"
-                                        height="24"
-                                        viewBox="0 0 24 24"
-                                        stroke-width="2"
-                                        stroke="currentColor"
-                                        fill="none"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                    >
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                        <path d="M4 7l16 0"></path>
-                                        <path d="M10 11l0 6"></path>
-                                        <path d="M14 11l0 6"></path>
-                                        <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
-                                        <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
-                                    </svg>
-                                }
-                            }}
-
-                        </Suspense>
-
-                    </a>
                 </div>
             </td>
         </tr>

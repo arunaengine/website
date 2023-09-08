@@ -1,9 +1,10 @@
-use crate::utils::structs::{UpdateAdmin, UserState};
+use crate::utils::structs::UpdateAdmin;
+use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
 
 #[server(GetUsers, "/web")]
-pub async fn get_users() -> Result<Vec<UserState>, ServerFnError> {
+pub async fn get_users() -> Result<Vec<User>, ServerFnError> {
     // use crate::utils::aruna_api_handlers::aruna_get_all_users;
     // let req = use_context::<HttpRequest>()
     //     .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
@@ -44,14 +45,16 @@ pub fn AdminOverview() -> impl IntoView {
 
     provide_meta_context();
 
-    let get_user = use_context::<Resource<bool, Option<UserState>>>().expect("user_state not set");
+    let get_user = use_context::<Resource<bool, Option<User>>>().expect("user_state not set");
 
     let is_admin = create_memo(move |_| {
         get_user
             .get()
             .unwrap_or_default()
             .unwrap_or_default()
-            .is_admin
+            .attributes
+            .unwrap_or_default()
+            .global_admin
     });
 
     if !is_admin() {

@@ -1,15 +1,15 @@
+use crate::utils::structs::UpdateUser;
+use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-
-use crate::utils::structs::{UpdateUser, UserState};
 
 /// Renders the home page of your application.
 #[component]
 pub fn ArunaHeader() -> impl IntoView {
     provide_meta_context();
 
-    let get_user = use_context::<Resource<bool, Option<UserState>>>().expect("user_state not set");
+    let get_user = use_context::<Resource<bool, Option<User>>>().expect("user_state not set");
 
     // On first load -> Check if user is logged in
     let _update_user = use_context::<UpdateUser>().expect("user_state not set");
@@ -192,6 +192,7 @@ pub fn ArunaHeader() -> impl IntoView {
                 {move || {
                     match get_user.get().flatten() {
                         Some(u) => {
+                            let is_admin = u.attributes.unwrap_or_default().global_admin;
                             view! {
                                 <div class="nav-item dropdown">
                                     <a
@@ -222,7 +223,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                         <div class="d-none d-xl-block ps-2">
                                             <div>{u.display_name}</div>
                                             {move || {
-                                                if u.is_admin {
+                                                if is_admin {
                                                     view! { <div class="mt-1 small text-muted">{"Admin"}</div> }
                                                 } else {
                                                     view! { <div class="mt-1 small text-muted">{"User"}</div> }

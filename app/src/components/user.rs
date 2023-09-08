@@ -1,4 +1,8 @@
-use crate::utils::structs::{UpdateAdmin, UserState};
+use crate::utils::{
+    conversion_helpers::{extract_type_id, to_permission_string},
+    structs::UpdateAdmin,
+};
+use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
 
@@ -49,13 +53,13 @@ pub async fn remove_user_project(
 
 /// Renders the home page of your application.
 #[component]
-pub fn AdminUser(user: UserState) -> impl IntoView {
+pub fn AdminUser(user: User) -> impl IntoView {
     use crate::components::activate_modal::*;
     use crate::components::add_user::*;
 
     provide_meta_context();
 
-    let is_active = user.is_active;
+    let is_active = user.active;
     let deactivate_action = create_server_action::<DeactivateUser>();
     let remove_user_action = create_server_action::<RemoveUser>();
     let last_version = create_rw_signal(0);
@@ -96,8 +100,18 @@ pub fn AdminUser(user: UserState) -> impl IntoView {
         }
     };
 
-    let is_admin = user.is_admin;
-    let is_p_admin = user.permissions.iter().any(|u| u.permission == 5);
+    let is_admin = user
+        .attributes
+        .as_ref()
+        .map(|a| a.global_admin)
+        .unwrap_or_default();
+    let is_p_admin = user
+        .attributes
+        .as_ref()
+        .map(|e| e.personal_permissions.clone())
+        .unwrap_or_default()
+        .iter()
+        .any(|u| u.permission_level == 5);
 
     let create_role_badges = {
         move || {
@@ -126,14 +140,19 @@ pub fn AdminUser(user: UserState) -> impl IntoView {
         }
     };
 
-    let stored_permission = store_value(user.permissions);
-    let store_user = store_value(user.user_id.clone());
+    let stored_permission = store_value(
+        user.clone()
+            .attributes
+            .map(|e| e.personal_permissions.clone())
+            .unwrap_or_default(),
+    );
+    let store_user = store_value(user.id.clone());
 
     view! {
         <ActivateModal user_id=store_user.get_value()/>
         <AddUserProject user_id=store_user.get_value()/>
         <tr>
-            <td>{user.user_id.clone()}</td>
+            <td>{user.id.clone()}</td>
             <td>{user.display_name.clone()}</td>
             <td>{user.email.clone()}</td>
             <td>{create_active_badges} {create_role_badges}</td>
@@ -319,12 +338,13 @@ pub fn AdminUser(user: UserState) -> impl IntoView {
                             .into_iter()
                             .map(|item| {
                                 let item_clone = item.clone();
+                                let (id, _) = extract_type_id(item.resource_id);
                                 view! {
                                     <tr colspan="5">
                                         <td>"PID:"</td>
-                                        <td>{item_clone.project_id.to_string()}</td>
+                                        <td>{ id.to_string() }</td>
                                         <td>"Role:"</td>
-                                        <td>{item_clone.to_permission_string()}</td>
+                                        <td>{to_permission_string(item_clone)}</td>
                                         <td>
                                             <div class="d-flex justify-content-end">
                                                 <a
@@ -336,7 +356,7 @@ pub fn AdminUser(user: UserState) -> impl IntoView {
                                                         remove_user_action
                                                             .dispatch(RemoveUser {
                                                                 _user_id: store_user.get_value(),
-                                                                _project_id: item.project_id.to_string(),
+                                                                _project_id: id.to_string(),
                                                             })
                                                     }
                                                 >

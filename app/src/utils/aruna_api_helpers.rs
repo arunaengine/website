@@ -1,4 +1,4 @@
-use aruna_rust_api::api::storage::services::v1::{CreateApiTokenRequest, ExpiresAt};
+use aruna_rust_api::api::storage::services::v2::{CreateApiTokenRequest, ExpiresAt};
 use chrono::{Datelike, Days, Months, NaiveDate, Timelike, Utc};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 

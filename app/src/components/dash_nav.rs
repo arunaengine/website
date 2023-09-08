@@ -1,8 +1,7 @@
+use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-
-use crate::utils::structs::UserState;
 
 /// Renders the home page of your application.
 #[component]
@@ -13,14 +12,16 @@ pub fn DashNav() -> impl IntoView {
 
     let path = loc.pathname;
 
-    let get_user = use_context::<Resource<bool, Option<UserState>>>().expect("user_state not set");
+    let get_user = use_context::<Resource<bool, Option<User>>>().expect("user_state not set");
 
     let is_admin = create_memo(move |_| {
         get_user
             .get()
             .unwrap_or_default()
             .unwrap_or_default()
-            .is_admin
+            .attributes
+            .unwrap_or_default()
+            .global_admin
     });
 
     view! {
