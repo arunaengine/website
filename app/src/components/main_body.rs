@@ -44,7 +44,7 @@ pub fn MainBody() -> impl IntoView {
                 <div class="col-lg-10 mx-auto">
                     <h3 class="lead mb-4">
                         {"Fast, secure, geo-redundant data storage with sophisticated metadata management according to "}
-                        <a href="https://www.go-fair.org/fair-principles/">{"FAIR"}</a>
+                        <a class="text-primary" href="https://www.go-fair.org/fair-principles/">{"FAIR"}</a>
                         {" principles. Store and organize your data in new ways, share it with your colleagues and partners. Transparent data management made easy."}
                     </h3>
                     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
