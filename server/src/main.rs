@@ -37,12 +37,12 @@ async fn main() {
     // The file would need to be included with the executable when moved to deployment
     let conf = get_configuration(None).await.unwrap();
     let leptos_options = conf.leptos_options;
-    let server_state = ServerState {
-        oidc: oidc::Authorizer::new(key_cloak_url)
-            .await
-            .expect("Unable to initialize authorizer"),
-        leptos_options: leptos_options.clone(),
-    };
+    // let server_state = ServerState {
+    //     oidc: oidc::Authorizer::new(key_cloak_url)
+    //         .await
+    //         .expect("Unable to initialize authorizer"),
+    //     leptos_options: leptos_options.clone(),
+    // };
     let addr = leptos_options.site_addr;
     let routes = generate_route_list(|| view! { <EntryPoint/> }).await;
 
@@ -62,9 +62,9 @@ async fn main() {
         // .route("/callback", get(callback))
         // .route("/oidc-callback", get(callback))
         // .route("/refresh", get(refresh))
-        .leptos_routes(&server_state, routes, || view! { <EntryPoint/> })
+        .leptos_routes(&leptos_options, routes, || view! { <EntryPoint/> })
         .fallback(file_and_error_handler)
-        .with_state(server_state);
+        .with_state(leptos_options);
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
