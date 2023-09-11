@@ -269,7 +269,7 @@ pub fn MainBody() -> impl IntoView {
                                 </div>
                             </div>
                             <div
-                                class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 my-2"
+                                class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 my-3"
                                 style="border: 1px dashed #999"
                             >
                                 <div class="text-body-emphasis d-inline-flex align-self-center flex-shrink-0 me-3">
@@ -295,11 +295,11 @@ pub fn MainBody() -> impl IntoView {
                         </div>
 
                         <div
-                            class="align-self-center d-inline-flex col-xl-6 border-opacity-50 mt-1"
-                            style="border: 1px dashed #999; padding: 15px;"
+                            class="d-inline-flex col-xl-6 border-opacity-50"
+                            style="border: 1px dashed #999;"
                         >
                             <img
-                                src="/aruna_components.svg"
+                                src="/aruna_schematic.png"
                                 class="img-fluid my-auto"
                                 alt="ConceptAruna"
                             />
