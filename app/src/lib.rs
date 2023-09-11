@@ -63,41 +63,62 @@ pub fn EntryPoint() -> impl IntoView {
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(true));
 
+    let hide_cordi = create_rw_signal(true);
+
+    create_effect(move |_| {
+        let is_item = if let Ok(Some(storage)) = window().local_storage() {
+            if let Ok(Some(_)) = storage.get_item("cordi") {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        request_animation_frame(move || hide_cordi.set(is_item));
+    });
+
     let cordi = move || {
         view! {
-            <div
-                class="offcanvas offcanvas-top show"
-                style="max-height: 90px;"
-                tabindex="-1"
-                id="offcanvasBottom"
-                aria-modal="true"
-                role="dialog"
-            >
-                <div class="offcanvas-body">
-                    <div class="container">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <strong>
-                                    "👋 Meet us @"
-                                    <a href="https://www.nfdi.de/cordi-2023/?lang=en">
-                                        "CORDI 2023"
-                                    </a>
-                                </strong>
-                                ": We are proud to announce that we will be presenting our project at the Enabling RDM II session on September 13th, 2023"
-                            </div>
-                            <div class="col-auto">
-                                <button
-                                    type="button"
-                                    class="btn btn-primary"
-                                    data-bs-dismiss="offcanvas"
-                                >
-                                       Close
-                                </button>
+                <div
+                    class=move || if hide_cordi.get() { "offcanvas offcanvas-top"} else { "offcanvas offcanvas-top show"}
+                    style="max-height: 90px;"
+                    tabindex="-1"
+                    id="cordi-canvas"
+                    aria-modal="true"
+                    role="dialog"
+                >
+                    <div class="offcanvas-body">
+                        <div class="container">
+                            <div class="row align-items-center">
+                                <div class="col">
+                                    <strong>
+                                        "👋 Meet us @"
+                                        <a href="https://www.nfdi.de/cordi-2023/?lang=en">
+                                            "CORDI 2023"
+                                        </a>
+                                    </strong>
+                                    ": We are proud to announce that we will be presenting our project at the Enabling RDM II session on September 13th, 2023"
+                                </div>
+                                <div class="col-auto">
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary"
+                                        data-bs-dismiss="offcanvas"
+                                        on:click=move |_| {
+                                            if let Ok(Some(storage)) = window().local_storage() {
+                                                storage.set_item("cordi", "true").expect("Failed to set item");
+                                                hide_cordi.set(true);
+                                            }
+                                        }
+                                    >
+                                        Close
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
         }
     };
 
@@ -161,7 +182,8 @@ pub fn EntryPoint() -> impl IntoView {
         // sets the document title
         <Title text="Aruna Object Storage"/>
         <div class="page">
-            {cordi} // { cookies }
+            {cordi}
+            // { cookies }
             <Router>
                 <Routes>
                     <Route
