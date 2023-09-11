@@ -1,6 +1,6 @@
 FROM rust:slim-bullseye as builder
 RUN apt-get -y update && apt-get -y upgrade
-RUN apt-get -y install llvm cmake gcc ca-certificates libssl-dev pkg-config
+RUN apt-get -y install llvm cmake gcc ca-certificates libssl-dev pkg-config curl
 ENV RUSTFLAGS="-C target-feature=-crt-static --cfg=web_sys_unstable_apis"
 ENV PB_REL="https://github.com/protocolbuffers/protobuf/releases"
 RUN curl -LO $PB_REL/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip
