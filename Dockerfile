@@ -12,7 +12,7 @@ COPY . .
 RUN cargo leptos build --release -vv
 
 FROM debian:bullseye-slim
-COPY --from=builder /app/target/server/release/aruna_web /app/
+COPY --from=builder /app/target/server/release/aruna_web_server /app/
 COPY --from=builder /app/target/site /app/site
 COPY --from=builder /app/Cargo.toml /app/
 COPY --from=builder /app/.env /app/
@@ -25,4 +25,4 @@ ENV APP_ENVIRONMENT="production"
 ENV LEPTOS_SITE_ADDR="0.0.0.0:3000"
 ENV LEPTOS_SITE_ROOT="site"
 EXPOSE 3000
-CMD ["/app/aruna_web"]
+CMD ["/app/aruna_web_server"]
