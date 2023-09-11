@@ -605,7 +605,7 @@ pub fn MainBody() -> impl IntoView {
                                             <div class="accordion-body pt-0">
                                                 <div>
                                                     <p>
-                                                        {"Currently we do not enforce storage quotas, but as always their is a physical limit in storage capacity. If you plan to store large amounts of data (>1 TB) contact us and we will figure out a solution."}
+                                                        {"Currently we do not enforce storage quotas, but as always there is a physical limit in storage capacity. If you plan to store large amounts of data (>1 TB) contact us and we will figure out a solution."}
                                                     </p>
                                                 </div>
                                             </div>
