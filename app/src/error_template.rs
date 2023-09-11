@@ -55,9 +55,9 @@ pub fn ErrorTemplate(
     }}
 
     view! {
-        <Stylesheet href="/tabler.min.css"/>
-        <Stylesheet id="leptos" href="/pkg/aruna_web_workspace.css"/>
-        <Script src="/tabler.min.js"/>
+        <Stylesheet href="/tabler.min_v4.css"/>
+        <Stylesheet id="leptos" href="/pkg/aruna_web_v4.css"/>
+        <Script src="/tabler.min_v4.js"/>
         // sets the document title
         <Title text="Aruna Object Storage"/>
         <For

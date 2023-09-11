@@ -176,9 +176,9 @@ pub fn EntryPoint() -> impl IntoView {
     provide_context(update_user);
 
     view! {
-        <Stylesheet href="/tabler.min.css"/>
+        <Stylesheet href="/tabler.min_v4.css"/>
         <Stylesheet id="leptos" href="/pkg/aruna_web_v4.css"/>
-        <Script src="/tabler.min.js"/>
+        <Script src="/tabler.min_v4.js"/>
         // sets the document title
         <Title text="Aruna Object Storage"/>
         <div class="page">
