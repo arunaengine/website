@@ -40,10 +40,10 @@ pub fn MainBody() -> impl IntoView {
                         />
                     </div>
                 </div>
-                <h1 class="fw-bold hook pb-2">{"Your geo-redundant scientific data mesh"}</h1>
+                <h1 class="fw-bold hook pb-2">{"Your distributed scientific data mesh"}</h1>
                 <div class="col-lg-10 mx-auto">
                     <h3 class="lead mb-4">
-                        {"Fast, secure, geo-redundant data storage with sophisticated metadata management according to "}
+                        {"Fast, secure, distributed and domain-agnostic data storage with sophisticated metadata management according to "}
                         <a class="text-primary" href="https://www.go-fair.org/fair-principles/">{"FAIR"}</a>
                         {" principles. Store and organize your data in new ways, share it with your colleagues and partners. Transparent data management made easy."}
                     </h3>
@@ -146,7 +146,7 @@ pub fn MainBody() -> impl IntoView {
                             </div>
                             <h2 class="h3">{"Modular design"}</h2>
                             <p class="text-muted">
-                                {"A modern microservice architecture allows us to deploy only the components you need, no unnecessary overhead"}
+                                {"A modern microservice architecture allows us to deploy only the components you need, without unnecessary overhead"}
                             </p>
                         </div>
                     </div>
@@ -180,7 +180,7 @@ pub fn MainBody() -> impl IntoView {
                                 <div>
                                     <h3 class="fw-bold mb-0 mt-1">{"Data storage"}</h3>
                                     <p class="text-muted mb-1">
-                                        {"Store data of any size, use our managed service or participate via a self-hosted proxy instance"}
+                                        {"Store data regardless of format or size, use our managed service, or join the network with a self-hosted proxy instance."}
                                     </p>
                                 </div>
                             </div>
@@ -205,7 +205,7 @@ pub fn MainBody() -> impl IntoView {
                                 <div>
                                     <h3 class="fw-bold mb-0 mt-1">{"Metadata enrichment"}</h3>
                                     <p class="text-muted mb-1">
-                                        {"Enrich, group and organize data and metadata, thanks to a flexible and powerful multi-standard metadata management system."}
+                                        {"Enrich, group, and organize data and metadata, including qualified links to internal and external sources, thanks to a flexible and powerful multi-standard metadata management system."}
                                     </p>
                                 </div>
                             </div>
@@ -229,7 +229,7 @@ pub fn MainBody() -> impl IntoView {
                                 <div>
                                     <h3 class="fw-bold mb-0 mt-1">{"FAIR"}</h3>
                                     <p class="text-muted mb-1">
-                                        {"All data is treated similar to FAIR Digital objects, with a globally unique persistent identifier for each resource."}
+                                        {"All data is treated similarly to FAIR Digital Objects, with a globally unique persistent identifier for each resource and qualified (user-defined) relationships to internal and external sources."}
                                     </p>
                                 </div>
                             </div>
@@ -253,7 +253,7 @@ pub fn MainBody() -> impl IntoView {
                                 <div>
                                     <h3 class="fw-bold mb-0 mt-1">{"Easy Sharing"}</h3>
                                     <p class="text-muted mb-1">
-                                        {"Flexible data sharing via the widely accepted S3 compatible interface, including pre-authenticated up- and download URLs."}
+                                        {"Flexible data handling via the widely accepted S3 compatible interface, including pre-authenticated up- and download URLs makes it easy to integrate with existing tools and workflows."}
                                     </p>
                                 </div>
                             </div>
@@ -279,12 +279,12 @@ pub fn MainBody() -> impl IntoView {
                                 <div>
                                     <h3 class="fw-bold mb-0 mt-1">{"Effortless Migration"}</h3>
                                     <p class="text-muted">
-                                        {"Existing storage systems can be easily ingested into the system, without the need to move the data at all."}
+                                        {"Existing storage systems can be easily integrated into the system without moving any data. You maintain full control over who has access to your data."}
                                     </p>
                                 </div>
                             </div>
                             <div
-                                class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 my-3"
+                                class="col d-flex align-items-start border-opacity-50 shadow-sm px-3 py-3 mt-2"
                                 style="border: 1px dashed #999"
                             >
                                 <div class="text-body-emphasis d-inline-flex align-self-center flex-shrink-0 me-3">
@@ -327,6 +327,8 @@ pub fn MainBody() -> impl IntoView {
 
     let send_mail = create_server_action::<SendMail>();
 
+    let succeeded = move || send_mail.value()().map(|e| e.ok()).flatten().is_some();
+
     let timeline = move || {
         view! {
             <div class="row">
@@ -347,7 +349,7 @@ pub fn MainBody() -> impl IntoView {
                     <div class="card-body">
                         <ul class="timeline">
                             <li class="timeline-event">
-                                <div class="text-white timeline-event-icon bg-yellow">
+                                <div class="text-white timeline-event-icon bg-primary">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         class="icon icon-tabler icon-tabler-info-hexagon fw-bolder"
@@ -386,6 +388,9 @@ pub fn MainBody() -> impl IntoView {
                                                     <div><b>"- and a lot more..."</b></div>
                                                 </p>
                                                 <p>
+                                                    <div><b>"We have temporarily disabled new user registrations and logins to prepare for the update. Existing users can still log in and use the system as usual."</b></div>
+                                                </p>
+                                                <p>
                                                     <div>"Stay tuned for the upcoming update and join our mailing list here:"</div>
                                                 </p>
                                             </div>
@@ -394,7 +399,7 @@ pub fn MainBody() -> impl IntoView {
                                 </div>
                             </li>
                             <li class="timeline-event">
-                                <div class="timeline-event-icon text-white bg-success fw-bolder">
+                                <div class="timeline-event-icon text-white bg-primary fw-bolder">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-mail-check" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                         <path d="M11 19h-6a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v6"></path>
@@ -405,7 +410,7 @@ pub fn MainBody() -> impl IntoView {
                                 <div class="card timeline-event-card">
                                     <div class="card-body">
                                         //<div class="text-muted float-end">"21.04.23"</div>
-                                        <h3 class="h2">"Join the mailing list"</h3>
+                                        <h3 class="h2">"Join our mailing list"</h3>
                                         <div class="text-muted">
                                             <p>
                                                 <div>
@@ -417,9 +422,19 @@ pub fn MainBody() -> impl IntoView {
                                         <div class="container p-1">
 
                                             <ActionForm action=send_mail class="row">
-                                                <input type="email" class="form-control col-6 w-auto" name="mail" aria-describedby="emailHelp" placeholder="Enter email" />
+                                                <input type="email" class="form-control col-6 w-25" name="mail" aria-describedby="emailHelp" placeholder="Enter email" />
                                                 <button type="submit" class="btn btn-primary col-1">Join</button>
-                                                <div id="emailHelp" class="form-text">"We'll never share your email with anyone else. Click "<A href="/imprint"> "here" </A> " to learn more."</div>
+                                                { move || if succeeded() {
+                                                    view! {
+                                                        <div class="alert alert-success col-5" role="alert">
+                                                            "Success ! Thank you for joining our mailing list!"
+                                                        </div>
+                                                    }.into_view()
+                                                }else{
+                                                    ().into_view()
+                                                }
+                                                }
+                                                <div id="emailHelp" class="form-text">"We'll never share your email with anyone else. Click "<A href="/imprint"> "here" </A> " to learn how we store and process your data."</div>
                                             </ActionForm>
                                         </div>
                                     </div>
@@ -648,7 +663,7 @@ pub fn MainBody() -> impl IntoView {
                                             <div class="accordion-body pt-0">
                                                 <div>
                                                     <p>
-                                                        {"You can decide how your data is shared, we provide a wide variety of access models, from strongly confidential data to public datasets that can be seen by everyone. By default all your data is private and only accessible by people you grand access to."}
+                                                        {"You can choose how your data is shared, and we offer a variety of access models, from highly confidential data to public datasets that anyone can view and download. By default, all of your data is private and only accessible to the people you grant access to, but a minimal configurable set of metadata is always public to ensure discoverability."}
                                                     </p>
                                                 </div>
                                             </div>
@@ -673,12 +688,37 @@ pub fn MainBody() -> impl IntoView {
                                             <div class="accordion-body pt-0">
                                                 <div>
                                                     <p>
-                                                        {"Data is stored via our custom data-proxy component, that encrypts, compresses and anonymizes all user-provided data by default. This way your data is always secure while stored on disk."}
+                                                        {"When you use our managed service, we ensure that your data is stored through our custom data proxy component, which encrypts, compresses, and anonymizes all user-provided data by default. This way, your data is always secure while stored on disk."}
                                                     </p>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="accordion-item">
+                                    <div class="accordion-header" role="tab">
+                                        <button
+                                            class="accordion-button collapsed"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#faq-2-7"
+                                        >
+                                            {"What is a Dataproxy ?"}
+                                        </button>
+                                    </div>
+                                    <div
+                                        id="faq-2-7"
+                                        class="accordion-collapse collapse"
+                                        role="tabpanel"
+                                        data-bs-parent="#faq-2"
+                                    >
+                                        <div class="accordion-body pt-0">
+                                            <div>
+                                                <p>
+                                                    {"Data proxies are the decentralized backbone of the data plane, interacting directly with data storage providers and providing a unified S3-compliant interface for data. In addition, they can be configured to perform data encryption, compression, anonymization, and end-user access control, including enforcement of data usage policies."}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 </div>
                             </div>
                     </div>

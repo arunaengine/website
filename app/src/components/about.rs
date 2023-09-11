@@ -6,17 +6,36 @@ pub fn About() -> impl IntoView {
     provide_meta_context();
 
     view! {
-        <div class="card px-4 my-5 text-center col-10 mx-auto">
-            <img class="d-block mx-auto" src="/aruna_icon.png" alt="" width="72"/>
-            <div class="card-body">
-                <h1 class="display-5 fw-bold text-body-emphasis">"About Us"</h1>
-                <div class="col-lg-10 col-md-10 mx-auto">
-                    <p class="lead mb-4">
-                        "We are a small team of developers from the Justus-Liebig-University in Gießen interested in developing advanced cloud native infrastructure and applications. With this expertise, we would like to further develop the fundamental way in which data management and storage is conducted in research in the future. As the Aruna Object Storage is part of the visionary Gaia-X project, the goal is the implementation of a cloud-native, geo-redundant, scalable, domain-agnostic and performant object storage system for scientists as well as corporate members."
-                    </p>
-                    <p class="lead mb-4">
-                        "We are funded by the project FAIR Data Spaces and various consortia of the NFDI (Nationale Forschungsdateninfrastruktur), associations of different institutions within a research field, which must also be mentioned accordingly as early adopters of the system with their unprecedented contribution."
-                    </p>
+
+        <div class="container-xl mt-4 mx-auto row d-flex justify-content-center">
+        <div class="card col-lg-8 text-start" id="timeline">
+            <div class="card-header">
+                <span class="text-white avatar me-2">
+                    <img class="d-block mx-auto" src="/aruna_icon.png" alt="" width="72"/>
+                </span>
+                <h3 class="h2 card-text ms-2 text-primary">
+                    <b>"About us"</b>
+                </h3>
+            </div>
+                <div class="card-body">
+                    <div class="text-muted">""</div>
+                        <h3 class="h2">"👋 Hi there, and welcome !"</h3>
+                        <p>
+                            <div class="text-muted">
+                                <p><b>"Who are we ?"</b></p>
+                                <p>
+                                    <div>"We are a small team of developers from the Justus-Liebig-University in Gießen interested in developing advanced cloud native infrastructure and applications."</div>
+                                </p>
+                                <p><b>"Why ?"</b></p>
+                                <p>
+                                    <div>"As one of the major cloud locations for the de.NBI network, we have years of experience in developing and operating cloud-native infrastructures. With this expertise, we aim to further develop the fundamental way in which research data is managed and stored in the future."</div>
+                                </p>
+                                <p><b>"What is our goal ?"</b></p>
+                                <p>
+                                <div>"Aruna Object Storage is a multi-domain project that was first envisioned as the core cloud storage component of the Research Data Commons architecture in NFDI4BioDiversity, and later adopted by the FAIR Data Spaces project and NFDI4Microbiota. This multi-domain expertise has resulted in a flexible and generalizable approach to the base storage layer that can be adapted to any data management solution in any domain."</div>
+                                </p>
+                            </div>
+                        </p>
                 </div>
             </div>
         </div>
