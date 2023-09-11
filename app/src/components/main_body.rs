@@ -1,4 +1,5 @@
 use leptos::{html::Div, *};
+use leptos_router::*;
 
 /// Renders the home page of your application.
 #[component]
@@ -311,130 +312,103 @@ pub fn MainBody() -> impl IntoView {
 
     let timeline = move || {
         view! {
-            <div class="card text-start mt-3 col mx-auto">
-                <div class="card-header">
-                    <h3 class="card-title text-left">
-                        <b>"News & Updates"</b>
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <ul class="timeline">
-                        <li class="timeline-event">
-                            <div class="timeline-event-icon bg-yellow">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    class="icon icon-tabler icon-tabler-info-hexagon fw-bolder"
-                                    width="40"
-                                    height="40"
-                                    viewBox="0 0 24 24"
-                                    stroke-width="2"
-                                    stroke="currentColor"
-                                    fill="none"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                >
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    <path d="M19.875 6.27c.7 .398 1.13 1.143 1.125 1.948v7.284c0 .809 -.443 1.555 -1.158 1.948l-6.75 4.27a2.269 2.269 0 0 1 -2.184 0l-6.75 -4.27a2.225 2.225 0 0 1 -1.158 -1.948v-7.285c0 -.809 .443 -1.554 1.158 -1.947l6.75 -3.98a2.33 2.33 0 0 1 2.25 0l6.75 3.98h-.033z"></path>
-                                    <path d="M12 9h.01"></path>
-                                    <path d="M11 12h1v4h1"></path>
-                                </svg>
-                            </div>
-                            <div class="card timeline-event-card">
-                                <div class="card-body">
-                                    <div class="text-muted float-end">""</div>
-                                    <h4>"Important Note"</h4>
-                                    <p>
-                                        <div class="text-muted">
-                                            "Please note that this website is heavily work in progress and besides "
-                                            <b>"token creation"</b> " entirely optional."
-                                        </div>
-                                        <div class="text-muted">
-                                            "Expect visual bugs, glitches and issues. We are actively working on improving the user experience and hope to release further updates soon."
-                                        </div>
-                                        <div class="text-muted">
-                                            "If you have any issues, especially regarding the API-Token creation please open an issue at:"
-                                        </div>
-                                    </p>
-                                    <p class="text-muted">
-                                        <a href="https://github.com/ArunaStorage/ArunaWeb">
-                                            "https://github.com/ArunaStorage/ArunaWeb"
-                                        </a>
-                                        " or write an email to "
-                                        <a href="mailto:support@aruna-storage.org">
-                                            "support@aruna-storage.org"
-                                        </a>
-                                    </p>
+            <div class="row">
+                <div class="card text-start col-lg-12" id="timeline">
+                    <div class="card-header">
+                        <span class="text-white avatar bg-primary me-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-info-square" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M12 9h.01"></path>
+                                <path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14z"></path>
+                                <path d="M11 12h1v4h1"></path>
+                            </svg>
+                        </span>
+                        <h3 class="h2 card-text text-left ms-2 text-primary">
+                            <b>"News & Updates"</b>
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <ul class="timeline">
+                            <li class="timeline-event">
+                                <div class="text-white timeline-event-icon bg-yellow">
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        class="icon icon-tabler icon-tabler-info-hexagon fw-bolder"
+                                        width="40"
+                                        height="40"
+                                        viewBox="0 0 24 24"
+                                        stroke-width="2"
+                                        stroke="currentColor"
+                                        fill="none"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                        <path d="M19.875 6.27c.7 .398 1.13 1.143 1.125 1.948v7.284c0 .809 -.443 1.555 -1.158 1.948l-6.75 4.27a2.269 2.269 0 0 1 -2.184 0l-6.75 -4.27a2.225 2.225 0 0 1 -1.158 -1.948v-7.285c0 -.809 .443 -1.554 1.158 -1.947l6.75 -3.98a2.33 2.33 0 0 1 2.25 0l6.75 3.98h-.033z"></path>
+                                        <path d="M12 9h.01"></path>
+                                        <path d="M11 12h1v4h1"></path>
+                                    </svg>
                                 </div>
-                            </div>
-                        </li>
-                        <li class="timeline-event">
-                            <div class="timeline-event-icon bg-success fw-bolder">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    class="icon icon-tabler icon-tabler-confetti"
-                                    width="40"
-                                    height="40"
-                                    viewBox="0 0 24 24"
-                                    stroke-width="2"
-                                    stroke="currentColor"
-                                    fill="none"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                >
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    <path d="M4 5h2"></path>
-                                    <path d="M5 4v2"></path>
-                                    <path d="M11.5 4l-.5 2"></path>
-                                    <path d="M18 5h2"></path>
-                                    <path d="M19 4v2"></path>
-                                    <path d="M15 9l-1 1"></path>
-                                    <path d="M18 13l2 -.5"></path>
-                                    <path d="M18 19h2"></path>
-                                    <path d="M19 18v2"></path>
-                                    <path d="M14 16.518l-6.518 -6.518l-4.39 9.58a1 1 0 0 0 1.329 1.329l9.579 -4.39z"></path>
-                                </svg>
-                            </div>
-                            <div class="card timeline-event-card">
-                                <div class="card-body">
-                                    <div class="text-muted float-end">"21.04.23"</div>
-                                    <h4>"v1.0.0 Release"</h4>
-                                    <p>
-                                        <div class="text-muted">
-                                            "We are proud to announce the official release of Aruna 1.0.0"
-                                        </div>
-                                        <div class="text-muted">
-                                            "This update adds many long awaited updates. For full changelogs see:"
-                                        </div>
-                                    </p>
-                                    <p>
-                                        <div class="text-muted">
-                                            <b>"API: "</b>
-                                            <a href="https://github.com/ArunaStorage/ArunaAPI/releases/tag/v1.0.0">
-                                                "API Release / Changelog"
-                                            </a>
-                                        </div>
-                                        <div class="text-muted">
-                                            <b>"Server: "</b>
-                                            <a href="https://github.com/ArunaStorage/ArunaServer/releases/tag/v1.0.0">
-                                                "Server Changelog"
-                                            </a>
-                                        </div>
-                                        <div class="text-muted">
-                                            <b>"Dataproxy: "</b>
-                                            <a href="https://github.com/ArunaStorage/DataProxy/releases/tag/v1.0.0">
-                                                "Dataproxy Changelog"
-                                            </a>
-                                        </div>
-                                    </p>
-                                    <p>
-                                        <div class="text-muted">
-                                            "As always, if you have any problems or issues, contact us or create an issue on GitHub."
-                                        </div>
-                                    </p>
+                                <div class="card timeline-event-card">
+                                    <div class="card-body">
+                                        <div class="text-muted float-end">""</div>
+                                        <h3 class="h2">"🎉 Version 2.0.0 is coming soon!"</h3>
+                                        <p>
+                                            <div class="text-muted">
+                                                <p>
+                                                    <div>"We are very happy to anounce that the next major version of Aruna is scheduled for release on "<b>"02.10.2023"</b></div>
+                                                    <div>"This will integrate many long awaited features and improvements. Such as:"</div>
+                                                </p>
+                                                <p>
+                                                    <div><b>"- Relaxed hierarchy: "</b>"You can now arrange your objects in a tree-like structure without the requirement for intermediate collections."</div>
+                                                    <div><b>"- Improved search: "</b>"A new typo-tolerant metadata search with advanced query capabilities"</div>
+                                                    <div><b>"- Hooks: "</b>"Automated actions on object creation for data transformation and validation"</div>
+                                                    <div><b>"- Improved web interface: "</b>"You can explore the preview "<A href="/dash/search">here</A> "!"</div>
+                                                    <div><b>"- Data proxy overhaul: "</b>"Data proxies have been completely redesigned to separate"</div>
+                                                    <div><b>"- Fine grained user permissions: "</b>"A new attribute based user permission system has been added"</div>
+                                                    <div><b>"- and a lot more..."</b></div>
+                                                </p>
+                                                <p>
+                                                    <div>"Stay tuned for the upcoming update and join our mailing list here:"</div>
+                                                </p>
+                                            </div>
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
-                        </li>
-                    </ul>
+                            </li>
+                            <li class="timeline-event">
+                                <div class="timeline-event-icon text-white bg-success fw-bolder">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-mail-check" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                        <path d="M11 19h-6a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v6"></path>
+                                        <path d="M3 7l9 6l9 -6"></path>
+                                        <path d="M15 19l2 2l4 -4"></path>
+                                    </svg>
+                                </div>
+                                <div class="card timeline-event-card">
+                                    <div class="card-body">
+                                        //<div class="text-muted float-end">"21.04.23"</div>
+                                        <h3 class="h2">"Join the mailing list"</h3>
+                                        <div class="text-muted">
+                                            <p>
+                                                <div>
+                                                    "If you want to stay up to date with the latest news and updates, you can now join our mailing list."
+                                                </div>
+                                            </p>
+                                        </div>
+
+                                        <div class="container p-1">
+                                            <form class="row">
+                                                <input type="email" class="form-control col-4 w-auto" aria-describedby="emailHelp" placeholder="Enter email" />
+                                                <a href="#" class="btn btn-primary col-2">Join</a>
+                                                <div id="emailHelp" class="form-text">"We'll never share your email with anyone else. Click "<A href="/imprint"> "here" </A> " to learn more."</div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         }
@@ -444,8 +418,20 @@ pub fn MainBody() -> impl IntoView {
         view! {
             <div class="row">
                 <div class="card card-lg text-start col-lg-12">
-                    <div class="card-body">
-                        <div class="space-y-4">
+                    <div class="card-header">
+                        <span class="text-white avatar bg-primary me-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-help-hexagon" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M19.875 6.27c.7 .398 1.13 1.143 1.125 1.948v7.284c0 .809 -.443 1.555 -1.158 1.948l-6.75 4.27a2.269 2.269 0 0 1 -2.184 0l-6.75 -4.27a2.225 2.225 0 0 1 -1.158 -1.948v-7.285c0 -.809 .443 -1.554 1.158 -1.947l6.75 -3.98a2.33 2.33 0 0 1 2.25 0l6.75 3.98h-.033z"></path>
+                                <path d="M12 16v.01"></path>
+                                <path d="M12 13a2 2 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483"></path>
+                            </svg>
+                        </span>
+                        <h3 class="h2 card-text text-primary text-left ms-2">
+                            <b>"FAQ"</b>
+                        </h3>
+                    </div>
+                    <div class="card-body p-4">
                             <div>
                                 <h2 class="mb-3">{"1. Introduction"}</h2>
                                 <div
@@ -542,7 +528,7 @@ pub fn MainBody() -> impl IntoView {
                                     </div>
                                 </div>
                             </div>
-                            <div>
+                            <div class="mt-2">
                                 <h2 class="mb-3">{"2. Technical information"}</h2>
                                 <div
                                     id="faq-2"
@@ -677,7 +663,6 @@ pub fn MainBody() -> impl IntoView {
                                     </div>
                                 </div>
                             </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -780,24 +765,24 @@ pub fn MainBody() -> impl IntoView {
             </div>
             {waves}
         </section>
-        <section class="section ocean-bg">
+        <section class="section ocean-bg pb-4">
             <div class="container-xl">
                 {section2}
             </div>
             {bubbles}
         </section>
-        <section class="section">
+        <section class="section pt-4 pb-4">
             <div class="container-xl">
                 {timeline}
             </div>
         </section>
-        <section id="faq" class="section">
-            <div class="container-xl mt-5">
+        <section id="faq" class="section pt-2 pb-4">
+            <div class="container-xl">
                 {faq}
             </div>
         </section>
         <section class="section">
-            <div class="container-xl mt-5">
+            <div class="container-xl">
                 {partners}
             </div>
         </section>

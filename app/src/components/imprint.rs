@@ -30,16 +30,16 @@ pub fn Imprint() -> impl IntoView {
                 <h3 class="mt-2">"2. Collection of personal data"</h3>
 
                 <div>
-                    "We collect personal data from you when you register for an account on our website. The following personal data is collected:"
+                    "We collect personal data from you when you register for an account or join the mailing-list on our website. The following personal data is collected:"
                 </div>
 
                 <div>"- A self-selected name"</div>
-                <div>"- Preferably an email address for contact"</div>
+                <div>"- Email address for contact"</div>
 
                 <h3 class="mt-2">"3. Purpose of data processing"</h3>
 
                 <div>
-                    "The personal data provided by you is exclusively used for the creation of your account. If an email address is provided, we will inform you about account-related events."
+                    "The personal data provided by you is exclusively used for the creation of your account. If an email address is provided, we will inform you about account-related events. If you join the mailing-list, we will send you information about the project in irregular intervals."
                 </div>
 
                 <h3 class="mt-2">"4. Legal basis for data processing"</h3>
@@ -106,16 +106,16 @@ pub fn Imprint() -> impl IntoView {
                 <h3 class="mt-2">"2. Erhebung von personenbezogenen Daten"</h3>
 
                 <div>
-                    "Wir erheben personenbezogene Daten von Ihnen, wenn Sie sich für einen Account auf unserer Website registrieren. Folgende personenbezogene Daten werden erhoben:"
+                    "Wir erheben personenbezogene Daten von Ihnen, wenn Sie sich für einen Account auf unserer Website oder im Email-verteiler registrieren. Folgende personenbezogene Daten werden erhoben:"
                 </div>
 
                 <div>"- Einen selbst zu vergebenen Namen"</div>
-                <div>"- Vorzugsweise eine E-Mail-Adresse zur Kontaktaufnahme"</div>
+                <div>"- Eine E-Mail-Adresse zur Kontaktaufnahme"</div>
 
                 <h3 class="mt-2">"3. Zweck der Datenverarbeitung"</h3>
 
                 <div>
-                    "Die von Ihnen angegebenen personenbezogenen Daten werden ausschließlich zur Erstellung Ihres Accounts verwendet. Falls eine Emailadresse hinterlegt wurde, informieren wir Sie über Account relevante Ereignisse."
+                    "Die von Ihnen angegebenen personenbezogenen Daten werden ausschließlich zur Erstellung Ihres Accounts oder der Verarbeitung des Email verteilers verwendet. Falls eine Emailadresse hinterlegt wurde, informieren wir Sie über Account relevante Ereignisse und allgemeine Ereignisse des Systems (Updates, Status etc.) ."
                 </div>
 
                 <h3 class="mt-2">"4. Rechtsgrundlage für die Datenverarbeitung"</h3>
