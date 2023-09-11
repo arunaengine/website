@@ -20,7 +20,7 @@ RUN apt-get -y update && apt-get -y upgrade
 RUN apt-get -y install ca-certificates libssl-dev
 WORKDIR /app
 ENV RUST_LOG="info"
-ENV LEPTOS_OUTPUT_NAME="aruna_web"
+ENV LEPTOS_OUTPUT_NAME="aruna_web_v4"
 ENV APP_ENVIRONMENT="production"
 ENV LEPTOS_SITE_ADDR="0.0.0.0:3000"
 ENV LEPTOS_SITE_ROOT="site"
