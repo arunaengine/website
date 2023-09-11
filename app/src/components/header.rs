@@ -270,7 +270,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                         }
                                     }
 
-                                    class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2"
+                                    class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2 disabled"
                                 >
                                     {"Login"}
                                 </a>
@@ -342,7 +342,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                         class:active=move || { path().contains("dash") }
                                     >
                                         <A
-                                            class="nav-link"
+                                            class="nav-link disabled"
                                             href=move || {
                                                 if is_logged_memo()() {
                                                     "/dash".to_string()

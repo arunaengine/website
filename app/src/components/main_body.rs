@@ -42,7 +42,7 @@ pub fn MainBody() -> impl IntoView {
                             }
                         >
 
-                            {"Get started!"}
+                            {"Learn more!"}
                         </button>
                         <button
                             type="button"
@@ -309,90 +309,134 @@ pub fn MainBody() -> impl IntoView {
         }
     };
 
-    let _timeline = move || {
+    let timeline = move || {
         view! {
-            <ul class="timeline">
-                <li class="timeline-event">
-                    <div class="timeline-event-icon bg-twitter-lt"></div>
-                    <div class="card timeline-event-card">
-                        <div class="card-body">
-                            <div class="text-muted float-end">{"10 hrs ago"}</div>
-                            <h4>{"+1150 Followers"}</h4>
-                            <p class="text-muted">
-                                {"Youre getting more and more followers, keep it up!"}
-                            </p>
-                        </div>
-                    </div>
-                </li>
-                <li class="timeline-event">
-                    <div class="timeline-event-icon"></div>
-                    <div class="card timeline-event-card">
-                        <div class="card-body">
-                            <div class="text-muted float-end">{"2 hrs ago"}</div>
-                            <h4>{"+3 New Products were added!"}</h4>
-                            <p class="text-muted">{"Congratulations!"}</p>
-                        </div>
-                    </div>
-                </li>
-                <li class="timeline-event">
-                    <div class="timeline-event-icon"></div>
-                    <div class="card timeline-event-card">
-                        <div class="card-body">
-                            <div class="text-muted float-end">{"1 day ago"}</div>
-                            <h4>{"Database backup completed!"}</h4>
-                            <p class="text-muted">{"Download the latest backup."}</p>
-                        </div>
-                    </div>
-                </li>
-                <li class="timeline-event">
-                    <div class="timeline-event-icon bg-facebook-lt"></div>
-                    <div class="card timeline-event-card">
-                        <div class="card-body">
-                            <div class="text-muted float-end">{"1 day ago"}</div>
-                            <h4>{"+290 Page Likes"}</h4>
-                            <p class="text-muted">{"This is great, keep it up!"}</p>
-                        </div>
-                    </div>
-                </li>
-                <li class="timeline-event">
-                    <div class="timeline-event-icon"></div>
-                    <div class="card timeline-event-card">
-                        <div class="card-body">
-                            <div class="text-muted float-end">{"2 days ago"}</div>
-                            <h4>{"+3 Friend Requests"}</h4>
-                        </div>
-                    </div>
-                </li>
-                <li class="timeline-event">
-                    <div class="timeline-event-icon"></div>
-                    <div class="card timeline-event-card">
-                        <div class="card-body">
-                            <div class="text-muted float-end">{"3 days ago"}</div>
-                            <h4>{"+2 New photos"}</h4>
-                            <div class="mt-3">
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <div class="media media-2x1 rounded"></div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="media media-2x1 rounded"></div>
-                                    </div>
+            <div class="card text-start mt-3 col mx-auto">
+                <div class="card-header">
+                    <h3 class="card-title text-left">
+                        <b>"News & Updates"</b>
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <ul class="timeline">
+                        <li class="timeline-event">
+                            <div class="timeline-event-icon bg-yellow">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="icon icon-tabler icon-tabler-info-hexagon fw-bolder"
+                                    width="40"
+                                    height="40"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="2"
+                                    stroke="currentColor"
+                                    fill="none"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M19.875 6.27c.7 .398 1.13 1.143 1.125 1.948v7.284c0 .809 -.443 1.555 -1.158 1.948l-6.75 4.27a2.269 2.269 0 0 1 -2.184 0l-6.75 -4.27a2.225 2.225 0 0 1 -1.158 -1.948v-7.285c0 -.809 .443 -1.554 1.158 -1.947l6.75 -3.98a2.33 2.33 0 0 1 2.25 0l6.75 3.98h-.033z"></path>
+                                    <path d="M12 9h.01"></path>
+                                    <path d="M11 12h1v4h1"></path>
+                                </svg>
+                            </div>
+                            <div class="card timeline-event-card">
+                                <div class="card-body">
+                                    <div class="text-muted float-end">""</div>
+                                    <h4>"Important Note"</h4>
+                                    <p>
+                                        <div class="text-muted">
+                                            "Please note that this website is heavily work in progress and besides "
+                                            <b>"token creation"</b> " entirely optional."
+                                        </div>
+                                        <div class="text-muted">
+                                            "Expect visual bugs, glitches and issues. We are actively working on improving the user experience and hope to release further updates soon."
+                                        </div>
+                                        <div class="text-muted">
+                                            "If you have any issues, especially regarding the API-Token creation please open an issue at:"
+                                        </div>
+                                    </p>
+                                    <p class="text-muted">
+                                        <a href="https://github.com/ArunaStorage/ArunaWeb">
+                                            "https://github.com/ArunaStorage/ArunaWeb"
+                                        </a>
+                                        " or write an email to "
+                                        <a href="mailto:support@aruna-storage.org">
+                                            "support@aruna-storage.org"
+                                        </a>
+                                    </p>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </li>
-                <li class="timeline-event">
-                    <div class="timeline-event-icon"></div>
-                    <div class="card timeline-event-card">
-                        <div class="card-body">
-                            <div class="text-muted float-end">{"2 weeks ago"}</div>
-                            <h4>{"System updated to v2.02"}</h4>
-                            <p class="text-muted">{"Check the complete changelog at the"}</p>
-                        </div>
-                    </div>
-                </li>
-            </ul>
+                        </li>
+                        <li class="timeline-event">
+                            <div class="timeline-event-icon bg-success fw-bolder">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="icon icon-tabler icon-tabler-confetti"
+                                    width="40"
+                                    height="40"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="2"
+                                    stroke="currentColor"
+                                    fill="none"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M4 5h2"></path>
+                                    <path d="M5 4v2"></path>
+                                    <path d="M11.5 4l-.5 2"></path>
+                                    <path d="M18 5h2"></path>
+                                    <path d="M19 4v2"></path>
+                                    <path d="M15 9l-1 1"></path>
+                                    <path d="M18 13l2 -.5"></path>
+                                    <path d="M18 19h2"></path>
+                                    <path d="M19 18v2"></path>
+                                    <path d="M14 16.518l-6.518 -6.518l-4.39 9.58a1 1 0 0 0 1.329 1.329l9.579 -4.39z"></path>
+                                </svg>
+                            </div>
+                            <div class="card timeline-event-card">
+                                <div class="card-body">
+                                    <div class="text-muted float-end">"21.04.23"</div>
+                                    <h4>"v1.0.0 Release"</h4>
+                                    <p>
+                                        <div class="text-muted">
+                                            "We are proud to announce the official release of Aruna 1.0.0"
+                                        </div>
+                                        <div class="text-muted">
+                                            "This update adds many long awaited updates. For full changelogs see:"
+                                        </div>
+                                    </p>
+                                    <p>
+                                        <div class="text-muted">
+                                            <b>"API: "</b>
+                                            <a href="https://github.com/ArunaStorage/ArunaAPI/releases/tag/v1.0.0">
+                                                "API Release / Changelog"
+                                            </a>
+                                        </div>
+                                        <div class="text-muted">
+                                            <b>"Server: "</b>
+                                            <a href="https://github.com/ArunaStorage/ArunaServer/releases/tag/v1.0.0">
+                                                "Server Changelog"
+                                            </a>
+                                        </div>
+                                        <div class="text-muted">
+                                            <b>"Dataproxy: "</b>
+                                            <a href="https://github.com/ArunaStorage/DataProxy/releases/tag/v1.0.0">
+                                                "Dataproxy Changelog"
+                                            </a>
+                                        </div>
+                                    </p>
+                                    <p>
+                                        <div class="text-muted">
+                                            "As always, if you have any problems or issues, contact us or create an issue on GitHub."
+                                        </div>
+                                    </p>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
         }
     };
 
@@ -705,35 +749,57 @@ pub fn MainBody() -> impl IntoView {
         }
     };
 
+    let bubbles = move || {
+        view! {
+            {(1..=12)
+                .map(|x| {
+                    view! { <div class=format!("bubble bubble--{x}")></div> }
+                })
+                .collect::<Vec<HtmlElement<Div>>>()}
+        }
+    };
+
     let waves = move || {
         view! {
-            <div class="top">
+            <div class="outer">
                 <div class="wave"></div>
                 <div class="wave"></div>
-                // <div class="wave"></div>
-                <div class="ocean"></div>
-
-                {(1..=12)
-                    .map(|x| {
-                        view! { <div class=format!("bubble bubble--{x}")></div> }
-                    })
-                    .collect::<Vec<HtmlElement<Div>>>()}
-
             </div>
         }
     };
 
     view! {
-        {waves}
-        <section class="section container-xl">{hook}</section>
-        <section class="section container-xl">{section1}</section>
-        <section class="section container-xl mt-5">{section2}</section>
-        // <section class="section container-xl mt-5">
-        // {timeline}
-        // </section>
-        <section id="faq" class="section container-xl mt-5">
-            {faq}
+        <section class="section">
+            <div class="container-xl">
+                {hook}
+            </div>
         </section>
-        <section class="section container-xl mt-5">{partners}</section>
+        <section class="section">
+            <div class="container-xl">
+                {section1}
+            </div>
+            {waves}
+        </section>
+        <section class="section ocean-bg">
+            <div class="container-xl">
+                {section2}
+            </div>
+            {bubbles}
+        </section>
+        <section class="section">
+            <div class="container-xl">
+                {timeline}
+            </div>
+        </section>
+        <section id="faq" class="section">
+            <div class="container-xl mt-5">
+                {faq}
+            </div>
+        </section>
+        <section class="section">
+            <div class="container-xl mt-5">
+                {partners}
+            </div>
+        </section>
     }
 }

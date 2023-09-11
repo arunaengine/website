@@ -29,6 +29,12 @@ body {
 	margin-top: 40vh;
 }
 
+.ocean-bg {
+	background-color:rgba( #007bc1, .175);
+	z-index: -2;
+}
+
+
 .ocean {
 	background-color: #007bc1;
 	top: 25vh;
@@ -45,8 +51,6 @@ body {
 	border-radius: 100%;
 	position: absolute;
 	background-color: white;
-	bottom: -30px;
-	top: 80vh;
 	z-index: -1;
 	opacity: 0.4;
 	animation: bubble 15s ease-in-out infinite,
@@ -56,22 +60,22 @@ body {
 
 @keyframes bubble {
 	0% {
-		transform: translateY(0%);
+		transform: translateY(0vh);
 		opacity: 0;
 	}
 
 	10% {
-		transform: translateY(-13vh);
+		transform: translateY(-10vh);
 		opacity: 0.2;
 	}
 
 	50% {
-		transform: translateY(-65vh);
+		transform: translateY(-55vh);
 		opacity: 0.3;
 	}
 
 	100% {
-		transform: translateY(-130vh);
+		transform: translateY(-70vh);
 		opacity: 0;
 	}
 }
@@ -159,7 +163,6 @@ body {
 	width: 20px;
 	height: 20px;
 	left: 90vw;
-	bottom: 30px;
 	animation-delay: -5s;
 	animation-duration: 19s;
 	transition: visibility 0s 19s, opacity 19s linear;
@@ -170,7 +173,6 @@ body {
 	width: 40px;
 	height: 40px;
 	left: 20vw;
-	bottom: 30px;
 	animation-delay: -21s;
 	animation-duration: 16s;
 	transition: visibility 0s 16s, opacity 16s linear;
@@ -181,7 +183,6 @@ body {
 	width: 30px;
 	height: 30px;
 	left: 20vw;
-	bottom: 30px;
 	animation-delay: -13.75s;
 	animation-duration: 20s;
 	transition: opacity 18s ease-in-out;
@@ -192,7 +193,6 @@ body {
 	width: 25px;
 	height: 25px;
 	left: 20vw;
-	bottom: 30px;
 	animation-delay: -10.5s;
 	animation-duration: 19s;
 	transition: opacity 17s ease-in-out;
@@ -214,20 +214,22 @@ body {
 	}
 }
 
+.outer {
+	position: relative;
+}
+
 
 .wave {
 	background: url(../wave.svg) repeat-x;
 	position: absolute;
-	top: 10vh;
+	bottom: 0.4px;
 	width: 10*100vw;
-	height: 15vh;
+	height: 170px;
 	animation: wave 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) infinite;
 }
 
 .wave:nth-of-type(2) {
-	top: 11vh;
-	height: 14vh;
-	animation: wave 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) -.2s infinite, swell 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) -.2s infinite;
+	animation: wave 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) -.2s infinite, swell 28s linear -.2s infinite;
 	opacity: 1;
 }
 
@@ -244,16 +246,15 @@ body {
 @keyframes swell {
 
 	0% {
-		transform: translate3d(-100vw, 0, 0);
+		height: 160px;
 	}
 
 	50% {
-		transform: translate3d(-150vw, 3vh, 0);
-		height: 11vh;
+		height: 120px;
 	}
 
 	100% {
-		transform: translate3d(-200vw, 0, 0);
+		height: 160px;
 	}
 }
 

@@ -32,7 +32,9 @@ pub fn EntryPoint() -> impl IntoView {
     pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
         use axum_extra::extract::CookieJar;
         use http::header;
+        use leptos_axum::ResponseOptions;
         use utils::aruna_api_handlers::who_am_i;
+
         let req_parts = use_context::<leptos_axum::RequestParts>()
             .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
         let jar = CookieJar::from_headers(&req_parts.headers);
@@ -51,13 +53,8 @@ pub fn EntryPoint() -> impl IntoView {
             return Ok(Some(user));
         } else {
             if let Some(response_options) = use_context::<ResponseOptions>() {
-                response_options.set_status(StatusCode::FOUND);
                 response_options.insert_header(
                     header::LOCATION,
-                    header::HeaderValue::from_str("/login").expect("Failed to create HeaderValue"),
-                );
-                response_options.insert_header(
-                    header::SAMESITE,
                     header::HeaderValue::from_str("/login").expect("Failed to create HeaderValue"),
                 );
             }
@@ -150,7 +147,8 @@ pub fn EntryPoint() -> impl IntoView {
 
     let res: Resource<bool, Option<User>> =
         create_local_resource(update_user.0, move |_| async move {
-            get_user_info().await.ok().flatten()
+            //&get_user_info().await.ok().flatten()
+            None
         });
 
     provide_context(res);
