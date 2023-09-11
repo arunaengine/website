@@ -6,19 +6,6 @@ body {
 	text-align: center;
 }
 
-
-.btn-primary {
-	color: #f8fafc;
-	background-color: #007bc1;
-	border-color: #007ac19c;
-}
-
-.btn-primary:hover {
-	color: #f8fafc;
-	background-color: #007ac1aa;
-	border-color: #007ac168;
-}
-
 .down {
 	margin-top: 10rem;
 }
@@ -27,22 +14,36 @@ body {
 	text-align: left !important;
 }
 
+.table-responsive {
+	max-height: 300px;
+  }
+
 
 .hook {
 	font-size: 4vw;
 }
 
-.ocean {
-	background-color: #007bc1;
-	top: 100%;
-	opacity: .25;
-	width: 200vw;
+.top {
 	position: absolute;
-	height: 150vh;
-	z-index: -2;
-	transform: translateX(-20vw);
+	z-index: -100vh;
+	margin-top: 40vh;
 }
 
+.ocean-bg {
+	background-color:rgba( #007bc1, .175);
+	z-index: -2;
+}
+
+
+.ocean {
+	background-color: #007bc1;
+	top: 25vh;
+	opacity: .175;
+	width: 200vw;
+	position: absolute;
+	height: 43vh;
+	z-index: -2;
+}
 
 .bubble {
 	width: 30px;
@@ -50,8 +51,6 @@ body {
 	border-radius: 100%;
 	position: absolute;
 	background-color: white;
-	bottom: -30px;
-	top: 230vh;
 	z-index: -1;
 	opacity: 0.4;
 	animation: bubble 15s ease-in-out infinite,
@@ -61,22 +60,22 @@ body {
 
 @keyframes bubble {
 	0% {
-		transform: translateY(0%);
+		transform: translateY(0vh);
 		opacity: 0;
 	}
 
 	10% {
-		transform: translateY(-13vh);
+		transform: translateY(-10vh);
 		opacity: 0.2;
 	}
 
 	50% {
-		transform: translateY(-65vh);
+		transform: translateY(-55vh);
 		opacity: 0.3;
 	}
 
 	100% {
-		transform: translateY(-130vh);
+		transform: translateY(-70vh);
 		opacity: 0;
 	}
 }
@@ -93,7 +92,7 @@ body {
 
 
 .bubble--1 {
-	left: 10%;
+	left: 90vw;
 	animation-delay: 0.5s;
 	animation-duration: 16s;
 	opacity: 0.2;
@@ -103,7 +102,7 @@ body {
 .bubble--2 {
 	width: 15px;
 	height: 15px;
-	left: 50%;
+	left: 90vw;
 	animation-delay: 1s;
 	animation-duration: 10s;
 	transition: visibility 0s 10s, opacity 10s linear;
@@ -113,7 +112,7 @@ body {
 .bubble--3 {
 	width: 10px;
 	height: 10px;
-	left: 40%;
+	left: 10vw;
 	animation-delay: 5s;
 	animation-duration: 20s;
 	transition: visibility 0s 20s, opacity 20s linear;
@@ -123,7 +122,7 @@ body {
 .bubble--4 {
 	width: 25px;
 	height: 25px;
-	left: 40%;
+	left: 90vw;
 	animation-delay: 8s;
 	animation-duration: 17s;
 	transition: visibility 0s 17s, opacity 17s linear;
@@ -133,7 +132,7 @@ body {
 .bubble--5 {
 	width: 30px;
 	height: 30px;
-	left: 60%;
+	left: 90vw;
 	animation-delay: 10s;
 	animation-duration: 15s;
 	transition: visibility 0s 15s, opacity 15s linear;
@@ -143,7 +142,7 @@ body {
 .bubble--6 {
 	width: 10px;
 	height: 10px;
-	left: 80%;
+	left: 90vw;
 	animation-delay: 3s;
 	animation-duration: 30s;
 	transition: visibility 0s 30s, opacity 30s linear;
@@ -153,7 +152,7 @@ body {
 .bubble--7 {
 	width: 15px;
 	height: 15px;
-	left: 90%;
+	left: 90vw;
 	animation-delay: -7s;
 	animation-duration: 25s;
 	transition: visibility 0s 25s, opacity 25s linear;
@@ -163,8 +162,7 @@ body {
 .bubble--9 {
 	width: 20px;
 	height: 20px;
-	left: 50%;
-	bottom: 30px;
+	left: 90vw;
 	animation-delay: -5s;
 	animation-duration: 19s;
 	transition: visibility 0s 19s, opacity 19s linear;
@@ -174,8 +172,7 @@ body {
 .bubble--10 {
 	width: 40px;
 	height: 40px;
-	left: 30%;
-	bottom: 30px;
+	left: 20vw;
 	animation-delay: -21s;
 	animation-duration: 16s;
 	transition: visibility 0s 16s, opacity 16s linear;
@@ -185,8 +182,7 @@ body {
 .bubble--11 {
 	width: 30px;
 	height: 30px;
-	left: 60%;
-	bottom: 30px;
+	left: 20vw;
 	animation-delay: -13.75s;
 	animation-duration: 20s;
 	transition: opacity 18s ease-in-out;
@@ -196,8 +192,7 @@ body {
 .bubble--11 {
 	width: 25px;
 	height: 25px;
-	left: 90%;
-	bottom: 30px;
+	left: 20vw;
 	animation-delay: -10.5s;
 	animation-duration: 19s;
 	transition: opacity 17s ease-in-out;
@@ -219,44 +214,47 @@ body {
 	}
 }
 
+.outer {
+	position: relative;
+}
+
 
 .wave {
 	background: url(../wave.svg) repeat-x;
 	position: absolute;
-	top: 80%;
+	bottom: 0.4px;
 	width: 10*100vw;
-	height: 20vh;
+	height: 170px;
 	animation: wave 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) infinite;
-	transform: translate3d(0, 0, 0);
 }
 
 .wave:nth-of-type(2) {
-	top: 85%;
-	animation: wave 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) -.125s infinite, swell 28s ease -1.25s infinite;
+	animation: wave 28s cubic-bezier(0.36, 0.45, 0.63, 0.53) -.2s infinite, swell 28s linear -.2s infinite;
 	opacity: 1;
 }
 
 @keyframes wave {
 	0% {
-		margin-left: -400px;
+		transform: translate3d(-100vw, 0, 0);
 	}
 
 	100% {
-		margin-left: -2000px;
+		transform: translate3d(-200vw, 0, 0);
 	}
 }
 
 @keyframes swell {
 
-	0%,
-	100% {
-		transform: translate3d(0, -4vh, 0);
-		height: 19vh;
+	0% {
+		height: 160px;
 	}
 
 	50% {
-		transform: translate3d(0, 0.1vh, 0);
-		height: 14.95vh;
+		height: 120px;
+	}
+
+	100% {
+		height: 160px;
 	}
 }
 
@@ -305,5 +303,28 @@ body {
 }
 
 .hidden {
-	display: none;
+	display: none !important;
+}
+
+.tag {
+	margin-right: 8px;
+	margin-bottom: .5em;
+	border-radius: 8px;
+	cursor: pointer;
+}
+
+.key, .value {
+   	padding: .8em;
+    padding-top: .2em;
+    padding-bottom: .2em;
+}
+
+
+.value {
+	--tblr-status-color: #0054a6;
+	--tblr-status-color-rgb: 0,84,166;
+	color: var(--tblr-status-color);
+	border-radius: 0 8px 8px 0;
+	margin-right: -8px;
+	background: rgba(var(--tblr-status-color-rgb),.1)
 }
