@@ -4,7 +4,7 @@ RUN apt-get -y install llvm cmake gcc ca-certificates libssl-dev pkg-config
 ENV RUSTFLAGS="-C target-feature=-crt-static --cfg=web_sys_unstable_apis"
 RUN rustup toolchain install nightly
 RUN rustup default nightly
-RUN cargo install --locked cargo-leptos
+RUN cargo install --git https://github.com/leptos-rs/cargo-leptos --locked cargo-leptos
 RUN rustup target add wasm32-unknown-unknown
 RUN mkdir -p /app
 WORKDIR /app
