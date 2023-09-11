@@ -785,8 +785,8 @@ pub fn ObjectOverview() -> impl IntoView {
             <div class="row row-deck row-cards">
                 {small_card(("ID".to_string(), id(), Colors::Primary, Some(Colors::Primary)))}
                 {small_card(("Name".to_string(), _name(), Colors::Primary, Some(Colors::Primary)))}
-                {stats_card(entry().stats)} {full_card(entry().description)} {labels} {hooks}
-                {ext_relations} {int_relations} {endpoints}
+                {stats_card(entry().stats)} {full_card(entry().description)} {labels} {hooks} {endpoints}
+                {ext_relations} {int_relations}
             </div>
         }
     };

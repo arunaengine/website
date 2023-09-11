@@ -27,6 +27,8 @@ prost-wkt-types = "0.4"
 reqwest = "0.11"
 tonic = { version = "0.9.2", optional = true }
 axum-extra = "0.7.7"
+lettre = { version = "0.10.4", optional = true }
+
 
 http.workspace = true
 cfg-if.workspace = true
@@ -35,5 +37,5 @@ thiserror.workspace = true
 [features]
 default = []
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
-ssr = ["leptos/ssr", "leptos_meta/ssr", "leptos_router/ssr", "dep:leptos_axum", "aruna-rust-api/transport", "dep:tonic", "tonic/transport"]
+ssr = ["leptos/ssr", "leptos_meta/ssr", "leptos_router/ssr", "dep:leptos_axum", "aruna-rust-api/transport", "dep:tonic", "tonic/transport", "dep:lettre"]
 

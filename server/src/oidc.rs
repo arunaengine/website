@@ -4,8 +4,6 @@ use anyhow::anyhow;
 use anyhow::Result;
 use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
 use openidconnect::reqwest::async_http_client;
-use openidconnect::AccessToken;
-use openidconnect::IdToken;
 use openidconnect::OAuth2TokenResponse;
 use openidconnect::PkceCodeVerifier;
 use openidconnect::RefreshToken;
@@ -118,7 +116,7 @@ impl Authorizer {
         // authorization code. For security reasons, your code should verify that the `state`
         // parameter returned by the server matches `csrf_state`.
 
-        use openidconnect::{OAuth2TokenResponse, TokenResponse};
+        use openidconnect::TokenResponse;
 
         if challenge.csrf_token.secret() != state {
             return Err(anyhow!("Invalid state, csrf detected"));

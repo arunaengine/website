@@ -1,6 +1,21 @@
 use leptos::{html::Div, *};
 use leptos_router::*;
 
+#[server(SendMail, "/api")]
+pub async fn send_mail(mail: String) -> Result<(), ServerFnError> {
+    use crate::utils::mail::MailClient;
+    let state: MailClient = use_context::<MailClient>()
+        .ok_or(ServerFnError::ServerError("No server state".to_string()))?;
+
+    state
+        .send_message(
+            "mailing-list@aruna-storage.org",
+            mail,
+            "A new member in the mailing-list",
+        )
+        .map_err(|_| ServerFnError::ServerError("Failed to send mail".to_string()))
+}
+
 /// Renders the home page of your application.
 #[component]
 pub fn MainBody() -> impl IntoView {
@@ -310,6 +325,8 @@ pub fn MainBody() -> impl IntoView {
         }
     };
 
+    let send_mail = create_server_action::<SendMail>();
+
     let timeline = move || {
         view! {
             <div class="row">
@@ -398,11 +415,12 @@ pub fn MainBody() -> impl IntoView {
                                         </div>
 
                                         <div class="container p-1">
-                                            <form class="row">
-                                                <input type="email" class="form-control col-4 w-auto" aria-describedby="emailHelp" placeholder="Enter email" />
-                                                <a href="#" class="btn btn-primary col-2">Join</a>
+
+                                            <ActionForm action=send_mail class="row">
+                                                <input type="email" class="form-control col-6 w-auto" name="mail" aria-describedby="emailHelp" placeholder="Enter email" />
+                                                <button type="submit" class="btn btn-primary col-1">Join</button>
                                                 <div id="emailHelp" class="form-text">"We'll never share your email with anyone else. Click "<A href="/imprint"> "here" </A> " to learn more."</div>
-                                            </form>
+                                            </ActionForm>
                                         </div>
                                     </div>
                                 </div>

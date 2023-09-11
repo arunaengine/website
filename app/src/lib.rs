@@ -7,6 +7,41 @@ pub mod components;
 pub mod error_template;
 pub mod utils;
 
+#[server(GetUserInfo, "/api", "GetJson")]
+pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
+    use axum_extra::extract::CookieJar;
+    use http::header;
+    use leptos_axum::ResponseOptions;
+    use utils::aruna_api_handlers::who_am_i;
+
+    let req_parts = use_context::<leptos_axum::RequestParts>()
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let jar = CookieJar::from_headers(&req_parts.headers);
+
+    match jar.get("logged_in") {
+        Some(l) if l.value() == "false" => return Ok(None),
+        None => return Ok(None),
+        _ => {}
+    }
+
+    if let Some(cookie) = jar.get("token") {
+        let user = who_am_i(cookie.value()).await.map_err(|_| {
+            leptos::log!("Unable to query token from session");
+            ServerFnError::Request("Invalid request, who_i_am".to_string())
+        })?;
+        return Ok(Some(user));
+    } else {
+        if let Some(response_options) = use_context::<ResponseOptions>() {
+            response_options.insert_header(
+                header::LOCATION,
+                header::HeaderValue::from_str("/login").expect("Failed to create HeaderValue"),
+            );
+        }
+    };
+
+    Ok(None)
+}
+
 #[component]
 pub fn EntryPoint() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
@@ -27,41 +62,6 @@ pub fn EntryPoint() -> impl IntoView {
     use crate::utils::structs::*;
 
     let update_user: UpdateUser = UpdateUser(create_rw_signal(true));
-
-    #[server(GetUserInfo, "/api", "GetJson")]
-    pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
-        use axum_extra::extract::CookieJar;
-        use http::header;
-        use leptos_axum::ResponseOptions;
-        use utils::aruna_api_handlers::who_am_i;
-
-        let req_parts = use_context::<leptos_axum::RequestParts>()
-            .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-        let jar = CookieJar::from_headers(&req_parts.headers);
-
-        match jar.get("logged_in") {
-            Some(l) if l.value() == "false" => return Ok(None),
-            None => return Ok(None),
-            _ => {}
-        }
-
-        if let Some(cookie) = jar.get("token") {
-            let user = who_am_i(cookie.value()).await.map_err(|_| {
-                leptos::log!("Unable to query token from session");
-                ServerFnError::Request("Invalid request, who_i_am".to_string())
-            })?;
-            return Ok(Some(user));
-        } else {
-            if let Some(response_options) = use_context::<ResponseOptions>() {
-                response_options.insert_header(
-                    header::LOCATION,
-                    header::HeaderValue::from_str("/login").expect("Failed to create HeaderValue"),
-                );
-            }
-        };
-
-        Ok(None)
-    }
 
     let cordi = move || {
         view! {

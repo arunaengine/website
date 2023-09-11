@@ -1,12 +1,10 @@
 use anyhow::{anyhow, Result};
 use aruna_rust_api::api::storage::models::v2::User;
-use aruna_rust_api::api::storage::services::v2::project_service_client;
+//use aruna_rust_api::api::storage::services::v2::project_service_client;
 use aruna_rust_api::api::storage::services::v2::{
-    user_service_client, ActivateUserRequest, CreateApiTokenRequest, CreateApiTokenResponse,
-    CreateProjectRequest, DeactivateUserRequest, DeleteApiTokenRequest, GetAllUsersRequest,
-    GetAllUsersResponse, GetApiTokensRequest, GetApiTokensResponse, GetProjectsRequest,
-    GetProjectsResponse, GetUserRequest, GetUserResponse, RegisterUserRequest,
-    RegisterUserResponse,
+    user_service_client, CreateApiTokenRequest, CreateApiTokenResponse, DeleteApiTokenRequest,
+    GetApiTokensRequest, GetApiTokensResponse, GetUserRequest, GetUserResponse,
+    RegisterUserRequest, RegisterUserResponse,
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
