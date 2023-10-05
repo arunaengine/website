@@ -93,12 +93,9 @@ pub fn EntryPoint() -> impl IntoView {
                             <div class="row align-items-center">
                                 <div class="col">
                                     <strong>
-                                        "👋 Meet us @"
-                                        <a href="https://www.nfdi.de/cordi-2023/?lang=en">
-                                            "CORDI 2023"
-                                        </a>
+                                        "Update on version 2.0.0: "
                                     </strong>
-                                    ": We are proud to announce that we will be presenting our project at the Enabling RDM II session on September 13th, 2023"
+                                    "We are sorry for the delay in the release of version 2.0.0. Testing and bug fixing took longer than expected and we need some time to prepare the final release. As we cannot just leave it at that, we are happy to announce that a test environment will be deployed soon, where everyone can participate and help us smooth things out!"
                                 </div>
                                 <div class="col-auto">
                                     <button
