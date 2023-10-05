@@ -1,5 +1,6 @@
 use crate::utils::structs::UpdateUser;
 use aruna_rust_api::api::storage::models::v2::User;
+use cfg_if::cfg_if;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -12,7 +13,7 @@ pub fn ArunaHeader() -> impl IntoView {
     let get_user = use_context::<Resource<bool, Option<User>>>().expect("user_state not set");
 
     // On first load -> Check if user is logged in
-    let _update_user = use_context::<UpdateUser>().expect("user_state not set");
+    let update_user = use_context::<UpdateUser>().expect("user_state not set");
 
     let is_logged_memo = move || create_memo(move |_| get_user.get().flatten().is_some());
     // Creates a reactive value to update the button
@@ -31,17 +32,17 @@ pub fn ArunaHeader() -> impl IntoView {
 
     let path = loc.pathname;
 
-    // let hide_cookies = create_rw_signal(false);
+    let hide_cookies = create_rw_signal(false);
 
-    // cfg_if! {
-    //     if #[cfg(feature = "hydrate")] {
-    //         if let Ok(Some(storage)) = window().local_storage() {
-    //             if let Ok(Some(_)) = storage.get_item("allow-cookie"){
-    //                 hide_cookies.set(true);
-    //             }
-    //         }
-    //     }
-    // };
+    cfg_if! {
+        if #[cfg(feature = "hydrate")] {
+            if let Ok(Some(storage)) = window().local_storage() {
+                if let Ok(Some(_)) = storage.get_item("allow-cookie"){
+                    hide_cookies.set(true);
+                }
+            }
+        }
+    };
     let aruna_header = move || {
         view! {
             <h1 class="navbar-brand navbar-brand-light d-none-navbar-horizontal pe-0 pe-md-3">
@@ -150,7 +151,7 @@ pub fn ArunaHeader() -> impl IntoView {
             <div class="nav-item dropdown d-none d-md-flex me-3">
                 <a
                     href="#"
-                    class="nav-link px-0 disabled"
+                    class="nav-link px-0" //disabled"
                     data-bs-toggle="dropdown"
                     tabindex="-1"
                     aria-label="Coming soon"
@@ -171,18 +172,18 @@ pub fn ArunaHeader() -> impl IntoView {
                         <path d="M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"></path>
                         <path d="M9 17v1a3 3 0 0 0 6 0v-1"></path>
                     </svg>
-                // <span class="badge bg-red"></span>
+                    <span class="badge bg-red"></span>
                 </a>
             </div>
         }
     };
 
-    // let class_cookie = move || {
-    //     format!(
-    //         "cookie-consent {}",
-    //         if hide_cookies() { "hidden" } else { "" }
-    //     )
-    // };
+    let class_cookie = move || {
+        format!(
+            "cookie-consent {}",
+            if hide_cookies() { "hidden" } else { "" }
+        )
+    };
 
     let user_elem = move || {
         view! {
@@ -270,7 +271,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                         }
                                     }
 
-                                    class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2 disabled"
+                                    class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2" // disabled"
                                 >
                                     {"Login"}
                                 </a>
@@ -342,7 +343,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                         class:active=move || { path().contains("dash") }
                                     >
                                         <A
-                                            class="nav-link disabled"
+                                            class="nav-link" // disabled"
                                             href=move || {
                                                 if is_logged_memo()() {
                                                     "/dash".to_string()
@@ -372,47 +373,48 @@ pub fn ArunaHeader() -> impl IntoView {
                                             <span class="nav-link-title">{"Explore"}</span>
                                         </A>
                                     </li>
-                                    // <Suspense fallback=move || {
-                                    // view! { cx, <div class="spinner-border"></div> }
-                                    // }>
-                                    // {move || {
-                                    // if is_logged_memo()() {
-                                    // view! {
-                                    // <li
-                                    // class="nav-item"
-                                    // class:active=move || { path().contains("panel") }
-                                    // >
-                                    // <A class="nav-link" href="/panel">
-                                    // <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                    // <svg
-                                    // xmlns="http://www.w3.org/2000/svg"
-                                    // class="icon icon-tabler icon-tabler-dashboard"
-                                    // width="40"
-                                    // height="40"
-                                    // viewBox="0 0 24 24"
-                                    // stroke-width="1"
-                                    // stroke="currentColor"
-                                    // fill="none"
-                                    // stroke-linecap="round"
-                                    // stroke-linejoin="round"
-                                    // >
-                                    // <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    // <path d="M12 13m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>
-                                    // <path d="M13.45 11.55l2.05 -2.05"></path>
-                                    // <path d="M6.4 20a9 9 0 1 1 11.2 0z"></path>
-                                    // </svg>
-                                    // </span>
-                                    // <span class="nav-link-title">{"Dashboard"}</span>
-                                    // </A>
-                                    // </li>
-                                    // }
-                                    // .into_view()
-                                    // } else {
-                                    // ().into_view()
-                                    // }
-                                    // }}
+                                    <Suspense fallback=move || {
+                                        view! { cx, <div class="spinner-border"></div> }
+                                    }>
+                                        { move || {
+                                            if is_logged_memo()() {
+                                                view! {
+                                                    <li
+                                                        class="nav-item"
+                                                        class:active=move || { path().contains("panel") }
+                                                    >
+                                                        <A class="nav-link" href="/panel">
+                                                            <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                                            <svg
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            class="icon icon-tabler icon-tabler-dashboard"
+                                                            width="40"
+                                                            height="40"
+                                                            viewBox="0 0 24 24"
+                                                            stroke-width="1"
+                                                            stroke="currentColor"
+                                                            fill="none"
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            >
+                                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                            <path d="M12 13m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>
+                                                            <path d="M13.45 11.55l2.05 -2.05"></path>
+                                                            <path d="M6.4 20a9 9 0 1 1 11.2 0z"></path>
+                                                            </svg>
+                                                            </span>
+                                                            <span class="nav-link-title">{"Dashboard"}</span>
+                                                        </A>
+                                                    </li>
+                                                }
+                                                .into_view()
+                                            } else {
+                                                ().into_view()
+                                            }
+                                        }
+                                    }
 
-                                    // </Suspense>
+                                    </Suspense>
 
                                     <li
                                         class="nav-item"

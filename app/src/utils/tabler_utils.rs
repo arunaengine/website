@@ -62,20 +62,19 @@ pub fn custom_select(_name: String, variants: Vec<String>) -> impl IntoView {
     };
 
     let _variants_a = move |vars: Vec<String>| {
-        vars
-            .into_iter()
+        vars.into_iter()
             .map(|variant| {
                 let var_clone = variant.clone();
-            view! {
-                <a
-                    class="dropdown-item"
-                    on:click=move |_| { write_selected.set(var_clone.clone()) }
-                >
-                    {variant.to_string()}
-                </a>
-            }
-        })
-        .collect::<Vec<_>>()
+                view! {
+                    <a
+                        class="dropdown-item"
+                        on:click=move |_| { write_selected.set(var_clone.clone()) }
+                    >
+                        {variant.to_string()}
+                    </a>
+                }
+            })
+            .collect::<Vec<_>>()
     };
 
     let _cloned_vars = variants.clone();
