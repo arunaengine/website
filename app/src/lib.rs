@@ -18,6 +18,7 @@ pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
         .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
     let jar = CookieJar::from_headers(&req_parts.headers);
 
+    dbg!(&jar);
     match jar.get("logged_in") {
         Some(l) if l.value() == "false" => return Ok(None),
         None => return Ok(None),
@@ -26,7 +27,7 @@ pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
 
     if let Some(cookie) = jar.get("token") {
         let user = who_am_i(cookie.value()).await.map_err(|_| {
-            leptos::log!("Unable to query token from session");
+            leptos::logging::log!("Unable to query token from session");
             ServerFnError::Request("Invalid request, who_i_am".to_string())
         })?;
         return Ok(Some(user));
@@ -119,7 +120,7 @@ pub fn EntryPoint() -> impl IntoView {
         }
     };
 
-    let _cookies = move || {
+    let cookies = move || {
         view! {
             <div
                 class="offcanvas offcanvas-bottom h-auto show"
@@ -133,7 +134,7 @@ pub fn EntryPoint() -> impl IntoView {
                         <div class="row align-items-center">
                             <div class="col">
                                 <strong>
-                                    ng>Do you like cooki
+                                    Do you like cookies
                                 </strong>
                                 "🍪 We use cookies to ensure you get the best experience on our website."
                                 <a href="./terms-of-service.html" target="_blank">Learn more</a>
@@ -143,8 +144,14 @@ pub fn EntryPoint() -> impl IntoView {
                                     type="button"
                                     class="btn btn-primary"
                                     data-bs-dismiss="offcanvas"
+                                    on:click=move |_| {
+                                            if let Ok(Some(storage)) = window().local_storage() {
+                                                storage.set_item("allow-cookie", "true").expect("Failed to set item");
+                                                hide_cordi.set(true);
+                                            }
+                                        }
                                 >
-                                          Essential Cookie
+                                          Essential Cookies
                                 </button>
                             </div>
                             <div class="col-auto">
@@ -152,8 +159,14 @@ pub fn EntryPoint() -> impl IntoView {
                                     type="button"
                                     class="btn btn-primary"
                                     data-bs-dismiss="offcanvas"
+                                    on:click=move |_| {
+                                            if let Ok(Some(storage)) = window().local_storage() {
+                                                storage.set_item("allow-cookie", "true").expect("Failed to set item");
+                                                hide_cordi.set(true);
+                                            }
+                                        }
                                 >
-                                          Allow All C
+                                          Allow All Cookies
                                 </button>
                             </div>
                         </div>
@@ -165,8 +178,8 @@ pub fn EntryPoint() -> impl IntoView {
 
     let res: Resource<bool, Option<User>> =
         create_local_resource(update_user.0, move |_| async move {
-            //&get_user_info().await.ok().flatten()
-            None
+            get_user_info().await.ok()?
+            //None
         });
 
     provide_context(res);
@@ -180,7 +193,7 @@ pub fn EntryPoint() -> impl IntoView {
         <Title text="Aruna Object Storage"/>
         <div class="page">
             {cordi}
-            // { cookies }
+            {cookies}
             <Router>
                 <Routes>
                     <Route

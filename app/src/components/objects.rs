@@ -415,7 +415,7 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <For
                                     each=move || hooks.clone().into_iter().enumerate()
                                     key=|(id, _)| format!("hooks_{}", * id)
-                                    view=move |(_, rel)| { rel.into_table_view() }
+                                    children=move |(_, rel)| { rel.into_table_view() }
                                 />
 
                             </tbody>
@@ -474,7 +474,7 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <For
                                     each=move || label.clone().into_iter().enumerate()
                                     key=|(id, _)| format!("label_{}", * id)
-                                    view=move |(_, rel)| { rel.into_table_view() }
+                                    children=move |(_, rel)| { rel.into_table_view() }
                                 />
 
                             </tbody>
@@ -546,7 +546,7 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <For
                                     each=move || external.clone().into_iter().enumerate()
                                     key=|(id, _)| format!("external_{}", * id)
-                                    view=move |(_, rel)| { rel.into_table_view() }
+                                    children=move |(_, rel)| { rel.into_table_view() }
                                 />
 
                             </tbody>
@@ -616,7 +616,7 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <For
                                     each=move || internal_inc.clone().into_iter().enumerate()
                                     key=|(id, _)| format!("internal_inc_{}", * id)
-                                    view=move |(_, rel)| { rel.into_table_view() }
+                                    children=move |(_, rel)| { rel.into_table_view() }
                                 />
 
                             </tbody>
@@ -631,7 +631,7 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <For
                                     each=move || internal_ext.clone().into_iter().enumerate()
                                     key=|(id, _)| format!("internal_ext_{}", * id)
-                                    view=move |(_, rel)| { rel.into_table_view() }
+                                    children=move |(_, rel)| { rel.into_table_view() }
                                 />
 
                             </tbody>

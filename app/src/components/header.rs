@@ -193,6 +193,7 @@ pub fn ArunaHeader() -> impl IntoView {
                 {move || {
                     match get_user.get().flatten() {
                         Some(u) => {
+                            provide_context::<User>(u.clone());
                             let is_admin = u.attributes.unwrap_or_default().global_admin;
                             view! {
                                 <div class="nav-item dropdown">
@@ -255,6 +256,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                     href="/login"
                                     on:click=move |_| {
                                         if let Ok(Some(storage)) = window().local_storage() {
+                                            dbg!(&storage);
                                             if let Ok(Some(cookie_value))
                                                 = storage.get_item("allow-cookie")
                                             {
@@ -287,7 +289,7 @@ pub fn ArunaHeader() -> impl IntoView {
 
     let html = {
         move || {
-            view! { <Body attributes=AdditionalAttributes::from(vec![("data-bs-theme", dark.get())])/> }
+            view! { <Body attributes=vec![("data-bs-theme", Attribute::String(dark.get().into()))]/> }
         }
     };
 
@@ -346,8 +348,10 @@ pub fn ArunaHeader() -> impl IntoView {
                                             class="nav-link" // disabled"
                                             href=move || {
                                                 if is_logged_memo()() {
+                                                    // TODO: Public + Private objects
                                                     "/dash".to_string()
                                                 } else {
+                                                    // TODO: Public objects
                                                     "/dash/search".to_string()
                                                 }
                                             }
@@ -374,7 +378,9 @@ pub fn ArunaHeader() -> impl IntoView {
                                         </A>
                                     </li>
                                     <Suspense fallback=move || {
-                                        view! { cx, <div class="spinner-border"></div> }
+                                        view! { // cx,
+                                                <div class="spinner-border"></div>
+                                        }
                                     }>
                                         { move || {
                                             if is_logged_memo()() {
@@ -383,7 +389,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                                         class="nav-item"
                                                         class:active=move || { path().contains("panel") }
                                                     >
-                                                        <A class="nav-link" href="/panel">
+                                                        <A class="nav-link" href="/dash">
                                                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                             <svg
                                                             xmlns="http://www.w3.org/2000/svg"

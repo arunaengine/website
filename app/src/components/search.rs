@@ -1,5 +1,5 @@
 use crate::utils::{mocks::get_demo_data, structs::SearchResultEntry};
-use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
+use aruna_rust_api::api::storage::models::v2::{generic_resource::Resource, User};
 use leptos::*;
 //use leptos_meta::*;
 use leptos_router::*;
@@ -136,7 +136,7 @@ pub fn Search() -> impl IntoView {
                     <For
                         each=move || { read_range() }
                         key=|num| *num
-                        view=move |num| {
+                        children=move |num| {
                             view! {
                                 <li class=move || {
                                     if query_page().unwrap_or(1) == num {
@@ -375,7 +375,7 @@ pub fn Search() -> impl IntoView {
                                 }
                             }
 
-                            view=move |res| {
+                            children=move |res| {
                                 view! { <SearchResult res=res/> }
                             }
                         />

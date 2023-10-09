@@ -740,7 +740,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 id: id.to_string(),
                 name,
                 variant: "Project".to_string(),
-                description: description,
+                description,
                 key_values: key_values
                     .into_iter()
                     .map(|kv| kv.into())
@@ -765,7 +765,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 id: id.to_string(),
                 name,
                 variant: "Collection".to_string(),
-                description: description,
+                description,
                 key_values: key_values
                     .into_iter()
                     .map(|kv| kv.into())
@@ -790,7 +790,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 id: id.to_string(),
                 name,
                 variant: "Dataset".to_string(),
-                description: description,
+                description,
                 key_values: key_values
                     .into_iter()
                     .map(|kv| kv.into())
@@ -816,7 +816,7 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 id: id.to_string(),
                 name,
                 variant: "Object".to_string(),
-                description: description,
+                description,
                 key_values: key_values
                     .into_iter()
                     .map(|kv| kv.into())
@@ -981,7 +981,7 @@ impl SearchResultEntry {
             <For
                 each=move || { only_labels.clone().into_iter().enumerate() }
                 key=|(index, _k)| *index
-                view=move |kv| {
+                children=move |kv| {
                     view! {
                         <div class="d-inline-flex tag">
                             <div class="key text-secondary">{kv.1.get_key()}</div>

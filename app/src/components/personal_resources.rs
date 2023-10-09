@@ -1,5 +1,5 @@
 use crate::utils::{mocks::get_demo_data, structs::SearchResultEntry};
-use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
+use aruna_rust_api::api::storage::models::v2::{generic_resource::Resource, User};
 use leptos::*;
 //use leptos_meta::*;
 use leptos_router::*;
@@ -106,7 +106,10 @@ pub fn PersonalResources() -> impl IntoView {
             <div class="row mt-2">
                 <div class="col">
                     <For
-                        each=move || { get_demo_data().clone().into_iter() }
+                        each=move || {
+                            // TODO: Get all owned resources
+                            get_demo_data().clone().into_iter()
+                        }
                         key=|res| {
                             match res {
                                 Resource::Collection(c) => c.id.clone(),
@@ -116,7 +119,7 @@ pub fn PersonalResources() -> impl IntoView {
                             }
                         }
 
-                        view=move |res| {
+                        children=move |res| {
                             view! { <SearchResult res=res/> }
                         }
                     />

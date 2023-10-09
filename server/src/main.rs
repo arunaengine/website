@@ -8,6 +8,7 @@ use axum::{
     Router,
 };
 use fileserv::file_and_error_handler;
+use leptos::logging::log;
 use leptos::*;
 use leptos_axum::{generate_route_list, handle_server_fns_with_context, LeptosRoutes};
 use tower_http::cors::{Any, CorsLayer};
@@ -79,7 +80,7 @@ async fn main() {
         leptos_options: leptos_options.clone(),
     };
     let addr = leptos_options.site_addr;
-    let routes = generate_route_list(|| view! { <EntryPoint/> }).await;
+    let routes = generate_route_list(|| view! { <EntryPoint/> });
 
     let cors = CorsLayer::new()
         // allow `GET` and `POST` when accessing the resource
@@ -89,6 +90,7 @@ async fn main() {
 
     // build our application with a route
     let app = Router::new()
+        .layer(cors)
         .route(
             "/api/*fn_name",
             post(server_fn_handler).get(server_fn_handler),
