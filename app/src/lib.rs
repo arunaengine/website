@@ -8,7 +8,7 @@ pub mod error_template;
 pub mod utils;
 
 #[server(GetUserInfo, "/api", "GetJson")]
-pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
+pub async fn get_user_info() -> Result<Option<(User, String)>, ServerFnError> {
     use axum_extra::extract::CookieJar;
     use http::header;
     use leptos_axum::ResponseOptions;
@@ -18,7 +18,6 @@ pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
         .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
     let jar = CookieJar::from_headers(&req_parts.headers);
 
-    dbg!(&jar);
     match jar.get("logged_in") {
         Some(l) if l.value() == "false" => return Ok(None),
         None => return Ok(None),
@@ -26,11 +25,12 @@ pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
     }
 
     if let Some(cookie) = jar.get("token") {
-        let user = who_am_i(cookie.value()).await.map_err(|_| {
+        let token = cookie.value().to_string();
+        let user = who_am_i(&token).await.map_err(|_| {
             leptos::logging::log!("Unable to query token from session");
             ServerFnError::Request("Invalid request, who_i_am".to_string())
         })?;
-        return Ok(Some(user));
+        return Ok(Some((user, token)));
     } else {
         if let Some(response_options) = use_context::<ResponseOptions>() {
             response_options.insert_header(
@@ -176,10 +176,9 @@ pub fn EntryPoint() -> impl IntoView {
         }
     };
 
-    let res: Resource<bool, Option<User>> =
+    let res: Resource<bool, Option<(User, String)>> =
         create_local_resource(update_user.0, move |_| async move {
             get_user_info().await.ok()?
-            //None
         });
 
     provide_context(res);
@@ -244,7 +243,7 @@ pub fn EntryPoint() -> impl IntoView {
 
                             <Route path="create" view=move || view! { <CreateObjectPage/> }/>
                             <Route path=":id" view=move || view! { <ObjectOverview/> }/>
-                            <Route path="" view=move || view! { <PersonalResources/> }/>
+                            <Route path="" view=move || view! { <PersonalResources/>  }/>
                         </Route>
                         <Route
                             path=""

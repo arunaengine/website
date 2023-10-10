@@ -20,8 +20,6 @@ pub async fn login(
             .secure(true)
             .http_only(true)
             .finish();
-        dbg!(&cookie);
-        dbg!(&url);
 
         Ok((jar.add(cookie), Redirect::to(url.as_str())))
     } else {
@@ -40,8 +38,6 @@ pub async fn callback(
     jar: CookieJar,
     Query(query): Query<QueryData>,
 ) -> Result<(CookieJar, Redirect), StatusCode> {
-    dbg!("START");
-    dbg!(&jar);
     let challenge = jar.get("challenge").ok_or(StatusCode::UNAUTHORIZED)?;
     let challenge: Challenge =
         serde_json::from_str(challenge.value()).map_err(|_| StatusCode::UNAUTHORIZED)?;

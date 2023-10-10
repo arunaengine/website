@@ -10,7 +10,8 @@ use leptos_router::*;
 pub fn ArunaHeader() -> impl IntoView {
     provide_meta_context();
 
-    let get_user = use_context::<Resource<bool, Option<User>>>().expect("user_state not set");
+    let get_user =
+        use_context::<Resource<bool, Option<(User, String)>>>().expect("user_state not set");
 
     // On first load -> Check if user is logged in
     let update_user = use_context::<UpdateUser>().expect("user_state not set");
@@ -192,8 +193,7 @@ pub fn ArunaHeader() -> impl IntoView {
             }>
                 {move || {
                     match get_user.get().flatten() {
-                        Some(u) => {
-                            provide_context::<User>(u.clone());
+                        Some((u, _)) => {
                             let is_admin = u.attributes.unwrap_or_default().global_admin;
                             view! {
                                 <div class="nav-item dropdown">
@@ -348,10 +348,8 @@ pub fn ArunaHeader() -> impl IntoView {
                                             class="nav-link" // disabled"
                                             href=move || {
                                                 if is_logged_memo()() {
-                                                    // TODO: Public + Private objects
                                                     "/dash".to_string()
                                                 } else {
-                                                    // TODO: Public objects
                                                     "/dash/search".to_string()
                                                 }
                                             }

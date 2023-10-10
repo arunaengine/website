@@ -1,4 +1,4 @@
-use crate::utils::{mocks::get_demo_data, structs::SearchResultEntry};
+use crate::utils::structs::{GetOwnedResources, SearchResultEntry};
 use aruna_rust_api::api::storage::models::v2::{generic_resource::Resource, User};
 use leptos::*;
 //use leptos_meta::*;
@@ -46,6 +46,73 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 
 #[component]
 pub fn PersonalResources() -> impl IntoView {
+    // This takes the user context and creates a server call for
+    // all resources that are explicitly statet in User{permissions} field
+    let ctx = match use_context::<leptos::Resource<bool, Option<(User, String)>>>() {
+        Some(res) => res.get().flatten(),
+        None => None,
+    };
+    // This has to be manually parsed, because User structs can have
+    // empty vectors as fields, and serde does not deserialize them
+    // correctly if nested, so these needed fields need to be parsed
+    // by hand and then annotated with #[server(default)] and #[derive(Default)]
+    let query_params = match ctx {
+        Some((user, token)) => {
+            let perms = match user.attributes {
+                Some(a) => a.personal_permissions,
+                None => vec![],
+            };
+            Some(GetOwnedResources { perms, token })
+
+            //Some(resource)
+        }
+        None => None,
+    };
+    // Renders a view for each resource or returns a default page if no resources are found
+    let element = move || {
+        if let Some(query) = query_params.clone() {
+            // Runs async server call
+            let resource = create_local_resource(move || query.clone(), get_user_resources);
+            // Puts everything into a nice view
+            view! {
+                <Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
+                    {move || {
+                        resource.get().map(|resources| match resources {
+                            Ok(res) => view!{
+                                 <For
+                                 each=move || res.clone()
+                                 key=|result| {
+                                     match result {
+                                         Resource::Collection(c) => c.id.clone(),
+                                         Resource::Dataset(d) => d.id.clone(),
+                                         Resource::Object(o) => o.id.clone(),
+                                         Resource::Project(p) => p.id.clone(),
+                                     }
+                                 }
+
+                                 children=move |res| {
+                                     view! { <SearchResult res=res/> }
+                                }
+                                />
+                            }.into_view(),
+                            Err(e)=> {
+                                leptos::logging::log!("{e:?}");
+                                view!{<p> "Error while loading resources" </p>}.into_view()
+                            }
+                        })
+                    }
+                }
+                </Suspense>
+            }
+            .into_view()
+        } else {
+            view! {
+                <p> "Nothing to see here!" </p>
+            }
+            .into_view()
+        }
+    };
+
     view! {
         <div class="container-xl text-start mt-3">
             <div class="row mb-4">
@@ -105,27 +172,23 @@ pub fn PersonalResources() -> impl IntoView {
             </div>
             <div class="row mt-2">
                 <div class="col">
-                    <For
-                        each=move || {
-                            // TODO: Get all owned resources
-                            get_demo_data().clone().into_iter()
-                        }
-                        key=|res| {
-                            match res {
-                                Resource::Collection(c) => c.id.clone(),
-                                Resource::Dataset(d) => d.id.clone(),
-                                Resource::Object(o) => o.id.clone(),
-                                Resource::Project(p) => p.id.clone(),
-                            }
-                        }
-
-                        children=move |res| {
-                            view! { <SearchResult res=res/> }
-                        }
-                    />
-
+                    {element}
                 </div>
             </div>
         </div>
     }
+}
+
+#[server(UserResources, "/api", "GetJson")]
+pub async fn get_user_resources(
+    #[server(default)] query: GetOwnedResources,
+) -> Result<Vec<Resource>, ServerFnError> {
+    use crate::utils::aruna_api_handlers::get_owned_resources;
+    let res = get_owned_resources(query.perms, query.token)
+        .await
+        .map_err(|_| {
+            leptos::logging::log!("Unable to query owned resources");
+            ServerFnError::Request("Invalid request: UserResources".to_string())
+        })?;
+    Ok(res)
 }

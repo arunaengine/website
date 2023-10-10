@@ -1,7 +1,7 @@
 use aruna_rust_api::api::storage::models::v2::{
     generic_resource, relation, Collection, Dataset, ExternalRelation, ExternalRelationVariant,
-    InternalRelation, InternalRelationVariant, KeyValue, Object, Project, Relation,
-    RelationDirection, Stats, Status,
+    InternalRelation, InternalRelationVariant, KeyValue, Object, Permission, Project, Relation,
+    RelationDirection, Stats, Status, User,
 };
 //use anyhow::anyhow;
 // use aruna_rust_api::api::storage::{
@@ -89,6 +89,13 @@ impl SimplePermission {
 
 #[derive(Clone, Copy)]
 pub struct UpdateUser(pub RwSignal<bool>);
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+pub struct GetOwnedResources {
+    #[serde(default)]
+    pub perms: Vec<Permission>,
+    pub token: String,
+}
 
 #[derive(Clone, Copy)]
 pub struct UpdateTokens(pub RwSignal<bool>);

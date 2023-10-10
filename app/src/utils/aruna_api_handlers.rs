@@ -130,48 +130,47 @@ pub async fn aruna_get_resources(
     Ok(res)
 }
 
-pub async fn get_owned_resources(token: &str, owner: User) -> Result<Vec<Resource>> {
+pub async fn get_owned_resources(perms: Vec<Permission>, token: String) -> Result<Vec<Resource>> {
+    leptos::logging::log!("Permissions: {perms:?}");
+    leptos::logging::log!("Token: {token}");
     let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
     let endpoint = Channel::from_shared(aruna_endpoint)?;
     let channel = endpoint.connect().await?;
     let mut client = search_service_client::SearchServiceClient::new(channel);
-    let resource_ids = match owner.attributes {
-        Some(attr) => attr
-            .personal_permissions
-            .into_iter()
-            .filter_map(
-                |Permission {
-                     resource_id,
-                     permission_level,
-                 }| {
-                    if permission_level > 3 {
-                        match resource_id {
-                            Some(id) => match id {
-                                ResourceId::ProjectId(id) => Some(id),
-                                ResourceId::CollectionId(id) => Some(id),
-                                ResourceId::DatasetId(id) => Some(id),
-                                ResourceId::ObjectId(id) => Some(id),
-                            },
-                            None => None,
-                        }
-                    } else {
-                        None
+    let resource_ids = perms
+        .into_iter()
+        .filter_map(
+            |Permission {
+                 resource_id,
+                 permission_level,
+             }| {
+                if permission_level > 3 {
+                    match resource_id {
+                        Some(id) => match id {
+                            ResourceId::ProjectId(id) => Some(id),
+                            ResourceId::CollectionId(id) => Some(id),
+                            ResourceId::DatasetId(id) => Some(id),
+                            ResourceId::ObjectId(id) => Some(id),
+                        },
+                        None => None,
                     }
-                },
-            )
-            .collect(),
-        None => return Err(anyhow!("No attributes provided")),
-    };
+                } else {
+                    None
+                }
+            },
+        )
+        .collect();
     let req = tonic::Request::new(GetResourcesRequest { resource_ids });
-    let result = client
-        .get_resources(add_token(req, token))
+    let result: Vec<Resource> = client
+        .get_resources(add_token(req, &token))
         .await?
         .into_inner()
         .resources
         .into_iter()
         .map(|res| res.resource.unwrap().resource.unwrap())
         .collect();
-    Ok(result)
+    leptos::logging::log!("API Response: {result:?}");
+    Ok(result.clone())
 }
 
 // pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
