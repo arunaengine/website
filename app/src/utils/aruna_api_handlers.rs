@@ -7,7 +7,7 @@ use aruna_rust_api::api::storage::services::v2::{
     search_service_client, user_service_client, CreateApiTokenRequest, CreateApiTokenResponse,
     DeleteApiTokenRequest, GetApiTokensRequest, GetApiTokensResponse, GetResourceRequest,
     GetResourcesRequest, GetUserRequest, GetUserResponse, RegisterUserRequest,
-    RegisterUserResponse, SearchResourcesRequest,
+    RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest,
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
@@ -107,7 +107,24 @@ pub async fn aruna_delete_api_token(token_id: String, token: &str) -> Result<()>
         .into_inner();
     Ok(())
 }
-
+pub async fn aruna_get_resource(
+    token: Option<String>,
+    resource_id: String,
+) -> Result<ResourceWithPermission> {
+    leptos::logging::log!("Starting GetResource call");
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
+    let channel = endpoint.connect().await?;
+    let mut client = search_service_client::SearchServiceClient::new(channel);
+    let req = tonic::Request::new(GetResourceRequest { resource_id });
+    let result = match token {
+        Some(t) => client.get_resource(add_token(req, &t)).await?.into_inner(),
+        None => client.get_resource(req).await?.into_inner(),
+    };
+    leptos::logging::log!("GetResource result: {result:?}");
+    let res = result.resource.expect("Resource not found");
+    Ok(res)
+}
 pub async fn aruna_get_resources(
     token: Option<&str>,
     resource_ids: Vec<String>,
