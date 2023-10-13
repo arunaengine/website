@@ -1,7 +1,14 @@
-use crate::utils::{mocks::get_demo_data, structs::SearchResultEntry};
-use aruna_rust_api::api::storage::models::v2::{generic_resource::Resource, User};
+use crate::utils::{
+    mocks::get_demo_data,
+    structs::{SearchQuery, SearchResultEntry},
+};
+use aruna_rust_api::api::storage::{
+    models::v2::{generic_resource::Resource, User},
+    services::v2::SearchResourcesResponse,
+};
 use leptos::*;
 //use leptos_meta::*;
+use leptos::logging::log;
 use leptos_router::*;
 
 #[component]
@@ -41,25 +48,91 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
     }
 }
 
+#[server(APISearch)]
+async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, ServerFnError> {
+    use crate::utils::aruna_api_handlers::search;
+    use axum_extra::extract::CookieJar;
+    use http::header;
+    use leptos_axum::ResponseOptions;
+
+    let req_parts = use_context::<leptos_axum::RequestParts>()
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let jar = CookieJar::from_headers(&req_parts.headers);
+
+    let token = if let Some(cookie) = jar.get("token") {
+        Some(cookie.value().to_string())
+    } else {
+        None
+    };
+    let res = search(token, query).await.map_err(|_| {
+        leptos::logging::log!("Unable to query SearchResults");
+        ServerFnError::Request("Error accessing SearchResult".to_string())
+    })?;
+    Ok(res)
+}
+
 #[component]
 pub fn Search() -> impl IntoView {
+    let (query, query_set) = create_query_signal::<String>("query");
     let (query_class, query_set_class_p) = create_query_signal::<String>("class");
-    let (query_res, query_set_res_p) = create_query_signal::<String>("filter_res");
+    let (query_filter, query_set_filter_p) = create_query_signal::<String>("filter");
 
     let query_set_class = move |class: &str| {
         query_set_class_p(Some(class.to_string()));
     };
 
-    let query_set_res = move |res: &str| {
-        query_set_res_p(Some(res.to_string()));
+    let query_set_filter = move |res: &str| {
+        query_set_filter_p(Some(res.to_string()));
     };
-
-    // let is_class = move |class: &str| query_class() == Some(class.to_string());
-    let is_res = move |res: &str| query_res() == Some(res.to_string());
-
+    let is_res = move |res: &str| query_filter() == Some(res.to_string());
     let (read_range, set_range) = create_signal(1..=5);
 
-    let (results, _set_results) = create_signal::<i32>(18838);
+    let (results, set_results) = create_signal::<i32>(18838);
+    let query_data = move || {
+        let query = SearchQuery {
+            query: query().unwrap_or_default(),
+            filter: query_filter().unwrap_or_default(),
+            limit: 99,
+            offset: 0,
+        };
+        let resource = create_local_resource(move || query.clone(), search_api);
+        view! {<Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
+                {move || {
+                    resource.get().map(|result| match result {
+                        Ok(res) => {
+                            let resources = res.resources.into_iter().map(|gen_res| gen_res.resource.unwrap()); // This should be safe,
+                                                                                                                // because these grpc oneofs should not exist with undefined,
+                                                                                                                // but nevertheless: TODO!
+                            log!("{resources:?}");
+                            set_results(res.estimated_total as i32);
+                            view! {<For
+                                each=move || { resources.clone().into_iter() }
+                                key=|res| {
+                                    match res {
+                                        Resource::Collection(c) => c.id.clone(),
+                                        Resource::Dataset(d) => d.id.clone(),
+                                        Resource::Object(o) => o.id.clone(),
+                                        Resource::Project(p) => p.id.clone(),
+                                    }
+                                }
+                                children=move |res| {
+                                    view! { <SearchResult res=res/> }
+                                }
+                            />}.into_view()
+                        },
+                        Err(e)=> {
+                            leptos::logging::log!("{e:?}");
+                            view!{<p> "Error while searching resources" </p>}.into_view()
+                        }
+                    })
+                }
+            }
+            </Suspense>
+        }
+        .into_view()
+    };
+    // let is_class = move |class: &str| query_class() == Some(class.to_string());
+
     let max_pages = move || (results() / 50) + 1;
     let get_range_iter = {
         move |current: i32| {
@@ -260,11 +333,11 @@ pub fn Search() -> impl IntoView {
                         <div class="subheader mb-2">"Resource"</div>
                         <div class="list-group list-group-transparent mb-3">
                             <button
-                                on:click=move |_| query_set_res("all")
+                                on:click=move |_| query_set_filter("all")
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
-                                        + if is_res("all") || query_res().is_none() {
+                                        + if is_res("all") || query_filter().is_none() {
                                             " active"
                                         } else {
                                             ""
@@ -275,7 +348,7 @@ pub fn Search() -> impl IntoView {
                                 "All"
                             </button>
                             <button
-                                on:click=move |_| query_set_res("projects")
+                                on:click=move |_| query_set_filter("projects")
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
@@ -286,7 +359,7 @@ pub fn Search() -> impl IntoView {
                                 "Projects"
                             </button>
                             <button
-                                on:click=move |_| query_set_res("collections")
+                                on:click=move |_| query_set_filter("collections")
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
@@ -297,7 +370,7 @@ pub fn Search() -> impl IntoView {
                                 "Collections"
                             </button>
                             <button
-                                on:click=move |_| query_set_res("datasets")
+                                on:click=move |_| query_set_filter("datasets")
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
@@ -308,7 +381,7 @@ pub fn Search() -> impl IntoView {
                                 "Datasets"
                             </button>
                             <button
-                                on:click=move |_| query_set_res("objects")
+                                on:click=move |_| query_set_filter("objects")
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned() + if is_res("objects") { " active" } else { "" }
@@ -364,21 +437,8 @@ pub fn Search() -> impl IntoView {
                     <div class="col-9 ps-3">
 
                         {pagination}
-                        <For
-                            each=move || { get_demo_data().clone().into_iter() }
-                            key=|res| {
-                                match res {
-                                    Resource::Collection(c) => c.id.clone(),
-                                    Resource::Dataset(d) => d.id.clone(),
-                                    Resource::Object(o) => o.id.clone(),
-                                    Resource::Project(p) => p.id.clone(),
-                                }
-                            }
+                        {query_data}
 
-                            children=move |res| {
-                                view! { <SearchResult res=res/> }
-                            }
-                        />
 
                     </div>
                 </div>

@@ -244,6 +244,14 @@ pub struct ProjectOverviewWeb {
 //     }
 // }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SearchQuery {
+    pub query: String,
+    pub filter: String,
+    pub limit: i64,
+    pub offset: i64,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct SearchResultEntry {
     pub id: String,

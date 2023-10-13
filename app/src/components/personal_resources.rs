@@ -188,7 +188,7 @@ pub async fn get_user_resources(
         .await
         .map_err(|_| {
             leptos::logging::log!("Unable to query owned resources");
-            ServerFnError::Request("Invalid request: UserResources".to_string())
+            ServerFnError::Request("Error accessing UserResources".to_string())
         })?;
     Ok(res)
 }

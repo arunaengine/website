@@ -7,12 +7,14 @@ use aruna_rust_api::api::storage::services::v2::{
     search_service_client, user_service_client, CreateApiTokenRequest, CreateApiTokenResponse,
     DeleteApiTokenRequest, GetApiTokensRequest, GetApiTokensResponse, GetResourceRequest,
     GetResourcesRequest, GetUserRequest, GetUserResponse, RegisterUserRequest,
-    RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest,
+    RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse,
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
     transport::Channel,
 };
+
+use super::structs::SearchQuery;
 
 #[allow(dead_code)]
 pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T> {
@@ -190,6 +192,31 @@ pub async fn get_owned_resources(perms: Vec<Permission>, token: String) -> Resul
     Ok(result.clone())
 }
 
+pub async fn search(token: Option<String>, query: SearchQuery) -> Result<SearchResourcesResponse> {
+    leptos::logging::log!("Starting SearchResource server call");
+    leptos::logging::log!("Query: {query:?}");
+    leptos::logging::log!("Token: {token:?}");
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
+    let channel = endpoint.connect().await?;
+    let mut client = search_service_client::SearchServiceClient::new(channel);
+    let req = tonic::Request::new(SearchResourcesRequest {
+        query: query.query,
+        filter: query.filter,
+        limit: query.limit,
+        offset: query.offset,
+    });
+    leptos::logging::log!("SearchResourceRequest: {req:?}");
+    let result = match token {
+        Some(t) => client
+            .search_resources(add_token(req, &t))
+            .await?
+            .into_inner(),
+        None => client.search_resources(req).await?.into_inner(),
+    };
+    leptos::logging::log!("SearchResource result: {result:?}");
+    Ok(result)
+}
 // pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
 //     let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
 //     let endpoint = Channel::from_shared(aruna_endpoint)?;
