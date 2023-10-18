@@ -1,42 +1,30 @@
+use crate::utils::structs::UpdateTokens;
+use aruna_rust_api::api::storage::models::v2::Token;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-use crate::utils::structs::{TokenStats, UpdateTokens};
+#[server(GetTokens)]
+pub async fn get_tokens() -> Result<Vec<Token>, ServerFnError> {
+    use crate::utils::aruna_api_handlers::aruna_get_api_tokens as get_tokens;
+    use axum_extra::extract::CookieJar;
+    use http::header;
+    use leptos_axum::ResponseOptions;
 
-#[server(GetTokens, "/web")]
-pub async fn get_tokens() -> Result<Vec<TokenStats>, ServerFnError> {
-    // use crate::utils::aruna_api_handlers::aruna_get_api_tokens;
-    // use actix_session::SessionExt;
-    // use actix_web::HttpRequest;
-    // let req = use_context::<HttpRequest>()
-    //     .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let req_parts = use_context::<leptos_axum::RequestParts>()
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let jar = CookieJar::from_headers(&req_parts.headers);
 
-    // let sess = req.get_session();
-
-    // let token = sess
-    //     .get::<String>("token")
-    //     .map_err(|_| {
-    //         log::debug!("Unable to query token from session 1");
-    //         ServerFnError::Request("Invalid request".to_string())
-    //     })?
-    //     .ok_or_else(|| {
-    //         log::debug!("Unable to query token from session 1");
-    //         ServerFnError::Request("Invalid request".to_string())
-    //     })?;
-
-    // let result = aruna_get_api_tokens(&token).await.map_err(|_| {
-    //     log::debug!("Unable to query token from session 1");
-    //     ServerFnError::Request("Invalid request".to_string())
-    // })?;
-
-    // Ok(result
-    //     .token
-    //     .into_iter()
-    //     .map(TokenStats::from)
-    //     .collect::<Vec<TokenStats>>())
-
-    Ok(vec![])
+    let token = if let Some(cookie) = jar.get("token") {
+        Some(cookie.value().to_string())
+    } else {
+        None
+    };
+    let res = get_tokens(token).await.map_err(|_| {
+        leptos::logging::log!("Unable to query SearchResults");
+        ServerFnError::Request("Error accessing SearchResult".to_string())
+    })?;
+    Ok(res.token)
 }
 
 #[component]
@@ -61,11 +49,11 @@ pub fn TokensOverview() -> impl IntoView {
         get_tokens_res
             .get()
             .flatten()
-            .map(|ve| {
-                ve.into_iter()
-                    .filter_map(|elem| if !elem.is_session { Some(elem) } else { None })
-                    .collect::<Vec<_>>()
-            })
+            //.map(|ve| {
+            //    ve.into_iter()
+            //        .filter_map(|elem| if !elem.is_session { Some(elem) } else { None })
+            //        .collect::<Vec<_>>()
+            //})
             .unwrap_or_default()
     };
 

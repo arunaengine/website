@@ -2,6 +2,7 @@ use leptos::*;
 use leptos_meta::*;
 
 use crate::utils::structs::{TokenStats, UpdateTokens};
+use aruna_rust_api::api::storage::models::v2::Token;
 
 #[server(DeleteToken, "/web")]
 pub async fn delete_token(_token_id: String) -> Result<(), ServerFnError> {
@@ -36,7 +37,7 @@ pub async fn delete_token(_token_id: String) -> Result<(), ServerFnError> {
 
 /// Renders the home page of your application.
 #[component]
-pub fn Token(token_info: TokenStats) -> impl IntoView {
+pub fn Token(token_info: Token) -> impl IntoView {
     provide_meta_context();
 
     let token_id = store_value(token_info.id.to_string());
@@ -57,7 +58,7 @@ pub fn Token(token_info: TokenStats) -> impl IntoView {
         <tr>
             <td>{token_info.id.clone()}</td>
             <td>{token_info.name.clone()}</td>
-            <td>{token_info.used_at.clone()}</td>
+            //<td>{token_info.used_at.clone()}</td>
             <td>
                 <div class="d-flex justify-content-end">
                     <a
@@ -148,16 +149,20 @@ pub fn Token(token_info: TokenStats) -> impl IntoView {
                                 <div class="datagrid-title">"Name"</div>
                                 <div class="datagrid-content">{token_info.name.clone()}</div>
                             </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">"Type"</div>
-                                <div class="datagrid-content">
-                                    {token_info.token_type.get_type_variant()}
-                                </div>
-                            </div>
+                            //<div class="datagrid-item">
+                            //    <div class="datagrid-title">"Type"</div>
+                            //    <div class="datagrid-content">
+                            //        {token_info.token_type.get_type_variant()}
+                            //    </div>
+                            //</div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">"Target"</div>
                                 <div class="datagrid-content">
-                                    {token_info.token_type.get_target_id()}
+                                    {match token_info.permission {
+                                            Some(p) => p.resource_id,
+                                            None => String::new(),
+                                        }
+                                    }
                                 </div>
                             </div>
                             <div class="datagrid-item">
