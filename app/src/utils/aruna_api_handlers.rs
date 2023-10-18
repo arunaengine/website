@@ -1,12 +1,14 @@
 use anyhow::{anyhow, Result};
-use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
+use aruna_rust_api::api::storage::models::v2::generic_resource::{self, Resource};
 use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
-use aruna_rust_api::api::storage::models::v2::{Permission, User};
+use aruna_rust_api::api::storage::models::v2::{DataClass, Permission, User};
 //use aruna_rust_api::api::storage::services::v2::project_service_client;
 use aruna_rust_api::api::storage::services::v2::{
-    search_service_client, user_service_client, CreateApiTokenRequest, CreateApiTokenResponse,
-    DeleteApiTokenRequest, GetApiTokensRequest, GetApiTokensResponse, GetResourceRequest,
-    GetResourcesRequest, GetUserRequest, GetUserResponse, RegisterUserRequest,
+    collection_service_client, create_collection_request, dataset_service_client,
+    object_service_client, project_service_client, search_service_client, user_service_client,
+    CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest, CreateDatasetRequest,
+    CreateObjectRequest, DeleteApiTokenRequest, GetApiTokensRequest, GetApiTokensResponse,
+    GetResourceRequest, GetResourcesRequest, GetUserRequest, GetUserResponse, RegisterUserRequest,
     RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse,
 };
 use tonic::{
@@ -14,7 +16,7 @@ use tonic::{
     transport::Channel,
 };
 
-use super::structs::SearchQuery;
+use super::structs::{ResourceType, SearchQuery};
 
 #[allow(dead_code)]
 pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T> {
@@ -217,6 +219,126 @@ pub async fn search(token: Option<String>, query: SearchQuery) -> Result<SearchR
     leptos::logging::log!("SearchResource result: {result:?}");
     Ok(result)
 }
+
+pub async fn aruna_create_resource(
+    token: &str,
+    name: &str,
+    description: &str,
+    res_type: ResourceType,
+    parent: Option<String>,
+    parent_type: Option<ResourceType>,
+) -> Result<()> {
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
+    let channel = endpoint.connect().await?;
+    match res_type {
+        ResourceType::Project => {
+            let mut client = project_service_client::ProjectServiceClient::new(channel);
+            let request = tonic::Request::new(
+                aruna_rust_api::api::storage::services::v2::CreateProjectRequest {
+                    name: name.to_string(),
+                    description: description.to_string(),
+                    key_values: vec![],
+                    external_relations: vec![],
+                    data_class: DataClass::Public as i32, // TODO!
+                    preferred_endpoint: String::new(),
+                },
+            );
+            // Send the request to the AOS instance gRPC gateway
+            client
+                .create_project(add_token(request, token))
+                .await?
+                .into_inner();
+        }
+        ResourceType::Collection => {
+            let parent_id = match parent {
+                Some(id) => id,
+                None => return Err(anyhow!("No id provided")),
+            };
+            let parent = match parent_type {
+                Some(p) => match p {
+                    ResourceType::Project => Some(aruna_rust_api::api::storage::services::v2::create_collection_request::Parent::ProjectId(parent_id)),
+                    _ => return Err(anyhow!("Only projects are valid parents for collections")),
+                },
+                None => return Err(anyhow!("No parent type provided")),
+                
+            };
+            let mut client = collection_service_client::CollectionServiceClient::new(channel);
+            let request = tonic::Request::new(CreateCollectionRequest {
+                name: name.to_string(),
+                description: description.to_string(),
+                key_values: vec![],
+                external_relations: vec![],
+                data_class: DataClass::Public as i32, // TODO!
+                parent,
+            });
+            client
+                .create_collection(add_token(request, token))
+                .await?
+                .into_inner();
+        }
+        ResourceType::Dataset => {
+            let parent_id = match parent {
+                Some(id) => id,
+                None => return Err(anyhow!("No id provided")),
+            };
+            let parent = match parent_type {
+                Some(p) => match p {
+                    ResourceType::Project => Some(aruna_rust_api::api::storage::services::v2::create_dataset_request::Parent::ProjectId(parent_id)),
+                    ResourceType::Collection => Some(aruna_rust_api::api::storage::services::v2::create_dataset_request::Parent::CollectionId(parent_id)),
+                    _ => return Err(anyhow!("Only projects are valid parents for collections")),
+                },
+                None => return Err(anyhow!("No parent type provided")),
+                
+            };
+            let mut client = dataset_service_client::DatasetServiceClient::new(channel);
+            let request = tonic::Request::new(CreateDatasetRequest {
+                name: name.to_string(),
+                description: description.to_string(),
+                key_values: vec![],
+                external_relations: vec![],
+                data_class: DataClass::Public as i32, // TODO!
+                parent,
+            });
+            client
+                .create_dataset(add_token(request, token))
+                .await?
+                .into_inner();
+        }
+        ResourceType::Object => {
+            let parent_id = match parent {
+                Some(id) => id,
+                None => return Err(anyhow!("No id provided")),
+            };
+            let parent = match parent_type {
+                Some(p) => match p {
+                    ResourceType::Project => Some(aruna_rust_api::api::storage::services::v2::create_object_request::Parent::ProjectId(parent_id)),
+                    ResourceType::Collection => Some(aruna_rust_api::api::storage::services::v2::create_object_request::Parent::CollectionId(parent_id)),
+                    ResourceType::Dataset=> Some(aruna_rust_api::api::storage::services::v2::create_object_request::Parent::DatasetId(parent_id)),
+                    _ => return Err(anyhow!("Objects ")),
+                },
+                None => return Err(anyhow!("No parent type provided")),
+                
+            };
+            let mut client = object_service_client::ObjectServiceClient::new(channel);
+            let request = tonic::Request::new(CreateObjectRequest {
+                name: name.to_string(),
+                description: description.to_string(),
+                key_values: vec![],
+                external_relations: vec![],
+                data_class: DataClass::Public as i32, // TODO!
+                parent,
+                hashes: vec![],                       // TODO!
+            });
+            client
+                .create_object(add_token(request, token))
+                .await?
+                .into_inner();
+        }
+    }
+    Ok(())
+}
+
 // pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
 //     let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
 //     let endpoint = Channel::from_shared(aruna_endpoint)?;
@@ -331,27 +453,6 @@ pub async fn search(token: Option<String>, query: SearchQuery) -> Result<SearchR
 //     // Send the request to the AOS instance gRPC gateway
 //     client
 //         .remove_user_from_project(add_token(remove_user_proj, token))
-//         .await?
-//         .into_inner();
-//     Ok(())
-// }
-
-// pub async fn aruna_create_project(
-//     token: &str,
-//     project_name: &str,
-//     description: &str,
-// ) -> Result<()> {
-//     let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
-//     let endpoint = Channel::from_shared(aruna_endpoint)?;
-//     let channel = endpoint.connect().await?;
-//     let create_project_req = tonic::Request::new(CreateProjectRequest {
-//         name: project_name.to_string(),
-//         description: description.to_string(),
-//     });
-//     let mut client = project_service_client::ProjectServiceClient::new(channel);
-//     // Send the request to the AOS instance gRPC gateway
-//     client
-//         .create_project(add_token(create_project_req, token))
 //         .await?
 //         .into_inner();
 //     Ok(())

@@ -1,7 +1,77 @@
+use crate::utils::structs::{CreateResource, ResourceType};
+use leptos::logging::log;
 use leptos::{html::Input, *};
+use leptos_router::ActionForm;
+use leptos_router::FromFormData;
+
+#[server(CreateResourceRequest)]
+pub async fn create_resource_request(
+    //req: CreateResource,
+    #[server(default)] resname: String,
+    #[server(default)] resource_type: String,
+    #[server(default)] description: String,
+    #[server(default)] parent: Option<String>,
+    #[server(default)] parent_type: Option<ResourceType>,
+) -> Result<(), ServerFnError> {
+    use crate::utils::aruna_api_handlers::aruna_create_resource;
+    use axum_extra::extract::CookieJar;
+    use http::header;
+    use leptos_axum::{redirect, ResponseOptions};
+
+    let req_parts = use_context::<leptos_axum::RequestParts>()
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let jar = CookieJar::from_headers(&req_parts.headers);
+
+    let token = if let Some(cookie) = jar.get("token") {
+        cookie.value().to_string()
+    } else {
+        return Err(ServerFnError::Args(
+            "Custom error: Token not found".to_string(),
+        ));
+    };
+    log!("CreateResource name : {resname:?}");
+    log!("CreateResource description : {description:?}");
+    log!("CreateResource type : {resource_type:?}");
+    let res_type = match resource_type.as_str() {
+        "Project" => ResourceType::Project,
+        "Collection" => ResourceType::Collection,
+        "Dataset" => ResourceType::Dataset,
+        "Object" => ResourceType::Object,
+        _ => {
+            return Err(ServerFnError::ServerError(
+                "Invalid resource type".to_string(),
+            ))
+        }
+    };
+    let res = aruna_create_resource(
+        &token,
+        &resname,
+        &description,
+        res_type,
+        parent,
+        parent_type,
+    )
+    .await;
+    log!("{res:?}");
+    if res.is_ok() {
+        redirect("/objects");
+    } else {
+        return Err(ServerFnError::ServerError(
+            "CreateResource failed.".to_string(),
+        ));
+    }
+    Ok(())
+}
 
 #[component]
 pub fn CreateObjectPage() -> impl IntoView {
+    let create_resource_action = create_server_action::<CreateResourceRequest>();
+    let succeeded = move || {
+        create_resource_action.value()()
+            .map(|e| e.ok())
+            .flatten()
+            .is_some()
+    };
     let header = move || {
         view! {
             <div class="container-xl">
@@ -46,8 +116,22 @@ pub fn CreateObjectPage() -> impl IntoView {
     };
 
     let (read_type_select, write_type_select) = create_signal::<String>("Project".to_string());
-
+    let (read_name_select, write_name_select) = create_signal::<String>(String::new());
+    let (read_description_select, write_description_select) =
+        create_signal::<String>(String::new());
+    let (read_class_select, write_class_select) = create_signal::<i32>(1);
+    let (read_parent_select, write_parent_select) = create_signal::<Option<String>>(None);
     let (file_size, write_file_size) = create_signal::<Option<u64>>(None);
+    let (read_parent_type, write_parent_type) = create_signal::<Option<ResourceType>>(None);
+    let parent_from_event = move |ev| {
+        let parent = match event_target_value(&ev).as_str() {
+            "Project" => Some(ResourceType::Project),
+            "Collection" => Some(ResourceType::Collection),
+            "Dataset" => Some(ResourceType::Dataset),
+            _ => None,
+        };
+        write_parent_type(parent);
+    };
 
     let input_element = create_node_ref::<Input>();
 
@@ -80,7 +164,17 @@ pub fn CreateObjectPage() -> impl IntoView {
         view! {
             <div class="row row-cards">
                 <div class="col-lg-12">
-                    <form class="card">
+                    //<form class="card">
+                    <ActionForm
+                        class="card"
+                        // on:submit=move |ev| {
+                        //     let data = CreateResourceRequest::from_event(&ev)
+                        //         .expect("to parse form data");
+                        //     log!("{data:?}");
+                        //     create_resource_action.dispatch(data);
+                        // }
+                        action=create_resource_action
+                    >
                         <div class="card-body">
                             <div class="row g-5">
                                 <div class="col-lg-4 mb-3 text-start">
@@ -89,7 +183,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                         <label class="form-selectgroup-item">
                                             <input
                                                 type="radio"
-                                                name="name"
+                                                name="resource_type"
                                                 value="Project"
                                                 class="form-selectgroup-input"
                                                 checked=""
@@ -104,7 +198,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                         <label class="form-selectgroup-item">
                                             <input
                                                 type="radio"
-                                                name="name"
+                                                name="resource_type"
                                                 value="Collection"
                                                 class="form-selectgroup-input"
                                                 on:input=move |ev| {
@@ -118,7 +212,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                         <label class="form-selectgroup-item">
                                             <input
                                                 type="radio"
-                                                name="name"
+                                                name="resource_type"
                                                 value="Dataset"
                                                 class="form-selectgroup-input"
                                                 on:input=move |ev| {
@@ -132,7 +226,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                         <label class="form-selectgroup-item">
                                             <input
                                                 type="radio"
-                                                name="name"
+                                                name="resource_type"
                                                 value="Object"
                                                 class="form-selectgroup-input"
                                                 on:input=move |ev| {
@@ -153,9 +247,12 @@ pub fn CreateObjectPage() -> impl IntoView {
                                             <input
                                                 type="radio"
                                                 name="class"
-                                                value="Public"
+                                                value=1
                                                 class="form-selectgroup-input"
                                                 checked=""
+                                                on:input=move |ev| {
+                                                    write_class_select(i32::from_event(&ev).unwrap_or(1));
+                                                }
                                             />
                                             <span class="form-selectgroup-label">
                                                 Public
@@ -165,8 +262,12 @@ pub fn CreateObjectPage() -> impl IntoView {
                                             <input
                                                 type="radio"
                                                 name="class"
-                                                value="Private"
+                                                value=2
                                                 class="form-selectgroup-input"
+                                                // TODO!
+                                                on:input=move |ev| {
+                                                    write_class_select(i32::from_event(&ev).unwrap_or(2));
+                                                }
                                             />
                                             <span class="form-selectgroup-label">
                                                 Private
@@ -176,8 +277,11 @@ pub fn CreateObjectPage() -> impl IntoView {
                                             <input
                                                 type="radio"
                                                 name="class"
-                                                value="Workspace"
+                                                value=4
                                                 class="form-selectgroup-input"
+                                                on:input=move |ev| {
+                                                    write_class_select(i32::from_event(&ev).unwrap_or(4));
+                                                }
                                             />
                                             <span class="form-selectgroup-label">
                                                 Workspace
@@ -187,8 +291,11 @@ pub fn CreateObjectPage() -> impl IntoView {
                                             <input
                                                 type="radio"
                                                 name="class"
-                                                value="Confidential"
+                                                value=5
                                                 class="form-selectgroup-input"
+                                                on:input=move |ev| {
+                                                    write_class_select(i32::from_event(&ev).unwrap_or(5));
+                                                }
                                             />
                                             <span class="form-selectgroup-label">
                                                 Confidential
@@ -205,7 +312,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                         <label class="form-selectgroup-item">
                                             <input
                                                 type="radio"
-                                                name="lic"
+                                                name="lic-ccby"
                                                 value="ccbysa"
                                                 class="form-selectgroup-input"
                                                 checked=""
@@ -215,7 +322,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                         <label class="form-selectgroup-item">
                                             <input
                                                 type="radio"
-                                                name="lic"
+                                                name="lic-custom"
                                                 value="custom"
                                                 class="form-selectgroup-input"
                                                 checked=""
@@ -223,7 +330,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                             <span class="form-selectgroup-label">"Custom"</span>
                                             <input
                                                 type="text"
-                                                name="lic"
+                                                name="lic-custom_form"
                                                 placeholder="Custom"
                                                 class="form-control"
                                             />
@@ -243,6 +350,9 @@ pub fn CreateObjectPage() -> impl IntoView {
                                             name="resname"
                                             placeholder="Resource Name"
                                             required
+                                            on:input=move |ev| {
+                                                write_name_select(event_target_value(&ev))
+                                            }
                                         />
                                         <small class="form-hint">
                                             "The name of the resource, cannot contain spaces or special characters"
@@ -252,6 +362,111 @@ pub fn CreateObjectPage() -> impl IntoView {
 
                                 <Show when=move || read_type_select() != "Project" fallback=|| ()>
                                     <div class="col-lg-4 mb-3 text-start">
+                                        <label class="form-label required">"Parent type"</label>
+                                        {move || match read_type_select().as_str() {
+                                            "Collection" => view!{
+                                                <div class="form-selectgroup">
+                                                    <label class="form-selectgroup-item">
+                                                        <input
+                                                            type="radio"
+                                                            name="parent_type"
+                                                            value="Project"
+                                                            class="form-selectgroup-input"
+                                                            checked=""
+                                                            on:input=parent_from_event
+                                                        />
+                                                        <span class="form-selectgroup-label">
+                                                            Project
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                                <small class="form-hint">
+                                                    "Collections can only have projects as parents"
+                                                    <p/>
+                                                </small>
+                                            }.into_view(),
+                                            "Dataset" => view!{
+                                                <div class="form-selectgroup">
+                                                    <label class="form-selectgroup-item">
+                                                        <input
+                                                            type="radio"
+                                                            name="parent_type"
+                                                            value="Project"
+                                                            class="form-selectgroup-input"
+                                                            checked=""
+                                                            on:input=parent_from_event
+                                                        />
+                                                        <span class="form-selectgroup-label">
+                                                            Project
+                                                        </span>
+                                                    </label>
+                                                    <label class="form-selectgroup-item">
+                                                        <input
+                                                            type="radio"
+                                                            name="parent_type"
+                                                            value="Collection"
+                                                            class="form-selectgroup-input"
+                                                            checked=""
+                                                            on:input=parent_from_event
+                                                        />
+                                                        <span class="form-selectgroup-label">
+                                                            Collection
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                                <small class="form-hint">
+                                                    "Dataset parents can only have projects and collections as parents"
+                                                    <p/>
+                                                </small>
+                                            }.into_view(),
+                                            "Object" => view!{
+                                                <div class="form-selectgroup">
+                                                    <label class="form-selectgroup-item">
+                                                        <input
+                                                            type="radio"
+                                                            name="parent_type"
+                                                            value="Project"
+                                                            class="form-selectgroup-input"
+                                                            checked=""
+                                                            on:input=parent_from_event
+                                                        />
+                                                        <span class="form-selectgroup-label">
+                                                            Project
+                                                        </span>
+                                                    </label>
+                                                    <label class="form-selectgroup-item">
+                                                        <input
+                                                            type="radio"
+                                                            name="parent_type"
+                                                            value="Collection"
+                                                            class="form-selectgroup-input"
+                                                            checked=""
+                                                            on:input=parent_from_event
+                                                        />
+                                                        <span class="form-selectgroup-label">
+                                                            Collection
+                                                        </span>
+                                                    </label>
+                                                    <label class="form-selectgroup-item">
+                                                        <input
+                                                            type="radio"
+                                                            name="parent_type"
+                                                            value="Dataset"
+                                                            class="form-selectgroup-input"
+                                                            checked=""
+                                                            on:input=parent_from_event                                                        />
+                                                        <span class="form-selectgroup-label">
+                                                            Dataset
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                                <small class="form-hint">
+                                                    "Object parents can only have projects, collections or datasets as parents"
+                                                    <p/>
+                                                </small>
+                                            }.into_view(),
+                                            _ => ().into_view()
+                                        }}
                                         <label class="form-label required">"Parent ID"</label>
                                         <div>
                                             <input
@@ -259,8 +474,11 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                 class="form-control text-uppercase"
                                                 pattern={"^[0-7][0-9A-HJKMNP-TV-Z]{25}$"}
                                                 id="resid"
-                                                name="resid"
+                                                name="parent"
                                                 placeholder="Resource ID"
+                                                on:input=move |ev| {
+                                                    write_parent_select(Some(event_target_value(&ev)))
+                                                }
                                                 required
                                             />
                                             <small class="form-hint">
@@ -274,9 +492,10 @@ pub fn CreateObjectPage() -> impl IntoView {
                                     <label class="form-label">"Description"</label>
                                     <textarea
                                         class="form-control"
-                                        name="description-tarea-input"
+                                        name="description"
                                         rows="6"
                                         placeholder="Description"
+                                        on:input=move |ev| {write_description_select(event_target_value(&ev))}
                                     ></textarea>
                                 </div>
 
@@ -303,7 +522,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                     <input
                                                         type="text"
                                                         class="form-control"
-                                                        name="example-text-input"
+                                                        name="example-text-input-ulid"
                                                         placeholder="Target ULID"
                                                     />
                                                 </td>
@@ -379,7 +598,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                     <input
                                                         type="text"
                                                         class="form-control"
-                                                        name="example-text-input"
+                                                        name="example-text-input-external_id"
                                                         placeholder="Target Identifier (URL etc.)"
                                                     />
                                                 </td>
@@ -530,10 +749,9 @@ pub fn CreateObjectPage() -> impl IntoView {
                                 Submit
                             </button>
                         </div>
-                    </form>
-
+                    //</form>
+                    </ActionForm>
                 </div>
-
             </div>
         }
     };

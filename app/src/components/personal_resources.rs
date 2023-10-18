@@ -72,9 +72,9 @@ pub fn PersonalResources() -> impl IntoView {
     let element = move || {
         if let Some(query) = query_params.clone() {
             // Runs async server call
-            let resource = create_local_resource(move || query.clone(), get_user_resources);
-            // Puts everything into a nice view
+            let resource = create_local_resource(move || query.clone(), get_user_resources); // TODO: Use create_resource
             view! {
+                // Puts everything into a nice view
                 <Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
                     {move || {
                         resource.get().map(|resources| match resources {

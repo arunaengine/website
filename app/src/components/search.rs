@@ -96,7 +96,8 @@ pub fn Search() -> impl IntoView {
             offset: 0,
         };
         let resource = create_local_resource(move || query.clone(), search_api);
-        view! {<Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
+        view! {
+            <Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
                 {move || {
                     resource.get().map(|result| match result {
                         Ok(res) => {

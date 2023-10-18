@@ -251,6 +251,19 @@ pub struct SearchQuery {
     pub limit: i64,
     pub offset: i64,
 }
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct CreateResource {
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResourceType {
+    Project,
+    Collection,
+    Dataset,
+    Object,
+}
 
 #[derive(Debug, Default, Clone)]
 pub struct SearchResultEntry {
