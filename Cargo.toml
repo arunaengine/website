@@ -21,8 +21,8 @@ console_log = "1.0.0"
 http = "0.2.9"
 log = "0.4.20"
 simple_logger = "4.2.0"
-thiserror = "1.0.48"
-tokio = { version = "1.32.0", features = ["full"] }
+thiserror = "1.0.50"
+tokio = { version = "1.33.0", features = ["full"] }
 tower = { version = "0.4.13", features = ["full"] }
 tower-http = { version = "0.4.4", features = ["full"] }
 wasm-bindgen = "=0.2.87"

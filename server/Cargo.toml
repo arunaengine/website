@@ -17,11 +17,11 @@ tower.workspace = true
 tower-http.workspace = true
 log.workspace = true
 
-openidconnect = "3.3.1"
+openidconnect = "3.4.0"
 anyhow = "1.0.75"
-serde = { version = "1.0.188", features = ["derive"] }
+serde = { version = "1.0.189", features = ["derive"] }
 url = "2.4.1"
 dotenvy = "0.15.7"
-serde_json = "1.0.105"
-axum-extra = { version = "0.7.7", features = ["cookie"] }
-time = "0.3.28"
+serde_json = "1.0.107"
+axum-extra = { version = "0.8.0", features = ["cookie"] }
+time = "0.3.30"
