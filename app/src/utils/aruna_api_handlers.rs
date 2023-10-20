@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Result};
-use aruna_rust_api::api::storage::models::v2::generic_resource::{self, Resource};
+use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
 use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
 use aruna_rust_api::api::storage::models::v2::{DataClass, Permission, User};
 //use aruna_rust_api::api::storage::services::v2::project_service_client;
 use aruna_rust_api::api::storage::services::v2::{
-    collection_service_client, create_collection_request, dataset_service_client,
+    collection_service_client, dataset_service_client,
     object_service_client, project_service_client, search_service_client, user_service_client,
     CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest, CreateDatasetRequest,
     CreateObjectRequest, DeleteApiTokenRequest, GetApiTokensRequest, GetApiTokensResponse,
@@ -238,10 +238,8 @@ pub async fn aruna_create_resource(
                 aruna_rust_api::api::storage::services::v2::CreateProjectRequest {
                     name: name.to_string(),
                     description: description.to_string(),
-                    key_values: vec![],
-                    external_relations: vec![],
-                    data_class: DataClass::Public as i32, // TODO!
-                    preferred_endpoint: String::new(),
+                    data_class: DataClass::Public as i32,
+                    ..Default::default()
                 },
             );
             // Send the request to the AOS instance gRPC gateway
@@ -267,10 +265,9 @@ pub async fn aruna_create_resource(
             let request = tonic::Request::new(CreateCollectionRequest {
                 name: name.to_string(),
                 description: description.to_string(),
-                key_values: vec![],
-                external_relations: vec![],
                 data_class: DataClass::Public as i32, // TODO!
                 parent,
+                ..Default::default()
             });
             client
                 .create_collection(add_token(request, token))
@@ -295,10 +292,9 @@ pub async fn aruna_create_resource(
             let request = tonic::Request::new(CreateDatasetRequest {
                 name: name.to_string(),
                 description: description.to_string(),
-                key_values: vec![],
-                external_relations: vec![],
                 data_class: DataClass::Public as i32, // TODO!
                 parent,
+                ..Default::default()
             });
             client
                 .create_dataset(add_token(request, token))
@@ -324,11 +320,9 @@ pub async fn aruna_create_resource(
             let request = tonic::Request::new(CreateObjectRequest {
                 name: name.to_string(),
                 description: description.to_string(),
-                key_values: vec![],
-                external_relations: vec![],
                 data_class: DataClass::Public as i32, // TODO!
                 parent,
-                hashes: vec![],                       // TODO!
+                ..Default::default()
             });
             client
                 .create_object(add_token(request, token))

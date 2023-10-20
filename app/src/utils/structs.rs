@@ -1,7 +1,7 @@
 use aruna_rust_api::api::storage::models::v2::{
     generic_resource, relation, Collection, Dataset, ExternalRelation, ExternalRelationVariant,
     InternalRelation, InternalRelationVariant, KeyValue, Object, Permission, Project, Relation,
-    RelationDirection, Stats, Status, User,
+    RelationDirection, Stats, Status,
 };
 //use anyhow::anyhow;
 // use aruna_rust_api::api::storage::{
@@ -853,9 +853,9 @@ impl From<generic_resource::Resource> for SearchResultEntry {
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
                 relations: from_relation_vec(relations),
-                object_status: Status::from_i32(status)
+                object_status: Status::try_from(status)
                     .map(|s| format!("{:?}", s))
-                    .unwrap_or_else(|| "Unknown".to_string()),
+                    .unwrap_or_else(|_| "Unknown".to_string()),
             },
         }
     }

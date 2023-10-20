@@ -14,7 +14,7 @@ pub fn ArunaHeader() -> impl IntoView {
         use_context::<Resource<bool, Option<(User, String)>>>().expect("user_state not set");
 
     // On first load -> Check if user is logged in
-    let update_user = use_context::<UpdateUser>().expect("user_state not set");
+    let _update_user = use_context::<UpdateUser>().expect("user_state not set");
 
     let is_logged_memo = move || create_memo(move |_| get_user.get().flatten().is_some());
     // Creates a reactive value to update the button
@@ -179,7 +179,7 @@ pub fn ArunaHeader() -> impl IntoView {
         }
     };
 
-    let class_cookie = move || {
+    let _class_cookie = move || {
         format!(
             "cookie-consent {}",
             if hide_cookies() { "hidden" } else { "" }

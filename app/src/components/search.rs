@@ -1,10 +1,6 @@
-use crate::utils::{
-    mocks::get_demo_data,
-    structs::{SearchQuery, SearchResultEntry},
-};
+use crate::utils::structs::{SearchQuery, SearchResultEntry};
 use aruna_rust_api::api::storage::{
-    models::v2::{generic_resource::Resource, User},
-    services::v2::SearchResourcesResponse,
+    models::v2::generic_resource::Resource, services::v2::SearchResourcesResponse,
 };
 use leptos::*;
 //use leptos_meta::*;
@@ -52,8 +48,6 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, ServerFnError> {
     use crate::utils::aruna_api_handlers::search;
     use axum_extra::extract::CookieJar;
-    use http::header;
-    use leptos_axum::ResponseOptions;
 
     let req_parts = use_context::<leptos_axum::RequestParts>()
         .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
@@ -73,7 +67,7 @@ async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, Serve
 
 #[component]
 pub fn Search() -> impl IntoView {
-    let (query, query_set) = create_query_signal::<String>("query");
+    let (query, _query_set) = create_query_signal::<String>("query");
     let (query_class, query_set_class_p) = create_query_signal::<String>("class");
     let (query_filter, query_set_filter_p) = create_query_signal::<String>("filter");
 

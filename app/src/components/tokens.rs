@@ -8,8 +8,6 @@ use leptos_router::*;
 pub async fn get_tokens() -> Result<Vec<Token>, ServerFnError> {
     use crate::utils::aruna_api_handlers::aruna_get_api_tokens as get_tokens;
     use axum_extra::extract::CookieJar;
-    use http::header;
-    use leptos_axum::ResponseOptions;
 
     let req_parts = use_context::<leptos_axum::RequestParts>()
         .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
@@ -24,7 +22,7 @@ pub async fn get_tokens() -> Result<Vec<Token>, ServerFnError> {
         leptos::logging::log!("Unable to query SearchResults");
         ServerFnError::Request("Error accessing SearchResult".to_string())
     })?;
-    Ok(res.token)
+    Ok(res.tokens)
 }
 
 #[component]

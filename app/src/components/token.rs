@@ -1,7 +1,7 @@
 use leptos::*;
 use leptos_meta::*;
 
-use crate::utils::structs::{TokenStats, UpdateTokens};
+use crate::utils::structs::UpdateTokens;
 use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
 use aruna_rust_api::api::storage::models::v2::Token;
 

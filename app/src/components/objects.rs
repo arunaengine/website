@@ -1,13 +1,10 @@
-use crate::components::objects::GetObject as OtherGetObject;
 use crate::utils::{
-    mocks::get_mock_by_id,
     structs::{SearchResultEntry, VisualizedStats},
     tabler_utils::{add_bg_color, add_text_color, Colors},
 };
 use aruna_rust_api::api::storage::{
-    models::v2::generic_resource::Resource as APIResource,
-    models::v2::User,
-    services::v2::{GetObjectRequest, ResourceWithPermission},
+    models::v2::generic_resource::Resource as APIResource, models::v2::User,
+    services::v2::ResourceWithPermission,
 };
 use leptos::*;
 use leptos_router::*;
@@ -78,7 +75,7 @@ pub fn ObjectOverview() -> impl IntoView {
     });
 
     // Uses entry
-    let entry = move |value: APIResource| SearchResultEntry::from(value);
+    let _entry = move |value: APIResource| SearchResultEntry::from(value);
     let name = move |entry: SearchResultEntry| entry.name.to_string();
     let id = move |entry: SearchResultEntry| entry.id.to_string();
 

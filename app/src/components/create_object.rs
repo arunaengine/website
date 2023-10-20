@@ -1,4 +1,4 @@
-use crate::utils::structs::{CreateResource, ResourceType};
+use crate::utils::structs::ResourceType;
 use leptos::logging::log;
 use leptos::{html::Input, *};
 use leptos_router::ActionForm;
@@ -15,8 +15,7 @@ pub async fn create_resource_request(
 ) -> Result<(), ServerFnError> {
     use crate::utils::aruna_api_handlers::aruna_create_resource;
     use axum_extra::extract::CookieJar;
-    use http::header;
-    use leptos_axum::{redirect, ResponseOptions};
+    use leptos_axum::redirect;
 
     let req_parts = use_context::<leptos_axum::RequestParts>()
         .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
@@ -66,7 +65,7 @@ pub async fn create_resource_request(
 #[component]
 pub fn CreateObjectPage() -> impl IntoView {
     let create_resource_action = create_server_action::<CreateResourceRequest>();
-    let succeeded = move || {
+    let _succeeded = move || {
         create_resource_action.value()()
             .map(|e| e.ok())
             .flatten()
@@ -116,13 +115,13 @@ pub fn CreateObjectPage() -> impl IntoView {
     };
 
     let (read_type_select, write_type_select) = create_signal::<String>("Project".to_string());
-    let (read_name_select, write_name_select) = create_signal::<String>(String::new());
-    let (read_description_select, write_description_select) =
+    let (_read_name_select, write_name_select) = create_signal::<String>(String::new());
+    let (_read_description_select, write_description_select) =
         create_signal::<String>(String::new());
-    let (read_class_select, write_class_select) = create_signal::<i32>(1);
-    let (read_parent_select, write_parent_select) = create_signal::<Option<String>>(None);
+    let (_read_class_select, write_class_select) = create_signal::<i32>(1);
+    let (_read_parent_select, write_parent_select) = create_signal::<Option<String>>(None);
     let (file_size, write_file_size) = create_signal::<Option<u64>>(None);
-    let (read_parent_type, write_parent_type) = create_signal::<Option<ResourceType>>(None);
+    let (_read_parent_type, write_parent_type) = create_signal::<Option<ResourceType>>(None);
     let parent_from_event = move |ev| {
         let parent = match event_target_value(&ev).as_str() {
             "Project" => Some(ResourceType::Project),
