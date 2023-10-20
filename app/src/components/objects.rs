@@ -3,8 +3,7 @@ use crate::utils::{
     tabler_utils::{add_bg_color, add_text_color, Colors},
 };
 use aruna_rust_api::api::storage::{
-    models::v2::generic_resource::Resource as APIResource, models::v2::User,
-    services::v2::ResourceWithPermission,
+    models::v2::generic_resource::Resource as APIResource, services::v2::ResourceWithPermission,
 };
 use leptos::*;
 use leptos_router::*;
@@ -17,7 +16,6 @@ struct ObjectParams {
 
 #[derive(PartialEq, Debug, Serialize, Deserialize, Clone)]
 struct GetObjectQuery {
-    pub token: Option<String>,
     pub id: String,
 }
 
@@ -51,19 +49,7 @@ pub fn ObjectOverview() -> impl IntoView {
         })
     };
 
-    // Gets optional token
-    let get_token = move || {
-        let ctx = match use_context::<leptos::Resource<bool, Option<User>>>() {
-            Some(res) => res.get().flatten(),
-            None => None,
-        };
-        match ctx {
-            Some((_, token)) => Some(token),
-            None => None,
-        }
-    };
     let args = move || GetObjectQuery {
-        token: get_token().clone(),
         id: get_params().clone(),
     };
     // Create leptos::Resource for ServerFn

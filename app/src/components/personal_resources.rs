@@ -184,6 +184,7 @@ pub async fn get_user_resources(
     #[server(default)] query: GetOwnedResources,
 ) -> Result<Vec<Resource>, ServerFnError> {
     use crate::utils::aruna_api_handlers::get_owned_resources;
+
     let res = get_owned_resources(query.perms, query.token)
         .await
         .map_err(|_| {

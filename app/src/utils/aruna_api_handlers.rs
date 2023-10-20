@@ -8,7 +8,7 @@ use aruna_rust_api::api::storage::services::v2::{
     object_service_client, project_service_client, search_service_client, user_service_client,
     CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest, CreateDatasetRequest,
     CreateObjectRequest, DeleteApiTokenRequest, GetApiTokensRequest, GetApiTokensResponse,
-    GetResourceRequest, GetResourcesRequest, GetUserRequest, GetUserResponse, RegisterUserRequest,
+    GetResourceRequest, GetResourcesRequest, GetUserRequest, RegisterUserRequest,
     RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse,
 };
 use tonic::{
@@ -28,20 +28,32 @@ pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T
     req
 }
 
-pub async fn who_am_i(token: &str) -> Result<User> {
+pub enum WhoamiResponse {
+    User(User),
+    NotRegistered,
+    NotActivated,
+    Error,
+}
+
+pub async fn who_am_i(token: &str) -> WhoamiResponse {
     let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
-    let endpoint = Channel::from_shared(aruna_endpoint)?;
-    let channel = endpoint.connect().await?;
+    let Ok(endpoint) = Channel::from_shared(aruna_endpoint) else { return WhoamiResponse::Error };
+    let Ok(channel) = endpoint.connect().await else { return WhoamiResponse::Error };
     let get_request = tonic::Request::new(GetUserRequest {
         user_id: "".to_string(),
     });
     let mut client = user_service_client::UserServiceClient::new(channel);
     // Send the request to the AOS instance gRPC gateway
-    let response: GetUserResponse = client
+    match client
         .get_user(add_token(get_request, token))
-        .await?
-        .into_inner();
-    response.user.ok_or(anyhow!("No user found"))
+        .await {
+            Ok(i) => 
+                match i.into_inner().user {
+                    Some(u) => return WhoamiResponse::User(u),
+                    None => return WhoamiResponse::NotRegistered,
+                }
+            Err(_) => WhoamiResponse::NotRegistered,
+        }
 }
 
 pub async fn aruna_register_user(

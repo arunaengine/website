@@ -20,7 +20,7 @@ pub async fn login(
 ) -> Result<(CookieJar, Redirect), StatusCode> {
     let redirect = urlencoding::decode(&redirect.0.unwrap_or_else(|| "/".to_string()))
         .unwrap_or_else(|| "/".to_string())
-        .to_string();
+        .into_owned();
 
     if let Some(refresh_token) = jar.get("refresh") {
         if let Ok((token, duration)) = state.oidc.refresh(refresh_token.value()).await {

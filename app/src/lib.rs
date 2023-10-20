@@ -23,22 +23,27 @@ pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
         None => return Ok(None),
         _ => {}
     }
-
-    if let Some(cookie) = jar.get("token") {
-        let token = cookie.value().to_string();
-        let user = who_am_i(&token).await.map_err(|_| {
-            leptos::logging::log!("Unable to query token from session");
-            ServerFnError::Request("Invalid request, who_i_am".to_string())
-        })?;
-        return Ok(Some(user));
-    } else {
-        if let Some(response_options) = use_context::<ResponseOptions>() {
+    if let Some(response_options) = use_context::<ResponseOptions>() {
+        if let Some(cookie) = jar.get("token") {
+            let token = cookie.value().to_string();
+            match who_am_i(&token).await {
+                utils::aruna_api_handlers::WhoamiResponse::User(u) => return Ok(Some(u)),
+                _ => {
+                    response_options.insert_header(
+                        header::LOCATION,
+                        header::HeaderValue::from_str("/login")
+                            .expect("Failed to create HeaderValue"),
+                    );
+                    return Ok(None);
+                }
+            };
+        } else {
             response_options.insert_header(
                 header::LOCATION,
                 header::HeaderValue::from_str("/login").expect("Failed to create HeaderValue"),
             );
-        }
-    };
+        };
+    }
 
     Ok(None)
 }
@@ -79,7 +84,7 @@ pub fn EntryPoint() -> impl IntoView {
         request_animation_frame(move || hide_cordi.set(is_item));
     });
 
-    let cordi = move || {
+    let _cordi = move || {
         view! {
                 <div
                     class=move || if hide_cordi.get() { "offcanvas offcanvas-top"} else { "offcanvas offcanvas-top show"}
@@ -120,7 +125,7 @@ pub fn EntryPoint() -> impl IntoView {
         }
     };
 
-    let cookies = move || {
+    let _cookies = move || {
         view! {
             <div
                 class="offcanvas offcanvas-bottom h-auto show"
