@@ -16,9 +16,9 @@ pub async fn get_tokens() -> Result<Vec<Token>, ServerFnError> {
     let jar = CookieJar::from_headers(&req_parts.headers);
 
     let token = if let Some(cookie) = jar.get("token") {
-        Some(cookie.value().to_string())
+        cookie.value()
     } else {
-        None
+        return Err(ServerFnError::Request("Error accessing token".to_string()));
     };
     let res = get_tokens(token).await.map_err(|_| {
         leptos::logging::log!("Unable to query SearchResults");
