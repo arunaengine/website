@@ -94,7 +94,6 @@ pub struct UpdateUser(pub RwSignal<bool>);
 pub struct GetOwnedResources {
     #[serde(default)]
     pub perms: Vec<Permission>,
-    pub token: String,
 }
 
 #[derive(Clone, Copy)]

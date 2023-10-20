@@ -44,7 +44,7 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
     }
 }
 
-#[server(APISearch)]
+#[server]
 async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, ServerFnError> {
     use crate::utils::aruna_api_handlers::search;
     use axum_extra::extract::CookieJar;

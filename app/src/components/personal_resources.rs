@@ -48,7 +48,7 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 pub fn PersonalResources() -> impl IntoView {
     // This takes the user context and creates a server call for
     // all resources that are explicitly statet in User{permissions} field
-    let ctx = match use_context::<leptos::Resource<bool, Option<(User, String)>>>() {
+    let ctx = match use_context::<leptos::Resource<bool, Option<User>>>() {
         Some(res) => res.get().flatten(),
         None => None,
     };
@@ -57,12 +57,12 @@ pub fn PersonalResources() -> impl IntoView {
     // correctly if nested, so these needed fields need to be parsed
     // by hand and then annotated with #[server(default)] and #[derive(Default)]
     let query_params = match ctx {
-        Some((user, token)) => {
+        Some(user) => {
             let perms = match user.attributes {
                 Some(a) => a.personal_permissions,
                 None => vec![],
             };
-            Some(GetOwnedResources { perms, token })
+            Some(GetOwnedResources { perms })
 
             //Some(resource)
         }

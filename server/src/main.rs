@@ -55,7 +55,7 @@ async fn leptos_routes_handler(
 #[derive(FromRef, Clone)]
 pub struct ServerState {
     pub oidc: oidc::Authorizer,
-    pub mail: aruna_web_app::utils::mail::MailClient,
+    pub mail: Option<aruna_web_app::utils::mail::MailClient>,
     pub leptos_options: LeptosOptions,
 }
 
@@ -65,7 +65,7 @@ async fn main() {
 
     dotenvy::dotenv().expect("couldn't load .env file");
 
-    let key_cloak_url = std::env::var("KEYCLOAK_URL").expect("Keycloak URL must be set!");
+    let key_cloak_url = dotenvy::var("KEYCLOAK_URL").expect("Keycloak URL must be set!");
 
     // Setting get_configuration(None) means we'll be using cargo-leptos's env values
     // For deployment these variables are:
@@ -74,9 +74,19 @@ async fn main() {
     // The file would need to be included with the executable when moved to deployment
     let conf = get_configuration(None).await.unwrap();
     let leptos_options = conf.leptos_options;
+    let mail_client = if let Ok(val) = dotenvy::var("DEV_MODE") {
+        if &val == "true" {
+            None
+        } else {
+            Some(MailClient::new().expect("Failed to create mail client"))
+        }
+    } else {
+        Some(MailClient::new().expect("Failed to create mail client"))
+    };
+
     let server_state = ServerState {
         oidc: oidc::Authorizer::new(key_cloak_url).await.unwrap(),
-        mail: MailClient::new().expect("Failed to create mail client"),
+        mail: mail_client,
         leptos_options: leptos_options.clone(),
     };
     let addr = leptos_options.site_addr;

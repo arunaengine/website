@@ -25,3 +25,4 @@ dotenvy = "0.15.7"
 serde_json = "1.0.107"
 axum-extra = { version = "0.8.0", features = ["cookie"] }
 time = "0.3.30"
+urlencoding = "2.1.3"

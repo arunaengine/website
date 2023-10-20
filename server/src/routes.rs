@@ -10,11 +10,34 @@ use axum_extra::extract::{cookie::Cookie, CookieJar};
 use serde::{de, Deserialize, Deserializer};
 use time::OffsetDateTime;
 
+#[derive(Deserialize)]
+pub struct RedirectBack(pub Option<String>);
+
 pub async fn login(
     State(state): State<ServerState>,
+    Query(redirect): Query<RedirectBack>,
     jar: CookieJar,
 ) -> Result<(CookieJar, Redirect), StatusCode> {
-    if let Ok((c, url)) = state.oidc.get_challenge() {
+    let redirect = urlencoding::decode(&redirect.0.unwrap_or_else(|| "/".to_string()))
+        .unwrap_or_else(|| "/".to_string())
+        .to_string();
+
+    if let Some(refresh_token) = jar.get("refresh") {
+        if let Ok((token, duration)) = state.oidc.refresh(refresh_token.value()).await {
+            let expires = OffsetDateTime::now_utc() + duration;
+            let token_cookie = Cookie::build("token", token.clone())
+                .path("/")
+                .secure(true)
+                .http_only(true)
+                .expires(expires)
+                .finish();
+
+            let jar = jar.add(token_cookie).add(Cookie::new("logged_in", "true"));
+            return Ok((jar, Redirect::to(&redirect)));
+        }
+    }
+
+    if let Ok((c, url)) = state.oidc.get_challenge(redirect) {
         let cookie = Cookie::build("challenge", serde_json::to_string(&c).unwrap())
             .path("/")
             .secure(true)
@@ -72,7 +95,10 @@ pub async fn callback(
         .add(token_cookie)
         .add(refresh_cookie)
         .add(Cookie::new("logged_in", "true"));
-    Ok((jar, Redirect::to("/")))
+    Ok((
+        jar,
+        Redirect::to(&challenge.redirect_url.unwrap_or_else(|| "/".to_string())),
+    ))
 }
 
 #[derive(serde::Deserialize)]

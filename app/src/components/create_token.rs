@@ -10,7 +10,7 @@ use crate::utils::{
     structs::{TokenResponse, UpdateTokens},
 };
 
-#[server(CreateTokenServer, "/web")]
+#[server]
 pub async fn create_token_server(
     _tokenname: String,
     _selecttype: String,

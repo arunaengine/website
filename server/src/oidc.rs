@@ -25,14 +25,21 @@ pub struct Challenge {
     pub csrf_token: CsrfToken,
     pub nonce: Nonce,
     pub pkce_verifier: PkceCodeVerifier,
+    pub redirect_url: String,
 }
 
 impl Challenge {
-    pub fn new(csrf_token: CsrfToken, nonce: Nonce, pkce_verifier: PkceCodeVerifier) -> Self {
+    pub fn new(
+        csrf_token: CsrfToken,
+        nonce: Nonce,
+        pkce_verifier: PkceCodeVerifier,
+        redirect_url: String,
+    ) -> Self {
         Challenge {
             csrf_token,
             nonce,
             pkce_verifier,
+            redirect_url,
         }
     }
 
@@ -86,7 +93,7 @@ impl Authorizer {
         self.key_cloak_url.to_string()
     }
 
-    pub fn get_challenge(&self) -> Result<(Challenge, url::Url)> {
+    pub fn get_challenge(&self, redirect_url: String) -> Result<(Challenge, url::Url)> {
         // Generate a PKCE challenge.
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
@@ -102,7 +109,10 @@ impl Authorizer {
             .set_pkce_challenge(pkce_challenge)
             .url();
 
-        Ok((Challenge::new(csrf_token, nonce, pkce_verifier), auth_url))
+        Ok((
+            Challenge::new(csrf_token, nonce, pkce_verifier, redirect_url),
+            auth_url,
+        ))
     }
 
     /// Exchange the temp token for a "real one"
@@ -165,13 +175,12 @@ impl Authorizer {
         ))
     }
 
-    pub async fn refresh(&self, token: &str) -> (String, Duration) {
+    pub async fn refresh(&self, refresh_token: &str) -> Result<(String, Duration)> {
         let token = self
             .core_client
             .exchange_refresh_token(&RefreshToken::new(token.to_string()))
             .request_async(async_http_client)
-            .await
-            .unwrap();
+            .await?;
 
         (
             token.access_token().secret().to_string(),

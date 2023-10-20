@@ -53,7 +53,7 @@ pub fn ObjectOverview() -> impl IntoView {
 
     // Gets optional token
     let get_token = move || {
-        let ctx = match use_context::<leptos::Resource<bool, Option<(User, String)>>>() {
+        let ctx = match use_context::<leptos::Resource<bool, Option<User>>>() {
             Some(res) => res.get().flatten(),
             None => None,
         };

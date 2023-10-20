@@ -6,7 +6,7 @@ use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
 
-#[server(DeactivateUser, "/web")]
+#[server]
 pub async fn deactivate_user(_user_id: String) -> Result<(), ServerFnError> {
     // use crate::utils::aruna_api_handlers::aruna_deactivate_user;
     // use actix_session::SessionExt;
@@ -27,7 +27,7 @@ pub async fn deactivate_user(_user_id: String) -> Result<(), ServerFnError> {
     Ok(())
 }
 
-#[server(RemoveUser, "/web")]
+#[server]
 pub async fn remove_user_project(
     _user_id: String,
     _project_id: String,
@@ -61,7 +61,7 @@ pub fn AdminUser(user: User) -> impl IntoView {
 
     let is_active = user.active;
     let deactivate_action = create_server_action::<DeactivateUser>();
-    let remove_user_action = create_server_action::<RemoveUser>();
+    let remove_user_action = create_server_action::<RemoveUserProject>();
     let last_version = create_rw_signal(0);
     let update_admin = use_context::<UpdateAdmin>().expect("user_state not set");
 
@@ -355,7 +355,7 @@ pub fn AdminUser(user: User) -> impl IntoView {
                                                     aria-label="Button"
                                                     on:click=move |_| {
                                                         remove_user_action
-                                                            .dispatch(RemoveUser {
+                                                            .dispatch(RemoveUserProject {
                                                                 _user_id: store_user.get_value(),
                                                                 _project_id: id_clone.clone(),
                                                             })

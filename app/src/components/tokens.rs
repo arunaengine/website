@@ -163,17 +163,12 @@ pub fn TokensOverview() -> impl IntoView {
                         match create_token_action.value().get() {
                             Some(Ok(resp)) => {
                                 view! {
-                                    // This guarantees that every result can only be seen once
-                                    ,
                                     <CreateTokenSuccess create_token_resp=resp/>
                                 }
                                     .into_view()
                             }
                             Some(Err(_)) => {
                                 view! {
-                                    // This guarantees that every result can only be seen once
-
-                                    // This guarantees that every result can only be seen once
                                     "Something went wrong"
                                 }
                                     .into_view()

@@ -8,7 +8,7 @@ pub mod error_template;
 pub mod utils;
 
 #[server(GetUserInfo, "/api", "GetJson")]
-pub async fn get_user_info() -> Result<Option<(User, String)>, ServerFnError> {
+pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
     use axum_extra::extract::CookieJar;
     use http::header;
     use leptos_axum::ResponseOptions;
@@ -30,7 +30,7 @@ pub async fn get_user_info() -> Result<Option<(User, String)>, ServerFnError> {
             leptos::logging::log!("Unable to query token from session");
             ServerFnError::Request("Invalid request, who_i_am".to_string())
         })?;
-        return Ok(Some((user, token)));
+        return Ok(Some(user));
     } else {
         if let Some(response_options) = use_context::<ResponseOptions>() {
             response_options.insert_header(
@@ -176,7 +176,7 @@ pub fn EntryPoint() -> impl IntoView {
         }
     };
 
-    let res: Resource<bool, Option<(User, String)>> =
+    let res: Resource<bool, Option<User>> =
         create_local_resource(update_user.0, move |_| async move {
             get_user_info().await.ok()?
         });
@@ -191,8 +191,8 @@ pub fn EntryPoint() -> impl IntoView {
         // sets the document title
         <Title text="Aruna Object Storage"/>
         <div class="page">
-            {cordi}
-            {cookies}
+            //{cordi}
+            //{cookies}
             <Router>
                 <Routes>
                     <Route

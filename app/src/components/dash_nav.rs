@@ -12,9 +12,8 @@ pub fn DashNav() -> impl IntoView {
 
     let path = loc.pathname;
 
-    let get_user =
-        use_context::<Resource<bool, Option<(User, String)>>>().expect("user_state not set");
-    let (user, _) = get_user.get().flatten().unwrap_or_default();
+    let get_user = use_context::<Resource<bool, Option<User>>>().expect("user_state not set");
+    let user = get_user.get().flatten().unwrap_or_default();
 
     let is_admin = create_memo(move |_| user.attributes.clone().unwrap_or_default().global_admin);
 
