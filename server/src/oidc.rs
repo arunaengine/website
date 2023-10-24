@@ -178,13 +178,13 @@ impl Authorizer {
     pub async fn refresh(&self, refresh_token: &str) -> Result<(String, Duration)> {
         let token = self
             .core_client
-            .exchange_refresh_token(&RefreshToken::new(token.to_string()))
+            .exchange_refresh_token(&RefreshToken::new(refresh_token.to_string()))
             .request_async(async_http_client)
             .await?;
 
-        (
+        Ok((
             token.access_token().secret().to_string(),
             token.expires_in().unwrap_or_default(),
-        )
+        ))
     }
 }

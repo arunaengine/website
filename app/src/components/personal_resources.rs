@@ -180,16 +180,42 @@ pub fn PersonalResources() -> impl IntoView {
 }
 
 #[server(UserResources, "/api", "GetJson")]
-pub async fn get_user_resources(
-    #[server(default)] query: GetOwnedResources,
-) -> Result<Vec<Resource>, ServerFnError> {
+pub async fn get_user_resources(query: GetOwnedResources) -> Result<Vec<Resource>, ServerFnError> {
     use crate::utils::aruna_api_handlers::get_owned_resources;
+    use axum_extra::extract::CookieJar;
+    use http::header;
+    use leptos_axum::ResponseOptions;
 
-    let res = get_owned_resources(query.perms, query.token)
-        .await
-        .map_err(|_| {
-            leptos::logging::log!("Unable to query owned resources");
-            ServerFnError::Request("Error accessing UserResources".to_string())
-        })?;
-    Ok(res)
+    let req_parts = use_context::<leptos_axum::RequestParts>()
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let jar = CookieJar::from_headers(&req_parts.headers);
+
+    match jar.get("logged_in") {
+        Some(l) if l.value() == "false" => return Ok(vec![]),
+        None => return Ok(vec![]),
+        _ => {}
+    }
+    if let Some(response_options) = use_context::<ResponseOptions>() {
+        if let Some(cookie) = jar.get("token") {
+            let token = cookie.value().to_string();
+            match get_owned_resources(query.perms, token).await {
+                Ok(res) => return Ok(res),
+                _ => {
+                    response_options.insert_header(
+                        header::LOCATION,
+                        header::HeaderValue::from_str("/login?redirect=%2Fobjects")
+                            .expect("Failed to create HeaderValue"),
+                    );
+                    return Ok(vec![]);
+                }
+            };
+        } else {
+            response_options.insert_header(
+                header::LOCATION,
+                header::HeaderValue::from_str("/login?redirect=%2Fobjects")
+                    .expect("Failed to create HeaderValue"),
+            );
+        };
+    }
+    Ok(vec![])
 }

@@ -24,14 +24,34 @@ pub async fn get_object_by_id(
     query: GetObjectQuery,
 ) -> Result<ResourceWithPermission, ServerFnError> {
     use crate::utils::aruna_api_handlers::aruna_get_resource;
-    leptos::logging::log!("GetObject init");
-    let res = aruna_get_resource(query.token, query.id)
-        .await
-        .map_err(|_| {
-            leptos::logging::log!("Unable to query owned resources");
-            ServerFnError::Request("Invalid request: UserResources".to_string())
-        })?;
-    Ok(res)
+    use axum_extra::extract::CookieJar;
+    use http::header;
+    use leptos_axum::ResponseOptions;
+
+    let req_parts = use_context::<leptos_axum::RequestParts>()
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let jar = CookieJar::from_headers(&req_parts.headers);
+
+    if let Some(response_options) = use_context::<ResponseOptions>() {
+        let maybe_token = jar.get("token").map(|v| v.value().to_string());
+
+        match aruna_get_resource(maybe_token, query.id).await {
+            Ok(res) => return Ok(res),
+            _ => {
+                response_options.insert_header(
+                    header::LOCATION,
+                    header::HeaderValue::from_str("/login").expect("Failed to create HeaderValue"),
+                );
+                return Err(ServerFnError::Request(
+                    "Invalid request: UserResources".to_string(),
+                ));
+            }
+        }
+    } else {
+        return Err(ServerFnError::Request(
+            "Unable to get response_options".to_string(),
+        ));
+    }
 }
 
 #[component]

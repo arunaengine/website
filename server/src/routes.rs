@@ -1,4 +1,4 @@
-use std::{fmt, str::FromStr};
+use std::{fmt, mem, str::FromStr};
 
 use crate::{oidc::Challenge, ServerState};
 use axum::{
@@ -11,16 +11,18 @@ use serde::{de, Deserialize, Deserializer};
 use time::OffsetDateTime;
 
 #[derive(Deserialize)]
-pub struct RedirectBack(pub Option<String>);
+pub struct RedirectBack {
+    pub redirect: Option<String>,
+}
 
 pub async fn login(
     State(state): State<ServerState>,
     Query(redirect): Query<RedirectBack>,
     jar: CookieJar,
 ) -> Result<(CookieJar, Redirect), StatusCode> {
-    let redirect = urlencoding::decode(&redirect.0.unwrap_or_else(|| "/".to_string()))
-        .unwrap_or_else(|| "/".to_string())
-        .into_owned();
+    let redirect = urlencoding::decode(&redirect.redirect.unwrap_or_else(|| "/".to_string()))
+        .map(|e| e.into_owned())
+        .unwrap_or_else(|_| "/".to_string());
 
     if let Some(refresh_token) = jar.get("refresh") {
         if let Ok((token, duration)) = state.oidc.refresh(refresh_token.value()).await {
@@ -62,9 +64,10 @@ pub async fn callback(
     Query(query): Query<QueryData>,
 ) -> Result<(CookieJar, Redirect), StatusCode> {
     let challenge = jar.get("challenge").ok_or(StatusCode::UNAUTHORIZED)?;
-    let challenge: Challenge =
+    let mut challenge: Challenge =
         serde_json::from_str(challenge.value()).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
+    let redirect = mem::take(&mut challenge.redirect_url);
     let jar = jar.remove(Cookie::named("challenge"));
 
     let (token, expires, refresh) = state
@@ -95,10 +98,7 @@ pub async fn callback(
         .add(token_cookie)
         .add(refresh_cookie)
         .add(Cookie::new("logged_in", "true"));
-    Ok((
-        jar,
-        Redirect::to(&challenge.redirect_url.unwrap_or_else(|| "/".to_string())),
-    ))
+    Ok((jar, Redirect::to(&redirect)))
 }
 
 #[derive(serde::Deserialize)]
@@ -126,9 +126,13 @@ pub async fn refresh(
     jar: CookieJar,
     Query(query): Query<FromQuery>,
 ) -> Result<(CookieJar, Redirect), StatusCode> {
-    let challenge = jar.get("refresh").ok_or(StatusCode::UNAUTHORIZED)?;
+    let challenge = jar.get("refresh").ok_or_else(|| StatusCode::UNAUTHORIZED)?;
 
-    let (new_token, expires) = state.oidc.refresh(challenge.value()).await;
+    let (new_token, expires) = state
+        .oidc
+        .refresh(challenge.value())
+        .await
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
     let expires = OffsetDateTime::now_utc() + expires;
 
     let token_cookie = Cookie::build("token", new_token.clone())
