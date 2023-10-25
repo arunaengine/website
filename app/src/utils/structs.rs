@@ -1,7 +1,7 @@
 use aruna_rust_api::api::storage::models::v2::{
     generic_resource, relation, Collection, Dataset, ExternalRelation, ExternalRelationVariant,
     InternalRelation, InternalRelationVariant, KeyValue, Object, Permission, Project, Relation,
-    RelationDirection, Stats, Status,
+    RelationDirection, Stats, Status, User,
 };
 //use anyhow::anyhow;
 // use aruna_rust_api::api::storage::{
@@ -86,6 +86,15 @@ impl SimplePermission {
 //         }
 //     }
 // }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum WhoamiResponse {
+    User(User),
+    NotRegistered,
+    NotActivated,
+    NotLoggedIn,
+    Error(String),
+}
 
 #[derive(Clone, Copy)]
 pub struct UpdateUser(pub RwSignal<bool>);

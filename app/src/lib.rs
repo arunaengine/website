@@ -2,16 +2,22 @@ use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+use utils::structs::WhoamiResponse;
 
 pub mod components;
 pub mod error_template;
 pub mod utils;
 
+pub enum GetUserResponse {
+    User(User),
+    NotRegistered,
+    NotActivated,
+    Error(String),
+}
+
 #[server(GetUserInfo, "/api", "GetJson")]
-pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
+pub async fn get_user_info() -> Result<WhoamiResponse, ServerFnError> {
     use axum_extra::extract::CookieJar;
-    use http::header;
-    use leptos_axum::ResponseOptions;
     use utils::aruna_api_handlers::who_am_i;
 
     let req_parts = use_context::<leptos_axum::RequestParts>()
@@ -19,33 +25,16 @@ pub async fn get_user_info() -> Result<Option<User>, ServerFnError> {
     let jar = CookieJar::from_headers(&req_parts.headers);
 
     match jar.get("logged_in") {
-        Some(l) if l.value() == "false" => return Ok(None),
-        None => return Ok(None),
+        Some(l) if l.value() == "false" => return Ok(WhoamiResponse::NotLoggedIn),
+        None => return Ok(WhoamiResponse::NotLoggedIn),
         _ => {}
     }
-    if let Some(response_options) = use_context::<ResponseOptions>() {
-        if let Some(cookie) = jar.get("token") {
-            let token = cookie.value().to_string();
-            match who_am_i(&token).await {
-                utils::aruna_api_handlers::WhoamiResponse::User(u) => return Ok(Some(u)),
-                _ => {
-                    response_options.insert_header(
-                        header::LOCATION,
-                        header::HeaderValue::from_str("/login")
-                            .expect("Failed to create HeaderValue"),
-                    );
-                    return Ok(None);
-                }
-            };
-        } else {
-            response_options.insert_header(
-                header::LOCATION,
-                header::HeaderValue::from_str("/login").expect("Failed to create HeaderValue"),
-            );
-        };
+    if let Some(cookie) = jar.get("token") {
+        let token = cookie.value().to_string();
+        return Ok(who_am_i(&token).await);
+    } else {
+        Ok(WhoamiResponse::NotLoggedIn)
     }
-
-    Ok(None)
 }
 
 #[component]
@@ -181,12 +170,13 @@ pub fn EntryPoint() -> impl IntoView {
         }
     };
 
-    let res: Resource<bool, Option<User>> =
-        create_local_resource(update_user.0, move |_| async move {
-            get_user_info().await.ok()?
-        });
+    let res: Resource<bool, WhoamiResponse> = create_resource(update_user.0, move |_| async move {
+        get_user_info()
+            .await
+            .unwrap_or_else(|e| WhoamiResponse::Error(e.to_string()))
+    });
 
-    provide_context(res);
+    //provide_context(res);
     provide_context(update_user);
 
     view! {

@@ -1,8 +1,7 @@
 use anyhow::{anyhow, Result};
 use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
 use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
-use aruna_rust_api::api::storage::models::v2::{DataClass, Permission, User};
-//use aruna_rust_api::api::storage::services::v2::project_service_client;
+use aruna_rust_api::api::storage::models::v2::{DataClass, Permission};
 use aruna_rust_api::api::storage::services::v2::{
     collection_service_client, dataset_service_client,
     object_service_client, project_service_client, search_service_client, user_service_client,
@@ -16,7 +15,7 @@ use tonic::{
     transport::Channel,
 };
 
-use super::structs::{ResourceType, SearchQuery};
+use super::structs::{ResourceType, SearchQuery, WhoamiResponse};
 
 #[allow(dead_code)]
 pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T> {
@@ -27,18 +26,10 @@ pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T
     );
     req
 }
-
-pub enum WhoamiResponse {
-    User(User),
-    NotRegistered,
-    NotActivated,
-    Error,
-}
-
 pub async fn who_am_i(token: &str) -> WhoamiResponse {
     let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
-    let Ok(endpoint) = Channel::from_shared(aruna_endpoint) else { return WhoamiResponse::Error };
-    let Ok(channel) = endpoint.connect().await else { return WhoamiResponse::Error };
+    let Ok(endpoint) = Channel::from_shared(aruna_endpoint) else { return WhoamiResponse::Error("Unable to create channel".to_string()) };
+    let Ok(channel) = endpoint.connect().await else { return WhoamiResponse::Error("Unable to connect to ep".to_string()) };
     let get_request = tonic::Request::new(GetUserRequest {
         user_id: "".to_string(),
     });
