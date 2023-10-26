@@ -96,6 +96,15 @@ pub enum WhoamiResponse {
     Error(String),
 }
 
+impl WhoamiResponse {
+    pub fn is_logged_in(&self) -> bool {
+        match self {
+            WhoamiResponse::User(_) => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct UpdateUser(pub RwSignal<bool>);
 

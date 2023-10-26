@@ -1,5 +1,4 @@
-use crate::utils::structs::UpdateUser;
-use aruna_rust_api::api::storage::models::v2::User;
+use crate::utils::structs::{UpdateUser, WhoamiResponse};
 use cfg_if::cfg_if;
 use leptos::*;
 use leptos_meta::*;
@@ -10,12 +9,13 @@ use leptos_router::*;
 pub fn ArunaHeader() -> impl IntoView {
     provide_meta_context();
 
-    let get_user = use_context::<Resource<bool, Option<User>>>().expect("user_state not set");
+    let get_user = use_context::<Resource<bool, WhoamiResponse>>().expect("user_state not set");
 
     // On first load -> Check if user is logged in
     let _update_user = use_context::<UpdateUser>().expect("user_state not set");
 
-    let is_logged_memo = move || create_memo(move |_| get_user.get().flatten().is_some());
+    let is_logged_memo =
+        move || create_memo(move |_| get_user.get().map(|e| e.is_logged_in()).unwrap_or_default());
     // Creates a reactive value to update the button
     let (dark, toggle_dark) = create_signal("light".to_string());
     let darkmode = move |_| {
@@ -191,8 +191,8 @@ pub fn ArunaHeader() -> impl IntoView {
                 view! { <div class="spinner-border"></div> }
             }>
                 {move || {
-                    match get_user.get().flatten() {
-                        Some(u) => {
+                    match get_user.get() {
+                        Some(WhoamiResponse::User(u)) => {
                             let is_admin = u.attributes.unwrap_or_default().global_admin;
                             view! {
                                 <div class="nav-item dropdown">
@@ -249,7 +249,7 @@ pub fn ArunaHeader() -> impl IntoView {
                             }
                                 .into_view()
                         }
-                        None => {
+                        _ => {
                             view! {
                                 <a
                                     href="/login"
