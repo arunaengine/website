@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use crate::utils::modal::hide_modal;
 
-#[server(RegisterUser, "/web")]
+#[server(RegisterUser)]
 pub async fn register_user(
     displayname: String,
     email: String,

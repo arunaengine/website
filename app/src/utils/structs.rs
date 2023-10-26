@@ -103,6 +103,13 @@ impl WhoamiResponse {
             _ => false,
         }
     }
+
+    pub fn maybe_user(&self) -> Option<User> {
+        match self {
+            WhoamiResponse::User(u) => Some(u.clone()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]

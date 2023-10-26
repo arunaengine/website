@@ -13,7 +13,9 @@ pub fn ArunaHeader() -> impl IntoView {
         .expect("user_state not set");
 
     // On first load -> Check if user is logged in
-    let _update_user = use_context::<UpdateUser>().expect("user_state not set");
+    let update_user = use_context::<UpdateUser>().expect("user_state not set");
+
+    update_user.0.update(|e| *e = !*e);
 
     let is_logged_memo =
         move || create_memo(move |_| get_user.get().map(|e| e.is_logged_in()).unwrap_or_default());
@@ -152,7 +154,7 @@ pub fn ArunaHeader() -> impl IntoView {
             <div class="nav-item dropdown d-none d-md-flex me-3">
                 <a
                     href="#"
-                    class="nav-link px-0" //disabled"
+                    class="nav-link px-0 disabled" //disabled"
                     data-bs-toggle="dropdown"
                     tabindex="-1"
                     aria-label="Coming soon"
@@ -173,7 +175,7 @@ pub fn ArunaHeader() -> impl IntoView {
                         <path d="M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"></path>
                         <path d="M9 17v1a3 3 0 0 0 6 0v-1"></path>
                     </svg>
-                    <span class="badge bg-red"></span>
+                    //<span class="badge bg-red"></span>
                 </a>
             </div>
         }
@@ -195,6 +197,7 @@ pub fn ArunaHeader() -> impl IntoView {
                     match get_user.get() {
                         Some(WhoamiResponse::User(u)) => {
                             let is_admin = u.attributes.unwrap_or_default().global_admin;
+                            let active_text = move || if u.active { "" }else{ " (inactive)" };
                             view! {
                                 <div class="nav-item dropdown">
                                     <a
@@ -226,9 +229,9 @@ pub fn ArunaHeader() -> impl IntoView {
                                             <div>{u.display_name}</div>
                                             {move || {
                                                 if is_admin {
-                                                    view! { <div class="mt-1 small text-muted">{"Admin"}</div> }
+                                                    view! { <div class="mt-1 small text-muted">{format!("Admin{}", active_text())}</div> }
                                                 } else {
-                                                    view! { <div class="mt-1 small text-muted">{"User"}</div> }
+                                                    view! { <div class="mt-1 small text-muted">{format!("User{}", active_text())}</div> }
                                                 }
                                             }}
 
@@ -377,50 +380,6 @@ pub fn ArunaHeader() -> impl IntoView {
                                             </A>
                                         </Suspense>
                                     </li>
-                                    <Suspense fallback=move || {
-                                        view! { // cx,
-                                                <div class="spinner-border"></div>
-                                        }
-                                    }>
-                                        { move || {
-                                            if is_logged_memo()() {
-                                                view! {
-                                                    <li
-                                                        class="nav-item"
-                                                        class:active=move || { path().contains("panel") }
-                                                    >
-                                                        <A class="nav-link" href="/dash">
-                                                            <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                                            <svg
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            class="icon icon-tabler icon-tabler-dashboard"
-                                                            width="40"
-                                                            height="40"
-                                                            viewBox="0 0 24 24"
-                                                            stroke-width="1"
-                                                            stroke="currentColor"
-                                                            fill="none"
-                                                            stroke-linecap="round"
-                                                            stroke-linejoin="round"
-                                                            >
-                                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                                            <path d="M12 13m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>
-                                                            <path d="M13.45 11.55l2.05 -2.05"></path>
-                                                            <path d="M6.4 20a9 9 0 1 1 11.2 0z"></path>
-                                                            </svg>
-                                                            </span>
-                                                            <span class="nav-link-title">{"Dashboard"}</span>
-                                                        </A>
-                                                    </li>
-                                                }
-                                                .into_view()
-                                            } else {
-                                                ().into_view()
-                                            }
-                                        }
-                                    }
-
-                                    </Suspense>
 
                                     <li
                                         class="nav-item"

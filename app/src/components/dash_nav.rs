@@ -1,4 +1,4 @@
-use aruna_rust_api::api::storage::models::v2::User;
+use crate::utils::structs::WhoamiResponse;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -12,13 +12,20 @@ pub fn DashNav() -> impl IntoView {
 
     let path = loc.pathname;
 
-    let get_user = use_context::<Resource<bool, Option<User>>>().expect("user_state not set");
-    let user = get_user.get().flatten().unwrap_or_default();
+    let get_user = use_context::<Resource<leptos::RwSignal<bool>, WhoamiResponse>>()
+        .expect("user_state not set");
 
-    let is_admin = create_memo(move |_| user.attributes.clone().unwrap_or_default().global_admin);
+    let maybe_user = move || get_user.get().map(|u| u.maybe_user()).flatten();
+
+    let is_admin = move || {
+        maybe_user()
+            .map(|user| user.attributes.clone().unwrap_or_default().global_admin)
+            .unwrap_or_default()
+    };
 
     view! {
-        <Show when=move || get_user().map(|e| e.is_some()).unwrap_or_default() fallback=|| ()>
+        <Suspense>
+        <Show when=move || maybe_user().is_some() fallback=|| ()>
             <header class="navbar-expand-md">
                 <div class="collapse navbar-collapse" id="navbar-menu">
                     <div class="navbar navbar-light">
@@ -150,11 +157,12 @@ pub fn DashNav() -> impl IntoView {
                                         </A>
                                     </div>
                                 </li>
-                                <Suspense fallback=move || ().into_view()>
+
                                     <li
                                         class="nav-item"
                                         class:active=move || { path().contains("admin") }
                                     >
+                                    <Suspense fallback=move || ().into_view()>
                                         <a
                                             class="nav-link"
                                             class:disabled=move || { !is_admin() }
@@ -187,13 +195,14 @@ pub fn DashNav() -> impl IntoView {
                                             </span>
                                             <span class="nav-link-title">"Admin"</span>
                                         </a>
+                                        </Suspense>
                                     </li>
-                                </Suspense>
                             </ul>
                         </div>
                     </div>
                 </div>
             </header>
         </Show>
+        </Suspense>
     }
 }
