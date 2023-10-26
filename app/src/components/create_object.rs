@@ -1,5 +1,4 @@
 use crate::utils::structs::ResourceType;
-use leptos::logging::log;
 use leptos::{html::Input, *};
 use leptos_router::ActionForm;
 use leptos_router::FromFormData;
@@ -15,6 +14,7 @@ pub async fn create_resource_request(
 ) -> Result<(), ServerFnError> {
     use crate::utils::aruna_api_handlers::aruna_create_resource;
     use axum_extra::extract::CookieJar;
+    use leptos::logging::log;
     use leptos_axum::redirect;
 
     let req_parts = use_context::<leptos_axum::RequestParts>()

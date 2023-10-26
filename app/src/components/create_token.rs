@@ -68,7 +68,7 @@ pub fn CreateTokenSuccess(create_token_resp: TokenResponse) -> impl IntoView {
     let nav = use_navigate();
     let modal_ref = create_node_ref::<html::Div>();
     modal_ref.on_load(move |loaded| {
-        loaded.on_mount(move |mounted| {
+        let _ = loaded.on_mount(move |mounted| {
             cfg_if! {
                 if #[cfg(feature = "hydrate")] {
                     use crate::utils::modal::show_modal;
@@ -185,7 +185,7 @@ pub fn CreateToken(
     //let loc = use_location();
     let modal_ref = create_node_ref::<html::Div>();
     modal_ref.on_load(move |loaded| {
-        loaded.on_mount(move |mounted| {
+        let _ = loaded.on_mount(move |mounted| {
             cfg_if! {
                 if #[cfg(feature = "hydrate")] {
                     use crate::utils::modal::show_modal;

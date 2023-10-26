@@ -9,7 +9,8 @@ use leptos_router::*;
 pub fn ArunaHeader() -> impl IntoView {
     provide_meta_context();
 
-    let get_user = use_context::<Resource<bool, WhoamiResponse>>().expect("user_state not set");
+    let get_user = use_context::<Resource<leptos::RwSignal<bool>, WhoamiResponse>>()
+        .expect("user_state not set");
 
     // On first load -> Check if user is logged in
     let _update_user = use_context::<UpdateUser>().expect("user_state not set");

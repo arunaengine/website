@@ -11,30 +11,34 @@ use crate::utils::modal::hide_modal;
 
 #[server(RegisterUser, "/web")]
 pub async fn register_user(
-    _displayname: String,
-    _email: String,
-    _project: String,
+    displayname: String,
+    email: String,
+    project: String,
 ) -> Result<(), ServerFnError> {
-    // use crate::utils::aruna_api_handlers::aruna_register_user;
-    // use actix_session::SessionExt;
-    // use actix_web::HttpRequest;
-    // let req = use_context::<HttpRequest>().unwrap();
+    use crate::utils::aruna_api_handlers::aruna_register_user;
+    use axum_extra::extract::CookieJar;
 
-    // let sess = req.get_session();
+    let req_parts = use_context::<leptos_axum::RequestParts>()
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let jar = CookieJar::from_headers(&req_parts.headers);
 
-    // let token = sess
-    //     .get::<String>("token")
-    //     .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
-    //     .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+    match jar.get("logged_in") {
+        Some(l) if l.value() == "false" => {
+            return Err(ServerFnError::Request("Not logged in".to_string()))
+        }
+        None => return Err(ServerFnError::Request("Not logged in".to_string())),
 
-    // let resp = aruna_register_user(&token, &displayname, &email, &project)
-    //     .await
-    //     .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
-
-    // sess.insert("user_id", resp)
-    //     .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
-
-    Ok(())
+        _ => {}
+    }
+    if let Some(cookie) = jar.get("token") {
+        let token = cookie.value().to_string();
+        if let Ok(_) = aruna_register_user(&token, &displayname, &email, &project).await {
+            return Ok(());
+        }
+    }
+    return Err(ServerFnError::Request(
+        "Unable to register user".to_string(),
+    ));
 }
 
 #[server(CheckActivated, "/web")]

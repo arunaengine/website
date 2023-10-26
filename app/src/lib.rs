@@ -170,14 +170,29 @@ pub fn EntryPoint() -> impl IntoView {
         }
     };
 
-    let res: Resource<bool, WhoamiResponse> = create_resource(update_user.0, move |_| async move {
-        get_user_info()
-            .await
-            .unwrap_or_else(|e| WhoamiResponse::Error(e.to_string()))
-    });
+    let res: Resource<RwSignal<bool>, WhoamiResponse> = create_resource(
+        move || update_user.0,
+        move |_| async move {
+            get_user_info()
+                .await
+                .unwrap_or_else(|e| WhoamiResponse::Error(e.to_string()))
+        },
+    );
 
-    //provide_context(res);
+    provide_context(res);
     provide_context(update_user);
+
+    let red = move || match res.get() {
+        Some(WhoamiResponse::NotActivated) => view! {
+            <Redirect path="/activate"/>
+        }
+        .into_view(),
+        Some(WhoamiResponse::NotRegistered) => view! {
+            <Redirect path="/register"/>
+        }
+        .into_view(),
+        _ => ().into_view(),
+    };
 
     view! {
         <Stylesheet href="/tabler.min_v4.css"/>
@@ -189,6 +204,9 @@ pub fn EntryPoint() -> impl IntoView {
             //{cordi}
             //{cookies}
             <Router>
+                <Suspense>
+                    { red }
+                </Suspense>
                 <Routes>
                     <Route
                         path="/"
