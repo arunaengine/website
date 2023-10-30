@@ -45,7 +45,7 @@ pub fn AdminOverview() -> impl IntoView {
 
     provide_meta_context();
 
-    let get_user = use_context::<Resource<bool, Option<User>>>().expect("user_state not set");
+    let get_user = use_context::<Resource<(), Option<User>>>().expect("user_state not set");
 
     let is_admin = create_memo(move |_| {
         get_user

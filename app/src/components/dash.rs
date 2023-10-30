@@ -1,9 +1,6 @@
 use leptos::*;
 //use leptos_meta::*;
 use leptos_router::*;
-
-use crate::utils::structs::UpdateUser;
-
 /// Renders the home page of your application.
 #[component(transparent)]
 pub fn Dash() -> impl IntoView {
@@ -12,10 +9,6 @@ pub fn Dash() -> impl IntoView {
     use crate::components::dash_nav::*;
     use crate::components::search::*;
     use crate::components::tokens::*;
-
-    let update_user = use_context::<UpdateUser>().expect("user_state not set");
-
-    update_user.0.update(|e| *e = !*e);
 
     view! {
         <Route

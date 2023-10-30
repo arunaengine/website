@@ -7,7 +7,7 @@ use regex::Regex;
 #[allow(unused_imports)]
 use std::time::Duration;
 
-use crate::utils::structs::UpdateUser;
+use crate::utils::structs::{UpdateUser, WhoamiResponse};
 
 #[server(RegisterUser)]
 pub async fn register_user(
@@ -214,8 +214,7 @@ pub fn ActivatePage() -> impl IntoView {
 
     let nav = use_navigate();
     let activate_ref = create_node_ref::<html::Div>();
-
-    let update_user = use_context::<UpdateUser>().expect("user_state not set");
+    let get_user = use_context::<Resource<(), WhoamiResponse>>().expect("user_state not set");
 
     activate_ref.on_load(move |loaded| {
         let _ = loaded.on_mount(move |mounted| {
@@ -225,12 +224,18 @@ pub fn ActivatePage() -> impl IntoView {
                     show_modal("activateModal");
             }};
             let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
-                update_user.0.update(|e| *e = !*e);
                 nav("/", Default::default());
             });
 
-            on_cleanup(move || drop(show_modal));
+            on_cleanup(move || {
+                get_user.refetch();
+                drop(show_modal)
+            });
         });
+    });
+
+    on_cleanup(move || {
+        get_user.refetch();
     });
 
     view! {

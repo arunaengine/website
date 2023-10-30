@@ -1,4 +1,4 @@
-use crate::utils::structs::{UpdateUser, WhoamiResponse};
+use crate::utils::structs::WhoamiResponse;
 use cfg_if::cfg_if;
 use leptos::*;
 use leptos_meta::*;
@@ -9,13 +9,8 @@ use leptos_router::*;
 pub fn ArunaHeader() -> impl IntoView {
     provide_meta_context();
 
-    let get_user = use_context::<Resource<leptos::RwSignal<bool>, WhoamiResponse>>()
-        .expect("user_state not set");
-
+    let get_user = use_context::<Resource<(), WhoamiResponse>>().expect("user_state not set");
     // On first load -> Check if user is logged in
-    let update_user = use_context::<UpdateUser>().expect("user_state not set");
-
-    update_user.0.update(|e| *e = !*e);
 
     let is_logged_memo =
         move || create_memo(move |_| get_user.get().map(|e| e.is_logged_in()).unwrap_or_default());

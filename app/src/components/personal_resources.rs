@@ -48,7 +48,7 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 pub fn PersonalResources() -> impl IntoView {
     // This takes the user context and creates a server call for
     // all resources that are explicitly statet in User{permissions} field
-    let ctx = match use_context::<leptos::Resource<bool, Option<User>>>() {
+    let ctx = match use_context::<leptos::Resource<(), Option<User>>>() {
         Some(res) => res.get().flatten(),
         None => None,
     };

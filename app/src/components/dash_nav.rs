@@ -12,8 +12,7 @@ pub fn DashNav() -> impl IntoView {
 
     let path = loc.pathname;
 
-    let get_user = use_context::<Resource<leptos::RwSignal<bool>, WhoamiResponse>>()
-        .expect("user_state not set");
+    let get_user = use_context::<Resource<(), WhoamiResponse>>().expect("user_state not set");
 
     let maybe_user = move || get_user.get().map(|u| u.maybe_user()).flatten();
 

@@ -170,14 +170,16 @@ pub fn EntryPoint() -> impl IntoView {
         }
     };
 
-    let res: Resource<RwSignal<bool>, WhoamiResponse> = create_resource((), move |_| async move {
-        get_user_info()
-            .await
-            .unwrap_or_else(|e| WhoamiResponse::Error(e.to_string()))
-    });
+    let res: Resource<(), WhoamiResponse> = create_resource(
+        move || (),
+        move |_| async move {
+            get_user_info()
+                .await
+                .unwrap_or_else(|e| WhoamiResponse::Error(e.to_string()))
+        },
+    );
 
     provide_context(res);
-    provide_context(update_user);
 
     let red = move || match res.get() {
         Some(WhoamiResponse::NotActivated) => view! {
@@ -201,9 +203,6 @@ pub fn EntryPoint() -> impl IntoView {
             //{cordi}
             //{cookies}
             <Router>
-                <Suspense>
-                    { red }
-                </Suspense>
                 <Routes>
                     <Route
                         path="/"
@@ -212,6 +211,9 @@ pub fn EntryPoint() -> impl IntoView {
                                 <ArunaHeader/>
                                 <Outlet/>
                                 <Footer/>
+                                <Suspense>
+                                    { red }
+                                </Suspense>
                             }
                         }
                     >
