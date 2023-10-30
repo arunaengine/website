@@ -7,7 +7,7 @@ use regex::Regex;
 #[allow(unused_imports)]
 use std::time::Duration;
 
-use crate::utils::modal::hide_modal;
+use crate::utils::structs::UpdateUser;
 
 #[server(RegisterUser)]
 pub async fn register_user(
@@ -41,27 +41,6 @@ pub async fn register_user(
     ));
 }
 
-#[server(CheckActivated, "/web")]
-pub async fn check_activated() -> Result<bool, ServerFnError> {
-    /*     use crate::utils::aruna_api_handlers::who_am_i;
-    use actix_session::SessionExt;
-    use actix_web::HttpRequest;
-    let req = use_context::<HttpRequest>().unwrap();
-
-    let sess = req.get_session();
-
-    let token = sess
-        .get::<String>("token")
-        .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
-        .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
-
-    match who_am_i(&token).await {
-        Ok(_) => Ok(true),
-        _ => Ok(false),
-    } */
-    Ok(true)
-}
-
 /// Renders the home page of your application.
 #[component]
 pub fn RegisterPage() -> impl IntoView {
@@ -83,17 +62,20 @@ pub fn RegisterPage() -> impl IntoView {
                     use crate::utils::modal::show_modal;
                     show_modal("registerModal");
             }};
-            let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
+            let _show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
                 nav("/", Default::default());
             });
-
-            on_cleanup(move || drop(show_modal));
         });
     });
 
     view! {
         <ActionForm
             on:submit=move |ev| {
+                cfg_if! {
+                    if #[cfg(feature = "hydrate")] {
+                        use crate::utils::modal::hide_modal;
+                        hide_modal("registerModal");
+                }};
                 let _data = RegisterUser::from_event(&ev).expect("to parse form data");
             }
 
@@ -207,14 +189,12 @@ pub fn RegisterPage() -> impl IntoView {
                     match v {
                         Ok(_) => {
                             view! {
-                                ,
                                 <Redirect path="/activate"/>
                             }
                                 .into_view()
                         }
                         Err(_) => {
                             view! {
-                                ,
                                 <Redirect path="/"/>
                             }
                                 .into_view()
@@ -231,27 +211,12 @@ pub fn RegisterPage() -> impl IntoView {
 #[component]
 pub fn ActivatePage() -> impl IntoView {
     provide_meta_context();
-    let check_activated = create_server_action::<CheckActivated>();
-
-    let activated = move || {
-        check_activated
-            .value()
-            .get()
-            .and_then(|r| r.ok())
-            .unwrap_or(false)
-    };
-
-    #[cfg(feature = "hydrate")]
-    let handle = set_interval_with_handle(
-        move || {
-            check_activated.dispatch(CheckActivated {});
-        },
-        Duration::from_secs(10), // every 10 seconds for now
-    )
-    .unwrap();
 
     let nav = use_navigate();
     let activate_ref = create_node_ref::<html::Div>();
+
+    let update_user = use_context::<UpdateUser>().expect("user_state not set");
+
     activate_ref.on_load(move |loaded| {
         let _ = loaded.on_mount(move |mounted| {
             cfg_if! {
@@ -260,8 +225,7 @@ pub fn ActivatePage() -> impl IntoView {
                     show_modal("activateModal");
             }};
             let show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
-                #[cfg(feature = "hydrate")]
-                handle.clear();
+                update_user.0.update(|e| *e = !*e);
                 nav("/", Default::default());
             });
 
@@ -307,7 +271,7 @@ pub fn ActivatePage() -> impl IntoView {
                         </svg>
                         <h3 class="pt-4">"Registration complete!"</h3>
                         <div class="text-muted">
-                            "Your account will be reviewed and activated by an administrator. If your account gets activated this page will automatically forward you to the management panel and (if specified) you will receive an e-mail notification."
+                            "Your account will be reviewed and activated by an administrator. We will send you a notification on activation."
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -319,7 +283,7 @@ pub fn ActivatePage() -> impl IntoView {
                                         data-bs-dismiss="modal"
                                         data-bs-target="#activateModal"
                                     >
-                                        "Back"
+                                        "Close"
                                     </a>
                                 </div>
                             </div>
@@ -328,12 +292,5 @@ pub fn ActivatePage() -> impl IntoView {
                 </div>
             </div>
         </div>
-        {move || {
-            activated()
-                .then(|| {
-                    hide_modal("activateModal");
-                    view! { <Redirect path="/panel"/> }
-                })
-        }}
     }
 }

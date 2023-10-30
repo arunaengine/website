@@ -145,3 +145,16 @@ pub async fn refresh(
     let jar = jar.add(token_cookie).add(Cookie::new("logged_in", "true"));
     Ok((jar, Redirect::to(&query.from.unwrap_or("/".to_string()))))
 }
+
+pub async fn logout(
+    State(_state): State<ServerState>,
+    mut jar: CookieJar,
+) -> Result<(CookieJar, Redirect), StatusCode> {
+    let old_jar = jar.clone();
+
+    for c in old_jar.iter() {
+        jar = jar.remove(c.clone());
+    }
+
+    Ok((jar, Redirect::to("/")))
+}

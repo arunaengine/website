@@ -13,7 +13,7 @@ use leptos::*;
 use leptos_axum::{generate_route_list, handle_server_fns_with_context, LeptosRoutes};
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::routes::{callback, login, refresh};
+use crate::routes::{callback, login, logout, refresh};
 
 pub mod fileserv;
 pub mod oidc;
@@ -109,6 +109,7 @@ async fn main() {
         .route("/callback", get(callback))
         .route("/oidc-callback", get(callback))
         .route("/refresh", get(refresh))
+        .route("/logout", get(logout))
         .leptos_routes_with_handler(routes, leptos_routes_handler)
         .fallback(file_and_error_handler)
         .with_state(server_state);

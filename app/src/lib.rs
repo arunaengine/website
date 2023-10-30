@@ -170,14 +170,11 @@ pub fn EntryPoint() -> impl IntoView {
         }
     };
 
-    let res: Resource<RwSignal<bool>, WhoamiResponse> = create_resource(
-        move || update_user.0,
-        move |_| async move {
-            get_user_info()
-                .await
-                .unwrap_or_else(|e| WhoamiResponse::Error(e.to_string()))
-        },
-    );
+    let res: Resource<RwSignal<bool>, WhoamiResponse> = create_resource((), move |_| async move {
+        get_user_info()
+            .await
+            .unwrap_or_else(|e| WhoamiResponse::Error(e.to_string()))
+    });
 
     provide_context(res);
     provide_context(update_user);
