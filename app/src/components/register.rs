@@ -1,3 +1,4 @@
+use crate::utils::structs::WhoamiResponse;
 use cfg_if::cfg_if;
 use gloo_events::EventListener;
 use leptos::*;
@@ -6,8 +7,6 @@ use leptos_router::*;
 use regex::Regex;
 #[allow(unused_imports)]
 use std::time::Duration;
-
-use crate::utils::structs::{UpdateUser, WhoamiResponse};
 
 #[server(RegisterUser)]
 pub async fn register_user(
@@ -75,7 +74,9 @@ pub fn RegisterPage() -> impl IntoView {
                     if #[cfg(feature = "hydrate")] {
                         use crate::utils::modal::hide_modal;
                         hide_modal("registerModal");
-                }};
+
+                    }
+                };
                 let _data = RegisterUser::from_event(&ev).expect("to parse form data");
             }
 
@@ -109,9 +110,10 @@ pub fn RegisterPage() -> impl IntoView {
                                 </svg>
                                 <h3>"Registration required!"</h3>
                                 <div class="text-muted">
-                                    "Your account is not yet registered, you must register first before you can proceed! Registering indicates your acceptance to our "
-                                    <a href="/tos" class="nav-link px-2 text-muted">
-                                        {"Terms of Service"}
+                                    <div>"Your account is not yet registered, you must register first before you can proceed!"</div>
+                                    <div>"Registering indicates your acceptance to our:"</div>
+                                    <a href="/tos" class="px-2">
+                                        "Terms of Service"
                                     </a>
                                 </div>
                             </div>

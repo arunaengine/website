@@ -1,6 +1,7 @@
-use aruna_rust_api::api::storage::services::v2::{CreateApiTokenRequest, ExpiresAt};
-use chrono::{Datelike, Days, Months, NaiveDate, Timelike, Utc};
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use aruna_rust_api::api::storage::models::v2::Permission;
+use aruna_rust_api::api::storage::services::v2::CreateApiTokenRequest;
+use chrono::{Days, Months, NaiveDate, Utc};
+use prost_wkt_types::Timestamp;
 
 pub fn to_create_token_req(
     tokenname: String,
@@ -10,6 +11,11 @@ pub fn to_create_token_req(
     selectexpiry: String,
     customdate: Option<String>,
 ) -> CreateApiTokenRequest {
+
+
+    let resource = match selecttype.as_str() {
+        "1" =>
+    }
     let (col_id, proj_id) = match selecttype.as_str() {
         "1" => (resid.unwrap_or_default(), "".to_string()),
         "2" => ("".to_string(), resid.unwrap_or_default()),
@@ -33,7 +39,7 @@ pub fn to_create_token_req(
         },
     };
 
-    let permission = match selectperm {
+    let permission_level = match selectperm {
         Some(perm) => match perm.as_str() {
             "NONE" => 1,
             "READ" => 2,
@@ -45,55 +51,14 @@ pub fn to_create_token_req(
         None => 1,
     };
 
-    CreateApiTokenRequest {
-        project_id: proj_id,
-        collection_id: col_id,
-        name: tokenname,
-        expires_at: Some(ExpiresAt {
-            timestamp: Some(
-                prost_types::Timestamp::date_time(
-                    expires.date().year().into(),
-                    expires.date().month() as u8,
-                    expires.date().day() as u8,
-                    expires.time().hour() as u8,
-                    expires.time().minute() as u8,
-                    expires.time().second() as u8,
-                )
-                .unwrap(),
-            ),
-        }),
-        permission,
-        is_session: false,
-    }
-}
+    let perm = Permission {
+        permission_level,
+        resource_id: Some(),
+    };
 
-pub fn new_session_req() -> CreateApiTokenRequest {
-    let chrono_time = Utc::now().naive_utc() + Days::new(7);
     CreateApiTokenRequest {
-        project_id: "".to_string(),
-        collection_id: "".to_string(),
-        name: format!(
-            "SESSION-{}",
-            thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(8)
-                .map(char::from)
-                .collect::<String>()
-        ),
-        expires_at: Some(ExpiresAt {
-            timestamp: Some(
-                prost_types::Timestamp::date_time(
-                    chrono_time.date().year().into(),
-                    chrono_time.date().month() as u8,
-                    chrono_time.date().day() as u8,
-                    chrono_time.time().hour() as u8,
-                    chrono_time.time().minute() as u8,
-                    chrono_time.time().second() as u8,
-                )
-                .unwrap(),
-            ),
-        }),
-        permission: 1, // Does not matter -> Personal
-        is_session: true,
+        name: tokenname,
+        expires_at: Some(Timestamp::from(expires)),
+        permission: Some(perm),
     }
 }

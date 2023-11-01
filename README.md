@@ -5,7 +5,7 @@ For now only an experimental rudimentary version is available, this will be expa
 
 The web version is a fully integrated website + webserver version including SSR + hydration.
 
-This version uses leptos 0.5.0 and is inteded to be used with version 2.x.x of the Aruna Object Storage server.
+This version uses leptos 0.5.0 and is intended to be used with version 2.x.x of the Aruna Object Storage server.
 
 
 ## Getting started
@@ -13,7 +13,7 @@ This version uses leptos 0.5.0 and is inteded to be used with version 2.x.x of t
 - Install [rustup](https://rustup.rs/)
 - Add nightly toolchain and wasm32 target:
 
-```
+```bash
 rustup toolchain install nightly
 rustup default nightly
 rustup target add wasm32-unknown-unknown

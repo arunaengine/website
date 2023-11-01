@@ -34,6 +34,7 @@ pub fn ArunaHeader() -> impl IntoView {
 
     cfg_if! {
         if #[cfg(feature = "hydrate")] {
+            get_user.refetch();
             if let Ok(Some(storage)) = window().local_storage() {
                 if let Ok(Some(_)) = storage.get_item("allow-cookie"){
                     hide_cookies.set(true);
@@ -252,24 +253,7 @@ pub fn ArunaHeader() -> impl IntoView {
                             view! {
                                 <a
                                     href="/login"
-                                    on:click=move |_| {
-                                        if let Ok(Some(storage)) = window().local_storage() {
-                                            dbg!(&storage);
-                                            if let Ok(Some(cookie_value))
-                                                = storage.get_item("allow-cookie")
-                                            {
-                                                if cookie_value == "false" {
-                                                    storage.clear().unwrap_or_default();
-                                                    let _ = window().location().set_href("/");
-                                                } else {
-                                                    let _ = window().location().set_href("/login");
-                                                }
-                                            } else {
-                                                storage.clear().unwrap_or_default();
-                                                let _ = window().location().set_href("/");
-                                            }
-                                        }
-                                    }
+                                    on:click=move |_| {let _ = window().location().set_href("/login");}
 
                                     class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2" // disabled"
                                 >

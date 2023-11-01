@@ -16,6 +16,8 @@ pub fn DashNav() -> impl IntoView {
 
     let maybe_user = move || get_user.get().map(|u| u.maybe_user()).flatten();
 
+    let is_active = move || maybe_user().map(|user| user.active).unwrap_or_default();
+
     let is_admin = move || {
         maybe_user()
             .map(|user| user.attributes.clone().unwrap_or_default().global_admin)
@@ -88,7 +90,7 @@ pub fn DashNav() -> impl IntoView {
                                     class="nav-item"
                                     class:active=move || { path().contains("objects") }
                                 >
-                                    <A class="nav-link" href="/objects">
+                                    <A class={move || if is_active() {"nav-link"}else{"nav-link disabled"}} href="/objects">
                                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
@@ -123,6 +125,7 @@ pub fn DashNav() -> impl IntoView {
                                         data-bs-auto-close="true"
                                         role="button"
                                         aria-expanded="false"
+                                        class:disabled=move || { !is_active() }
                                     >
                                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                                             <svg

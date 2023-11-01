@@ -12,42 +12,43 @@ use crate::utils::{
 
 #[server]
 pub async fn create_token_server(
-    _tokenname: String,
-    _selecttype: String,
-    _resid: Option<String>,
-    _selectperm: Option<String>,
-    _selectexpiry: String,
-    _customdate: Option<String>,
+    tokenname: String,
+    selecttype: String,
+    resid: Option<String>,
+    selectperm: Option<String>,
+    selectexpiry: String,
+    customdate: Option<String>,
 ) -> Result<TokenResponse, ServerFnError> {
-    Ok(TokenResponse::default())
-    // use crate::utils::aruna_api_handlers::aruna_create_token;
-    // use crate::utils::aruna_api_helpers::to_create_token_req;
-    // use actix_session::SessionExt;
-    // use actix_web::HttpRequest;
-    // let req = use_context::<HttpRequest>().unwrap();
+    use crate::utils::aruna_api_handlers::aruna_create_token;
+    use crate::utils::aruna_api_helpers::to_create_token_req;
+    use axum_extra::extract::CookieJar;
 
-    // let sess = req.get_session();
+    let req_parts = use_context::<leptos_axum::RequestParts>()
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let jar = CookieJar::from_headers(&req_parts.headers);
 
-    // let token = sess
-    //     .get::<String>("token")
-    //     .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
-    //     .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+    let token = if let Some(cookie) = jar.get("token") {
+        cookie.value().to_string().as_str()
+    } else {
+        ""
+    };
+    aruna_create_token(
+        to_create_token_req(
+            tokenname,
+            selecttype,
+            resid,
+            selectperm,
+            selectexpiry,
+            customdate,
+        ),
+        &token,
+    )
+    .await
+    .map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))?
+    .try_into()
+    .map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))
 
-    // aruna_create_token(
-    //     to_create_token_req(
-    //         tokenname,
-    //         selecttype,
-    //         resid,
-    //         selectperm,
-    //         selectexpiry,
-    //         customdate,
-    //     ),
-    //     &token,
-    // )
-    // .await
-    // .map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))?
-    // .try_into()
-    // .map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))
+    Err(ServerFnError::ServerError("A error".to_string()))
 }
 
 #[component]
@@ -287,8 +288,10 @@ pub fn CreateToken(
                                     <option value="0" selected>
                                         "Personal"
                                     </option>
-                                    <option value="1">"Collection"</option>
-                                    <option value="2">"Project"</option>
+                                    <option value="1">"Project"</option>
+                                    <option value="2">"Collection"</option>
+                                    <option value="3">"Dataset"</option>
+                                    <option value="4">"Object"</option>
                                 </select>
                                 <label for="selecttype">"Select a tokentype"</label>
                             </div>

@@ -26,7 +26,7 @@ pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T
     );
     req
 }
-pub async fn who_am_i(token: &str) -> WhoamiResponse {
+pub async fn aruna_who_am_i(token: &str) -> WhoamiResponse {
     let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
     let Ok(endpoint) = Channel::from_shared(aruna_endpoint) else { return WhoamiResponse::Error("Unable to create channel".to_string()) };
     let Ok(channel) = endpoint.connect().await else { return WhoamiResponse::Error("Unable to connect to ep".to_string()) };
@@ -43,7 +43,12 @@ pub async fn who_am_i(token: &str) -> WhoamiResponse {
                     Some(u) => return WhoamiResponse::User(u),
                     None => return WhoamiResponse::NotRegistered,
                 }
-            Err(_) => WhoamiResponse::NotRegistered,
+            Err(e) => 
+                if e.message().contains("Not registered") {
+                    return WhoamiResponse::NotRegistered
+                }else{
+                    return WhoamiResponse::Error(e.message().to_string())
+                }
         }
 }
 

@@ -93,6 +93,7 @@ pub enum WhoamiResponse {
     NotRegistered,
     NotActivated,
     NotLoggedIn,
+    ShouldLogin,
     Error(String),
 }
 

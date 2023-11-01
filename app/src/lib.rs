@@ -1,24 +1,14 @@
-use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 use utils::structs::WhoamiResponse;
-
 pub mod components;
 pub mod error_template;
 pub mod utils;
-
-pub enum GetUserResponse {
-    User(User),
-    NotRegistered,
-    NotActivated,
-    Error(String),
-}
-
 #[server(GetUserInfo, "/api", "GetJson")]
 pub async fn get_user_info() -> Result<WhoamiResponse, ServerFnError> {
     use axum_extra::extract::CookieJar;
-    use utils::aruna_api_handlers::who_am_i;
+    use utils::aruna_api_handlers::aruna_who_am_i;
 
     let req_parts = use_context::<leptos_axum::RequestParts>()
         .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
@@ -31,7 +21,7 @@ pub async fn get_user_info() -> Result<WhoamiResponse, ServerFnError> {
     }
     if let Some(cookie) = jar.get("token") {
         let token = cookie.value().to_string();
-        return Ok(who_am_i(&token).await);
+        return Ok(aruna_who_am_i(&token).await);
     } else {
         Ok(WhoamiResponse::NotLoggedIn)
     }
@@ -55,8 +45,6 @@ pub fn EntryPoint() -> impl IntoView {
     use crate::components::search::*;
     use crate::components::tos::*;
     use crate::utils::structs::*;
-
-    let update_user: UpdateUser = UpdateUser(create_rw_signal(true));
 
     let hide_cordi = create_rw_signal(true);
 
@@ -170,7 +158,7 @@ pub fn EntryPoint() -> impl IntoView {
         }
     };
 
-    let res: Resource<(), WhoamiResponse> = create_resource(
+    let res: Resource<(), WhoamiResponse> = create_local_resource(
         move || (),
         move |_| async move {
             get_user_info()
@@ -181,17 +169,27 @@ pub fn EntryPoint() -> impl IntoView {
 
     provide_context(res);
 
-    let red = move || match res.get() {
-        Some(WhoamiResponse::NotActivated) => view! {
-            <Redirect path="/activate"/>
-        }
-        .into_view(),
-        Some(WhoamiResponse::NotRegistered) => view! {
-            <Redirect path="/register"/>
-        }
-        .into_view(),
-        _ => ().into_view(),
-    };
+    create_effect(move |_| {
+        let loc = use_location();
+        match res.get() {
+            Some(WhoamiResponse::NotActivated) => {
+                if !loc.pathname.get().contains("/activate") {
+                    let _ = window().location().set_href("/activate");
+                }
+            },
+            Some(WhoamiResponse::NotRegistered) =>  {
+                if !loc.pathname.get().contains("/register") {
+                    let _ = window().location().set_href("/register");
+                }
+            },
+            Some(WhoamiResponse::ShouldLogin) => {
+                if !loc.pathname.get().contains("/login") {
+                    let _ = window().location().set_href("/login");
+                }
+            },
+            _ => (),
+        }}
+    );
 
     view! {
         <Stylesheet href="/tabler.min_v4.css"/>
@@ -211,9 +209,6 @@ pub fn EntryPoint() -> impl IntoView {
                                 <ArunaHeader/>
                                 <Outlet/>
                                 <Footer/>
-                                <Suspense>
-                                    { red }
-                                </Suspense>
                             }
                         }
                     >
