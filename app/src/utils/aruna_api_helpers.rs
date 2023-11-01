@@ -1,7 +1,9 @@
-use aruna_rust_api::api::storage::models::v2::Permission;
+use aruna_rust_api::api::storage::models::v2::{Permission, permission};
 use aruna_rust_api::api::storage::services::v2::CreateApiTokenRequest;
 use chrono::{Days, Months, NaiveDate, Utc};
 use prost_wkt_types::Timestamp;
+use anyhow::Result;
+use anyhow::anyhow;
 
 pub fn to_create_token_req(
     tokenname: String,
@@ -10,16 +12,15 @@ pub fn to_create_token_req(
     selectperm: Option<String>,
     selectexpiry: String,
     customdate: Option<String>,
-) -> CreateApiTokenRequest {
+) -> Result<CreateApiTokenRequest> {
 
 
     let resource = match selecttype.as_str() {
-        "1" =>
-    }
-    let (col_id, proj_id) = match selecttype.as_str() {
-        "1" => (resid.unwrap_or_default(), "".to_string()),
-        "2" => ("".to_string(), resid.unwrap_or_default()),
-        _ => ("".to_string(), "".to_string()),
+        "project" => Some(permission::ResourceId::ProjectId(resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?)),
+        "collection" => Some(permission::ResourceId::CollectionId(resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?)),
+        "dataset" => Some(permission::ResourceId::DatasetId(resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?)),
+        "object" => Some(permission::ResourceId::ObjectId(resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?)),
+        _ => None,
     };
 
     let now = Utc::now().naive_utc();
@@ -53,12 +54,12 @@ pub fn to_create_token_req(
 
     let perm = Permission {
         permission_level,
-        resource_id: Some(),
+        resource_id: resource,
     };
 
-    CreateApiTokenRequest {
+    Ok(CreateApiTokenRequest {
         name: tokenname,
         expires_at: Some(Timestamp::from(expires)),
         permission: Some(perm),
-    }
+    })
 }

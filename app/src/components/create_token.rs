@@ -1,4 +1,5 @@
 use anyhow::Result;
+use aruna_rust_api::api::storage::services::v2::CreateApiTokenResponse;
 use cfg_if::cfg_if;
 use gloo_events::EventListener;
 use leptos::*;
@@ -7,7 +8,7 @@ use leptos_router::*;
 
 use crate::utils::{
     modal::hide_modal,
-    structs::{TokenResponse, UpdateTokens},
+    structs::{UpdateTokens},
 };
 
 #[server]
@@ -18,7 +19,7 @@ pub async fn create_token_server(
     selectperm: Option<String>,
     selectexpiry: String,
     customdate: Option<String>,
-) -> Result<TokenResponse, ServerFnError> {
+) -> Result<CreateApiTokenResponse, ServerFnError> {
     use crate::utils::aruna_api_handlers::aruna_create_token;
     use crate::utils::aruna_api_helpers::to_create_token_req;
     use axum_extra::extract::CookieJar;
@@ -28,9 +29,9 @@ pub async fn create_token_server(
     let jar = CookieJar::from_headers(&req_parts.headers);
 
     let token = if let Some(cookie) = jar.get("token") {
-        cookie.value().to_string().as_str()
+        cookie.value().to_string()
     } else {
-        ""
+        "".to_string()
     };
     aruna_create_token(
         to_create_token_req(
@@ -40,31 +41,28 @@ pub async fn create_token_server(
             selectperm,
             selectexpiry,
             customdate,
-        ),
+        ).map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))?,
         &token,
     )
     .await
     .map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))?
     .try_into()
     .map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))
-
-    Err(ServerFnError::ServerError("A error".to_string()))
 }
 
 #[component]
-pub fn CreateTokenSuccess(create_token_resp: TokenResponse) -> impl IntoView {
+pub fn CreateTokenSuccess(create_token_resp: CreateApiTokenResponse) -> impl IntoView {
     provide_meta_context();
 
     let update_tokens = use_context::<UpdateTokens>().expect("user_state not set");
     update_tokens.0.update(|e| *e = !*e);
 
-    let TokenResponse {
-        id,
-        name,
+    let CreateApiTokenResponse {
+        token,
         token_secret,
-        access_key,
-        secret_key,
     } = create_token_resp;
+
+    let token = token.unwrap_or_default();
 
     let nav = use_navigate();
     let modal_ref = create_node_ref::<html::Div>();
@@ -83,11 +81,9 @@ pub fn CreateTokenSuccess(create_token_resp: TokenResponse) -> impl IntoView {
         });
     });
 
-    let id_clone = id.clone();
-    let name_clone = name.clone();
+    let id_clone = token.id.clone();
+    let name_clone = token.name.clone();
     let token_secret_clone = token_secret.clone();
-    let access_key_clone = access_key.clone();
-    let secret_key_clone = secret_key.clone();
 
     //let to_clipboard = move |cp: &str| _ = window().navigator().to_clipboard().unwrap().write_text(cp);
 
@@ -133,25 +129,7 @@ pub fn CreateTokenSuccess(create_token_resp: TokenResponse) -> impl IntoView {
                                 <li class="list-group-item list-group-item-action text-break">
                                     {name_clone}
                                 </li>
-                                <label class="form-label">"S3 Access Key"</label>
-                                // on:click=move |_| to_clipboard(&access_key)>
-                                <li class="list-group-item list-group-item-action text-break">
-                                    {access_key_clone}
-                                </li>
-                                <div class="alert alert-warning mt-3" role="alert">
-                                    <h4 class="alert-title">
-                                        "Make sure to copy (click) your secrets below!"
-                                    </h4>
-                                    <div class="text-muted">
-                                        "These secrets can not be recreated, if lost, a new token must be generated!"
-                                    </div>
-                                </div>
-                                <label class="form-label">"S3 Secret Key"</label>
-                                // on:click=move |_| to_clipboard(&secret_key)>
-                                <li class="list-group-item list-group-item-action text-break">
-                                    {secret_key_clone}
-                                </li>
-                                <label class="form-label">"Secret"</label>
+                                <label class="form-label">"Token secret"</label>
                                 // on:click=move |_| to_clipboard(&token_secret)>
                                 <li class="list-group-item list-group-item-action text-break">
                                     {token_secret_clone}
@@ -179,7 +157,7 @@ pub fn CreateTokenSuccess(create_token_resp: TokenResponse) -> impl IntoView {
 
 #[component]
 pub fn CreateToken(
-    create_token_action: Action<CreateTokenServer, Result<TokenResponse, ServerFnError>>,
+    create_token_action: Action<CreateTokenServer, Result<CreateApiTokenResponse, ServerFnError>>,
 ) -> impl IntoView {
     provide_meta_context();
     let nav = use_navigate();
@@ -285,13 +263,13 @@ pub fn CreateToken(
                                     }
                                 >
 
-                                    <option value="0" selected>
+                                    <option value="personal" selected>
                                         "Personal"
                                     </option>
-                                    <option value="1">"Project"</option>
-                                    <option value="2">"Collection"</option>
-                                    <option value="3">"Dataset"</option>
-                                    <option value="4">"Object"</option>
+                                    <option value="project">"Project"</option>
+                                    <option value="collection">"Collection"</option>
+                                    <option value="dataset">"Dataset"</option>
+                                    <option value="object">"Object"</option>
                                 </select>
                                 <label for="selecttype">"Select a tokentype"</label>
                             </div>

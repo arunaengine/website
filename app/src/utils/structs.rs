@@ -130,31 +130,6 @@ pub struct UpdateAdmin(pub RwSignal<bool>);
 
 #[derive(Clone, Copy)]
 pub struct UpdateAdminProjects(pub RwSignal<bool>);
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct TokenResponse {
-    pub id: String,
-    pub name: String,
-    pub token_secret: String,
-    pub access_key: String,
-    pub secret_key: String,
-}
-
-// impl TryFrom<CreateApiTokenResponse> for TokenResponse {
-//     type Error = anyhow::Error;
-
-//     fn try_from(value: CreateApiTokenResponse) -> Result<Self, Self::Error> {
-//         let token_spec = value.token.ok_or_else(|| anyhow!("No token found"))?;
-//         Ok(Self {
-//             id: token_spec.id,
-//             name: token_spec.name,
-//             token_secret: value.token_secret,
-//             access_key: value.s3_access_key,
-//             secret_key: value.s3_secret_key,
-//         })
-//     }
-// }
-
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub enum TokenType {
     #[default]
