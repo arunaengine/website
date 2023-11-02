@@ -31,7 +31,9 @@ pub async fn register_user(
     }
     if let Some(cookie) = jar.get("token") {
         let token = cookie.value().to_string();
-        if let Ok(_) = ConnectionHandler::aruna_register_user(&token, &displayname, &email, &project).await {
+        if let Ok(_) =
+            ConnectionHandler::aruna_register_user(&token, &displayname, &email, &project).await
+        {
             return Ok(());
         }
     }
@@ -51,7 +53,7 @@ pub fn RegisterPage() -> impl IntoView {
     provide_meta_context();
 
     let register_user = create_server_action::<RegisterUser>();
-    let get_user = use_context::<Resource<(), WhoamiResponse>>().expect("user_state not set");
+    let _get_user = use_context::<Resource<(), WhoamiResponse>>().expect("user_state not set");
 
     let nav = use_navigate();
     let modal_ref = create_node_ref::<html::Div>();

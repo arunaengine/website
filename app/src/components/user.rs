@@ -92,7 +92,18 @@ pub fn AdminUser(user: User) -> impl IntoView {
     let activate_action = create_server_action::<ActivateUser>();
     let deactivate_action = create_server_action::<DeactivateUser>();
     let remove_user_action = create_server_action::<RemoveUserProject>();
-    let last_version = create_rw_signal(0);
+
+    let get_users: Resource<(), Vec<User>> =
+        use_context::<Resource<(), Vec<User>>>().expect("user_state not set");
+
+    let version = RwSignal::new(0);
+
+    create_effect(move |_| {
+        if activate_action.version()() + deactivate_action.version()() != version.get() {
+            get_users.refetch();
+            version.set(activate_action.version()() + deactivate_action.version()());
+        }
+    });
 
     let create_active_badges = {
         move || {
@@ -286,21 +297,23 @@ pub fn AdminUser(user: User) -> impl IntoView {
                                 .into_view()
                         } else {
                             view! {
-                                // on:click=move |_| {set_deleting.set(token_id.get_value())}>
                                 <a
                                     href="#"
                                     class="btn btn-success btn-icon btn-sm"
                                     aria-label="Button"
                                     role="button"
-                                    data-bs-toggle="modal"
-                                    data-bs-target=format!("#AV{}", store_user.get_value())
+                                    on:click=move |_| {
+                                        activate_action
+                                            .dispatch(ActivateUser {
+                                                user_id: store_user.get_value(),
+                                            })
+                                    }
                                 >
                                     <Suspense fallback=move || {
                                         view! { <div class="spinner-border"></div> }
                                     }>
                                         {move || {
                                             view! {
-                                                ,
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
                                                     class="icon icon-tabler icon-tabler-plus"
