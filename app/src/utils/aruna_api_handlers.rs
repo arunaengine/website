@@ -1,18 +1,27 @@
 use anyhow::{anyhow, Result};
 use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
 use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
-use aruna_rust_api::api::storage::models::v2::{DataClass, Permission};
-use aruna_rust_api::api::storage::services::v2::{collection_service_client, dataset_service_client, object_service_client, project_service_client, search_service_client, user_service_client, CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest, CreateDatasetRequest, CreateObjectRequest, DeleteApiTokenRequest, GetApiTokensRequest, GetApiTokensResponse, GetResourceRequest, GetResourcesRequest, GetUserRequest, RegisterUserRequest, RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse, ActivateUserRequest, DeactivateUserRequest, GetAllUsersResponse, GetAllUsersRequest};
+use aruna_rust_api::api::storage::models::v2::{DataClass, Permission, User};
+use aruna_rust_api::api::storage::services::v2::{
+    collection_service_client, dataset_service_client, object_service_client,
+    project_service_client, search_service_client, user_service_client, ActivateUserRequest,
+    CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest, CreateDatasetRequest,
+    CreateObjectRequest, DeactivateUserRequest, DeleteApiTokenRequest, GetAllUsersRequest,
+    GetAllUsersResponse, GetApiTokensRequest, GetApiTokensResponse, GetResourceRequest,
+    GetResourcesRequest, GetUserRequest, RegisterUserRequest, RegisterUserResponse,
+    ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse,
+};
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
-    transport::Channel, transport::ClientTlsConfig,
+    transport::Channel,
+    transport::ClientTlsConfig,
 };
 
 use super::structs::{ResourceType, SearchQuery, WhoamiResponse};
 
 pub struct ConnectionHandler {}
 
-impl ConnectionHandler{
+impl ConnectionHandler {
     #[allow(dead_code)]
     pub fn add_token<T>(mut req: tonic::Request<T>, token: &str) -> tonic::Request<T> {
         let metadata = req.metadata_mut();
@@ -38,31 +47,28 @@ impl ConnectionHandler{
     }
 
     pub async fn aruna_who_am_i(token: &str) -> WhoamiResponse {
-        let Ok(channel) = Self::get_channel().await else { return WhoamiResponse::Error("Unable to connect to ep".to_string()) };
+        let Ok(channel) = Self::get_channel().await else {
+            return WhoamiResponse::Error("Unable to connect to ep".to_string());
+        };
         let get_request = tonic::Request::new(GetUserRequest {
             user_id: "".to_string(),
         });
         let mut client = user_service_client::UserServiceClient::new(channel);
         // Send the request to the AOS instance gRPC gateway
-        match client
-            .get_user(Self::add_token(get_request, token))
-            .await {
-            Ok(i) =>
-                match i.into_inner().user {
-                    Some(u) => return WhoamiResponse::User(u),
-                    None => return WhoamiResponse::NotRegistered,
-                }
-            Err(e) =>
+        match client.get_user(Self::add_token(get_request, token)).await {
+            Ok(i) => match i.into_inner().user {
+                Some(u) => return WhoamiResponse::User(u),
+                None => return WhoamiResponse::NotRegistered,
+            },
+            Err(e) => {
                 if e.message().contains("Not registered") {
-                    return WhoamiResponse::NotRegistered
-                }else{
-                    return WhoamiResponse::Error(e.message().to_string())
+                    return WhoamiResponse::NotRegistered;
+                } else {
+                    return WhoamiResponse::Error(e.message().to_string());
                 }
+            }
         }
     }
-
-
-
 
     pub async fn aruna_register_user(
         token: &str,
@@ -132,7 +138,10 @@ impl ConnectionHandler{
         let mut client = search_service_client::SearchServiceClient::new(channel);
         let req = tonic::Request::new(GetResourceRequest { resource_id });
         let result = match token {
-            Some(t) => client.get_resource(Self::add_token(req, &t)).await?.into_inner(),
+            Some(t) => client
+                .get_resource(Self::add_token(req, &t))
+                .await?
+                .into_inner(),
             None => client.get_resource(req).await?.into_inner(),
         };
         leptos::logging::log!("GetResource result: {result:?}");
@@ -147,7 +156,10 @@ impl ConnectionHandler{
         let mut client = search_service_client::SearchServiceClient::new(channel);
         let req = tonic::Request::new(GetResourcesRequest { resource_ids });
         let result = match token {
-            Some(t) => client.get_resources(Self::add_token(req, t)).await?.into_inner(),
+            Some(t) => client
+                .get_resources(Self::add_token(req, t))
+                .await?
+                .into_inner(),
             None => client.get_resources(req).await?.into_inner(),
         };
         let res = result
@@ -159,7 +171,10 @@ impl ConnectionHandler{
         Ok(res)
     }
 
-    pub async fn get_owned_resources(perms: Vec<Permission>, token: String) -> Result<Vec<Resource>> {
+    pub async fn get_owned_resources(
+        perms: Vec<Permission>,
+        token: String,
+    ) -> Result<Vec<Resource>> {
         let channel = Self::get_channel().await?;
         let mut client = search_service_client::SearchServiceClient::new(channel);
         let resource_ids = perms
@@ -198,7 +213,10 @@ impl ConnectionHandler{
         Ok(result.clone())
     }
 
-    pub async fn search(token: Option<String>, query: SearchQuery) -> Result<SearchResourcesResponse> {
+    pub async fn search(
+        token: Option<String>,
+        query: SearchQuery,
+    ) -> Result<SearchResourcesResponse> {
         let channel = Self::get_channel().await?;
         let mut client = search_service_client::SearchServiceClient::new(channel);
         let req = tonic::Request::new(SearchResourcesRequest {
@@ -330,7 +348,7 @@ impl ConnectionHandler{
         Ok(())
     }
 
-    pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
+    pub async fn aruna_get_all_users(token: &str) -> Result<Vec<User>> {
         let channel = Self::get_channel().await?;
         let get_users_req = tonic::Request::new(GetAllUsersRequest {});
         let mut client = user_service_client::UserServiceClient::new(channel);
@@ -339,13 +357,10 @@ impl ConnectionHandler{
             .get_all_users(Self::add_token(get_users_req, token))
             .await?
             .into_inner();
-        Ok(response)
+        Ok(response.user)
     }
 
-    pub async fn aruna_activate_user(
-        token: &str,
-        user_id: &str,
-    ) -> Result<()> {
+    pub async fn aruna_activate_user(token: &str, user_id: &str) -> Result<()> {
         let channel = Self::get_channel().await?;
         let act_user_req = tonic::Request::new(ActivateUserRequest {
             user_id: user_id.to_string(),
@@ -372,10 +387,7 @@ impl ConnectionHandler{
             .into_inner();
         Ok(())
     }
-
 }
-
-
 
 // pub async fn aruna_add_user_to_proj(
 //     token: &str,

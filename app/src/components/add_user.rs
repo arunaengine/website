@@ -1,4 +1,3 @@
-use crate::utils::structs::UpdateAdmin;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -34,13 +33,13 @@ pub fn AddUserProject(user_id: String) -> impl IntoView {
     provide_meta_context();
 
     let activate_user = create_server_action::<AddUserProject>();
-    let update_admin = use_context::<UpdateAdmin>().expect("user_state not set");
+    //let update_admin = use_context::<UpdateAdmin>().expect("user_state not set");
 
     let current_state = create_rw_signal(0);
 
     create_effect(move |_| {
         if activate_user.version()() > current_state() {
-            update_admin.0.update(|e| *e = !*e);
+            //update_admin.0.update(|e| *e = !*e);
             current_state.set_untracked(activate_user.version()())
         }
     });

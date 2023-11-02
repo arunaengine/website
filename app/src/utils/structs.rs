@@ -33,60 +33,6 @@ impl SimplePermission {
     }
 }
 
-// #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
-// pub struct UserState {
-//     pub user_id: String,
-//     pub display_name: String,
-//     pub email: String,
-//     pub is_active: bool,
-//     pub is_admin: bool,
-//     pub permissions: Vec<SimplePermission>,
-//     pub session_id: String,
-// }
-
-// impl From<ProjectPermission> for SimplePermission {
-//     fn from(value: ProjectPermission) -> Self {
-//         SimplePermission {
-//             project_id: value.project_id,
-//             permission: value.permission,
-//         }
-//     }
-// }
-
-// impl From<User> for UserState {
-//     fn from(value: User) -> Self {
-//         UserState {
-//             user_id: value.id,
-//             display_name: value.display_name,
-//             email: value.email,
-//             is_active: value.active,
-//             is_admin: value.is_admin,
-//             permissions: vec![],
-//             session_id: "".to_string(),
-//         }
-//     }
-// }
-
-// impl From<UserWithPerms> for UserState {
-//     fn from(value: UserWithPerms) -> Self {
-//         let user = value.user.unwrap_or_default();
-//         let perms = value
-//             .project_perms
-//             .into_iter()
-//             .map(|p| p.into())
-//             .collect::<Vec<_>>();
-//         UserState {
-//             user_id: user.id,
-//             display_name: user.display_name,
-//             email: user.email,
-//             is_active: user.active,
-//             is_admin: user.is_admin,
-//             permissions: perms,
-//             session_id: "".to_string(),
-//         }
-//     }
-// }
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum WhoamiResponse {
     User(User),
@@ -113,9 +59,6 @@ impl WhoamiResponse {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct UpdateUser(pub RwSignal<bool>);
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct GetOwnedResources {
     #[serde(default)]
@@ -124,9 +67,6 @@ pub struct GetOwnedResources {
 
 #[derive(Clone, Copy)]
 pub struct UpdateTokens(pub RwSignal<bool>);
-
-#[derive(Clone, Copy)]
-pub struct UpdateAdmin(pub RwSignal<bool>);
 
 #[derive(Clone, Copy)]
 pub struct UpdateAdminProjects(pub RwSignal<bool>);

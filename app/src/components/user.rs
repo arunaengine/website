@@ -1,30 +1,60 @@
-use crate::utils::{
-    conversion_helpers::{extract_type_id, to_permission_string},
-    structs::UpdateAdmin,
-};
+use crate::utils::conversion_helpers::{extract_type_id, to_permission_string};
 use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
 
 #[server]
-pub async fn deactivate_user(_user_id: String) -> Result<(), ServerFnError> {
-    // use crate::utils::aruna_api_handlers::aruna_deactivate_user;
-    // use actix_session::SessionExt;
-    // use actix_web::HttpRequest;
-    // let req = use_context::<HttpRequest>().unwrap();
+pub async fn activate_user(user_id: String) -> Result<(), ServerFnError> {
+    use crate::utils::aruna_api_handlers::ConnectionHandler;
+    use axum_extra::extract::CookieJar;
 
-    // let sess = req.get_session();
+    let req_parts = use_context::<leptos_axum::RequestParts>()
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let jar = CookieJar::from_headers(&req_parts.headers);
 
-    // let token = sess
-    //     .get::<String>("token")
-    //     .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?
-    //     .ok_or_else(|| ServerFnError::Request("Invalid request".to_string()))?;
+    match jar.get("logged_in") {
+        Some(l) if l.value() == "false" => {
+            return Err(ServerFnError::MissingArg("Not logged in".to_string()))
+        }
+        None => return Err(ServerFnError::MissingArg("Not logged in".to_string())),
+        _ => {}
+    }
+    if let Some(cookie) = jar.get("token") {
+        let token = cookie.value().to_string();
 
-    // let _resp = aruna_deactivate_user(&token, &user_id)
-    //     .await
-    //     .map_err(|_| ServerFnError::Request("Invalid request".to_string()))?;
+        return Ok(ConnectionHandler::aruna_activate_user(&token, &user_id)
+            .await
+            .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?);
+    } else {
+        return Err(ServerFnError::Request("Invalid request".to_string()));
+    }
+}
 
-    Ok(())
+#[server]
+pub async fn deactivate_user(user_id: String) -> Result<(), ServerFnError> {
+    use crate::utils::aruna_api_handlers::ConnectionHandler;
+    use axum_extra::extract::CookieJar;
+
+    let req_parts = use_context::<leptos_axum::RequestParts>()
+        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+    let jar = CookieJar::from_headers(&req_parts.headers);
+
+    match jar.get("logged_in") {
+        Some(l) if l.value() == "false" => {
+            return Err(ServerFnError::MissingArg("Not logged in".to_string()))
+        }
+        None => return Err(ServerFnError::MissingArg("Not logged in".to_string())),
+        _ => {}
+    }
+    if let Some(cookie) = jar.get("token") {
+        let token = cookie.value().to_string();
+
+        return Ok(ConnectionHandler::aruna_deactivate_user(&token, &user_id)
+            .await
+            .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?);
+    } else {
+        return Err(ServerFnError::Request("Invalid request".to_string()));
+    }
 }
 
 #[server]
@@ -54,31 +84,15 @@ pub async fn remove_user_project(
 /// Renders the home page of your application.
 #[component]
 pub fn AdminUser(user: User) -> impl IntoView {
-    use crate::components::activate_modal::*;
     use crate::components::add_user::*;
 
     provide_meta_context();
 
     let is_active = user.active;
+    let activate_action = create_server_action::<ActivateUser>();
     let deactivate_action = create_server_action::<DeactivateUser>();
     let remove_user_action = create_server_action::<RemoveUserProject>();
     let last_version = create_rw_signal(0);
-    let update_admin = use_context::<UpdateAdmin>().expect("user_state not set");
-
-    create_effect(move |_| {
-        if last_version() < deactivate_action.version()() {
-            update_admin.0.update(|e| *e = !*e);
-            last_version.set_untracked(deactivate_action.version()())
-        }
-    });
-
-    let remove_action_count = create_rw_signal(0);
-    create_effect(move |_| {
-        if remove_action_count() < remove_user_action.version()() {
-            update_admin.0.update(|e| *e = !*e);
-            remove_action_count.set_untracked(remove_user_action.version()())
-        }
-    });
 
     let create_active_badges = {
         move || {
@@ -149,7 +163,6 @@ pub fn AdminUser(user: User) -> impl IntoView {
     let store_user = store_value(user.id.clone());
 
     view! {
-        <ActivateModal user_id=store_user.get_value()/>
         <AddUserProject user_id=store_user.get_value()/>
         <tr>
             <td>{user.id.clone()}</td>
@@ -196,14 +209,13 @@ pub fn AdminUser(user: User) -> impl IntoView {
                                     on:click=move |_| {
                                         deactivate_action
                                             .dispatch(DeactivateUser {
-                                                _user_id: store_user.get_value(),
+                                                user_id: store_user.get_value(),
                                             })
                                     }
                                 >
 
                                     <Suspense fallback=move || {
                                         view! {
-                                            ,
                                             <div class="spinner-border"></div>
                                         }
                                     }>
@@ -234,8 +246,12 @@ pub fn AdminUser(user: User) -> impl IntoView {
                                     class="btn btn-success btn-icon btn-sm ms-2"
                                     aria-label="Button"
                                     role="button"
-                                    data-bs-toggle="modal"
-                                    data-bs-target=format!("#ACU{}", store_user.get_value())
+                                    on:click=move |_| {
+                                        activate_action
+                                            .dispatch(ActivateUser {
+                                                user_id: store_user.get_value(),
+                                            })
+                                    }
                                 >
                                     <Suspense fallback=move || {
                                         view! { <div class="spinner-border"></div> }

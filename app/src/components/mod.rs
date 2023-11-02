@@ -1,5 +1,4 @@
 pub mod about;
-pub mod activate_modal;
 pub mod add_user;
 pub mod admin;
 pub mod alert_modal;
