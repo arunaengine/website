@@ -51,6 +51,7 @@ pub fn RegisterPage() -> impl IntoView {
     provide_meta_context();
 
     let register_user = create_server_action::<RegisterUser>();
+    let get_user = use_context::<Resource<(), WhoamiResponse>>().expect("user_state not set");
 
     let nav = use_navigate();
     let modal_ref = create_node_ref::<html::Div>();
@@ -60,13 +61,13 @@ pub fn RegisterPage() -> impl IntoView {
                 if #[cfg(feature = "hydrate")] {
                     use crate::utils::modal::show_modal;
                     show_modal("registerModal");
-            }};
+                }
+            };
             let _show_modal = EventListener::new(&mounted, "hide.bs.modal", move |_event| {
                 nav("/", Default::default());
             });
         });
     });
-
     view! {
         <ActionForm
             on:submit=move |ev| {
@@ -74,7 +75,7 @@ pub fn RegisterPage() -> impl IntoView {
                     if #[cfg(feature = "hydrate")] {
                         use crate::utils::modal::hide_modal;
                         hide_modal("registerModal");
-
+                        let _ = window().location().set_href("/activate");
                     }
                 };
                 let _data = RegisterUser::from_event(&ev).expect("to parse form data");
@@ -185,27 +186,6 @@ pub fn RegisterPage() -> impl IntoView {
                 </div>
             </div>
         </ActionForm>
-        {move || {
-            match register_user.value().get() {
-                Some(v) => {
-                    match v {
-                        Ok(_) => {
-                            view! {
-                                <Redirect path="/activate"/>
-                            }
-                                .into_view()
-                        }
-                        Err(_) => {
-                            view! {
-                                <Redirect path="/"/>
-                            }
-                                .into_view()
-                        }
-                    }
-                }
-                None => ().into_view(),
-            }
-        }}
     }
 }
 
