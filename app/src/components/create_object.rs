@@ -12,7 +12,7 @@ pub async fn create_resource_request(
     #[server(default)] parent: Option<String>,
     #[server(default)] parent_type: Option<ResourceType>,
 ) -> Result<(), ServerFnError> {
-    use crate::utils::aruna_api_handlers::aruna_create_resource;
+    use crate::utils::aruna_api_handlers::ConnectionHandler;
     use axum_extra::extract::CookieJar;
     use leptos::logging::log;
     use leptos_axum::redirect;
@@ -42,7 +42,7 @@ pub async fn create_resource_request(
             ))
         }
     };
-    let res = aruna_create_resource(
+    let res = ConnectionHandler::aruna_create_resource(
         &token,
         &resname,
         &description,

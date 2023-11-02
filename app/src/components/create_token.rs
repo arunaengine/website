@@ -20,7 +20,7 @@ pub async fn create_token_server(
     selectexpiry: String,
     customdate: Option<String>,
 ) -> Result<CreateApiTokenResponse, ServerFnError> {
-    use crate::utils::aruna_api_handlers::aruna_create_token;
+    use crate::utils::aruna_api_handlers::ConnectionHandler;
     use crate::utils::aruna_api_helpers::to_create_token_req;
     use axum_extra::extract::CookieJar;
 
@@ -33,7 +33,7 @@ pub async fn create_token_server(
     } else {
         "".to_string()
     };
-    aruna_create_token(
+    ConnectionHandler::aruna_create_token(
         to_create_token_req(
             tokenname,
             selecttype,

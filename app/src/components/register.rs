@@ -14,7 +14,7 @@ pub async fn register_user(
     email: String,
     project: String,
 ) -> Result<(), ServerFnError> {
-    use crate::utils::aruna_api_handlers::aruna_register_user;
+    use crate::utils::aruna_api_handlers::ConnectionHandler;
     use axum_extra::extract::CookieJar;
 
     let req_parts = use_context::<leptos_axum::RequestParts>()
@@ -31,7 +31,7 @@ pub async fn register_user(
     }
     if let Some(cookie) = jar.get("token") {
         let token = cookie.value().to_string();
-        if let Ok(_) = aruna_register_user(&token, &displayname, &email, &project).await {
+        if let Ok(_) = ConnectionHandler::aruna_register_user(&token, &displayname, &email, &project).await {
             return Ok(());
         }
     }

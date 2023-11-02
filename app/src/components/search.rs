@@ -46,7 +46,7 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 
 #[server]
 async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, ServerFnError> {
-    use crate::utils::aruna_api_handlers::search;
+    use crate::utils::aruna_api_handlers::ConnectionHandler;
     use axum_extra::extract::CookieJar;
 
     let req_parts = use_context::<leptos_axum::RequestParts>()
@@ -58,7 +58,7 @@ async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, Serve
     } else {
         None
     };
-    let res = search(token, query).await.map_err(|_| {
+    let res = ConnectionHandler::search(token, query).await.map_err(|_| {
         leptos::logging::log!("Unable to query SearchResults");
         ServerFnError::Request("Error accessing SearchResult".to_string())
     })?;

@@ -8,7 +8,7 @@ pub mod utils;
 #[server(GetUserInfo, "/api", "GetJson")]
 pub async fn get_user_info() -> Result<WhoamiResponse, ServerFnError> {
     use axum_extra::extract::CookieJar;
-    use utils::aruna_api_handlers::aruna_who_am_i;
+    use utils::aruna_api_handlers::ConnectionHandler;
 
     let req_parts = use_context::<leptos_axum::RequestParts>()
         .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
@@ -21,7 +21,7 @@ pub async fn get_user_info() -> Result<WhoamiResponse, ServerFnError> {
     }
     if let Some(cookie) = jar.get("token") {
         let token = cookie.value().to_string();
-        return Ok(aruna_who_am_i(&token).await);
+        return Ok(ConnectionHandler::aruna_who_am_i(&token).await);
     } else {
         Ok(WhoamiResponse::NotLoggedIn)
     }

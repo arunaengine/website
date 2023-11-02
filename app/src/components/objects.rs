@@ -23,7 +23,7 @@ struct GetObjectQuery {
 pub async fn get_object_by_id(
     query: GetObjectQuery,
 ) -> Result<ResourceWithPermission, ServerFnError> {
-    use crate::utils::aruna_api_handlers::aruna_get_resource;
+    use crate::utils::aruna_api_handlers::ConnectionHandler;
     use axum_extra::extract::CookieJar;
     use http::header;
     use leptos_axum::ResponseOptions;
@@ -35,7 +35,7 @@ pub async fn get_object_by_id(
     if let Some(response_options) = use_context::<ResponseOptions>() {
         let maybe_token = jar.get("token").map(|v| v.value().to_string());
 
-        match aruna_get_resource(maybe_token, query.id).await {
+        match ConnectionHandler::aruna_get_resource(maybe_token, query.id).await {
             Ok(res) => return Ok(res),
             _ => {
                 response_options.insert_header(
