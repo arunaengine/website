@@ -2,14 +2,7 @@ use anyhow::{anyhow, Result};
 use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
 use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
 use aruna_rust_api::api::storage::models::v2::{DataClass, Permission};
-use aruna_rust_api::api::storage::services::v2::{
-    collection_service_client, dataset_service_client,
-    object_service_client, project_service_client, search_service_client, user_service_client,
-    CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest, CreateDatasetRequest,
-    CreateObjectRequest, DeleteApiTokenRequest, GetApiTokensRequest, GetApiTokensResponse,
-    GetResourceRequest, GetResourcesRequest, GetUserRequest, RegisterUserRequest,
-    RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse,
-};
+use aruna_rust_api::api::storage::services::v2::{collection_service_client, dataset_service_client, object_service_client, project_service_client, search_service_client, user_service_client, CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest, CreateDatasetRequest, CreateObjectRequest, DeleteApiTokenRequest, GetApiTokensRequest, GetApiTokensResponse, GetResourceRequest, GetResourcesRequest, GetUserRequest, RegisterUserRequest, RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse, ActivateUserRequest, DeactivateUserRequest, GetAllUsersResponse, GetAllUsersRequest};
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
     transport::Channel,
@@ -341,75 +334,54 @@ pub async fn aruna_create_resource(
     Ok(())
 }
 
-// pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
-//     let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
-//     let endpoint = Channel::from_shared(aruna_endpoint)?;
-//     let channel = endpoint.connect().await?;
-//     let get_users_req = tonic::Request::new(GetAllUsersRequest {
-//         include_permissions: true,
-//     });
-//     let mut client = user_service_client::UserServiceClient::new(channel);
-//     // Send the request to the AOS instance gRPC gateway
-//     let response: GetAllUsersResponse = client
-//         .get_all_users(add_token(get_users_req, token))
-//         .await?
-//         .into_inner();
-//     Ok(response)
-// }
+pub async fn aruna_get_all_users(token: &str) -> Result<GetAllUsersResponse> {
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
+    let channel = endpoint.connect().await?;
+    let get_users_req = tonic::Request::new(GetAllUsersRequest {});
+    let mut client = user_service_client::UserServiceClient::new(channel);
+    // Send the request to the AOS instance gRPC gateway
+    let response: GetAllUsersResponse = client
+        .get_all_users(add_token(get_users_req, token))
+        .await?
+        .into_inner();
+    Ok(response)
+}
 
-// pub async fn aruna_activate_user(
-//     token: &str,
-//     user_id: &str,
-//     project_ulid: Option<String>,
-//     perm: i32,
-// ) -> Result<()> {
-//     let perm = match project_ulid {
-//         Some(pul) => {
-//             if pul.is_empty() {
-//                 None
-//             } else {
-//                 Some(ProjectPermission {
-//                     user_id: user_id.to_string(),
-//                     permission: perm,
-//                     project_id: pul,
-//                     service_account: false,
-//                 })
-//             }
-//         }
-//         None => None,
-//     };
-//     let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+pub async fn aruna_activate_user(
+    token: &str,
+    user_id: &str,
+) -> Result<()> {
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
+    let channel = endpoint.connect().await?;
+    let act_user_req = tonic::Request::new(ActivateUserRequest {
+        user_id: user_id.to_string(),
+    });
+    let mut client = user_service_client::UserServiceClient::new(channel);
+    // Send the request to the AOS instance gRPC gateway
+    client
+        .activate_user(add_token(act_user_req, token))
+        .await?
+        .into_inner();
+    Ok(())
+}
 
-//     let endpoint = Channel::from_shared(aruna_endpoint)?;
-//     let channel = endpoint.connect().await?;
-//     let act_user_req = tonic::Request::new(ActivateUserRequest {
-//         user_id: user_id.to_string(),
-//         project_perms: perm,
-//     });
-//     let mut client = user_service_client::UserServiceClient::new(channel);
-//     // Send the request to the AOS instance gRPC gateway
-//     client
-//         .activate_user(add_token(act_user_req, token))
-//         .await?
-//         .into_inner();
-//     Ok(())
-// }
-
-// pub async fn aruna_deactivate_user(token: &str, user_id: &str) -> Result<()> {
-//     let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
-//     let endpoint = Channel::from_shared(aruna_endpoint)?;
-//     let channel = endpoint.connect().await?;
-//     let dact_user_req = tonic::Request::new(DeactivateUserRequest {
-//         user_id: user_id.to_string(),
-//     });
-//     let mut client = user_service_client::UserServiceClient::new(channel);
-//     // Send the request to the AOS instance gRPC gateway
-//     client
-//         .deactivate_user(add_token(dact_user_req, token))
-//         .await?
-//         .into_inner();
-//     Ok(())
-// }
+pub async fn aruna_deactivate_user(token: &str, user_id: &str) -> Result<()> {
+    let aruna_endpoint = std::env::var("ARUNA_URL").expect("ARUNA_URL client must be set!");
+    let endpoint = Channel::from_shared(aruna_endpoint)?;
+    let channel = endpoint.connect().await?;
+    let deact_user_req = tonic::Request::new(DeactivateUserRequest {
+        user_id: user_id.to_string(),
+    });
+    let mut client = user_service_client::UserServiceClient::new(channel);
+    // Send the request to the AOS instance gRPC gateway
+    client
+        .deactivate_user(add_token(deact_user_req, token))
+        .await?
+        .into_inner();
+    Ok(())
+}
 
 // pub async fn aruna_add_user_to_proj(
 //     token: &str,

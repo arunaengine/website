@@ -52,14 +52,14 @@ pub fn to_create_token_req(
         None => 1,
     };
 
-    let perm = Permission {
+    let perm = resource.map(|r| Permission {
         permission_level,
-        resource_id: resource,
-    };
+        resource_id: Some(r),
+    });
 
     Ok(CreateApiTokenRequest {
         name: tokenname,
         expires_at: Some(Timestamp::from(expires)),
-        permission: Some(perm),
+        permission: perm,
     })
 }

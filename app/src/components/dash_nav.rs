@@ -153,6 +153,12 @@ pub fn DashNav() -> impl IntoView {
                                         </A>
                                         <A
                                             class="dropdown-item disabled"
+                                            href="/dash/data_proxies"
+                                        >
+                                            "Data proxies"
+                                        </A>
+                                        <A
+                                            class="dropdown-item disabled"
                                             href="/dash/service_accounts"
                                         >
                                             "Service accounts"

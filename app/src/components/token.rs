@@ -98,14 +98,12 @@ pub fn Token(token_info: Token) -> impl IntoView {
                     >
                         <Suspense fallback=move || {
                             view! {
-                                ,
                                 <div class="spinner-border"></div>
                             }
                         }>
                             {move || {
                                 let _ = dispatch_delete.get();
                                 view! {
-                                    ,
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         class="icon icon-tabler icon-tabler-trash"
@@ -127,7 +125,6 @@ pub fn Token(token_info: Token) -> impl IntoView {
                                     </svg>
                                 }
                             }}
-
                         </Suspense>
                     </a>
                 </div>
