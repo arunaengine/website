@@ -1,9 +1,8 @@
-use crate::utils::structs::{SearchQuery, SearchResultEntry};
+use crate::utils::structs::{SearchQuery, SearchResultEntry, Filter};
 use aruna_rust_api::api::storage::{
     models::v2::generic_resource::Resource, services::v2::SearchResourcesResponse,
 };
 use leptos::*;
-//use leptos_meta::*;
 use leptos::logging::log;
 use leptos_router::*;
 
@@ -71,6 +70,8 @@ pub fn Search() -> impl IntoView {
     let (query_class, query_set_class_p) = create_query_signal::<String>("class");
     let (query_filter, query_set_filter_p) = create_query_signal::<String>("filter");
 
+    query_set_filter_p.set(Some("object_type = blup".to_string()));
+
     let query_set_class = move |class: &str| {
         query_set_class_p(Some(class.to_string()));
     };
@@ -85,7 +86,7 @@ pub fn Search() -> impl IntoView {
     let query_data = move || {
         let query = SearchQuery {
             query: query().unwrap_or_default(),
-            filter: query_filter().unwrap_or_default(),
+            filter: Filter::default(), //query_filter().unwrap_or_default(),
             limit: 99,
             offset: 0,
         };
@@ -95,9 +96,7 @@ pub fn Search() -> impl IntoView {
                 {move || {
                     resource.get().map(|result| match result {
                         Ok(res) => {
-                            let resources = res.resources.into_iter().map(|gen_res| gen_res.resource.unwrap()); // This should be safe,
-                                                                                                                // because these grpc oneofs should not exist with undefined,
-                                                                                                                // but nevertheless: TODO!
+                            let resources = res.resources.into_iter().map(|gen_res| gen_res.resource.unwrap());
                             log!("{resources:?}");
                             set_results(res.estimated_total as i32);
                             view! {<For

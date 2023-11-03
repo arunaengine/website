@@ -28,7 +28,7 @@ reqwest = "0.11"
 tonic = { version = "0.10.2", features=["tls", "tls-roots"], optional = true }
 axum-extra = { version = "0.8.0", features = ["cookie"] }
 lettre = { version = "0.11.1", optional = true }
-
+urlencoding = "2.1.3"
 
 http.workspace = true
 cfg-if.workspace = true

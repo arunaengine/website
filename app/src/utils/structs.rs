@@ -184,6 +184,12 @@ pub struct ProjectOverviewWeb {
 //     }
 // }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DataClass {
+    PUBLIC,
+    PRIVATE,
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SearchQuery {
     pub query: String,
@@ -197,12 +203,23 @@ pub struct CreateResource {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ResourceType {
     Project,
     Collection,
     Dataset,
     Object,
+}
+
+impl ResourceType {
+    pub fn into_filter_string(self) -> String {
+        match self {
+            ResourceType::Project => "type = PROJECT".to_string(),
+            ResourceType::Collection => "type = COLLECTION".to_string(),
+            ResourceType::Dataset => "type = DATASET".to_string(),
+            ResourceType::Object => "type = OBJECT".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]

@@ -186,7 +186,7 @@ pub fn ArunaHeader() -> impl IntoView {
 
     let user_elem = move || {
         view! {
-            <Suspense fallback=move || {
+            <Transition fallback=move || {
                 view! { <div class="spinner-border"></div> }
             }>
                 {move || {
@@ -265,7 +265,7 @@ pub fn ArunaHeader() -> impl IntoView {
                     }
                 }}
 
-            </Suspense>
+            </Transition>
         }
     };
 

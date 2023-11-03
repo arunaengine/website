@@ -131,6 +131,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tonic",
+ "urlencoding",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

@@ -221,11 +221,10 @@ impl ConnectionHandler {
         let mut client = search_service_client::SearchServiceClient::new(channel);
         let req = tonic::Request::new(SearchResourcesRequest {
             query: query.query,
-            filter: query.filter,
+            filter: query.filter.into_string(),
             limit: query.limit,
             offset: query.offset,
         });
-        leptos::logging::log!("SearchResourceRequest: {req:?}");
         let result = match token {
             Some(t) => client
                 .search_resources(Self::add_token(req, &t))
@@ -233,7 +232,6 @@ impl ConnectionHandler {
                 .into_inner(),
             None => client.search_resources(req).await?.into_inner(),
         };
-        leptos::logging::log!("SearchResource result: {result:?}");
         Ok(result)
     }
 
