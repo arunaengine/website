@@ -4,7 +4,6 @@ use crate::utils::structs::{
 use aruna_rust_api::api::storage::{
     models::v2::generic_resource::Resource, services::v2::SearchResourcesResponse,
 };
-use leptos::logging::log;
 use leptos::*;
 use leptos_router::*;
 
@@ -70,8 +69,8 @@ async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, Serve
 pub fn Search() -> impl IntoView {
     let (query, _query_set) = create_query_signal::<String>("query");
     let (query_filter, query_set_filter_p) = create_query_signal::<JsonFilter>("filter");
-
-    let (results, set_results) = create_signal::<i32>(18838);
+    let (read_range, set_range) = create_signal(1..=5);
+    let (results, set_results) = create_signal::<i32>(0);
 
     let update_filter = move |filter: Filter| {
         let current_filter = query_filter().unwrap_or_default();
@@ -79,13 +78,13 @@ pub fn Search() -> impl IntoView {
     };
 
     let max_pages = move || (results() / 50) + 1;
-    let get_range_iter = {
+    let get_range_iter = 
         move |current: i32| {
             let max = max_pages();
             let from = if current > 3 { current - 2 } else { 1 };
             let to = if current + 2 < max { current + 2 } else { max };
             if to < 5 {
-                return 1..=5;
+                return 1..=max;
             }
 
             if to + 2 > max {
@@ -93,9 +92,7 @@ pub fn Search() -> impl IntoView {
             }
 
             from..=to
-        }
-    };
-    let (read_range, set_range) = create_signal(1..=5);
+        };
 
     let (query_page, query_set_page_p) = create_query_signal::<i32>("page");
     let query_set_page = move |size: i32| {
@@ -122,51 +119,12 @@ pub fn Search() -> impl IntoView {
 
     let current_page = move || query_page().unwrap_or(1);
 
-    let query_data = move || {
-        let query = SearchQuery {
-            query: query().unwrap_or_default(),
-            filter: query_filter().unwrap_or_default().into_filter_string(), //query_filter().unwrap_or_default(),
-            limit: 99,
-            offset: 0,
-        };
-        let resource = create_local_resource(move || query.clone(), search_api);
-        view! {
-            <Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
-                {move || {
-                    resource.get().map(|result| match result {
-                        Ok(res) => {
-                            let resources = res.resources.into_iter().map(|gen_res| gen_res.resource.unwrap());
-                            log!("{resources:?}");
-                            set_results(res.estimated_total as i32);
-                            view! {<For
-                                each=move || { resources.clone().into_iter() }
-                                key=|res| {
-                                    match res {
-                                        Resource::Collection(c) => c.id.clone(),
-                                        Resource::Dataset(d) => d.id.clone(),
-                                        Resource::Object(o) => o.id.clone(),
-                                        Resource::Project(p) => p.id.clone(),
-                                    }
-                                }
-                                children=move |res| {
-                                    view! { <SearchResult res=res/> }
-                                }
-                            />}.into_view()
-                        },
-                        Err(e)=> {
-                            leptos::logging::log!("{e:?}");
-                            view!{<p> "Error while searching resources" </p>}.into_view()
-                        }
-                    })
-                }
-            }
-            </Suspense>
-        }
-        .into_view()
-    };
-
     let pagination = move || {
         view! {
+            <Show
+            when=move || (max_pages() > 1)
+            fallback=|| ().into_view()
+            >
             <div class="mt-1 align-items-end">
                 <ul class="pagination">
                     <li class=move || {
@@ -215,8 +173,11 @@ pub fn Search() -> impl IntoView {
                         }
                     />
 
-                    <li class="page-item">
-                        <button class="page-link" on:click=move |_| inc_page()>
+                    <li class=move || if current_page() == max_pages() { "page-item disabled" } else { "page-item" }>
+                        <button 
+                            class="page-link"
+                            aria-disabled=move || if current_page() == max_pages() { "true" } else { "false" } 
+                            on:click=move |_| inc_page()>
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 class="icon"
@@ -236,7 +197,63 @@ pub fn Search() -> impl IntoView {
                     </li>
                 </ul>
             </div>
+            </Show>
         }
+    };
+
+
+    let query = move || SearchQuery {
+        query: query().unwrap_or_default(),
+        filter: query_filter().unwrap_or_default().into_filter_string(), //query_filter().unwrap_or_default(),
+        limit: 50,
+        offset: (current_page() as i64 - 1) * 50,
+    };
+    let resource = create_local_resource(move || query(), search_api);
+
+    let query_data = move || {
+
+        view! {
+            <Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
+                {move || {
+                    resource.get().map(|result| match result {
+                        Ok(res) => {
+                            let resources = res.resources.into_iter().map(|gen_res| gen_res.resource.unwrap());
+
+                            set_results(res.estimated_total as i32);
+                            query_set_page(current_page());
+
+                            view! {
+                                {pagination}
+                                <For
+                                each=move || { resources.clone().into_iter() }
+                                key=|res| {
+                                    match res {
+                                        Resource::Collection(c) => c.id.clone(),
+                                        Resource::Dataset(d) => d.id.clone(),
+                                        Resource::Object(o) => o.id.clone(),
+                                        Resource::Project(p) => p.id.clone(),
+                                    }
+                                }
+                                children=move |res| {
+                                    view! { <SearchResult res=res/> }
+                                }
+                            />
+                        
+                        
+                        
+                            
+                            }.into_view()
+                        },
+                        Err(e)=> {
+                            leptos::logging::log!("{e:?}");
+                            view!{<p> "Error while searching resources" </p>}.into_view()
+                        }
+                    })
+                }
+            }
+            </Suspense>
+        }
+        .into_view()
     };
 
     view! {
@@ -272,6 +289,7 @@ pub fn Search() -> impl IntoView {
                             type="text"
                             class="form-control form-control-lg"
                             placeholder="Search Aruna objects"
+                            on:input=move |_| resource.refetch()
                         />
                         <span class="input-group-text" id="inputGroup-sizing-default">
                             Dataclass
@@ -387,6 +405,7 @@ pub fn Search() -> impl IntoView {
                                 class="form-control"
                                 placeholder="Filter string"
                                 aria-label="Filter string"
+                                on:change=move |e| { resource.refetch(); update_filter(Filter::Custom(Some(event_target_value(&e)))) }
                             />
                         </div>
 
@@ -424,7 +443,6 @@ pub fn Search() -> impl IntoView {
                     </div>
                     <div class="col-9 ps-3">
 
-                        {pagination}
                         {query_data}
 
 

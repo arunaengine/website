@@ -261,10 +261,10 @@ pub enum ResourceType {
 impl ResourceType {
     pub fn into_filter_string(&self) -> String {
         match self {
-            ResourceType::Project => "type = PROJECT".to_string(),
-            ResourceType::Collection => "type = COLLECTION".to_string(),
-            ResourceType::Dataset => "type = DATASET".to_string(),
-            ResourceType::Object => "type = OBJECT".to_string(),
+            ResourceType::Project => "object_type = PROJECT".to_string(),
+            ResourceType::Collection => "object_type = COLLECTION".to_string(),
+            ResourceType::Dataset => "object_type = DATASET".to_string(),
+            ResourceType::Object => "object_type = OBJECT".to_string(),
         }
     }
 }
