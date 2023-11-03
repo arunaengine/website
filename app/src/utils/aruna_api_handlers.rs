@@ -221,7 +221,7 @@ impl ConnectionHandler {
         let mut client = search_service_client::SearchServiceClient::new(channel);
         let req = tonic::Request::new(SearchResourcesRequest {
             query: query.query,
-            filter: query.filter.into_string(),
+            filter: query.filter,
             limit: query.limit,
             offset: query.offset,
         });

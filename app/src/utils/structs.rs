@@ -1,3 +1,8 @@
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
+
 use aruna_rust_api::api::storage::models::v2::{
     generic_resource, relation, Collection, Dataset, ExternalRelation, ExternalRelationVariant,
     InternalRelation, InternalRelationVariant, KeyValue, Object, Permission, Project, Relation,
@@ -115,54 +120,6 @@ pub struct TokenStats {
     pub used_at: String,
 }
 
-// impl From<Token> for TokenStats {
-//     fn from(value: Token) -> Self {
-//         let perm = match value.permission() {
-//             aruna_rust_api::api::storage::models::v1::Permission::Read => "READ".to_string(),
-//             aruna_rust_api::api::storage::models::v1::Permission::Append => "APPEND".to_string(),
-//             aruna_rust_api::api::storage::models::v1::Permission::Modify => "MODIFY".to_string(),
-//             aruna_rust_api::api::storage::models::v1::Permission::Admin => "ADMIN".to_string(),
-//             _ => "NONE".to_string(),
-//         };
-
-//         let token_type = match value.token_type() {
-//             aruna_rust_api::api::storage::models::v1::TokenType::Unspecified => TokenType::PERSONAL,
-//             aruna_rust_api::api::storage::models::v1::TokenType::Personal => TokenType::PERSONAL,
-//             aruna_rust_api::api::storage::models::v1::TokenType::Scoped => {
-//                 if !value.collection_id.is_empty() {
-//                     TokenType::COLLECTION(value.collection_id, perm)
-//                 } else if !value.project_id.is_empty() {
-//                     TokenType::COLLECTION(value.project_id, perm)
-//                 } else {
-//                     TokenType::PERSONAL
-//                 }
-//             }
-//         };
-
-//         TokenStats {
-//             id: value.id,
-//             name: value.name,
-//             token_type,
-//             created_at: format_time_stamp(value.created_at),
-//             expires_at: format_time_stamp(value.expires_at),
-//             is_session: value.is_session,
-//             used_at: format_time_stamp(value.used_at),
-//         }
-//     }
-// }
-
-// pub fn format_time_stamp(ts: Option<Timestamp>) -> String {
-//     let raw_ts = ts.unwrap_or_default();
-//     let as_ndt = chrono::NaiveDateTime::from_timestamp_opt(raw_ts.seconds, raw_ts.nanos as u32)
-//         .unwrap_or_default();
-//     as_ndt
-//         .and_local_timezone(Local)
-//         .latest()
-//         .unwrap_or_default()
-//         .format("%Y-%m-%d %H:%M:%S")
-//         .to_string()
-// }
-
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProjectOverviewWeb {
     pub id: String,
@@ -172,22 +129,112 @@ pub struct ProjectOverviewWeb {
     pub user_ids: Vec<String>,
 }
 
-// impl From<ProjectOverview> for ProjectOverviewWeb {
-//     fn from(value: ProjectOverview) -> Self {
-//         ProjectOverviewWeb {
-//             id: value.id,
-//             name: value.name,
-//             description: value.description,
-//             collection_ids: value.collection_ids,
-//             user_ids: value.user_ids,
-//         }
-//     }
-// }
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DataClass {
     PUBLIC,
     PRIVATE,
+}
+
+impl DataClass {
+    pub fn into_filter_string(&self) -> String {
+        match self {
+            DataClass::PUBLIC => "data_class = PUBLIC".to_string(),
+            DataClass::PRIVATE => "data_class = PRIVATE".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct JsonFilter {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dataclass: Option<DataClass>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub objecttype: Option<ResourceType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom: Option<String>,
+}
+
+impl JsonFilter {
+    pub fn get_class(&self) -> String {
+        match self.dataclass {
+            Some(DataClass::PUBLIC) => "PUBLIC".to_string(),
+            Some(DataClass::PRIVATE) => "PRIVATE".to_string(),
+            None => "All".to_string(),
+        }
+    }
+
+    pub fn res_selected(&self, res: Option<ResourceType>) -> bool {
+        self.objecttype == res
+    }
+
+    pub fn update_filter(self, filter: Filter) -> Option<Self> {
+        let maybe_filter = match filter {
+            Filter::DataClass(d) => JsonFilter {
+                dataclass: d,
+                ..self
+            },
+            Filter::ObjectType(o) => JsonFilter {
+                objecttype: o,
+                ..self
+            },
+            Filter::Custom(c) => JsonFilter { custom: c, ..self },
+        };
+
+        if maybe_filter.custom.is_none()
+            && maybe_filter.dataclass.is_none()
+            && maybe_filter.objecttype.is_none()
+        {
+            None
+        } else {
+            Some(maybe_filter)
+        }
+    }
+
+    pub fn into_filter_string(&self) -> String {
+        match (&self.dataclass, &self.objecttype, &self.custom) {
+            (None, None, None) => "".to_string(),
+            (None, None, Some(c)) => c.clone(),
+            (None, Some(o), None) => o.into_filter_string(),
+            (None, Some(o), Some(c)) => format!("{} AND {}", o.into_filter_string(), c),
+            (Some(d), None, None) => d.into_filter_string(),
+            (Some(d), None, Some(c)) => format!("{} AND {}", d.into_filter_string(), c),
+            (Some(d), Some(o), None) => {
+                format!("{} AND {}", d.into_filter_string(), o.into_filter_string())
+            }
+            (Some(d), Some(o), Some(c)) => {
+                format!(
+                    "{} AND {} AND {}",
+                    d.into_filter_string(),
+                    o.into_filter_string(),
+                    c
+                )
+            }
+        }
+    }
+}
+
+impl FromStr for JsonFilter {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let filter: JsonFilter = serde_json::from_str(&urlencoding::decode(s)?)?;
+        Ok(filter)
+    }
+}
+
+impl Display for JsonFilter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let json_data = serde_json::to_string(self).map_err(|_| std::fmt::Error {})?;
+        let filter = urlencoding::encode(&json_data);
+        write!(f, "{}", filter)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Filter {
+    DataClass(Option<DataClass>),
+    ObjectType(Option<ResourceType>),
+    Custom(Option<String>),
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -212,7 +259,7 @@ pub enum ResourceType {
 }
 
 impl ResourceType {
-    pub fn into_filter_string(self) -> String {
+    pub fn into_filter_string(&self) -> String {
         match self {
             ResourceType::Project => "type = PROJECT".to_string(),
             ResourceType::Collection => "type = COLLECTION".to_string(),

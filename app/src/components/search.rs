@@ -1,9 +1,11 @@
-use crate::utils::structs::{SearchQuery, SearchResultEntry, Filter};
+use crate::utils::structs::{
+    DataClass, Filter, JsonFilter, ResourceType, SearchQuery, SearchResultEntry,
+};
 use aruna_rust_api::api::storage::{
     models::v2::generic_resource::Resource, services::v2::SearchResourcesResponse,
 };
-use leptos::*;
 use leptos::logging::log;
+use leptos::*;
 use leptos_router::*;
 
 #[component]
@@ -67,26 +69,63 @@ async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, Serve
 #[component]
 pub fn Search() -> impl IntoView {
     let (query, _query_set) = create_query_signal::<String>("query");
-    let (query_class, query_set_class_p) = create_query_signal::<String>("class");
-    let (query_filter, query_set_filter_p) = create_query_signal::<String>("filter");
-
-    query_set_filter_p.set(Some("object_type = blup".to_string()));
-
-    let query_set_class = move |class: &str| {
-        query_set_class_p(Some(class.to_string()));
-    };
-
-    let query_set_filter = move |res: &str| {
-        query_set_filter_p(Some(res.to_string()));
-    };
-    let is_res = move |res: &str| query_filter() == Some(res.to_string());
-    let (read_range, set_range) = create_signal(1..=5);
+    let (query_filter, query_set_filter_p) = create_query_signal::<JsonFilter>("filter");
 
     let (results, set_results) = create_signal::<i32>(18838);
+
+    let update_filter = move |filter: Filter| {
+        let current_filter = query_filter().unwrap_or_default();
+        query_set_filter_p(current_filter.update_filter(filter));
+    };
+
+    let max_pages = move || (results() / 50) + 1;
+    let get_range_iter = {
+        move |current: i32| {
+            let max = max_pages();
+            let from = if current > 3 { current - 2 } else { 1 };
+            let to = if current + 2 < max { current + 2 } else { max };
+            if to < 5 {
+                return 1..=5;
+            }
+
+            if to + 2 > max {
+                return (max - 4)..=max;
+            }
+
+            from..=to
+        }
+    };
+    let (read_range, set_range) = create_signal(1..=5);
+
+    let (query_page, query_set_page_p) = create_query_signal::<i32>("page");
+    let query_set_page = move |size: i32| {
+        set_range(get_range_iter(size));
+        query_set_page_p(Some(size));
+    };
+
+    let inc_page = move || {
+        let page = query_page().unwrap_or(1);
+        if page == max_pages() {
+            return;
+        }
+        set_range(get_range_iter(page + 1));
+        query_set_page(page + 1);
+    };
+
+    let dec_page = move || {
+        let page = query_page().unwrap_or(1);
+        if page == 1 {
+            return;
+        }
+        query_set_page(page - 1);
+    };
+
+    let current_page = move || query_page().unwrap_or(1);
+
     let query_data = move || {
         let query = SearchQuery {
             query: query().unwrap_or_default(),
-            filter: Filter::default(), //query_filter().unwrap_or_default(),
+            filter: query_filter().unwrap_or_default().into_filter_string(), //query_filter().unwrap_or_default(),
             limit: 99,
             offset: 0,
         };
@@ -125,50 +164,6 @@ pub fn Search() -> impl IntoView {
         }
         .into_view()
     };
-    // let is_class = move |class: &str| query_class() == Some(class.to_string());
-
-    let max_pages = move || (results() / 50) + 1;
-    let get_range_iter = {
-        move |current: i32| {
-            let max = max_pages();
-            let from = if current > 3 { current - 2 } else { 1 };
-            let to = if current + 2 < max { current + 2 } else { max };
-            if to < 5 {
-                return 1..=5;
-            }
-
-            if to + 2 > max {
-                return (max - 4)..=max;
-            }
-
-            from..=to
-        }
-    };
-
-    let (query_page, query_set_page_p) = create_query_signal::<i32>("page");
-    let query_set_page = move |size: i32| {
-        set_range(get_range_iter(size));
-        query_set_page_p(Some(size));
-    };
-
-    let inc_page = move || {
-        let page = query_page().unwrap_or(1);
-        if page == max_pages() {
-            return;
-        }
-        set_range(get_range_iter(page + 1));
-        query_set_page(page + 1);
-    };
-
-    let dec_page = move || {
-        let page = query_page().unwrap_or(1);
-        if page == 1 {
-            return;
-        }
-        query_set_page(page - 1);
-    };
-
-    let current_page = move || query_page().unwrap_or(1);
 
     let pagination = move || {
         view! {
@@ -288,15 +283,14 @@ pub fn Search() -> impl IntoView {
                             aria-expanded="false"
                         >
                             {move || {
-                                let s = query_class().unwrap_or("all".to_string());
-                                format!("{}{}", (& s[..1].to_string()).to_uppercase(), & s[1..])
+                                query_filter().map(|e| e.get_class()).unwrap_or("All".to_string())
                             }}
 
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li>
                                 <button
-                                    on:click=move |_| query_set_class("all")
+                                    on:click=move |_| update_filter(Filter::DataClass(None))
                                     class="dropdown-item"
                                 >
                                     All
@@ -304,7 +298,7 @@ pub fn Search() -> impl IntoView {
                             </li>
                             <li>
                                 <button
-                                    on:click=move |_| query_set_class("public")
+                                    on:click=move |_| update_filter(Filter::DataClass(Some(DataClass::PUBLIC)))
                                     class="dropdown-item"
                                 >
                                     Public
@@ -312,7 +306,7 @@ pub fn Search() -> impl IntoView {
                             </li>
                             <li>
                                 <button
-                                    on:click=move |_| query_set_class("private")
+                                    on:click=move |_| update_filter(Filter::DataClass(Some(DataClass::PRIVATE)))
                                     class="dropdown-item"
                                 >
                                     Private
@@ -327,11 +321,11 @@ pub fn Search() -> impl IntoView {
                         <div class="subheader mb-2">"Resource"</div>
                         <div class="list-group list-group-transparent mb-3">
                             <button
-                                on:click=move |_| query_set_filter("all")
+                                on:click=move |_| update_filter(Filter::ObjectType(None))
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
-                                        + if is_res("all") || query_filter().is_none() {
+                                        + if query_filter().map(|e| e.res_selected(None)).unwrap_or(true) {
                                             " active"
                                         } else {
                                             ""
@@ -342,43 +336,43 @@ pub fn Search() -> impl IntoView {
                                 "All"
                             </button>
                             <button
-                                on:click=move |_| query_set_filter("projects")
+                                on:click=move |_| update_filter(Filter::ObjectType(Some(ResourceType::Project)))
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
-                                        + if is_res("projects") { " active" } else { "" }
+                                        + if query_filter().map(|e| e.res_selected(Some(ResourceType::Project))).unwrap_or_default() { " active" } else { "" }
                                 }
                             >
 
                                 "Projects"
                             </button>
                             <button
-                                on:click=move |_| query_set_filter("collections")
+                                on:click=move |_| update_filter(Filter::ObjectType(Some(ResourceType::Collection)))
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
-                                        + if is_res("collections") { " active" } else { "" }
+                                        +  if query_filter().map(|e| e.res_selected(Some(ResourceType::Collection))).unwrap_or_default() { " active" } else { "" }
                                 }
                             >
 
                                 "Collections"
                             </button>
                             <button
-                                on:click=move |_| query_set_filter("datasets")
+                                on:click=move |_| update_filter(Filter::ObjectType(Some(ResourceType::Dataset)))
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
-                                        + if is_res("datasets") { " active" } else { "" }
+                                        +  if query_filter().map(|e| e.res_selected(Some(ResourceType::Dataset))).unwrap_or_default() { " active" } else { "" }
                                 }
                             >
 
                                 "Datasets"
                             </button>
                             <button
-                                on:click=move |_| query_set_filter("objects")
+                                on:click=move |_| update_filter(Filter::ObjectType(Some(ResourceType::Object)))
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
-                                        .to_owned() + if is_res("objects") { " active" } else { "" }
+                                        .to_owned() + if query_filter().map(|e| e.res_selected(Some(ResourceType::Object))).unwrap_or_default() { " active" } else { "" }
                                 }
                             >
 
