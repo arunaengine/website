@@ -313,8 +313,8 @@ impl ConnectionHandler {
                     name: name.to_string(),
                     description: description.to_string(),
                     data_class: dataclass as i32,
-                    metadata_license_tag: meta_license_tag,
-                    default_data_license_tag: data_licenses_tag,
+                    metadata_license_tag: Some(meta_license_tag),
+                    default_data_license_tag: Some(data_licenses_tag),
                     parent,
                     ..Default::default()
                 });
@@ -342,8 +342,8 @@ impl ConnectionHandler {
                     name: name.to_string(),
                     description: description.to_string(),
                     data_class: dataclass as i32,
-                    metadata_license_tag: meta_license_tag,
-                    default_data_license_tag: data_licenses_tag,
+                    metadata_license_tag: Some(meta_license_tag),
+                    default_data_license_tag: Some(data_licenses_tag),
                     parent,
                     ..Default::default()
                 });

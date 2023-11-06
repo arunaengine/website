@@ -2,9 +2,11 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 use utils::structs::WhoamiResponse;
+
 pub mod components;
 pub mod error_template;
 pub mod utils;
+
 #[server(GetUserInfo, "/api", "GetJson")]
 pub async fn get_user_info() -> Result<WhoamiResponse, ServerFnError> {
     use axum_extra::extract::CookieJar;

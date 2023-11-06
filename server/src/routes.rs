@@ -7,7 +7,7 @@ use axum::{
     http::StatusCode,
     response::Redirect,
 };
-use axum_extra::extract::{cookie::Cookie, CookieJar};
+use axum_extra::extract::{cookie::Cookie, PrivateCookieJar};
 use serde::{de, Deserialize, Deserializer};
 use time::OffsetDateTime;
 
@@ -19,8 +19,8 @@ pub struct RedirectBack {
 pub async fn login(
     State(state): State<ServerState>,
     Query(redirect): Query<RedirectBack>,
-    jar: CookieJar,
-) -> Result<(CookieJar, Redirect), StatusCode> {
+    jar: PrivateCookieJar,
+) -> Result<(PrivateCookieJar, Redirect), StatusCode> {
     let redirect = urlencoding::decode(&redirect.redirect.unwrap_or_else(|| "/".to_string()))
         .map(|e| e.into_owned())
         .unwrap_or_else(|_| "/".to_string());
@@ -61,9 +61,9 @@ pub struct QueryData {
 
 pub async fn callback(
     State(state): State<ServerState>,
-    jar: CookieJar,
+    jar: PrivateCookieJar,
     Query(query): Query<QueryData>,
-) -> Result<(CookieJar, Redirect), StatusCode> {
+) -> Result<(PrivateCookieJar, Redirect), StatusCode> {
     let challenge = jar.get("challenge").ok_or(StatusCode::UNAUTHORIZED)?;
     let mut challenge: Challenge =
         serde_json::from_str(challenge.value()).map_err(|_| StatusCode::UNAUTHORIZED)?;
@@ -124,9 +124,9 @@ where
 
 pub async fn refresh(
     State(state): State<ServerState>,
-    jar: CookieJar,
+    jar: PrivateCookieJar,
     Query(query): Query<FromQuery>,
-) -> Result<(CookieJar, Redirect), StatusCode> {
+) -> Result<(PrivateCookieJar, Redirect), StatusCode> {
     let challenge = jar.get("refresh").ok_or_else(|| StatusCode::UNAUTHORIZED)?;
 
     let (new_token, expires) = state
@@ -149,8 +149,8 @@ pub async fn refresh(
 
 pub async fn logout(
     State(_state): State<ServerState>,
-    mut jar: CookieJar,
-) -> Result<(CookieJar, Redirect), StatusCode> {
+    mut jar: PrivateCookieJar,
+) -> Result<(PrivateCookieJar, Redirect), StatusCode> {
     let old_jar = jar.clone();
 
     for c in old_jar.iter() {

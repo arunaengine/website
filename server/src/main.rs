@@ -10,6 +10,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use axum_extra::extract::cookie::Key;
 use fileserv::file_and_error_handler;
 use leptos::logging::log;
 use leptos::*;
@@ -34,6 +35,8 @@ async fn server_fn_handler(
         raw_query,
         move || {
             provide_context(app_state.mail.clone());
+            provide_context(app_state.oidc.clone());
+            provide_context(app_state.key.clone());
         },
         request,
     )
@@ -48,6 +51,8 @@ async fn leptos_routes_handler(
         app_state.leptos_options.clone(),
         move || {
             provide_context(app_state.mail.clone());
+            provide_context(app_state.oidc.clone());
+            provide_context(app_state.key.clone());
         },
         || view! { <EntryPoint/> },
     );
@@ -58,6 +63,7 @@ async fn leptos_routes_handler(
 pub struct ServerState {
     pub oidc: oidc::Authorizer,
     pub mail: Option<aruna_web_app::utils::mail::MailClient>,
+    pub key: Key,
     pub leptos_options: LeptosOptions,
 }
 
@@ -89,6 +95,11 @@ async fn main() {
     let server_state = ServerState {
         oidc: oidc::Authorizer::new(key_cloak_url).await.unwrap(),
         mail: mail_client,
+        key: Key::from(
+            dotenvy::var("ENCRYPTION_KEY")
+                .expect("KEY must be set!")
+                .as_bytes(),
+        ),
         leptos_options: leptos_options.clone(),
     };
     let addr = leptos_options.site_addr;
