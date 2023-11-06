@@ -1,6 +1,7 @@
 use std::{fmt, mem, str::FromStr};
 
-use crate::{oidc::Challenge, ServerState};
+use crate::ServerState;
+use aruna_web_app::utils::oidc::Challenge;
 use axum::{
     extract::{Query, State},
     http::StatusCode,

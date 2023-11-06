@@ -1,4 +1,7 @@
-use aruna_web_app::{utils::mail::MailClient, *};
+use aruna_web_app::{
+    utils::{mail::MailClient, oidc},
+    *,
+};
 use axum::{
     body::Body as AxumBody,
     extract::{FromRef, Path, RawQuery, State},
@@ -16,7 +19,6 @@ use tower_http::cors::{Any, CorsLayer};
 use crate::routes::{callback, login, logout, refresh};
 
 pub mod fileserv;
-pub mod oidc;
 pub mod routes;
 
 async fn server_fn_handler(

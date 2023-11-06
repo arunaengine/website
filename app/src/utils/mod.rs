@@ -7,6 +7,8 @@ pub mod conversion_helpers;
 pub mod mail;
 pub mod mocks;
 pub mod modal;
+#[cfg(feature = "ssr")]
+pub mod oidc;
 pub mod parse_cookies;
 pub mod structs;
 pub mod tabler_utils;
