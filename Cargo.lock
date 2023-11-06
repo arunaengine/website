@@ -147,6 +147,7 @@ version = "4.0.0"
 dependencies = [
  "anyhow",
  "aruna-rust-api",
+ "axum-core",
  "axum-extra",
  "bytesize",
  "cfg-if",
