@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
 use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
-use aruna_rust_api::api::storage::models::v2::{DataClass, Permission, User};
+use aruna_rust_api::api::storage::models::v2::{DataClass, Permission, User, License};
 use aruna_rust_api::api::storage::services::v2::{
     collection_service_client, dataset_service_client, object_service_client,
     project_service_client, search_service_client, user_service_client, ActivateUserRequest,
@@ -9,7 +9,7 @@ use aruna_rust_api::api::storage::services::v2::{
     CreateObjectRequest, DeactivateUserRequest, DeleteApiTokenRequest, GetAllUsersRequest,
     GetAllUsersResponse, GetApiTokensRequest, GetApiTokensResponse, GetResourceRequest,
     GetResourcesRequest, GetUserRequest, RegisterUserRequest, RegisterUserResponse,
-    ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse,
+    ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse, license_service_client, ListLicensesRequest,
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
@@ -240,7 +240,10 @@ impl ConnectionHandler {
         name: &str,
         description: &str,
         res_type: ResourceType,
+        data_licenses_tag: String,
+        meta_license_tag: String,
         parent: Option<String>,
+        dataclass: i32,
         parent_type: Option<ResourceType>,
     ) -> Result<()> {
         let channel = Self::get_channel().await?;
@@ -251,7 +254,9 @@ impl ConnectionHandler {
                     aruna_rust_api::api::storage::services::v2::CreateProjectRequest {
                         name: name.to_string(),
                         description: description.to_string(),
-                        data_class: DataClass::Public as i32,
+                        data_class: dataclass as i32,
+                        metadata_license_tag: meta_license_tag,
+                        default_data_license_tag: data_licenses_tag,
                         ..Default::default()
                     },
                 );
@@ -278,7 +283,9 @@ impl ConnectionHandler {
                 let request = tonic::Request::new(CreateCollectionRequest {
                     name: name.to_string(),
                     description: description.to_string(),
-                    data_class: DataClass::Public as i32, // TODO!
+                    data_class: dataclass as i32,
+                    metadata_license_tag: meta_license_tag,
+                    default_data_license_tag: data_licenses_tag,
                     parent,
                     ..Default::default()
                 });
@@ -305,7 +312,9 @@ impl ConnectionHandler {
                 let request = tonic::Request::new(CreateDatasetRequest {
                     name: name.to_string(),
                     description: description.to_string(),
-                    data_class: DataClass::Public as i32, // TODO!
+                    data_class: dataclass as i32,
+                    metadata_license_tag: meta_license_tag,
+                    default_data_license_tag: data_licenses_tag,
                     parent,
                     ..Default::default()
                 });
@@ -333,7 +342,9 @@ impl ConnectionHandler {
                 let request = tonic::Request::new(CreateObjectRequest {
                     name: name.to_string(),
                     description: description.to_string(),
-                    data_class: DataClass::Public as i32, // TODO!
+                    data_class: dataclass as i32,
+                    metadata_license_tag: meta_license_tag,
+                    data_license_tag: data_licenses_tag,
                     parent,
                     ..Default::default()
                 });
@@ -384,6 +395,13 @@ impl ConnectionHandler {
             .await?
             .into_inner();
         Ok(())
+    }
+
+    pub async fn get_licenses(token: &str) -> Result<Vec<License>> {
+        let channel = Self::get_channel().await?;
+        let mut client = license_service_client::LicenseServiceClient::new(channel);
+        let req = tonic::Request::new(ListLicensesRequest {});        
+        Ok(client.list_licenses(Self::add_token(req, token)).await?.into_inner().licenses)
     }
 }
 

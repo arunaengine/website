@@ -1,5 +1,5 @@
-use crate::utils::structs::{GetOwnedResources, SearchResultEntry};
-use aruna_rust_api::api::storage::models::v2::{generic_resource::Resource, User};
+use crate::utils::structs::{GetOwnedResources, SearchResultEntry, WhoamiResponse};
+use aruna_rust_api::api::storage::models::v2::{generic_resource::Resource, User, Permission};
 use leptos::*;
 //use leptos_meta::*;
 use leptos_router::*;
@@ -48,29 +48,20 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 pub fn PersonalResources() -> impl IntoView {
     // This takes the user context and creates a server call for
     // all resources that are explicitly statet in User{permissions} field
-    let ctx = match use_context::<leptos::Resource<(), Option<User>>>() {
-        Some(res) => res.get().flatten(),
-        None => None,
-    };
+    let user_context = use_context::<leptos::Resource<(), WhoamiResponse>>().expect("user_state not set");
     // This has to be manually parsed, because User structs can have
     // empty vectors as fields, and serde does not deserialize them
     // correctly if nested, so these needed fields need to be parsed
     // by hand and then annotated with #[server(default)] and #[derive(Default)]
-    let query_params = match ctx {
-        Some(user) => {
-            let perms = match user.attributes {
-                Some(a) => a.personal_permissions,
-                None => vec![],
-            };
-            Some(GetOwnedResources { perms })
-
-            //Some(resource)
+    let query_params = move || {
+        match user_context.get() {
+            Some(WhoamiResponse::User(u)) => Some(u.attributes.map(|e| e.personal_permissions).unwrap_or_default()),
+            _ => None,
         }
-        None => None,
     };
     // Renders a view for each resource or returns a default page if no resources are found
     let element = move || {
-        if let Some(query) = query_params.clone() {
+        if let Some(query) = query_params() {
             // Runs async server call
             let resource = create_local_resource(move || query.clone(), get_user_resources); // TODO: Use create_resource
             view! {
@@ -107,7 +98,7 @@ pub fn PersonalResources() -> impl IntoView {
             .into_view()
         } else {
             view! {
-                <p> "Nothing to see here!" </p>
+                <p> "No Resources found !" </p>
             }
             .into_view()
         }
@@ -180,7 +171,7 @@ pub fn PersonalResources() -> impl IntoView {
 }
 
 #[server(UserResources, "/api", "GetJson")]
-pub async fn get_user_resources(query: GetOwnedResources) -> Result<Vec<Resource>, ServerFnError> {
+pub async fn get_user_resources(query: Vec<Permission>) -> Result<Vec<Resource>, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
     use axum_extra::extract::CookieJar;
     use http::header;
@@ -198,7 +189,7 @@ pub async fn get_user_resources(query: GetOwnedResources) -> Result<Vec<Resource
     if let Some(response_options) = use_context::<ResponseOptions>() {
         if let Some(cookie) = jar.get("token") {
             let token = cookie.value().to_string();
-            match ConnectionHandler::get_owned_resources(query.perms, token).await {
+            match ConnectionHandler::get_owned_resources(query, token).await {
                 Ok(res) => return Ok(res),
                 _ => {
                     response_options.insert_header(

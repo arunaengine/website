@@ -217,7 +217,8 @@ pub fn Search() -> impl IntoView {
                 {move || {
                     resource.get().map(|result| match result {
                         Ok(res) => {
-                            let resources = res.resources.into_iter().map(|gen_res| gen_res.resource.unwrap());
+                            let resources = res.resources.into_iter().map(|gen_res| gen_res.resource.unwrap()).collect::<Vec<Resource>>();
+                            let num = resources.len();
 
                             set_results(res.estimated_total as i32);
                             query_set_page(current_page());
@@ -237,10 +238,18 @@ pub fn Search() -> impl IntoView {
                                 children=move |res| {
                                     view! { <SearchResult res=res/> }
                                 }
-                            />
-                        
-                        
-                        
+                                />
+                                <Show
+                                    when=move || (num == 0)
+                                    fallback=|| ().into_view()
+                                >
+                                    <div class="d-flex">
+                                        <h2 class="text-muted">
+                                            "No results found"
+                                        </h2>
+                                    </div>
+
+                                </Show>
                             
                             }.into_view()
                         },
@@ -261,7 +270,7 @@ pub fn Search() -> impl IntoView {
             <div class="row mt-2">
                 <div class="col-3">
                     <h2 class="text-primary">"Search results"</h2>
-                    <div class="text-secondary">"About " {results} " result (0.19 seconds)"</div>
+                    <div class="text-secondary">"About " {results} " results"</div> //result (0.19 seconds)"</div>
                 </div>
                 <div class="col-9 pe-4">
                     <div class="input-group">
