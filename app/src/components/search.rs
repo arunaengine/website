@@ -67,7 +67,7 @@ async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, Serve
 
 #[component]
 pub fn Search() -> impl IntoView {
-    let (query, _query_set) = create_query_signal::<String>("query");
+    let (query, query_set) = create_query_signal::<String>("query");
     let (query_filter, query_set_filter_p) = create_query_signal::<JsonFilter>("filter");
     let (read_range, set_range) = create_signal(1..=5);
     let (results, set_results) = create_signal::<i32>(0);
@@ -294,7 +294,7 @@ pub fn Search() -> impl IntoView {
                             type="text"
                             class="form-control form-control-lg"
                             placeholder="Search Aruna objects"
-                            on:input=move |_| resource.refetch()
+                            on:input=move |v| {query_set(Some(event_target_value(&v))); resource.refetch();}
                         />
                         <span class="input-group-text" id="inputGroup-sizing-default">
                             Dataclass
