@@ -1,9 +1,9 @@
-use aruna_rust_api::api::storage::models::v2::{Permission, permission};
+use anyhow::anyhow;
+use anyhow::Result;
+use aruna_rust_api::api::storage::models::v2::{permission, Permission};
 use aruna_rust_api::api::storage::services::v2::CreateApiTokenRequest;
 use chrono::{Days, Months, NaiveDate, Utc};
 use prost_wkt_types::Timestamp;
-use anyhow::Result;
-use anyhow::anyhow;
 
 pub fn to_create_token_req(
     tokenname: String,
@@ -13,13 +13,19 @@ pub fn to_create_token_req(
     selectexpiry: String,
     customdate: Option<String>,
 ) -> Result<CreateApiTokenRequest> {
-
-
     let resource = match selecttype.as_str() {
-        "project" => Some(permission::ResourceId::ProjectId(resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?)),
-        "collection" => Some(permission::ResourceId::CollectionId(resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?)),
-        "dataset" => Some(permission::ResourceId::DatasetId(resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?)),
-        "object" => Some(permission::ResourceId::ObjectId(resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?)),
+        "project" => Some(permission::ResourceId::ProjectId(
+            resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?,
+        )),
+        "collection" => Some(permission::ResourceId::CollectionId(
+            resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?,
+        )),
+        "dataset" => Some(permission::ResourceId::DatasetId(
+            resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?,
+        )),
+        "object" => Some(permission::ResourceId::ObjectId(
+            resid.ok_or_else(|| anyhow!("No resource id provided for project token"))?,
+        )),
         _ => None,
     };
 

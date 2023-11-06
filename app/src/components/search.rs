@@ -78,21 +78,20 @@ pub fn Search() -> impl IntoView {
     };
 
     let max_pages = move || (results() / 50) + 1;
-    let get_range_iter = 
-        move |current: i32| {
-            let max = max_pages();
-            let from = if current > 3 { current - 2 } else { 1 };
-            let to = if current + 2 < max { current + 2 } else { max };
-            if to < 5 {
-                return 1..=max;
-            }
+    let get_range_iter = move |current: i32| {
+        let max = max_pages();
+        let from = if current > 3 { current - 2 } else { 1 };
+        let to = if current + 2 < max { current + 2 } else { max };
+        if to < 5 {
+            return 1..=max;
+        }
 
-            if to + 2 > max {
-                return (max - 4)..=max;
-            }
+        if to + 2 > max {
+            return (max - 4)..=max;
+        }
 
-            from..=to
-        };
+        from..=to
+    };
 
     let (query_page, query_set_page_p) = create_query_signal::<i32>("page");
     let query_set_page = move |size: i32| {
@@ -174,9 +173,9 @@ pub fn Search() -> impl IntoView {
                     />
 
                     <li class=move || if current_page() == max_pages() { "page-item disabled" } else { "page-item" }>
-                        <button 
+                        <button
                             class="page-link"
-                            aria-disabled=move || if current_page() == max_pages() { "true" } else { "false" } 
+                            aria-disabled=move || if current_page() == max_pages() { "true" } else { "false" }
                             on:click=move |_| inc_page()>
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -201,7 +200,6 @@ pub fn Search() -> impl IntoView {
         }
     };
 
-
     let query = move || SearchQuery {
         query: query().unwrap_or_default(),
         filter: query_filter().unwrap_or_default().into_filter_string(), //query_filter().unwrap_or_default(),
@@ -211,7 +209,6 @@ pub fn Search() -> impl IntoView {
     let resource = create_local_resource(move || query(), search_api);
 
     let query_data = move || {
-
         view! {
             <Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
                 {move || {
@@ -250,7 +247,6 @@ pub fn Search() -> impl IntoView {
                                     </div>
 
                                 </Show>
-                            
                             }.into_view()
                         },
                         Err(e)=> {

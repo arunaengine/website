@@ -1,15 +1,16 @@
 use anyhow::{anyhow, Result};
 use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
 use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
-use aruna_rust_api::api::storage::models::v2::{DataClass, Permission, User, License};
+use aruna_rust_api::api::storage::models::v2::{License, Permission, PermissionLevel, User};
 use aruna_rust_api::api::storage::services::v2::{
-    collection_service_client, dataset_service_client, object_service_client,
-    project_service_client, search_service_client, user_service_client, ActivateUserRequest,
-    CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest, CreateDatasetRequest,
-    CreateObjectRequest, DeactivateUserRequest, DeleteApiTokenRequest, GetAllUsersRequest,
-    GetAllUsersResponse, GetApiTokensRequest, GetApiTokensResponse, GetResourceRequest,
-    GetResourcesRequest, GetUserRequest, RegisterUserRequest, RegisterUserResponse,
-    ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse, license_service_client, ListLicensesRequest,
+    collection_service_client, dataset_service_client, license_service_client,
+    object_service_client, project_service_client, search_service_client, user_service_client,
+    ActivateUserRequest, CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest,
+    CreateDatasetRequest, CreateObjectRequest, DeactivateUserRequest, DeleteApiTokenRequest,
+    GetAllUsersRequest, GetAllUsersResponse, GetApiTokensRequest, GetApiTokensResponse,
+    GetResourceRequest, GetResourcesRequest, GetUserRequest, ListLicensesRequest,
+    RegisterUserRequest, RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest,
+    SearchResourcesResponse,
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
@@ -178,15 +179,15 @@ impl ConnectionHandler {
         let channel = Self::get_channel().await?;
         let mut client = search_service_client::SearchServiceClient::new(channel);
         let resource_ids = perms
-            .into_iter()
+            .iter()
             .filter_map(
                 |Permission {
                      resource_id,
                      permission_level,
                  }| {
-                    if permission_level > 3 {
+                    if *permission_level > 3 {
                         match resource_id {
-                            Some(id) => match id {
+                            Some(id) => match id.clone() {
                                 ResourceId::ProjectId(id) => Some(id),
                                 ResourceId::CollectionId(id) => Some(id),
                                 ResourceId::DatasetId(id) => Some(id),
@@ -200,6 +201,21 @@ impl ConnectionHandler {
                 },
             )
             .collect();
+
+        let perm_hashmap = perms
+            .into_iter()
+            .map(|p| {
+                let id = match p.resource_id {
+                    Some(ResourceId::CollectionId(id))
+                    | Some(ResourceId::ProjectId(id))
+                    | Some(ResourceId::DatasetId(id))
+                    | Some(ResourceId::ObjectId(id)) => Some(id),
+                    _ => None,
+                };
+                (id.unwrap(), p.permission_level())
+            })
+            .collect::<std::collections::HashMap<String, PermissionLevel>>();
+
         let req = tonic::Request::new(GetResourcesRequest { resource_ids });
         let result: Vec<Resource> = client
             .get_resources(Self::add_token(req, &token))
@@ -209,6 +225,7 @@ impl ConnectionHandler {
             .into_iter()
             .map(|res| res.resource.unwrap().resource.unwrap())
             .collect();
+
         leptos::logging::log!("API Response: {result:?}");
         Ok(result.clone())
     }
@@ -400,8 +417,12 @@ impl ConnectionHandler {
     pub async fn get_licenses(token: &str) -> Result<Vec<License>> {
         let channel = Self::get_channel().await?;
         let mut client = license_service_client::LicenseServiceClient::new(channel);
-        let req = tonic::Request::new(ListLicensesRequest {});        
-        Ok(client.list_licenses(Self::add_token(req, token)).await?.into_inner().licenses)
+        let req = tonic::Request::new(ListLicensesRequest {});
+        Ok(client
+            .list_licenses(Self::add_token(req, token))
+            .await?
+            .into_inner()
+            .licenses)
     }
 }
 

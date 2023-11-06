@@ -176,20 +176,20 @@ pub fn EntryPoint() -> impl IntoView {
                 if !loc.pathname.get().contains("/activate") {
                     let _ = window().location().set_href("/activate");
                 }
-            },
-            Some(WhoamiResponse::NotRegistered) =>  {
+            }
+            Some(WhoamiResponse::NotRegistered) => {
                 if !loc.pathname.get().contains("/register") {
                     let _ = window().location().set_href("/register");
                 }
-            },
+            }
             Some(WhoamiResponse::ShouldLogin) => {
                 if !loc.pathname.get().contains("/login") {
                     let _ = window().location().set_href("/login");
                 }
-            },
+            }
             _ => (),
-        }}
-    );
+        }
+    });
 
     view! {
         <Stylesheet href="/tabler.min_v4.css"/>

@@ -18,10 +18,12 @@ pub async fn get_tokens() -> Result<Vec<Token>, ServerFnError> {
     } else {
         return Err(ServerFnError::Request("Error accessing token".to_string()));
     };
-    let res = ConnectionHandler::aruna_get_api_tokens(token).await.map_err(|_| {
-        leptos::logging::log!("Unable to query SearchResults");
-        ServerFnError::Request("Error accessing SearchResult".to_string())
-    })?;
+    let res = ConnectionHandler::aruna_get_api_tokens(token)
+        .await
+        .map_err(|_| {
+            leptos::logging::log!("Unable to query SearchResults");
+            ServerFnError::Request("Error accessing SearchResult".to_string())
+        })?;
     Ok(res.tokens)
 }
 

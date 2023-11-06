@@ -1,5 +1,5 @@
-use crate::utils::structs::{GetOwnedResources, SearchResultEntry, WhoamiResponse};
-use aruna_rust_api::api::storage::models::v2::{generic_resource::Resource, User, Permission};
+use crate::utils::structs::{SearchResultEntry, WhoamiResponse};
+use aruna_rust_api::api::storage::models::v2::{generic_resource::Resource, Permission};
 use leptos::*;
 //use leptos_meta::*;
 use leptos_router::*;
@@ -48,16 +48,19 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 pub fn PersonalResources() -> impl IntoView {
     // This takes the user context and creates a server call for
     // all resources that are explicitly statet in User{permissions} field
-    let user_context = use_context::<leptos::Resource<(), WhoamiResponse>>().expect("user_state not set");
+    let user_context =
+        use_context::<leptos::Resource<(), WhoamiResponse>>().expect("user_state not set");
     // This has to be manually parsed, because User structs can have
     // empty vectors as fields, and serde does not deserialize them
     // correctly if nested, so these needed fields need to be parsed
     // by hand and then annotated with #[server(default)] and #[derive(Default)]
-    let query_params = move || {
-        match user_context.get() {
-            Some(WhoamiResponse::User(u)) => Some(u.attributes.map(|e| e.personal_permissions).unwrap_or_default()),
-            _ => None,
-        }
+    let query_params = move || match user_context.get() {
+        Some(WhoamiResponse::User(u)) => Some(
+            u.attributes
+                .map(|e| e.personal_permissions)
+                .unwrap_or_default(),
+        ),
+        _ => None,
     };
     // Renders a view for each resource or returns a default page if no resources are found
     let element = move || {

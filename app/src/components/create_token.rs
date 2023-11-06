@@ -6,10 +6,7 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-use crate::utils::{
-    modal::hide_modal,
-    structs::{UpdateTokens},
-};
+use crate::utils::{modal::hide_modal, structs::UpdateTokens};
 
 #[server]
 pub async fn create_token_server(
@@ -41,7 +38,8 @@ pub async fn create_token_server(
             selectperm,
             selectexpiry,
             customdate,
-        ).map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))?,
+        )
+        .map_err(|_| ServerFnError::Request("Invalid request (aruna_get_token)".to_string()))?,
         &token,
     )
     .await

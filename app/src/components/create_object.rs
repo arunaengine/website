@@ -2,7 +2,6 @@ use crate::utils::structs::ResourceType;
 use aruna_rust_api::api::storage::models::v2::License;
 use leptos::{html::Input, *};
 use leptos_router::ActionForm;
-use leptos_router::FromFormData;
 
 #[server(CreateResourceRequest)]
 pub async fn create_resource_request(
@@ -68,8 +67,8 @@ pub async fn create_resource_request(
 #[server]
 pub async fn get_licenses() -> Result<Vec<License>, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use leptos::logging::log;
     use axum_extra::extract::CookieJar;
+    use leptos::logging::log;
 
     let req_parts = use_context::<leptos_axum::RequestParts>()
         .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
@@ -97,10 +96,13 @@ pub async fn get_licenses() -> Result<Vec<License>, ServerFnError> {
 #[component]
 pub fn CreateObjectPage() -> impl IntoView {
     let create_resource_action = create_server_action::<CreateResourceRequest>();
-    let get_licenses_result = create_local_resource(|| (), move |_| async move {
-        let result = get_licenses().await;
-        result.unwrap_or_default()
-    });
+    let get_licenses_result = create_local_resource(
+        || (),
+        move |_| async move {
+            let result = get_licenses().await;
+            result.unwrap_or_default()
+        },
+    );
     let _succeeded = move || {
         create_resource_action.value()()
             .map(|e| e.ok())
@@ -151,11 +153,11 @@ pub fn CreateObjectPage() -> impl IntoView {
     };
 
     let (read_type_select, write_type_select) = create_signal::<String>("Project".to_string());
-    let (file_size, write_file_size) = create_signal::<Option<u64>>(None);
+    let (_file_size, write_file_size) = create_signal::<Option<u64>>(None);
 
     let input_element = create_node_ref::<Input>();
 
-    let on_file_change = move |_ev: leptos::ev::Event| {
+    let _on_file_change = move |_ev: leptos::ev::Event| {
         if let Some(files) = input_element.get().map(|fi| fi.files()).flatten() {
             let file = files.get(0).unwrap();
             write_file_size(Some(file.size() as u64));
@@ -312,7 +314,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                     <Transition
                                         fallback=move || view!{ <p>"Loading licenses ..." </p>}
                                     >
-                                        {move || 
+                                        {move ||
                                             {
                                                 let licenses = get_licenses_result.get().unwrap_or_default();
                                                 let licenses_copy = licenses.clone();
@@ -349,7 +351,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                             }
                                         }
                                     </Transition>
-                                    
+
                                 </div>
                                 <div class="col-lg-4 mb-3 text-start">
                                     <label class="form-label required">"Name"</label>
