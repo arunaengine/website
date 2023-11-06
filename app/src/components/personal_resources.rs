@@ -1,12 +1,17 @@
-use crate::utils::structs::{SearchResultEntry, WhoamiResponse};
-use aruna_rust_api::api::storage::models::v2::{generic_resource::Resource, Permission};
+use crate::utils::{
+    structs::{SearchResultEntry, WhoamiResponse},
+    visual_helpers::GetVisualization,
+};
+use aruna_rust_api::api::storage::models::v2::{
+    generic_resource::Resource, Permission, PermissionLevel,
+};
 use leptos::*;
 //use leptos_meta::*;
 use leptos_router::*;
 
 #[component]
-pub fn SearchResult(res: Resource) -> impl IntoView {
-    let entry = SearchResultEntry::from(res);
+pub fn SearchResult(res: (Resource, PermissionLevel)) -> impl IntoView {
+    let entry = SearchResultEntry::from(res.0);
     let entry_clone = entry.clone();
     let name = move || entry_clone.name.to_string();
     let id = move || entry_clone.id.to_string();
@@ -27,9 +32,7 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
                         </div>
                         {entry.get_status()}
                         {entry.get_stats()}
-                        <span class="status status-orange">
-                            WRITE
-                        </span>
+                        {res.1.get_visualization()}
                     </div>
                     <div class="col border-start me-4 container">
                         <div class="border-bottom pb-3 mb-2">{entry.get_key_values()}</div>
@@ -75,7 +78,7 @@ pub fn PersonalResources() -> impl IntoView {
                             Ok(res) => view!{
                                  <For
                                  each=move || res.clone()
-                                 key=|result| {
+                                 key=|(result, _)| {
                                      match result {
                                          Resource::Collection(c) => c.id.clone(),
                                          Resource::Dataset(d) => d.id.clone(),
@@ -174,7 +177,9 @@ pub fn PersonalResources() -> impl IntoView {
 }
 
 #[server(UserResources, "/api", "GetJson")]
-pub async fn get_user_resources(query: Vec<Permission>) -> Result<Vec<Resource>, ServerFnError> {
+pub async fn get_user_resources(
+    query: Vec<Permission>,
+) -> Result<Vec<(Resource, PermissionLevel)>, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
     use axum_extra::extract::CookieJar;
     use http::header;
