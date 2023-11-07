@@ -2,7 +2,6 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 use utils::structs::WhoamiResponse;
-use anyhow::Result;
 
 pub mod components;
 pub mod error_template;
@@ -10,15 +9,13 @@ pub mod utils;
 
 #[server(GetUserInfo, "/api", "GetJson")]
 pub async fn get_user_info() -> Result<WhoamiResponse, ServerFnError> {
+    use crate::utils::aruna_api_handlers::ConnectionHandler;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    use utils::aruna_api_handlers::ConnectionHandler;
-    use utils::login_helpers::extract_test;
-
-    let token = match extract_test() {
-        Ok(t) => t,
-        Err(e) => return Ok(WhoamiResponse::Error(e.to_string())),
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Ok(WhoamiResponse::NotLoggedIn);
     };
-    return Ok(ConnectionHandler::aruna_who_am_i(&token).await);
+    Ok(ConnectionHandler::aruna_who_am_i(&token).await)
 }
 
 #[component]
