@@ -2,32 +2,20 @@ use crate::utils::structs::WhoamiResponse;
 use aruna_rust_api::api::storage::models::v2::User;
 use leptos::*;
 use leptos_meta::*;
+use leptos_router::{use_navigate, NavigateOptions};
 
 #[server]
 pub async fn get_users() -> Result<Vec<User>, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use axum_extra::extract::CookieJar;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError("NotLoggedIn".to_string()));
+    };
 
-    match jar.get("logged_in") {
-        Some(l) if l.value() == "false" => {
-            return Err(ServerFnError::MissingArg("Not logged in".to_string()))
-        }
-        None => return Err(ServerFnError::MissingArg("Not logged in".to_string())),
-        _ => {}
-    }
-    if let Some(cookie) = jar.get("token") {
-        let token = cookie.value().to_string();
-
-        return Ok(ConnectionHandler::aruna_get_all_users(&token)
-            .await
-            .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?);
-    } else {
-        return Err(ServerFnError::Request("Invalid request".to_string()));
-    }
+    return Ok(ConnectionHandler::aruna_get_all_users(&token)
+        .await
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?);
 }
 
 #[component]
@@ -51,21 +39,25 @@ pub fn AdminOverview() -> impl IntoView {
             .unwrap_or_default()
     });
 
-    if !is_admin.get() {
-        #[cfg(not(feature = "ssr"))]
-        window().location().set_href("/").unwrap();
-    }
-
     let get_users_res = create_local_resource(
         move || (),
         move |_| async move { get_users().await.unwrap_or_default() },
     );
+
+    let navigate = use_navigate();
+
+    let should_redirect =
+        move || get_users_res.get().unwrap_or_default().is_empty() || !is_admin.get();
 
     provide_context(get_users_res);
 
     let user_states = move || get_users_res.get().unwrap_or_default();
 
     view! {
+        {move || if should_redirect() {
+            navigate("/", NavigateOptions::default());
+            }
+        }
         <div class="page-header d-print-none my-3">
             <div class="container-xl">
                 <div class="row g-2 align-items-center">
