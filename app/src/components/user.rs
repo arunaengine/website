@@ -6,55 +6,31 @@ use leptos_meta::*;
 #[server]
 pub async fn activate_user(user_id: String) -> Result<(), ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use axum_extra::extract::CookieJar;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError("NotLoggedIn".to_string()));
+    };
 
-    match jar.get("logged_in") {
-        Some(l) if l.value() == "false" => {
-            return Err(ServerFnError::MissingArg("Not logged in".to_string()))
-        }
-        None => return Err(ServerFnError::MissingArg("Not logged in".to_string())),
-        _ => {}
-    }
-    if let Some(cookie) = jar.get("token") {
-        let token = cookie.value().to_string();
-
-        return Ok(ConnectionHandler::aruna_activate_user(&token, &user_id)
-            .await
-            .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?);
-    } else {
-        return Err(ServerFnError::Request("Invalid request".to_string()));
-    }
+    ConnectionHandler::aruna_activate_user(&token, &user_id)
+        .await
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?;
+    Ok(())
 }
 
 #[server]
 pub async fn deactivate_user(user_id: String) -> Result<(), ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use axum_extra::extract::CookieJar;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError("NotLoggedIn".to_string()));
+    };
 
-    match jar.get("logged_in") {
-        Some(l) if l.value() == "false" => {
-            return Err(ServerFnError::MissingArg("Not logged in".to_string()))
-        }
-        None => return Err(ServerFnError::MissingArg("Not logged in".to_string())),
-        _ => {}
-    }
-    if let Some(cookie) = jar.get("token") {
-        let token = cookie.value().to_string();
-
-        return Ok(ConnectionHandler::aruna_deactivate_user(&token, &user_id)
-            .await
-            .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?);
-    } else {
-        return Err(ServerFnError::Request("Invalid request".to_string()));
-    }
+    ConnectionHandler::aruna_deactivate_user(&token, &user_id)
+        .await
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?;
+    Ok(())
 }
 
 #[server]

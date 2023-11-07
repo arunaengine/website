@@ -70,5 +70,17 @@ pub async fn extract_token() -> LoginResult {
 
         return LoginResult::ValidToken(token);
     }
+
+    // Remove all cookies (Not logged / broken refresh)
+    let jarcopy = jar.clone();
+    for c in jarcopy.iter() {
+        jar = jar.remove(c);
+    }
+
+    response.overwrite(ResponseParts {
+        headers: jar.into_response().into_parts().0.headers,
+        ..Default::default()
+    });
+
     LoginResult::NotLoggedIn
 }
