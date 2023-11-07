@@ -2,6 +2,7 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 use utils::structs::WhoamiResponse;
+use anyhow::Result;
 
 pub mod components;
 pub mod error_template;
@@ -9,41 +10,15 @@ pub mod utils;
 
 #[server(GetUserInfo, "/api", "GetJson")]
 pub async fn get_user_info() -> Result<WhoamiResponse, ServerFnError> {
-    use axum_core::response::IntoResponse;
-    use axum_extra::extract::cookie::Cookie;
-    use axum_extra::extract::cookie::Key;
-    use axum_extra::extract::PrivateCookieJar;
-    use leptos_axum::ResponseOptions;
-    use leptos_axum::ResponseParts;
+
     use utils::aruna_api_handlers::ConnectionHandler;
+    use utils::login_helpers::extract_test;
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-
-    let a_key: Key =
-        use_context::<Key>().ok_or(ServerFnError::ServerError("No server state".to_string()))?;
-    let jar = PrivateCookieJar::from_headers(&req_parts.headers, a_key);
-
-    match jar.get("logged_in") {
-        Some(l) if l.value() == "false" => return Ok(WhoamiResponse::NotLoggedIn),
-        None => return Ok(WhoamiResponse::NotLoggedIn),
-        _ => {}
-    }
-
-    /*     let jar = jar.add(Cookie::new("whatever", "true"));
-
-    let response = expect_context::<ResponseOptions>();
-
-    response.overwrite(ResponseParts {
-        headers: jar.into_response().into_parts().0.headers,
-        ..Default::default()
-    }); */
-    if let Some(cookie) = jar.get("token") {
-        let token = cookie.value().to_string();
-        return Ok(ConnectionHandler::aruna_who_am_i(&token).await);
-    } else {
-        Ok(WhoamiResponse::NotLoggedIn)
-    }
+    let token = match extract_test() {
+        Ok(t) => t,
+        Err(e) => return Ok(WhoamiResponse::Error(e.to_string())),
+    };
+    return Ok(ConnectionHandler::aruna_who_am_i(&token).await);
 }
 
 #[component]
