@@ -7,18 +7,12 @@ use leptos_router::*;
 #[server(GetTokens)]
 pub async fn get_tokens() -> Result<Vec<Token>, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use axum_extra::extract::CookieJar;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
-
-    let token = if let Some(cookie) = jar.get("token") {
-        cookie.value()
-    } else {
-        return Err(ServerFnError::Request("Error accessing token".to_string()));
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError("NotLoggedIn".to_string()));
     };
-    let res = ConnectionHandler::aruna_get_api_tokens(token)
+    let res = ConnectionHandler::aruna_get_api_tokens(&token)
         .await
         .map_err(|_| {
             leptos::logging::log!("Unable to query SearchResults");
@@ -38,24 +32,32 @@ pub fn TokensOverview() -> impl IntoView {
 
     let get_tokens_res = create_resource(update_tokens.0, move |_| async move {
         // this is the ServerFn that is called by the GetUser Action above
-        get_tokens().await.ok()
+        get_tokens().await
     });
 
     update_tokens.0.update(|e| *e = !*e);
 
     provide_context(update_tokens);
 
-    let tokens = move || {
-        get_tokens_res
-            .get()
-            .flatten()
-            //.map(|ve| {
-            //    ve.into_iter()
-            //        .filter_map(|elem| if !elem.is_session { Some(elem) } else { None })
-            //        .collect::<Vec<_>>()
-            //})
-            .unwrap_or_default()
+    let nav = use_navigate();
+
+    let has_failed = move || {
+        if let Some(Err(_)) = get_tokens_res.get() {
+            true
+        } else {
+            false
+        }
     };
+
+    let get_tokens = move || {
+        if let Some(Ok(tokens)) = get_tokens_res.get() {
+            tokens
+        } else {
+            vec![]
+        }
+    };
+
+    let tokens_empty = move || get_tokens().is_empty();
 
     let location = use_location();
     let query_map = location.query;
@@ -64,6 +66,11 @@ pub fn TokensOverview() -> impl IntoView {
     let current_action_version = create_rw_signal(0);
 
     view! {
+        {
+            move || if has_failed() {
+                nav("/", NavigateOptions::default())
+            }
+        }
         <div class="container-xl mt-3">
             <div class="row mb-4">
                 <div class="col">
@@ -100,16 +107,9 @@ pub fn TokensOverview() -> impl IntoView {
                                 }
                             }>
 
-                                {move || {
-                                    if !tokens().is_empty() {
-                                        tokens()
-                                            .into_iter()
-                                            .map(|item| {
-                                                view! { <Token token_info=item/> }
-                                            })
-                                            .collect::<Vec<_>>()
-                                            .into_view()
-                                    } else {
+                                <Show
+                                    when=move || !tokens_empty()
+                                    fallback=move || {
                                         view! {
                                             <tr>
                                                 <td colspan="4" class="text-center">
@@ -117,9 +117,19 @@ pub fn TokensOverview() -> impl IntoView {
                                                 </td>
                                             </tr>
                                         }
-                                            .into_view()
                                     }
-                                }}
+                                >
+                                        {
+                                            move || { get_tokens()
+                                            .into_iter()
+                                            .map(|item| {
+                                                view! { <Token token_info=item/> }
+                                            })
+                                            .collect::<Vec<_>>()
+                                            .into_view()
+                                        }}
+                                </Show>
+
 
                             </Transition>
                         </tbody>
