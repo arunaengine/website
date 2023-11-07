@@ -38,6 +38,7 @@ pub async fn extract_token() -> LoginResult {
     let mut jar = PrivateCookieJar::from_headers(&req_parts.headers, signing_key);
 
     if jar.get("logged_in") != Some(Cookie::new("logged_in", "true")) {
+        leptos_axum::redirect("/");
         return LoginResult::NotLoggedIn;
     }
 
@@ -45,7 +46,7 @@ pub async fn extract_token() -> LoginResult {
         return LoginResult::ValidToken(token.value().to_string());
     }
 
-    if let Some(refresh_token) = jar.get("refresh_token") {
+    if let Some(refresh_token) = jar.get("refresh") {
         let (token, duration) = match oidc_handler.refresh(refresh_token.value()).await {
             Ok(token) => token,
             Err(e) => {
@@ -81,6 +82,8 @@ pub async fn extract_token() -> LoginResult {
         headers: jar.into_response().into_parts().0.headers,
         ..Default::default()
     });
+
+    leptos_axum::redirect("/");
 
     LoginResult::NotLoggedIn
 }

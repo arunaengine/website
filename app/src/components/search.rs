@@ -47,21 +47,16 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 #[server]
 async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use axum_extra::extract::CookieJar;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
-
-    let token = if let Some(cookie) = jar.get("token") {
-        Some(cookie.value().to_string())
-    } else {
-        None
+    let token = match extract_token().await {
+        LoginResult::ValidToken(token) => Some(token),
+        _ => None,
     };
-    let res = ConnectionHandler::search(token, query).await.map_err(|_| {
-        leptos::logging::log!("Unable to query SearchResults");
-        ServerFnError::Request("Error accessing SearchResult".to_string())
-    })?;
+
+    let res = ConnectionHandler::search(token, query)
+        .await
+        .map_err(|_| ServerFnError::Request("Error accessing SearchResult".to_string()))?;
     Ok(res)
 }
 

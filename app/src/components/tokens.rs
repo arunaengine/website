@@ -30,7 +30,7 @@ pub fn TokensOverview() -> impl IntoView {
 
     let update_tokens: UpdateTokens = UpdateTokens(create_rw_signal(true));
 
-    let get_tokens_res = create_resource(update_tokens.0, move |_| async move {
+    let get_tokens_res = create_local_resource(update_tokens.0, move |_| async move {
         // this is the ServerFn that is called by the GetUser Action above
         get_tokens().await
     });

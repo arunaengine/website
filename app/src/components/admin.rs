@@ -46,15 +46,21 @@ pub fn AdminOverview() -> impl IntoView {
 
     let navigate = use_navigate();
 
-    let should_redirect =
-        move || get_users_res.get().unwrap_or_default().is_empty() || !is_admin.get();
+    let should_redirect = move || {
+        if let Some(r) = get_users_res.get() {
+            r.is_empty() || !is_admin.get()
+        } else {
+            false || !is_admin.get()
+        }
+    };
 
     provide_context(get_users_res);
 
     let user_states = move || get_users_res.get().unwrap_or_default();
 
     view! {
-        {move || if should_redirect() {
+        {
+            move || if should_redirect() {
             navigate("/", NavigateOptions::default());
             }
         }

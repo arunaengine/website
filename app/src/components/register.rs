@@ -15,31 +15,17 @@ pub async fn register_user(
     project: String,
 ) -> Result<(), ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use axum_extra::extract::CookieJar;
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    match jar.get("logged_in") {
-        Some(l) if l.value() == "false" => {
-            return Err(ServerFnError::Request("Not logged in".to_string()))
-        }
-        None => return Err(ServerFnError::Request("Not logged in".to_string())),
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError("NotLoggedIn".to_string()));
+    };
 
-        _ => {}
-    }
-    if let Some(cookie) = jar.get("token") {
-        let token = cookie.value().to_string();
-        if let Ok(_) =
-            ConnectionHandler::aruna_register_user(&token, &displayname, &email, &project).await
-        {
-            return Ok(());
-        }
-    }
-    return Err(ServerFnError::Request(
-        "Unable to register user".to_string(),
-    ));
+    ConnectionHandler::aruna_register_user(&token, &displayname, &email, &project)
+        .await
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?;
+    Ok(())
 }
 
 /// Renders the home page of your application.

@@ -201,10 +201,6 @@ pub fn Token(token_info: Token) -> impl IntoView {
                                     None => String::new(),
                                 }}</div>
                             </div>
-                            // <div class="datagrid-item">
-                            //     <div class="datagrid-title">"Last used"</div>
-                            //     <div class="datagrid-content">{token_info.used_at}</div>
-                            // </div>
                         </div>
                     </div>
                 </div>
