@@ -89,6 +89,9 @@ pub async fn get_licenses() -> Result<Vec<License>, ServerFnError> {
 
 #[component]
 pub fn CreateObjectPage() -> impl IntoView {
+    use crate::utils::structs::WhoamiResponse;
+
+    let get_user = use_context::<Resource<(), WhoamiResponse>>().expect("user_state not set");
     let create_resource_action = create_server_action::<CreateResourceRequest>();
     let get_licenses_result = create_local_resource(
         || (),
@@ -98,10 +101,15 @@ pub fn CreateObjectPage() -> impl IntoView {
         },
     );
     let _succeeded = move || {
-        create_resource_action.value()()
+        if create_resource_action.value()()
             .map(|e| e.ok())
             .flatten()
-            .is_some()
+            .is_some() {
+                get_user.refetch();
+                true
+            }else{
+                false
+            }
     };
     let header = move || {
         view! {
@@ -170,6 +178,12 @@ pub fn CreateObjectPage() -> impl IntoView {
             //     leptos::log!("{:?}", resp);
             // })
         }
+    };
+
+    let name_regex = move || if read_type_select() == "Project" {
+        r"^[a-z0-9\-]+$"
+    } else {
+        r"^[a-zA-Z0-9\-\!\_\.\*\_\'\(\)\/]+$"
     };
 
     let main = move || {
@@ -334,9 +348,10 @@ pub fn CreateObjectPage() -> impl IntoView {
                                     <div>
                                         <input
                                             type="text"
-                                            class="form-control text-uppercase"
+                                            class="form-control text-lowercase"
                                             id="resname"
                                             name="resname"
+                                            pattern={move || name_regex()}
                                             placeholder="Resource Name"
                                             required
                                         />
@@ -448,7 +463,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                             <input
                                                 type="text"
                                                 class="form-control text-uppercase"
-                                                pattern="^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+                                                pattern={"^[0-7][0-9A-HJKMNP-TV-Z]{25}$"}
                                                 id="resid"
                                                 name="parent"
                                                 placeholder="Resource ID"

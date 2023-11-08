@@ -53,21 +53,28 @@ pub fn PersonalResources() -> impl IntoView {
     // all resources that are explicitly statet in User{permissions} field
     let user_context =
         use_context::<leptos::Resource<(), WhoamiResponse>>().expect("user_state not set");
+
+    // Always refetch the user context, because the user might have gotten new permissions
+    user_context.refetch();
     // This has to be manually parsed, because User structs can have
     // empty vectors as fields, and serde does not deserialize them
     // correctly if nested, so these needed fields need to be parsed
     // by hand and then annotated with #[server(default)] and #[derive(Default)]
     let query_params = move || match user_context.get() {
-        Some(WhoamiResponse::User(u)) => Some(
+        Some(WhoamiResponse::User(u)) => 
             u.attributes
                 .map(|e| e.personal_permissions)
                 .unwrap_or_default(),
-        ),
-        _ => None,
+        
+        _ => vec![],
     };
+
+    let is_empty = move || query_params().is_empty();
+
     // Renders a view for each resource or returns a default page if no resources are found
     let element = move || {
-        if let Some(query) = query_params() {
+        if !is_empty() {
+            let query = query_params();
             // Runs async server call
             let resource = create_local_resource(move || query.clone(), get_user_resources); // TODO: Use create_resource
             view! {
