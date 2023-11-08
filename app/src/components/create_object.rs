@@ -108,12 +108,8 @@ pub fn CreateObjectPage() -> impl IntoView {
             <div class="container-xl">
                 <div class="row g-2">
                     <div class="col">
-                        <div class="page-pretitle text-start">
-                            Create
-                        </div>
-                        <h2 class="page-title">
-                            Resource
-                        </h2>
+                        <div class="page-pretitle text-start">Create</div>
+                        <h2 class="page-title">Resource</h2>
                     </div>
                     <div class="col-auto ms-auto d-print-none text-end">
                         <div class="btn-list">
@@ -180,11 +176,8 @@ pub fn CreateObjectPage() -> impl IntoView {
         view! {
             <div class="row row-cards">
                 <div class="col-lg-12">
-                    //<form class="card">
-                    <ActionForm
-                        class="card"
-                        action=create_resource_action
-                    >
+                    // <form class="card">
+                    <ActionForm class="card" action=create_resource_action>
                         <div class="card-body">
                             <div class="row g-5">
                                 <div class="col-lg-4 mb-3 text-start">
@@ -201,9 +194,8 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                     write_type_select(event_target_value(&ev));
                                                 }
                                             />
-                                            <span class="form-selectgroup-label">
-                                                Project
-                                            </span>
+
+                                            <span class="form-selectgroup-label">Project</span>
                                         </label>
                                         <label class="form-selectgroup-item">
                                             <input
@@ -215,9 +207,8 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                     write_type_select(event_target_value(&ev));
                                                 }
                                             />
-                                            <span class="form-selectgroup-label">
-                                                Collection
-                                            </span>
+
+                                            <span class="form-selectgroup-label">Collection</span>
                                         </label>
                                         <label class="form-selectgroup-item">
                                             <input
@@ -229,9 +220,8 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                     write_type_select(event_target_value(&ev));
                                                 }
                                             />
-                                            <span class="form-selectgroup-label">
-                                                Dataset
-                                            </span>
+
+                                            <span class="form-selectgroup-label">Dataset</span>
                                         </label>
                                         <label class="form-selectgroup-item">
                                             <input
@@ -243,9 +233,8 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                     write_type_select(event_target_value(&ev));
                                                 }
                                             />
-                                            <span class="form-selectgroup-label">
-                                                Object
-                                            </span>
+
+                                            <span class="form-selectgroup-label">Object</span>
                                         </label>
                                     </div>
                                     <small class="form-hint">"Every resource has a type"</small>
@@ -261,9 +250,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                 class="form-selectgroup-input"
                                                 checked=""
                                             />
-                                            <span class="form-selectgroup-label">
-                                                Public
-                                            </span>
+                                            <span class="form-selectgroup-label">Public</span>
                                         </label>
                                         <label class="form-selectgroup-item">
                                             <input
@@ -272,9 +259,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                 value=2
                                                 class="form-selectgroup-input"
                                             />
-                                            <span class="form-selectgroup-label">
-                                                Private
-                                            </span>
+                                            <span class="form-selectgroup-label">Private</span>
                                         </label>
                                         <label class="form-selectgroup-item">
                                             <input
@@ -283,9 +268,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                 value=4
                                                 class="form-selectgroup-input"
                                             />
-                                            <span class="form-selectgroup-label">
-                                                Workspace
-                                            </span>
+                                            <span class="form-selectgroup-label">Workspace</span>
                                         </label>
                                         <label class="form-selectgroup-item">
                                             <input
@@ -294,9 +277,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                                 value=5
                                                 class="form-selectgroup-input"
                                             />
-                                            <span class="form-selectgroup-label">
-                                                Confidential
-                                            </span>
+                                            <span class="form-selectgroup-label">Confidential</span>
                                         </label>
                                     </div>
                                     <small class="form-hint">
@@ -305,45 +286,46 @@ pub fn CreateObjectPage() -> impl IntoView {
                                 </div>
                                 <div class="col-lg-4 mb-3 text-start">
                                     <label class="form-label">"Licenses"</label>
-                                    <Transition
-                                        fallback=move || view!{ <p>"Loading licenses ..." </p>}
-                                    >
-                                        {move ||
-                                            {
-                                                let licenses = get_licenses_result.get().unwrap_or_default();
-                                                let licenses_copy = licenses.clone();
-                                                view!{
-                                                    <select class="form-select" name="metadata_license">
-                                                        <For
+                                    <Transition fallback=move || {
+                                        view! { <p>"Loading licenses ..."</p> }
+                                    }>
+                                        {move || {
+                                            let licenses = get_licenses_result
+                                                .get()
+                                                .unwrap_or_default();
+                                            let licenses_copy = licenses.clone();
+                                            view! {
+                                                <select class="form-select" name="metadata_license">
+                                                    <For
                                                         each=move || licenses.clone()
-                                                        key=|result| {
-                                                            result.tag.clone()
-                                                        }
+                                                        key=|result| { result.tag.clone() }
+
                                                         children=move |res| {
-                                                            view! { <option value={res.tag.clone()}>{res.tag.clone()}</option> }
+                                                            view! {
+                                                                <option value=res.tag.clone()>{res.tag.clone()}</option>
+                                                            }
                                                         }
-                                                        />
-                                                    </select>
-                                                    <small class="form-hint">
-                                                        "Metadata license"
-                                                    </small>
-                                                    <select class="form-select" name="data_license">
-                                                        <For
+                                                    />
+
+                                                </select>
+                                                <small class="form-hint">"Metadata license"</small>
+                                                <select class="form-select" name="data_license">
+                                                    <For
                                                         each=move || licenses_copy.clone()
-                                                        key=|result| {
-                                                            result.tag.clone()
-                                                        }
+                                                        key=|result| { result.tag.clone() }
+
                                                         children=move |res| {
-                                                            view! { <option value={res.tag.clone()}>{res.tag.clone()}</option> }
+                                                            view! {
+                                                                <option value=res.tag.clone()>{res.tag.clone()}</option>
+                                                            }
                                                         }
-                                                        />
-                                                    </select>
-                                                    <small class="form-hint">
-                                                        "Data license (default)"
-                                                    </small>
-                                                }
+                                                    />
+
+                                                </select>
+                                                <small class="form-hint">"Data license (default)"</small>
                                             }
-                                        }
+                                        }}
+
                                     </Transition>
 
                                 </div>
@@ -368,108 +350,105 @@ pub fn CreateObjectPage() -> impl IntoView {
                                     <div class="col-lg-4 mb-3 text-start">
                                         <label class="form-label required">"Parent type"</label>
                                         {move || match read_type_select().as_str() {
-                                            "Collection" => view!{
-                                                <div class="form-selectgroup">
-                                                    <label class="form-selectgroup-item">
-                                                        <input
-                                                            type="radio"
-                                                            name="parent_type"
-                                                            value="Project"
-                                                            class="form-selectgroup-input"
-                                                            checked=""
-                                                        />
-                                                        <span class="form-selectgroup-label">
-                                                            Project
-                                                        </span>
-                                                    </label>
-                                                </div>
-                                                <small class="form-hint">
-                                                    "Collections can only have projects as parents"
-                                                    <p/>
-                                                </small>
-                                            }.into_view(),
-                                            "Dataset" => view!{
-                                                <div class="form-selectgroup">
-                                                    <label class="form-selectgroup-item">
-                                                        <input
-                                                            type="radio"
-                                                            name="parent_type"
-                                                            value="Project"
-                                                            class="form-selectgroup-input"
-                                                            checked=""
-                                                        />
-                                                        <span class="form-selectgroup-label">
-                                                            Project
-                                                        </span>
-                                                    </label>
-                                                    <label class="form-selectgroup-item">
-                                                        <input
-                                                            type="radio"
-                                                            name="parent_type"
-                                                            value="Collection"
-                                                            class="form-selectgroup-input"
-                                                            checked=""
-                                                        />
-                                                        <span class="form-selectgroup-label">
-                                                            Collection
-                                                        </span>
-                                                    </label>
-                                                </div>
-                                                <small class="form-hint">
-                                                    "Dataset parents can only have projects and collections as parents"
-                                                    <p/>
-                                                </small>
-                                            }.into_view(),
-                                            "Object" => view!{
-                                                <div class="form-selectgroup">
-                                                    <label class="form-selectgroup-item">
-                                                        <input
-                                                            type="radio"
-                                                            name="parent_type"
-                                                            value="Project"
-                                                            class="form-selectgroup-input"
-                                                            checked=""
-                                                        />
-                                                        <span class="form-selectgroup-label">
-                                                            Project
-                                                        </span>
-                                                    </label>
-                                                    <label class="form-selectgroup-item">
-                                                        <input
-                                                            type="radio"
-                                                            name="parent_type"
-                                                            value="Collection"
-                                                            class="form-selectgroup-input"
-                                                        />
-                                                        <span class="form-selectgroup-label">
-                                                            Collection
-                                                        </span>
-                                                    </label>
-                                                    <label class="form-selectgroup-item">
-                                                        <input
-                                                            type="radio"
-                                                            name="parent_type"
-                                                            value="Dataset"
-                                                            class="form-selectgroup-input"
-                                                     />
-                                                        <span class="form-selectgroup-label">
-                                                            Dataset
-                                                        </span>
-                                                    </label>
-                                                </div>
-                                                <small class="form-hint">
-                                                    "Object parents can only have projects, collections or datasets as parents"
-                                                    <p/>
-                                                </small>
-                                            }.into_view(),
-                                            _ => ().into_view()
+                                            "Collection" => {
+                                                view! {
+                                                    <div class="form-selectgroup">
+                                                        <label class="form-selectgroup-item">
+                                                            <input
+                                                                type="radio"
+                                                                name="parent_type"
+                                                                value="Project"
+                                                                class="form-selectgroup-input"
+                                                                checked=""
+                                                            />
+                                                            <span class="form-selectgroup-label">Project</span>
+                                                        </label>
+                                                    </div>
+                                                    <small class="form-hint">
+                                                        "Collections can only have projects as parents" <p></p>
+                                                    </small>
+                                                }
+                                                    .into_view()
+                                            }
+                                            "Dataset" => {
+                                                view! {
+                                                    <div class="form-selectgroup">
+                                                        <label class="form-selectgroup-item">
+                                                            <input
+                                                                type="radio"
+                                                                name="parent_type"
+                                                                value="Project"
+                                                                class="form-selectgroup-input"
+                                                                checked=""
+                                                            />
+                                                            <span class="form-selectgroup-label">Project</span>
+                                                        </label>
+                                                        <label class="form-selectgroup-item">
+                                                            <input
+                                                                type="radio"
+                                                                name="parent_type"
+                                                                value="Collection"
+                                                                class="form-selectgroup-input"
+                                                                checked=""
+                                                            />
+                                                            <span class="form-selectgroup-label">Collection</span>
+                                                        </label>
+                                                    </div>
+                                                    <small class="form-hint">
+                                                        "Dataset parents can only have projects and collections as parents"
+                                                        <p></p>
+                                                    </small>
+                                                }
+                                                    .into_view()
+                                            }
+                                            "Object" => {
+                                                view! {
+                                                    <div class="form-selectgroup">
+                                                        <label class="form-selectgroup-item">
+                                                            <input
+                                                                type="radio"
+                                                                name="parent_type"
+                                                                value="Project"
+                                                                class="form-selectgroup-input"
+                                                                checked=""
+                                                            />
+                                                            <span class="form-selectgroup-label">Project</span>
+                                                        </label>
+                                                        <label class="form-selectgroup-item">
+                                                            <input
+                                                                type="radio"
+                                                                name="parent_type"
+                                                                value="Collection"
+                                                                class="form-selectgroup-input"
+                                                            />
+                                                            <span class="form-selectgroup-label">Collection</span>
+                                                        </label>
+                                                        <label class="form-selectgroup-item">
+                                                            <input
+                                                                type="radio"
+                                                                name="parent_type"
+                                                                value="Dataset"
+                                                                class="form-selectgroup-input"
+                                                            />
+                                                            <span class="form-selectgroup-label">Dataset</span>
+                                                        </label>
+                                                    </div>
+                                                    <small class="form-hint">
+                                                        "Object parents can only have projects, collections or datasets as parents"
+                                                        <p></p>
+                                                    </small>
+                                                }
+                                                    .into_view()
+                                            }
+                                            _ => ().into_view(),
                                         }}
+
                                         <label class="form-label required">"Parent ID"</label>
                                         <div>
                                             <input
                                                 type="text"
                                                 class="form-control text-uppercase"
-                                                pattern={"^[0-7][0-9A-HJKMNP-TV-Z]{25}$"}
+                                                pattern="^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
                                                 id="resid"
                                                 name="parent"
                                                 placeholder="Resource ID"
@@ -492,246 +471,246 @@ pub fn CreateObjectPage() -> impl IntoView {
                                     ></textarea>
                                 </div>
 
-                                // <div class="table-responsive col-lg-6 mt-5 mb-3 text-start">
-                                //     <label class="form-label">"Internal relations"</label>
-                                //     <table class="table table-vcenter text-start">
-                                //         <thead>
-                                //             <tr>
-                                //                 <th class="text-start">
-                                //                     TARGET
-                                //                 </th>
-                                //                 <th>
-                                //                     DIRECTION
-                                //                 </th>
-                                //                 <th>
-                                //                     TYPE
-                                //                 </th>
-                                //                 <th></th>
-                                //             </tr>
-                                //         </thead>
-                                //         <tbody>
-                                //             <tr>
-                                //                 <td>
-                                //                     <input
-                                //                         type="text"
-                                //                         class="form-control"
-                                //                         name="relations"
-                                //                         placeholder="Target ULID"
-                                //                     />
-                                //                 </td>
-                                //                 <td>
-                                //                     <select class="form-select">
-                                //                         <option value="Inc" selected="">
-                                //                             Outgoing
-                                //                         </option>
-                                //                         <option value="Out">
-                                //                             Incoming
-                                //                         </option>
-                                //                     </select>
-                                //                 </td>
-                                //                 <td>
-                                //                     <select class="form-select">
-                                //                         <option value="belo" selected="">
-                                //                             BelongsTo
-                                //                         </option>
-                                //                         <option value="meta">
-                                //                             Metadata
-                                //                         </option>
-                                //                         <option value="orig">
-                                //                             Origin
-                                //                         </option>
-                                //                     </select>
-                                //                 </td>
-                                //                 <td>
-                                //                     <button class="btn btn-success w-100 btn-icon">
-                                //                         <svg
-                                //                             xmlns="http://www.w3.org/2000/svg"
-                                //                             class="icon icon-tabler icon-tabler-circle-plus"
-                                //                             width="40"
-                                //                             height="40"
-                                //                             viewBox="0 0 24 24"
-                                //                             stroke-width="2"
-                                //                             stroke="currentColor"
-                                //                             fill="none"
-                                //                             stroke-linecap="round"
-                                //                             stroke-linejoin="round"
-                                //                         >
-                                //                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                //                             <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path>
-                                //                             <path d="M9 12h6"></path>
-                                //                             <path d="M12 9v6"></path>
-                                //                         </svg>
-                                //                     </button>
-                                //                 </td>
-                                //             </tr>
-                                //         </tbody>
-                                //     </table>
-                                //     <small class="form-hint">
-                                //         "Internal relations are connections to other resources within the system"
-                                //     </small>
-                                // </div>
-                                // <div class="table-responsive col-lg-6 mt-5 mb-3 text-start">
-                                //     <label class="form-label">"External relations"</label>
-                                //     <table class="table table-vcenter text-start">
-                                //         <thead>
-                                //             <tr>
-                                //                 <th class="text-start">
-                                //                     TARGET
-                                //                 </th>
-                                //                 <th>
-                                //                     TYPE
-                                //                 </th>
-                                //                 <th></th>
-                                //             </tr>
-                                //         </thead>
+                            // <div class="table-responsive col-lg-6 mt-5 mb-3 text-start">
+                            // <label class="form-label">"Internal relations"</label>
+                            // <table class="table table-vcenter text-start">
+                            // <thead>
+                            // <tr>
+                            // <th class="text-start">
+                            // TARGET
+                            // </th>
+                            // <th>
+                            // DIRECTION
+                            // </th>
+                            // <th>
+                            // TYPE
+                            // </th>
+                            // <th></th>
+                            // </tr>
+                            // </thead>
+                            // <tbody>
+                            // <tr>
+                            // <td>
+                            // <input
+                            // type="text"
+                            // class="form-control"
+                            // name="relations"
+                            // placeholder="Target ULID"
+                            // />
+                            // </td>
+                            // <td>
+                            // <select class="form-select">
+                            // <option value="Inc" selected="">
+                            // Outgoing
+                            // </option>
+                            // <option value="Out">
+                            // Incoming
+                            // </option>
+                            // </select>
+                            // </td>
+                            // <td>
+                            // <select class="form-select">
+                            // <option value="belo" selected="">
+                            // BelongsTo
+                            // </option>
+                            // <option value="meta">
+                            // Metadata
+                            // </option>
+                            // <option value="orig">
+                            // Origin
+                            // </option>
+                            // </select>
+                            // </td>
+                            // <td>
+                            // <button class="btn btn-success w-100 btn-icon">
+                            // <svg
+                            // xmlns="http://www.w3.org/2000/svg"
+                            // class="icon icon-tabler icon-tabler-circle-plus"
+                            // width="40"
+                            // height="40"
+                            // viewBox="0 0 24 24"
+                            // stroke-width="2"
+                            // stroke="currentColor"
+                            // fill="none"
+                            // stroke-linecap="round"
+                            // stroke-linejoin="round"
+                            // >
+                            // <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            // <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path>
+                            // <path d="M9 12h6"></path>
+                            // <path d="M12 9v6"></path>
+                            // </svg>
+                            // </button>
+                            // </td>
+                            // </tr>
+                            // </tbody>
+                            // </table>
+                            // <small class="form-hint">
+                            // "Internal relations are connections to other resources within the system"
+                            // </small>
+                            // </div>
+                            // <div class="table-responsive col-lg-6 mt-5 mb-3 text-start">
+                            // <label class="form-label">"External relations"</label>
+                            // <table class="table table-vcenter text-start">
+                            // <thead>
+                            // <tr>
+                            // <th class="text-start">
+                            // TARGET
+                            // </th>
+                            // <th>
+                            // TYPE
+                            // </th>
+                            // <th></th>
+                            // </tr>
+                            // </thead>
 
-                                //         <tbody>
-                                //             <tr>
-                                //                 <td>
-                                //                     <input
-                                //                         type="text"
-                                //                         class="form-control"
-                                //                         placeholder="Target Identifier (URL etc.)"
-                                //                     />
-                                //                 </td>
-                                //                 <td>
-                                //                     <select class="form-select">
-                                //                         <option value="url" selected="">
-                                //                             URL
-                                //                         </option>
-                                //                         <option value="id">
-                                //                             IDENTIFIER
-                                //                         </option>
-                                //                         <option value="doi">
-                                //                             DOI
-                                //                         </option>
-                                //                     </select>
-                                //                 </td>
-                                //                 <td>
-                                //                     <button class="btn btn-success w-100 btn-icon">
-                                //                         <svg
-                                //                             xmlns="http://www.w3.org/2000/svg"
-                                //                             class="icon icon-tabler icon-tabler-circle-plus"
-                                //                             width="40"
-                                //                             height="40"
-                                //                             viewBox="0 0 24 24"
-                                //                             stroke-width="2"
-                                //                             stroke="currentColor"
-                                //                             fill="none"
-                                //                             stroke-linecap="round"
-                                //                             stroke-linejoin="round"
-                                //                         >
-                                //                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                //                             <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path>
-                                //                             <path d="M9 12h6"></path>
-                                //                             <path d="M12 9v6"></path>
-                                //                         </svg>
-                                //                     </button>
-                                //                 </td>
-                                //             </tr>
-                                //         </tbody>
-                                //     </table>
-                                //     <small class="form-hint">
-                                //         "External relations are connections to external resources"
-                                //     </small>
-                                // </div>
-                                // <div class="table-responsive col-12 mt-5 mb-3 text-start">
-                                //     <label class="form-label">"Labels & Hooks"</label>
-                                //     <table class="table table-vcenter text-start">
-                                //         <thead>
-                                //             <tr>
-                                //                 <th class="text-start">
-                                //                     Key
-                                //                 </th>
-                                //                 <th>
-                                //                     Value
-                                //                 </th>
-                                //                 <th>
-                                //                     TYPE
-                                //                 </th>
-                                //                 <th></th>
-                                //             </tr>
-                                //         </thead>
+                            // <tbody>
+                            // <tr>
+                            // <td>
+                            // <input
+                            // type="text"
+                            // class="form-control"
+                            // placeholder="Target Identifier (URL etc.)"
+                            // />
+                            // </td>
+                            // <td>
+                            // <select class="form-select">
+                            // <option value="url" selected="">
+                            // URL
+                            // </option>
+                            // <option value="id">
+                            // IDENTIFIER
+                            // </option>
+                            // <option value="doi">
+                            // DOI
+                            // </option>
+                            // </select>
+                            // </td>
+                            // <td>
+                            // <button class="btn btn-success w-100 btn-icon">
+                            // <svg
+                            // xmlns="http://www.w3.org/2000/svg"
+                            // class="icon icon-tabler icon-tabler-circle-plus"
+                            // width="40"
+                            // height="40"
+                            // viewBox="0 0 24 24"
+                            // stroke-width="2"
+                            // stroke="currentColor"
+                            // fill="none"
+                            // stroke-linecap="round"
+                            // stroke-linejoin="round"
+                            // >
+                            // <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            // <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path>
+                            // <path d="M9 12h6"></path>
+                            // <path d="M12 9v6"></path>
+                            // </svg>
+                            // </button>
+                            // </td>
+                            // </tr>
+                            // </tbody>
+                            // </table>
+                            // <small class="form-hint">
+                            // "External relations are connections to external resources"
+                            // </small>
+                            // </div>
+                            // <div class="table-responsive col-12 mt-5 mb-3 text-start">
+                            // <label class="form-label">"Labels & Hooks"</label>
+                            // <table class="table table-vcenter text-start">
+                            // <thead>
+                            // <tr>
+                            // <th class="text-start">
+                            // Key
+                            // </th>
+                            // <th>
+                            // Value
+                            // </th>
+                            // <th>
+                            // TYPE
+                            // </th>
+                            // <th></th>
+                            // </tr>
+                            // </thead>
 
-                                //         <tbody>
-                                //             <tr>
-                                //                 <td>
-                                //                     <input
-                                //                         type="text"
-                                //                         class="form-control"
-                                //                         placeholder="Key"
-                                //                     />
-                                //                 </td>
-                                //                 <td>
-                                //                     <input
-                                //                         type="text"
-                                //                         class="form-control"
-                                //                         placeholder="Value"
-                                //                     />
-                                //                 </td>
-                                //                 <td>
-                                //                     // { custom_select("label-type".to_string(), vec!["Label".to_string(), "Hook".to_string(), "Static Label".to_string()]) }
-                                //                     <select class="form-select">
-                                //                         <option value="lbl" selected="">
-                                //                             Label
-                                //                         </option>
-                                //                         <option value="hook">
-                                //                             Hook
-                                //                         </option>
-                                //                         <option value="slbl">
-                                //                             Static Label
-                                //                         </option>
-                                //                     </select>
-                                //                 </td>
-                                //                 <td colspan="1">
-                                //                     <button class="btn btn-success w-100 btn-icon">
-                                //                         <svg
-                                //                             xmlns="http://www.w3.org/2000/svg"
-                                //                             class="icon icon-tabler icon-tabler-circle-plus"
-                                //                             width="40"
-                                //                             height="40"
-                                //                             viewBox="0 0 24 24"
-                                //                             stroke-width="2"
-                                //                             stroke="currentColor"
-                                //                             fill="none"
-                                //                             stroke-linecap="round"
-                                //                             stroke-linejoin="round"
-                                //                         >
-                                //                             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                //                             <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path>
-                                //                             <path d="M9 12h6"></path>
-                                //                             <path d="M12 9v6"></path>
-                                //                         </svg>
-                                //                     </button>
-                                //                 </td>
-                                //             </tr>
-                                //         </tbody>
-                                //     </table>
-                                //     <small class="form-hint">
-                                //         "Labels are tags that make your resource finable, hooks are actions that can be performed on the resource"
-                                //     </small>
-                                // </div>
-                                // <Show when=move || read_type_select() == "Object" fallback=|| ()>
-                                //     <div class="col-lg-4 mb-3 text-start">
-                                //         <div class="mb-3">
-                                //             <div class="form-label">
-                                //                 Upload file
-                                //             </div>
-                                //             <input
-                                //                 type="file"
-                                //                 on:change=on_file_change
-                                //                 node_ref=input_element
-                                //                 class="form-control"
-                                //             />
-                                //         </div>
-                                //         <Show when=move || file_size().is_some() fallback=|| ()>
-                                //             <div class="h2 mb-0 text-muted">
-                                //                 {bytesize::ByteSize(file_size().unwrap())
-                                //                     .to_string_as(true)}
-                                //             </div>
-                                //         </Show>
-                                //     </div>
-                                // </Show>
+                            // <tbody>
+                            // <tr>
+                            // <td>
+                            // <input
+                            // type="text"
+                            // class="form-control"
+                            // placeholder="Key"
+                            // />
+                            // </td>
+                            // <td>
+                            // <input
+                            // type="text"
+                            // class="form-control"
+                            // placeholder="Value"
+                            // />
+                            // </td>
+                            // <td>
+                            // // { custom_select("label-type".to_string(), vec!["Label".to_string(), "Hook".to_string(), "Static Label".to_string()]) }
+                            // <select class="form-select">
+                            // <option value="lbl" selected="">
+                            // Label
+                            // </option>
+                            // <option value="hook">
+                            // Hook
+                            // </option>
+                            // <option value="slbl">
+                            // Static Label
+                            // </option>
+                            // </select>
+                            // </td>
+                            // <td colspan="1">
+                            // <button class="btn btn-success w-100 btn-icon">
+                            // <svg
+                            // xmlns="http://www.w3.org/2000/svg"
+                            // class="icon icon-tabler icon-tabler-circle-plus"
+                            // width="40"
+                            // height="40"
+                            // viewBox="0 0 24 24"
+                            // stroke-width="2"
+                            // stroke="currentColor"
+                            // fill="none"
+                            // stroke-linecap="round"
+                            // stroke-linejoin="round"
+                            // >
+                            // <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            // <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path>
+                            // <path d="M9 12h6"></path>
+                            // <path d="M12 9v6"></path>
+                            // </svg>
+                            // </button>
+                            // </td>
+                            // </tr>
+                            // </tbody>
+                            // </table>
+                            // <small class="form-hint">
+                            // "Labels are tags that make your resource finable, hooks are actions that can be performed on the resource"
+                            // </small>
+                            // </div>
+                            // <Show when=move || read_type_select() == "Object" fallback=|| ()>
+                            // <div class="col-lg-4 mb-3 text-start">
+                            // <div class="mb-3">
+                            // <div class="form-label">
+                            // Upload file
+                            // </div>
+                            // <input
+                            // type="file"
+                            // on:change=on_file_change
+                            // node_ref=input_element
+                            // class="form-control"
+                            // />
+                            // </div>
+                            // <Show when=move || file_size().is_some() fallback=|| ()>
+                            // <div class="h2 mb-0 text-muted">
+                            // {bytesize::ByteSize(file_size().unwrap())
+                            // .to_string_as(true)}
+                            // </div>
+                            // </Show>
+                            // </div>
+                            // </Show>
                             </div>
                         </div>
                         <div class="card-footer text-end">
@@ -739,7 +718,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                 Submit
                             </button>
                         </div>
-                    //</form>
+                    // </form>
                     </ActionForm>
                 </div>
             </div>

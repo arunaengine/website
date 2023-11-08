@@ -66,20 +66,17 @@ pub fn TokensOverview() -> impl IntoView {
     let current_action_version = create_rw_signal(0);
 
     view! {
-        {
-            move || if has_failed() {
+        {move || {
+            if has_failed() {
                 nav("/", NavigateOptions::default())
             }
-        }
+        }}
+
         <div class="container-xl mt-3">
             <div class="row mb-4">
                 <div class="col">
-                    <div class="page-pretitle text-start">
-                        Personal Permissions
-                    </div>
-                    <h2 class="page-title">
-                        Tokens
-                    </h2>
+                    <div class="page-pretitle text-start">Personal Permissions</div>
+                    <h2 class="page-title">Tokens</h2>
                 </div>
             </div>
         </div>
@@ -119,17 +116,18 @@ pub fn TokensOverview() -> impl IntoView {
                                         }
                                     }
                                 >
-                                        {
-                                            move || { get_tokens()
+
+                                    {move || {
+                                        get_tokens()
                                             .into_iter()
                                             .map(|item| {
                                                 view! { <Token token_info=item/> }
                                             })
                                             .collect::<Vec<_>>()
                                             .into_view()
-                                        }}
-                                </Show>
+                                    }}
 
+                                </Show>
 
                             </Transition>
                         </tbody>
@@ -174,17 +172,9 @@ pub fn TokensOverview() -> impl IntoView {
                         current_action_version.set(create_token_action.version()());
                         match create_token_action.value().get() {
                             Some(Ok(resp)) => {
-                                view! {
-                                    <CreateTokenSuccess create_token_resp=resp/>
-                                }
-                                    .into_view()
+                                view! { <CreateTokenSuccess create_token_resp=resp/> }.into_view()
                             }
-                            Some(Err(_)) => {
-                                view! {
-                                    "Something went wrong"
-                                }
-                                    .into_view()
-                            }
+                            Some(Err(_)) => view! { "Something went wrong" }.into_view(),
                             None => ().into_view(),
                         }
                     } else {

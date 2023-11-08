@@ -59,7 +59,7 @@ pub fn Token(token_info: Token) -> impl IntoView {
         <tr>
             <td>{token_info.id.clone()}</td>
             <td>{token_info.name.clone()}</td>
-            //<td>{token_info.used_at.clone()}</td>
+            // <td>{token_info.used_at.clone()}</td>
             <td>
                 <div class="d-flex justify-content-end">
                     <a
@@ -97,9 +97,7 @@ pub fn Token(token_info: Token) -> impl IntoView {
                         on:click=move |_| { set_deleting.set(token_id.get_value()) }
                     >
                         <Suspense fallback=move || {
-                            view! {
-                                <div class="spinner-border"></div>
-                            }
+                            view! { <div class="spinner-border"></div> }
                         }>
                             {move || {
                                 let _ = dispatch_delete.get();
@@ -125,6 +123,7 @@ pub fn Token(token_info: Token) -> impl IntoView {
                                     </svg>
                                 }
                             }}
+
                         </Suspense>
                     </a>
                 </div>
@@ -147,59 +146,71 @@ pub fn Token(token_info: Token) -> impl IntoView {
                                 <div class="datagrid-title">"Name"</div>
                                 <div class="datagrid-content">{token_info.name.clone()}</div>
                             </div>
-                            //<div class="datagrid-item">
-                            //    <div class="datagrid-title">"Type"</div>
-                            //    <div class="datagrid-content">
-                            //        {token_info.token_type.get_type_variant()}
-                            //    </div>
-                            //</div>
+                            // <div class="datagrid-item">
+                            // <div class="datagrid-title">"Type"</div>
+                            // <div class="datagrid-content">
+                            // {token_info.token_type.get_type_variant()}
+                            // </div>
+                            // </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">"Target"</div>
                                 <div class="datagrid-content">
                                     {match token_info.permission.clone() {
-                                            Some(perm) => match perm.resource_id {
-                                                Some(res_id) => match res_id {
-                                                     ResourceId::ObjectId(id) | ResourceId::DatasetId(id) | ResourceId::CollectionId(id) | ResourceId::ProjectId(id) => id
-                                                },
+                                        Some(perm) => {
+                                            match perm.resource_id {
+                                                Some(res_id) => {
+                                                    match res_id {
+                                                        ResourceId::ObjectId(id)
+                                                        | ResourceId::DatasetId(id)
+                                                        | ResourceId::CollectionId(id)
+                                                        | ResourceId::ProjectId(id) => id,
+                                                    }
+                                                }
                                                 None => String::new(),
-                                            },
-                                            None => String::new(),
+                                            }
                                         }
-                                    }
+                                        None => String::new(),
+                                    }}
+
                                 </div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">"Permission level"</div>
                                 <div class="datagrid-content">
-                                    {
-                                        match token_info.permission {
-                                            Some(perm) => match perm.permission_level {
+
+                                    {match token_info.permission {
+                                        Some(perm) => {
+                                            match perm.permission_level {
                                                 2 => "None".to_string(),
                                                 3 => "Read".to_string(),
                                                 4 => "Append".to_string(),
                                                 5 => "Write".to_string(),
                                                 6 => "Admin".to_string(),
                                                 _ => "Invalid permission level".to_string(),
-
-                                            },
-                                            None => String::new(),
+                                            }
                                         }
-                                    }
+                                        None => String::new(),
+                                    }}
+
                                 </div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">"Created at"</div>
-                                <div class="datagrid-content">{match token_info.created_at {
-                                    Some(timestamp) => timestamp.to_string(),
-                                    None => String::new(),
-                                }}</div>
+                                <div class="datagrid-content">
+                                    {match token_info.created_at {
+                                        Some(timestamp) => timestamp.to_string(),
+                                        None => String::new(),
+                                    }}
+                                </div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">"Expires at"</div>
-                                <div class="datagrid-content">{match token_info.expires_at {
-                                    Some(timestamp) => timestamp.to_string(),
-                                    None => String::new(),
-                                }}</div>
+                                <div class="datagrid-content">
+                                    {match token_info.expires_at {
+                                        Some(timestamp) => timestamp.to_string(),
+                                        None => String::new(),
+                                    }}
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -71,41 +71,45 @@ pub fn PersonalResources() -> impl IntoView {
             // Runs async server call
             let resource = create_local_resource(move || query.clone(), get_user_resources); // TODO: Use create_resource
             view! {
-                // Puts everything into a nice view
-                <Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
+                <Suspense fallback=move || {
+                    view! { <p>"Loading resources ..."</p> }
+                }>
                     {move || {
-                        resource.get().map(|resources| match resources {
-                            Ok(res) => view!{
-                                 <For
-                                 each=move || res.clone()
-                                 key=|(result, _)| {
-                                     match result {
-                                         Resource::Collection(c) => c.id.clone(),
-                                         Resource::Dataset(d) => d.id.clone(),
-                                         Resource::Object(o) => o.id.clone(),
-                                         Resource::Project(p) => p.id.clone(),
-                                     }
-                                 }
+                        resource
+                            .get()
+                            .map(|resources| match resources {
+                                Ok(res) => {
+                                    view! {
+                                        <For
+                                            each=move || res.clone()
+                                            key=|(result, _)| {
+                                                match result {
+                                                    Resource::Collection(c) => c.id.clone(),
+                                                    Resource::Dataset(d) => d.id.clone(),
+                                                    Resource::Object(o) => o.id.clone(),
+                                                    Resource::Project(p) => p.id.clone(),
+                                                }
+                                            }
 
-                                 children=move |res| {
-                                     view! { <SearchResult res=res/> }
+                                            children=move |res| {
+                                                view! { <SearchResult res=res/> }
+                                            }
+                                        />
+                                    }
+                                        .into_view()
                                 }
-                                />
-                            }.into_view(),
-                            Err(e)=> {
-                                leptos::logging::log!("{e:?}");
-                                view!{<p> "Error while loading resources" </p>}.into_view()
-                            }
-                        })
-                    }
-                }
+                                Err(e) => {
+                                    leptos::logging::log!("{e:?}");
+                                    view! { <p>"Error while loading resources"</p> }.into_view()
+                                }
+                            })
+                    }}
+
                 </Suspense>
             }
             .into_view()
         } else {
-            view! {
-                <p> "No Resources found !" </p>
-            }
+            view! { <p>"No Resources found !"</p> }
             .into_view()
         }
     };
@@ -114,12 +118,8 @@ pub fn PersonalResources() -> impl IntoView {
         <div class="container-xl text-start mt-3">
             <div class="row mb-4">
                 <div class="col">
-                    <div class="page-pretitle text-start">
-                        Personal Permissions
-                    </div>
-                    <h2 class="page-title">
-                        Resource
-                    </h2>
+                    <div class="page-pretitle text-start">Personal Permissions</div>
+                    <h2 class="page-title">Resource</h2>
                 </div>
                 <div class="col-auto ms-auto d-print-none text-end">
                     <div class="btn-list">
@@ -168,9 +168,7 @@ pub fn PersonalResources() -> impl IntoView {
                 </div>
             </div>
             <div class="row mt-2">
-                <div class="col">
-                    {element}
-                </div>
+                <div class="col">{element}</div>
             </div>
         </div>
     }

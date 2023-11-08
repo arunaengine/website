@@ -352,7 +352,9 @@ impl WebKV {
                 <td class="text-start">
                     <A
                         href=format!(
-                            "/search?filter_key={}&filter_value={}", key.clone(), value.clone()
+                            "/search?filter_key={}&filter_value={}",
+                            key.clone(),
+                            value.clone(),
                         )
 
                         exact=true
@@ -366,7 +368,9 @@ impl WebKV {
                 <td>
                     <A
                         href=format!(
-                            "/search?filter_key={}&filter_value={}", key.clone(), value.clone()
+                            "/search?filter_key={}&filter_value={}",
+                            key.clone(),
+                            value.clone(),
                         )
 
                         exact=true
@@ -397,19 +401,9 @@ impl WebKV {
                         }
                             .into_view()
                     } else if status == 1 {
-                        view! {
-                            <span class="status status-green">
-                                Running
-                            </span>
-                        }
-                            .into_view()
+                        view! { <span class="status status-green">Running</span> }.into_view()
                     } else if status == 2 {
-                        view! {
-                            <span class="status status-red">
-                                Error
-                            </span>
-                        }
-                            .into_view()
+                        view! { <span class="status status-red">Error</span> }.into_view()
                     } else {
                         ().into_view()
                     }}
@@ -574,39 +568,19 @@ impl RelationVariant {
     pub fn get_object_batch(&self) -> impl IntoView {
         match self.target_name.as_str() {
             "Project" => {
-                view! {
-                    <span class="text-muted">
-                        Project
-                    </span>
-                }
+                view! { <span class="text-muted">Project</span> }
             }
             "Collection" => {
-                view! {
-                    <span class="text-muted">
-                        Collection
-                    </span>
-                }
+                view! { <span class="text-muted">Collection</span> }
             }
             "Dataset" => {
-                view! {
-                    <span class="text-muted">
-                        Dataset
-                    </span>
-                }
+                view! { <span class="text-muted">Dataset</span> }
             }
             "Object" => {
-                view! {
-                    <span class="text-muted">
-                        Object
-                    </span>
-                }
+                view! { <span class="text-muted">Object</span> }
             }
             _ => {
-                view! {
-                    <span class="text-muted">
-                        Unknown
-                    </span>
-                }
+                view! { <span class="text-muted">Unknown</span> }
             }
         }
     }
@@ -615,46 +589,22 @@ impl RelationVariant {
         match self.relation_type.as_str() {
             "BelongsTo" => {
                 if self.inbound {
-                    view! {
-                        <span class="text-muted">
-                            Parent
-                        </span>
-                    }
+                    view! { <span class="text-muted">Parent</span> }
                 } else {
-                    view! {
-                        <span class="text-muted">
-                            Child
-                        </span>
-                    }
+                    view! { <span class="text-muted">Child</span> }
                 }
             }
             "Origin" => {
-                view! {
-                    <span class="text-muted">
-                        Origin
-                    </span>
-                }
+                view! { <span class="text-muted">Origin</span> }
             }
             "Version" => {
-                view! {
-                    <span class="status status-orange">
-                        Version
-                    </span>
-                }
+                view! { <span class="status status-orange">Version</span> }
             }
             "Metadata" => {
-                view! {
-                    <span class="text-muted">
-                        Metadata
-                    </span>
-                }
+                view! { <span class="text-muted">Metadata</span> }
             }
             "Policy" => {
-                view! {
-                    <span class="text-muted">
-                        Policy
-                    </span>
-                }
+                view! { <span class="text-muted">Policy</span> }
             }
             _ => {
                 view! { <span class="text-muted">{self.relation_type.to_ascii_uppercase()}</span> }
@@ -665,19 +615,11 @@ impl RelationVariant {
     pub fn external_relation_type_status(&self) -> impl IntoView {
         match self.relation_type.as_str() {
             "Url" => {
-                view! {
-                    <span class="text-muted">
-                        Identifier
-                    </span>
-                }
+                view! { <span class="text-muted">Identifier</span> }
             }
 
             "Identifier" => {
-                view! {
-                    <span class="text-muted">
-                        Url
-                    </span>
-                }
+                view! { <span class="text-muted">Url</span> }
             }
             _ => {
                 view! { <span class="text-muted">{self.relation_type.to_ascii_uppercase()}</span> }
@@ -878,61 +820,21 @@ impl SearchResultEntry {
 
     pub fn get_ribbon(&self) -> impl IntoView {
         match self.variant.as_str() {
-            "Project" => view! {
-                <div class="ribbon bg-blue">
-                    Project
-                </div>
-            },
-            "Collection" => view! {
-                <div class="ribbon bg-orange">
-                    Collection
-                </div>
-            },
-            "Dataset" => view! {
-                <div class="ribbon bg-cyan">
-                    Dataset
-                </div>
-            },
-            "Object" => view! {
-                <div class="ribbon bg-green">
-                    Object
-                </div>
-            },
-            _ => view! {
-                <div class="ribbon bg-pink">
-                    Unknown
-                </div>
-            },
+            "Project" => view! { <div class="ribbon bg-blue">Project</div> },
+            "Collection" => view! { <div class="ribbon bg-orange">Collection</div> },
+            "Dataset" => view! { <div class="ribbon bg-cyan">Dataset</div> },
+            "Object" => view! { <div class="ribbon bg-green">Object</div> },
+            _ => view! { <div class="ribbon bg-pink">Unknown</div> },
         }
     }
 
     pub fn get_status(&self) -> impl IntoView {
         match self.data_class.as_str() {
-            "Public" => view! {
-                <span class="status status-green m-1">
-                    Public
-                </span>
-            },
-            "Private" => view! {
-                <span class="status status-orange m-1">
-                    Private
-                </span>
-            },
-            "Workspace" => view! {
-                <span class="status status-cyan m-1">
-                    Workspace
-                </span>
-            },
-            "Confidential" => view! {
-                <span class="status status-red m-1">
-                    Confidential
-                </span>
-            },
-            _ => view! {
-                <span class="status status-red m-1">
-                    Unknown
-                </span>
-            },
+            "Public" => view! { <span class="status status-green m-1">Public</span> },
+            "Private" => view! { <span class="status status-orange m-1">Private</span> },
+            "Workspace" => view! { <span class="status status-cyan m-1">Workspace</span> },
+            "Confidential" => view! { <span class="status status-red m-1">Confidential</span> },
+            _ => view! { <span class="status status-red m-1">Unknown</span> },
         }
     }
 
@@ -992,10 +894,7 @@ impl SearchResultEntry {
 
     pub fn get_stats(&self) -> impl IntoView {
         view! {
-            <span class="status status-yellow m-1">
-                Count:
-                {self.stats.count}
-            </span>
+            <span class="status status-yellow m-1">Count: {self.stats.count}</span>
             <span class="status status-cyan m-1">{self.stats.size.to_string()}</span>
         }
     }

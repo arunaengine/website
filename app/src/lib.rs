@@ -54,42 +54,49 @@ pub fn EntryPoint() -> impl IntoView {
 
     let _cordi = move || {
         view! {
-                <div
-                    class=move || if hide_cordi.get() { "offcanvas offcanvas-top"} else { "offcanvas offcanvas-top show"}
-                    style="max-height: 90px;"
-                    tabindex="-1"
-                    id="cordi-canvas"
-                    aria-modal="true"
-                    role="dialog"
-                >
-                    <div class="offcanvas-body">
-                        <div class="container">
-                            <div class="row align-items-center">
-                                <div class="col">
-                                    <strong>
-                                        "Update on version 2.0.0: "
-                                    </strong>
-                                    "We are sorry for the delay in the release of version 2.0.0. Testing and bug fixing took longer than expected and we need some time to prepare the final release. As we cannot just leave it at that, we are happy to announce that a test environment will be deployed soon, where everyone can participate and help us smooth things out!"
-                                </div>
-                                <div class="col-auto">
-                                    <button
-                                        type="button"
-                                        class="btn btn-primary"
-                                        data-bs-dismiss="offcanvas"
-                                        on:click=move |_| {
-                                            if let Ok(Some(storage)) = window().local_storage() {
-                                                storage.set_item("cordi", "true").expect("Failed to set item");
-                                                hide_cordi.set(true);
-                                            }
+            <div
+                class=move || {
+                    if hide_cordi.get() {
+                        "offcanvas offcanvas-top"
+                    } else {
+                        "offcanvas offcanvas-top show"
+                    }
+                }
+                style="max-height: 90px;"
+                tabindex="-1"
+                id="cordi-canvas"
+                aria-modal="true"
+                role="dialog"
+            >
+                <div class="offcanvas-body">
+                    <div class="container">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <strong>"Update on version 2.0.0: "</strong>
+                                "We are sorry for the delay in the release of version 2.0.0. Testing and bug fixing took longer than expected and we need some time to prepare the final release. As we cannot just leave it at that, we are happy to announce that a test environment will be deployed soon, where everyone can participate and help us smooth things out!"
+                            </div>
+                            <div class="col-auto">
+                                <button
+                                    type="button"
+                                    class="btn btn-primary"
+                                    data-bs-dismiss="offcanvas"
+                                    on:click=move |_| {
+                                        if let Ok(Some(storage)) = window().local_storage() {
+                                            storage
+                                                .set_item("cordi", "true")
+                                                .expect("Failed to set item");
+                                            hide_cordi.set(true);
                                         }
-                                    >
-                                        Close
-                                    </button>
-                                </div>
+                                    }
+                                >
+
+                                    Close
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
         }
     };
 
@@ -106,11 +113,11 @@ pub fn EntryPoint() -> impl IntoView {
                     <div class="container">
                         <div class="row align-items-center">
                             <div class="col">
-                                <strong>
-                                    Do you like cookies
-                                </strong>
+                                <strong>Do you like cookies</strong>
                                 "🍪 We use cookies to ensure you get the best experience on our website."
-                                <a href="./terms-of-service.html" target="_blank">Learn more</a>
+                                <a href="./terms-of-service.html" target="_blank">
+                                    Learn more
+                                </a>
                             </div>
                             <div class="col-auto">
                                 <button
@@ -118,13 +125,16 @@ pub fn EntryPoint() -> impl IntoView {
                                     class="btn btn-primary"
                                     data-bs-dismiss="offcanvas"
                                     on:click=move |_| {
-                                            if let Ok(Some(storage)) = window().local_storage() {
-                                                storage.set_item("allow-cookie", "true").expect("Failed to set item");
-                                                hide_cordi.set(true);
-                                            }
+                                        if let Ok(Some(storage)) = window().local_storage() {
+                                            storage
+                                                .set_item("allow-cookie", "true")
+                                                .expect("Failed to set item");
+                                            hide_cordi.set(true);
                                         }
+                                    }
                                 >
-                                          Essential Cookies
+
+                                    Essential Cookies
                                 </button>
                             </div>
                             <div class="col-auto">
@@ -133,13 +143,16 @@ pub fn EntryPoint() -> impl IntoView {
                                     class="btn btn-primary"
                                     data-bs-dismiss="offcanvas"
                                     on:click=move |_| {
-                                            if let Ok(Some(storage)) = window().local_storage() {
-                                                storage.set_item("allow-cookie", "true").expect("Failed to set item");
-                                                hide_cordi.set(true);
-                                            }
+                                        if let Ok(Some(storage)) = window().local_storage() {
+                                            storage
+                                                .set_item("allow-cookie", "true")
+                                                .expect("Failed to set item");
+                                            hide_cordi.set(true);
                                         }
+                                    }
                                 >
-                                          Allow All Cookies
+
+                                    Allow All Cookies
                                 </button>
                             </div>
                         </div>
@@ -189,8 +202,8 @@ pub fn EntryPoint() -> impl IntoView {
         // sets the document title
         <Title text="Aruna Object Storage"/>
         <div class="page">
-            //{cordi}
-            //{cookies}
+            // {cordi}
+            // {cookies}
             <Router>
                 <Routes>
                     <Route
@@ -241,7 +254,7 @@ pub fn EntryPoint() -> impl IntoView {
 
                             <Route path="create" view=move || view! { <CreateObjectPage/> }/>
                             <Route path=":id" view=move || view! { <ObjectOverview/> }/>
-                            <Route path="" view=move || view! { <PersonalResources/>  }/>
+                            <Route path="" view=move || view! { <PersonalResources/> }/>
                         </Route>
                         <Route
                             path=""

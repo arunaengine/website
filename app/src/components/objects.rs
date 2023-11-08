@@ -1,5 +1,4 @@
 use crate::utils::{
-    login_helpers::LoginResult,
     structs::{SearchResultEntry, VisualizedStats},
     tabler_utils::{add_bg_color, add_text_color, Colors},
 };
@@ -81,12 +80,8 @@ pub fn ObjectOverview() -> impl IntoView {
             <div class="container-xl">
                 <div class="row g-2">
                     <div class="col">
-                        <div class="page-pretitle text-start">
-                            Overview
-                        </div>
-                        <h2 class="page-title">
-                            Resource
-                        </h2>
+                        <div class="page-pretitle text-start">Overview</div>
+                        <h2 class="page-title">Resource</h2>
                     </div>
                     <div class="col-auto ms-auto d-print-none">
                         <div class="btn-list">
@@ -328,9 +323,7 @@ pub fn ObjectOverview() -> impl IntoView {
                             {get_icon("Stats".to_string(), Colors::Green)}
                             <div class="col-auto me-6">
                                 <div class="text-start card-text text-nowrap align-items-center">
-                                    <div class="text-muted">
-                                        Count
-                                    </div>
+                                    <div class="text-muted">Count</div>
                                     <div class=add_text_color(
                                         "h2 mb-0",
                                         Colors::Muted,
@@ -338,9 +331,7 @@ pub fn ObjectOverview() -> impl IntoView {
                                 </div>
                             </div> <div class="col-auto border-start">
                                 <div class="ms-2 text-start card-text text-nowrap align-items-center">
-                                    <div class="text-muted">
-                                        Size
-                                    </div>
+                                    <div class="text-muted">Size</div>
                                     <div class=add_text_color(
                                         "h2 mb-0",
                                         Colors::Muted,
@@ -379,9 +370,7 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <path d="M12 11h.01"></path>
                             </svg>
                         </span>
-                        <h3 class="h2 text-secondary mb-0 align-items-top">
-                            Description
-                        </h3>
+                        <h3 class="h2 text-secondary mb-0 align-items-top">Description</h3>
                     </div>
                     <div class="card-body">
                         <div class="align-items-center">
@@ -441,29 +430,21 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <path d="M6 9h-.01"></path>
                             </svg>
                         </span>
-                        <h3 class="h2 text-secondary mb-0 align-items-top">
-                            Labels
-                        </h3>
+                        <h3 class="h2 text-secondary mb-0 align-items-top">Labels</h3>
                     </div>
                     <div class="card-table table-responsive">
                         <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
-                                    <th class="text-start">
-                                        KEY
-                                    </th>
-                                    <th>
-                                        VALUE
-                                    </th>
-                                    <th>
-                                        STATIC
-                                    </th>
+                                    <th class="text-start">KEY</th>
+                                    <th>VALUE</th>
+                                    <th>STATIC</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <For
                                     each=move || hooks.clone().into_iter().enumerate()
-                                    key=|(id, _)| format!("hooks_{}", * id)
+                                    key=|(id, _)| format!("hooks_{}", *id)
                                     children=move |(_, rel)| { rel.into_table_view() }
                                 />
 
@@ -500,29 +481,21 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <path d="M16 8a4 4 0 1 0 -8 0c0 1.506 .77 2.818 2 3.5l-3 5.5"></path>
                             </svg>
                         </span>
-                        <h3 class="h2 text-secondary mb-0 align-items-top">
-                            Hooks
-                        </h3>
+                        <h3 class="h2 text-secondary mb-0 align-items-top">Hooks</h3>
                     </div>
                     <div class="card-table table-responsive ">
                         <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
-                                    <th class="text-start">
-                                        KEY
-                                    </th>
-                                    <th>
-                                        VALUE
-                                    </th>
-                                    <th>
-                                        STATUS
-                                    </th>
+                                    <th class="text-start">KEY</th>
+                                    <th>VALUE</th>
+                                    <th>STATUS</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <For
                                     each=move || label.clone().into_iter().enumerate()
-                                    key=|(id, _)| format!("label_{}", * id)
+                                    key=|(id, _)| format!("label_{}", *id)
                                     children=move |(_, rel)| { rel.into_table_view() }
                                 />
 
@@ -568,26 +541,20 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <path d="M15 4h5v5"></path>
                             </svg>
                         </span>
-                        <h3 class="h2 text-secondary mb-0 align-items-top">
-                            External relations
-                        </h3>
+                        <h3 class="h2 text-secondary mb-0 align-items-top">External relations</h3>
                     </div>
                     <div class="card-table table-responsive ">
                         <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
-                                    <th class="text-start">
-                                        URL
-                                    </th>
-                                    <th>
-                                        TYPE
-                                    </th>
+                                    <th class="text-start">URL</th>
+                                    <th>TYPE</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <For
                                     each=move || external.clone().into_iter().enumerate()
-                                    key=|(id, _)| format!("external_{}", * id)
+                                    key=|(id, _)| format!("external_{}", *id)
                                     children=move |(_, rel)| { rel.into_table_view() }
                                 />
 
@@ -626,53 +593,41 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <path d="M18 20l3 -3l-3 -3"></path>
                             </svg>
                         </span>
-                        <h3 class="h2 text-secondary mb-0 align-items-top">
-                            Internal relations
-                        </h3>
+                        <h3 class="h2 text-secondary mb-0 align-items-top">Internal relations</h3>
                     </div>
                     <div class="card-table table-responsive">
                         <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
-                                    <th class="text-start">
-                                        ID
-                                    </th>
-                                    <th>
-                                        RESOURCE
-                                    </th>
-                                    <th>
-                                        TYPE
-                                    </th>
+                                    <th class="text-start">ID</th>
+                                    <th>RESOURCE</th>
+                                    <th>TYPE</th>
                                 </tr>
                             </thead>
 
                             <thead>
                                 <tr>
-                                    <th colspan="3">
-                                        incoming
-                                    </th>
+                                    <th colspan="3">incoming</th>
                                 </tr>
                             </thead>
 
                             <tbody>
                                 <For
                                     each=move || internal_inc.clone().into_iter().enumerate()
-                                    key=|(id, _)| format!("internal_inc_{}", * id)
+                                    key=|(id, _)| format!("internal_inc_{}", *id)
                                     children=move |(_, rel)| { rel.into_table_view() }
                                 />
 
                             </tbody>
                             <thead>
                                 <tr>
-                                    <th colspan="3">
-                                        outgoing
-                                    </th>
+                                    <th colspan="3">outgoing</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <For
                                     each=move || internal_ext.clone().into_iter().enumerate()
-                                    key=|(id, _)| format!("internal_ext_{}", * id)
+                                    key=|(id, _)| format!("internal_ext_{}", *id)
                                     children=move |(_, rel)| { rel.into_table_view() }
                                 />
 
@@ -708,23 +663,15 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <path d="M15 4h5v5"></path>
                             </svg>
                         </span>
-                        <h3 class="h2 text-secondary mb-0 align-items-top">
-                            Proxy endpoints
-                        </h3>
+                        <h3 class="h2 text-secondary mb-0 align-items-top">Proxy endpoints</h3>
                     </div>
                     <div class="card-table table-responsive ">
                         <table class="table table-vcenter text-start">
                             <thead>
                                 <tr>
-                                    <th class="text-start">
-                                        NAME
-                                    </th>
-                                    <th>
-                                        LINK
-                                    </th>
-                                    <th>
-                                        STATUS
-                                    </th>
+                                    <th class="text-start">NAME</th>
+                                    <th>LINK</th>
+                                    <th>STATUS</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -748,17 +695,13 @@ pub fn ObjectOverview() -> impl IntoView {
                                                 <path d="M4 7c0 .664 .088 1.324 .263 1.965l2.737 10.035c.5 1.5 2.239 2 5 2s4.5 -.5 5 -2c.333 -1 1.246 -4.345 2.737 -10.035a7.45 7.45 0 0 0 .263 -1.965"></path>
                                             </svg>
                                         </span>
-                                        <A href="">
-                                            gi-public
-                                        </A>
+                                        <A href="">gi-public</A>
                                     </td>
                                     <td>
                                         <A href="">"s3://objects/01H93HDRV1ZAJH8AT880CH8C0R"</A>
                                     </td>
                                     <td>
-                                        <span class="status status-green">
-                                            Available
-                                        </span>
+                                        <span class="status status-green">Available</span>
                                     </td>
                                 </tr>
                                 <tr>
@@ -781,17 +724,13 @@ pub fn ObjectOverview() -> impl IntoView {
                                                 <path d="M4 7c0 .664 .088 1.324 .263 1.965l2.737 10.035c.5 1.5 2.239 2 5 2s4.5 -.5 5 -2c.333 -1 1.246 -4.345 2.737 -10.035a7.45 7.45 0 0 0 .263 -1.965"></path>
                                             </svg>
                                         </span>
-                                        <A href="">
-                                            bi-public
-                                        </A>
+                                        <A href="">bi-public</A>
                                     </td>
                                     <td>
                                         <A href="">"s3://objects/01H93HDRV1ZAJH8AT880CH8C0R"</A>
                                     </td>
                                     <td>
-                                        <span class="status status-red">
-                                            Unavailable
-                                        </span>
+                                        <span class="status status-red">Unavailable</span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -809,14 +748,10 @@ pub fn ObjectOverview() -> impl IntoView {
                 <div class="col-auto">{entry.get_data_class_badge()}</div>
                 <div class="col-auto">{entry.get_status_badge()}</div>
                 <div class="col-auto">
-                    <span class="badge badge-outline text-primary">
-                        CC-BY-SA 4.0
-                    </span>
+                    <span class="badge badge-outline text-primary">CC-BY-SA 4.0</span>
                 </div>
                 <div class="col-auto">
-                    <span class="badge badge-outline text-orange">
-                        WRITE
-                    </span>
+                    <span class="badge badge-outline text-orange">WRITE</span>
                 </div>
             </div>
         }
@@ -825,42 +760,60 @@ pub fn ObjectOverview() -> impl IntoView {
     let card_deck = move |entry: SearchResultEntry| {
         view! {
             <div class="row row-deck row-cards">
-                {small_card(("ID".to_string(), id(entry.clone()), Colors::Primary, Some(Colors::Primary)))}
-                {small_card(("Name".to_string(), name(entry.clone()), Colors::Primary, Some(Colors::Primary)))}
-                {stats_card(entry.clone().stats)} {full_card(entry.clone().description)} {labels(entry.clone())} {hooks(entry.clone())} {endpoints()}
+                {small_card((
+                    "ID".to_string(),
+                    id(entry.clone()),
+                    Colors::Primary,
+                    Some(Colors::Primary),
+                ))}
+                {small_card((
+                    "Name".to_string(),
+                    name(entry.clone()),
+                    Colors::Primary,
+                    Some(Colors::Primary),
+                ))} {stats_card(entry.clone().stats)} {full_card(entry.clone().description)}
+                {labels(entry.clone())} {hooks(entry.clone())} {endpoints()}
                 {ext_relations(entry.clone())} {int_relations(entry.clone())}
             </div>
         }
     };
     let main = move || {
         view! {
-            <Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
-            {move ||
-                {
+            <Suspense fallback=move || {
+                view! { <p>"Loading resources ..."</p> }
+            }>
+                {move || {
                     let resource = move || resource.get().flatten();
                     match resource() {
-                        Some(result) => match result.resource {
-                            Some(result) => match result.resource {
+                        Some(result) => {
+                            match result.resource {
                                 Some(result) => {
-                                    let entry = move || SearchResultEntry::from(result.clone());
-                                    view!{
-                                        <div class="page-wrapper d-print-none">
-                                            <div class="page-header">{header}</div>
-                                            <div class="page-body mt-2">
-                                                <div class="container-xl mb-2">{top_tags(entry().clone())}</div>
-                                                <div class="container-xl">{card_deck(entry())}</div>
-                                            </div>
-                                        </div>
-                                        }.into_view()
-                                },
-                                None => view!{ <p>"No resource found" </p>}.into_view()
-                            },
-                            None => view!{ <p>"No resource found" </p>}.into_view()
-                        },
-                        None => view!{ <p>"No resource found" </p>}.into_view(),
+                                    match result.resource {
+                                        Some(result) => {
+                                            let entry = move || SearchResultEntry::from(result.clone());
+                                            view! {
+                                                <div class="page-wrapper d-print-none">
+                                                    <div class="page-header">{header}</div>
+                                                    <div class="page-body mt-2">
+                                                        <div class="container-xl mb-2">
+                                                            {top_tags(entry().clone())}
+                                                        </div>
+                                                        <div class="container-xl">{card_deck(entry())}</div>
+                                                    </div>
+                                                </div>
+                                            }
+                                                .into_view()
+                                        }
+                                        None => view! { <p>"No resource found"</p> }.into_view(),
+                                    }
+                                }
+                                None => view! { <p>"No resource found"</p> }.into_view(),
+                            }
+                        }
+                        None => view! { <p>"No resource found"</p> }.into_view(),
                     }
-                }
-            }
+                }}
+
             </Suspense>
         }
     };

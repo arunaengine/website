@@ -86,12 +86,11 @@ pub fn custom_select(_name: String, variants: Vec<String>) -> impl IntoView {
                 on:input=move |ev| {
                     write_selected(event_target_value(&ev));
                 }
+
                 selected=move || read_selected.get()
             >
                 {variants_option(variants.clone())}
-                <option value="Custom">
-                    Custom
-                </option>
+                <option value="Custom">Custom</option>
             </select>
             <Show when=move || read_selected.get() == "Custom" fallback=move || ()>
                 <input type="text" class="form-control" aria-label="Custom"/>

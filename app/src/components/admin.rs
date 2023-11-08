@@ -59,21 +59,18 @@ pub fn AdminOverview() -> impl IntoView {
     let user_states = move || get_users_res.get().unwrap_or_default();
 
     view! {
-        {
-            move || if should_redirect() {
-            navigate("/", NavigateOptions::default());
+        {move || {
+            if should_redirect() {
+                navigate("/", NavigateOptions::default());
             }
-        }
+        }}
+
         <div class="page-header d-print-none my-3">
             <div class="container-xl">
                 <div class="row g-2 align-items-center">
                     <div class="col">
-                        <div class="page-pretitle text-start">
-                            Global Permissions
-                        </div>
-                        <h2 class="page-title">
-                            Users
-                        </h2>
+                        <div class="page-pretitle text-start">Global Permissions</div>
+                        <h2 class="page-title">Users</h2>
                     </div>
                 </div>
             </div>

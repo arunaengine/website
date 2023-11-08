@@ -115,82 +115,93 @@ pub fn Search() -> impl IntoView {
 
     let pagination = move || {
         view! {
-            <Show
-            when=move || (max_pages() > 1)
-            fallback=|| ().into_view()
-            >
-            <div class="mt-1 align-items-end">
-                <ul class="pagination">
-                    <li class=move || {
-                        if current_page() == 1 { "page-item disabled" } else { "page-item" }
-                    }>
-                        <button
-                            class="page-link"
-                            on:click=move |_| dec_page()
-                            aria-disabled=move || if current_page() == 1 { "true" } else { "false" }
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                class="icon"
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                stroke-width="2"
-                                stroke="currentColor"
-                                fill="none"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
+            <Show when=move || (max_pages() > 1) fallback=|| ().into_view()>
+                <div class="mt-1 align-items-end">
+                    <ul class="pagination">
+                        <li class=move || {
+                            if current_page() == 1 { "page-item disabled" } else { "page-item" }
+                        }>
+                            <button
+                                class="page-link"
+                                on:click=move |_| dec_page()
+                                aria-disabled=move || {
+                                    if current_page() == 1 { "true" } else { "false" }
+                                }
                             >
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path d="M15 6l-6 6l6 6"></path>
-                            </svg>
-                        </button>
-                    </li>
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="icon"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="2"
+                                    stroke="currentColor"
+                                    fill="none"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M15 6l-6 6l6 6"></path>
+                                </svg>
+                            </button>
+                        </li>
 
-                    <For
-                        each=move || { read_range() }
-                        key=|num| *num
-                        children=move |num| {
-                            view! {
-                                <li class=move || {
-                                    if query_page().unwrap_or(1) == num {
-                                        "page-item active"
-                                    } else {
-                                        "page-item"
-                                    }
-                                }>
-                                    <button class="page-link" on:click=move |_| query_set_page(num)>
-                                        {num}
-                                    </button>
-                                </li>
+                        <For
+                            each=move || { read_range() }
+                            key=|num| *num
+                            children=move |num| {
+                                view! {
+                                    <li class=move || {
+                                        if query_page().unwrap_or(1) == num {
+                                            "page-item active"
+                                        } else {
+                                            "page-item"
+                                        }
+                                    }>
+                                        <button
+                                            class="page-link"
+                                            on:click=move |_| query_set_page(num)
+                                        >
+                                            {num}
+                                        </button>
+                                    </li>
+                                }
                             }
-                        }
-                    />
+                        />
 
-                    <li class=move || if current_page() == max_pages() { "page-item disabled" } else { "page-item" }>
-                        <button
-                            class="page-link"
-                            aria-disabled=move || if current_page() == max_pages() { "true" } else { "false" }
-                            on:click=move |_| inc_page()>
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                class="icon"
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                stroke-width="2"
-                                stroke="currentColor"
-                                fill="none"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
+                        <li class=move || {
+                            if current_page() == max_pages() {
+                                "page-item disabled"
+                            } else {
+                                "page-item"
+                            }
+                        }>
+                            <button
+                                class="page-link"
+                                aria-disabled=move || {
+                                    if current_page() == max_pages() { "true" } else { "false" }
+                                }
+                                on:click=move |_| inc_page()
                             >
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path d="M9 6l6 6l-6 6"></path>
-                            </svg>
-                        </button>
-                    </li>
-                </ul>
-            </div>
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="icon"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="2"
+                                    stroke="currentColor"
+                                    fill="none"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M9 6l6 6l-6 6"></path>
+                                </svg>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
             </Show>
         }
     };
@@ -205,52 +216,56 @@ pub fn Search() -> impl IntoView {
 
     let query_data = move || {
         view! {
-            <Suspense fallback=move || view!{ <p>"Loading resources ..." </p>}>
+            <Suspense fallback=move || {
+                view! { <p>"Loading resources ..."</p> }
+            }>
                 {move || {
-                    resource.get().map(|result| match result {
-                        Ok(res) => {
-                            let resources = res.resources.into_iter().map(|gen_res| gen_res.resource.unwrap()).collect::<Vec<Resource>>();
-                            let num = resources.len();
+                    resource
+                        .get()
+                        .map(|result| match result {
+                            Ok(res) => {
+                                let resources = res
+                                    .resources
+                                    .into_iter()
+                                    .map(|gen_res| gen_res.resource.unwrap())
+                                    .collect::<Vec<Resource>>();
+                                let num = resources.len();
+                                set_results(res.estimated_total as i32);
+                                query_set_page(current_page());
+                                view! {
+                                    {pagination}
+                                    <For
+                                        each=move || { resources.clone().into_iter() }
+                                        key=|res| {
+                                            match res {
+                                                Resource::Collection(c) => c.id.clone(),
+                                                Resource::Dataset(d) => d.id.clone(),
+                                                Resource::Object(o) => o.id.clone(),
+                                                Resource::Project(p) => p.id.clone(),
+                                            }
+                                        }
 
-                            set_results(res.estimated_total as i32);
-                            query_set_page(current_page());
+                                        children=move |res| {
+                                            view! { <SearchResult res=res/> }
+                                        }
+                                    />
 
-                            view! {
-                                {pagination}
-                                <For
-                                each=move || { resources.clone().into_iter() }
-                                key=|res| {
-                                    match res {
-                                        Resource::Collection(c) => c.id.clone(),
-                                        Resource::Dataset(d) => d.id.clone(),
-                                        Resource::Object(o) => o.id.clone(),
-                                        Resource::Project(p) => p.id.clone(),
-                                    }
+                                    <Show when=move || (num == 0) fallback=|| ().into_view()>
+                                        <div class="d-flex">
+                                            <h2 class="text-muted">"No results found"</h2>
+                                        </div>
+
+                                    </Show>
                                 }
-                                children=move |res| {
-                                    view! { <SearchResult res=res/> }
-                                }
-                                />
-                                <Show
-                                    when=move || (num == 0)
-                                    fallback=|| ().into_view()
-                                >
-                                    <div class="d-flex">
-                                        <h2 class="text-muted">
-                                            "No results found"
-                                        </h2>
-                                    </div>
+                                    .into_view()
+                            }
+                            Err(e) => {
+                                leptos::logging::log!("{e:?}");
+                                view! { <p>"Error while searching resources"</p> }.into_view()
+                            }
+                        })
+                }}
 
-                                </Show>
-                            }.into_view()
-                        },
-                        Err(e)=> {
-                            leptos::logging::log!("{e:?}");
-                            view!{<p> "Error while searching resources" </p>}.into_view()
-                        }
-                    })
-                }
-            }
             </Suspense>
         }
         .into_view()
@@ -261,7 +276,8 @@ pub fn Search() -> impl IntoView {
             <div class="row mt-2">
                 <div class="col-3">
                     <h2 class="text-primary">"Search results"</h2>
-                    <div class="text-secondary">"About " {results} " results"</div> //result (0.19 seconds)"</div>
+                    // result (0.19 seconds)"</div>
+                    <div class="text-secondary">"About " {results} " results"</div>
                 </div>
                 <div class="col-9 pe-4">
                     <div class="input-group">
@@ -289,7 +305,10 @@ pub fn Search() -> impl IntoView {
                             type="text"
                             class="form-control form-control-lg"
                             placeholder="Search Aruna objects"
-                            on:input=move |v| {query_set(Some(event_target_value(&v))); resource.refetch();}
+                            on:input=move |v| {
+                                query_set(Some(event_target_value(&v)));
+                                resource.refetch();
+                            }
                         />
                         <span class="input-group-text" id="inputGroup-sizing-default">
                             Dataclass
@@ -316,7 +335,9 @@ pub fn Search() -> impl IntoView {
                             </li>
                             <li>
                                 <button
-                                    on:click=move |_| update_filter(Filter::DataClass(Some(DataClass::PUBLIC)))
+                                    on:click=move |_| update_filter(
+                                        Filter::DataClass(Some(DataClass::PUBLIC)),
+                                    )
                                     class="dropdown-item"
                                 >
                                     Public
@@ -324,7 +345,9 @@ pub fn Search() -> impl IntoView {
                             </li>
                             <li>
                                 <button
-                                    on:click=move |_| update_filter(Filter::DataClass(Some(DataClass::PRIVATE)))
+                                    on:click=move |_| update_filter(
+                                        Filter::DataClass(Some(DataClass::PRIVATE)),
+                                    )
                                     class="dropdown-item"
                                 >
                                     Private
@@ -343,7 +366,10 @@ pub fn Search() -> impl IntoView {
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
-                                        + if query_filter().map(|e| e.res_selected(None)).unwrap_or(true) {
+                                        + if query_filter()
+                                            .map(|e| e.res_selected(None))
+                                            .unwrap_or(true)
+                                        {
                                             " active"
                                         } else {
                                             ""
@@ -354,43 +380,80 @@ pub fn Search() -> impl IntoView {
                                 "All"
                             </button>
                             <button
-                                on:click=move |_| update_filter(Filter::ObjectType(Some(ResourceType::Project)))
+                                on:click=move |_| update_filter(
+                                    Filter::ObjectType(Some(ResourceType::Project)),
+                                )
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
-                                        + if query_filter().map(|e| e.res_selected(Some(ResourceType::Project))).unwrap_or_default() { " active" } else { "" }
+                                        + if query_filter()
+                                            .map(|e| e.res_selected(Some(ResourceType::Project)))
+                                            .unwrap_or_default()
+                                        {
+                                            " active"
+                                        } else {
+                                            ""
+                                        }
                                 }
                             >
 
                                 "Projects"
                             </button>
                             <button
-                                on:click=move |_| update_filter(Filter::ObjectType(Some(ResourceType::Collection)))
+                                on:click=move |_| update_filter(
+                                    Filter::ObjectType(Some(ResourceType::Collection)),
+                                )
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
-                                        +  if query_filter().map(|e| e.res_selected(Some(ResourceType::Collection))).unwrap_or_default() { " active" } else { "" }
+                                        + if query_filter()
+                                            .map(|e| e.res_selected(Some(ResourceType::Collection)))
+                                            .unwrap_or_default()
+                                        {
+                                            " active"
+                                        } else {
+                                            ""
+                                        }
                                 }
                             >
 
                                 "Collections"
                             </button>
                             <button
-                                on:click=move |_| update_filter(Filter::ObjectType(Some(ResourceType::Dataset)))
+                                on:click=move |_| update_filter(
+                                    Filter::ObjectType(Some(ResourceType::Dataset)),
+                                )
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
                                         .to_owned()
-                                        +  if query_filter().map(|e| e.res_selected(Some(ResourceType::Dataset))).unwrap_or_default() { " active" } else { "" }
+                                        + if query_filter()
+                                            .map(|e| e.res_selected(Some(ResourceType::Dataset)))
+                                            .unwrap_or_default()
+                                        {
+                                            " active"
+                                        } else {
+                                            ""
+                                        }
                                 }
                             >
 
                                 "Datasets"
                             </button>
                             <button
-                                on:click=move |_| update_filter(Filter::ObjectType(Some(ResourceType::Object)))
+                                on:click=move |_| update_filter(
+                                    Filter::ObjectType(Some(ResourceType::Object)),
+                                )
                                 class=move || {
                                     "list-group-item list-group-item-action d-flex align-items-center"
-                                        .to_owned() + if query_filter().map(|e| e.res_selected(Some(ResourceType::Object))).unwrap_or_default() { " active" } else { "" }
+                                        .to_owned()
+                                        + if query_filter()
+                                            .map(|e| e.res_selected(Some(ResourceType::Object)))
+                                            .unwrap_or_default()
+                                        {
+                                            " active"
+                                        } else {
+                                            ""
+                                        }
                                 }
                             >
 
@@ -405,46 +468,35 @@ pub fn Search() -> impl IntoView {
                                 class="form-control"
                                 placeholder="Filter string"
                                 aria-label="Filter string"
-                                on:change=move |e| { resource.refetch(); update_filter(Filter::Custom(Some(event_target_value(&e)))) }
+                                on:change=move |e| {
+                                    resource.refetch();
+                                    update_filter(Filter::Custom(Some(event_target_value(&e))))
+                                }
                             />
                         </div>
 
                         <div class="alert alert-success" role="alert">
-                            <div class="alert-title">
-                                Filter arguments by value.
-                            </div>
+                            <div class="alert-title">Filter arguments by value.</div>
                             <div class="text-muted mt-2">
-                                E.g:
-                                <b>"size > 100"</b>
-                                ,
-                                <b>"labels.key = akey"</b>
+                                E.g: <b>"size > 100"</b> , <b>"labels.key = akey"</b>
                             </div>
                             <div class="text-secondary mt-2 mb-2">
                                 Current available parameters are:
                             </div>
                             <div class="text-secondary">
-                                <b>
-                                    size
-                                </b>
+                                <b>size</b>
                                 ,
-                                <b>
-                                    labels.key
-                                </b>
+                                <b>labels.key</b>
                                 ,
-                                <b>
-                                    labels.value
-                                </b>
+                                <b>labels.value</b>
                                 ,
-                                <b>
-                                    created_at
-                                </b>
+                                <b>created_at</b>
                             </div>
                         </div>
                     </div>
                     <div class="col-9 ps-3">
 
                         {query_data}
-
 
                     </div>
                 </div>

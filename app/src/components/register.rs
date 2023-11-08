@@ -60,12 +60,10 @@ pub fn RegisterPage() -> impl IntoView {
         <ActionForm
             on:submit=move |ev| {
                 cfg_if! {
-                    if #[cfg(feature = "hydrate")] {
-                        use crate::utils::modal::hide_modal;
-                        hide_modal("registerModal");
-                        let _ = window().location().set_href("/activate");
+                    if #[cfg(feature = "hydrate")] { use crate ::utils::modal::hide_modal;
+                    hide_modal("registerModal"); let _ = window().location().set_href("/activate");
                     }
-                };
+                }
                 let _data = RegisterUser::from_event(&ev).expect("to parse form data");
             }
 
@@ -99,7 +97,9 @@ pub fn RegisterPage() -> impl IntoView {
                                 </svg>
                                 <h3>"Registration required!"</h3>
                                 <div class="text-muted">
-                                    <div>"Your account is not yet registered, you must register first before you can proceed!"</div>
+                                    <div>
+                                        "Your account is not yet registered, you must register first before you can proceed!"
+                                    </div>
                                     <div>"Registering indicates your acceptance to our:"</div>
                                     <a href="/tos" class="px-2">
                                         "Terms of Service"
@@ -117,9 +117,7 @@ pub fn RegisterPage() -> impl IntoView {
                                     />
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label text-left import-left">
-                                        "Email"
-                                    </label>
+                                    <label class="form-label text-left import-left">"Email"</label>
                                     <input
                                         type="text"
                                         class="form-control flex-fill"

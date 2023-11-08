@@ -202,9 +202,7 @@ pub fn AdminUser(user: User) -> impl IntoView {
                                 >
 
                                     <Suspense fallback=move || {
-                                        view! {
-                                            <div class="spinner-border"></div>
-                                        }
+                                        view! { <div class="spinner-border"></div> }
                                     }>
                                         {move || {
                                             view! {
@@ -240,6 +238,7 @@ pub fn AdminUser(user: User) -> impl IntoView {
                                             })
                                     }
                                 >
+
                                     <Suspense fallback=move || {
                                         view! { <div class="spinner-border"></div> }
                                     }>
@@ -285,6 +284,7 @@ pub fn AdminUser(user: User) -> impl IntoView {
                                             })
                                     }
                                 >
+
                                     <Suspense fallback=move || {
                                         view! { <div class="spinner-border"></div> }
                                     }>
@@ -348,7 +348,7 @@ pub fn AdminUser(user: User) -> impl IntoView {
                                 view! {
                                     <tr colspan="5">
                                         <td>"PID:"</td>
-                                        <td>{ id.to_string() }</td>
+                                        <td>{id.to_string()}</td>
                                         <td>"Role:"</td>
                                         <td>{to_permission_string(item_clone)}</td>
                                         <td>

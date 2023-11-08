@@ -44,7 +44,9 @@ pub fn MainBody() -> impl IntoView {
                 <div class="col-lg-10 mx-auto">
                     <h3 class="lead mb-4">
                         {"Fast, secure, distributed and domain-agnostic data storage with sophisticated metadata management according to "}
-                        <a class="text-primary" href="https://www.go-fair.org/fair-principles/">{"FAIR"}</a>
+                        <a class="text-primary" href="https://www.go-fair.org/fair-principles/">
+                            {"FAIR"}
+                        </a>
                         {" principles. Store and organize your data in new ways, share it with your colleagues and partners. Transparent data management made easy."}
                     </h3>
                     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
@@ -335,7 +337,18 @@ pub fn MainBody() -> impl IntoView {
                 <div class="card text-start col-lg-12" id="timeline">
                     <div class="card-header">
                         <span class="text-white avatar bg-primary me-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-info-square" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="icon icon-tabler icon-tabler-info-square"
+                                width="40"
+                                height="40"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                 <path d="M12 9h.01"></path>
                                 <path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14z"></path>
@@ -375,23 +388,56 @@ pub fn MainBody() -> impl IntoView {
                                         <p>
                                             <div class="text-muted">
                                                 <p>
-                                                    <div>"We are very happy to anounce that the next major version of Aruna is scheduled for release on "<b>"02.10.2023"</b></div>
-                                                    <div>"This will integrate many long awaited features and improvements. Such as:"</div>
+                                                    <div>
+                                                        "We are very happy to anounce that the next major version of Aruna is scheduled for release on "
+                                                        <b>"02.10.2023"</b>
+                                                    </div>
+                                                    <div>
+                                                        "This will integrate many long awaited features and improvements. Such as:"
+                                                    </div>
                                                 </p>
                                                 <p>
-                                                    <div><b>"- Relaxed hierarchy: "</b>"You can now arrange your objects in a tree-like structure without the requirement for intermediate collections."</div>
-                                                    <div><b>"- Improved search: "</b>"A new typo-tolerant metadata search with advanced query capabilities"</div>
-                                                    <div><b>"- Hooks: "</b>"Automated actions on object creation for data transformation and validation"</div>
-                                                    <div><b>"- Improved web interface: "</b>"You can explore the preview "<A href="/dash/search">here</A> "!"</div>
-                                                    <div><b>"- Data proxy overhaul: "</b>"Data proxies have been completely redesigned to separate"</div>
-                                                    <div><b>"- Fine grained user permissions: "</b>"A new attribute based user permission system has been added"</div>
-                                                    <div><b>"- and a lot more..."</b></div>
+                                                    <div>
+                                                        <b>"- Relaxed hierarchy: "</b>
+                                                        "You can now arrange your objects in a tree-like structure without the requirement for intermediate collections."
+                                                    </div>
+                                                    <div>
+                                                        <b>"- Improved search: "</b>
+                                                        "A new typo-tolerant metadata search with advanced query capabilities"
+                                                    </div>
+                                                    <div>
+                                                        <b>"- Hooks: "</b>
+                                                        "Automated actions on object creation for data transformation and validation"
+                                                    </div>
+                                                    <div>
+                                                        <b>"- Improved web interface: "</b>
+                                                        "You can explore the preview "
+                                                        <A href="/dash/search">here</A>
+                                                        "!"
+                                                    </div>
+                                                    <div>
+                                                        <b>"- Data proxy overhaul: "</b>
+                                                        "Data proxies have been completely redesigned to separate"
+                                                    </div>
+                                                    <div>
+                                                        <b>"- Fine grained user permissions: "</b>
+                                                        "A new attribute based user permission system has been added"
+                                                    </div>
+                                                    <div>
+                                                        <b>"- and a lot more..."</b>
+                                                    </div>
                                                 </p>
                                                 <p>
-                                                    <div><b>"We have temporarily disabled new user registrations and logins to prepare for the update. Existing users can still log in and use the system as usual."</b></div>
+                                                    <div>
+                                                        <b>
+                                                            "We have temporarily disabled new user registrations and logins to prepare for the update. Existing users can still log in and use the system as usual."
+                                                        </b>
+                                                    </div>
                                                 </p>
                                                 <p>
-                                                    <div>"Stay tuned for the upcoming update and join our mailing list here:"</div>
+                                                    <div>
+                                                        "Stay tuned for the upcoming update and join our mailing list here:"
+                                                    </div>
                                                 </p>
                                             </div>
                                         </p>
@@ -400,7 +446,18 @@ pub fn MainBody() -> impl IntoView {
                             </li>
                             <li class="timeline-event">
                                 <div class="timeline-event-icon text-white bg-primary fw-bolder">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-mail-check" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        class="icon icon-tabler icon-tabler-mail-check"
+                                        width="40"
+                                        height="40"
+                                        viewBox="0 0 24 24"
+                                        stroke-width="2"
+                                        stroke="currentColor"
+                                        fill="none"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                         <path d="M11 19h-6a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v6"></path>
                                         <path d="M3 7l9 6l9 -6"></path>
@@ -409,7 +466,7 @@ pub fn MainBody() -> impl IntoView {
                                 </div>
                                 <div class="card timeline-event-card">
                                     <div class="card-body">
-                                        //<div class="text-muted float-end">"21.04.23"</div>
+                                        // <div class="text-muted float-end">"21.04.23"</div>
                                         <h3 class="h2">"Join our mailing list"</h3>
                                         <div class="text-muted">
                                             <p>
@@ -422,19 +479,34 @@ pub fn MainBody() -> impl IntoView {
                                         <div class="container p-1">
 
                                             <ActionForm action=send_mail class="row">
-                                                <input type="email" class="form-control col-6 w-25" name="mail" aria-describedby="emailHelp" placeholder="Enter email" />
-                                                <button type="submit" class="btn btn-primary col-1">Join</button>
-                                                { move || if succeeded() {
-                                                    view! {
-                                                        <div class="alert alert-success col-5" role="alert">
-                                                            "Success ! Thank you for joining our mailing list!"
-                                                        </div>
-                                                    }.into_view()
-                                                }else{
-                                                    ().into_view()
-                                                }
-                                                }
-                                                <div id="emailHelp" class="form-text">"We'll never share your email with anyone else. Click "<A href="/imprint"> "here" </A> " to learn how we store and process your data."</div>
+                                                <input
+                                                    type="email"
+                                                    class="form-control col-6 w-25"
+                                                    name="mail"
+                                                    aria-describedby="emailHelp"
+                                                    placeholder="Enter email"
+                                                />
+                                                <button type="submit" class="btn btn-primary col-1">
+                                                    Join
+                                                </button>
+                                                {move || {
+                                                    if succeeded() {
+                                                        view! {
+                                                            <div class="alert alert-success col-5" role="alert">
+                                                                "Success ! Thank you for joining our mailing list!"
+                                                            </div>
+                                                        }
+                                                            .into_view()
+                                                    } else {
+                                                        ().into_view()
+                                                    }
+                                                }}
+
+                                                <div id="emailHelp" class="form-text">
+                                                    "We'll never share your email with anyone else. Click "
+                                                    <A href="/imprint">"here"</A>
+                                                    " to learn how we store and process your data."
+                                                </div>
                                             </ActionForm>
                                         </div>
                                     </div>
@@ -453,7 +525,18 @@ pub fn MainBody() -> impl IntoView {
                 <div class="card card-lg text-start col-lg-12">
                     <div class="card-header">
                         <span class="text-white avatar bg-primary me-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-help-hexagon" width="40" height="40" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="icon icon-tabler icon-tabler-help-hexagon"
+                                width="40"
+                                height="40"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                fill="none"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                 <path d="M19.875 6.27c.7 .398 1.13 1.143 1.125 1.948v7.284c0 .809 -.443 1.555 -1.158 1.948l-6.75 4.27a2.269 2.269 0 0 1 -2.184 0l-6.75 -4.27a2.225 2.225 0 0 1 -1.158 -1.948v-7.285c0 -.809 .443 -1.554 1.158 -1.947l6.75 -3.98a2.33 2.33 0 0 1 2.25 0l6.75 3.98h-.033z"></path>
                                 <path d="M12 16v.01"></path>
@@ -465,236 +548,236 @@ pub fn MainBody() -> impl IntoView {
                         </h3>
                     </div>
                     <div class="card-body p-4">
-                            <div>
-                                <h2 class="mb-3">{"1. Introduction"}</h2>
-                                <div
-                                    id="faq-1"
-                                    class="accordion"
-                                    role="tablist"
-                                    aria-multiselectable="true"
-                                >
-                                    <div class="accordion-item">
-                                        <div class="accordion-header" role="tab">
-                                            <button
-                                                class="accordion-button"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#faq-1-1"
-                                            >
-                                                {"What is Aruna ?"}
-                                            </button>
-                                        </div>
-                                        <div
-                                            id="faq-1-1"
-                                            class="accordion-collapse collapse show"
-                                            role="tabpanel"
-                                            data-bs-parent="#faq-1"
+                        <div>
+                            <h2 class="mb-3">{"1. Introduction"}</h2>
+                            <div
+                                id="faq-1"
+                                class="accordion"
+                                role="tablist"
+                                aria-multiselectable="true"
+                            >
+                                <div class="accordion-item">
+                                    <div class="accordion-header" role="tab">
+                                        <button
+                                            class="accordion-button"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#faq-1-1"
                                         >
-                                            <div class="accordion-body pt-0">
-                                                <div>
-                                                    <p>
-                                                        {"Aruna Object Storage (AOS) is an open source data storage platform that enables scientists to store, annotate and share their data according to "}
-                                                        <a href="https://www.go-fair.org/fair-principles/">
-                                                            {"FAIR"}
-                                                        </a> {" principles."}
-                                                    </p>
-                                                    <p>
-                                                        {"The name Aruna originates from the god of the sea in hittite mythology and their name for the sea and bodies of water in general.
-                                                        We choose this name to symbolize our vision of a revolutionary cloud-native data lake."}
-                                                    </p>
-                                                </div>
+                                            {"What is Aruna ?"}
+                                        </button>
+                                    </div>
+                                    <div
+                                        id="faq-1-1"
+                                        class="accordion-collapse collapse show"
+                                        role="tabpanel"
+                                        data-bs-parent="#faq-1"
+                                    >
+                                        <div class="accordion-body pt-0">
+                                            <div>
+                                                <p>
+                                                    {"Aruna Object Storage (AOS) is an open source data storage platform that enables scientists to store, annotate and share their data according to "}
+                                                    <a href="https://www.go-fair.org/fair-principles/">
+                                                        {"FAIR"}
+                                                    </a> {" principles."}
+                                                </p>
+                                                <p>
+                                                    {"The name Aruna originates from the god of the sea in hittite mythology and their name for the sea and bodies of water in general.
+                                                    We choose this name to symbolize our vision of a revolutionary cloud-native data lake."}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="accordion-item">
-                                        <div class="accordion-header" role="tab">
-                                            <button
-                                                class="accordion-button collapsed"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#faq-1-2"
-                                            >
-                                                {"Who are we?"}
-                                            </button>
-                                        </div>
-                                        <div
-                                            id="faq-1-2"
-                                            class="accordion-collapse collapse"
-                                            role="tabpanel"
-                                            data-bs-parent="#faq-1"
+                                </div>
+                                <div class="accordion-item">
+                                    <div class="accordion-header" role="tab">
+                                        <button
+                                            class="accordion-button collapsed"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#faq-1-2"
                                         >
-                                            <div class="accordion-body pt-0">
-                                                <div>
-                                                    <p>
-                                                        {"Aruna is developed by a small team at "}
-                                                        <a href="https://www.uni-giessen.de/de">
-                                                            "Justus-Liebig-University Giessen"
-                                                        </a>
-                                                        {" for the NFDI4Biodiversity and NFDI4Microbiota projects, as well as the GAIA-X connector project FAIR-Dataspaces"}
-                                                    </p>
-                                                </div>
+                                            {"Who are we?"}
+                                        </button>
+                                    </div>
+                                    <div
+                                        id="faq-1-2"
+                                        class="accordion-collapse collapse"
+                                        role="tabpanel"
+                                        data-bs-parent="#faq-1"
+                                    >
+                                        <div class="accordion-body pt-0">
+                                            <div>
+                                                <p>
+                                                    {"Aruna is developed by a small team at "}
+                                                    <a href="https://www.uni-giessen.de/de">
+                                                        "Justus-Liebig-University Giessen"
+                                                    </a>
+                                                    {" for the NFDI4Biodiversity and NFDI4Microbiota projects, as well as the GAIA-X connector project FAIR-Dataspaces"}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="accordion-item">
-                                        <div class="accordion-header" role="tab">
-                                            <button
-                                                class="accordion-button collapsed"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#faq-1-3"
-                                            >
-                                                {"Why should I use Aruna for my project?"}
-                                            </button>
-                                        </div>
-                                        <div
-                                            id="faq-1-3"
-                                            class="accordion-collapse collapse"
-                                            role="tabpanel"
-                                            data-bs-parent="#faq-1"
+                                </div>
+                                <div class="accordion-item">
+                                    <div class="accordion-header" role="tab">
+                                        <button
+                                            class="accordion-button collapsed"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#faq-1-3"
                                         >
-                                            <div class="accordion-body pt-0">
-                                                <div>
-                                                    <p>
-                                                        {"Storing data in localized domain specific data silos can limit collaboration, reuse, and analysis of data. The Aruna platform can bring great benefits for your research data such as improved collaboration, compliance with FAIR principles, scalability, data security, and easy integration with existing systems and workflow systems, ultimately accelerating scientific progress and improving research quality."}
-                                                    </p>
-                                                </div>
+                                            {"Why should I use Aruna for my project?"}
+                                        </button>
+                                    </div>
+                                    <div
+                                        id="faq-1-3"
+                                        class="accordion-collapse collapse"
+                                        role="tabpanel"
+                                        data-bs-parent="#faq-1"
+                                    >
+                                        <div class="accordion-body pt-0">
+                                            <div>
+                                                <p>
+                                                    {"Storing data in localized domain specific data silos can limit collaboration, reuse, and analysis of data. The Aruna platform can bring great benefits for your research data such as improved collaboration, compliance with FAIR principles, scalability, data security, and easy integration with existing systems and workflow systems, ultimately accelerating scientific progress and improving research quality."}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="mt-2">
-                                <h2 class="mb-3">{"2. Technical information"}</h2>
-                                <div
-                                    id="faq-2"
-                                    class="accordion"
-                                    role="tablist"
-                                    aria-multiselectable="true"
-                                >
-                                    <div class="accordion-item">
-                                        <div class="accordion-header" role="tab">
-                                            <button
-                                                class="accordion-button collapsed"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#faq-2-2"
-                                            >
-                                                {"How can I log in?"}
-                                            </button>
-                                        </div>
-                                        <div
-                                            id="faq-2-2"
-                                            class="accordion-collapse collapse"
-                                            role="tabpanel"
-                                            data-bs-parent="#faq-2"
+                        </div>
+                        <div class="mt-2">
+                            <h2 class="mb-3">{"2. Technical information"}</h2>
+                            <div
+                                id="faq-2"
+                                class="accordion"
+                                role="tablist"
+                                aria-multiselectable="true"
+                            >
+                                <div class="accordion-item">
+                                    <div class="accordion-header" role="tab">
+                                        <button
+                                            class="accordion-button collapsed"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#faq-2-2"
                                         >
-                                            <div class="accordion-body pt-0">
-                                                <div>
-                                                    <p>
-                                                        {"Currently our service is an invitation only platform for members of the NFDI consortia. In the future we plan to open our platform for a broader audience."}
-                                                    </p>
-                                                </div>
+                                            {"How can I log in?"}
+                                        </button>
+                                    </div>
+                                    <div
+                                        id="faq-2-2"
+                                        class="accordion-collapse collapse"
+                                        role="tabpanel"
+                                        data-bs-parent="#faq-2"
+                                    >
+                                        <div class="accordion-body pt-0">
+                                            <div>
+                                                <p>
+                                                    {"Currently our service is an invitation only platform for members of the NFDI consortia. In the future we plan to open our platform for a broader audience."}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="accordion-item">
-                                        <div class="accordion-header" role="tab">
-                                            <button
-                                                class="accordion-button collapsed"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#faq-2-3"
-                                            >
-                                                {"How many projects can I create?"}
-                                            </button>
-                                        </div>
-                                        <div
-                                            id="faq-2-3"
-                                            class="accordion-collapse collapse"
-                                            role="tabpanel"
-                                            data-bs-parent="#faq-2"
+                                </div>
+                                <div class="accordion-item">
+                                    <div class="accordion-header" role="tab">
+                                        <button
+                                            class="accordion-button collapsed"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#faq-2-3"
                                         >
-                                            <div class="accordion-body pt-0">
-                                                <div>
-                                                    <p>
-                                                        {"Projects are used to organize users on a per institution or research project basis. They are created on demand, contact us and we will figure out how to organize your specific request."}
-                                                    </p>
-                                                </div>
+                                            {"How many projects can I create?"}
+                                        </button>
+                                    </div>
+                                    <div
+                                        id="faq-2-3"
+                                        class="accordion-collapse collapse"
+                                        role="tabpanel"
+                                        data-bs-parent="#faq-2"
+                                    >
+                                        <div class="accordion-body pt-0">
+                                            <div>
+                                                <p>
+                                                    {"Projects are used to organize users on a per institution or research project basis. They are created on demand, contact us and we will figure out how to organize your specific request."}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="accordion-item">
-                                        <div class="accordion-header" role="tab">
-                                            <button
-                                                class="accordion-button collapsed"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#faq-2-4"
-                                            >
-                                                {"Is there a maximum storage capacity?"}
-                                            </button>
-                                        </div>
-                                        <div
-                                            id="faq-2-4"
-                                            class="accordion-collapse collapse"
-                                            role="tabpanel"
-                                            data-bs-parent="#faq-2"
+                                </div>
+                                <div class="accordion-item">
+                                    <div class="accordion-header" role="tab">
+                                        <button
+                                            class="accordion-button collapsed"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#faq-2-4"
                                         >
-                                            <div class="accordion-body pt-0">
-                                                <div>
-                                                    <p>
-                                                        {"Currently we do not enforce storage quotas, but as always there is a physical limit in storage capacity. If you plan to store large amounts of data (>1 TB) contact us and we will figure out a solution."}
-                                                    </p>
-                                                </div>
+                                            {"Is there a maximum storage capacity?"}
+                                        </button>
+                                    </div>
+                                    <div
+                                        id="faq-2-4"
+                                        class="accordion-collapse collapse"
+                                        role="tabpanel"
+                                        data-bs-parent="#faq-2"
+                                    >
+                                        <div class="accordion-body pt-0">
+                                            <div>
+                                                <p>
+                                                    {"Currently we do not enforce storage quotas, but as always there is a physical limit in storage capacity. If you plan to store large amounts of data (>1 TB) contact us and we will figure out a solution."}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="accordion-item">
-                                        <div class="accordion-header" role="tab">
-                                            <button
-                                                class="accordion-button collapsed"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#faq-2-5"
-                                            >
-                                                {"Who can see my data?"}
-                                            </button>
-                                        </div>
-                                        <div
-                                            id="faq-2-5"
-                                            class="accordion-collapse collapse"
-                                            role="tabpanel"
-                                            data-bs-parent="#faq-2"
+                                </div>
+                                <div class="accordion-item">
+                                    <div class="accordion-header" role="tab">
+                                        <button
+                                            class="accordion-button collapsed"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#faq-2-5"
                                         >
-                                            <div class="accordion-body pt-0">
-                                                <div>
-                                                    <p>
-                                                        {"You can choose how your data is shared, and we offer a variety of access models, from highly confidential data to public datasets that anyone can view and download. By default, all of your data is private and only accessible to the people you grant access to, but a minimal configurable set of metadata is always public to ensure discoverability."}
-                                                    </p>
-                                                </div>
+                                            {"Who can see my data?"}
+                                        </button>
+                                    </div>
+                                    <div
+                                        id="faq-2-5"
+                                        class="accordion-collapse collapse"
+                                        role="tabpanel"
+                                        data-bs-parent="#faq-2"
+                                    >
+                                        <div class="accordion-body pt-0">
+                                            <div>
+                                                <p>
+                                                    {"You can choose how your data is shared, and we offer a variety of access models, from highly confidential data to public datasets that anyone can view and download. By default, all of your data is private and only accessible to the people you grant access to, but a minimal configurable set of metadata is always public to ensure discoverability."}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="accordion-item">
-                                        <div class="accordion-header" role="tab">
-                                            <button
-                                                class="accordion-button collapsed"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#faq-2-6"
-                                            >
-                                                {"Is my data secure?"}
-                                            </button>
-                                        </div>
-                                        <div
-                                            id="faq-2-6"
-                                            class="accordion-collapse collapse"
-                                            role="tabpanel"
-                                            data-bs-parent="#faq-2"
+                                </div>
+                                <div class="accordion-item">
+                                    <div class="accordion-header" role="tab">
+                                        <button
+                                            class="accordion-button collapsed"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#faq-2-6"
                                         >
-                                            <div class="accordion-body pt-0">
-                                                <div>
-                                                    <p>
-                                                        {"When you use our managed service, we ensure that your data is stored through our custom data proxy component, which encrypts, compresses, and anonymizes all user-provided data by default. This way, your data is always secure while stored on disk."}
-                                                    </p>
-                                                </div>
+                                            {"Is my data secure?"}
+                                        </button>
+                                    </div>
+                                    <div
+                                        id="faq-2-6"
+                                        class="accordion-collapse collapse"
+                                        role="tabpanel"
+                                        data-bs-parent="#faq-2"
+                                    >
+                                        <div class="accordion-body pt-0">
+                                            <div>
+                                                <p>
+                                                    {"When you use our managed service, we ensure that your data is stored through our custom data proxy component, which encrypts, compresses, and anonymizes all user-provided data by default. This way, your data is always secure while stored on disk."}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="accordion-item">
+                                </div>
+                                <div class="accordion-item">
                                     <div class="accordion-header" role="tab">
                                         <button
                                             class="accordion-button collapsed"
@@ -719,8 +802,8 @@ pub fn MainBody() -> impl IntoView {
                                         </div>
                                     </div>
                                 </div>
-                                </div>
                             </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -813,36 +896,24 @@ pub fn MainBody() -> impl IntoView {
 
     view! {
         <section class="section">
-            <div class="container-xl">
-                {hook}
-            </div>
+            <div class="container-xl">{hook}</div>
         </section>
         <section class="section">
-            <div class="container-xl">
-                {section1}
-            </div>
+            <div class="container-xl">{section1}</div>
             {waves}
         </section>
         <section class="section ocean-bg pb-4">
-            <div class="container-xl">
-                {section2}
-            </div>
+            <div class="container-xl">{section2}</div>
             {bubbles}
         </section>
         <section class="section pt-4 pb-4">
-            <div class="container-xl">
-                {timeline}
-            </div>
+            <div class="container-xl">{timeline}</div>
         </section>
         <section id="faq" class="section pt-2 pb-4">
-            <div class="container-xl">
-                {faq}
-            </div>
+            <div class="container-xl">{faq}</div>
         </section>
         <section class="section">
-            <div class="container-xl">
-                {partners}
-            </div>
+            <div class="container-xl">{partners}</div>
         </section>
     }
 }

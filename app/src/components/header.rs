@@ -150,7 +150,8 @@ pub fn ArunaHeader() -> impl IntoView {
             <div class="nav-item dropdown d-none d-md-flex me-3">
                 <a
                     href="#"
-                    class="nav-link px-0 disabled" //disabled"
+                    // disabled"
+                    class="nav-link px-0 disabled"
                     data-bs-toggle="dropdown"
                     tabindex="-1"
                     aria-label="Coming soon"
@@ -171,7 +172,7 @@ pub fn ArunaHeader() -> impl IntoView {
                         <path d="M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"></path>
                         <path d="M9 17v1a3 3 0 0 0 6 0v-1"></path>
                     </svg>
-                    //<span class="badge bg-red"></span>
+                // <span class="badge bg-red"></span>
                 </a>
             </div>
         }
@@ -193,7 +194,7 @@ pub fn ArunaHeader() -> impl IntoView {
                     match get_user.get() {
                         Some(WhoamiResponse::User(u)) => {
                             let is_admin = u.attributes.unwrap_or_default().global_admin;
-                            let active_text = move || if u.active { "" }else{ " (inactive)" };
+                            let active_text = move || if u.active { "" } else { " (inactive)" };
                             view! {
                                 <div class="nav-item dropdown">
                                     <a
@@ -225,9 +226,17 @@ pub fn ArunaHeader() -> impl IntoView {
                                             <div>{u.display_name}</div>
                                             {move || {
                                                 if is_admin {
-                                                    view! { <div class="mt-1 small text-muted">{format!("Admin{}", active_text())}</div> }
+                                                    view! {
+                                                        <div class="mt-1 small text-muted">
+                                                            {format!("Admin{}", active_text())}
+                                                        </div>
+                                                    }
                                                 } else {
-                                                    view! { <div class="mt-1 small text-muted">{format!("User{}", active_text())}</div> }
+                                                    view! {
+                                                        <div class="mt-1 small text-muted">
+                                                            {format!("User{}", active_text())}
+                                                        </div>
+                                                    }
                                                 }
                                             }}
 
@@ -253,9 +262,12 @@ pub fn ArunaHeader() -> impl IntoView {
                             view! {
                                 <a
                                     href="/login"
-                                    on:click=move |_| {let _ = window().location().set_href("/login");}
+                                    on:click=move |_| {
+                                        let _ = window().location().set_href("/login");
+                                    }
 
-                                    class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2" // disabled"
+                                    // disabled"
+                                    class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2"
                                 >
                                     {"Login"}
                                 </a>
@@ -328,7 +340,8 @@ pub fn ArunaHeader() -> impl IntoView {
                                     >
                                         <Suspense>
                                             <A
-                                                class="nav-link" // disabled"
+                                                // disabled"
+                                                class="nav-link"
                                                 href=move || {
                                                     if is_logged_memo()() {
                                                         "/dash".to_string()
@@ -337,6 +350,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                                     }
                                                 }
                                             >
+
                                                 <span class="nav-link-icon d-md-none d-lg-inline-block">
                                                     <svg
                                                         xmlns="http://www.w3.org/2000/svg"
