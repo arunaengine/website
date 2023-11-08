@@ -4,6 +4,8 @@ pub mod aruna_api_handlers;
 pub mod aruna_api_helpers;
 pub mod conversion_helpers;
 #[cfg(feature = "ssr")]
+pub mod login_helpers;
+#[cfg(feature = "ssr")]
 pub mod mail;
 pub mod mocks;
 pub mod modal;
@@ -13,5 +15,3 @@ pub mod parse_cookies;
 pub mod structs;
 pub mod tabler_utils;
 pub mod visual_helpers;
-#[cfg(feature = "ssr")]
-pub mod login_helpers;

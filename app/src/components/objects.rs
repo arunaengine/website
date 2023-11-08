@@ -1,4 +1,5 @@
 use crate::utils::{
+    login_helpers::LoginResult,
     structs::{SearchResultEntry, VisualizedStats},
     tabler_utils::{add_bg_color, add_text_color, Colors},
 };
@@ -24,33 +25,19 @@ pub async fn get_object_by_id(
     query: GetObjectQuery,
 ) -> Result<ResourceWithPermission, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use axum_extra::extract::CookieJar;
-    use http::header;
-    use leptos_axum::ResponseOptions;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
-
-    if let Some(response_options) = use_context::<ResponseOptions>() {
-        let maybe_token = jar.get("token").map(|v| v.value().to_string());
-
-        match ConnectionHandler::aruna_get_resource(maybe_token, query.id).await {
-            Ok(res) => return Ok(res),
-            _ => {
-                response_options.insert_header(
-                    header::LOCATION,
-                    header::HeaderValue::from_str("/login").expect("Failed to create HeaderValue"),
-                );
-                return Err(ServerFnError::Request(
-                    "Invalid request: UserResources".to_string(),
-                ));
-            }
+    let maybe_token = match extract_token().await {
+        LoginResult::ValidToken(token) => Some(token),
+        _ => None,
+    };
+    match ConnectionHandler::aruna_get_resource(maybe_token, query.id).await {
+        Ok(res) => return Ok(res),
+        _ => {
+            return Err(ServerFnError::Request(
+                "Invalid request: UserResources".to_string(),
+            ));
         }
-    } else {
-        return Err(ServerFnError::Request(
-            "Unable to get response_options".to_string(),
-        ));
     }
 }
 

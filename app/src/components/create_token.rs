@@ -19,16 +19,12 @@ pub async fn create_token_server(
 ) -> Result<CreateApiTokenResponse, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
     use crate::utils::aruna_api_helpers::to_create_token_req;
-    use axum_extra::extract::CookieJar;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
-
-    let token = if let Some(cookie) = jar.get("token") {
-        cookie.value().to_string()
-    } else {
-        "".to_string()
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError(
+            "Failed to aquire token".to_string(),
+        ));
     };
     ConnectionHandler::aruna_create_token(
         to_create_token_req(

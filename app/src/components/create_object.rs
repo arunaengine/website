@@ -15,21 +15,15 @@ pub async fn create_resource_request(
     #[server(default)] parent_type: Option<ResourceType>,
 ) -> Result<(), ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use axum_extra::extract::CookieJar;
-    use leptos::logging::log;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
     use leptos_axum::redirect;
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
-
-    let token = if let Some(cookie) = jar.get("token") {
-        cookie.value().to_string()
-    } else {
-        return Err(ServerFnError::Args(
-            "Custom error: Token not found".to_string(),
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError(
+            "Failed to aquire token".to_string(),
         ));
     };
+
     let res_type = match resource_type.as_str() {
         "Project" => ResourceType::Project,
         "Collection" => ResourceType::Collection,
@@ -53,7 +47,7 @@ pub async fn create_resource_request(
         parent_type,
     )
     .await;
-    log!("{res:?}");
+
     if res.is_ok() {
         redirect("/objects");
     } else {
@@ -67,29 +61,29 @@ pub async fn create_resource_request(
 #[server]
 pub async fn get_licenses() -> Result<Vec<License>, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use axum_extra::extract::CookieJar;
     use leptos::logging::log;
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    let token = if let Some(cookie) = jar.get("token") {
-        cookie.value().to_string()
-    } else {
-        return Err(ServerFnError::Args(
-            "Custom error: Token not found".to_string(),
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError(
+            "Failed to aquire token".to_string(),
         ));
     };
 
     let res = ConnectionHandler::get_licenses(&token).await;
-    log!("{res:?}");
-    if res.is_ok() {
-        Ok(res.unwrap())
-    } else {
-        return Err(ServerFnError::ServerError(
-            "GetLicenses failed.".to_string(),
-        ));
+
+    match res {
+        Ok(licenses) => {
+            log!("Licenses: {:?}", licenses);
+            Ok(licenses)
+        }
+        Err(e) => {
+            log!("Error: {:?}", e);
+            Err(ServerFnError::ServerError(
+                "GetLicenses failed.".to_string(),
+            ))
+        }
     }
 }
 

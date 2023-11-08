@@ -181,40 +181,19 @@ pub async fn get_user_resources(
     query: Vec<Permission>,
 ) -> Result<Vec<(Resource, PermissionLevel)>, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
-    use axum_extra::extract::CookieJar;
-    use http::header;
-    use leptos_axum::ResponseOptions;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    let req_parts = use_context::<leptos_axum::RequestParts>()
-        .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
-    let jar = CookieJar::from_headers(&req_parts.headers);
-
-    match jar.get("logged_in") {
-        Some(l) if l.value() == "false" => return Ok(vec![]),
-        None => return Ok(vec![]),
-        _ => {}
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError(
+            "Failed to aquire token".to_string(),
+        ));
+    };
+    match ConnectionHandler::get_owned_resources(query, token).await {
+        Ok(res) => return Ok(res),
+        _ => {
+            return Err(ServerFnError::ServerError(
+                "Failed to aquire token".to_string(),
+            ))
+        }
     }
-    if let Some(response_options) = use_context::<ResponseOptions>() {
-        if let Some(cookie) = jar.get("token") {
-            let token = cookie.value().to_string();
-            match ConnectionHandler::get_owned_resources(query, token).await {
-                Ok(res) => return Ok(res),
-                _ => {
-                    response_options.insert_header(
-                        header::LOCATION,
-                        header::HeaderValue::from_str("/login?redirect=%2Fobjects")
-                            .expect("Failed to create HeaderValue"),
-                    );
-                    return Ok(vec![]);
-                }
-            };
-        } else {
-            response_options.insert_header(
-                header::LOCATION,
-                header::HeaderValue::from_str("/login?redirect=%2Fobjects")
-                    .expect("Failed to create HeaderValue"),
-            );
-        };
-    }
-    Ok(vec![])
 }
