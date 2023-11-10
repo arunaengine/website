@@ -4,6 +4,7 @@ use crate::utils::structs::{
 use aruna_rust_api::api::storage::{
     models::v2::generic_resource::Resource, services::v2::SearchResourcesResponse,
 };
+use http::{StatusCode, header};
 use leptos::*;
 use leptos_router::*;
 
@@ -48,6 +49,7 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
     use crate::utils::login_helpers::{extract_token, LoginResult};
+    use leptos_axum::ResponseOptions;
 
     let token = match extract_token().await {
         LoginResult::ValidToken(token) => Some(token),
@@ -57,6 +59,17 @@ async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, Serve
     let res = ConnectionHandler::search(token, query)
         .await
         .map_err(|_| ServerFnError::Request("Error accessing SearchResult".to_string()))?;
+
+    //Overwrite the response status and options if everything went well
+    if let Some(response_options) = use_context::<ResponseOptions>() {
+        response_options.set_status(StatusCode::OK);
+        response_options.insert_header(
+            header::LOCATION,
+            header::HeaderValue::from_str("")
+                .expect("Failed to create HeaderValue"),
+        );
+    }
+
     Ok(res)
 }
 
