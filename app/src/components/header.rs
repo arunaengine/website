@@ -261,11 +261,7 @@ pub fn ArunaHeader() -> impl IntoView {
                         _ => {
                             view! {
                                 <a
-                                    href="/login?oidc=keycloak_test"
-                                    on:click=move |_| {
-                                        let _ = window().location().set_href("/login?oidc=keycloak_test");
-                                    }
-
+                                    href="/provider"
                                     // disabled"
                                     class="btn btn-outline-success btn-sm px-4 me-sm-3 mt-2 mb-2"
                                 >

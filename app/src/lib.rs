@@ -35,6 +35,7 @@ pub fn EntryPoint() -> impl IntoView {
     use crate::components::register::*;
     use crate::components::search::*;
     use crate::components::tos::*;
+    use crate::components::login_modal::*;
     use crate::utils::structs::*;
 
     let hide_cordi = create_rw_signal(true);
@@ -223,6 +224,16 @@ pub fn EntryPoint() -> impl IntoView {
                                 view! {
                                     <MainPage/>
                                     <RegisterPage/>
+                                }
+                            }
+                        />
+
+                        <Route
+                            path="provider"
+                            view=move || {
+                                view! {
+                                    <MainPage/>
+                                    <LoginModal/>
                                 }
                             }
                         />
