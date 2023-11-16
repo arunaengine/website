@@ -61,11 +61,11 @@ pub fn PersonalResources() -> impl IntoView {
     // correctly if nested, so these needed fields need to be parsed
     // by hand and then annotated with #[server(default)] and #[derive(Default)]
     let query_params = move || match user_context.get() {
-        Some(WhoamiResponse::User(u)) => 
-            u.attributes
-                .map(|e| e.personal_permissions)
-                .unwrap_or_default(),
-        
+        Some(WhoamiResponse::User(u)) => u
+            .attributes
+            .map(|e| e.personal_permissions)
+            .unwrap_or_default(),
+
         _ => vec![],
     };
 
@@ -116,8 +116,7 @@ pub fn PersonalResources() -> impl IntoView {
             }
             .into_view()
         } else {
-            view! { <p>"No Resources found !"</p> }
-            .into_view()
+            view! { <p>"No Resources found !"</p> }.into_view()
         }
     };
 

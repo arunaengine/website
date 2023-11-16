@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::anyhow;
 use anyhow::Result;
 use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
@@ -12,16 +10,19 @@ use openidconnect::{
     PkceCodeChallenge, RedirectUrl,
 };
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use url::Url;
 
 #[derive(Clone)]
 pub struct Authorizer {
+    pub authorizer_name: String,
     core_client: CoreClient,
     key_cloak_url: Url,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Challenge {
+    pub authorizer_name: String,
     pub csrf_token: CsrfToken,
     pub nonce: Nonce,
     pub pkce_verifier: PkceCodeVerifier,
@@ -34,8 +35,10 @@ impl Challenge {
         nonce: Nonce,
         pkce_verifier: PkceCodeVerifier,
         redirect_url: String,
+        authorizer_name: String,
     ) -> Self {
         Challenge {
+            authorizer_name,
             csrf_token,
             nonce,
             pkce_verifier,
@@ -61,29 +64,29 @@ impl Challenge {
 }
 
 impl Authorizer {
-    pub async fn new(url: String) -> Result<Self> {
+    pub async fn new(
+        name: String,
+        url: String,
+        client: String,
+        secret: String,
+        callback: String,
+    ) -> Result<Self> {
         let provider_metadata =
             CoreProviderMetadata::discover_async(IssuerUrl::new(url.clone())?, async_http_client)
                 .await?;
-
-        let keycloak_client =
-            std::env::var("KEYCLOAK_CLIENT").expect("Keycloak client must be set!");
-        let keycloak_secret =
-            std::env::var("KEYCLOAK_SECRET").expect("Keycloak secret must be set!");
-        let keycloak_callback_url =
-            std::env::var("KEYCLOAK_CALLBACK_URL").expect("KEYCLOAK_CALLBACK_URL must be set!");
 
         // Create an OpenID Connect client by specifying the client ID, client secret, authorization URL
         // and token URL.
         let client = CoreClient::from_provider_metadata(
             provider_metadata,
-            ClientId::new(keycloak_client),
-            Some(ClientSecret::new(keycloak_secret)),
+            ClientId::new(client),
+            Some(ClientSecret::new(secret)),
         )
         // Set the URL the user will be redirected to after the authorization process.
-        .set_redirect_uri(RedirectUrl::new(keycloak_callback_url)?);
+        .set_redirect_uri(RedirectUrl::new(callback)?);
 
         Ok(Authorizer {
+            authorizer_name: name,
             core_client: client,
             key_cloak_url: url::Url::parse(&url).unwrap(),
         })
@@ -110,7 +113,13 @@ impl Authorizer {
             .url();
 
         Ok((
-            Challenge::new(csrf_token, nonce, pkce_verifier, redirect_url),
+            Challenge::new(
+                csrf_token,
+                nonce,
+                pkce_verifier,
+                redirect_url,
+                self.authorizer_name.to_string(),
+            ),
             auth_url,
         ))
     }

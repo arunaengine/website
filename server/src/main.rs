@@ -17,10 +17,14 @@ use leptos::*;
 use leptos_axum::{generate_route_list, handle_server_fns_with_context, LeptosRoutes};
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::routes::{callback, login, logout, refresh};
+use crate::{
+    routes::{callback, login, logout, refresh},
+    utils::Config,
+};
 
 pub mod fileserv;
 pub mod routes;
+pub mod utils;
 
 async fn server_fn_handler(
     State(app_state): State<ServerState>,
@@ -35,7 +39,7 @@ async fn server_fn_handler(
         raw_query,
         move || {
             provide_context(app_state.mail.clone());
-            provide_context(app_state.oidc.clone());
+            provide_context(app_state.oidcs.clone());
             provide_context(app_state.key.clone());
         },
         request,
@@ -51,7 +55,7 @@ async fn leptos_routes_handler(
         app_state.leptos_options.clone(),
         move || {
             provide_context(app_state.mail.clone());
-            provide_context(app_state.oidc.clone());
+            provide_context(app_state.oidcs.clone());
             provide_context(app_state.key.clone());
         },
         || view! { <EntryPoint/> },
@@ -61,25 +65,25 @@ async fn leptos_routes_handler(
 
 #[derive(FromRef, Clone)]
 pub struct ServerState {
-    pub oidc: oidc::Authorizer,
+    pub oidcs: Vec<(String, oidc::Authorizer)>,
     pub mail: Option<aruna_web_app::utils::mail::MailClient>,
     pub key: Key,
     pub leptos_options: LeptosOptions,
 }
 
+impl ServerState {
+    pub fn get_oidc(&self, name: &str) -> Option<&oidc::Authorizer> {
+        self.oidcs
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, oidc)| oidc)
+    }
+}
+
 #[tokio::main]
 async fn main() {
     simple_logger::init_with_level(log::Level::Debug).expect("couldn't initialize logging");
-
     dotenvy::dotenv().expect("couldn't load .env file");
-
-    let key_cloak_url = dotenvy::var("KEYCLOAK_URL").expect("Keycloak URL must be set!");
-
-    // Setting get_configuration(None) means we'll be using cargo-leptos's env values
-    // For deployment these variables are:
-    // <https://github.com/leptos-rs/start-axum#executing-a-server-on-a-remote-machine-without-the-toolchain>
-    // Alternately a file can be specified such as Some("Cargo.toml")
-    // The file would need to be included with the executable when moved to deployment
     let conf = get_configuration(None).await.unwrap();
     let leptos_options = conf.leptos_options;
     let mail_client = if let Ok(val) = dotenvy::var("DEV_MODE") {
@@ -92,8 +96,15 @@ async fn main() {
         Some(MailClient::new().expect("Failed to create mail client"))
     };
 
+    let config: Config =
+        toml::from_str(&dotenvy::var("OIDC_CONFIG").expect("OIDC_CONFIG must be set!"))
+            .expect("Failed to parse OIDC_CONFIG");
+
     let server_state = ServerState {
-        oidc: oidc::Authorizer::new(key_cloak_url).await.unwrap(),
+        oidcs: config
+            .into_authorizers()
+            .await
+            .expect("Failed to create authorizers"),
         mail: mail_client,
         key: Key::from(
             dotenvy::var("ENCRYPTION_KEY")

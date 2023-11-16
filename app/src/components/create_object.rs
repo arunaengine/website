@@ -104,12 +104,13 @@ pub fn CreateObjectPage() -> impl IntoView {
         if create_resource_action.value()()
             .map(|e| e.ok())
             .flatten()
-            .is_some() {
-                get_user.refetch();
-                true
-            }else{
-                false
-            }
+            .is_some()
+        {
+            get_user.refetch();
+            true
+        } else {
+            false
+        }
     };
     let header = move || {
         view! {
@@ -180,10 +181,12 @@ pub fn CreateObjectPage() -> impl IntoView {
         }
     };
 
-    let name_regex = move || if read_type_select() == "Project" {
-        r"^[a-z0-9\-]+$"
-    } else {
-        r"^[a-zA-Z0-9\-\!\_\.\*\_\'\(\)\/]+$"
+    let name_regex = move || {
+        if read_type_select() == "Project" {
+            r"^[a-z0-9\-]+$"
+        } else {
+            r"^[a-zA-Z0-9\-\!\_\.\*\_\'\(\)\/]+$"
+        }
     };
 
     let main = move || {

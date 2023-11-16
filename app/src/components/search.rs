@@ -4,7 +4,7 @@ use crate::utils::structs::{
 use aruna_rust_api::api::storage::{
     models::v2::generic_resource::Resource, services::v2::SearchResourcesResponse,
 };
-use http::{StatusCode, header};
+use http::{header, StatusCode};
 use leptos::*;
 use leptos_router::*;
 
@@ -65,8 +65,7 @@ async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, Serve
         response_options.set_status(StatusCode::OK);
         response_options.insert_header(
             header::LOCATION,
-            header::HeaderValue::from_str("")
-                .expect("Failed to create HeaderValue"),
+            header::HeaderValue::from_str("").expect("Failed to create HeaderValue"),
         );
     }
 
