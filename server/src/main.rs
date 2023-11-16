@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use aruna_web_app::{
     utils::{mail::MailClient, oidc},
     *,
@@ -97,7 +99,12 @@ async fn main() {
     };
 
     let config: Config =
-        toml::from_str(&dotenvy::var("OIDC_CONFIG").expect("OIDC_CONFIG must be set!"))
+        toml::from_str(
+            std::io::read_to_string(
+                File::open(
+                    &dotenvy::var("OIDC_CONFIG").expect("OIDC_CONFIG must be set!")
+                ).expect("Failed to open OIDC_CONFIG file")
+            ).expect("Failed to read OIDC_CONFIG").as_str())
             .expect("Failed to parse OIDC_CONFIG");
 
     let server_state = ServerState {

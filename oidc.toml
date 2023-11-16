@@ -1,0 +1,6 @@
+[[oidc_provider]]
+name = "keycloak_test"
+discovery_url = "http://localhost:1998/realms/test"
+client_id = "test"
+client_secret = "QgBl9I2CD3eVhL7LFvkHrYUK7oKL3LE2"
+callback_url = "http://localhost:3000/callback"

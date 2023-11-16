@@ -23,7 +23,7 @@ pub async fn extract_token() -> LoginResult {
         return LoginResult::Error("Missing request parts".to_string());
     };
 
-    let Some(oidc_handler) = use_context::<Authorizer>() else {
+    let Some(oidc_handlers) = use_context::<Vec<(String, Authorizer)>>() else {
         return LoginResult::Error("Missing oidc handler".to_string());
     };
 
@@ -47,7 +47,17 @@ pub async fn extract_token() -> LoginResult {
     }
 
     if let Some(refresh_token) = jar.get("refresh") {
-        let (token, duration) = match oidc_handler.refresh(refresh_token.value()).await {
+
+        let Some(provider) = jar.get("oidc") else {
+            return LoginResult::NotLoggedIn;
+        };
+
+        let Some(handler) = oidc_handlers.iter().find(|(a, _)| a == provider.value()).map(|(_, oidc_handler)| oidc_handler) else {
+            return LoginResult::Error("Missing oidc handler".to_string());
+        };
+
+
+        let (token, duration) = match handler.refresh(refresh_token.value()).await {
             Ok(token) => token,
             Err(e) => {
                 return LoginResult::Error(format!("Error refreshing token: {}", e));

@@ -188,7 +188,7 @@ pub fn EntryPoint() -> impl IntoView {
             }
             Some(WhoamiResponse::ShouldLogin) => {
                 if !loc.pathname.get().contains("/login") {
-                    let _ = window().location().set_href("/login");
+                    let _ = window().location().set_href("/login?oidc=keycloak_test");
                 }
             }
             _ => (),
