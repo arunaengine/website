@@ -1,15 +1,18 @@
-use std::{
-    fmt::{Display, Formatter},
-    str::FromStr, 
-};
-use aruna_rust_api::api::storage::{models::v2::{
-    generic_resource, relation, Collection, Dataset, ExternalRelation, ExternalRelationVariant,
-    InternalRelation, InternalRelationVariant, KeyValue, Object, Permission, Project, Relation,
-    RelationDirection, Stats, Status, User,
-}, services::v2::ResourceWithPermission};
 use anyhow::anyhow;
+use aruna_rust_api::api::storage::{
+    models::v2::{
+        generic_resource, relation, Collection, Dataset, Endpoint, EndpointHostVariant,
+        ExternalRelation, ExternalRelationVariant, InternalRelation, InternalRelationVariant,
+        KeyValue, Object, Permission, Project, Relation, RelationDirection, Stats, Status, User,
+    },
+    services::v2::ResourceWithPermission,
+};
 use leptos::*;
 use leptos_router::*;
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 //use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
 
@@ -711,7 +714,6 @@ pub fn timestamp_to_string(ts: Option<prost_wkt_types::Timestamp>) -> String {
 impl TryFrom<ResourceWithPermission> for ObjectInfo {
     type Error = anyhow::Error;
     fn try_from(value: ResourceWithPermission) -> Result<Self, Self::Error> {
-
         let Some(ref resource) = value.resource else {
             return Err(anyhow!("Missing resource"));
         };
@@ -746,7 +748,7 @@ impl TryFrom<ResourceWithPermission> for ObjectInfo {
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
                 relations: from_relation_vec(relations),
-                permission: format!("{:?}",value.permission().clone()),
+                permission: format!("{:?}", value.permission().clone()),
                 license: metadata_license_tag,
                 data_license: default_data_license_tag,
                 object_status: Status::try_from(status)
@@ -779,7 +781,7 @@ impl TryFrom<ResourceWithPermission> for ObjectInfo {
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
                 relations: from_relation_vec(relations),
-                permission: format!("{:?}",value.permission()),
+                permission: format!("{:?}", value.permission()),
                 license: metadata_license_tag,
                 data_license: default_data_license_tag,
                 object_status: Status::try_from(status)
@@ -812,7 +814,7 @@ impl TryFrom<ResourceWithPermission> for ObjectInfo {
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
                 relations: from_relation_vec(relations),
-                permission: format!("{:?}",value.permission()),
+                permission: format!("{:?}", value.permission()),
                 license: metadata_license_tag,
                 data_license: default_data_license_tag,
                 object_status: Status::try_from(status)
@@ -845,7 +847,7 @@ impl TryFrom<ResourceWithPermission> for ObjectInfo {
                 data_class: data_class_to_string(data_class),
                 created_at: timestamp_to_string(created_at),
                 relations: from_relation_vec(relations),
-                permission: format!("{:?}",value.permission()),
+                permission: format!("{:?}", value.permission()),
                 license: metadata_license_tag,
                 data_license: data_license_tag,
                 object_status: Status::try_from(status)
@@ -855,7 +857,6 @@ impl TryFrom<ResourceWithPermission> for ObjectInfo {
         })
     }
 }
-
 
 impl From<generic_resource::Resource> for SearchResultEntry {
     fn from(value: generic_resource::Resource) -> Self {
@@ -1085,7 +1086,6 @@ impl SearchResultEntry {
     }
 }
 
-
 impl ObjectInfo {
     pub fn get_card_status(&self) -> impl IntoView {
         match self.data_class.as_str() {
@@ -1175,10 +1175,10 @@ impl ObjectInfo {
         match self.permission.as_str() {
             "Read" => {
                 view! { <span class="badge badge-outline text-green">READ</span>}
-            },
+            }
             "Append" => {
                 view! { <span class="badge badge-outline text-yellow">APPEND</span> }
-            },
+            }
             "Write" => {
                 view! { <span class="badge badge-outline text-orange">WRITE</span> }
             }
@@ -1192,13 +1192,13 @@ impl ObjectInfo {
     }
 
     pub fn get_license_badge(&self) -> impl IntoView {
-        view!{
+        view! {
             <span class="badge badge-outline text-blue">{self.license.clone()}</span>
         }
     }
 
     pub fn get_data_license_badge(&self) -> impl IntoView {
-        view!{
+        view! {
             <span class="badge badge-outline text-yellow">{self.data_license.clone()}</span>
         }
     }
@@ -1232,6 +1232,67 @@ impl ObjectInfo {
                     }
                 }
             />
+        }
+    }
+}
+
+pub struct VisualizedEndpoint {
+    pub id: String,
+    pub url: String,
+    pub name: String,
+    pub location: String,
+    pub ep_type: String,
+    pub status: String,
+    pub stats: Option<String>,
+}
+
+impl From<Endpoint> for VisualizedEndpoint {
+    fn from(value: Endpoint) -> Self {
+        let s3: String = value
+            .host_configs
+            .iter()
+            .find(|e| e.host_variant() == EndpointHostVariant::S3)
+            .map(|e| e.url.clone())
+            .unwrap_or("N/A".to_string());
+
+        VisualizedEndpoint {
+            id: value.id.to_string(),
+            url: s3,
+            name: value.name.to_string(),
+            location: "N/A".to_string(),
+            ep_type: format!("{:#?}", value.ep_variant()),
+            status: format!("{:#?}", value.status()),
+            stats: None,
+        }
+    }
+}
+
+impl VisualizedEndpoint {
+    pub fn get_status_badge(&self) -> impl IntoView {
+        match self.status.as_str() {
+            "Available" => {
+                view! { <span class="badge badge-outline text-green">{self.status.to_string()}</span> }
+            }
+            "Error" => {
+                view! { <span class="badge badge-outline text-red">{self.status.to_string()}</span> }
+            }
+            _ => {
+                view! { <span class="badge badge-outline text-blue">{self.status.to_string()}</span> }
+            }
+        }
+    }
+
+    pub fn get_type_badge(&self) -> impl IntoView {
+        match self.ep_type.as_str() {
+            "Persistent" => {
+                view! { <span class="badge badge-outline text-green">{self.ep_type.to_string()}</span> }
+            }
+            "Volatile" => {
+                view! { <span class="badge badge-outline text-red">{self.ep_type.to_string()}</span> }
+            }
+            _ => {
+                view! { <span class="badge badge-outline text-blue">{self.ep_type.to_string()}</span> }
+            }
         }
     }
 }

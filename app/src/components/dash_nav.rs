@@ -120,7 +120,7 @@ pub fn DashNav() -> impl IntoView {
                                     <li
                                         class="nav-item dropdown"
                                         id="access-dropdown"
-                                        class:active=move || { path().contains("tokens") }
+                                        class:active=move || { path().contains("token") || path().contains("proxy") }
                                     >
                                         <a
                                             class="nav-link dropdown-toggle"
@@ -156,7 +156,7 @@ pub fn DashNav() -> impl IntoView {
                                             <A class="dropdown-item" href="/dash/tokens">
                                                 "Tokens"
                                             </A>
-                                            <A class="dropdown-item disabled" href="/dash/data_proxies">
+                                            <A class="dropdown-item" href="/dash/proxies">
                                                 "Data proxies"
                                             </A>
                                             <A

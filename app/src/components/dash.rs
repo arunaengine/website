@@ -1,12 +1,12 @@
 use leptos::*;
-//use leptos_meta::*;
 use leptos_router::*;
-/// Renders the home page of your application.
+
 #[component(transparent)]
 pub fn Dash() -> impl IntoView {
     use crate::components::admin::*;
     use crate::components::dash_landing_content::*;
     use crate::components::dash_nav::*;
+    use crate::components::data_proxies::*;
     use crate::components::search::*;
     use crate::components::tokens::*;
 
@@ -26,6 +26,7 @@ pub fn Dash() -> impl IntoView {
             <Route path="resources" view=move || "Resources".into_view()/>
             <Route path="admin" view=move || view! { <AdminOverview/> }/>
             <Route path="tokens" view=move || view! { <TokensOverview/> }/>
+            <Route path="proxies" view=move || view! { <DataProxyOverview/> }/>
             <Route path="" view=move || view! { <Redirect path="news"/> }/>
         </Route>
     }

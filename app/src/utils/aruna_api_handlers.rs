@@ -1,16 +1,19 @@
 use anyhow::{anyhow, Result};
 use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
 use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
-use aruna_rust_api::api::storage::models::v2::{License, Permission, PermissionLevel, User};
+use aruna_rust_api::api::storage::models::v2::{
+    Endpoint, License, Permission, PermissionLevel, User,
+};
 use aruna_rust_api::api::storage::services::v2::{
-    collection_service_client, dataset_service_client, license_service_client,
-    object_service_client, project_service_client, search_service_client, user_service_client,
-    ActivateUserRequest, CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest,
-    CreateDatasetRequest, CreateObjectRequest, DeactivateUserRequest, DeleteApiTokenRequest,
-    GetAllUsersRequest, GetAllUsersResponse, GetApiTokensRequest, GetApiTokensResponse,
-    GetResourceRequest, GetResourcesRequest, GetUserRequest, ListLicensesRequest,
-    RegisterUserRequest, RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest,
-    SearchResourcesResponse,
+    collection_service_client, dataset_service_client, endpoint_service_client,
+    license_service_client, object_service_client, project_service_client, search_service_client,
+    user_service_client, ActivateUserRequest, CreateApiTokenRequest, CreateApiTokenResponse,
+    CreateCollectionRequest, CreateDatasetRequest, CreateObjectRequest, DeactivateUserRequest,
+    DeleteApiTokenRequest, GetAllUsersRequest, GetAllUsersResponse, GetApiTokensRequest,
+    GetApiTokensResponse, GetEndpointsRequest, GetEndpointsResponse, GetResourceRequest,
+    GetResourcesRequest, GetS3CredentialsUserRequest, GetS3CredentialsUserResponse, GetUserRequest,
+    ListLicensesRequest, RegisterUserRequest, RegisterUserResponse, ResourceWithPermission,
+    SearchResourcesRequest, SearchResourcesResponse,
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
@@ -398,6 +401,18 @@ impl ConnectionHandler {
         Ok(response.user)
     }
 
+    pub async fn aruna_get_all_proxies(token: &str) -> Result<Vec<Endpoint>> {
+        let channel = Self::get_channel().await?;
+        let get_users_req = tonic::Request::new(GetEndpointsRequest {});
+        let mut client = endpoint_service_client::EndpointServiceClient::new(channel);
+        // Send the request to the AOS instance gRPC gateway
+        let response: GetEndpointsResponse = client
+            .get_endpoints(Self::add_token(get_users_req, token))
+            .await?
+            .into_inner();
+        Ok(response.endpoints)
+    }
+
     pub async fn aruna_activate_user(token: &str, user_id: &str) -> Result<()> {
         let channel = Self::get_channel().await?;
         let act_user_req = tonic::Request::new(ActivateUserRequest {
@@ -435,5 +450,21 @@ impl ConnectionHandler {
             .await?
             .into_inner()
             .licenses)
+    }
+
+    pub async fn aruna_get_s3_credentials(
+        token: &str,
+        endpoint_id: &str,
+    ) -> Result<GetS3CredentialsUserResponse> {
+        let channel = Self::get_channel().await?;
+        let mut client = user_service_client::UserServiceClient::new(channel);
+        let req = tonic::Request::new(GetS3CredentialsUserRequest {
+            user_id: "".to_string(),
+            endpoint_id: endpoint_id.to_string(),
+        });
+        Ok(client
+            .get_s3_credentials_user(Self::add_token(req, token))
+            .await?
+            .into_inner())
     }
 }
