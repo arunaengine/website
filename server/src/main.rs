@@ -98,14 +98,15 @@ async fn main() {
         Some(MailClient::new().expect("Failed to create mail client"))
     };
 
-    let config: Config =
-        toml::from_str(
-            std::io::read_to_string(
-                File::open(
-                    &dotenvy::var("OIDC_CONFIG").expect("OIDC_CONFIG must be set!")
-                ).expect("Failed to open OIDC_CONFIG file")
-            ).expect("Failed to read OIDC_CONFIG").as_str())
-            .expect("Failed to parse OIDC_CONFIG");
+    let config: Config = toml::from_str(
+        std::io::read_to_string(
+            File::open(&dotenvy::var("OIDC_CONFIG").expect("OIDC_CONFIG must be set!"))
+                .expect("Failed to open OIDC_CONFIG file"),
+        )
+        .expect("Failed to read OIDC_CONFIG")
+        .as_str(),
+    )
+    .expect("Failed to parse OIDC_CONFIG");
 
     let server_state = ServerState {
         oidcs: config

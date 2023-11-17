@@ -7,13 +7,13 @@ use axum::{
     http::StatusCode,
     response::Redirect,
 };
-use axum_extra::extract::{cookie::Cookie, PrivateCookieJar};
+use axum_extra::extract::{cookie::{Cookie, SameSite}, PrivateCookieJar};
 use serde::{de, Deserialize, Deserializer};
 use time::OffsetDateTime;
 
 #[derive(Deserialize)]
 pub struct LoginQuery {
-    pub oidc: String,
+    pub oidc: Option<String>,
     pub redirect: Option<String>,
 }
 
@@ -26,22 +26,40 @@ pub async fn login(
         .map(|e| e.into_owned())
         .unwrap_or_else(|_| "/".to_string());
 
-    let oidc = match state.get_oidc(&querydata.oidc) {
+    let provider_name = match querydata.oidc {
+        Some(ref name) => name.to_string(),
+        None => jar
+            .get("provider")
+            .map(|c| c.value().to_string())
+            .ok_or_else(|| StatusCode::BAD_REQUEST)?,
+    };
+
+    let oidc = match state.get_oidc(&provider_name) {
         Some(oidc) => oidc,
         None => return Err(StatusCode::NOT_FOUND),
     };
 
     if let Some(refresh_token) = jar.get("refresh") {
-        if let Ok((token, duration)) = oidc.refresh(refresh_token.value()).await {
+        if let Ok((token, refresh, duration)) = oidc.refresh(refresh_token.value()).await {
             let expires = OffsetDateTime::now_utc() + duration;
             let token_cookie = Cookie::build("token", token.clone())
                 .path("/")
                 .secure(true)
                 .http_only(true)
                 .expires(expires)
+                .same_site(SameSite::Strict)
                 .finish();
 
-            let jar = jar.add(token_cookie).add(Cookie::new("logged_in", "true"));
+            let mut jar = jar.add(token_cookie).add(Cookie::new("logged_in", "true"));
+
+            if let Some(refresh) = refresh {
+                jar = jar.add(Cookie::build("refresh", refresh.clone())
+                    .path("/")
+                    .secure(true)
+                    .http_only(true).same_site(SameSite::Strict)
+                    .finish());
+            }
+
             return Ok((jar, Redirect::to(&redirect)));
         }
     }
@@ -51,12 +69,14 @@ pub async fn login(
             .path("/")
             .secure(true)
             .http_only(true)
+            .same_site(SameSite::Strict)
             .finish();
 
         let provider_cookie = Cookie::build("provider", oidc.authorizer_name.clone())
             .path("/")
             .secure(true)
             .http_only(true)
+            .same_site(SameSite::Strict)
             .finish();
 
         Ok((
@@ -106,12 +126,14 @@ pub async fn callback(
         .secure(true)
         .http_only(true)
         .expires(expires)
+        .same_site(SameSite::Strict)
         .finish();
 
     let refresh_cookie = Cookie::build("refresh", refresh.clone())
         .path("/")
         .secure(true)
         .http_only(true)
+        .same_site(SameSite::Strict)
         .finish();
 
     let jar = jar
@@ -143,7 +165,7 @@ where
 
 pub async fn refresh(
     State(state): State<ServerState>,
-    jar: PrivateCookieJar,
+    mut jar: PrivateCookieJar,
     Query(query): Query<FromQuery>,
 ) -> Result<(PrivateCookieJar, Redirect), StatusCode> {
     let challenge = jar.get("refresh").ok_or_else(|| StatusCode::UNAUTHORIZED)?;
@@ -153,18 +175,27 @@ pub async fn refresh(
         .get_oidc(provider.value())
         .ok_or_else(|| StatusCode::NOT_FOUND)?;
 
-    let (new_token, expires) = oidc
+    let (access_token, refresh_token, expires) = oidc
         .refresh(challenge.value())
         .await
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
     let expires = OffsetDateTime::now_utc() + expires;
 
-    let token_cookie = Cookie::build("token", new_token.clone())
+    let token_cookie = Cookie::build("token", access_token.clone())
         .path("/")
         .secure(true)
         .http_only(true)
         .expires(expires)
         .finish();
+
+    if let Some(refresh) = refresh_token {
+        jar = jar.add(Cookie::build("refresh", refresh.clone())
+            .path("/")
+            .secure(true)
+            .http_only(true)
+            .same_site(SameSite::Strict)
+            .finish());
+    }
 
     let jar = jar.add(token_cookie).add(Cookie::new("logged_in", "true"));
     Ok((jar, Redirect::to(&query.from.unwrap_or("/".to_string()))))

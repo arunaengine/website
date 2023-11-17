@@ -1,10 +1,8 @@
 use crate::utils::{
-    structs::{SearchResultEntry, VisualizedStats},
+    structs::{ObjectInfo, VisualizedStats},
     tabler_utils::{add_bg_color, add_text_color, Colors},
 };
-use aruna_rust_api::api::storage::{
-    models::v2::generic_resource::Resource as APIResource, services::v2::ResourceWithPermission,
-};
+use aruna_rust_api::api::storage::services::v2::ResourceWithPermission;
 use leptos::*;
 use leptos_router::*;
 use serde::{Deserialize, Serialize};
@@ -80,9 +78,9 @@ pub fn ObjectOverview() -> impl IntoView {
     });
 
     // Uses entry
-    let _entry = move |value: APIResource| SearchResultEntry::from(value);
-    let name = move |entry: SearchResultEntry| entry.name.to_string();
-    let id = move |entry: SearchResultEntry| entry.id.to_string();
+    //let _entry = move |value: APIResource| SearchResultEntry::from(value);
+    let name = move |entry: ObjectInfo| entry.name.to_string();
+    let id = move |entry: ObjectInfo| entry.id.to_string();
 
     // This is ugly, but leptos::Recource cant get loaded outside of views
     // and because SearchResult does not implement view, everything now needs to be matched
@@ -399,7 +397,7 @@ pub fn ObjectOverview() -> impl IntoView {
         }
     };
 
-    let relations = move |entry: SearchResultEntry| {
+    let relations = move |entry: ObjectInfo| {
         let (a, b): (Vec<_>, Vec<_>) = entry
             .relations
             .clone()
@@ -408,7 +406,7 @@ pub fn ObjectOverview() -> impl IntoView {
         (a, b)
     };
 
-    let get_labels = move |entry: SearchResultEntry| {
+    let get_labels = move |entry: ObjectInfo| {
         let (a, b): (Vec<_>, Vec<_>) = entry
             .key_values
             .clone()
@@ -417,7 +415,7 @@ pub fn ObjectOverview() -> impl IntoView {
         (a, b)
     };
 
-    let labels = move |entry: SearchResultEntry| {
+    let labels = move |entry: ObjectInfo| {
         let (hooks, _) = get_labels(entry);
 
         view! {
@@ -468,7 +466,7 @@ pub fn ObjectOverview() -> impl IntoView {
             </div>
         }
     };
-    let hooks = move |entry: SearchResultEntry| {
+    let hooks = move |entry: ObjectInfo| {
         let (_, label) = get_labels(entry);
 
         view! {
@@ -520,7 +518,7 @@ pub fn ObjectOverview() -> impl IntoView {
         }
     };
 
-    let splitted_relations = move |entry: SearchResultEntry| {
+    let splitted_relations = move |entry: ObjectInfo| {
         let (ext, int) = relations(entry);
 
         let (inc, out): (Vec<_>, Vec<_>) = int.into_iter().partition(|x| x.is_incoming());
@@ -528,7 +526,7 @@ pub fn ObjectOverview() -> impl IntoView {
         (ext, inc, out)
     };
 
-    let ext_relations = move |entry: SearchResultEntry| {
+    let ext_relations = move |entry: ObjectInfo| {
         let (external, _, _) = splitted_relations(entry);
 
         view! {
@@ -579,7 +577,7 @@ pub fn ObjectOverview() -> impl IntoView {
         }
     };
 
-    let int_relations = move |entry: SearchResultEntry| {
+    let int_relations = move |entry: ObjectInfo| {
         let (_, internal_inc, internal_ext) = splitted_relations(entry);
 
         view! {
@@ -652,7 +650,7 @@ pub fn ObjectOverview() -> impl IntoView {
         }
     };
 
-    let endpoints = move || {
+    let _endpoints = move || {
         view! {
             <div class="col-xl-12 col-xxl-6">
                 <div class="card">
@@ -754,7 +752,7 @@ pub fn ObjectOverview() -> impl IntoView {
         }
     };
 
-    let top_tags = move |entry: SearchResultEntry| {
+    let top_tags = move |entry: ObjectInfo| {
         view! {
             <div class="row">
                 <div class="col-auto">{entry.get_type_badge()}</div>
@@ -770,7 +768,7 @@ pub fn ObjectOverview() -> impl IntoView {
         }
     };
 
-    let card_deck = move |entry: SearchResultEntry| {
+    let card_deck = move |entry: ObjectInfo| {
         view! {
             <div class="row row-deck row-cards">
                 {small_card((
@@ -785,7 +783,7 @@ pub fn ObjectOverview() -> impl IntoView {
                     Colors::Primary,
                     Some(Colors::Primary),
                 ))} {stats_card(entry.clone().stats)} {full_card(entry.clone().description)}
-                {labels(entry.clone())} {hooks(entry.clone())} {endpoints()}
+                {labels(entry.clone())} {hooks(entry.clone())} //{endpoints()}
                 {ext_relations(entry.clone())} {int_relations(entry.clone())}
             </div>
         }
@@ -799,29 +797,20 @@ pub fn ObjectOverview() -> impl IntoView {
                     let resource = move || resource.get().flatten();
                     match resource() {
                         Some(result) => {
-                            match result.resource {
-                                Some(result) => {
-                                    match result.resource {
-                                        Some(result) => {
-                                            let entry = move || SearchResultEntry::from(result.clone());
-                                            view! {
-                                                <div class="page-wrapper d-print-none">
-                                                    <div class="page-header">{header}</div>
-                                                    <div class="page-body mt-2">
-                                                        <div class="container-xl mb-2">
-                                                            {top_tags(entry().clone())}
-                                                        </div>
-                                                        <div class="container-xl">{card_deck(entry())}</div>
-                                                    </div>
-                                                </div>
-                                            }
-                                                .into_view()
-                                        }
-                                        None => view! { <p>"No resource found"</p> }.into_view(),
-                                    }
+                           
+                                let entry = move || ObjectInfo::try_from(result.clone()).unwrap();
+                                view! {
+                                    <div class="page-wrapper d-print-none">
+                                        <div class="page-header">{header}</div>
+                                        <div class="page-body mt-2">
+                                            <div class="container-xl mb-2">
+                                                {top_tags(entry().clone())}
+                                            </div>
+                                            <div class="container-xl">{card_deck(entry())}</div>
+                                        </div>
+                                    </div>
                                 }
-                                None => view! { <p>"No resource found"</p> }.into_view(),
-                            }
+                                    .into_view()
                         }
                         None => view! { <p>"No resource found"</p> }.into_view(),
                     }

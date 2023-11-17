@@ -3,6 +3,7 @@ use axum_core::response::IntoResponse;
 use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::cookie::Key;
 use axum_extra::extract::PrivateCookieJar;
+use axum_extra::extract::cookie::SameSite;
 use leptos::*;
 use leptos_axum::ResponseOptions;
 use leptos_axum::ResponseParts;
@@ -37,6 +38,8 @@ pub async fn extract_token() -> LoginResult {
 
     let mut jar = PrivateCookieJar::from_headers(&req_parts.headers, signing_key);
 
+
+
     if jar.get("logged_in") != Some(Cookie::new("logged_in", "true")) {
         leptos_axum::redirect("/");
         return LoginResult::NotLoggedIn;
@@ -47,17 +50,19 @@ pub async fn extract_token() -> LoginResult {
     }
 
     if let Some(refresh_token) = jar.get("refresh") {
-
-        let Some(provider) = jar.get("oidc") else {
+        let Some(provider) = jar.get("provider") else {
             return LoginResult::NotLoggedIn;
         };
 
-        let Some(handler) = oidc_handlers.iter().find(|(a, _)| a == provider.value()).map(|(_, oidc_handler)| oidc_handler) else {
+        let Some(handler) = oidc_handlers
+            .iter()
+            .find(|(a, _)| a == provider.value())
+            .map(|(_, oidc_handler)| oidc_handler)
+        else {
             return LoginResult::Error("Missing oidc handler".to_string());
         };
 
-
-        let (token, duration) = match handler.refresh(refresh_token.value()).await {
+        let (access_token, refresh_token, duration) = match handler.refresh(refresh_token.value()).await {
             Ok(token) => token,
             Err(e) => {
                 return LoginResult::Error(format!("Error refreshing token: {}", e));
@@ -65,12 +70,24 @@ pub async fn extract_token() -> LoginResult {
         };
 
         let expires = OffsetDateTime::now_utc() + duration;
-        let token_cookie = Cookie::build("token", token.clone())
+        let token_cookie = Cookie::build("token", access_token.clone())
             .path("/")
             .secure(true)
             .http_only(true)
             .expires(expires)
+            .same_site(SameSite::Strict)
             .finish();
+
+        if let Some(refresh_token) = refresh_token {
+            let refresh_cookie = Cookie::build("refresh", refresh_token.clone())
+                .path("/")
+                .secure(true)
+                .http_only(true)
+                .same_site(SameSite::Strict)
+                .finish();
+
+            jar = jar.add(refresh_cookie);
+        }
 
         jar = jar.add(token_cookie).add(Cookie::new("logged_in", "true"));
 
@@ -79,7 +96,7 @@ pub async fn extract_token() -> LoginResult {
             ..Default::default()
         });
 
-        return LoginResult::ValidToken(token);
+        return LoginResult::ValidToken(access_token);
     }
 
     // Remove all cookies (Not logged / broken refresh)

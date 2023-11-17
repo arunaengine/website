@@ -4,7 +4,6 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-
 #[server]
 pub async fn get_provider_names() -> Result<Vec<String>, ServerFnError> {
     use crate::utils::oidc::Authorizer;
@@ -19,7 +18,7 @@ pub fn Provider(name: String) -> impl IntoView {
     let name_clone = name.clone();
     let href = move || format!("/login?oidc={}", name_clone);
     let path_clone = href().clone();
-    view!{
+    view! {
         <a href=href class="btn w-100" on:click=move |_| {
             let _ = window().location().set_href(&path_clone);
         }>
@@ -29,13 +28,10 @@ pub fn Provider(name: String) -> impl IntoView {
     }
 }
 
-
 /// Renders the home page of your application.
 #[component]
 pub fn LoginModal() -> impl IntoView {
-
     provide_meta_context();
-
 
     let provider_res = create_resource(move || (), |_| get_provider_names());
 
@@ -53,14 +49,17 @@ pub fn LoginModal() -> impl IntoView {
                 nav("/", Default::default());
             });
 
-            on_cleanup(move || {
-                drop(show_modal)
-            });
+            on_cleanup(move || drop(show_modal));
         });
     });
 
-
-    let providers = move || provider_res.get().map(|r| r.ok()).flatten().unwrap_or_default();
+    let providers = move || {
+        provider_res
+            .get()
+            .map(|r| r.ok())
+            .flatten()
+            .unwrap_or_default()
+    };
 
     view! {
             <div class="modal mt-5 fade" id="loginModal" _ref=modal_ref tabindex="-1">
@@ -100,7 +99,7 @@ pub fn LoginModal() -> impl IntoView {
                             // a function that returns the items we're iterating over; a signal is fine
                             each=providers
                             // a unique key for each item
-                            key=|name| name.to_string() 
+                            key=|name| name.to_string()
                             // renders each item to a view
                             children=move |name: String| {
                               view! {

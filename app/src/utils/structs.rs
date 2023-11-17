@@ -1,19 +1,13 @@
 use std::{
     fmt::{Display, Formatter},
-    str::FromStr,
+    str::FromStr, 
 };
-
-use aruna_rust_api::api::storage::models::v2::{
+use aruna_rust_api::api::storage::{models::v2::{
     generic_resource, relation, Collection, Dataset, ExternalRelation, ExternalRelationVariant,
     InternalRelation, InternalRelationVariant, KeyValue, Object, Permission, Project, Relation,
     RelationDirection, Stats, Status, User,
-};
-//use anyhow::anyhow;
-// use aruna_rust_api::api::storage::{
-//     models::v1::{ProjectOverview, ProjectPermission, Token, User},
-//     services::v1::{CreateApiTokenResponse, UserWithPerms},
-// };
-//use chrono::Local;
+}, services::v2::ResourceWithPermission};
+use anyhow::anyhow;
 use leptos::*;
 use leptos_router::*;
 //use prost_types::Timestamp;
@@ -267,6 +261,23 @@ impl ResourceType {
             ResourceType::Object => "object_type = OBJECT".to_string(),
         }
     }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ObjectInfo {
+    pub id: String,
+    pub name: String,
+    pub variant: String,
+    pub description: String,
+    pub key_values: Vec<WebKV>,
+    pub stats: VisualizedStats,
+    pub data_class: String,
+    pub created_at: String,
+    pub relations: Vec<WebRelation>,
+    pub object_status: String,
+    pub permission: String,
+    pub license: String,
+    pub data_license: String,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -697,6 +708,155 @@ pub fn timestamp_to_string(ts: Option<prost_wkt_types::Timestamp>) -> String {
     }
 }
 
+impl TryFrom<ResourceWithPermission> for ObjectInfo {
+    type Error = anyhow::Error;
+    fn try_from(value: ResourceWithPermission) -> Result<Self, Self::Error> {
+
+        let Some(ref resource) = value.resource else {
+            return Err(anyhow!("Missing resource"));
+        };
+        let Some(ref resource) = resource.resource else {
+            return Err(anyhow!("Missing resource"));
+        };
+
+        Ok(match resource.clone() {
+            generic_resource::Resource::Project(Project {
+                id,
+                name,
+                description,
+                key_values,
+                stats,
+                data_class,
+                created_at,
+                relations,
+                metadata_license_tag,
+                default_data_license_tag,
+                status,
+                ..
+            }) => ObjectInfo {
+                id: id.to_string(),
+                name,
+                variant: "Project".to_string(),
+                description,
+                key_values: key_values
+                    .into_iter()
+                    .map(|kv| kv.into())
+                    .collect::<Vec<_>>(),
+                stats: VisualizedStats::from(stats),
+                data_class: data_class_to_string(data_class),
+                created_at: timestamp_to_string(created_at),
+                relations: from_relation_vec(relations),
+                permission: format!("{:?}",value.permission().clone()),
+                license: metadata_license_tag,
+                data_license: default_data_license_tag,
+                object_status: Status::try_from(status)
+                    .map(|s| format!("{:?}", s))
+                    .unwrap_or_else(|_| "Unknown".to_string()),
+            },
+            generic_resource::Resource::Collection(Collection {
+                id,
+                name,
+                description,
+                key_values,
+                stats,
+                data_class,
+                created_at,
+                relations,
+                metadata_license_tag,
+                default_data_license_tag,
+                status,
+                ..
+            }) => ObjectInfo {
+                id: id.to_string(),
+                name,
+                variant: "Collection".to_string(),
+                description,
+                key_values: key_values
+                    .into_iter()
+                    .map(|kv| kv.into())
+                    .collect::<Vec<_>>(),
+                stats: VisualizedStats::from(stats),
+                data_class: data_class_to_string(data_class),
+                created_at: timestamp_to_string(created_at),
+                relations: from_relation_vec(relations),
+                permission: format!("{:?}",value.permission()),
+                license: metadata_license_tag,
+                data_license: default_data_license_tag,
+                object_status: Status::try_from(status)
+                    .map(|s| format!("{:?}", s))
+                    .unwrap_or_else(|_| "Unknown".to_string()),
+            },
+            generic_resource::Resource::Dataset(Dataset {
+                id,
+                name,
+                description,
+                key_values,
+                stats,
+                data_class,
+                created_at,
+                relations,
+                metadata_license_tag,
+                default_data_license_tag,
+                status,
+                ..
+            }) => ObjectInfo {
+                id: id.to_string(),
+                name,
+                variant: "Dataset".to_string(),
+                description,
+                key_values: key_values
+                    .into_iter()
+                    .map(|kv| kv.into())
+                    .collect::<Vec<_>>(),
+                stats: VisualizedStats::from(stats),
+                data_class: data_class_to_string(data_class),
+                created_at: timestamp_to_string(created_at),
+                relations: from_relation_vec(relations),
+                permission: format!("{:?}",value.permission()),
+                license: metadata_license_tag,
+                data_license: default_data_license_tag,
+                object_status: Status::try_from(status)
+                    .map(|s| format!("{:?}", s))
+                    .unwrap_or_else(|_| "Unknown".to_string()),
+            },
+            generic_resource::Resource::Object(Object {
+                id,
+                name,
+                description,
+                key_values,
+                content_len,
+                data_class,
+                created_at,
+                relations,
+                status,
+                metadata_license_tag,
+                data_license_tag,
+                ..
+            }) => ObjectInfo {
+                id: id.to_string(),
+                name,
+                variant: "Object".to_string(),
+                description,
+                key_values: key_values
+                    .into_iter()
+                    .map(|kv| kv.into())
+                    .collect::<Vec<_>>(),
+                stats: VisualizedStats::from(content_len),
+                data_class: data_class_to_string(data_class),
+                created_at: timestamp_to_string(created_at),
+                relations: from_relation_vec(relations),
+                permission: format!("{:?}",value.permission()),
+                license: metadata_license_tag,
+                data_license: data_license_tag,
+                object_status: Status::try_from(status)
+                    .map(|s| format!("{:?}", s))
+                    .unwrap_or_else(|_| "Unknown".to_string()),
+            },
+        })
+    }
+}
+
+
 impl From<generic_resource::Resource> for SearchResultEntry {
     fn from(value: generic_resource::Resource) -> Self {
         match value {
@@ -808,6 +968,125 @@ impl From<generic_resource::Resource> for SearchResultEntry {
 }
 
 impl SearchResultEntry {
+    pub fn get_card_status(&self) -> impl IntoView {
+        match self.data_class.as_str() {
+            "Public" => view! { <div class="card-status-start bg-green"></div> },
+            "Private" => view! { <div class="card-status-start bg-orange"></div> },
+            "Workspace" => view! { <div class="card-status-start bg-cyan"></div> },
+            "Confidential" => view! { <div class="card-status-start bg-red"></div> },
+            _ => view! { <div class="card-status-start bg-red"></div> },
+        }
+    }
+
+    pub fn get_ribbon(&self) -> impl IntoView {
+        match self.variant.as_str() {
+            "Project" => view! { <div class="ribbon bg-blue">Project</div> },
+            "Collection" => view! { <div class="ribbon bg-orange">Collection</div> },
+            "Dataset" => view! { <div class="ribbon bg-cyan">Dataset</div> },
+            "Object" => view! { <div class="ribbon bg-green">Object</div> },
+            _ => view! { <div class="ribbon bg-pink">Unknown</div> },
+        }
+    }
+
+    pub fn get_status(&self) -> impl IntoView {
+        match self.data_class.as_str() {
+            "Public" => view! { <span class="status status-green m-1">Public</span> },
+            "Private" => view! { <span class="status status-orange m-1">Private</span> },
+            "Workspace" => view! { <span class="status status-cyan m-1">Workspace</span> },
+            "Confidential" => view! { <span class="status status-red m-1">Confidential</span> },
+            _ => view! { <span class="status status-red m-1">Unknown</span> },
+        }
+    }
+
+    pub fn get_data_class_badge(&self) -> impl IntoView {
+        match self.data_class.as_str() {
+            "Public" => {
+                view! { <span class="badge badge-outline text-green">{self.data_class.to_string()}</span> }
+            }
+            "Private" => {
+                view! { <span class="badge badge-outline text-orange">{self.data_class.to_string()}</span> }
+            }
+            "Workspace" => {
+                view! { <span class="badge badge-outline text-cyan">{self.data_class.to_string()}</span> }
+            }
+            "Confidential" => {
+                view! { <span class="badge badge-outline text-red">{self.data_class.to_string()}</span> }
+            }
+            _ => {
+                view! { <span class="badge badge-outline text-red">{self.data_class.to_string()}</span> }
+            }
+        }
+    }
+
+    pub fn get_type_badge(&self) -> impl IntoView {
+        match self.variant.as_str() {
+            "Project" => {
+                view! { <span class="badge badge-outline text-blue">{self.variant.to_string()}</span> }
+            }
+            "Collection" => {
+                view! { <span class="badge badge-outline text-orange">{self.variant.to_string()}</span> }
+            }
+            "Dataset" => {
+                view! { <span class="badge badge-outline text-cyan">{self.variant.to_string()}</span> }
+            }
+            "Object" => {
+                view! { <span class="badge badge-outline text-blue">{self.variant.to_string()}</span> }
+            }
+            _ => {
+                view! { <span class="badge badge-outline text-blue">{self.variant.to_string()}</span> }
+            }
+        }
+    }
+
+    pub fn get_status_badge(&self) -> impl IntoView {
+        match self.object_status.as_str() {
+            "Available" => {
+                view! { <span class="badge badge-outline text-green">{self.object_status.to_string()}</span> }
+            }
+            "Error" => {
+                view! { <span class="badge badge-outline text-red">{self.object_status.to_string()}</span> }
+            }
+            _ => {
+                view! { <span class="badge badge-outline text-blue">{self.object_status.to_string()}</span> }
+            }
+        }
+    }
+
+    pub fn get_stats(&self) -> impl IntoView {
+        view! {
+            <span class="status status-yellow m-1">Count: {self.stats.count}</span>
+            <span class="status status-cyan m-1">{self.stats.size.to_string()}</span>
+        }
+    }
+
+    pub fn get_key_values(&self) -> impl IntoView {
+        let kv = self.key_values.clone();
+
+        let only_labels = kv
+            .iter()
+            .filter(|kv| kv.variant == 1)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        view! {
+            <For
+                each=move || { only_labels.clone().into_iter().enumerate() }
+                key=|(index, _k)| *index
+                children=move |kv| {
+                    view! {
+                        <div class="d-inline-flex tag">
+                            <div class="key text-secondary">{kv.1.get_key()}</div>
+                            <div class="value">{kv.1.get_value()}</div>
+                        </div>
+                    }
+                }
+            />
+        }
+    }
+}
+
+
+impl ObjectInfo {
     pub fn get_card_status(&self) -> impl IntoView {
         match self.data_class.as_str() {
             "Public" => view! { <div class="card-status-start bg-green"></div> },

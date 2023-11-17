@@ -6,7 +6,7 @@ use openidconnect::OAuth2TokenResponse;
 use openidconnect::PkceCodeVerifier;
 use openidconnect::RefreshToken;
 use openidconnect::{
-    AccessTokenHash, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
+    AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
     PkceCodeChallenge, RedirectUrl,
 };
 use serde::{Deserialize, Serialize};
@@ -134,9 +134,6 @@ impl Authorizer {
         // Once the user has been redirected to the redirect URL, you'll have access to the
         // authorization code. For security reasons, your code should verify that the `state`
         // parameter returned by the server matches `csrf_state`.
-
-        use openidconnect::TokenResponse;
-
         if challenge.csrf_token.secret() != state {
             return Err(anyhow!("Invalid state, csrf detected"));
         }
@@ -152,39 +149,22 @@ impl Authorizer {
 
         let expires = token_response.expires_in().unwrap_or_default();
         // Extract the ID token claims after verifying its authenticity and nonce.
-        let id_token = token_response
-            .id_token()
-            .ok_or_else(|| anyhow!("Server did not return an ID token"))?
-            .clone();
+        let access_token = token_response
+            .access_token().secret().to_string();
 
         let refresh_token = token_response
             .refresh_token()
             .ok_or_else(|| anyhow!("Server did not return a refresh token"))?
             .clone();
 
-        let claims =
-            id_token.claims(&self.core_client.id_token_verifier(), challenge.get_nonce())?;
-
-        // Verify the access token hash to ensure that the access token hasn't been substituted for
-        // another user's.
-        if let Some(expected_access_token_hash) = claims.access_token_hash() {
-            let actual_access_token_hash = AccessTokenHash::from_token(
-                token_response.access_token(),
-                &id_token.signing_alg()?,
-            )?;
-            if actual_access_token_hash != *expected_access_token_hash {
-                return Err(anyhow!("Invalid access token"));
-            }
-        }
-
         Ok((
-            id_token.to_string(),
+            access_token,
             expires,
             refresh_token.secret().to_string(),
         ))
     }
 
-    pub async fn refresh(&self, refresh_token: &str) -> Result<(String, Duration)> {
+    pub async fn refresh(&self, refresh_token: &str) -> Result<(String, Option<String>, Duration)> {
         let token = self
             .core_client
             .exchange_refresh_token(&RefreshToken::new(refresh_token.to_string()))
@@ -193,6 +173,7 @@ impl Authorizer {
 
         Ok((
             token.access_token().secret().to_string(),
+            token.refresh_token().map(|r| r.secret().to_string()),
             token.expires_in().unwrap_or_default(),
         ))
     }

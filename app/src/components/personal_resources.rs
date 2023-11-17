@@ -1,17 +1,21 @@
 use crate::utils::{
-    structs::{SearchResultEntry, WhoamiResponse},
+    structs::{ObjectInfo, WhoamiResponse},
     visual_helpers::GetVisualization,
 };
-use aruna_rust_api::api::storage::models::v2::{
-    generic_resource::Resource, Permission, PermissionLevel,
-};
+use aruna_rust_api::api::storage::{models::v2::{
+    generic_resource::Resource, Permission, PermissionLevel, GenericResource,
+}, services::v2::ResourceWithPermission};
 use leptos::*;
 //use leptos_meta::*;
 use leptos_router::*;
 
 #[component]
 pub fn SearchResult(res: (Resource, PermissionLevel)) -> impl IntoView {
-    let entry = SearchResultEntry::from(res.0);
+    let res_with_perm = ResourceWithPermission {
+        resource: Some(GenericResource{resource: Some(res.0.clone())}),
+        permission: res.1 as i32,
+    };
+    let entry = ObjectInfo::try_from(res_with_perm).unwrap();
     let entry_clone = entry.clone();
     let name = move || entry_clone.name.to_string();
     let id = move || entry_clone.id.to_string();

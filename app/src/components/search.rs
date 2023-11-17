@@ -4,7 +4,6 @@ use crate::utils::structs::{
 use aruna_rust_api::api::storage::{
     models::v2::generic_resource::Resource, services::v2::SearchResourcesResponse,
 };
-use http::{header, StatusCode};
 use leptos::*;
 use leptos_router::*;
 
@@ -49,6 +48,7 @@ pub fn SearchResult(res: Resource) -> impl IntoView {
 async fn search_api(query: SearchQuery) -> Result<SearchResourcesResponse, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
     use crate::utils::login_helpers::{extract_token, LoginResult};
+    use http::{header, StatusCode};
     use leptos_axum::ResponseOptions;
 
     let token = match extract_token().await {

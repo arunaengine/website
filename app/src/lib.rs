@@ -30,12 +30,12 @@ pub fn EntryPoint() -> impl IntoView {
     use crate::components::footer::*;
     use crate::components::header::*;
     use crate::components::imprint::*;
+    use crate::components::login_modal::*;
     use crate::components::objects::*;
     use crate::components::personal_resources::*;
     use crate::components::register::*;
     use crate::components::search::*;
     use crate::components::tos::*;
-    use crate::components::login_modal::*;
     use crate::utils::structs::*;
 
     let hide_cordi = create_rw_signal(true);
