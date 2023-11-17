@@ -100,7 +100,7 @@ async fn main() {
 
     let config: Config = toml::from_str(
         std::io::read_to_string(
-            File::open(&dotenvy::var("OIDC_CONFIG").expect("OIDC_CONFIG must be set!"))
+            File::open(dotenvy::var("OIDC_CONFIG").expect("OIDC_CONFIG must be set!"))
                 .expect("Failed to open OIDC_CONFIG file"),
         )
         .expect("Failed to read OIDC_CONFIG")

@@ -24,7 +24,7 @@ pub async fn register_user(
 
     ConnectionHandler::aruna_register_user(&token, &displayname, &email, &project)
         .await
-        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?;
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e)))?;
     Ok(())
 }
 

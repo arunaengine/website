@@ -14,7 +14,7 @@ pub async fn activate_user(user_id: String) -> Result<(), ServerFnError> {
 
     ConnectionHandler::aruna_activate_user(&token, &user_id)
         .await
-        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?;
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e)))?;
     Ok(())
 }
 
@@ -29,7 +29,7 @@ pub async fn deactivate_user(user_id: String) -> Result<(), ServerFnError> {
 
     ConnectionHandler::aruna_deactivate_user(&token, &user_id)
         .await
-        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?;
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e)))?;
     Ok(())
 }
 

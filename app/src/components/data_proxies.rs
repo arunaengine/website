@@ -16,9 +16,9 @@ pub async fn get_proxies() -> Result<Vec<Endpoint>, ServerFnError> {
         return Err(ServerFnError::ServerError("NotLoggedIn".to_string()));
     };
 
-    return Ok(ConnectionHandler::aruna_get_all_proxies(&token)
+    return ConnectionHandler::aruna_get_all_proxies(&token)
         .await
-        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?);
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e)));
 }
 
 #[server]
@@ -32,11 +32,9 @@ pub async fn get_credentials(
         return Err(ServerFnError::ServerError("NotLoggedIn".to_string()));
     };
 
-    return Ok(
-        ConnectionHandler::aruna_get_s3_credentials(&token, &endpoint)
-            .await
-            .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?,
-    );
+    return ConnectionHandler::aruna_get_s3_credentials(&token, &endpoint)
+        .await
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e)));
 }
 
 #[component]

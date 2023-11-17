@@ -7,7 +7,10 @@ use axum::{
     http::StatusCode,
     response::Redirect,
 };
-use axum_extra::extract::{cookie::{Cookie, SameSite}, PrivateCookieJar};
+use axum_extra::extract::{
+    cookie::{Cookie, SameSite},
+    PrivateCookieJar,
+};
 use serde::{de, Deserialize, Deserializer};
 use time::OffsetDateTime;
 
@@ -31,7 +34,7 @@ pub async fn login(
         None => jar
             .get("provider")
             .map(|c| c.value().to_string())
-            .ok_or_else(|| StatusCode::BAD_REQUEST)?,
+            .ok_or(StatusCode::BAD_REQUEST)?,
     };
 
     let oidc = match state.get_oidc(&provider_name) {
@@ -53,11 +56,14 @@ pub async fn login(
             let mut jar = jar.add(token_cookie).add(Cookie::new("logged_in", "true"));
 
             if let Some(refresh) = refresh {
-                jar = jar.add(Cookie::build("refresh", refresh.clone())
-                    .path("/")
-                    .secure(true)
-                    .http_only(true).same_site(SameSite::Strict)
-                    .finish());
+                jar = jar.add(
+                    Cookie::build("refresh", refresh.clone())
+                        .path("/")
+                        .secure(true)
+                        .http_only(true)
+                        .same_site(SameSite::Strict)
+                        .finish(),
+                );
             }
 
             return Ok((jar, Redirect::to(&redirect)));
@@ -168,12 +174,12 @@ pub async fn refresh(
     mut jar: PrivateCookieJar,
     Query(query): Query<FromQuery>,
 ) -> Result<(PrivateCookieJar, Redirect), StatusCode> {
-    let challenge = jar.get("refresh").ok_or_else(|| StatusCode::UNAUTHORIZED)?;
-    let provider = jar.get("provider").ok_or_else(|| StatusCode::NOT_FOUND)?;
+    let challenge = jar.get("refresh").ok_or(StatusCode::UNAUTHORIZED)?;
+    let provider = jar.get("provider").ok_or(StatusCode::NOT_FOUND)?;
 
     let oidc = state
         .get_oidc(provider.value())
-        .ok_or_else(|| StatusCode::NOT_FOUND)?;
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     let (access_token, refresh_token, expires) = oidc
         .refresh(challenge.value())
@@ -189,12 +195,14 @@ pub async fn refresh(
         .finish();
 
     if let Some(refresh) = refresh_token {
-        jar = jar.add(Cookie::build("refresh", refresh.clone())
-            .path("/")
-            .secure(true)
-            .http_only(true)
-            .same_site(SameSite::Strict)
-            .finish());
+        jar = jar.add(
+            Cookie::build("refresh", refresh.clone())
+                .path("/")
+                .secure(true)
+                .http_only(true)
+                .same_site(SameSite::Strict)
+                .finish(),
+        );
     }
 
     let jar = jar.add(token_cookie).add(Cookie::new("logged_in", "true"));

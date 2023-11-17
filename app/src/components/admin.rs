@@ -13,9 +13,9 @@ pub async fn get_users() -> Result<Vec<User>, ServerFnError> {
         return Err(ServerFnError::ServerError("NotLoggedIn".to_string()));
     };
 
-    return Ok(ConnectionHandler::aruna_get_all_users(&token)
+    return ConnectionHandler::aruna_get_all_users(&token)
         .await
-        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e.to_string())))?);
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e)));
 }
 
 #[component]

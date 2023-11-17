@@ -58,11 +58,10 @@ pub fn ObjectOverview() -> impl IntoView {
 
     let get_user = use_context::<Resource<(), WhoamiResponse>>();
 
-    let is_user = move ||  {match get_user.map(|u| u.get()).flatten() {
+    let is_user = move || match get_user.and_then(|u| u.get()) {
         Some(WhoamiResponse::User(_)) => true,
-        _ => false
-    }};
-
+        _ => false,
+    };
 
     // Converts id
     let get_params = move || {
@@ -150,8 +149,8 @@ pub fn ObjectOverview() -> impl IntoView {
                             //     </svg>
                             //     Edit
                             // </a>
-                            <Show 
-                                when=move || is_user()
+                            <Show
+                                when=is_user
                             >
                             <A
                                 href="/objects/create"
@@ -325,7 +324,7 @@ pub fn ObjectOverview() -> impl IntoView {
                                     <div class="text-muted">{id}</div>
                                     <div class=add_text_color(
                                         "h3 mb-0 w-auto",
-                                        text_color.unwrap_or_else(|| Colors::Muted),
+                                        text_color.unwrap_or(Colors::Muted),
                                     )>{text}</div>
                                 </div>
                             </div>
@@ -796,7 +795,8 @@ pub fn ObjectOverview() -> impl IntoView {
             </div>
         }
     };
-    let main = move || {
+
+    move || {
         view! {
             <Suspense fallback=move || {
                 view! { <p>"Loading resources ..."</p> }
@@ -805,7 +805,7 @@ pub fn ObjectOverview() -> impl IntoView {
                     let resource = move || resource.get().flatten();
                     match resource() {
                         Some(result) => {
-                           
+
                                 let entry = move || ObjectInfo::try_from(result.clone()).unwrap();
                                 view! {
                                     <div class="page-wrapper d-print-none">
@@ -826,6 +826,5 @@ pub fn ObjectOverview() -> impl IntoView {
 
             </Suspense>
         }
-    };
-    main
+    }
 }

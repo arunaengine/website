@@ -2,8 +2,8 @@ use crate::utils::oidc::Authorizer;
 use axum_core::response::IntoResponse;
 use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::cookie::Key;
-use axum_extra::extract::PrivateCookieJar;
 use axum_extra::extract::cookie::SameSite;
+use axum_extra::extract::PrivateCookieJar;
 use leptos::*;
 use leptos_axum::ResponseOptions;
 use leptos_axum::ResponseParts;
@@ -38,8 +38,6 @@ pub async fn extract_token() -> LoginResult {
 
     let mut jar = PrivateCookieJar::from_headers(&req_parts.headers, signing_key);
 
-
-
     if jar.get("logged_in") != Some(Cookie::new("logged_in", "true")) {
         leptos_axum::redirect("/");
         return LoginResult::NotLoggedIn;
@@ -62,12 +60,13 @@ pub async fn extract_token() -> LoginResult {
             return LoginResult::Error("Missing oidc handler".to_string());
         };
 
-        let (access_token, refresh_token, duration) = match handler.refresh(refresh_token.value()).await {
-            Ok(token) => token,
-            Err(e) => {
-                return LoginResult::Error(format!("Error refreshing token: {}", e));
-            }
-        };
+        let (access_token, refresh_token, duration) =
+            match handler.refresh(refresh_token.value()).await {
+                Ok(token) => token,
+                Err(e) => {
+                    return LoginResult::Error(format!("Error refreshing token: {}", e));
+                }
+            };
 
         let expires = OffsetDateTime::now_utc() + duration;
         let token_cookie = Cookie::build("token", access_token.clone())

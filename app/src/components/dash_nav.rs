@@ -14,7 +14,7 @@ pub fn DashNav() -> impl IntoView {
 
     let get_user = use_context::<Resource<(), WhoamiResponse>>().expect("user_state not set");
 
-    let maybe_user = move || get_user.get().map(|u| u.maybe_user()).flatten();
+    let maybe_user = move || get_user.get().and_then(|u| u.maybe_user());
 
     let is_active = move || maybe_user().map(|user| user.active).unwrap_or_default();
 

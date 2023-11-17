@@ -224,7 +224,7 @@ pub fn Search() -> impl IntoView {
         limit: 50,
         offset: (current_page() as i64 - 1) * 50,
     };
-    let resource = create_local_resource(move || query(), search_api);
+    let resource = create_local_resource(query, search_api);
 
     let query_data = move || {
         view! {

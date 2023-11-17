@@ -102,8 +102,7 @@ pub fn CreateObjectPage() -> impl IntoView {
     );
     let _succeeded = move || {
         if create_resource_action.value()()
-            .map(|e| e.ok())
-            .flatten()
+            .and_then(|e| e.ok())
             .is_some()
         {
             get_user.refetch();
@@ -157,7 +156,7 @@ pub fn CreateObjectPage() -> impl IntoView {
     let input_element = create_node_ref::<Input>();
 
     let _on_file_change = move |_ev: leptos::ev::Event| {
-        if let Some(files) = input_element.get().map(|fi| fi.files()).flatten() {
+        if let Some(files) = input_element.get().and_then(|fi| fi.files()) {
             let file = files.get(0).unwrap();
             write_file_size(Some(file.size() as u64));
             // let file_blob_promise = js_sys::Promise::resolve(&file.array_buffer());
@@ -354,7 +353,7 @@ pub fn CreateObjectPage() -> impl IntoView {
                                             class="form-control text-lowercase"
                                             id="resname"
                                             name="resname"
-                                            pattern={move || name_regex()}
+                                            pattern={name_regex}
                                             placeholder="Resource Name"
                                             required
                                         />

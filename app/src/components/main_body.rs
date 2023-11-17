@@ -329,7 +329,7 @@ pub fn MainBody() -> impl IntoView {
 
     let send_mail = create_server_action::<SendMail>();
 
-    let succeeded = move || send_mail.value()().map(|e| e.ok()).flatten().is_some();
+    let succeeded = move || send_mail.value()().and_then(|e| e.ok()).is_some();
 
     let timeline = move || {
         view! {

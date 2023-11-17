@@ -6,8 +6,8 @@ use openidconnect::OAuth2TokenResponse;
 use openidconnect::PkceCodeVerifier;
 use openidconnect::RefreshToken;
 use openidconnect::{
-    AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
-    PkceCodeChallenge, RedirectUrl,
+    AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, PkceCodeChallenge,
+    RedirectUrl,
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -149,19 +149,14 @@ impl Authorizer {
 
         let expires = token_response.expires_in().unwrap_or_default();
         // Extract the ID token claims after verifying its authenticity and nonce.
-        let access_token = token_response
-            .access_token().secret().to_string();
+        let access_token = token_response.access_token().secret().to_string();
 
         let refresh_token = token_response
             .refresh_token()
             .ok_or_else(|| anyhow!("Server did not return a refresh token"))?
             .clone();
 
-        Ok((
-            access_token,
-            expires,
-            refresh_token.secret().to_string(),
-        ))
+        Ok((access_token, expires, refresh_token.secret().to_string()))
     }
 
     pub async fn refresh(&self, refresh_token: &str) -> Result<(String, Option<String>, Duration)> {

@@ -61,12 +61,12 @@ impl ConnectionHandler {
         // Send the request to the AOS instance gRPC gateway
         match client.get_user(Self::add_token(get_request, token)).await {
             Ok(i) => match i.into_inner().user {
-                Some(u) => return WhoamiResponse::User(u),
-                None => return WhoamiResponse::NotRegistered,
+                Some(u) => WhoamiResponse::User(u),
+                None => WhoamiResponse::NotRegistered,
             },
             Err(e) => {
                 if e.message().contains("Not registered") {
-                    return WhoamiResponse::NotRegistered;
+                    WhoamiResponse::NotRegistered
                 } else {
                     return WhoamiResponse::Error(e.message().to_string());
                 }
@@ -208,7 +208,7 @@ impl ConnectionHandler {
         let perm_hashmap = perms
             .into_iter()
             .map(|p| {
-                let perm = p.permission_level().clone();
+                let perm = p.permission_level();
                 let id = match p.resource_id {
                     Some(ResourceId::CollectionId(id))
                     | Some(ResourceId::ProjectId(id))
@@ -286,7 +286,7 @@ impl ConnectionHandler {
                     aruna_rust_api::api::storage::services::v2::CreateProjectRequest {
                         name: name.to_string(),
                         description: description.to_string(),
-                        data_class: dataclass as i32,
+                        data_class: dataclass,
                         metadata_license_tag: meta_license_tag,
                         default_data_license_tag: data_licenses_tag,
                         ..Default::default()
@@ -315,7 +315,7 @@ impl ConnectionHandler {
                 let request = tonic::Request::new(CreateCollectionRequest {
                     name: name.to_string(),
                     description: description.to_string(),
-                    data_class: dataclass as i32,
+                    data_class: dataclass,
                     metadata_license_tag: Some(meta_license_tag),
                     default_data_license_tag: Some(data_licenses_tag),
                     parent,
@@ -344,7 +344,7 @@ impl ConnectionHandler {
                 let request = tonic::Request::new(CreateDatasetRequest {
                     name: name.to_string(),
                     description: description.to_string(),
-                    data_class: dataclass as i32,
+                    data_class: dataclass,
                     metadata_license_tag: Some(meta_license_tag),
                     default_data_license_tag: Some(data_licenses_tag),
                     parent,
@@ -374,7 +374,7 @@ impl ConnectionHandler {
                 let request = tonic::Request::new(CreateObjectRequest {
                     name: name.to_string(),
                     description: description.to_string(),
-                    data_class: dataclass as i32,
+                    data_class: dataclass,
                     metadata_license_tag: meta_license_tag,
                     data_license_tag: data_licenses_tag,
                     parent,

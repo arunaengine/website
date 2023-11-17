@@ -53,13 +53,7 @@ pub fn LoginModal() -> impl IntoView {
         });
     });
 
-    let providers = move || {
-        provider_res
-            .get()
-            .map(|r| r.ok())
-            .flatten()
-            .unwrap_or_default()
-    };
+    let providers = move || provider_res.get().and_then(|r| r.ok()).unwrap_or_default();
 
     view! {
             <div class="modal mt-5 fade" id="loginModal" _ref=modal_ref tabindex="-1">
