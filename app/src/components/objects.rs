@@ -1,5 +1,5 @@
 use crate::utils::{
-    structs::{ObjectInfo, VisualizedStats},
+    structs::{ObjectInfo, VisualizedStats, WhoamiResponse},
     tabler_utils::{add_bg_color, add_text_color, Colors},
 };
 use aruna_rust_api::api::storage::services::v2::ResourceWithPermission;
@@ -55,6 +55,14 @@ pub async fn get_object_by_id(
 pub fn ObjectOverview() -> impl IntoView {
     // Gets id
     let params = use_params::<ObjectParams>();
+
+    let get_user = use_context::<Resource<(), WhoamiResponse>>();
+
+    let is_user = move ||  {match get_user.map(|u| u.get()).flatten() {
+        Some(WhoamiResponse::User(_)) => true,
+        _ => false
+    }};
+
 
     // Converts id
     let get_params = move || {
@@ -119,30 +127,32 @@ pub fn ObjectOverview() -> impl IntoView {
                                 </svg>
                             </a>
 
-                            <a
-                                href="#"
-                                class="btn btn-green d-none d-sm-inline-block"
-                                data-bs-toggle="modal"
-                                data-bs-target="#modal-report"
+                            // <a
+                            //     href="#"
+                            //     class="btn btn-green d-none d-sm-inline-block"
+                            //     hidden
+                            // >
+                            //     <svg
+                            //         xmlns="http://www.w3.org/2000/svg"
+                            //         class="icon icon-tabler icon-tabler-pencil"
+                            //         width="40"
+                            //         height="40"
+                            //         viewBox="0 0 24 24"
+                            //         stroke-width="2"
+                            //         stroke="currentColor"
+                            //         fill="none"
+                            //         stroke-linecap="round"
+                            //         stroke-linejoin="round"
+                            //     >
+                            //         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            //         <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path>
+                            //         <path d="M13.5 6.5l4 4"></path>
+                            //     </svg>
+                            //     Edit
+                            // </a>
+                            <Show 
+                                when=move || is_user()
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    class="icon icon-tabler icon-tabler-pencil"
-                                    width="40"
-                                    height="40"
-                                    viewBox="0 0 24 24"
-                                    stroke-width="2"
-                                    stroke="currentColor"
-                                    fill="none"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                >
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path>
-                                    <path d="M13.5 6.5l4 4"></path>
-                                </svg>
-                                Edit
-                            </a>
                             <A
                                 href="/objects/create"
                                 class="btn btn-primary d-none d-sm-inline-block"
@@ -165,6 +175,7 @@ pub fn ObjectOverview() -> impl IntoView {
                                 </svg>
                                 Create new
                             </A>
+                            </Show>
                         </div>
                     </div>
                 </div>
@@ -313,7 +324,7 @@ pub fn ObjectOverview() -> impl IntoView {
                                 <div class="text-start card-text text-nowrap align-items-center">
                                     <div class="text-muted">{id}</div>
                                     <div class=add_text_color(
-                                        "h2 mb-0 w-auto",
+                                        "h3 mb-0 w-auto",
                                         text_color.unwrap_or_else(|| Colors::Muted),
                                     )>{text}</div>
                                 </div>
@@ -758,12 +769,9 @@ pub fn ObjectOverview() -> impl IntoView {
                 <div class="col-auto">{entry.get_type_badge()}</div>
                 <div class="col-auto">{entry.get_data_class_badge()}</div>
                 <div class="col-auto">{entry.get_status_badge()}</div>
-                <div class="col-auto">
-                    <span class="badge badge-outline text-primary">CC-BY-SA 4.0</span>
-                </div>
-                <div class="col-auto">
-                    <span class="badge badge-outline text-orange">WRITE</span>
-                </div>
+                <div class="col-auto">{entry.get_license_badge()}</div>
+                <div class="col-auto">{entry.get_data_license_badge()}</div>
+                <div class="col-auto">{entry.get_permission_badge()}</div>
             </div>
         }
     };

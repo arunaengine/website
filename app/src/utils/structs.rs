@@ -1171,6 +1171,38 @@ impl ObjectInfo {
         }
     }
 
+    pub fn get_permission_badge(&self) -> impl IntoView {
+        match self.permission.as_str() {
+            "Read" => {
+                view! { <span class="badge badge-outline text-green">READ</span>}
+            },
+            "Append" => {
+                view! { <span class="badge badge-outline text-yellow">APPEND</span> }
+            },
+            "Write" => {
+                view! { <span class="badge badge-outline text-orange">WRITE</span> }
+            }
+            "Admin" => {
+                view! { <span class="badge badge-outline text-red">ADMIN</span> }
+            }
+            _ => {
+                view! { <span class="badge badge-outline text-gray">NONE</span> }
+            }
+        }
+    }
+
+    pub fn get_license_badge(&self) -> impl IntoView {
+        view!{
+            <span class="badge badge-outline text-blue">{self.license.clone()}</span>
+        }
+    }
+
+    pub fn get_data_license_badge(&self) -> impl IntoView {
+        view!{
+            <span class="badge badge-outline text-yellow">{self.data_license.clone()}</span>
+        }
+    }
+
     pub fn get_stats(&self) -> impl IntoView {
         view! {
             <span class="status status-yellow m-1">Count: {self.stats.count}</span>
