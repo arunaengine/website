@@ -35,7 +35,7 @@ pub fn TokensOverview() -> impl IntoView {
         get_tokens().await
     });
 
-    update_tokens.0.update(|e| *e = !*e);
+    //update_tokens.0.update(|e| *e = !*e);
 
     provide_context(update_tokens);
 
