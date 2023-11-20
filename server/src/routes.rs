@@ -105,9 +105,15 @@ pub async fn callback(
     jar: PrivateCookieJar,
     Query(query): Query<QueryData>,
 ) -> Result<(PrivateCookieJar, Redirect), StatusCode> {
-    let challenge = jar.get("challenge").ok_or(StatusCode::UNAUTHORIZED)?;
+    let challenge = jar.get("challenge").ok_or({
+        log::error!("No challenge cookie found");
+        StatusCode::UNAUTHORIZED
+    })?;
     let mut challenge: Challenge =
-        serde_json::from_str(challenge.value()).map_err(|_| StatusCode::UNAUTHORIZED)?;
+        serde_json::from_str(challenge.value()).map_err(|e| {
+            log::error!("Unable to deserialize challenge: {}, value: {}", e, challenge.value());
+            StatusCode::UNAUTHORIZED
+        })?;
 
     let redirect = mem::take(&mut challenge.redirect_url);
     let jar = jar.remove(Cookie::named("challenge"));
