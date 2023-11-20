@@ -433,13 +433,8 @@ pub fn MainBody() -> impl IntoView {
                                                 <p>
                                                     <div>
                                                         <b>
-                                                            "We have temporarily disabled new user registrations and logins to prepare for the update. Existing users can still log in and use the system as usual."
+                                                            "Login and try it out! If you find any issues or have any feedback, please let us know by opening an issue on Github or by sending us an email."
                                                         </b>
-                                                    </div>
-                                                </p>
-                                                <p>
-                                                    <div>
-                                                        "Stay tuned for the upcoming update and join our mailing list here:"
                                                     </div>
                                                 </p>
                                             </div>
@@ -447,26 +442,26 @@ pub fn MainBody() -> impl IntoView {
                                     </div>
                                 </div>
                             </li>
-                            <li class="timeline-event">
-                                <div class="timeline-event-icon text-white bg-primary fw-bolder">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        class="icon icon-tabler icon-tabler-mail-check"
-                                        width="40"
-                                        height="40"
-                                        viewBox="0 0 24 24"
-                                        stroke-width="2"
-                                        stroke="currentColor"
-                                        fill="none"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                    >
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                        <path d="M11 19h-6a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v6"></path>
-                                        <path d="M3 7l9 6l9 -6"></path>
-                                        <path d="M15 19l2 2l4 -4"></path>
-                                    </svg>
-                                </div>
+                            // <li class="timeline-event">
+                            //     <div class="timeline-event-icon text-white bg-primary fw-bolder">
+                            //         <svg
+                            //             xmlns="http://www.w3.org/2000/svg"
+                            //             class="icon icon-tabler icon-tabler-mail-check"
+                            //             width="40"
+                            //             height="40"
+                            //             viewBox="0 0 24 24"
+                            //             stroke-width="2"
+                            //             stroke="currentColor"
+                            //             fill="none"
+                            //             stroke-linecap="round"
+                            //             stroke-linejoin="round"
+                            //         >
+                            //             <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            //             <path d="M11 19h-6a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v6"></path>
+                            //             <path d="M3 7l9 6l9 -6"></path>
+                            //             <path d="M15 19l2 2l4 -4"></path>
+                            //         </svg>
+                            //    </div>
                                 // <div class="card timeline-event-card">
                                 //     <div class="card-body">
                                 //         // <div class="text-muted float-end">"21.04.23"</div>
@@ -514,7 +509,7 @@ pub fn MainBody() -> impl IntoView {
                                 //         </div>
                                 //     </div>
                                 //</div>
-                            </li>
+                            //</li>
                         </ul>
                     </div>
                 </div>

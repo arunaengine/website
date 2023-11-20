@@ -36,8 +36,7 @@ pub fn DashLanding() -> impl IntoView {
                                     <h4>"Important Note"</h4>
                                     <p>
                                         <div class="text-muted">
-                                            "Please note that this website is heavily work in progress and besides "
-                                            <b>"token creation"</b> " entirely optional."
+                                            "Please note that this website is still work in progress and should be treated mostly optional."
                                         </div>
                                         <div class="text-muted">
                                             "Expect visual bugs, glitches and issues. We are actively working on improving the user experience and hope to release further updates soon."
@@ -54,6 +53,88 @@ pub fn DashLanding() -> impl IntoView {
                                         <a href="mailto:support@aruna-storage.org">
                                             "support@aruna-storage.org"
                                         </a>
+                                    </p>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="timeline-event">
+                            <div class="timeline-event-icon bg-success fw-bolder">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="icon icon-tabler icon-tabler-confetti"
+                                    width="40"
+                                    height="40"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="2"
+                                    stroke="currentColor"
+                                    fill="none"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M4 5h2"></path>
+                                    <path d="M5 4v2"></path>
+                                    <path d="M11.5 4l-.5 2"></path>
+                                    <path d="M18 5h2"></path>
+                                    <path d="M19 4v2"></path>
+                                    <path d="M15 9l-1 1"></path>
+                                    <path d="M18 13l2 -.5"></path>
+                                    <path d="M18 19h2"></path>
+                                    <path d="M19 18v2"></path>
+                                    <path d="M14 16.518l-6.518 -6.518l-4.39 9.58a1 1 0 0 0 1.329 1.329l9.579 -4.39z"></path>
+                                </svg>
+                            </div>
+                            <div class="card timeline-event-card">
+                                <div class="card-body">
+                                    <div class="text-muted float-end">"10.11.23"</div>
+                                    <h4>"v2.0.0 Open Beta"</h4>
+                                    <p>
+                                        <div class="text-muted">
+                                            "We are proud to announce the official (open) beta of Aruna 2.0.0"
+                                        </div>
+                                        <div class="text-muted">
+                                            "This update adds many long awaited updates. For full changelogs see:"
+                                        </div>
+                                    </p>
+                                    <p>
+                                        <div>
+                                            <b>"- Relaxed hierarchy: "</b>
+                                            "You can now arrange your objects in a tree-like structure without the requirement for intermediate collections."
+                                        </div>
+                                        <div>
+                                            <b>"- Improved search: "</b>
+                                            "A new typo-tolerant metadata search with advanced query capabilities"
+                                        </div>
+                                        <div>
+                                            <b>"- Hooks: "</b>
+                                            "Automated actions on object creation for data transformation and validation"
+                                        </div>
+                                        <div>
+                                            <b>"- Improved web interface: "</b>
+                                        </div>
+                                        <div>
+                                            <b>"- Data proxy overhaul: "</b>
+                                            "Data proxies have been completely redesigned to separate data storage from the metadata management system"
+                                        </div>
+                                        <div>
+                                            <b>"- Fine grained user permissions: "</b>
+                                            "A new attribute based user permission system has been added"
+                                        </div>
+                                        <div>
+                                            <b>"- New tags: "</b>
+                                            "A new attribute based user permission system has been added"
+                                        </div>
+                                        <div>
+                                            <b>"- and a lot more..."</b>
+                                        </div>
+                                        <div>
+                                            <b>"Please visit our documentation to see whats new, a full changelog will follow soon !"</b>
+                                        </div>
+                                    </p>
+                                    <p>
+                                        <div class="text-muted">
+                                            "As always, if you have any problems or issues, contact us or create an issue on GitHub."
+                                        </div>
                                     </p>
                                 </div>
                             </div>
