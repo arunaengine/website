@@ -329,7 +329,7 @@ pub fn MainBody() -> impl IntoView {
 
     let send_mail = create_server_action::<SendMail>();
 
-    let succeeded = move || send_mail.value()().and_then(|e| e.ok()).is_some();
+    let _succeeded = move || send_mail.value()().and_then(|e| e.ok()).is_some();
 
     let timeline = move || {
         view! {
@@ -384,16 +384,15 @@ pub fn MainBody() -> impl IntoView {
                                 <div class="card timeline-event-card">
                                     <div class="card-body">
                                         <div class="text-muted float-end">""</div>
-                                        <h3 class="h2">"🎉 Version 2.0.0 is coming soon!"</h3>
+                                        <h3 class="h2">"🎉 Version 2.0.0 preview out now!"</h3>
                                         <p>
                                             <div class="text-muted">
                                                 <p>
                                                     <div>
-                                                        "We are very happy to anounce that the next major version of Aruna is scheduled for release on "
-                                                        <b>"02.10.2023"</b>
+                                                        "We are very happy to anounce that the Open-Beta of Aruna Version 2.0 has started"
                                                     </div>
                                                     <div>
-                                                        "This will integrate many long awaited features and improvements. Such as:"
+                                                        "This integrates many long awaited features and improvements. Such as:"
                                                     </div>
                                                 </p>
                                                 <p>
@@ -417,10 +416,14 @@ pub fn MainBody() -> impl IntoView {
                                                     </div>
                                                     <div>
                                                         <b>"- Data proxy overhaul: "</b>
-                                                        "Data proxies have been completely redesigned to separate"
+                                                        "Data proxies have been completely redesigned to separate data storage from the metadata management system"
                                                     </div>
                                                     <div>
                                                         <b>"- Fine grained user permissions: "</b>
+                                                        "A new attribute based user permission system has been added"
+                                                    </div>
+                                                    <div>
+                                                        <b>"- New tags: "</b>
                                                         "A new attribute based user permission system has been added"
                                                     </div>
                                                     <div>
@@ -464,53 +467,53 @@ pub fn MainBody() -> impl IntoView {
                                         <path d="M15 19l2 2l4 -4"></path>
                                     </svg>
                                 </div>
-                                <div class="card timeline-event-card">
-                                    <div class="card-body">
-                                        // <div class="text-muted float-end">"21.04.23"</div>
-                                        <h3 class="h2">"Join our mailing list"</h3>
-                                        <div class="text-muted">
-                                            <p>
-                                                <div>
-                                                    "If you want to stay up to date with the latest news and updates, you can now join our mailing list."
-                                                </div>
-                                            </p>
-                                        </div>
+                                // <div class="card timeline-event-card">
+                                //     <div class="card-body">
+                                //         // <div class="text-muted float-end">"21.04.23"</div>
+                                //         <h3 class="h2">"Join our mailing list"</h3>
+                                //         <div class="text-muted">
+                                //             <p>
+                                //                 <div>
+                                //                     "If you want to stay up to date with the latest news and updates, you can now join our mailing list."
+                                //                 </div>
+                                //             </p>
+                                //         </div>
 
-                                        <div class="container p-1">
+                                //         <div class="container p-1">
 
-                                            <ActionForm action=send_mail class="row">
-                                                <input
-                                                    type="email"
-                                                    class="form-control col-6 w-25"
-                                                    name="mail"
-                                                    aria-describedby="emailHelp"
-                                                    placeholder="Enter email"
-                                                />
-                                                <button type="submit" class="btn btn-primary col-1">
-                                                    Join
-                                                </button>
-                                                {move || {
-                                                    if succeeded() {
-                                                        view! {
-                                                            <div class="alert alert-success col-5" role="alert">
-                                                                "Success ! Thank you for joining our mailing list!"
-                                                            </div>
-                                                        }
-                                                            .into_view()
-                                                    } else {
-                                                        ().into_view()
-                                                    }
-                                                }}
+                                //             <ActionForm action=send_mail class="row">
+                                //                 <input
+                                //                     type="email"
+                                //                     class="form-control col-6 w-25"
+                                //                     name="mail"
+                                //                     aria-describedby="emailHelp"
+                                //                     placeholder="Enter email"
+                                //                 />
+                                //                 <button type="submit" class="btn btn-primary col-1">
+                                //                     Join
+                                //                 </button>
+                                //                 {move || {
+                                //                     if succeeded() {
+                                //                         view! {
+                                //                             <div class="alert alert-success col-5" role="alert">
+                                //                                 "Success ! Thank you for joining our mailing list!"
+                                //                             </div>
+                                //                         }
+                                //                             .into_view()
+                                //                     } else {
+                                //                         ().into_view()
+                                //                     }
+                                //                 }}
 
-                                                <div id="emailHelp" class="form-text">
-                                                    "We'll never share your email with anyone else. Click "
-                                                    <A href="/imprint">"here"</A>
-                                                    " to learn how we store and process your data."
-                                                </div>
-                                            </ActionForm>
-                                        </div>
-                                    </div>
-                                </div>
+                                //                 <div id="emailHelp" class="form-text">
+                                //                     "We'll never share your email with anyone else. Click "
+                                //                     <A href="/imprint">"here"</A>
+                                //                     " to learn how we store and process your data."
+                                //                 </div>
+                                //             </ActionForm>
+                                //         </div>
+                                //     </div>
+                                //</div>
                             </li>
                         </ul>
                     </div>
