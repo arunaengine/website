@@ -75,14 +75,14 @@ pub async fn login(
             .path("/")
             .secure(true)
             .http_only(true)
-            .same_site(SameSite::Strict)
+            .same_site(SameSite::Lax)
             .finish();
 
         let provider_cookie = Cookie::build("provider", oidc.authorizer_name.clone())
             .path("/")
             .secure(true)
             .http_only(true)
-            .same_site(SameSite::Strict)
+            .same_site(SameSite::Lax)
             .finish();
 
         Ok((
@@ -198,6 +198,7 @@ pub async fn refresh(
         .secure(true)
         .http_only(true)
         .expires(expires)
+        .same_site(SameSite::Strict)
         .finish();
 
     if let Some(refresh) = refresh_token {
