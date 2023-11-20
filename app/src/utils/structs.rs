@@ -192,19 +192,40 @@ impl JsonFilter {
             (None, None, None) => "".to_string(),
             (None, None, Some(c)) => c.clone(),
             (None, Some(o), None) => o.into_filter_string(),
-            (None, Some(o), Some(c)) => format!("{} AND {}", o.into_filter_string(), c),
+            (None, Some(o), Some(c)) => {
+                if !c.is_empty() {
+                    format!("{} AND {}", o.into_filter_string(), c)
+                } else {
+                    format!("{}", o.into_filter_string())
+                }
+            },
             (Some(d), None, None) => d.into_filter_string(),
-            (Some(d), None, Some(c)) => format!("{} AND {}", d.into_filter_string(), c),
+            (Some(d), None, Some(c)) => {
+                if !c.is_empty() {
+                    format!("{} AND {}", d.into_filter_string(), c)
+                } else {
+                    format!("{}", d.into_filter_string())
+                }
+            },
             (Some(d), Some(o), None) => {
                 format!("{} AND {}", d.into_filter_string(), o.into_filter_string())
             }
             (Some(d), Some(o), Some(c)) => {
-                format!(
-                    "{} AND {} AND {}",
-                    d.into_filter_string(),
-                    o.into_filter_string(),
-                    c
-                )
+
+                if !c.is_empty() {
+                    format!(
+                        "{} AND {} AND {}",
+                        d.into_filter_string(),
+                        o.into_filter_string(),
+                        c
+                    )
+                }else{
+                    format!(
+                        "{} AND {}",
+                        d.into_filter_string(),
+                        o.into_filter_string(),
+                    )
+                }
             }
         }
     }
