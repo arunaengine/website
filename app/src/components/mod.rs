@@ -22,3 +22,4 @@ pub mod token;
 pub mod tokens;
 pub mod tos;
 pub mod user;
+pub mod provider;

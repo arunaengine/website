@@ -110,7 +110,7 @@ pub fn AdminOverview() -> impl IntoView {
                                         view! {
                                             <tr>
                                                 <td colspan="5" class="text-center">
-                                                    "Looks like you are currently not associated with any project!"
+                                                    "Hmm no users found (This is a bug!)"
                                                 </td>
                                             </tr>
                                         }
