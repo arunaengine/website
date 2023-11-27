@@ -6,33 +6,19 @@ use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
 use aruna_rust_api::api::storage::models::v2::Token;
 
 #[server(DeleteToken, "/web")]
-pub async fn delete_token(_token_id: String) -> Result<(), ServerFnError> {
-    // use crate::utils::aruna_api_handlers::aruna_delete_api_token;
-    // use actix_session::SessionExt;
-    // use actix_web::HttpRequest;
-    // let req = use_context::<HttpRequest>()
-    //     .ok_or_else(|| ServerFnError::Request("Invalid context".to_string()))?;
+pub async fn delete_token(token_id: String) -> Result<(), ServerFnError> {
+    use crate::utils::aruna_api_handlers::ConnectionHandler;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
 
-    // let sess = req.get_session();
-
-    // let token = sess
-    //     .get::<String>("token")
-    //     .map_err(|_| {
-    //         log::debug!("Unable to query token from session 1");
-    //         ServerFnError::Request("Invalid request".to_string())
-    //     })?
-    //     .ok_or_else(|| {
-    //         log::debug!("Unable to query token from session 1");
-    //         ServerFnError::Request("Invalid request".to_string())
-    //     })?;
-
-    // _ = aruna_delete_api_token(token_id.clone(), &token)
-    //     .await
-    //     .map_err(|_| {
-    //         log::debug!("Unable to query token from session 1");
-    //         ServerFnError::Request("Invalid request".to_string())
-    //     })?;
-
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError("NotLoggedIn".to_string()));
+    };
+    ConnectionHandler::aruna_delete_api_token(token_id, &token)
+        .await
+        .map_err(|_| {
+            leptos::logging::log!("Unable to query SearchResults");
+            ServerFnError::Request("Error accessing SearchResult".to_string())
+        })?;
     Ok(())
 }
 
