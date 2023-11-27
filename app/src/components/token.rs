@@ -5,7 +5,7 @@ use crate::utils::structs::UpdateTokens;
 use aruna_rust_api::api::storage::models::v2::permission::ResourceId;
 use aruna_rust_api::api::storage::models::v2::Token;
 
-#[server(DeleteToken, "/web")]
+#[server]
 pub async fn delete_token(token_id: String) -> Result<(), ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
     use crate::utils::login_helpers::{extract_token, LoginResult};
