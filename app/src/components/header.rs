@@ -438,7 +438,7 @@ pub fn ArunaHeader() -> impl IntoView {
                                             </a>
                                             <a
                                                 class="dropdown-item"
-                                                href="https://arunastorage.github.io/Documentation/v1.0.x/"
+                                                href="https://arunastorage.github.io/Documentation/latest/"
                                             >
                                                 {"Getting started"}
                                             </a>
