@@ -1,0 +1,24 @@
+{
+  "name": "nuxt-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@connectrpc/connect": "^1.4.0",
+    "@connectrpc/connect-web": "^1.4.0",
+    "@connectrpc/protoc-gen-connect-es": "^1.4.0",
+    "@tabler/icons-vue": "^2.47.0",
+    "grpc-web": "^1.5.0",
+    "nuxt": "^3.10.3",
+    "sass": "^1.71.1",
+    "sass-loader": "^14.1.1",
+    "vue": "^3.4.19",
+    "vue-router": "^4.3.0"
+  }
+}

@@ -1,24 +1,79 @@
-# ArunaWeb 4.0
+# ArunaWeb 5.0
 
-This is a total revised web version for the Aruna Object Storage website. Powered by [tabler.io](https://tabler.io/), [Bootstrap 5](https://getbootstrap.com/), Rust + Wasm via [Leptos](https://github.com/leptos-rs/leptos).
-For now only an experimental rudimentary version is available, this will be expanded further.
+This is another total revised web version for the Aruna Object Storage website. Powered by [tabler.io](https://tabler.io/), [Bootstrap 5](https://getbootstrap.com/), [Nuxt](https://nuxt.com/) and [Vue](https://vuejs.org/). For now only an experimental rudimentary version is available, this will be expanded further.
 
 The web version is a fully integrated website + webserver version including SSR + hydration.
 
-This version uses leptos 0.5.0 and is intended to be used with version 2.x.x of the Aruna Object Storage server.
+This version is intended to be used with version 2.x.x of the Aruna Object Storage server.
+Look at the [Nuxt 3 documentation](https://nuxt.com/docs/getting-started/introduction) and 
+[Vue 3 documentation](https://vuejs.org/guide/introduction.html) to learn more.
 
+## Setup
 
-## Getting started
-
-- Install [rustup](https://rustup.rs/)
-- Add nightly toolchain and wasm32 target:
+Make sure to install the dependencies:
 
 ```bash
-rustup toolchain install nightly
-rustup default nightly
-rustup target add wasm32-unknown-unknown
+# npm
+npm install
+
+# pnpm
+pnpm install
+
+# yarn
+yarn install
+
+# bun
+bun install
 ```
 
-- Install cargo leptos `cargo install cargo-leptos`
-- Run the development webserver with `cargo leptos watch`
-- The website will be available on `localhost:3000`
+## Development Server
+
+Start the development server on `http://localhost:3000`:
+
+```bash
+# npm
+npm run dev
+
+# pnpm
+pnpm run dev
+
+# yarn
+yarn dev
+
+# bun
+bun run dev
+```
+
+## Production
+
+Build the application for production:
+
+```bash
+# npm
+npm run build
+
+# pnpm
+pnpm run build
+
+# yarn
+yarn build
+
+# bun
+bun run build
+```
+
+Locally preview production build:
+
+```bash
+# npm
+npm run preview
+
+# pnpm
+pnpm run preview
+
+# yarn
+yarn preview
+
+# bun
+bun run preview
+```
