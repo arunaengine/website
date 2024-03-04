@@ -75,7 +75,6 @@ export function toObjectInfo(
             data_license: resource.dataset.defaultDataLicenseTag,
         } as ObjectInfo
     } else if (resource.object) {
-        console.log(resource.object.relations)
         return {
             id: resource.object.id,
             name: resource.object.name,
@@ -85,7 +84,7 @@ export function toObjectInfo(
             stats: {
                 size: resource.object.contentLen,
                 count: "1",
-                lastUpdated: "", // No one cares.
+                lastUpdated: "", // Not provided
             } as v2Stats,
             data_class: resource.object.dataClass,
             created_at: resource.object.createdAt,

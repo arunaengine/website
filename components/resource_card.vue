@@ -51,11 +51,10 @@ function filterKeyValues(keyValues: v2KeyValue[] | undefined, variant: v2KeyValu
 
             <!-- Labels -->
             <div class="col border-start me-4 container">
-                <div v-for="label in filterKeyValues(entry?.key_values, v2KeyValueVariant.KEY_VALUE_VARIANT_LABEL)"
-                    class="border-bottom pb-3 mb-2">
-                    <div class="d-inline-flex tag">
+                <div class="border-bottom pb-3 mb-2">
+                    <div v-for="label in entry?.key_values" class="d-inline-flex tag">
                         <div class="key text-secondary">{{ label.key }}</div>
-                        <div class="value">{{ label.value }}</div>
+                        <div v-if="label.value" class="value">{{ label.value }}</div>
                     </div>
                 </div>
 

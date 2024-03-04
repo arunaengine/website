@@ -5,8 +5,6 @@ const route = useRoute()
 const { data: response } = await useFetch<v2GetResourceResponse>(`https://api.dev.aruna-storage.org/v2/resources/${route.params.id}`)
 const objectInfo = toObjectInfo(response.value?.resource?.resource, response.value?.resource?.permission)
 
-console.log(objectInfo)
-
 /* Back link to last page in navigation history */
 const router = useRouter()
 function goBack() {
