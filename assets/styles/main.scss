@@ -307,6 +307,7 @@ body {
 }
 
 .tag {
+	height: auto !important;
 	margin-right: 8px;
 	margin-bottom: .5em;
 	border-radius: 8px;
@@ -324,7 +325,7 @@ body {
 	--tblr-status-color: #0054a6;
 	--tblr-status-color-rgb: 0,84,166;
 	color: var(--tblr-status-color);
-	border-radius: 0 8px 8px 0;
+	border-radius: 0 4px 4px 0;
 	margin-right: -8px;
 	background: rgba(var(--tblr-status-color-rgb),.1)
 }
