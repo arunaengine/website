@@ -1,9 +1,21 @@
 <script setup lang="ts">
-import type { v2GetResourceResponse } from '~/composables/aruna_api_json';
-
 const route = useRoute()
-const { data: response } = await useFetch<v2GetResourceResponse>(`https://api.dev.aruna-storage.org/v2/resources/${route.params.id}`)
-const objectInfo = toObjectInfo(response.value?.resource?.resource, response.value?.resource?.permission)
+const objectInfo = await useFetch(`/api/resource?resourceId=${route.params.id}`).then(res => {
+    const resource = res.data.value
+    if (resource) {
+        try {
+            return toObjectInfo(resource.resource, resource.permission)
+        } catch (error) {
+            console.log(error)
+        }
+    } 
+
+    console.log(res.error.value)
+    return undefined
+}, error => {
+    console.log(error)
+    return undefined
+})
 
 /* Back link to last page in navigation history */
 const router = useRouter()

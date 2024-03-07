@@ -16,7 +16,7 @@ body {
 
 .table-responsive {
 	max-height: 80dvh;
-  }
+}
 
 
 .hook {
@@ -30,7 +30,7 @@ body {
 }
 
 .ocean-bg {
-	background-color:rgba( #007bc1, .175);
+	background-color: rgba(#007bc1, .175);
 	z-index: -2;
 }
 
@@ -314,22 +314,34 @@ body {
 	cursor: pointer;
 }
 
-.key, .value {
-   	padding: .8em;
-    padding-top: .2em;
-    padding-bottom: .2em;
+.key,
+.value {
+	padding: .8em;
+	padding-top: .2em;
+	padding-bottom: .2em;
 }
 
 
 .value {
 	--tblr-status-color: #0054a6;
-	--tblr-status-color-rgb: 0,84,166;
+	--tblr-status-color-rgb: 0, 84, 166;
 	color: var(--tblr-status-color);
 	border-radius: 0 4px 4px 0;
 	margin-right: -8px;
-	background: rgba(var(--tblr-status-color-rgb),.1)
+	background: rgba(var(--tblr-status-color-rgb), .1)
 }
 
 .pagination {
 	margin-top: 1rem;
+}
+
+input[type="radio"] {
+	visibility: hidden;
+	height: 0;
+	width: 0;
+}
+
+.form-selectgroup {
+	display: flex !important;
+	flex-direction: column;
 }

@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import type { v2SearchResourcesResponse } from '@/composables/aruna_api_json';
+import type { v2GenericResource, v2SearchResourcesResponse } from '@/composables/aruna_api_json';
 
 const props = defineProps<{
-    response: v2SearchResourcesResponse | null
+    resources: v2GenericResource[]
 }>()
 </script>
 
 <template>
     <div class="col-9 ps-3">
-        <div v-if="response">
-            <div class="card m-1" v-for="hit in response.resources">
+        <div v-if="resources.length > 0">
+            <div class="card m-1" v-for="hit in resources">
                 <ResourceCard :resource=hit />
             </div>
         </div>

@@ -1,19 +1,28 @@
 <script setup lang="ts">
 import { v2ResourceVariant } from '@/composables/aruna_api_json';
-import type { v2SearchResourcesResponse } from '@/composables/aruna_api_json';
+import type { v2GenericResource, v2SearchResourcesResponse } from '@/composables/aruna_api_json';
+import { IconFile, IconFiles, IconFolder, IconFolders, IconSearch, IconWorldSearch } from '@tabler/icons-vue';
+
+const page = ref(1)
+const limit = ref(20)
+const hits: Ref<v2GenericResource[]> = ref([])
+const estimatedTotal = ref(0)
 
 /* Query */
 const query = ref('')
-function updateQuery(event: Event) {
+async function updateQuery(event: Event) {
     if (event.target != null) {
         query.value = (event.target as HTMLInputElement).value
-        queryResources()
+        await queryResources()
     }
 }
+
+watch(query, async () => await queryResources())
 
 /* Filter */
 const filter = ref('')
 const typeFilter = ref(v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED)
+const customFilter = ref('')
 function addToFilter(condition: string) {
     if (filter.value) {
         if (filter.value.indexOf(condition) > -1) { return }
@@ -23,44 +32,66 @@ function addToFilter(condition: string) {
         filter.value = condition
     }
 }
-function setObjectTypeFilter(type: string) {
-    if (type) {
-        filter.value = 'object_type = ' + type
-    } else {
-        filter.value = ''
+
+watch(typeFilter, async (n) => {
+    generateFilter()
+    await queryResources()
+})
+
+function generateFilter() {
+    switch (typeFilter.value) {
+        case v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED: {
+            filter.value = ''
+            break
+        }
+        case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
+            filter.value = 'object_type = PROJECT'
+            break
+        }
+        case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION: {
+            filter.value = 'object_type = COLLECTION'
+            break
+        }
+        case v2ResourceVariant.RESOURCE_VARIANT_DATASET: {
+            filter.value = 'object_type = DATASET'
+            break
+        }
+        case v2ResourceVariant.RESOURCE_VARIANT_OBJECT: {
+            filter.value = 'object_type = OBJECT'
+        }
     }
 
-    switch (type) {
-        case 'Project': {
-            typeFilter.value = v2ResourceVariant.RESOURCE_VARIANT_PROJECT
-        }
-        case 'Collection': {
-            typeFilter.value = v2ResourceVariant.RESOURCE_VARIANT_COLLECTION
-        }
-        case 'Dataset': {
-            typeFilter.value = v2ResourceVariant.RESOURCE_VARIANT_DATASET
-        }
-        case 'Object': {
-            typeFilter.value = v2ResourceVariant.RESOURCE_VARIANT_OBJECT
-        }
-        default: {
-            typeFilter.value = v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED
+    if (customFilter.value.length > 0) {
+        if (filter.value.length > 0) {
+            filter.value += ` AND ${customFilter.value}`
+        } else {
+            filter.value = customFilter.value
         }
     }
-    queryResources()
 }
 
 /* Update search results list */
 async function queryResources() {
-    var body = `{"query":"${query.value}", "filter":"${filter.value}", "limit":"20", "offset":"0"}`
-    let { data: response } = await useFetch<v2SearchResourcesResponse>('https://api.dev.aruna-storage.org/v2/search', {
-        method: "POST",
-        body: body
-    })
+    const offset = (page.value - 1) * limit.value
+    const body = `{"query":"${query.value}", "filter":"${filter.value}", "limit":"${limit.value}", "offset":"${offset}"}`
 
-    return response
+    try {
+        const response = await $fetch<v2SearchResourcesResponse>('https://api.dev.aruna-storage.org/v2/search', {
+            //const response = await $fetch<v2SearchResourcesResponse>('http://localhost:8080/v2/search', {
+            method: "POST",
+            body: body
+        })
+
+        hits.value = response.resources ? response.resources : []
+        estimatedTotal.value = response.estimatedTotal ? Number(response.estimatedTotal) : 0
+
+    } catch (error) {
+        console.warn(error)
+        hits.value = []
+    }
 }
-const searchResponse = await queryResources()
+
+onMounted(async () => await queryResources())
 </script>
 
 <template>
@@ -68,25 +99,20 @@ const searchResponse = await queryResources()
         <div class="row mt-2">
             <div class="col-3">
                 <h2 class="text-primary">Search results</h2>
-                <div v-if="searchResponse" class="text-secondary">About {{ searchResponse.estimatedTotal }} results</div>
-                <div v-else class="text-secondary">About 0 results</div>
+                <div class="text-secondary">
+                    About {{ estimatedTotal }} results
+                </div>
             </div>
             <div class="col-9 pe-4">
                 <div class="input-group">
                     <label for="formFile" class="input-group-text">
                         <div class="col-auto d-flex">
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                class="icon icon-search-icon icon-tabler icon-tabler-search" width="24" height="24"
-                                viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                                stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path d="M10 10m-7 0a7 7 0 1 0 14 0 7 7 0 1 0-14 0"></path>
-                                <path d="M21 21l-6-6"></path>
-                            </svg>
+                            <IconSearch class="icon" />
+
                         </div>
                     </label>
                     <input type="text" class="form-control form-control-lg" placeholder="Search Aruna objects"
-                        @input="updateQuery" />
+                        v-model.lazy="query" @input="updateQuery" />
                     <span class="input-group-text" id="inputGroup-sizing-default">
                         Dataclass
                     </span>
@@ -114,39 +140,56 @@ const searchResponse = await queryResources()
             </div>
             <div class="row">
                 <div class="col-3 mt-5">
-                    <h3 class="text-muted">Filters</h3>
+                    <h3 class="text-muted mb-3">Filters</h3>
                     <div class="subheader mb-2">Resource</div>
-                    <div class="list-group list-group-transparent mb-3">
-                        <button class="list-group-item list-group-item-action d-flex align-items-center"
-                            :class="{ active: typeFilter === v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED }"
-                            @click="() => setObjectTypeFilter('')">
-                            All
-                        </button>
-                        <button class="list-group-item list-group-item-action d-flex align-items-center"
-                            @click="() => setObjectTypeFilter('Project')"
-                            :class="{ active: typeFilter === v2ResourceVariant.RESOURCE_VARIANT_PROJECT }">
-                            Projects
-                        </button>
-                        <button class="list-group-item list-group-item-action d-flex align-items-center"
-                            :class="{ active: typeFilter === v2ResourceVariant.RESOURCE_VARIANT_COLLECTION }"
-                            @click="() => setObjectTypeFilter('Collection')">
-                            Collections
-                        </button>
-                        <button class="list-group-item list-group-item-action d-flex align-items-center"
-                            :class="{ active: typeFilter === v2ResourceVariant.RESOURCE_VARIANT_DATASET }"
-                            @click="() => setObjectTypeFilter('Dataset')">
-                            Datasets
-                        </button>
-                        <button class="list-group-item list-group-item-action d-flex align-items-center"
-                            :class="{ active: typeFilter === v2ResourceVariant.RESOURCE_VARIANT_OBJECT }"
-                            @click="() => setObjectTypeFilter('Object')">
-                            Objects
-                        </button>
-                    </div>
-                    <div class="subheader mb-4">Filters</div>
 
+                    <div class="form-selectgroup mb-3">
+                        <label class="form-selectgroup-item flex-fill">
+                            <input v-model="typeFilter" type="radio" name="form-payment"
+                                :value="v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED" class="form-selectgroup-input"
+                                checked />
+                            <div class="form-selectgroup-label d-flex align-items-center p-3">
+                                <IconWorldSearch class="icon me-2" /> <strong>All</strong>
+                            </div>
+                        </label>
+                        <label class="form-selectgroup-item flex-fill">
+                            <input v-model="typeFilter" type="radio" name="form-payment"
+                                :value="v2ResourceVariant.RESOURCE_VARIANT_PROJECT" class="form-selectgroup-input"
+                                checked />
+                            <div class="form-selectgroup-label d-flex align-items-center p-3">
+                                <IconFolders class="icon me-2" /> <strong>Project</strong>
+                            </div>
+                        </label>
+                        <label class="form-selectgroup-item flex-fill">
+                            <input v-model="typeFilter" type="radio" name="form-payment"
+                                :value="v2ResourceVariant.RESOURCE_VARIANT_COLLECTION" class="form-selectgroup-input"
+                                checked />
+                            <div class="form-selectgroup-label d-flex align-items-center p-3">
+                                <IconFolder class="icon me-2" /> <strong>Collection</strong>
+                            </div>
+                        </label>
+                        <label class="form-selectgroup-item flex-fill">
+                            <input v-model="typeFilter" type="radio" name="form-payment"
+                                :value="v2ResourceVariant.RESOURCE_VARIANT_DATASET" class="form-selectgroup-input"
+                                checked />
+                            <div class="form-selectgroup-label d-flex align-items-center p-3">
+                                <IconFiles class="icon me-2" /> <strong>Dataset</strong>
+                            </div>
+                        </label>
+                        <label class="form-selectgroup-item flex-fill">
+                            <input v-model="typeFilter" type="radio" name="form-payment"
+                                :value="v2ResourceVariant.RESOURCE_VARIANT_OBJECT" class="form-selectgroup-input"
+                                checked />
+                            <div class="form-selectgroup-label d-flex align-items-center p-3">
+                                <IconFile class="icon me-2" /> <strong>Object</strong>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="subheader mb-4">Filters</div>
                     <div class="input-group mb-3">
-                        <input type="text" class="form-control" placeholder="Filter string" aria-label="Filter string" />
+                        <input v-model.lazy="customFilter" @input="generateFilter()" type="text" class="form-control"
+                            placeholder="Filter string" aria-label="Filter string" />
                     </div>
 
                     <div class="alert alert-success" role="alert">
@@ -155,8 +198,14 @@ const searchResponse = await queryResources()
                             E.g: <b>"size > 100"</b> , <b>"labels.key = akey"</b>
                         </div>
                         <div class="text-secondary mt-2 mb-2">
-                            Current available parameters are:
+                            Current available parameters can be looked up in the
+                            <NuxtLink
+                                to="https://arunastorage.github.io/Documentation/latest/get_started/basic_usage/12_How-To-Search/"
+                                target="_blank" rel="noreferrer">
+                                documentation
+                            </NuxtLink>.
                         </div>
+                        <!-- 
                         <div class="text-secondary">
                             <b>size</b>
                             ,
@@ -166,11 +215,12 @@ const searchResponse = await queryResources()
                             ,
                             <b>created_at</b>
                         </div>
+                        -->
                     </div>
                 </div>
 
                 <!-- Display Search Results -->
-                <SearchResults :key="searchResponse" :response="searchResponse" />
+                <SearchResults :key="hits" :resources="hits" />
             </div>
         </div>
     </div>

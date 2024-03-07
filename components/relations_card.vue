@@ -1,10 +1,8 @@
 
 <script setup lang="ts">
-import { IconArrowBigLeftLines } from '@tabler/icons-vue';
-import type { IconLink } from '@tabler/icons-vue';
-import { IconArrowBigRightLines } from '@tabler/icons-vue';
-import { IconExternalLink } from '@tabler/icons-vue';
-import { v2ExternalRelationVariant, type v2ExternalRelation, type v2Relation, v2RelationDirection, v2InternalRelationVariant, type v2InternalRelation } from '~/composables/aruna_api_json';
+import { IconLink, IconExternalLink, IconArrowBigLeftLines, IconArrowBigRightLines } from '@tabler/icons-vue';
+import { v2ExternalRelationVariant, v2RelationDirection, v2InternalRelationVariant,
+    type v2ExternalRelation, type v2Relation, type v2InternalRelation } from '~/composables/aruna_api_json';
 
 const props = defineProps<{
     relations: v2Relation[] | undefined
@@ -54,10 +52,10 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
                     <tbody v-if="props.relations && ext_rel.length > 0">
                         <tr v-for="relation in ext_rel">
                             <td class="text-start">
-                                <A href="`${relation.external.identifier}`" exact=true class="ms-1">
+                                <a href="`${relation.external.identifier}`" exact=true class="ms-1">
                                     <IconLink />
                                     {{ relation.identifier }}
-                                </A>
+                                </a>
                             </td>
                             <td>
                                 <span
@@ -98,12 +96,12 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
                     <tbody v-if="props.relations">
                         <tr v-for="relation in inc_int_rel">
                             <td class="text-start">
-                                <A :href="`/objects/${relation.resourceId}`" exact=true class="">
+                                <a :href="`/objects/${relation.resourceId}`" exact=true class="">
                                     <div>
                                         <IconArrowBigLeftLines :size="24" :stroke-width="2" />
                                         <span class="ms-2">{{ relation.resourceId }}</span>
                                     </div>
-                                </A>
+                                </a>
                             </td>
                             <td>
                                 <span class="text-muted">
@@ -158,12 +156,12 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
                     <tbody v-if="props.relations">
                         <tr v-for="relation in inc_out_rel">
                             <td class="text-start">
-                                <A :href="`/objects/${relation.resourceId}`" exact=true class="">
+                                <a :href="`/objects/${relation.resourceId}`" exact=true class="">
                                     <div>
                                         <IconArrowBigRightLines :size="24" :stroke-width="2" />
                                         <span class="ms-2">{{ relation.resourceId }}</span>
                                     </div>
-                                </A>
+                                </a>
                             </td>
                             <td>
                                 {{ toResourceType(relation.resourceVariant) }}

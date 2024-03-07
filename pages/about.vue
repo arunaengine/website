@@ -1,5 +1,5 @@
 <template>
-    <div class="container-xl mt-4 mx-auto row d-flex justify-content-center" style="margin-top: 100px !important">
+    <div class="container-xl mt-4 mx-auto row d-flex justify-content-center">
         <div class="card col-lg-8 text-start" id="timeline">
             <div class="card-header">
                 <span class="text-white avatar me-2">

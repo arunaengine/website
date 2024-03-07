@@ -25,11 +25,11 @@ function filterKeyValues(keyValues: v2KeyValue[] | undefined, variant: v2KeyValu
         <div class="row">
             <div class="col-4">
                 <div>
-                    <NuxtLink :to="`objects/${entry?.id}`" class="text-primary">
+                    <NuxtLink :to="`/objects/${entry?.id}`" class="text-primary">
                         <h3>{{ entry?.name }}</h3>
                     </NuxtLink>
 
-                    <NuxtLink :to="`objects/${entry?.id}`" class="subheader">
+                    <NuxtLink :to="`/objects/${entry?.id}`" class="subheader">
                         <h4>{{ entry?.id }}</h4>
                     </NuxtLink>
                 </div>
