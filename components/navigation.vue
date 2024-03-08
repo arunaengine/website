@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { IconBook, IconSearch, IconBrandGithub, 
-    IconUserScan, IconBell, IconBucket, 
-    IconUserUp, IconLogout, IconUserCircle 
+import {
+    IconBook, IconSearch, IconBrandGithub,
+    IconUserScan, IconBell, IconBucket,
+    IconUserUp, IconLogout, IconUserCircle
 } from '@tabler/icons-vue';
 
 const oidc = useOidc()
@@ -20,9 +21,8 @@ const anchor = ref(0)
                 <!-- Brand -->
                 <h1 class="navbar-brand navbar-brand-light d-none-navbar-horizontal pe-0 pe-md-3">
                     <NuxtLink to="/">
-                        <img src="assets/imgs/aruna_icon.png" width="32" height="32" alt="Aruna"
+                        <img src="assets/imgs/aruna_dark.png" width="32" height="32" alt="Aruna"
                             class="navbar-brand-image me-3" />
-                        Aruna
                     </NuxtLink>
                 </h1>
 
@@ -75,7 +75,8 @@ const anchor = ref(0)
                     </button>
                 </div>
                 <div class="collapse navbar-collapse" id="navbar-menu">
-                    <div class="d-flex flex-column flex-md-row-reverse flex-fill align-items-stretch align-items-md-center pe-md-5">
+                    <div
+                        class="d-flex flex-column flex-md-row-reverse flex-fill align-items-stretch align-items-md-center pe-md-5">
                         <ul class="navbar-nav">
 
                             <li class="nav-item">
