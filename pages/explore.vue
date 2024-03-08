@@ -23,17 +23,11 @@ watch(query, async () => await queryResources())
 const filter = ref('')
 const typeFilter = ref(v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED)
 const customFilter = ref('')
-function addToFilter(condition: string) {
-    if (filter.value) {
-        if (filter.value.indexOf(condition) > -1) { return }
+const customFilterValid = ref(true)
 
-        filter.value = filter.value + " AND " + condition
-    } else {
-        filter.value = condition
-    }
-}
+watch(customFilter, () => generateFilter())
 
-watch(typeFilter, async (n) => {
+watch(typeFilter, async () => {
     generateFilter()
     await queryResources()
 })
@@ -74,7 +68,7 @@ function generateFilter() {
 async function queryResources() {
     const offset = (page.value - 1) * limit.value
     const body = `{"query":"${query.value}", "filter":"${filter.value}", "limit":"${limit.value}", "offset":"${offset}"}`
-
+    
     try {
         const response = await $fetch<v2SearchResourcesResponse>('https://api.dev.aruna-storage.org/v2/search', {
             //const response = await $fetch<v2SearchResourcesResponse>('http://localhost:8080/v2/search', {
@@ -82,11 +76,13 @@ async function queryResources() {
             body: body
         })
 
+        customFilterValid.value = true
         hits.value = response.resources ? response.resources : []
         estimatedTotal.value = response.estimatedTotal ? Number(response.estimatedTotal) : 0
 
     } catch (error) {
         console.warn(error)
+        customFilterValid.value = false
         hits.value = []
     }
 }
@@ -154,32 +150,28 @@ onMounted(async () => await queryResources())
                         </label>
                         <label class="form-selectgroup-item flex-fill">
                             <input v-model="typeFilter" type="radio" name="form-payment"
-                                :value="v2ResourceVariant.RESOURCE_VARIANT_PROJECT" class="form-selectgroup-input"
-                                checked />
+                                :value="v2ResourceVariant.RESOURCE_VARIANT_PROJECT" class="form-selectgroup-input" />
                             <div class="form-selectgroup-label d-flex align-items-center p-3">
                                 <IconFolders class="icon me-2" /> <strong>Project</strong>
                             </div>
                         </label>
                         <label class="form-selectgroup-item flex-fill">
                             <input v-model="typeFilter" type="radio" name="form-payment"
-                                :value="v2ResourceVariant.RESOURCE_VARIANT_COLLECTION" class="form-selectgroup-input"
-                                checked />
+                                :value="v2ResourceVariant.RESOURCE_VARIANT_COLLECTION" class="form-selectgroup-input" />
                             <div class="form-selectgroup-label d-flex align-items-center p-3">
                                 <IconFolder class="icon me-2" /> <strong>Collection</strong>
                             </div>
                         </label>
                         <label class="form-selectgroup-item flex-fill">
                             <input v-model="typeFilter" type="radio" name="form-payment"
-                                :value="v2ResourceVariant.RESOURCE_VARIANT_DATASET" class="form-selectgroup-input"
-                                checked />
+                                :value="v2ResourceVariant.RESOURCE_VARIANT_DATASET" class="form-selectgroup-input" />
                             <div class="form-selectgroup-label d-flex align-items-center p-3">
                                 <IconFiles class="icon me-2" /> <strong>Dataset</strong>
                             </div>
                         </label>
                         <label class="form-selectgroup-item flex-fill">
                             <input v-model="typeFilter" type="radio" name="form-payment"
-                                :value="v2ResourceVariant.RESOURCE_VARIANT_OBJECT" class="form-selectgroup-input"
-                                checked />
+                                :value="v2ResourceVariant.RESOURCE_VARIANT_OBJECT" class="form-selectgroup-input" />
                             <div class="form-selectgroup-label d-flex align-items-center p-3">
                                 <IconFile class="icon me-2" /> <strong>Object</strong>
                             </div>
@@ -188,8 +180,9 @@ onMounted(async () => await queryResources())
 
                     <div class="subheader mb-4">Filters</div>
                     <div class="input-group mb-3">
-                        <input v-model.lazy="customFilter" @input="generateFilter()" type="text" class="form-control"
-                            placeholder="Filter string" aria-label="Filter string" />
+                        <input v-model="customFilter" @keyup.enter="queryResources"
+                            :class="{ 'is-valid': customFilterValid, 'is-invalid': !customFilterValid }" type="text"
+                            class="form-control" placeholder="Filter string" aria-label="Filter string" />
                     </div>
 
                     <div class="alert alert-success" role="alert">
