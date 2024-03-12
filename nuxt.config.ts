@@ -2,22 +2,32 @@
 export default defineNuxtConfig({
   devtools: { enabled: true },
   css: [
-    '~/assets/styles/main.scss',
-    '~/assets/styles/tabler.min_v4.css',
+    '~/assets/styles/main.css',
   ],
+  postcss: {
+    plugins: {
+      tailwindcss: {},
+      autoprefixer: {},
+    },
+  },
   app: {
     head: {
       title: 'Aruna',
-      script: [{
-        src: 'js/tabler.min_v4.js'
-      }]
     }
   },
-  
+  image: {
+    dir: 'assets/imgs',
+  },
+
+
+  plugins: [
+    "~/plugins/preline.client.ts",
+  ],
   modules: [
+    '@nuxt/image',
     'nuxt-openid-connect'
   ],
-  
+
   runtimeConfig: {
     openidConnect: {
       op: {
@@ -59,13 +69,13 @@ export default defineNuxtConfig({
       cookieEncryptALGO: 'aes-256-cbc',
       cookieMaxAge: 60 * 10, // 10 Minutes
       cookieFlags: {
-        access_token: { 
+        access_token: {
           httpOnly: true,
           secure: false,
         }
       }
     }
   }
-  
+
 })
 

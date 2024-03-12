@@ -1,3 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+@layer base {
+	body {
+		@apply bg-lightPrimary dark:bg-darkPrimary;
+	}
+}
+
+html {
+	@apply transition-colors ease-in duration-1000;
+	@apply bg-gradient-to-b bg-no-repeat w-screen;
+	@apply dark:from-dark/95 dark:via-dark/95 dark:to-dark dark:text-white from-white via-light/50 to-light;
+}
+
+.contain {
+	@apply px-[5%] md:px-[25%];
+}
+
+/*
 html,
 body {
 	max-width: 100%;
@@ -345,3 +367,4 @@ input[type="radio"] {
 	display: flex !important;
 	flex-direction: column;
 }
+*/
