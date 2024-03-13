@@ -26,7 +26,19 @@ module.exports = {
         lightSecondary: '#dddddd',
         main: '#0073FF',
         white: '#FFFFFF',
-        arunaPrimary: '#0054a6'
+        aruna: {
+          50: '#C9F0F8',
+          100: '#B1EFFC',
+          200: '#90e0ef',
+          300: '#6ED8ED',
+          400: '#43CAE5',
+          500: '#00B4D8',
+          600: '#00A0CC',
+          700: '#007BC2',
+          800: '#005299',
+          900: '#00208A',
+          950: '#0E0075'
+        },
       },
     },
   },
