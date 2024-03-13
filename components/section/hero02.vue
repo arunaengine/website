@@ -3,7 +3,7 @@ import { IconChevronRight } from '@tabler/icons-vue';
 </script>
 <template>
     <div
-        class="flex flex-grow pt-32 bg-gradient-to-r from-arunaPrimary/[.15] via-transparent dark:from-arunaPrimary/[.5] ">
+        class="flex flex-grow pt-32">
         <!-- Hero -->
         <div class="max-w-[85rem] mx-auto px-4 sm:px-6 lg:px-8">
             <!-- Grid -->
@@ -12,7 +12,7 @@ import { IconChevronRight } from '@tabler/icons-vue';
                     <h1
                         class="block text-3xl font-bold text-gray-800 sm:text-4xl lg:text-6xl lg:leading-tight dark:text-white">
                         Start your journey with
-                        <span class="text-arunaPrimary dark:text-blue-400">
+                        <span class="text-aruna-800 dark:text-aruna-500">
                             Aruna
                         </span>
                     </h1>
@@ -27,23 +27,11 @@ import { IconChevronRight } from '@tabler/icons-vue';
 
                     <!-- Buttons -->
                     <div class="mt-7 grid gap-3 w-full sm:inline-flex">
-                        <a class="py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-arunaPrimary text-white hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                        <a class="py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-aruna-800 text-white hover:bg-aruna-700 disabled:opacity-50 disabled:pointer-events-none dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
                             href="#">
                             Documentation
 
                             <IconChevronRight class="icon" :size=16 />
-                        </a>
-                    </div>
-                    <div class="mt-5 lg:mt-8 flex flex-col items-center gap-2 sm:flex-row sm:gap-3">
-                        <div class="w-full sm:w-auto">
-                            <label for="hero-input" class="sr-only">Search</label>
-                            <input type="text" id="hero-input" name="hero-input"
-                                class="py-3 px-4 block w-full xl:min-w-72 border-gray-200 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
-                                placeholder="Enter your email">
-                        </div>
-                        <a class="w-full sm:w-auto py-3 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-arunaPrimary text-white hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                            href="#">
-                            Join Mailing List
                         </a>
                     </div>
                     <!-- End Buttons -->
