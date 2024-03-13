@@ -114,7 +114,7 @@ onMounted(() => {
             class="font-medium text-gray-600 hover:text-gray-400 dark:text-gray-400 dark:hover:text-gray-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
             to="/explore">
             <!-- <IconSearch class="flex-shrink-0 size-4 inline-block" /> -->
-            Explore
+            Search
           </NuxtLink>
 
           <!-- Dropdown Start -->
@@ -150,7 +150,7 @@ onMounted(() => {
           </div>
           <!-- Dropdown End -->
 
-          <a class="border border-gray rounded p-2 font-medium text-gray-600 hover:text-gray-400 dark:text-gray-400 dark:hover:text-gray-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+          <a class="border border-gray rounded p-2 px-4 font-medium text-gray-600 hover:text-gray-400 dark:text-gray-400 dark:hover:text-gray-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
             target="_blank" href="https://github.com/ArunaStorage">
             <IconBrandGithub class="flex-shrink-0 size-4 inline-block" />
             Source Code
@@ -167,12 +167,12 @@ onMounted(() => {
         </button>
 
         <button type="button"
-          class="hs-dark-mode-active:hidden block hs-dark-mode group flex items-center text-gray-600 hover:text-blue-600 font-medium dark:text-gray-400 dark:hover:text-gray-500"
+          class="hs-dark-mode-active:hidden block hs-dark-mode group flex items-center px-3 text-gray-600 hover:text-blue-600 font-medium dark:text-gray-400 dark:hover:text-gray-500"
           data-hs-theme-click-value="dark">
           <IconMoon class="flex-shrink-0 size-4" />
         </button>
         <button type="button"
-          class="hs-dark-mode-active:block hidden hs-dark-mode group flex items-center text-gray-600 hover:text-blue-600 font-medium dark:text-gray-400 dark:hover:text-gray-500"
+          class="hs-dark-mode-active:block hidden hs-dark-mode group flex items-center px-3 text-gray-600 hover:text-blue-600 font-medium dark:text-gray-400 dark:hover:text-gray-500"
           data-hs-theme-click-value="light">
           <IconSun class="flex-shrink-0 size-4" />
         </button>
