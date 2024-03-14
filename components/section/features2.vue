@@ -12,7 +12,7 @@ import {
         <div class="space-y-6 lg:space-y-10">
           <!-- Icon Block -->          
             <div class="flex">
-            <IconTournament class="m-auto size-3/12 text-gray-600 dark:text-gray-200" />
+            <IconTournament class="m-auto w-14 h-auto flex-none text-gray-600 dark:text-gray-200" />
             <div class="ms-5 sm:ms-8">
               <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
                 Data orchestration
@@ -25,7 +25,7 @@ import {
 
           <!-- Icon Block -->
           <div class="flex">
-            <IconFileInfo class="m-auto size-3/12 text-gray-600 dark:text-gray-200"/>
+            <IconFileInfo class="m-auto w-14 h-auto flex-none text-gray-600 dark:text-gray-200"/>
             <div class="ms-5 sm:ms-8">
               <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
                 Metadata enrichment
@@ -39,7 +39,7 @@ import {
 
           <!-- Icon Block -->
           <div class="flex">
-            <IconSearch class="m-auto size-3/12 text-gray-600 dark:text-gray-200"/>
+            <IconSearch class="m-auto w-14 h-auto flex-none text-gray-600 dark:text-gray-200"/>
             <div class="ms-5 sm:ms-8">
               <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
                 FAIR
@@ -56,7 +56,7 @@ import {
         <div class="space-y-6 lg:space-y-10">
           <!-- Icon Block -->
           <div class="flex">
-            <IconShare class="m-auto size-3/12 text-gray-600 dark:text-gray-200"/>
+            <IconShare class="m-auto w-14 h-auto flex-none text-gray-600 dark:text-gray-200"/>
             <div class="ms-5 sm:ms-8">
               <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
                 Easy sharing
@@ -70,7 +70,7 @@ import {
 
           <!-- Icon Block -->
           <div class="flex">
-            <IconRocket class="m-auto size-3/12 text-gray-600 dark:text-gray-200"/>
+            <IconRocket class="m-auto w-14 h-auto flex-none text-gray-600 dark:text-gray-200"/>
             <div class="ms-5 sm:ms-8">
               <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
                 Effortless migration
@@ -84,7 +84,7 @@ import {
 
           <!-- Icon Block -->
           <div class="flex">
-            <IconShieldLock class="m-auto size-3/12 text-gray-600 dark:text-gray-200"/>
+            <IconShieldLock class="m-auto w-14 h-auto flex-none text-gray-600 dark:text-gray-200"/>
             <div class="ms-5 sm:ms-8">
               <h3 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">
                 Secure
