@@ -21,6 +21,7 @@ logs
 .fleet
 .idea
 .vscode
+target
 
 # Local env files
 .env

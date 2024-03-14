@@ -1,6 +1,14 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   devtools: { enabled: true },
+  plugins: [
+    "~/plugins/preline.client.ts",
+  ],
+  modules: [
+    '@nuxt/image',
+    '@nuxtjs/color-mode',
+    'nuxt-openid-connect'
+  ],
   css: [
     '~/assets/styles/main.css',
   ],
@@ -18,15 +26,9 @@ export default defineNuxtConfig({
   image: {
     dir: 'assets/imgs',
   },
-
-
-  plugins: [
-    "~/plugins/preline.client.ts",
-  ],
-  modules: [
-    '@nuxt/image',
-    'nuxt-openid-connect'
-  ],
+  colorMode: {
+    classSuffix: ''
+  },
 
   runtimeConfig: {
     openidConnect: {

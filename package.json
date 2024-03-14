@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@nuxt/image": "^1.4.0",
+    "@nuxtjs/color-mode": "^3.3.2",
     "@preline/dropdown": "^2.0.2",
     "@preline/tabs": "^2.0.2",
     "@tabler/icons-vue": "^2.47.0",

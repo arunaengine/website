@@ -42,7 +42,7 @@ onMounted(() => refreshUser())
 
 <template>
   <!-- Header + Navigation -->
-
+  <Sidebar />
   <!-- Main body -->
   <div class="flex flex-col flex-grow md:min-h-screen">
     <!-- Body -->

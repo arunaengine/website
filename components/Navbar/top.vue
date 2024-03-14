@@ -6,101 +6,24 @@ import {
 
 const oidc = useOidc()
 const anchor = ref(0)
+const colorMode = useColorMode()
+const toggleTheme = () => {
+  colorMode.preference = colorMode.preference === 'dark' ? 'light' : 'dark';
+};
 
-const HSThemeAppearance = {
-  init() {
-    const defaultTheme = 'default'
-    let storage = window.localStorage
-    let theme = storage.getItem('hs_theme') || defaultTheme
-
-    if (document.querySelector('html').classList.contains('dark')) return
-    this.setAppearance(theme)
-  },
-  _resetStylesOnLoad() {
-    const $resetStyles = document.createElement('style')
-    $resetStyles.innerText = `*{transition: unset !important;}`
-    $resetStyles.setAttribute('data-hs-appearance-onload-styles', '')
-    document.head.appendChild($resetStyles)
-    return $resetStyles
-  },
-  setAppearance(theme: string, saveInStore = true, dispatchEvent = true) {
-    const $resetStylesEl = this._resetStylesOnLoad()
-
-    if (saveInStore) {
-      localStorage.setItem('hs_theme', theme)
-    }
-
-    if (theme === 'auto') {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default'
-    }
-
-    document.querySelector('html').classList.remove('dark')
-    document.querySelector('html').classList.remove('default')
-    document.querySelector('html').classList.remove('auto')
-
-    document.querySelector('html').classList.add(this.getOriginalAppearance())
-
-    setTimeout(() => {
-      $resetStylesEl.remove()
-    })
-
-    if (dispatchEvent) {
-      window.dispatchEvent(new CustomEvent('on-hs-appearance-change', { detail: theme }))
-    }
-  },
-  getAppearance() {
-    let theme = this.getOriginalAppearance()
-    if (theme === 'auto') {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default'
-    }
-    return theme
-  },
-  getOriginalAppearance() {
-    const defaultTheme = 'default'
-    if (localStorage) {
-      return localStorage.getItem('hs_theme') || defaultTheme
-    }
-    return defaultTheme
-  }
-}
-onMounted(() => {
-  HSThemeAppearance.init()
-
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if (HSThemeAppearance.getOriginalAppearance() === 'auto') {
-      HSThemeAppearance.setAppearance('auto', false)
-    }
-  })
-
-  window.addEventListener('load', () => {
-    const $clickableThemes = document.querySelectorAll('[data-hs-theme-click-value]')
-    const $switchableThemes = document.querySelectorAll('[data-hs-theme-switch]')
-
-    $clickableThemes.forEach($item => {
-      $item.addEventListener('click', () => HSThemeAppearance.setAppearance($item.getAttribute('data-hs-theme-click-value'), true, $item))
-    })
-
-    $switchableThemes.forEach($item => {
-      $item.addEventListener('change', (e) => {
-        HSThemeAppearance.setAppearance(e.target.checked ? 'dark' : 'default')
-      })
-
-      $item.checked = HSThemeAppearance.getAppearance() === 'dark'
-    })
-
-    window.addEventListener('on-hs-appearance-change', e => {
-      $switchableThemes.forEach($item => {
-        $item.checked = e.detail === 'dark'
-      })
-    })
-  })
-})
 </script>
 
 <template>
   <header class="flex flex-wrap sm:justify-start sm:flex-nowrap w-full bg-transparent sm:py-4 md:py-2 dark:bg-gray-800">
     <nav class="max-w-[85rem] w-full mx-auto px-4 flex flex-wrap basis-full items-center justify-between"
       aria-label="Global">
+
+      <button type="button" class="text-gray-500 hover:text-gray-600" data-hs-overlay="#docs-sidebar" aria-controls="docs-sidebar" aria-label="Toggle navigation">
+        <span class="sr-only">Toggle Navigation</span>
+        <svg class="flex-shrink-0 size-4" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+        </svg>
+      </button>
 
       <NuxtLink class="sm:order-1 flex-none text-xl font-semibold dark:text-white" href="/">
         <NuxtImg src="aruna_light.png" height="24px" />
@@ -167,14 +90,10 @@ onMounted(() => {
         </button>
 
         <button type="button"
-          class="hs-dark-mode-active:hidden block hs-dark-mode group flex items-center px-3 text-gray-600 hover:text-blue-600 font-medium dark:text-gray-400 dark:hover:text-gray-500"
-          data-hs-theme-click-value="dark">
-          <IconMoon class="flex-shrink-0 size-4" />
-        </button>
-        <button type="button"
-          class="hs-dark-mode-active:block hidden hs-dark-mode group flex items-center px-3 text-gray-600 hover:text-blue-600 font-medium dark:text-gray-400 dark:hover:text-gray-500"
-          data-hs-theme-click-value="light">
-          <IconSun class="flex-shrink-0 size-4" />
+          class="block group flex items-center px-3 text-gray-600 hover:text-blue-600 font-medium dark:text-gray-400 dark:hover:text-gray-500"
+          @click="toggleTheme">
+            <IconMoon v-show="colorMode.preference === 'light'" class="theme-icon text-typography_primary_light dark:text-typography_primary_dark" width="28" height="28" />
+            <IconSun v-show="colorMode.preference === 'dark'"  class="theme-icon text-typography_primary_light dark:text-typography_primary_dark" width="28" height="28" />
         </button>
 
         <!-- User Dropdown Start -->
