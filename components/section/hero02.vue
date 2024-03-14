@@ -3,20 +3,20 @@ import { IconChevronRight } from '@tabler/icons-vue';
 </script>
 <template>
     <div
-        class="flex flex-grow pt-32">
+        class="flex flex-grow pt-16">
         <!-- Hero -->
-        <div class="max-w-[85rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[85rem] mx-auto sm:px-6 lg:px-8">
             <!-- Grid -->
             <div class="grid md:grid-cols-2 gap-4 md:gap-8 xl:gap-20 md:items-center">
                 <div>
                     <h1
                         class="block text-3xl font-bold text-gray-800 sm:text-4xl lg:text-6xl lg:leading-tight dark:text-white">
                         Start your journey with
-                        <span class="text-aruna-800 dark:text-aruna-500">
+                        <span class="text-aruna-800 dark:text-aruna-700">
                             Aruna
                         </span>
                     </h1>
-                    <p class="mt-3 text-lg text-gray-800 dark:text-gray-400">
+                    <p class="mt-3 text-lg text-gray-800 dark:text-gray-300">
                         <strong>
                             Fast, secure, distributed, cloud-native and domain-agnostic data orchestration
                         </strong>
@@ -41,14 +41,15 @@ import { IconChevronRight } from '@tabler/icons-vue';
                         <!-- <span class="text-xs font-medium text-gray-800 uppercase dark:text-gray-200">Sponsored by:</span> -->
 
                         <div
-                            class="py-3 flex items-center text-sm text-gray-800 before:flex-[1_1_0%] before:border-t before:border-gray-200 before:me-6 after:flex-[1_1_0%] after:border-t after:border-gray-200 after:ms-6 dark:text-white dark:before:border-gray-600 dark:after:border-gray-600">
-                            Sponsored by</div>
+                            class="py-3 flex items-center text-sm text-gray-800 before:flex-[1_1_0%] before:border-t before:border-gray-400 before:me-6 after:flex-[1_1_0%] after:border-t after:border-gray-400 after:ms-6 dark:text-white dark:before:border-gray-600 dark:after:border-gray-600">
+                            Supported by
+                        </div>
 
                         <div class="mt-4 flex gap-x-8">
-                            <NuxtImg src="fair-ds-logo.png" class="w-40 h-auto" fit="inside" />
-                            <NuxtImg src="microbiota.png" class="w-24 h-auto" fit="contain" />
-                            <NuxtImg src="biodiv.png" class="w-40 h-auto" fit="inside" />
-                            <NuxtImg src="denbi.svg" class="w-28 h-auto" fit="contain" />
+                            <NuxtImg src="fair-ds-logo.png" class="w-40 object-bottom object-contain h-auto"/>
+                            <NuxtImg src="microbiota.png" class="w-24 object-bottom object-contain h-auto" />
+                            <NuxtImg src="biodiv.png" class="w-40 object-bottom object-contain h-auto"/>
+                            <NuxtImg src="denbi.svg" class="w-28 object-bottom object-contain h-auto"/>
                         </div>
                         <!-- End Brands -->
 
