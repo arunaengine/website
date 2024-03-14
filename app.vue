@@ -1,52 +1,53 @@
 <script setup lang="ts">
 // Returns Vue component
-const oidc = useOidc()
-const fetchError = ref(false)
-const fetchErrorMsg = ref('')
-
+const oidc = useOidc();
+const fetchError = ref(false);
+const fetchErrorMsg = ref("");
 
 useHead({
-  title: 'Aruna | The data orchestration engine',
+  title: "Aruna | The data orchestration engine",
   meta: [
     {
-      name: 'description',
-      content: 'My amazing site.'
-    }
+      name: "description",
+      content: "My amazing site.",
+    },
   ],
-})
+});
 
 async function refreshUser() {
   if (oidc.isLoggedIn) {
     try {
-      oidc.setUser(await fetchUser())
-      fetchError.value = false
-      fetchErrorMsg.value = ''
-
+      oidc.setUser(await fetchUser());
+      fetchError.value = false;
+      fetchErrorMsg.value = "";
     } catch (error: unknown) {
-      fetchError.value = true
-      fetchErrorMsg.value = error instanceof Error ? error.message : 'Failed to fetch user info'
-      console.error(fetchErrorMsg.value)
+      fetchError.value = true;
+      fetchErrorMsg.value =
+        error instanceof Error ? error.message : "Failed to fetch user info";
+      console.error(fetchErrorMsg.value);
     }
   }
-  forceRefreshAnchor()
+  forceRefreshAnchor();
 }
 
-const anchor = ref(0)
+const anchor = ref(0);
 
 function forceRefreshAnchor() {
-  anchor.value++
+  anchor.value++;
 }
 
-onMounted(() => refreshUser())
+onMounted(() => refreshUser());
 </script>
 
 <template>
   <!-- Header + Navigation -->
   <Sidebar />
   <!-- Main body -->
-  <div class="flex flex-col flex-grow md:min-h-screen">
+  <div
+    class="flex flex-col flex-grow md:min-h-screen bg-gradient-to-b from-aruna-800/[.30] via-transparent"
+  >
     <!-- Body -->
-    <NuxtLoadingIndicator/>
-    <NuxtPage/>
+    <NuxtLoadingIndicator />
+    <NuxtPage />
   </div>
 </template>
