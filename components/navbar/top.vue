@@ -23,8 +23,8 @@ onMounted(() => {
     <nav class="max-w-[85rem] w-full mx-auto px-8 flex flex-wrap basis-full items-center justify-between"
       aria-label="Global">
 
-      <div>
-        <button type="button" class="sm:order-1 align-middle me-5 text-gray-300" data-hs-overlay="#docs-sidebar" aria-controls="docs-sidebar" aria-label="Toggle navigation">
+      <div class="flex">
+        <button type="button" class="sm:order-1 align-middle me-5 dark:text-gray-300" data-hs-overlay="#docs-sidebar" aria-controls="docs-sidebar" aria-label="Toggle navigation">
           <span class="sr-only">Toggle Navigation</span>
           <svg class="size-5" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
             <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
@@ -135,7 +135,7 @@ onMounted(() => {
         </div>
         <!-- User Dropdown End -->
         <button v-else
-          class="flex items-center rounded gap-x-2 font-medium text-gray-500 border sm:my-6 md:my-0 p-2 dark:text-gray-400"
+          class="flex items-center gap-x-2 font-medium text-gray-600 sm:my-6 md:my-0 p-2 dark:text-gray-300"
           @click="oidc.login()">
           Login
         </button>
