@@ -113,11 +113,7 @@ export type SearchResultEntry = {
     object_status: modelsv2Status,
 }
 
-export function toSearchResult(resource: v2GenericResource | undefined): SearchResultEntry | undefined {
-    if (resource === undefined) {
-        return undefined
-    }
-
+export function toSearchResult(resource: v2GenericResource): SearchResultEntry | undefined {
     if (resource.project) {
         return {
             id: resource.project.id,
