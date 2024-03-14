@@ -26,8 +26,11 @@ export default defineNuxtConfig({
   image: {
     dir: 'assets/imgs',
   },
+  
   colorMode: {
-    classSuffix: ''
+    classSuffix: '',
+    preference: 'light',
+    fallback: 'light',
   },
 
   runtimeConfig: {
