@@ -6,11 +6,12 @@ import {
 
 const oidc = useOidc()
 const anchor = ref(0)
+
+/* Dark mode toggle */
 const colorMode = useColorMode()
 const toggleTheme = () => {
   colorMode.preference = colorMode.preference === 'dark' ? 'light' : 'dark';
 };
-
 </script>
 
 <template>
@@ -26,8 +27,8 @@ const toggleTheme = () => {
       </button>
 
       <NuxtLink class="sm:order-1 flex-none text-xl font-semibold dark:text-white" href="/">
-        <NuxtImg src="aruna_light.png" height="24px" />
-        <!-- <NuxtImg v-else src="aruna_light.png" height="24px" /> -->
+        <NuxtImg v-if="colorMode.preference === 'light'" src="aruna_light.png" height="24px" />
+        <NuxtImg v-if="colorMode.preference === 'dark'" src="aruna_dark.png" height="24px" />
       </NuxtLink>
 
       <div id="navbar-alignment"
