@@ -1,0 +1,182 @@
+<script setup lang="ts">
+import { IconLink, IconExternalLink, IconArrowBigLeftLines, IconArrowBigRightLines } from '@tabler/icons-vue';
+import {
+  v2ExternalRelationVariant, v2RelationDirection, v2InternalRelationVariant,
+  type v2ExternalRelation, type v2Relation, type v2InternalRelation
+} from '~/composables/aruna_api_json';
+
+const props = defineProps<{
+  relations: v2Relation[] | undefined
+  external: boolean
+}>()
+const [inc_int_rel, inc_out_rel, ext_rel] = splitRelations()
+
+function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2ExternalRelation[]] {
+  let inc_int: v2InternalRelation[] = []
+  let inc_out: v2InternalRelation[] = []
+  let ext: v2ExternalRelation[] = []
+
+  props.relations?.forEach((dingens) => {
+    if (dingens.external) {
+      ext.push(dingens.external)
+    } else if (dingens.internal) {
+      if (dingens.internal.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND) {
+        inc_int.push(dingens.internal)
+      } else if (dingens.internal.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND) {
+        inc_out.push(dingens.internal)
+      }
+    }
+  })
+
+  return [inc_int, inc_out, ext]
+}
+</script>
+
+<template>
+
+  <div class="-m-1.5 overflow-x-auto">
+    <div class="p-1.5 min-w-full inline-block align-middle">
+      <div class="overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+
+          <thead>
+            <tr v-if="props.external">
+              <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">Identifier
+              </th>
+              <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
+                Type</th>
+            </tr>
+            <tr v-else>
+              <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">ID
+              </th>
+              <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">Resource
+              </th>
+              <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
+                Type</th>
+            </tr>
+          </thead>
+
+          <thead v-if="!props.external && inc_int_rel.length > 0">
+            <tr>
+              <th colspan="3" class="px-6 py-3 text-start text-sm font-medium text-gray-600 uppercase">Incoming</th>
+            </tr>
+          </thead>
+
+          <tbody v-if="props.external" class="divide-y divide-gray-200 dark:divide-gray-700">
+            <tr v-for="relation in ext_rel" class="hover:bg-gray-100 dark:hover:bg-gray-700">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+                <a href="`${relation.external.identifier}`" exact=true class="ms-1">
+                  <IconLink class="flex-shrink-0 size-4 inline-block" /> {{ relation.identifier }}
+                </a>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+                <span v-if="relation.definedVariant === v2ExternalRelationVariant.EXTERNAL_RELATION_VARIANT_URL">
+                  URL
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2ExternalRelationVariant.EXTERNAL_RELATION_VARIANT_IDENTIFIER">
+                  Identifier
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2ExternalRelationVariant.EXTERNAL_RELATION_VARIANT_CUSTOM">
+                  {{ relation.customVariant }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+          <tbody v-else class="divide-y divide-gray-200 dark:divide-gray-700">
+            <tr v-for="relation in inc_int_rel">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+                <NuxtLink :to="`/objects/${relation.resourceId}`" exact=true class="">
+                  <div>
+                    <IconArrowBigLeftLines class="flex-shrink-0 size-6 inline-block" /> {{ relation.resourceId }}
+                  </div>
+                </NuxtLink>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+                {{ toResourceType(relation.resourceVariant) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+                <span v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
+              relation.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND">
+                  Parent
+                </span>
+                <span v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
+              relation.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND">
+                  Child
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_ORIGIN">
+                  Origin
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_VERSION">
+                  Version
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_METADATA">
+                  Metadata
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_POLICY">
+                  Policy
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_CUSTOM">
+                  {{ relation.customVariant }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+
+          <thead v-if="!props.external && inc_out_rel.length > 0">
+            <tr>
+              <th colspan="3" class="px-6 py-3 text-start text-sm font-medium text-gray-600 uppercase">Outgoing</th>
+            </tr>
+          </thead>
+          <tbody v-if="!props.external && inc_out_rel.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
+            <tr v-for="relation in inc_out_rel">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+                <NuxtLink :to="`/objects/${relation.resourceId}`" exact=true class="">
+                  <div>
+                    <IconArrowBigLeftLines class="flex-shrink-0 size-6 inline-block" /> {{ relation.resourceId }}
+                  </div>
+                </NuxtLink>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+                <span v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
+              relation.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND">
+                  Parent
+                </span>
+                <span v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
+              relation.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND">
+                  Child
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_ORIGIN">
+                  Origin
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_VERSION">
+                  Version
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_METADATA">
+                  Metadata
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_POLICY">
+                  Policy
+                </span>
+                <span
+                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_CUSTOM">
+                  {{ relation.customVariant }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</template>
