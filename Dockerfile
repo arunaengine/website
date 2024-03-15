@@ -1,28 +1,22 @@
-FROM rust:slim-bullseye as builder
-RUN apt-get -y update && apt-get -y upgrade
-RUN apt-get -y install llvm cmake gcc ca-certificates libssl-dev pkg-config protobuf-compiler
-ENV RUSTFLAGS="-C target-feature=-crt-static --cfg=web_sys_unstable_apis"
-RUN rustup toolchain install nightly
-RUN rustup default nightly
-RUN cargo install --locked cargo-leptos
-RUN rustup target add wasm32-unknown-unknown
-RUN mkdir -p /app
-WORKDIR /app
-COPY . .
-RUN cargo leptos build --release -vv
+# Dockerfile
+FROM node:current-alpine
 
-FROM debian:bullseye-slim
-COPY --from=builder /app/target/release/aruna_web_server /app/
-COPY --from=builder /app/target/site /app/site
-COPY --from=builder /app/Cargo.toml /app/
-COPY --from=builder /app/.env /app/
-RUN apt-get -y update && apt-get -y upgrade
-RUN apt-get -y install ca-certificates libssl-dev
-WORKDIR /app
-ENV RUST_LOG="info"
-ENV LEPTOS_OUTPUT_NAME="aruna_web_v4"
-ENV APP_ENVIRONMENT="production"
-ENV LEPTOS_SITE_ADDR="0.0.0.0:3000"
-ENV LEPTOS_SITE_ROOT="site"
+# create destination directory
+RUN mkdir -p /usr/src/nuxt-app
+WORKDIR /usr/src/nuxt-app
+
+# update and install dependency
+RUN apk update && apk upgrade
+RUN apk add git
+
+# copy the app, note .dockerignore
+COPY . /usr/src/nuxt-app/
+RUN npm install
+RUN npm run build
+
 EXPOSE 3000
-CMD ["/app/aruna_web_server"]
+
+ENV NUXT_HOST=0.0.0.0
+ENV NUXT_PORT=3000
+
+ENTRYPOINT [ "node", ".output/server/index.mjs" ]
