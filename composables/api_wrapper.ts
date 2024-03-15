@@ -28,6 +28,21 @@ export async function fetchUsers(): Promise<v2User[] | undefined> {
     return undefined
 }
 
+export async function activateUser(userId: string): Promise<boolean> {
+    const oidc = useOidc()
+    if (oidc.isLoggedIn) {
+        // Check if token needs refresh
+        await $fetch('/oidc/user')
+        // Activate user
+        const response = await $fetch(`/api/user/${userId}/activate`, {
+            method: 'PATCH'
+        })
+        return true
+    }
+
+    return false
+}
+
 export async function deactivateUser(userId: string): Promise<boolean> {
     const oidc = useOidc()
     if (oidc.isLoggedIn) {
@@ -43,20 +58,29 @@ export async function deactivateUser(userId: string): Promise<boolean> {
     return false
 }
 
-export async function activateUser(userId: string): Promise<boolean> {
+export async function createUserToken(name: string, scope: v2Permission | undefined, expiry: string | undefined): Promise<v2CreateAPITokenResponse | undefined> {
     const oidc = useOidc()
     if (oidc.isLoggedIn) {
         // Check if token needs refresh
         await $fetch('/oidc/user')
-        // Activate user
-        const response = await $fetch(`/api/user/${userId}/activate`, {
-            method: 'PATCH'
+        // Create request and send
+        const request = {
+            name: name,
+            permission: scope,
+            expiresAt: expiry
+        } as v2CreateAPITokenRequest
+
+        const response: v2CreateAPITokenResponse = await $fetch('/api/user/tokens', {
+            method: 'POST',
+            body: request
         })
-        return true
+
+        return response
     }
 
-    return false
+    return undefined
 }
+
 
 export async function fetchUserResources(user: v2User): Promise<v2ResourceWithPermission[]> {
     const oidc = useOidc()

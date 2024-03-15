@@ -2,10 +2,6 @@
 import type { v2GetResourcesResponse } from '~/composables/aruna_api_json'
 
 export default defineEventHandler(async event => {
-
-    const test = event.context.params
-    console.log(test)
-
     const resourceIds = getQuery(event)['resourceIds']
     const authToken = parseCookies(event)["oidc._access_token"]
 
@@ -15,7 +11,6 @@ export default defineEventHandler(async event => {
             fetchUrl.searchParams.append('resourceIds', element)
         });
     }
-    console.log(fetchUrl.toString())
 
     const response = await $fetch<v2GetResourcesResponse>(fetchUrl.toString(), {
         headers: {

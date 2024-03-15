@@ -1,10 +1,14 @@
-import type { v2CreateProjectResponse } from '~/composables/aruna_api_json'
+
+import type { v2CreateAPITokenResponse } from '~/composables/aruna_api_json'
 
 export default defineEventHandler(async event => {
     const request = await readBody(event)
-    const apiEndpoint = `http://localhost:8080/v2/projects`
+    const baseUrl = useRuntimeConfig().serverHostUrl
+
+    const apiEndpoint = `${baseUrl}/v2/user/tokens`
     const token = parseCookies(event)["oidc._access_token"]
-    const response = await $fetch<v2CreateProjectResponse>(apiEndpoint, {
+
+    const response = await $fetch<v2CreateAPITokenResponse>(apiEndpoint, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`
@@ -12,5 +16,5 @@ export default defineEventHandler(async event => {
         body: request
     })
 
-    return response.project
+    return response
 })
