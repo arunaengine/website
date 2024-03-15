@@ -5,7 +5,6 @@ export default defineNuxtConfig({
     "~/plugins/preline.client.ts",
   ],
   modules: [
-    '@nuxt/image',
     '@nuxtjs/color-mode',
     'nuxt-openid-connect'
   ],
@@ -22,9 +21,6 @@ export default defineNuxtConfig({
     head: {
       title: 'Aruna',
     }
-  },
-  image: {
-    dir: 'assets/imgs',
   },
   
   colorMode: {

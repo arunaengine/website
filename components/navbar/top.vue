@@ -32,8 +32,8 @@ onMounted(() => {
         </button>
 
         <NuxtLink class="sm:order-2 font-semibold dark:text-white" href="/">
-          <NuxtImg src="aruna_light.png" class="dark:hidden" height="24px" />
-          <NuxtImg src="aruna_dark.png" class="hidden dark:inline" height="24px" />
+          <img src="assets/imgs/aruna_light.png" class="dark:hidden" height="24px" />
+          <img src="assets/imgs/aruna_dark.png" class="hidden dark:inline" height="24px" />
         </NuxtLink>
       </div>
 
