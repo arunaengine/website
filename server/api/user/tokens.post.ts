@@ -6,12 +6,11 @@ export default defineEventHandler(async event => {
     const baseUrl = useRuntimeConfig().serverHostUrl
 
     const apiEndpoint = `${baseUrl}/v2/user/tokens`
-    const token = parseCookies(event)["access_token"]
 
     const response = await $fetch<v2CreateAPITokenResponse>(apiEndpoint, {
         method: 'POST',
         headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${event.context.access_token}`
         },
         body: request
     })

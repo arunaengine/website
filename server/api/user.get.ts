@@ -1,5 +1,5 @@
 
-import type { v2GetUserResponse } from '~/composables/aruna_api_json'
+import { v2GetUserResponse } from '~/composables/aruna_api_json'
 
 export default defineEventHandler(async event => {
     //const userId = getQuery(event)['userId']
@@ -9,7 +9,16 @@ export default defineEventHandler(async event => {
         headers: {
             'Authorization': `Bearer ${event.context.access_token}`
         }
+    }).catch((error) => {
+        if (error.data.message === "Not registered") {
+            return "not_registered" as string
+        }
+        return error.data.message as string
     })
 
-    return response.user
+    if (typeof response === "string") {
+        return response
+    }else{
+        return response.user
+    }
 })

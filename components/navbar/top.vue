@@ -127,11 +127,11 @@ onMounted(() => {
               <IconBucket class="flex-shrink-0 size-4" />
               Resources
             </NuxtLink>
-            <!-- <a @click="logout()"
+            <a href="/auth/logout"
               class="flex items-center gap-x-2 py-2 px-3 rounded-lg cursor-pointer text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700">
               <IconLogout class="flex-shrink-0 size-4" />
               Logout
-            </a> -->
+            </a>
           </div>
         </div>
         <!-- User Dropdown End -->

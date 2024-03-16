@@ -2,8 +2,11 @@
 import type { v2User } from "./aruna_api_json/models/v2User"
 import { v2DataClass, type v2CreateProjectRequest, type v2ResourceWithPermission, type v2KeyValue, type v2DeactivateUserResponse, type v2ActivateUserResponse, type v2GetAllUsersResponse, type v2Permission, type v2CreateAPITokenResponse, type v2CreateAPITokenRequest } from "./aruna_api_json"
 
-export async function fetchUser(): Promise<v2User | undefined> {
-    const user = await $fetch('/api/user')
+export async function fetchUser(): Promise<v2User | string> {
+    const user = await $fetch('/api/user').catch((e) => {
+        console.log(e)
+        return e as string
+    })
     return user
 }
 

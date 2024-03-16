@@ -11,22 +11,26 @@ useHead({
   meta: [
     {
       name: "description",
-      content: "My amazing site.",
+      content: "Aruna is a modern data orchestration engine that enables users to connect disparate data sources, transform and enrich data, and build data pipelines in a distributed multi-cloud.",
     },
   ],
 });
 
+const user: v2User | string = await fetchUser();
+var displayName: string | undefined = undefined;
 
-const route = useRoute();
-var user: v2User | undefined = await fetchUser();
-if (user) {
-  console.log("User is logged in");
-  console.log(user);
+var isNotRegistered = false;
+if (typeof user === "string") {
+  if (user === "not_registered") {
+    console.log("User not registered");
+    isNotRegistered = true;
+  }
+}else{
+  displayName = user?.displayName;
 }
 
-const user_state = useState('user', () => user?.displayName as String)
-
-const anchor = ref(0);
+const is_registered = useState('register', () => isNotRegistered)
+const user_state = useState('user', () => displayName)
 
 </script>
 
@@ -37,6 +41,10 @@ const anchor = ref(0);
   <div
     class="flex flex-col flex-grow md:min-h-screen bg-gradient-to-b from-aruna-800/[.30] via-transparent"
   >
+
+    <ClientOnly fallback-tag="span" fallback="">
+      <ModalRegister v-if="isNotRegistered"/>
+    </ClientOnly>
     <!-- Body -->
     <NuxtLoadingIndicator />
     <NuxtPage />

@@ -6,11 +6,10 @@ export default defineEventHandler(async event => {
     let userId = event.context.params?.id
     const baseUrl = useRuntimeConfig().serverHostUrl
     const fetchUrl = `${baseUrl}/v2/user/${userId}/deactivate`
-    const authToken = parseCookies(event)[`access_token`]
     const response = await $fetch<v2DeactivateUserResponse>(fetchUrl, {
         method: 'PATCH',
         headers: {
-            'Authorization': `Bearer ${authToken}`
+            'Authorization': `Bearer ${event.context.access_token}`
         }
     })
 
