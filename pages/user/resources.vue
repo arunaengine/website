@@ -3,12 +3,8 @@ import { IconArrowLeft, IconPlus } from '@tabler/icons-vue';
 import { v2DataClass } from '~/composables/aruna_api_json';
 
 // Check refresh and access before navigation
-definePageMeta({
-    middleware: "check-access"
-})
 
 //TODO: GetUserResources
-const oidc = useOidc()
 const resources = await fetchUserResources(oidc.user)
 console.log(resources)
 

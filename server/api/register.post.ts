@@ -2,15 +2,26 @@ import type { v2CreateProjectResponse, v2RegisterUserRequest } from '~/composabl
 
 export default defineEventHandler(async event => {
     const request = await readBody(event)
+
+    console.log('request', request)
+
+
+    const final_body = {
+        displayName: request.name,
+        email: request.email,
+        project: request.project,
+    }
+
+
     const baseUrl = useRuntimeConfig().serverHostUrl
-    const fetchUrl = `${baseUrl}/v2/users/register` 
+    const fetchUrl = `${baseUrl}/v2/user/register` 
     const response = await $fetch<v2RegisterUserRequest>(fetchUrl, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${event.context.access_token}`
         },
-        body: request
+        body: final_body
     })
 
-    return response.project
+    return response.displayName
 })

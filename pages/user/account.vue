@@ -10,16 +10,33 @@ import {
 } from '@tabler/icons-vue';
 import type { v2Token } from '~/composables/aruna_api_json';
 
-// Redirect to log in if not logged in
-definePageMeta({
-  middleware: "check-access"
-})
-
 const router = useRouter()
 const arunaUser = await fetchUser()
-const endpoints = await fetchEndpoints()
+//const endpoints = await fetchEndpoints()
+
+
+const get_user = () => {
+  if (typeof arunaUser === "string") {
+    return undefined
+  }
+  return arunaUser
+}
+
+const is_active = () => {
+  if (typeof arunaUser === "string") {
+    return false
+  }
+  if (arunaUser?.active) {
+    arunaUser?.active
+  }
+  return false
+}
+
 
 function getTokens(): v2Token[] {
+  if (typeof arunaUser === "string") {
+    return []
+  }
   if (arunaUser?.attributes?.tokens) {
     return arunaUser?.attributes?.tokens
   }
@@ -32,7 +49,7 @@ function getTokens(): v2Token[] {
 
   <div class="flex flex-wrap justify-between container mx-auto my-10">
     <h1 class="text-3xl font-bold text-gray-700 dark:text-white">
-      Hej {{ arunaUser?.displayName }},
+      Hej {{ get_user()?.displayName }},
     </h1>
     <button @click="router.back()"
       class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-gray-700 hover:bg-gray-300 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/30 dark:hover:text-gray-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
@@ -50,13 +67,13 @@ function getTokens(): v2Token[] {
           <IconUserScan class="flex-shrink-0" />
           Profile
         </button>
-        <button type="button"
+        <button type="button" :disabled="!is_active()"
           class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-blue-600 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500"
           id="tabs-with-icons-item-2" data-hs-tab="#tabs-with-icons-2" aria-controls="tabs-with-icons-2" role="tab">
-          <IconPokeball class="flex-shrink-0 size-4" />
+          <IconPokeball class="flex-shrink-0 size-4"/>
           Tokens
         </button>
-        <button type="button"
+        <button type="button" :disabled="!is_active()"
           class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-blue-600 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500"
           id="tabs-with-icons-item-3" data-hs-tab="#tabs-with-icons-3" aria-controls="tabs-with-icons-3" role="tab">
           <IconBuildingWarehouse class="flex-shrink-0 size-4" />
@@ -67,14 +84,18 @@ function getTokens(): v2Token[] {
 
     <div class="mt-3">
       <div id="tabs-with-icons-1" role="tabpanel" aria-labelledby="tabs-with-icons-item-1">
+        <div class="bg-yellow-100 border border-yellow-200 text-sm text-yellow-800 rounded-lg p-4 dark:bg-yellow-800/10 dark:border-yellow-900 dark:text-yellow-500" role="alert" v-if="!is_active()">
+          <span class="font-bold">Info: </span> Your account is currently not active. We will activate your account as soon as possible.
+        </div>
         <div class="flex flex-auto gap-4">
+          
           <div
             class="flex flex-auto flex-col bg-transparent text-center dark:bg-slate-900 dark:border-gray-700 dark:shadow-slate-700/[.7]">
             <h3 class="text-lg font-bold text-gray-600 dark:text-white">
               ID
             </h3>
             <p class="mt-2 text-gray-500 dark:text-gray-400">
-              {{ arunaUser?.id }}
+              {{ get_user()?.id }}
             </p>
           </div>
 
@@ -84,7 +105,7 @@ function getTokens(): v2Token[] {
               Display Name
             </h3>
             <p class="mt-2 text-gray-500 dark:text-gray-400">
-              {{ arunaUser?.displayName }}
+              {{ get_user()?.displayName }}
             </p>
           </div>
 
@@ -93,7 +114,7 @@ function getTokens(): v2Token[] {
               Email
             </h3>
             <p class="mt-2 text-gray-600 dark:text-gray-400">
-              {{ arunaUser?.email ? arunaUser?.email : "No email provided" }}
+              {{ get_user()?.email ? get_user()?.email : "No email provided" }}
             </p>
           </div>
 
@@ -103,7 +124,7 @@ function getTokens(): v2Token[] {
               Is active:
             </h3>
             <p class="flex grow-0 items-center justify-center mt-2 text-gray-500 dark:text-gray-400">
-              <IconCheck v-if="arunaUser?.active" class="mx-2 flex-shrink-0 text-green-600" />
+              <IconCheck v-if="get_user()?.active" class="mx-2 flex-shrink-0 text-green-600" />
               <IconX v-else class="icon text-red" />
             </p>
           </div>
@@ -169,7 +190,7 @@ function getTokens(): v2Token[] {
       </div>
 
       <div id="tabs-with-icons-3" class="hidden" role="tabpanel" aria-labelledby="tabs-with-icons-item-3">
-
+        
         <div class="flex flex-auto flex-wrap gap-x-4">
           <div v-for="endpoint in endpoints"
             class="flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
@@ -191,6 +212,7 @@ function getTokens(): v2Token[] {
         </div>
       </div>
     </div>
+
   </div>
 
   <!-- Hidden token create modal dialog -->
