@@ -6,7 +6,7 @@ export default defineEventHandler(async event => {
     const baseUrl = useRuntimeConfig().serverHostUrl
 
     const apiEndpoint = `${baseUrl}/v2/user/tokens`
-    const token = parseCookies(event)["oidc._access_token"]
+    const token = parseCookies(event)["access_token"]
 
     const response = await $fetch<v2CreateAPITokenResponse>(apiEndpoint, {
         method: 'POST',

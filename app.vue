@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import type { v2User } from './composables/aruna_api_json';
+
 // Returns Vue component
-const oidc = useOidc();
+//const oidc = useOidc();
 const fetchError = ref(false);
 const fetchErrorMsg = ref("");
 
@@ -14,29 +16,18 @@ useHead({
   ],
 });
 
-async function refreshUser() {
-  if (oidc.isLoggedIn) {
-    try {
-      oidc.setUser(await fetchUser());
-      fetchError.value = false;
-      fetchErrorMsg.value = "";
-    } catch (error: unknown) {
-      fetchError.value = true;
-      fetchErrorMsg.value =
-        error instanceof Error ? error.message : "Failed to fetch user info";
-      console.error(fetchErrorMsg.value);
-    }
-  }
-  forceRefreshAnchor();
+
+const route = useRoute();
+var user: v2User | undefined = await fetchUser();
+if (user) {
+  console.log("User is logged in");
+  console.log(user);
 }
+
+const user_state = useState('user', () => user?.displayName as String)
 
 const anchor = ref(0);
 
-function forceRefreshAnchor() {
-  anchor.value++;
-}
-
-onMounted(() => refreshUser());
 </script>
 
 <template>

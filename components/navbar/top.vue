@@ -4,8 +4,9 @@ import {
   IconUserScan, IconBell, IconBucket, IconChevronDown
 } from '@tabler/icons-vue';
 
-const oidc = useOidc()
-const anchor = ref(0)
+const user_state: globalThis.Ref<String> = useState('user')
+
+const isLoggedIn = computed(() => user_state.value !== undefined)
 
 /* Dark mode toggle */
 const colorMode = useColorMode()
@@ -32,8 +33,8 @@ onMounted(() => {
         </button>
 
         <NuxtLink class="sm:order-2 font-semibold dark:text-white" href="/">
-          <img src="assets/imgs/aruna_light.png" class="dark:hidden" height="24px" />
-          <img src="assets/imgs/aruna_dark.png" class="hidden dark:inline" height="24px" />
+          <img src="assets/imgs/aruna_light.png" class="dark:hidden w-24 h-auto align-middle"/>
+          <img src="assets/imgs/aruna_dark.png" class="hidden dark:inline w-24 h-auto align-middle" />
         </NuxtLink>
       </div>
 
@@ -99,11 +100,11 @@ onMounted(() => {
         </button>
 
         <!-- User Dropdown Start -->
-        <div v-if="oidc.isLoggedIn" class="hs-dropdown [--strategy:static] sm:[--strategy:fixed] [--adaptive:none]">
+        <div v-if=isLoggedIn class="hs-dropdown [--strategy:static] sm:[--strategy:fixed] [--adaptive:none]">
           <button id="hs-mega-menu-basic-dr" type="button"
             class="p-2 flex items-center w-full text-gray-600 font-medium dark:text-gray-400 dark:hover:border-gray-500 ">
             <IconUserCircle class="mx-1 flex-shrink-0 w-5 h-auto" />
-            {{ oidc.user.displayName }}
+            {{ user_state }}
             <IconChevronDown class="ms-1 flex-shrink-0 w-5 h-auto" />
           </button>
           <div
@@ -126,18 +127,17 @@ onMounted(() => {
               <IconBucket class="flex-shrink-0 size-4" />
               Resources
             </NuxtLink>
-            <a @click="oidc.logout()"
+            <!-- <a @click="logout()"
               class="flex items-center gap-x-2 py-2 px-3 rounded-lg cursor-pointer text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700">
               <IconLogout class="flex-shrink-0 size-4" />
               Logout
-            </a>
+            </a> -->
           </div>
         </div>
         <!-- User Dropdown End -->
         <button v-else
-          class="flex items-center gap-x-2 font-medium text-gray-600 sm:my-6 md:my-0 p-2 dark:text-gray-300"
-          @click="oidc.login()">
-          Login
+          class="flex items-center gap-x-2 font-medium text-gray-600 sm:my-6 md:my-0 p-2 dark:text-gray-300">
+          <a href="/auth/login">Login</a>
         </button>
       </div>
     </nav>

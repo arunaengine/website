@@ -1,94 +1,54 @@
 
 import type { v2User } from "./aruna_api_json/models/v2User"
-import { v2DataClass, type v2CreateProjectRequest, type v2ResourceWithPermission, type v2KeyValue, type v2DeactivateUserResponse, type v2ActivateUserResponse, type v2GetAllUsersResponse } from "./aruna_api_json"
+import { v2DataClass, type v2CreateProjectRequest, type v2ResourceWithPermission, type v2KeyValue, type v2DeactivateUserResponse, type v2ActivateUserResponse, type v2GetAllUsersResponse, type v2Permission, type v2CreateAPITokenResponse, type v2CreateAPITokenRequest } from "./aruna_api_json"
 
 export async function fetchUser(): Promise<v2User | undefined> {
-    const oidc = useOidc()
-    if (oidc.isLoggedIn) {
-        // Check if token needs refresh
-        await $fetch('/oidc/user')
-        // Fetch user
-        const user = await $fetch('/api/user')
-        return user
-    }
-
-    return undefined
+    const user = await $fetch('/api/user')
+    return user
 }
 
 export async function fetchUsers(): Promise<v2User[] | undefined> {
-    const oidc = useOidc()
-    if (oidc.isLoggedIn) {
-        // Check if token needs refresh
-        await $fetch('/oidc/user')
-        // Fetch user
-        const users = await $fetch('/api/users')
-        return users
-    }
-
-    return undefined
+    const users = await $fetch('/api/users')
+    return users
 }
 
 export async function activateUser(userId: string): Promise<boolean> {
-    const oidc = useOidc()
-    if (oidc.isLoggedIn) {
-        // Check if token needs refresh
-        await $fetch('/oidc/user')
-        // Activate user
-        const response = await $fetch(`/api/user/${userId}/activate`, {
-            method: 'PATCH'
-        })
-        return true
-    }
-
-    return false
+    const response = await $fetch(`/api/user/${userId}/activate`, {
+        method: 'PATCH'
+    })
+    return response !== undefined
 }
 
 export async function deactivateUser(userId: string): Promise<boolean> {
-    const oidc = useOidc()
-    if (oidc.isLoggedIn) {
-        // Check if token needs refresh
-        await $fetch('/oidc/user')
-        // Deactivate user
-        const response = await $fetch(`/api/user/${userId}/deactivate`, {
-            method: 'PATCH'
-        })
-        return true
-    }
-
-    return false
+    // Check if token needs refresh
+    await $fetch('/oidc/user')
+    // Deactivate user
+    const response = await $fetch(`/api/user/${userId}/deactivate`, {
+        method: 'PATCH'
+    })
+    return true
 }
 
 export async function createUserToken(name: string, scope: v2Permission | undefined, expiry: string | undefined): Promise<v2CreateAPITokenResponse | undefined> {
-    const oidc = useOidc()
-    if (oidc.isLoggedIn) {
-        // Check if token needs refresh
-        await $fetch('/oidc/user')
-        // Create request and send
-        const request = {
-            name: name,
-            permission: scope,
-            expiresAt: expiry
-        } as v2CreateAPITokenRequest
+    // Create request and send
+    const request = {
+        name: name,
+        permission: scope,
+        expiresAt: expiry
+    } as v2CreateAPITokenRequest
 
-        const response: v2CreateAPITokenResponse = await $fetch('/api/user/tokens', {
-            method: 'POST',
-            body: request
-        })
+    const response: v2CreateAPITokenResponse = await $fetch<v2CreateAPITokenResponse>('/api/user/tokens', {
+        method: 'POST',
+        body: request
+    })
 
-        return response
-    }
-
-    return undefined
+    return response
 }
 
 
 export async function fetchUserResources(user: v2User): Promise<v2ResourceWithPermission[]> {
-    const oidc = useOidc()
-    if (oidc.isLoggedIn) {
         // Filter projects from user permissions
         const projectPermissions = user.attributes?.personalPermissions?.filter((perm) => perm.projectId)
-        // Check if token needs refresh
-        await $fetch('/oidc/user')
         // Fetch resources
         if (projectPermissions && projectPermissions.length > 0) {
             let fetchUrl = '/api/resources?'
@@ -101,16 +61,11 @@ export async function fetchUserResources(user: v2User): Promise<v2ResourceWithPe
             const resources = await $fetch<v2ResourceWithPermission[]>(fetchUrl)
             return resources
         }
-    }
 
-    return []
+        return []
 }
 
 export async function createProject(name: string, description: string, keyValues: v2KeyValue[], dataClass: v2DataClass) {
-    const oidc = useOidc()
-    if (oidc.isLoggedIn) {
-        // Check if token needs refresh
-        await $fetch('/oidc/user')
         // Create request and send
         const request = {
             name: name,
@@ -127,5 +82,4 @@ export async function createProject(name: string, description: string, keyValues
             method: 'POST',
             body: request
         })
-    }
 }

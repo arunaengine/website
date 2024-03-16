@@ -3,7 +3,7 @@ import type { v2GetResourcesResponse } from '~/composables/aruna_api_json'
 
 export default defineEventHandler(async event => {
     const resourceIds = getQuery(event)['resourceIds']
-    const authToken = parseCookies(event)["oidc._access_token"]
+    const authToken = parseCookies(event)["access_token"]
 
     const fetchUrl = new URL('http://localhost:8080/v2/resources')
     if (resourceIds) {
