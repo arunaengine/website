@@ -4,7 +4,8 @@ import type { v2GetResourcesResponse } from '~/composables/aruna_api_json'
 export default defineEventHandler(async event => {
     const resourceIds = getQuery(event)['resourceIds']
 
-    const fetchUrl = new URL('http://localhost:8080/v2/resources')
+    const baseUrl = useRuntimeConfig().serverHostUrl
+    const fetchUrl = `${baseUrl}/v2/resources`
     if (resourceIds) {
         resourceIds.forEach(element => {
             fetchUrl.searchParams.append('resourceIds', element)
