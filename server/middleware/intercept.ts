@@ -3,14 +3,7 @@ export default defineEventHandler(async (event) => {
     if (process
         .client
         ) return
-    const config = {
-        clientId: "test",
-        clientSecret: "QgBl9I2CD3eVhL7LFvkHrYUK7oKL3LE2",
-        serverUrl: "http://localhost:1998",
-        realm: "test",
-        scope: ["openid"],
-      };
-    
+        const config = useRuntimeConfig().provider.local;    
       const query = getQuery(event)
       const { code } = query
     

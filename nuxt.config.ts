@@ -29,7 +29,16 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    serverHostUrl: "http://localhost:8080"
+    serverHostUrl: "http://localhost:8080",
+    provider: {
+      local: {
+        clientId: "test",
+        clientSecret: "QgBl9I2CD3eVhL7LFvkHrYUK7oKL3LE2",
+        serverUrl: "http://localhost:1998",
+        realm: "test",
+        scope: ["openid"],
+      }
+    }
   },
 })
 

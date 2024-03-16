@@ -1,15 +1,7 @@
 import { withQuery, parsePath } from 'ufo'
 
 export default defineEventHandler(async event => {
-  //const userId = getQuery(event)['userId']
-  const config = {
-    clientId: "test",
-    clientSecret: "QgBl9I2CD3eVhL7LFvkHrYUK7oKL3LE2",
-    serverUrl: "http://localhost:1998",
-    realm: "test",
-    scope: ["openid"],
-  };
-
+  const config = useRuntimeConfig().provider.local;
   const realmURL = `${config.serverUrl}/realms/${config.realm}`
   const authorizationURL = `${realmURL}/protocol/openid-connect/auth`
   const tokenURL = `${realmURL}/protocol/openid-connect/token`
