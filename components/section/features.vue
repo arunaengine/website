@@ -12,7 +12,7 @@ import {
 <template>
   <!-- Icon Blocks -->
   <div
-    class="w-full max-w-[85rem] my-4 shadow-lg rounded-3xl border-2 dark:border-gray-200 px-4 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto"
+    class="w-full max-w-[85rem] my-4 rounded-3xl border-2 border-gray-300 shadow-lg px-4 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto"
   >
     <div class="mx-auto">
       <!-- Grid -->

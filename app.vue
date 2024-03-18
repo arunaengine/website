@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { v2User } from './composables/aruna_api_json';
+import type { v2User } from "./composables/aruna_api_json";
 
 // Returns Vue component
 //const oidc = useOidc();
@@ -11,7 +11,8 @@ useHead({
   meta: [
     {
       name: "description",
-      content: "Aruna is a modern data orchestration engine that enables users to connect disparate data sources, transform and enrich data, and build data pipelines in a distributed multi-cloud.",
+      content:
+        "Aruna is a modern data orchestration engine that enables users to connect disparate data sources, transform and enrich data, and build data pipelines in a distributed multi-cloud.",
     },
   ],
 });
@@ -25,13 +26,12 @@ if (typeof user === "string") {
     console.log("User not registered");
     isNotRegistered = true;
   }
-}else{
+} else {
   displayName = user?.displayName;
 }
 
-const is_registered = useState('register', () => isNotRegistered)
-const user_state = useState('user', () => displayName)
-
+const is_registered = useState("register", () => isNotRegistered);
+const user_state = useState("user", () => displayName);
 </script>
 
 <template>
@@ -39,11 +39,10 @@ const user_state = useState('user', () => displayName)
   <Sidebar />
   <!-- Main body -->
   <div
-    class="flex flex-col flex-grow md:min-h-screen bg-gradient-to-b from-aruna-800/[.30] via-transparent"
+    class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent"
   >
-
     <ClientOnly fallback-tag="span" fallback="">
-      <ModalRegister v-if="isNotRegistered"/>
+      <ModalRegister v-if="isNotRegistered" />
     </ClientOnly>
     <!-- Body -->
     <NuxtLoadingIndicator />

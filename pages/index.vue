@@ -4,7 +4,7 @@
     <NavbarTop />
     <SectionHero />
     <SectionFeatures />
-    <SectionFeaturesOld />
+    <SectionFeatures2 />
     <SectionNewsletter />
     <SectionFaq />
     <Footer />

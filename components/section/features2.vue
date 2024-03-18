@@ -1,15 +1,15 @@
 <template>
   <div
-    class="max-w-[85rem] border-2 shadow-lg rounded-3xl dark:border-aruna-800 px-4 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto"
+    class="max-w-[85rem] border-2 shadow-lg rounded-3xl border-gray-300 px-4 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto"
   >
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 items-center gap-2">
       <!-- Icon Block -->
       <a
         class="group flex flex-col justify-center hover:bg-gray-50 rounded-xl p-4 md:p-7 dark:hover:bg-slate-800 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-        href="#"
+        href="https://github.com/ArunaStorage/aruna/tree/main/LICENSE"
       >
         <div
-          class="flex justify-center items-center size-12 bg-blue-600 rounded-xl"
+          class="flex justify-center items-center size-12 bg-aruna-700 rounded-xl"
         >
           <svg
             class="flex-shrink-0 size-6 text-white"
@@ -41,7 +41,7 @@
             license
           </p>
           <span
-            class="mt-2 inline-flex items-center gap-x-1.5 text-sm text-blue-600 decoration-2 group-hover:underline font-medium"
+            class="mt-2 inline-flex items-center gap-x-1.5 text-sm text-aruna-700 decoration-2 group-hover:underline font-medium"
           >
             Learn more
             <svg
@@ -66,10 +66,10 @@
       <!-- Icon Block -->
       <a
         class="group flex flex-col justify-center hover:bg-gray-50 rounded-xl p-4 md:p-7 dark:hover:bg-slate-800 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-        href="#"
+        href="https://github.com/ArunaStorage/aruna?tab=readme-ov-file#getting-started"
       >
         <div
-          class="flex justify-center items-center size-12 bg-blue-600 rounded-xl"
+          class="flex justify-center items-center size-12 bg-aruna-700 rounded-xl"
         >
           <svg
             class="flex-shrink-0 size-6 text-white"
@@ -96,10 +96,10 @@
             Customizable
           </h3>
           <p class="mt-1 text-gray-600 dark:text-gray-400">
-            Components are easily customized and extendable
+            Data proxy and server components are easily customizable
           </p>
           <span
-            class="mt-2 inline-flex items-center gap-x-1.5 text-sm text-blue-600 decoration-2 group-hover:underline font-medium"
+            class="mt-2 inline-flex items-center gap-x-1.5 text-sm text-aruna-700 decoration-2 group-hover:underline font-medium"
           >
             Learn more
             <svg
@@ -124,10 +124,10 @@
       <!-- Icon Block -->
       <a
         class="group flex flex-col justify-center hover:bg-gray-50 rounded-xl p-4 md:p-7 dark:hover:bg-slate-800 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-        href="#"
+        href="https://arunastorage.github.io/documentation/latest"
       >
         <div
-          class="flex justify-center items-center size-12 bg-blue-600 rounded-xl"
+          class="flex justify-center items-center size-12 bg-aruna-700 rounded-xl"
         >
           <svg
             class="flex-shrink-0 size-6 text-white"
@@ -152,10 +152,10 @@
             Documentation
           </h3>
           <p class="mt-1 text-gray-600 dark:text-gray-400">
-            Every component and plugin is well documented
+            Learn how to participate by reading our documentation
           </p>
           <span
-            class="mt-2 inline-flex items-center gap-x-1.5 text-sm text-blue-600 decoration-2 group-hover:underline font-medium"
+            class="mt-2 inline-flex items-center gap-x-1.5 text-sm text-aruna-700 decoration-2 group-hover:underline font-medium"
           >
             Learn more
             <svg
