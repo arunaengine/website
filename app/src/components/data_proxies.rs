@@ -1,6 +1,6 @@
 use crate::utils::structs::{VisualizedEndpoint, WhoamiResponse};
 use aruna_rust_api::api::storage::models::v2::Endpoint;
-use aruna_rust_api::api::storage::services::v2::GetS3CredentialsUserResponse;
+use aruna_rust_api::api::storage::services::v2::GetS3CredentialsUserTokenResponse;
 use cfg_if::cfg_if;
 use gloo_events::EventListener;
 use leptos::*;
@@ -24,7 +24,7 @@ pub async fn get_proxies() -> Result<Vec<Endpoint>, ServerFnError> {
 #[server]
 pub async fn get_credentials(
     endpoint: String,
-) -> Result<GetS3CredentialsUserResponse, ServerFnError> {
+) -> Result<GetS3CredentialsUserTokenResponse, ServerFnError> {
     use crate::utils::aruna_api_handlers::ConnectionHandler;
     use crate::utils::login_helpers::{extract_token, LoginResult};
 
@@ -192,11 +192,11 @@ pub fn DataProxyOverview() -> impl IntoView {
 
 #[component]
 pub fn CreateCredentialsSuccess(
-    create_credentials_response: GetS3CredentialsUserResponse,
+    create_credentials_response: GetS3CredentialsUserTokenResponse,
 ) -> impl IntoView {
     provide_meta_context();
 
-    let GetS3CredentialsUserResponse {
+    let GetS3CredentialsUserTokenResponse {
         s3_access_key,
         s3_secret_key,
         ..

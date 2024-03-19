@@ -11,9 +11,9 @@ use aruna_rust_api::api::storage::services::v2::{
     CreateCollectionRequest, CreateDatasetRequest, CreateObjectRequest, DeactivateUserRequest,
     DeleteApiTokenRequest, GetAllUsersRequest, GetAllUsersResponse, GetApiTokensRequest,
     GetApiTokensResponse, GetEndpointsRequest, GetEndpointsResponse, GetResourceRequest,
-    GetResourcesRequest, GetS3CredentialsUserRequest, GetS3CredentialsUserResponse, GetUserRequest,
-    ListLicensesRequest, RegisterUserRequest, RegisterUserResponse, ResourceWithPermission,
-    SearchResourcesRequest, SearchResourcesResponse,
+    GetResourcesRequest, GetS3CredentialsUserTokenRequest, GetS3CredentialsUserTokenResponse,
+    GetUserRequest, ListLicensesRequest, RegisterUserRequest, RegisterUserResponse,
+    ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse,
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
@@ -455,15 +455,14 @@ impl ConnectionHandler {
     pub async fn aruna_get_s3_credentials(
         token: &str,
         endpoint_id: &str,
-    ) -> Result<GetS3CredentialsUserResponse> {
+    ) -> Result<GetS3CredentialsUserTokenResponse> {
         let channel = Self::get_channel().await?;
         let mut client = user_service_client::UserServiceClient::new(channel);
-        let req = tonic::Request::new(GetS3CredentialsUserRequest {
-            user_id: "".to_string(),
+        let req = tonic::Request::new(GetS3CredentialsUserTokenRequest {
             endpoint_id: endpoint_id.to_string(),
         });
         Ok(client
-            .get_s3_credentials_user(Self::add_token(req, token))
+            .get_s3_credentials_user_token(Self::add_token(req, token))
             .await?
             .into_inner())
     }
