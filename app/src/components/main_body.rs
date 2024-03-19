@@ -40,10 +40,10 @@ pub fn MainBody() -> impl IntoView {
                         />
                     </div>
                 </div>
-                <h1 class="fw-bold hook pb-2">{"Your distributed scientific data mesh"}</h1>
+                <h1 class="fw-bold hook pb-2">{"Your distributed data orchestration engine"}</h1>
                 <div class="col-lg-10 mx-auto">
                     <h3 class="lead mb-4">
-                        {"Fast, secure, distributed and domain-agnostic data storage with sophisticated metadata management according to "}
+                        {"Fast, secure, distributed and domain-agnostic data and metadata management according to "}
                         <a class="text-primary" href="https://www.go-fair.org/fair-principles/">
                             {"FAIR"}
                         </a>
@@ -123,7 +123,7 @@ pub fn MainBody() -> impl IntoView {
                             </div>
                             <h2 class="h3">{"Built with Rust"}</h2>
                             <p class="text-muted">
-                                {"Strong commitment for fast, safe and reliable code. In the backend and the frontend."}
+                                {"Strong commitment for fast, safe and reliable code."}
                             </p>
                         </div>
                         <div class="col-sm">
@@ -573,14 +573,14 @@ pub fn MainBody() -> impl IntoView {
                                         <div class="accordion-body pt-0">
                                             <div>
                                                 <p>
-                                                    {"Aruna Object Storage (AOS) is an open source data storage platform that enables scientists to store, annotate and share their data according to "}
+                                                    {"The Aruna Data Orchestration Engine is an open source data management platform that enables scientists to store, annotate and share their data according to "}
                                                     <a href="https://www.go-fair.org/fair-principles/">
                                                         {"FAIR"}
                                                     </a> {" principles."}
                                                 </p>
                                                 <p>
                                                     {"The name Aruna originates from the god of the sea in hittite mythology and their name for the sea and bodies of water in general.
-                                                    We choose this name to symbolize our vision of a revolutionary cloud-native data lake."}
+                                                    We choose this name to symbolize our vision of a revolutionary cloud-native data management application."}
                                                 </p>
                                             </div>
                                         </div>
