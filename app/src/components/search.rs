@@ -87,19 +87,19 @@ pub fn Search() -> impl IntoView {
     let max_pages = move || (results() / 50) + 1;
     let get_range_iter = move |current: i32| {
         let max = max_pages();
-        let from = if current > 3 { current - 2 } else { 1 };
-        let to = if current + 2 < max { current + 2 } else { max };
-        if to < 5 {
-            return 1..=max;
-        }
+        let (from, to) = match current {
+            1 | 2 | 3 => (1, if max > 5 { 5 } else { max }),
+            _ => (
+                current - 2,
+                if current + 2 >= max { max } else { current + 2 },
+            ),
+        };
 
         if to + 2 > max {
             return (max - 4)..=max;
         }
 
-        if from + 5 > to {
-            return from..=from + 4;
-        }
+       
         from..=to
     };
 
