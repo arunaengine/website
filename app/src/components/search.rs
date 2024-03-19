@@ -98,7 +98,7 @@ pub fn Search() -> impl IntoView {
         }
 
         if from + 5 > to {
-            return from..from + 5;
+            return from..=from + 4;
         }
         from..=to
     };
