@@ -1,6 +1,6 @@
 use crate::utils::structs::{VisualizedEndpoint, WhoamiResponse};
 use aruna_rust_api::api::storage::models::v2::Endpoint;
-use aruna_rust_api::api::storage::services::v2::GetS3CredentialsUserTokenResponse;
+use aruna_rust_api::api::storage::services::v2::{GetS3CredentialsUserTokenResponse, CreateS3CredentialsUserTokenResponse};
 use cfg_if::cfg_if;
 use gloo_events::EventListener;
 use leptos::*;
@@ -37,9 +37,25 @@ pub async fn get_credentials(
         .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e)));
 }
 
+#[server]
+pub async fn create_credentials(
+    endpoint: String,
+) -> Result<CreateS3CredentialsUserTokenResponse, ServerFnError> {
+    use crate::utils::aruna_api_handlers::ConnectionHandler;
+    use crate::utils::login_helpers::{extract_token, LoginResult};
+
+    let LoginResult::ValidToken(token) = extract_token().await else {
+        return Err(ServerFnError::ServerError("NotLoggedIn".to_string()));
+    };
+
+    return ConnectionHandler::aruna_create_s3_credentials(&token, &endpoint)
+        .await
+        .map_err(|e| ServerFnError::Request(format!("Invalid request: {}", e)));
+}
+
 #[component]
 pub fn DataProxy(endpoint: VisualizedEndpoint) -> impl IntoView {
-    let get_creds = create_server_action::<GetCredentials>();
+    let get_creds = create_server_action::<CreateCredentials>();
     // holds the latest *returned* value from the server
     let value = get_creds.value();
 
@@ -50,7 +66,7 @@ pub fn DataProxy(endpoint: VisualizedEndpoint) -> impl IntoView {
             None
         }
     };
-    let create_args = store_value(GetCredentials {
+    let create_args = store_value(CreateCredentials {
         endpoint: endpoint.id.to_string(),
     });
 
@@ -192,11 +208,11 @@ pub fn DataProxyOverview() -> impl IntoView {
 
 #[component]
 pub fn CreateCredentialsSuccess(
-    create_credentials_response: GetS3CredentialsUserTokenResponse,
+    create_credentials_response: CreateS3CredentialsUserTokenResponse,
 ) -> impl IntoView {
     provide_meta_context();
 
-    let GetS3CredentialsUserTokenResponse {
+    let CreateS3CredentialsUserTokenResponse {
         s3_access_key,
         s3_secret_key,
         ..

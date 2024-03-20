@@ -5,15 +5,7 @@ use aruna_rust_api::api::storage::models::v2::{
     Endpoint, License, Permission, PermissionLevel, User,
 };
 use aruna_rust_api::api::storage::services::v2::{
-    collection_service_client, dataset_service_client, endpoint_service_client,
-    license_service_client, object_service_client, project_service_client, search_service_client,
-    user_service_client, ActivateUserRequest, CreateApiTokenRequest, CreateApiTokenResponse,
-    CreateCollectionRequest, CreateDatasetRequest, CreateObjectRequest, DeactivateUserRequest,
-    DeleteApiTokenRequest, GetAllUsersRequest, GetAllUsersResponse, GetApiTokensRequest,
-    GetApiTokensResponse, GetEndpointsRequest, GetEndpointsResponse, GetResourceRequest,
-    GetResourcesRequest, GetS3CredentialsUserTokenRequest, GetS3CredentialsUserTokenResponse,
-    GetUserRequest, ListLicensesRequest, RegisterUserRequest, RegisterUserResponse,
-    ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse,
+    collection_service_client, dataset_service_client, endpoint_service_client, license_service_client, object_service_client, project_service_client, search_service_client, user_service_client, ActivateUserRequest, CreateApiTokenRequest, CreateApiTokenResponse, CreateCollectionRequest, CreateDatasetRequest, CreateObjectRequest, CreateS3CredentialsUserTokenRequest, CreateS3CredentialsUserTokenResponse, DeactivateUserRequest, DeleteApiTokenRequest, GetAllUsersRequest, GetAllUsersResponse, GetApiTokensRequest, GetApiTokensResponse, GetEndpointsRequest, GetEndpointsResponse, GetResourceRequest, GetResourcesRequest, GetS3CredentialsUserTokenRequest, GetS3CredentialsUserTokenResponse, GetUserRequest, ListLicensesRequest, RegisterUserRequest, RegisterUserResponse, ResourceWithPermission, SearchResourcesRequest, SearchResourcesResponse
 };
 use tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue},
@@ -463,6 +455,21 @@ impl ConnectionHandler {
         });
         Ok(client
             .get_s3_credentials_user_token(Self::add_token(req, token))
+            .await?
+            .into_inner())
+    }
+
+    pub async fn aruna_create_s3_credentials(
+        token: &str,
+        endpoint_id: &str,
+    ) -> Result<CreateS3CredentialsUserTokenResponse> {
+        let channel = Self::get_channel().await?;
+        let mut client = user_service_client::UserServiceClient::new(channel);
+        let req = tonic::Request::new(CreateS3CredentialsUserTokenRequest {
+            endpoint_id: endpoint_id.to_string(),
+        });
+        Ok(client
+            .create_s3_credentials_user_token(Self::add_token(req, token))
             .await?
             .into_inner())
     }
