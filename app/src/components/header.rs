@@ -432,19 +432,19 @@ pub fn ArunaHeader() -> impl IntoView {
                                         <div class="dropdown-menu">
                                             <a
                                                 class="dropdown-item"
-                                                href="https://arunastorage.github.io/Documentation#aos-components"
+                                                href="https://arunastorage.github.io/documentation#aos-components"
                                             >
                                                 {"Components"}
                                             </a>
                                             <a
                                                 class="dropdown-item"
-                                                href="https://arunastorage.github.io/Documentation/latest/"
+                                                href="https://arunastorage.github.io/documentation/latest/"
                                             >
                                                 {"Getting started"}
                                             </a>
                                             <a
                                                 class="dropdown-item"
-                                                href="https://github.com/ArunaStorage/ArunaAPI"
+                                                href="https://github.com/ArunaStorage/api"
                                             >
                                                 {"API"}
                                             </a>
