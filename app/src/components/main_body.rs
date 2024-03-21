@@ -56,7 +56,7 @@ pub fn MainBody() -> impl IntoView {
                             on:click=move |_| {
                                 let _ = window()
                                     .location()
-                                    .set_href("https://arunastorage.github.io/Documentation");
+                                    .set_href("https://arunastorage.github.io/documentation");
                             }
                         >
 
