@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { IconArrowLeft, IconPlus } from '@tabler/icons-vue';
-import { v2DataClass } from '~/composables/aruna_api_json';
+import { v2DataClass } from '~/composables/aruna_api_json/models/v2DataClass';
+import type { v2User } from "~/composables/aruna_api_json/models/v2User";
 
 // Check refresh and access before navigation
 
 //TODO: GetUserResources
-const resources = await fetchUserResources(oidc.user)
+const user_state: globalThis.Ref<v2User | undefined> = useState("user")
+const isLoggedIn = computed(() => user_state.value !== undefined)
+
+const resources = await fetchUserResources(user_state.value)
 console.log(resources)
 
 const name = ref('')
@@ -24,6 +28,8 @@ const router = useRouter()
 </script>
 
 <template>
+    <NavbarTop />
+
     <div class="container-xl text-start mt-3">
         <div class="row mb-4">
             <div class="col">
@@ -105,4 +111,6 @@ const router = useRouter()
             </div>
         </div>
     </div>
+    
+    <Footer />
 </template>

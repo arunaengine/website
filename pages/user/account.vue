@@ -11,7 +11,7 @@ import {
 import type { v2Token } from '~/composables/aruna_api_json';
 
 const router = useRouter()
-const arunaUser = await fetchUser()
+const arunaUser = await fetchUser(undefined)
 //const endpoints = await fetchEndpoints()
 
 
@@ -212,8 +212,9 @@ function getTokens(): v2Token[] {
         </div>
       </div>
     </div>
-
   </div>
+
+  <Footer />
 
   <!-- Hidden token create modal dialog -->
   <ModalToken modalId="token-create-modal" />

@@ -245,6 +245,8 @@ onMounted(async () => await queryResources());
       <!-- End Display Search Results -->
     </div>
   </div>
+  
+  <Footer />
 </template>
 
 <style>
