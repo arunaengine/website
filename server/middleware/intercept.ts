@@ -16,7 +16,6 @@ export default defineEventHandler(async (event) => {
         var access_token = getCookie(event, 'access_token')
         if (!access_token) {
             const refresh_token = getCookie(event, 'refresh_token')
-            console.log('refresh_token', refresh_token)
             if (!refresh_token) {
                 return sendRedirect(event, '/login')
             }else{
@@ -58,5 +57,5 @@ export default defineEventHandler(async (event) => {
         event.context.access_token = access_token
     }
 
-    console.log('Request @ ' + getRequestURL(event))
+    //console.log('Request @ ' + getRequestURL(event))
 })

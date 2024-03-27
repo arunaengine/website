@@ -65,8 +65,8 @@ function goBack() {
   </div>
 
   <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 container mx-auto mb-6">
-    <CardSmallInfo :icon_id='"ID"' :text="objectInfo?.id" :bg_color="Colors.Primary" :text_color="Colors.Primary" />
-    <CardSmallInfo :icon_id='"Name"' :text="objectInfo?.name" :bg_color="Colors.Primary" :text_color="Colors.Primary" />
+    <CardSmallInfo :icon_id='"ID"' :text="objectInfo?.id" />
+    <CardSmallInfo :icon_id='"Name"' :text="objectInfo?.name" />
     <CardStats :stats="objectInfo?.stats" />
   </div>
 

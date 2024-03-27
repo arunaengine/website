@@ -1,10 +1,7 @@
 import { withQuery, parsePath } from 'ufo'
 
 export default defineEventHandler(async event => {
-  //const userId = getQuery(event)['userId']
-
   const config = useRuntimeConfig().provider.local;
-
   const query = getQuery(event)
   const { code } = query
 

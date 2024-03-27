@@ -1,12 +1,9 @@
 <script setup lang="ts">
-import { Colors } from "@/composables/tabler_utils"
 import { IconFileAnalytics, IconCylinder, IconFileText } from "@tabler/icons-vue";
 
 const props = defineProps<{
   icon_id: string,
   text?: string,
-  bg_color: Colors,
-  text_color: Colors
 }>()
 
 
