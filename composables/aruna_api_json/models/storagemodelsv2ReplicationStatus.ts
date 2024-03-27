@@ -2,7 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export enum apistorageservicesv2ReplicationStatus {
+export enum storagemodelsv2ReplicationStatus {
     REPLICATION_STATUS_UNSPECIFIED = 'REPLICATION_STATUS_UNSPECIFIED',
     REPLICATION_STATUS_WAITING = 'REPLICATION_STATUS_WAITING',
     REPLICATION_STATUS_RUNNING = 'REPLICATION_STATUS_RUNNING',

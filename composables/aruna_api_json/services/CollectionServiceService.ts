@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { googlerpcStatus } from '../models/googlerpcStatus';
+import type { v2Author } from '../models/v2Author';
 import type { v2CreateCollectionRequest } from '../models/v2CreateCollectionRequest';
 import type { v2CreateCollectionResponse } from '../models/v2CreateCollectionResponse';
 import type { v2DataClass } from '../models/v2DataClass';
@@ -11,11 +12,13 @@ import type { v2GetCollectionResponse } from '../models/v2GetCollectionResponse'
 import type { v2GetCollectionsResponse } from '../models/v2GetCollectionsResponse';
 import type { v2KeyValue } from '../models/v2KeyValue';
 import type { v2SnapshotCollectionResponse } from '../models/v2SnapshotCollectionResponse';
+import type { v2UpdateCollectionAuthorsResponse } from '../models/v2UpdateCollectionAuthorsResponse';
 import type { v2UpdateCollectionDataClassResponse } from '../models/v2UpdateCollectionDataClassResponse';
 import type { v2UpdateCollectionDescriptionResponse } from '../models/v2UpdateCollectionDescriptionResponse';
 import type { v2UpdateCollectionKeyValuesResponse } from '../models/v2UpdateCollectionKeyValuesResponse';
 import type { v2UpdateCollectionLicensesResponse } from '../models/v2UpdateCollectionLicensesResponse';
 import type { v2UpdateCollectionNameResponse } from '../models/v2UpdateCollectionNameResponse';
+import type { v2UpdateCollectionTitleResponse } from '../models/v2UpdateCollectionTitleResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -100,6 +103,33 @@ export class CollectionServiceService {
             path: {
                 'collectionId': collectionId,
             },
+        });
+    }
+    /**
+     * UpdateAuthors
+     * Status: ALPHA
+     *
+     * Updates the collections metadata title.
+     * @param collectionId
+     * @param body
+     * @returns v2UpdateCollectionAuthorsResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static collectionServiceUpdateCollectionAuthors(
+        collectionId: string,
+        body: {
+            addAuthors?: Array<v2Author>;
+            removeAuthors?: Array<v2Author>;
+        },
+    ): CancelablePromise<v2UpdateCollectionAuthorsResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/v2/collections/{collectionId}/authors',
+            path: {
+                'collectionId': collectionId,
+            },
+            body: body,
         });
     }
     /**
@@ -252,6 +282,32 @@ export class CollectionServiceService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/v2/collections/{collectionId}/snapshot',
+            path: {
+                'collectionId': collectionId,
+            },
+            body: body,
+        });
+    }
+    /**
+     * UpdateTitle
+     * Status: ALPHA
+     *
+     * Updates the collections metadata title.
+     * @param collectionId
+     * @param body
+     * @returns v2UpdateCollectionTitleResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static collectionServiceUpdateCollectionTitle(
+        collectionId: string,
+        body: {
+            title?: string;
+        },
+    ): CancelablePromise<v2UpdateCollectionTitleResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/v2/collections/{collectionId}/title',
             path: {
                 'collectionId': collectionId,
             },

@@ -2,8 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type v2DataProxyInfo = {
-    dataproxyId?: string;
-    availableSpace?: string;
+import type { v2Collection } from './v2Collection';
+export type v2UpdateCollectionTitleResponse = {
+    collection?: v2Collection;
 };
 

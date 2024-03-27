@@ -2,7 +2,6 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type v2InitReplicationResponse = {
-    ack?: boolean;
+export type v2DeleteS3CredentialsUserResponse = {
 };
 

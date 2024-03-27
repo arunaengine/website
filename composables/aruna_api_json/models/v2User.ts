@@ -9,5 +9,7 @@ export type v2User = {
     active?: boolean;
     email?: string;
     attributes?: v2UserAttributes;
+    firstName?: string;
+    lastName?: string;
 };
 

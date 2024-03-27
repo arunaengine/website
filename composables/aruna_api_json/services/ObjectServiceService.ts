@@ -6,6 +6,7 @@ import type { apistorageservicesv2CompletedPart } from '../models/apistorageserv
 import type { apistorageservicesv2DeleteObjectResponse } from '../models/apistorageservicesv2DeleteObjectResponse';
 import type { apistorageservicesv2GetObjectResponse } from '../models/apistorageservicesv2GetObjectResponse';
 import type { googlerpcStatus } from '../models/googlerpcStatus';
+import type { v2Author } from '../models/v2Author';
 import type { v2CloneObjectResponse } from '../models/v2CloneObjectResponse';
 import type { v2CreateObjectRequest } from '../models/v2CreateObjectRequest';
 import type { v2CreateObjectResponse } from '../models/v2CreateObjectResponse';
@@ -16,7 +17,10 @@ import type { v2GetObjectsResponse } from '../models/v2GetObjectsResponse';
 import type { v2GetUploadURLResponse } from '../models/v2GetUploadURLResponse';
 import type { v2Hash } from '../models/v2Hash';
 import type { v2KeyValue } from '../models/v2KeyValue';
+import type { v2SetObjectHashesResponse } from '../models/v2SetObjectHashesResponse';
+import type { v2UpdateObjectAuthorsResponse } from '../models/v2UpdateObjectAuthorsResponse';
 import type { v2UpdateObjectResponse } from '../models/v2UpdateObjectResponse';
+import type { v2UpdateObjectTitleResponse } from '../models/v2UpdateObjectTitleResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -158,6 +162,33 @@ export class ObjectServiceService {
         });
     }
     /**
+     * UpdateAuthors
+     * Status: ALPHA
+     *
+     * This method updates the authors of an object
+     * @param objectId Object id
+     * @param body
+     * @returns v2UpdateObjectAuthorsResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static objectServiceUpdateObjectAuthors(
+        objectId: string,
+        body: {
+            addAuthors?: Array<v2Author>;
+            removeAuthors?: Array<v2Author>;
+        },
+    ): CancelablePromise<v2UpdateObjectAuthorsResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/v2/objects/{objectId}/authors',
+            path: {
+                'objectId': objectId,
+            },
+            body: body,
+        });
+    }
+    /**
      * GetDownloadUrl
      * Status: BETA
      *
@@ -205,6 +236,60 @@ export class ObjectServiceService {
         return __request(OpenAPI, {
             method: 'PATCH',
             url: '/v2/objects/{objectId}/finish',
+            path: {
+                'objectId': objectId,
+            },
+            body: body,
+        });
+    }
+    /**
+     * SetObjectHashes
+     * Status: ALPHA
+     *
+     * This method sets the object hashes if not already set
+     * if a hash is already set, it will be compared to the new hash and
+     * set the status to ERROR if they do not match
+     * @param objectId Object id
+     * @param body
+     * @returns v2SetObjectHashesResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static objectServiceSetObjectHashes(
+        objectId: string,
+        body: {
+            hashes?: Array<v2Hash>;
+        },
+    ): CancelablePromise<v2SetObjectHashesResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/v2/objects/{objectId}/hashes',
+            path: {
+                'objectId': objectId,
+            },
+            body: body,
+        });
+    }
+    /**
+     * UpdateTitle
+     * Status: ALPHA
+     *
+     * This method updates the title of an object
+     * @param objectId Object id
+     * @param body
+     * @returns v2UpdateObjectTitleResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static objectServiceUpdateObjectTitle(
+        objectId: string,
+        body: {
+            title?: string;
+        },
+    ): CancelablePromise<v2UpdateObjectTitleResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/v2/objects/{objectId}/title',
             path: {
                 'objectId': objectId,
             },

@@ -2,8 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { apistorageservicesv2ReplicationStatus } from '../models/apistorageservicesv2ReplicationStatus';
 import type { googlerpcStatus } from '../models/googlerpcStatus';
+import type { storagemodelsv2ReplicationStatus } from '../models/storagemodelsv2ReplicationStatus';
 import type { v2DeleteReplicationResponse } from '../models/v2DeleteReplicationResponse';
 import type { v2GetReplicationStatusResponse } from '../models/v2GetReplicationStatusResponse';
 import type { v2PartialReplicateDataResponse } from '../models/v2PartialReplicateDataResponse';
@@ -13,6 +13,63 @@ import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class DataReplicationServiceService {
+    /**
+     * PartialReplicateData
+     * Status: ALPHA
+     *
+     * Partial replicate data between endpoints
+     * @param endpointId
+     * @param body
+     * @returns v2PartialReplicateDataResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static dataReplicationServicePartialReplicateData(
+        endpointId: string,
+        body: {
+            collectionId?: string;
+            datasetId?: string;
+            objectId?: string;
+        },
+    ): CancelablePromise<v2PartialReplicateDataResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/v2/endpoints/{endpointId}/replication/partial',
+            path: {
+                'endpointId': endpointId,
+            },
+            body: body,
+        });
+    }
+    /**
+     * UpdateReplicationStatus
+     * Status: ALPHA
+     *
+     * Update the replication status of a project
+     * @param endpointId
+     * @param objectId
+     * @param body
+     * @returns v2UpdateReplicationStatusResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static dataReplicationServiceUpdateReplicationStatus(
+        endpointId: string,
+        objectId: string,
+        body: {
+            status?: storagemodelsv2ReplicationStatus;
+        },
+    ): CancelablePromise<v2UpdateReplicationStatusResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/v2/endpoints/{endpointId}/replication/{objectId}/status',
+            path: {
+                'endpointId': endpointId,
+                'objectId': objectId,
+            },
+            body: body,
+        });
+    }
     /**
      * ReplicateProjectData
      * Status: ALPHA
@@ -65,33 +122,6 @@ export class DataReplicationServiceService {
         });
     }
     /**
-     * PartialReplicateData
-     * Status: ALPHA
-     *
-     * Partial replicate data between endpoints
-     * @param endpointId
-     * @param resourceId
-     * @param body
-     * @returns v2PartialReplicateDataResponse A successful response.
-     * @returns googlerpcStatus An unexpected error response.
-     * @throws ApiError
-     */
-    public static dataReplicationServicePartialReplicateData(
-        endpointId: string,
-        resourceId: string,
-        body: any,
-    ): CancelablePromise<v2PartialReplicateDataResponse | googlerpcStatus> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/v2/endpoints/{endpointId}/replication/{resourceId}/partial',
-            path: {
-                'endpointId': endpointId,
-                'resourceId': resourceId,
-            },
-            body: body,
-        });
-    }
-    /**
      * GetReplicationStatus
      * Status: ALPHA
      *
@@ -113,35 +143,6 @@ export class DataReplicationServiceService {
                 'endpointId': endpointId,
                 'resourceId': resourceId,
             },
-        });
-    }
-    /**
-     * UpdateReplicationStatus
-     * Status: ALPHA
-     *
-     * Update the replication status of a project
-     * @param endpointId
-     * @param resourceId
-     * @param body
-     * @returns v2UpdateReplicationStatusResponse A successful response.
-     * @returns googlerpcStatus An unexpected error response.
-     * @throws ApiError
-     */
-    public static dataReplicationServiceUpdateReplicationStatus(
-        endpointId: string,
-        resourceId: string,
-        body: {
-            status?: apistorageservicesv2ReplicationStatus;
-        },
-    ): CancelablePromise<v2UpdateReplicationStatusResponse | googlerpcStatus> {
-        return __request(OpenAPI, {
-            method: 'PATCH',
-            url: '/v2/endpoints/{endpointId}/replication/{resourceId}/status',
-            path: {
-                'endpointId': endpointId,
-                'resourceId': resourceId,
-            },
-            body: body,
         });
     }
 }

@@ -9,5 +9,6 @@ export type v2CreateWorkspaceTemplateRequest = {
     hookIds?: Array<string>;
     description?: string;
     endpointIds?: Array<string>;
+    rules?: Array<string>;
 };
 

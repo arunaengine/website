@@ -2,8 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type v2CustomAttributes = {
-    attributeName?: string;
-    attributeValue?: string;
+export type v2InfoAckMessage = {
+    objectId?: string;
 };
 

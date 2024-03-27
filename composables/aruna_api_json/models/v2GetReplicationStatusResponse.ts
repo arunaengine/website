@@ -2,8 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { apistorageservicesv2ReplicationStatus } from './apistorageservicesv2ReplicationStatus';
+import type { v2ReplicationInfo } from './v2ReplicationInfo';
 export type v2GetReplicationStatusResponse = {
-    status?: apistorageservicesv2ReplicationStatus;
+    infos?: Array<v2ReplicationInfo>;
 };
 

@@ -7,6 +7,7 @@ import type { v2AddProjectsToHookResponse } from '../models/v2AddProjectsToHookR
 import type { v2CreateHookRequest } from '../models/v2CreateHookRequest';
 import type { v2CreateHookResponse } from '../models/v2CreateHookResponse';
 import type { v2DeleteHookResponse } from '../models/v2DeleteHookResponse';
+import type { v2HookCallbackRequest } from '../models/v2HookCallbackRequest';
 import type { v2HookCallbackResponse } from '../models/v2HookCallbackResponse';
 import type { v2ListOwnedHooksResponse } from '../models/v2ListOwnedHooksResponse';
 import type { v2ListProjectHooksResponse } from '../models/v2ListProjectHooksResponse';
@@ -40,32 +41,18 @@ export class HooksServiceService {
      *
      * Externally triggered hooks should respond to this endpoint to
      * signal completion or failure and to provide additional flags for the object
-     * @param errorError
-     * @param secret
-     * @param hookId
-     * @param objectId
-     * @param pubkeySerial
+     * @param body
      * @returns v2HookCallbackResponse A successful response.
      * @returns googlerpcStatus An unexpected error response.
      * @throws ApiError
      */
     public static hooksServiceHookCallback(
-        errorError?: string,
-        secret?: string,
-        hookId?: string,
-        objectId?: string,
-        pubkeySerial?: number,
+        body: v2HookCallbackRequest,
     ): CancelablePromise<v2HookCallbackResponse | googlerpcStatus> {
         return __request(OpenAPI, {
             method: 'PATCH',
             url: '/v2/hooks/callback',
-            query: {
-                'error.error': errorError,
-                'secret': secret,
-                'hookId': hookId,
-                'objectId': objectId,
-                'pubkeySerial': pubkeySerial,
-            },
+            body: body,
         });
     }
     /**

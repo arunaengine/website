@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { googlerpcStatus } from '../models/googlerpcStatus';
 import type { v2ArchiveProjectResponse } from '../models/v2ArchiveProjectResponse';
+import type { v2Author } from '../models/v2Author';
 import type { v2CreateProjectRequest } from '../models/v2CreateProjectRequest';
 import type { v2CreateProjectResponse } from '../models/v2CreateProjectResponse';
 import type { v2DataClass } from '../models/v2DataClass';
@@ -11,15 +12,70 @@ import type { v2DeleteProjectResponse } from '../models/v2DeleteProjectResponse'
 import type { v2GetProjectResponse } from '../models/v2GetProjectResponse';
 import type { v2GetProjectsResponse } from '../models/v2GetProjectsResponse';
 import type { v2KeyValue } from '../models/v2KeyValue';
+import type { v2UpdateProjectAuthorsResponse } from '../models/v2UpdateProjectAuthorsResponse';
 import type { v2UpdateProjectDataClassResponse } from '../models/v2UpdateProjectDataClassResponse';
 import type { v2UpdateProjectDescriptionResponse } from '../models/v2UpdateProjectDescriptionResponse';
 import type { v2UpdateProjectKeyValuesResponse } from '../models/v2UpdateProjectKeyValuesResponse';
 import type { v2UpdateProjectLicensesResponse } from '../models/v2UpdateProjectLicensesResponse';
 import type { v2UpdateProjectNameResponse } from '../models/v2UpdateProjectNameResponse';
+import type { v2UpdateProjectTitleResponse } from '../models/v2UpdateProjectTitleResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class ProjectServiceService {
+    /**
+     * UpdateAuthors
+     * Status: ALPHA
+     *
+     * This method updates the authors of an object
+     * @param projectId Project id
+     * @param body
+     * @returns v2UpdateProjectAuthorsResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static projectServiceUpdateProjectAuthors(
+        projectId: string,
+        body: {
+            addAuthors?: Array<v2Author>;
+            removeAuthors?: Array<v2Author>;
+        },
+    ): CancelablePromise<v2UpdateProjectAuthorsResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/v2/project/{projectId}/authors',
+            path: {
+                'projectId': projectId,
+            },
+            body: body,
+        });
+    }
+    /**
+     * UpdateTitle
+     * Status: ALPHA
+     *
+     * This method updates the title of a project
+     * @param projectId Project id
+     * @param body
+     * @returns v2UpdateProjectTitleResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static projectServiceUpdateProjectTitle(
+        projectId: string,
+        body: {
+            title?: string;
+        },
+    ): CancelablePromise<v2UpdateProjectTitleResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/v2/project/{projectId}/title',
+            path: {
+                'projectId': projectId,
+            },
+            body: body,
+        });
+    }
     /**
      * GetProjects
      * Status: BETA

@@ -2,9 +2,6 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type v2GetS3CredentialsUserResponse = {
-    s3AccessKey?: string;
-    s3SecretKey?: string;
-    s3EndpointUrl?: string;
+export type v2FullSync = {
 };
 

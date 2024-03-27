@@ -2,11 +2,13 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { v2Author } from './v2Author';
 import type { v2DataClass } from './v2DataClass';
 import type { v2KeyValue } from './v2KeyValue';
 import type { v2Relation } from './v2Relation';
 export type v2CreateProjectRequest = {
     name?: string;
+    title?: string;
     description?: string;
     keyValues?: Array<v2KeyValue>;
     relations?: Array<v2Relation>;
@@ -14,5 +16,6 @@ export type v2CreateProjectRequest = {
     preferredEndpoint?: string;
     metadataLicenseTag?: string;
     defaultDataLicenseTag?: string;
+    authors?: Array<v2Author>;
 };
 

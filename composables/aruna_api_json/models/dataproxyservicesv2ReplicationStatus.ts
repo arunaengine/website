@@ -2,7 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export enum apidataproxyservicesv2ReplicationStatus {
+export enum dataproxyservicesv2ReplicationStatus {
     REPLICATION_STATUS_UNSPECIFIED = 'REPLICATION_STATUS_UNSPECIFIED',
     REPLICATION_STATUS_PENDING = 'REPLICATION_STATUS_PENDING',
     REPLICATION_STATUS_RUNNING = 'REPLICATION_STATUS_RUNNING',

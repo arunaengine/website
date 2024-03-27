@@ -2,9 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { v2Permission } from './v2Permission';
+import type { v2PermissionLevel } from './v2PermissionLevel';
 export type v2CreateServiceAccountRequest = {
     name?: string;
-    permission?: v2Permission;
+    projectId?: string;
+    permissionLevel?: v2PermissionLevel;
 };
 

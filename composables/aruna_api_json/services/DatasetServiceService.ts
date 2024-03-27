@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { googlerpcStatus } from '../models/googlerpcStatus';
+import type { v2Author } from '../models/v2Author';
 import type { v2CreateDatasetRequest } from '../models/v2CreateDatasetRequest';
 import type { v2CreateDatasetResponse } from '../models/v2CreateDatasetResponse';
 import type { v2DataClass } from '../models/v2DataClass';
@@ -11,15 +12,44 @@ import type { v2GetDatasetResponse } from '../models/v2GetDatasetResponse';
 import type { v2GetDatasetsResponse } from '../models/v2GetDatasetsResponse';
 import type { v2KeyValue } from '../models/v2KeyValue';
 import type { v2SnapshotDatasetResponse } from '../models/v2SnapshotDatasetResponse';
+import type { v2UpdateDatasetAuthorsResponse } from '../models/v2UpdateDatasetAuthorsResponse';
 import type { v2UpdateDatasetDataClassResponse } from '../models/v2UpdateDatasetDataClassResponse';
 import type { v2UpdateDatasetDescriptionResponse } from '../models/v2UpdateDatasetDescriptionResponse';
 import type { v2UpdateDatasetKeyValuesResponse } from '../models/v2UpdateDatasetKeyValuesResponse';
 import type { v2UpdateDatasetLicensesResponse } from '../models/v2UpdateDatasetLicensesResponse';
 import type { v2UpdateDatasetNameResponse } from '../models/v2UpdateDatasetNameResponse';
+import type { v2UpdateDatasetTitleResponse } from '../models/v2UpdateDatasetTitleResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class DatasetServiceService {
+    /**
+     * UpdateAuthors
+     * Status: ALPHA
+     *
+     * Updates the datasets metadata title.
+     * @param datasetId
+     * @param body
+     * @returns v2UpdateDatasetAuthorsResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static datasetServiceUpdateDatasetAuthors(
+        datasetId: string,
+        body: {
+            addAuthors?: Array<v2Author>;
+            removeAuthors?: Array<v2Author>;
+        },
+    ): CancelablePromise<v2UpdateDatasetAuthorsResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/v2/dataset/{datasetId}/authors',
+            path: {
+                'datasetId': datasetId,
+            },
+            body: body,
+        });
+    }
     /**
      * GetDatasets
      * Status: BETA
@@ -252,6 +282,32 @@ export class DatasetServiceService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/v2/datasets/{datasetId}/snapshot',
+            path: {
+                'datasetId': datasetId,
+            },
+            body: body,
+        });
+    }
+    /**
+     * UpdateTitle
+     * Status: ALPHA
+     *
+     * Updates the datasets metadata title.
+     * @param datasetId
+     * @param body
+     * @returns v2UpdateDatasetTitleResponse A successful response.
+     * @returns googlerpcStatus An unexpected error response.
+     * @throws ApiError
+     */
+    public static datasetServiceUpdateDatasetTitle(
+        datasetId: string,
+        body: {
+            title?: string;
+        },
+    ): CancelablePromise<v2UpdateDatasetTitleResponse | googlerpcStatus> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/v2/datasets/{datasetId}/title',
             path: {
                 'datasetId': datasetId,
             },
