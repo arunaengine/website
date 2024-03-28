@@ -2,7 +2,7 @@
 import { IconChevronRight } from "@tabler/icons-vue";
 </script>
 <template>
-  <div class="flex flex-grow pt-24">
+  <div class="flex flex-grow pt-4 md:pt-24">
     <!-- Hero -->
     <div class="max-w-[85rem] mx-auto mb-6 sm:px-6 lg:px-8">
       <!-- Grid -->
