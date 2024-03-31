@@ -94,7 +94,7 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
                 </NuxtLink>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
-                {{ toResourceType(relation.resourceVariant) }}
+                {{ toResourceTypeStr(relation.resourceVariant) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
                 <span v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
