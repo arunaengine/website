@@ -5,6 +5,7 @@ import type { v2User } from "~/composables/aruna_api_json/models/v2User"
 // Fetch user from global state
 const user_state: globalThis.Ref<v2User | undefined> = useState("user")
 const isLoggedIn = computed(() => user_state.value !== undefined)
+const forceRefresh = ref(0)
 
 /* Dark mode toggle */
 const colorMode = useColorMode();
@@ -14,6 +15,7 @@ const toggleTheme = () => {
 
 onMounted(() => {
   colorMode.preference = colorMode.value;
+  forceRefresh.value += 1
 });
 </script>
 
@@ -86,18 +88,23 @@ onMounted(() => {
             height="28" />
         </button>
 
-        <button v-if="isLoggedIn" type="button" data-hs-overlay="#docs-sidebar" aria-controls="docs-sidebar"
-          aria-label="Toggle navigation"
-          class="py-1 px-2 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 shadow-sm disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-white dark:hover:bg-gray-800 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+        <button type="button"
+          :key="forceRefresh"
+          :class="{'hidden' : !isLoggedIn}"
+          class="py-1 px-2 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 shadow-sm disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-white dark:hover:bg-gray-800 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+          data-hs-overlay="#docs-sidebar" aria-controls="docs-sidebar" aria-label="Toggle navigation">
           <span class="sr-only">Toggle Navigation</span>
           <!-- <IconUserCircle class="mx-1 flex-shrink-0 w-5 h-auto" /> -->
           <span class="hidden md:block">{{ user_state?.displayName }}</span>
           <IconMenu2 class="size-5" />
         </button>
-        <button v-else
+        <button
+          :key="forceRefresh"
+          :class="{'hidden' : isLoggedIn}"
           class="flex items-center gap-x-2 font-medium text-gray-600 sm:my-6 md:my-0 p-2 dark:text-gray-300">
           <a href="/auth/login">Login</a>
         </button>
+        
       </div>
     </nav>
   </header>

@@ -57,19 +57,11 @@ const isLoggedIn = computed(() => userState.value !== undefined)
         </li>
 
         <li>
+          <hr class="border-gray-200 my-5" />
           <a href="/auth/logout"
             class="flex items-center gap-x-2 py-2 px-3 rounded-lg cursor-pointer text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700">
             <IconLogout class="flex-shrink-0 size-4" />
             Logout
-          </a>
-        </li>
-
-        <li>
-          <hr class="border-gray-200 my-5" />
-          <a class="flex items-center gap-x-3.5 py-2 px-2.5 text-sm text-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 dark:text-slate-400 dark:hover:text-slate-300 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-            href="#">
-            <IconBook class="flex-shrink-0 size-4" />
-            Documentation
           </a>
         </li>
       </ul>
