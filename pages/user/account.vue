@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { IconRosette } from '@tabler/icons-vue';
 import {
   IconArrowLeft,
   IconBuildingWarehouse,
@@ -7,40 +8,56 @@ import {
   IconUserScan,
   IconX,
   IconTrash
-} from '@tabler/icons-vue';
-import type { v2Token } from '~/composables/aruna_api_json';
+} from '@tabler/icons-vue'
+import type { v2Endpoint } from '~/composables/aruna_api_json';
+import type { v2Token } from '~/composables/aruna_api_json/models/v2Token';
+import type { v2User } from '~/composables/aruna_api_json/models/v2User';
 
 const router = useRouter()
-const arunaUser = await fetchUser(undefined)
-//const endpoints = await fetchEndpoints()
-
+const arunaUser: globalThis.Ref<v2User | undefined> = useState("user")
+const endpoints: v2Endpoint[] | undefined = await fetchEndpoints()
 
 const get_user = () => {
-  if (typeof arunaUser === "string") {
+  if (arunaUser.value === undefined || typeof arunaUser.value === "string") {
     return undefined
   }
-  return arunaUser
+  return arunaUser.value
 }
 
 const is_active = () => {
-  if (typeof arunaUser === "string") {
+  if (arunaUser.value === undefined || typeof arunaUser.value === "string") {
     return false
+  } else {
+    return arunaUser.value.active
   }
-  if (arunaUser?.active) {
-    arunaUser?.active
-  }
-  return false
 }
 
-
 function getTokens(): v2Token[] {
-  if (typeof arunaUser === "string") {
+  if (arunaUser.value === undefined || typeof arunaUser.value === "string") {
+    return []
+  } else {
+    if (arunaUser.value.attributes?.tokens) {
+      return arunaUser.value.attributes?.tokens
+    }
     return []
   }
-  if (arunaUser?.attributes?.tokens) {
-    return arunaUser?.attributes?.tokens
+}
+
+function hasEndpoint(endpointId: string | undefined): boolean {
+  if (arunaUser.value === undefined || typeof arunaUser.value === "string") {
+    return false
+  } else {
+    if (endpoints && arunaUser.value?.attributes?.trustedEndpoints) {
+      endpoints.forEach(ep => {
+        if (ep.id) {
+          if (arunaUser.value?.attributes?.trustedEndpoints?.includes(ep.id)) {
+            return true
+          }
+        }
+      })
+    }
+    return false
   }
-  return []
 }
 </script>
 
@@ -70,7 +87,7 @@ function getTokens(): v2Token[] {
         <button type="button" :disabled="!is_active()"
           class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-blue-600 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500"
           id="tabs-with-icons-item-2" data-hs-tab="#tabs-with-icons-2" aria-controls="tabs-with-icons-2" role="tab">
-          <IconPokeball class="flex-shrink-0 size-4"/>
+          <IconPokeball class="flex-shrink-0 size-4" />
           Tokens
         </button>
         <button type="button" :disabled="!is_active()"
@@ -84,11 +101,14 @@ function getTokens(): v2Token[] {
 
     <div class="mt-3">
       <div id="tabs-with-icons-1" role="tabpanel" aria-labelledby="tabs-with-icons-item-1">
-        <div class="bg-yellow-100 border border-yellow-200 text-sm text-yellow-800 rounded-lg p-4 dark:bg-yellow-800/10 dark:border-yellow-900 dark:text-yellow-500" role="alert" v-if="!is_active()">
-          <span class="font-bold">Info: </span> Your account is currently not active. We will activate your account as soon as possible.
+        <div
+          class="bg-yellow-100 border border-yellow-200 text-sm text-yellow-800 rounded-lg p-4 dark:bg-yellow-800/10 dark:border-yellow-900 dark:text-yellow-500"
+          role="alert" v-if="!is_active()">
+          <span class="font-bold">Info: </span> Your account is currently not active. We will activate your account as
+          soon as possible.
         </div>
         <div class="flex flex-auto gap-4">
-          
+
           <div
             class="flex flex-auto flex-col bg-transparent text-center dark:bg-slate-900 dark:border-gray-700 dark:shadow-slate-700/[.7]">
             <h3 class="text-lg font-bold text-gray-600 dark:text-white">
@@ -190,7 +210,7 @@ function getTokens(): v2Token[] {
       </div>
 
       <div id="tabs-with-icons-3" class="hidden" role="tabpanel" aria-labelledby="tabs-with-icons-item-3">
-        
+
         <div class="flex flex-auto flex-wrap gap-x-4 text-gray-600">
           <div v-for="endpoint in endpoints"
             class="flex flex-col space-y-1 bg-white border border-gray-200 shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
