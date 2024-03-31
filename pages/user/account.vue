@@ -191,19 +191,32 @@ function getTokens(): v2Token[] {
 
       <div id="tabs-with-icons-3" class="hidden" role="tabpanel" aria-labelledby="tabs-with-icons-item-3">
         
-        <div class="flex flex-auto flex-wrap gap-x-4">
+        <div class="flex flex-auto flex-wrap gap-x-4 text-gray-600">
           <div v-for="endpoint in endpoints"
-            class="flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-            <div class="flex flex-row">ID: {{ endpoint.id }}</div>
-            <div class="flex flex-row">Name: {{ endpoint.name }}</div>
-            <div class="flex flex-row">Variant: {{ endpoint.epVariant }}</div>
-            <div class="flex flex-row">Public Proxy: {{ endpoint.isPublic }}</div>
-            <div class="flex flex-row">Status: {{ endpoint.status }}</div>
-
-
+            class="flex flex-col space-y-1 bg-white border border-gray-200 shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+            <div class="flex flex-row font-bold text-aruna-800 dark:text-aruna-700">
+              {{ endpoint.id }}
+            </div>
+            <div class="flex flex-row">
+              <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Name:</span> 
+              {{ endpoint.name }}
+            </div>
+            <div class="flex flex-row">
+              <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Variant:</span> 
+              {{ toEndpointVariantStr(endpoint.epVariant) }}
+            </div>
+            <div class="flex flex-row">
+              <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Public:</span> 
+              {{ endpoint.isPublic }}
+            </div>
+            <div class="flex flex-row">
+              <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Status:</span> 
+              {{ toComponentStatusStr(endpoint.status) }}
+            </div>
             <div class="flex flex-row justify-end">
+              <IconRosette v-if="hasEndpoint(endpoint.id)" />
               <button type="button"
-                class="py-3 px-4 inline-flex gap-x-2 text-md font-semibold rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
                 data-hs-overlay="#get-s3-modal">
                 Get S3 Credentials
               </button>
@@ -216,6 +229,7 @@ function getTokens(): v2Token[] {
 
   <Footer />
 
-  <!-- Hidden token create modal dialog -->
+  <!-- Hidden modal dialogs -->
   <ModalToken modalId="token-create-modal" />
+  <ModalS3credentials modal-id="get-s3-modal" />
 </template>
