@@ -1,6 +1,19 @@
 
 import type { v2User } from "./aruna_api_json/models/v2User"
-import { v2DataClass, type v2CreateProjectRequest, type v2ResourceWithPermission, type v2KeyValue, type v2DeactivateUserResponse, type v2ActivateUserResponse, type v2GetAllUsersResponse, type v2Permission, type v2CreateAPITokenResponse, type v2CreateAPITokenRequest } from "./aruna_api_json"
+import { type v2Project } from "./aruna_api_json/models/v2Project"
+import { v2DataClass, type v2CreateProjectRequest, type v2ResourceWithPermission, type v2KeyValue, type v2DeactivateUserResponse, type v2ActivateUserResponse, type v2GetAllUsersResponse, type v2Permission, type v2CreateAPITokenResponse, type v2CreateAPITokenRequest, type v2Endpoint, type modelsv2License } from "./aruna_api_json"
+
+export async function fetchEndpoints(): Promise<v2Endpoint[] | undefined> {
+    // Fetch endpoints
+    const endpoints = await $fetch('/api/endpoints')
+    return endpoints
+}
+
+export async function fetchLicenses(): Promise<modelsv2License[] | undefined> {
+    // Fetch licenses
+    const licenses = await $fetch<modelsv2License[]>('/api/licenses')
+    return licenses
+}
 
 export async function fetchUser(id: string | undefined): Promise<v2User | string> {
     const user = await $fetch(id ? `/api/user?userId=${id}` : '/api/user').catch((e) => {
@@ -11,7 +24,6 @@ export async function fetchUser(id: string | undefined): Promise<v2User | string
 
 export async function fetchUsers(): Promise<v2User[] | undefined> {
     const users = await $fetch('/api/users')
-    console.log(users)
     return users
 }
 
@@ -27,7 +39,8 @@ export async function deactivateUser(userId: string): Promise<boolean> {
     const response = await $fetch(`/api/user/${userId}/deactivate`, {
         method: 'PATCH'
     })
-    return response !== undefined}
+    return response !== undefined
+}
 
 export async function createUserToken(name: string, scope: v2Permission | undefined, expiry: string | undefined): Promise<v2CreateAPITokenResponse | undefined> {
     // Create request and send
@@ -47,7 +60,6 @@ export async function createUserToken(name: string, scope: v2Permission | undefi
 
 
 export async function fetchUserResources(user: v2User | undefined): Promise<v2ResourceWithPermission[]> {
-
     if (user === undefined) {
         return []
     }
@@ -70,7 +82,13 @@ export async function fetchUserResources(user: v2User | undefined): Promise<v2Re
     return []
 }
 
-export async function createProject(name: string, description: string, keyValues: v2KeyValue[], dataClass: v2DataClass) {
+export async function createProject(
+    name: string,
+    description: string,
+    keyValues: v2KeyValue[],
+    dataClass: v2DataClass,
+    metaLicense: string,
+    dataLicense: string): Promise<v2Project | undefined> {
     // Create request and send
     const request = {
         name: name,
@@ -83,8 +101,9 @@ export async function createProject(name: string, description: string, keyValues
         defaultDataLicenseTag: ''
     } as v2CreateProjectRequest
 
-    await $fetch('/api/project', {
+    return $fetch<v2Project>('/api/project', {
         method: 'POST',
         body: request
+
     })
 }

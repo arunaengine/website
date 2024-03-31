@@ -207,7 +207,7 @@ async function sendRequest() {
               </option>
             -->
               <option v-for="(key, val) in tokenPermissions" :value="val"
-                v-bind:selected="key === tokenPermissions.None">
+                v-bind:selected="key === tokenPermissions.PERMISSION_LEVEL_NONE">
                 {{ displayPermissionLevel(val) }}
               </option>
             </select>

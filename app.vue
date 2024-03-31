@@ -38,7 +38,6 @@ const user_state = useState("user", () => userObject)
 
 <template>
   <!-- Header + Navigation -->
-  <Sidebar />
   <!-- Main body -->
   <div
     class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent"
@@ -50,4 +49,5 @@ const user_state = useState("user", () => userObject)
     <NuxtLoadingIndicator />
     <NuxtPage />
   </div>
+  <Sidebar />
 </template>

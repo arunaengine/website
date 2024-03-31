@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { IconArrowLeft } from '@tabler/icons-vue';
-import { IconPoint } from '@tabler/icons-vue';
-import { IconCheck, IconMinus, IconPlus, IconSearch, IconX } from '@tabler/icons-vue';
-import type { v2User } from '~/composables/aruna_api_json';
+import { IconArrowLeft } from '@tabler/icons-vue'
+import { IconCheck, IconMinus, IconPlus, IconSearch, IconX } from '@tabler/icons-vue'
+import type { v2User } from '~/composables/aruna_api_json'
 
+const router = useRouter()
 const users: Ref<v2User[] | undefined> = ref(undefined)
 const forceRefresh = ref(0)
 
@@ -21,8 +21,6 @@ async function activate(userId: string) {
   await activateUser(userId)
   await fillUsers()
 }
-
-const router = useRouter()
 
 onMounted(async () => await fillUsers())
 </script>
