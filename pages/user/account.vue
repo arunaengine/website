@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { IconRosette } from '@tabler/icons-vue';
 import {
   IconArrowLeft,
   IconBuildingWarehouse,
   IconCheck,
+  IconDiscountCheck,
   IconPokeball,
   IconUserScan,
   IconX,
@@ -13,7 +13,10 @@ import type { v2Endpoint } from '~/composables/aruna_api_json';
 import type { v2Token } from '~/composables/aruna_api_json/models/v2Token';
 import type { v2User } from '~/composables/aruna_api_json/models/v2User';
 
+// Router navigation
 const router = useRouter()
+
+// Constants
 const arunaUser: globalThis.Ref<v2User | undefined> = useState("user")
 const endpoints: v2Endpoint[] | undefined = await fetchEndpoints()
 
@@ -47,16 +50,18 @@ function hasEndpoint(endpointId: string | undefined): boolean {
   if (arunaUser.value === undefined || typeof arunaUser.value === "string") {
     return false
   } else {
+    let found = false
     if (endpoints && arunaUser.value?.attributes?.trustedEndpoints) {
-      endpoints.forEach(ep => {
-        if (ep.id) {
-          if (arunaUser.value?.attributes?.trustedEndpoints?.includes(ep.id)) {
-            return true
+      for (const endpoint of endpoints) {
+        if (endpoint.id) {
+          if (arunaUser.value?.attributes?.trustedEndpoints?.includes(endpoint.id)) {
+            found = true
+            break
           }
         }
-      })
+      }
     }
-    return false
+    return found
   }
 }
 </script>
@@ -79,19 +84,19 @@ function hasEndpoint(endpointId: string | undefined): boolean {
     <div class="border-b border-gray-300 dark:border-gray-700">
       <nav class="flex space-x-6" aria-label="Tabs" role="tablist">
         <button type="button"
-          class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-blue-600 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 active"
+          class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-aruna-800 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 active"
           id="tabs-with-icons-item-1" data-hs-tab="#tabs-with-icons-1" aria-controls="tabs-with-icons-1" role="tab">
           <IconUserScan class="flex-shrink-0" />
           Profile
         </button>
         <button type="button" :disabled="!is_active()"
-          class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-blue-600 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500"
+          class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-aruna-800 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500"
           id="tabs-with-icons-item-2" data-hs-tab="#tabs-with-icons-2" aria-controls="tabs-with-icons-2" role="tab">
           <IconPokeball class="flex-shrink-0 size-4" />
           Tokens
         </button>
         <button type="button" :disabled="!is_active()"
-          class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-blue-600 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500"
+          class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-aruna-800 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500"
           id="tabs-with-icons-item-3" data-hs-tab="#tabs-with-icons-3" aria-controls="tabs-with-icons-3" role="tab">
           <IconBuildingWarehouse class="flex-shrink-0 size-4" />
           Data Proxies
@@ -210,12 +215,12 @@ function hasEndpoint(endpointId: string | undefined): boolean {
       </div>
 
       <div id="tabs-with-icons-3" class="hidden" role="tabpanel" aria-labelledby="tabs-with-icons-item-3">
-
         <div class="flex flex-auto flex-wrap gap-x-4 text-gray-600">
           <div v-for="endpoint in endpoints"
             class="flex flex-col space-y-1 bg-white border border-gray-200 shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-            <div class="flex flex-row font-bold text-aruna-800 dark:text-aruna-700">
-              {{ endpoint.id }}
+            <div class="flex flex-row font-bold items-center text-aruna-800 dark:text-aruna-700">
+              {{ endpoint.id }}               
+              <IconDiscountCheck class="lex-shrink-0 size-6 ms-4 text-green-700" v-if="hasEndpoint(endpoint.id)" />
             </div>
             <div class="flex flex-row">
               <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Name:</span> 
@@ -234,10 +239,9 @@ function hasEndpoint(endpointId: string | undefined): boolean {
               {{ toComponentStatusStr(endpoint.status) }}
             </div>
             <div class="flex flex-row justify-end">
-              <IconRosette v-if="hasEndpoint(endpoint.id)" />
               <button type="button"
                 class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                data-hs-overlay="#get-s3-modal">
+                :data-hs-overlay="`#s3-modal-${endpoint.id}`">
                 Get S3 Credentials
               </button>
             </div>
@@ -251,5 +255,5 @@ function hasEndpoint(endpointId: string | undefined): boolean {
 
   <!-- Hidden modal dialogs -->
   <ModalToken modalId="token-create-modal" />
-  <ModalS3credentials modal-id="get-s3-modal" />
+  <ModalS3credentials v-for="endpoint in endpoints" :modal-id="`s3-modal-${endpoint.id}`" :endpointId="endpoint.id"  />
 </template>
