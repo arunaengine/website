@@ -58,6 +58,15 @@ export async function createUserToken(name: string, scope: v2Permission | undefi
     return response
 }
 
+export async function createUserS3Credentials(endpointId: string): Promise<v2CreateS3CredentialsUserTokenResponse> {
+    const response: v2CreateS3CredentialsUserTokenResponse = await $fetch<v2CreateS3CredentialsUserTokenResponse>(`/api/user/s3_credentials/${endpointId}`, {
+        method: 'PATCH',
+    })
+
+    console.log(response)
+
+    return response
+}
 
 export async function fetchUserResources(user: v2User | undefined): Promise<v2ResourceWithPermission[]> {
     if (user === undefined) {

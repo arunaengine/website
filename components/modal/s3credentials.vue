@@ -1,8 +1,20 @@
 <script lang="ts" setup>
+import type { v2CreateS3CredentialsUserTokenResponse } from '~/composables/aruna_api_json'
+
 const props = defineProps<{
-  modalId: string
+  modalId: string,
+  endpointId: string | undefined
 }>()
 
+const creds: Ref<v2CreateS3CredentialsUserTokenResponse | undefined> = ref(undefined)
+
+async function createS3Credentials() {
+  if (props.endpointId) {
+    creds.value = await createUserS3Credentials(props.endpointId)
+  }
+}
+
+onMounted(async () => await createS3Credentials())
 </script>
 
 <template>
@@ -31,10 +43,17 @@ const props = defineProps<{
         </div>
         <div class="p-4 overflow-y-auto">
           <p class="my-2 text-gray-800 dark:text-gray-400">
-            Here you can create a new token.
+            Your token credentials could be located here.
           </p>
+          <div v-if="creds">
+            <p> {{ creds.s3EndpointUrl }}</p>
+            <p> {{ creds.s3AccessKey }}</p>
+            <p> {{ creds.s3SecretKey }}</p>
+          </div>
+          <div v-else>
+            <p>Creds are undefined ...</p>
+          </div>
         </div>
-          
       </div>
     </div>
   </div>

@@ -5,8 +5,11 @@ export default defineEventHandler(async event => {
     const resourceIds = getQuery(event)['resourceIds']
 
     const baseUrl = useRuntimeConfig().serverHostUrl
-    const fetchUrl = `${baseUrl}/v2/resources`
-    if (resourceIds) {
+    const fetchUrl = new URL(`${baseUrl}/v2/resources`)
+
+    if (typeof resourceIds === 'string') {
+        fetchUrl.searchParams.append('resourceIds', resourceIds)
+    } else {
         resourceIds.forEach(element => {
             fetchUrl.searchParams.append('resourceIds', element)
         });
