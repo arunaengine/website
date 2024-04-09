@@ -196,16 +196,6 @@ async function sendRequest() {
                     [&:not(:placeholder-shown)]:pb-2
                     autofill:pt-6
                     autofill:pb-2">
-              <!-- 
-              <option v-for="(option, index) in scopeOptions" :value="option.value" v-bind:selected="index === 0">
-                {{ option.text }}
-              </option> 
-              -->
-              <!-- 
-              <option v-for="level in v2PermissionLevel" :value="level" v-bind:selected="level === v2PermissionLevel.PERMISSION_LEVEL_NONE">
-                {{ displayPermissionLevel(level) }}
-              </option>
-            -->
               <option v-for="(key, val) in tokenPermissions" :value="val"
                 v-bind:selected="key === tokenPermissions.PERMISSION_LEVEL_NONE">
                 {{ displayPermissionLevel(val) }}

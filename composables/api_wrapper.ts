@@ -1,7 +1,7 @@
 
 import type { v2User } from "./aruna_api_json/models/v2User"
 import { type v2Project } from "./aruna_api_json/models/v2Project"
-import { v2DataClass, type v2CreateProjectRequest, type v2ResourceWithPermission, type v2KeyValue, type v2DeactivateUserResponse, type v2ActivateUserResponse, type v2GetAllUsersResponse, type v2Permission, type v2CreateAPITokenResponse, type v2CreateAPITokenRequest, type v2Endpoint, type modelsv2License } from "./aruna_api_json"
+import { v2DataClass, type v2CreateProjectRequest, type v2ResourceWithPermission, type v2KeyValue, type v2DeactivateUserResponse, type v2ActivateUserResponse, type v2GetAllUsersResponse, type v2Permission, type v2CreateAPITokenResponse, type v2CreateAPITokenRequest, type v2Endpoint, type modelsv2License, type v2CreateS3CredentialsUserTokenResponse, type v2CreateObjectRequest, v2ResourceVariant, type v2Author, type v2Object } from "./aruna_api_json"
 
 export async function fetchEndpoints(): Promise<v2Endpoint[] | undefined> {
     // Fetch endpoints
@@ -111,6 +111,41 @@ export async function createProject(
     } as v2CreateProjectRequest
 
     return $fetch<v2Project>('/api/project', {
+        method: 'POST',
+        body: request
+
+    })
+}
+
+export async function createObject(
+    name: string,
+    title: string,
+    authors: v2Author[],
+    description: string,
+    keyValues: v2KeyValue[],
+    dataClass: v2DataClass,
+    parentType: v2ResourceVariant,
+    parentId: string,
+    metaLicense: string,
+    dataLicense: string): Promise<v2Project | undefined> {
+    // Create request and send
+    const request = {
+        name: name,
+        title: title,
+        description: description,
+        keyValues: keyValues,
+        relations: [],
+        dataClass: dataClass,
+        projectId: parentType === v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? parentId : undefined,
+        collectionId: parentType === v2ResourceVariant.RESOURCE_VARIANT_COLLECTION ? parentId : undefined,
+        datasetId: parentType === v2ResourceVariant.RESOURCE_VARIANT_DATASET ? parentId : undefined,
+        hashes: [],
+        metadataLicenseTag: metaLicense,
+        dataLicenseTag: dataLicense,
+        authors: []
+    } as v2CreateObjectRequest
+
+    return $fetch<v2Object>('/api/object', {
         method: 'POST',
         body: request
 
