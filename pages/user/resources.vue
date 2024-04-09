@@ -50,7 +50,7 @@ const router = useRouter()
       </div>
 
       <div class="flex flex-row grow">
-        <div v-for="resource in resources" class="flex flex-row">
+        <div v-for="resource in resources" class="flex flex-row grow">
           <CardResource v-if="resource.resource" :resource="resource.resource" />
         </div>
         <div class="flex flex-col grow" v-if="resources.length == 0">

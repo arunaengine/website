@@ -50,7 +50,7 @@ function displayDescription(description: string): string {
 
       <div class="flex sm:flex-col md:flex-row">
         <!-- Start DataClass -->
-        <BadgeDataclass :dataClass="entry.data_class" />
+        <BadgeDataclass :dataClass="entry.data_class" :outline="true" />
         <!-- End DataClass -->
 
         <!-- Start Stats -->
@@ -69,7 +69,7 @@ function displayDescription(description: string): string {
       <!-- Basic Label Display -->
       <div class="flex flex-row flex-wrap">
         <div v-for="label in entry.key_values" class="flex flex-row my-1">
-          <span :class="{'me-2 rounded-lg' : label.value === '' || label.value === undefined, 'rounded-l-lg': label.value && label.value.length > 0}"
+          <span :class="{ 'me-2 rounded-lg': label.value === '' || label.value === undefined, 'rounded-l-lg': label.value && label.value.length > 0 }"
             class="inline-flex items-center gap-x-1.5 py-1.5 px-3 rounded-l-lg text-xs font-medium bg-aruna-800 text-slate-300 dark:bg-blue-800/30 dark:text-blue-500">
             {{ label.key }}
           </span>
