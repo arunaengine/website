@@ -1,7 +1,22 @@
-
-import type { v2User } from "./aruna_api_json/models/v2User"
-import { type v2Project } from "./aruna_api_json/models/v2Project"
-import { v2DataClass, type v2CreateProjectRequest, type v2ResourceWithPermission, type v2KeyValue, type v2DeactivateUserResponse, type v2ActivateUserResponse, type v2GetAllUsersResponse, type v2Permission, type v2CreateAPITokenResponse, type v2CreateAPITokenRequest, type v2Endpoint, type modelsv2License, type v2CreateS3CredentialsUserTokenResponse, type v2CreateObjectRequest, v2ResourceVariant, type v2Author, type v2Object } from "./aruna_api_json"
+import {
+    type modelsv2License,
+    type v2Author,
+    type v2CreateAPITokenRequest,
+    type v2CreateAPITokenResponse,
+    type v2CreateObjectRequest,
+    type v2CreateProjectRequest,
+    type v2CreateS3CredentialsUserTokenResponse,
+    v2DataClass,
+    type v2Endpoint,
+    type v2GetS3CredentialsUserTokenResponse,
+    type v2KeyValue,
+    type v2Object,
+    type v2Permission,
+    type v2Project,
+    v2ResourceVariant,
+    type v2ResourceWithPermission,
+    type v2User
+} from "./aruna_api_json"
 
 export async function fetchEndpoints(): Promise<v2Endpoint[] | undefined> {
     // Fetch endpoints
@@ -59,13 +74,19 @@ export async function createUserToken(name: string, scope: v2Permission | undefi
 }
 
 export async function createUserS3Credentials(endpointId: string): Promise<v2CreateS3CredentialsUserTokenResponse> {
-    const response: v2CreateS3CredentialsUserTokenResponse = await $fetch<v2CreateS3CredentialsUserTokenResponse>(`/api/user/s3_credentials/${endpointId}`, {
+    return await $fetch<v2CreateS3CredentialsUserTokenResponse>(`/api/user/s3_credentials/${endpointId}`, {
         method: 'PATCH',
+    }).catch(error => {
+        throw Error("Failed to create S3 credentials. Please try again later.")
     })
+}
 
-    console.log(response)
-
-    return response
+export async function getUserS3Credentials(endpointId: string): Promise<v2GetS3CredentialsUserTokenResponse> {
+    return await $fetch<v2GetS3CredentialsUserTokenResponse>(`/api/user/s3_credentials/${endpointId}`, {
+        method: 'GET',
+    }).catch(error => {
+        throw Error("Failed to fetch S3 credentials. Please try again later.")
+    })
 }
 
 export async function fetchUserResources(user: v2User | undefined): Promise<v2ResourceWithPermission[]> {
