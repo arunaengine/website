@@ -113,7 +113,7 @@ onMounted(async () => await queryResources());
 </script>
 
 <template>
-  <NavbarTop />
+  <NavigationTop />
 
   <!-- Start Hits + Search Input -->
   <div class="flex sm:flex-col md:flex-row items-center md:container w-full mx-auto mt-10">

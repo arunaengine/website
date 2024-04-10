@@ -26,7 +26,7 @@ onMounted(async () => await fillUsers())
 </script>
 
 <template>
-  <NavbarTop />
+  <NavigationTop />
 
   <div class="flex flex-wrap justify-between container mx-auto my-10">
     <h1 class="text-3xl font-bold text-gray-700 dark:text-white">

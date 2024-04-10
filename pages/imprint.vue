@@ -4,7 +4,7 @@ import { IconMail } from '@tabler/icons-vue';
 </script>
 
 <template>
-  <NavbarTop />
+  <NavigationTop />
   
   <div class="container mx-auto mt-4 p-4 border rounded-lg bg-white/[.25]">
     <h1 class="text-3xl font-bold text-gray-800 dark:text-white">

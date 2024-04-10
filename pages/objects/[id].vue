@@ -30,7 +30,7 @@ function goBack() {
 
 <template>
 
-  <NavbarTop />
+  <NavigationTop />
 
   <div class="flex flex-wrap justify-between container mx-auto mt-10">
     <h1 class="text-3xl font-bold text-gray-700 dark:text-white my-4">

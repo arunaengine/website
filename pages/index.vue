@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col space-y-6 flex-grow md:h-auto">
     <!-- Header + Navigation -->
-    <NavbarTop />
+    <NavigationTop />
     <SectionHero />
     <SectionFeatures />
     <SectionFeatures2 />

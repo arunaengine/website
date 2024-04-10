@@ -49,5 +49,5 @@ const user_state = useState("user", () => userObject)
     <NuxtLoadingIndicator />
     <NuxtPage />
   </div>
-  <Sidebar />
+  <NavigationSidebar />
 </template>
