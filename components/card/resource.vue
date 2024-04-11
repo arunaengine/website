@@ -67,7 +67,7 @@ function displayDescription(description: string): string {
       <hr v-if="entry.key_values.length > 0" class="my-4 text-gray-500 " />
 
       <!-- Basic Label Display -->
-      <div class="flex flex-row flex-wrap">
+      <div class="flex flex-row flex-wrap space-x-4">
         <div v-for="label in entry.key_values" class="flex flex-row my-1">
           <span :class="{ 'me-2 rounded-lg': label.value === '' || label.value === undefined, 'rounded-l-lg': label.value && label.value.length > 0 }"
             class="inline-flex items-center gap-x-1.5 py-1.5 px-3 rounded-l-lg text-xs font-medium bg-aruna-800 text-slate-300 dark:bg-blue-800/30 dark:text-blue-500">
