@@ -13,23 +13,27 @@ useHead({
 });
 
 const user: v2User | string = await fetchUser(undefined);
-var displayName: string | undefined = undefined;
-var userObject: v2User | undefined = undefined;
+let userObject: v2User | undefined = undefined;
+
+// Provide user object globally read-only
+const userRef: Ref<v2User | undefined> = ref(undefined)
+provide('userRef', readonly(userRef))
 
 const fetchError = ref(false);
 const fetchErrorMsg = ref(""); // Can be displayed for the user
 
-var isNotRegistered = false;
+let isNotRegistered = false;
 if (typeof user === "string") {
+  userRef.value = undefined
   if (user === "not_registered") {
     console.log("User not registered")
     isNotRegistered = true
   }
 } else if (user.displayName === undefined) {
-  console.log("Should not exist anymore")
+  console.log("Should not exist anymore. What is going on?")
 } else {
+  userRef.value = user
   userObject = user
-  displayName = user?.displayName;
 }
 
 const is_registered = useState("register", () => isNotRegistered)

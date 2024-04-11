@@ -15,7 +15,7 @@ import type {v2Endpoint, v2Token, v2User} from '~/composables/aruna_api_json'
 const router = useRouter()
 
 // Constants
-const arunaUser: globalThis.Ref<v2User | undefined> = useState("user")
+const arunaUser: Ref<v2User | undefined> = inject('userRef', ref(undefined))
 const endpoints: v2Endpoint[] | undefined = await fetchEndpoints()
 
 const get_user = () => {
@@ -25,12 +25,13 @@ const get_user = () => {
   return arunaUser.value
 }
 
-const is_active = () => {
+function is_active(): boolean {
   if (arunaUser.value === undefined || typeof arunaUser.value === "string") {
     return false
-  } else {
+  } else if (arunaUser.value.active) {
     return arunaUser.value.active
   }
+  return false
 }
 
 function getTokens(): v2Token[] {
@@ -49,13 +50,11 @@ function hasEndpoint(endpointId: string | undefined): boolean {
     return false
   } else {
     let found = false
-    if (endpoints && arunaUser.value?.attributes?.trustedEndpoints) {
-      for (const endpoint of endpoints) {
-        if (endpoint.id) {
-          if (arunaUser.value?.attributes?.trustedEndpoints?.includes(endpoint.id)) {
-            found = true
-            break
-          }
+    if (arunaUser.value?.attributes?.trustedEndpoints) {
+      for (const trustedEndpoint of arunaUser.value.attributes.trustedEndpoints) {
+        if (trustedEndpoint === endpointId) {
+          found = true
+          break
         }
       }
     }
