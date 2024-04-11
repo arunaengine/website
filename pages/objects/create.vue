@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { IconSquareRoundedPlus } from '@tabler/icons-vue';
-import { IconPencil } from '@tabler/icons-vue';
-import { IconExclamationCircle } from '@tabler/icons-vue';
-import { IconTrash } from '@tabler/icons-vue';
-import { IconArrowLeft } from '@tabler/icons-vue';
-import { v2DataClass, v2KeyValueVariant, v2ResourceVariant, type v2KeyValue } from '~/composables/aruna_api_json';
-
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {IconSquareRoundedPlus, IconExclamationCircle, IconTrash, IconArrowLeft} from '@tabler/icons-vue';
+import {
+  v2DataClass,
+  v2KeyValueVariant,
+  v2ResourceVariant,
+  type v2KeyValue,
+  type v2Relation, type v2Author
+} from '~/composables/aruna_api_json';
+import {toRelationDirectionStr, toRelationVariantStr} from "~/composables/enum_conversions";
+import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants";
 
 
 // Router to navigate back
