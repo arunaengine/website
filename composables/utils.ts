@@ -48,3 +48,12 @@ export function getUserPermissions(user: v2User | undefined): v2Permission[] {
 
 export function getUserResources() {}
 /* -------------------- */
+
+
+/* ---------- RESOURCE ---------- */
+export function createS3Key(collection: string | undefined, dataset: string | undefined, object: string): string {
+    let key = collection ? `${collection}/` : ''
+    key = dataset ? `${key}${dataset}/` : ''
+    return `${key}${object}`
+}
+/* ------------------------------ */

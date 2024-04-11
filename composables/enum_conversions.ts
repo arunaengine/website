@@ -1,4 +1,11 @@
-import { storagemodelsv2ComponentStatus, v2DataClass, v2EndpointVariant, v2KeyValueVariant, v2ResourceVariant } from "./aruna_api_json"
+import {
+    storagemodelsv2ComponentStatus,
+    v2DataClass,
+    v2EndpointVariant,
+    v2InternalRelationVariant,
+    v2KeyValueVariant, v2RelationDirection,
+    v2ResourceVariant
+} from "./aruna_api_json"
 
 export function toResourceTypeStr(variant: v2ResourceVariant | undefined): string {
     switch (variant) {
@@ -45,6 +52,27 @@ export function toKeyValueVariantStr(variant: v2KeyValueVariant | undefined): st
         case v2KeyValueVariant.KEY_VALUE_VARIANT_STATIC_LABEL: return "Static Label"
         case v2KeyValueVariant.KEY_VALUE_VARIANT_HOOK: return "Hook"
         case v2KeyValueVariant.KEY_VALUE_VARIANT_HOOK_STATUS: return "Hook Status"
+        default: return 'Unspecified'
+    }
+}
+
+export function toRelationVariantStr(variant: v2InternalRelationVariant | undefined): string {
+    switch (variant) {
+        case v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO: return "Belongs To"
+        case v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_ORIGIN: return "Static Label"
+        case v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_VERSION: return "Version"
+        case v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_METADATA: return "Metadata"
+        case v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_POLICY: return "Policy"
+        case v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_DELETED: return "Deleted"
+        case v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_CUSTOM: return "Custom"
+        default: return 'Unspecified'
+    }
+}
+
+export function toRelationDirectionStr(variant: v2RelationDirection | undefined): string {
+    switch (variant) {
+        case v2RelationDirection.RELATION_DIRECTION_INBOUND: return "Inbound"
+        case v2RelationDirection.RELATION_DIRECTION_OUTBOUND: return "Outbound"
         default: return 'Unspecified'
     }
 }

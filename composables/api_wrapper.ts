@@ -14,6 +14,7 @@ import {
     type v2Object,
     type v2Permission,
     type v2Project,
+    type v2Relation,
     v2ResourceVariant,
     type v2ResourceWithPermission,
     type v2User
@@ -145,18 +146,20 @@ export async function createObject(
     authors: v2Author[],
     description: string,
     keyValues: v2KeyValue[],
+    relations: v2Relation[],
     dataClass: v2DataClass,
     parentType: v2ResourceVariant,
     parentId: string,
     metaLicense: string,
-    dataLicense: string): Promise<v2Project | undefined> {
+    dataLicense: string): Promise<v2Object | undefined>
+{
     // Create request and send
     const request = {
         name: name,
         title: title,
         description: description,
         keyValues: keyValues,
-        relations: [],
+        relations: relations,
         dataClass: dataClass,
         projectId: parentType === v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? parentId : undefined,
         collectionId: parentType === v2ResourceVariant.RESOURCE_VARIANT_COLLECTION ? parentId : undefined,
