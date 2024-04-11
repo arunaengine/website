@@ -16,6 +16,7 @@ export type ObjectInfo = {
     permission: v2PermissionLevel,
     license: string,
     data_license: string,
+    endpoints: string[]
 }
 
 export function toObjectInfo(
@@ -41,6 +42,7 @@ export function toObjectInfo(
             permission: permission,
             license: resource.project.metadataLicenseTag,
             data_license: resource.project.defaultDataLicenseTag,
+            endpoints: resource.project.endpoints?.map(x => x.id)
         } as ObjectInfo
     } else if (resource.collection) {
         return {
@@ -57,6 +59,7 @@ export function toObjectInfo(
             permission: permission,
             license: resource.collection.metadataLicenseTag,
             data_license: resource.collection.defaultDataLicenseTag,
+            endpoints: resource.collection.endpoints?.map(x => x.id)
         } as ObjectInfo
     } else if (resource.dataset) {
         return {
@@ -73,6 +76,7 @@ export function toObjectInfo(
             permission: permission,
             license: resource.dataset.metadataLicenseTag,
             data_license: resource.dataset.defaultDataLicenseTag,
+            endpoints: resource.dataset.endpoints?.map(x => x.id)
         } as ObjectInfo
     } else if (resource.object) {
         return {
@@ -93,6 +97,7 @@ export function toObjectInfo(
             permission: permission,
             license: resource.object.metadataLicenseTag,
             data_license: resource.object.dataLicenseTag,
+            endpoints: resource.object.endpoints?.map(x => x.id)
         } as ObjectInfo
     }
 

@@ -8,6 +8,7 @@ import {
     type v2CreateS3CredentialsUserTokenResponse,
     v2DataClass,
     type v2Endpoint,
+    type v2GetDownloadURLResponse,
     type v2GetS3CredentialsUserTokenResponse,
     type v2KeyValue,
     type v2Object,
@@ -169,6 +170,17 @@ export async function createObject(
     return $fetch<v2Object>('/api/object', {
         method: 'POST',
         body: request
+    })
+}
+
+export async function getDownloadUrl(resourceId: string) {
+    return $fetch<v2GetDownloadURLResponse>(`/api/object/${resourceId}/download`, {
+        method: 'GET'
+    }).catch(error => {
+        console.error(error)
+        throw Error("Failed to fetch resource download url. Please try again later.")
+    })
+}
 
     })
 }
