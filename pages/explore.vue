@@ -12,6 +12,7 @@ import {
   IconSearch,
   IconWorldSearch,
 } from "@tabler/icons-vue";
+import {searchResources} from "~/composables/api_wrapper";
 
 const page = ref(1);
 const limit = ref(20);
@@ -83,14 +84,7 @@ async function queryResources() {
   const body = `{"query":"${query.value}", "filter":"${filter.value}", "limit":"${limit.value}", "offset":"${offset}"}`;
 
   try {
-    const response = await $fetch<v2SearchResourcesResponse>(
-      "https://api.aruna-storage.org/v2/search",
-      {
-        //const response = await $fetch<v2SearchResourcesResponse>('http://localhost:8080/v2/search', {
-        method: "POST",
-        body: body,
-      }
-    );
+    const response = await searchResources(body)
 
     customFilterValid.value = true;
     hits.value = response.resources ? response.resources : [];
@@ -256,11 +250,12 @@ onMounted(async () => await queryResources());
 }
 
 .paginate-buttons {
-  height: 40px;
-  width: 40px;
+  height: 24px;
+  width: 24px;
   border-radius: 8px;
   cursor: pointer;
   background-color: #007bc2;
+  font-size: x-small;
   /*border: 1px solid #005299;*/
   color: white;
 }

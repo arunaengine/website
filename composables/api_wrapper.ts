@@ -23,8 +23,19 @@ import {
     type v2Relation,
     v2ResourceVariant,
     type v2ResourceWithPermission,
+    type v2SearchResourcesResponse,
     type v2User
 } from "./aruna_api_json"
+
+export async function searchResources(query: string): Promise<v2SearchResourcesResponse> {
+    return await $fetch<v2SearchResourcesResponse>('api/search', {
+        method: 'POST',
+        body: query
+    }).catch(error => {
+        console.error(error)
+        throw new Error("Resource search failed.")
+    })
+}
 
 export async function fetchEndpoints(): Promise<v2Endpoint[] | undefined> {
     // Fetch endpoints
