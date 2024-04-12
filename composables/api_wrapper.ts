@@ -1,14 +1,20 @@
 import {
     type modelsv2License,
     type v2Author,
+    type v2Collection,
     type v2CreateAPITokenRequest,
     type v2CreateAPITokenResponse,
+    type v2CreateCollectionRequest,
+    type v2CreateDatasetRequest,
     type v2CreateObjectRequest,
     type v2CreateProjectRequest,
     type v2CreateS3CredentialsUserTokenResponse,
     v2DataClass,
+    type v2Dataset,
     type v2Endpoint,
+    type v2GenericResource,
     type v2GetDownloadURLResponse,
+    type v2GetHierarchyResponse,
     type v2GetS3CredentialsUserTokenResponse,
     type v2KeyValue,
     type v2Object,
@@ -91,6 +97,18 @@ export async function getUserS3Credentials(endpointId: string): Promise<v2GetS3C
     })
 }
 
+export async function fetchResource(resourceId: string): Promise<v2ResourceWithPermission> {
+    return $fetch<v2ResourceWithPermission>('/api/resource', {
+        method: 'GET',
+        query: {
+            resourceId: resourceId
+        }
+    }).catch(error => {
+        console.error(error)
+        throw new Error("Resource fetch failed.")
+    })
+}
+
 export async function fetchUserResources(user: v2User | undefined): Promise<v2ResourceWithPermission[]> {
     if (user === undefined) {
         return []
@@ -114,29 +132,33 @@ export async function fetchUserResources(user: v2User | undefined): Promise<v2Re
     return []
 }
 
-export async function createProject(
-    name: string,
-    description: string,
-    keyValues: v2KeyValue[],
-    dataClass: v2DataClass,
-    metaLicense: string,
-    dataLicense: string): Promise<v2Project | undefined> {
-    // Create request and send
-    const request = {
-        name: name,
-        description: description,
-        keyValues: keyValues,
-        relations: [],
-        dataClass: dataClass,
-        preferredEndpoint: '',
-        metadataLicenseTag: '',
-        defaultDataLicenseTag: ''
-    } as v2CreateProjectRequest
-
+export async function createProject(request: v2CreateProjectRequest): Promise<v2Project | undefined> {
     return $fetch<v2Project>('/api/project', {
         method: 'POST',
         body: request
+    }).catch(error => {
+        console.error(error)
+        throw new Error("Project creation failed.")
+    })
+}
 
+export async function createCollection(request: v2CreateCollectionRequest): Promise<v2Collection | undefined> {
+    return $fetch<v2Project>('/api/collection', {
+        method: 'POST',
+        body: request
+    }).catch(error => {
+        console.error(error)
+        throw new Error("Collection creation failed.")
+    })
+}
+
+export async function createDataset(request: v2CreateDatasetRequest): Promise<v2Dataset | undefined> {
+    return $fetch<v2Project>('/api/dataset', {
+        method: 'POST',
+        body: request
+    }).catch(error => {
+        console.error(error)
+        throw new Error("Dataset creation failed.")
     })
 }
 
@@ -173,6 +195,9 @@ export async function createObject(
     return $fetch<v2Object>('/api/object', {
         method: 'POST',
         body: request
+    }).catch(error => {
+        console.error(error)
+        throw new Error("Object creation failed.")
     })
 }
 
@@ -185,5 +210,11 @@ export async function getDownloadUrl(resourceId: string) {
     })
 }
 
+export async function getResourceHierarchy(resourceId: string) {
+    return $fetch<v2GetHierarchyResponse>(`/api/relation/${resourceId}/hierarchy`, {
+        method: 'GET'
+    }).catch(error => {
+        console.error(error)
+        throw Error("Failed to fetch resource hierarchy. Please try again later.")
     })
 }

@@ -54,7 +54,7 @@ function displayLabelValue(value: string | undefined): string {
                 <div v-html="displayLabelValue(label.value)" />
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                <span v-if="label.variant === v2KeyValueVariant.KEY_VALUE_VARIANT_LABEL"
+                <span v-if="label.variant === v2KeyValueVariant.KEY_VALUE_VARIANT_STATIC_LABEL"
                   class="status status-green">
                   <IconCheck :size="24" />
                 </span>

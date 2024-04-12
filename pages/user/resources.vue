@@ -8,20 +8,7 @@ import type { v2User } from "~/composables/aruna_api_json/models/v2User";
 //TODO: GetUserResources
 const user_state: globalThis.Ref<v2User | undefined> = useState("user")
 const isLoggedIn = computed(() => user_state.value !== undefined)
-
 const resources = await fetchUserResources(user_state.value)
-console.log(resources)
-
-const name = ref('')
-const description = ref('')
-
-async function tryCreateProject() {
-  console.log(name.value)
-  console.log(description.value)
-
-  const project = await createProject(name.value, description.value, [], v2DataClass.DATA_CLASS_PUBLIC, '', '')
-  console.log("Successfully created Project: " + project)
-}
 
 // Used for back link to last page in navigation history
 const router = useRouter()
@@ -45,7 +32,7 @@ const router = useRouter()
       <div class="flex flex-row grow justify-end">
         <a href="/objects/create"
           class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-gray-400 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
-          Create new resouce
+          Create new resource
       </a>
       </div>
 

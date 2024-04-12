@@ -6,7 +6,9 @@ import {
   v2KeyValueVariant,
   v2ResourceVariant,
   type v2KeyValue,
-  type v2Relation, type v2Author
+  type v2Relation,
+  type v2Author,
+  type v2CreateProjectRequest, type v2CreateCollectionRequest, type v2CreateDatasetRequest
 } from '~/composables/aruna_api_json';
 import {toRelationDirectionStr, toRelationVariantStr} from "~/composables/enum_conversions";
 import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants";
@@ -156,30 +158,39 @@ function dataFileChange(e) {
 
 /* ----- Resource key-values ----- */
 const keyValues = ref(new Map())
+
 function addKeyValue(key: string, val: string, type: v2KeyValueVariant) {
   keyValues.value.set(key, {key: key, value: val, variant: type} as v2KeyValue)
 }
+
 function removeKeyValue(key: string) {
   keyValues.value.delete(key)
 }
+
 /* ----- End Resource key-values ----- */
 /* ----- Resource relations ----- */
 const relations: Ref<Map<string, v2Relation>> = ref(new Map())
+
 function addRelation(relation: v2Relation) {
   relations.value.set(getUniqueId(), relation)
 }
+
 function removeRelation(key: string) {
   relations.value.delete(key)
 }
+
 /* ----- End Resource relations ----- */
 /* ----- Resource Authors ----- */
 const authors: Ref<Map<string, v2Author>> = ref(new Map())
+
 function addAuthor(author: v2Author) {
   authors.value.set(getUniqueId(), author)
 }
+
 function removeAuthor(key: string) {
   authors.value.delete(key)
 }
+
 /* ----- End Resource Authors ----- */
 
 // ----- Helper functions -----
@@ -200,24 +211,91 @@ async function submit() {
   // Create resource in server
   switch (resourceType.value) {
     case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
-      await createProject(
-          resourceName.value,
-          resourceDescription.value,
-          Array.from(keyValues.value.values()),
-          resourceDataclass.value,
-          metaLicense.value,
-          dataLicense.value
-      ).then(response => console.log(response))
-          .catch(error => console.log(error))
+      let request = {
+        name: resourceName.value,
+        title: resourceTitle.value,
+        description: resourceDescription.value,
+        keyValues: Array.from(keyValues.value.values()),
+        relations: Array.from(relations.value.values()),
+        dataClass: resourceDataclass.value,
+        preferredEndpoint: '', //TODO
+        metadataLicenseTag: metaLicense.value,
+        defaultDataLicenseTag: dataLicense.value
+      } as v2CreateProjectRequest
+
+      await createProject(request)
+          .then(response => {
+            console.log(response)
+            //TODO: Display created Project
+          })
+          .catch(error => {
+            console.log(error)
+            //TODO: Display error message
+          })
       break
     }
-    case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION:
+    case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION: {
+      let request = {
+        name: resourceName.value,
+        title: resourceTitle.value,
+        description: resourceDescription.value,
+        keyValues: Array.from(keyValues.value.values()),
+        relations: Array.from(relations.value.values()),
+        dataClass: resourceDataclass.value,
+        projectId: resourceParentId.value,
+        metadataLicenseTag: metaLicense.value,
+        defaultDataLicenseTag: dataLicense.value,
+        authors: Array.from(authors.value.values()),
+      } as v2CreateCollectionRequest
+
+      await createCollection(request)
+          .then(response => {
+            console.log(response)
+            //TODO: Display created Collection
+          })
+          .catch(error => {
+            console.log(error)
+            //TODO: Display error message
+          })
+      break
+    }
     case v2ResourceVariant.RESOURCE_VARIANT_DATASET: {
-      //TODO
+      // Fetch parent resource
+      const parent = await fetchResource(resourceParentId.value)
+      if (parent.resource?.dataset || parent.resource?.object) {
+        throw Error("Parent is not a Collection or Project")
+      }
+
+      // Create request and send
+      let request = {
+        name: resourceName.value,
+        title: resourceTitle.value,
+        description: resourceDescription.value,
+        keyValues: Array.from(keyValues.value.values()),
+        relations: Array.from(relations.value.values()),
+        dataClass: resourceDataclass.value,
+        projectId: parent.resource?.project ? resourceParentId.value : undefined,
+        collectionId: parent.resource?.collection ? resourceParentId.value : undefined,
+        metadataLicenseTag: metaLicense.value,
+        defaultDataLicenseTag: dataLicense.value,
+        authors: Array.from(authors.value.values()),
+      } as v2CreateDatasetRequest
+
+      await createDataset(request)
+          .then(response => {
+            console.log(response)
+            //TODO: Display created Collection
+          })
+          .catch(error => {
+            console.log(error)
+            //TODO: Display error message
+          })
       break
     }
     case v2ResourceVariant.RESOURCE_VARIANT_OBJECT: {
       if (dataUpload.value) {
+        //TODO: Fetch parents until project
+
         // Create staging Object
         const stagingObject = await createObject(
             dataUpload.value.name,
@@ -233,11 +311,10 @@ async function submit() {
             dataLicense.value
         ).catch(error => {
           console.error(error)
-
+          //TODO: Display error message
         })
 
         //TODO: Choose "nearest" DataProxy
-
         // Fetch S3 credentials and create S3 client
         const creds = await getUserS3Credentials(endpointId)
         const client = new S3Client({
@@ -266,6 +343,8 @@ async function submit() {
           console.error(err);
           //TODO: Delete staging object
         }
+      } else {
+        //TODO: Display error
       }
     }
   }
