@@ -13,7 +13,6 @@ import {
 import {toRelationDirectionStr, toRelationVariantStr} from "~/composables/enum_conversions";
 import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants";
 
-
 // Router to navigate back
 const router = useRouter()
 const licenses = await fetchLicenses()
@@ -294,7 +293,7 @@ async function submit() {
     }
     case v2ResourceVariant.RESOURCE_VARIANT_OBJECT: {
       if (dataUpload.value) {
-        //TODO: Fetch parents until project
+        //TODO: Fetch parents until project ...
 
         // Create staging Object
         const stagingObject = await createObject(
@@ -314,6 +313,25 @@ async function submit() {
           //TODO: Display error message
         })
 
+        if (stagingObject?.id) {
+          const url = await getUploadUrl(stagingObject.id)
+
+          if (url.url) {
+            const data = new Uint8Array(await dataUpload.value.arrayBuffer());
+            await $fetch(url.url, {
+              method: "PUT",
+              body: data
+            }).then(() => {
+              //TODO: Display success message
+            }).catch(error => {
+              console.error()
+            })
+          } else {
+            console.error("Response does not contain upload url")
+          }
+        }
+
+        /*
         //TODO: Choose "nearest" DataProxy
         // Fetch S3 credentials and create S3 client
         const creds = await getUserS3Credentials(endpointId)
@@ -343,6 +361,7 @@ async function submit() {
           console.error(err);
           //TODO: Delete staging object
         }
+        */
       } else {
         //TODO: Display error
       }

@@ -12,17 +12,17 @@ import {
     v2DataClass,
     type v2Dataset,
     type v2Endpoint,
-    type v2GenericResource,
     type v2GetDownloadURLResponse,
     type v2GetHierarchyResponse,
     type v2GetS3CredentialsUserTokenResponse,
+    type v2GetUploadURLResponse,
     type v2KeyValue,
     type v2Object,
     type v2Permission,
     type v2Project,
     type v2Relation,
     v2ResourceVariant,
-    type v2ResourceWithPermission,
+    type v2ResourceWithPermission, 
     type v2SearchResourcesResponse,
     type v2User
 } from "./aruna_api_json"
@@ -209,6 +209,15 @@ export async function createObject(
     }).catch(error => {
         console.error(error)
         throw new Error("Object creation failed.")
+    })
+}
+
+export async function getUploadUrl(resourceId: string) {
+    return $fetch<v2GetUploadURLResponse>(`/api/object/${resourceId}/upload`, {
+        method: 'GET'
+    }).catch(error => {
+        console.error(error)
+        throw Error("Failed to fetch resource upload url. Please try again later.")
     })
 }
 
