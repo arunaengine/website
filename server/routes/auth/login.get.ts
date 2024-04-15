@@ -10,7 +10,7 @@ export default defineEventHandler(async event => {
     event,
     withQuery(authorizationURL, {
       client_id: config.clientId,
-      redirect_uri: "http://localhost:3000/auth/callback",
+      redirect_uri: config.redirectUrl,
       scope: config.scope.join(' '),
       response_type: 'code',
     })

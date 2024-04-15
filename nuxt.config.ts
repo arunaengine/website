@@ -35,7 +35,7 @@ export default defineNuxtConfig({
         clientId: "test",
         clientSecret: "QgBl9I2CD3eVhL7LFvkHrYUK7oKL3LE2",
         serverUrl: "http://localhost:1998",
-        redirectUrl: "http://localhost:3000/auth/callback",
+        redirectUrl: "http://localhost:3000/callback",
         realm: "test",
         scope: ["openid"],
       }
