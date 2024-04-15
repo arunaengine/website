@@ -24,7 +24,7 @@ export default defineEventHandler(async event => {
       client_id: config.clientId,
       client_secret: config.clientSecret,
       grant_type: 'authorization_code',
-      redirect_uri: "http://localhost:3000/auth/callback",
+      redirect_uri: config.redirectUrl,
       code: code as string,
     }).toString(),
   }).catch((error) => {
