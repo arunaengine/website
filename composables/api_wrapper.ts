@@ -43,8 +43,10 @@ export async function searchResources(query: string): Promise<v2SearchResourcesR
 
 export async function fetchEndpoints(): Promise<v2Endpoint[] | undefined> {
     // Fetch endpoints
-    const endpoints = await $fetch('/api/endpoints')
-    return endpoints
+    return await $fetch('/api/endpoints').catch(error => {
+        console.error(error)
+        return []
+    })
 }
 
 export async function fetchEndpoint(endpointId: string): Promise<v2Endpoint | undefined> {
@@ -93,7 +95,11 @@ export async function deactivateUser(userId: string): Promise<boolean> {
     return response !== undefined
 }
 
-export async function createUserToken(name: string, scope: v2Permission | undefined, expiry: string | undefined): Promise<v2CreateAPITokenResponse | undefined> {
+export async function createUserToken(
+    name: string,
+    scope: v2Permission | undefined,
+    expiry: string | undefined): Promise<v2CreateAPITokenResponse | undefined>
+{
     // Create request and send
     const request = {
         name: name,

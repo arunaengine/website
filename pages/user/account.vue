@@ -41,8 +41,8 @@ function getTokens(): v2Token[] {
     if (arunaUser.value.attributes?.tokens) {
       return arunaUser.value.attributes?.tokens
     }
-    return []
   }
+  return []
 }
 
 function hasEndpoint(endpointId: string | undefined): boolean {
@@ -87,14 +87,14 @@ function hasEndpoint(endpointId: string | undefined): boolean {
           <IconUserScan class="flex-shrink-0"/>
           Profile
         </button>
-        <button type="button" :disabled="!is_active()"
+        <button type="button"
                 class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-aruna-800 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500"
                 id="tabs-with-icons-item-2" data-hs-tab="#tabs-with-icons-2" aria-controls="tabs-with-icons-2"
                 role="tab">
           <IconPokeball class="flex-shrink-0 size-4"/>
           Tokens
         </button>
-        <button type="button" :disabled="!is_active()"
+        <button type="button"
                 class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-aruna-800 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500"
                 id="tabs-with-icons-item-3" data-hs-tab="#tabs-with-icons-3" aria-controls="tabs-with-icons-3"
                 role="tab">
@@ -261,6 +261,6 @@ function hasEndpoint(endpointId: string | undefined): boolean {
   <Footer/>
 
   <!-- Hidden modal dialogs -->
-  <ModalToken modalId="token-create-modal"/>
+  <ModalTokenCreate modalId="token-create-modal"/>
   <ModalS3credentials ref="s3modal" modalId="s3-modal-generic"/>
 </template>

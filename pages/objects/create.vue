@@ -8,8 +8,6 @@ import {
   type v2KeyValue,
   type v2Relation,
   type v2Author,
-  type v2CreateCollectionRequest,
-  type v2CreateDatasetRequest,
   type v2Project
 } from '~/composables/aruna_api_json';
 import {toRelationDirectionStr, toRelationVariantStr} from "~/composables/enum_conversions";
@@ -453,7 +451,8 @@ async function submit() {
           </div>
         </div>
         <p :class="{ 'hidden': validationStates.get('resourceName') }" class="text-sm text-red-600 mt-2"
-           id="hs-validation-name-error-helper">{{ resourceNameError }}</p>
+           id="hs-validation-name-error-helper">{{ resourceNameError }}
+        </p>
         <!-- End Resource Name Input -->
         <!-- Resource Title Input -->
         <label for="name-input-label"
