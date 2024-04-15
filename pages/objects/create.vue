@@ -8,7 +8,9 @@ import {
   type v2KeyValue,
   type v2Relation,
   type v2Author,
-  type v2CreateProjectRequest, type v2CreateCollectionRequest, type v2CreateDatasetRequest
+  type v2CreateCollectionRequest,
+  type v2CreateDatasetRequest,
+  type v2Project
 } from '~/composables/aruna_api_json';
 import {toRelationDirectionStr, toRelationVariantStr} from "~/composables/enum_conversions";
 import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants";
@@ -16,6 +18,9 @@ import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composabl
 // Router to navigate back
 const router = useRouter()
 const licenses = await fetchLicenses()
+
+const createdResource: Ref<v2Project | undefined> = ref(undefined)
+const creationError: Ref<string | undefined> = ref(undefined)
 
 // ----- Form validation ----- //
 const validState = ref(false)
@@ -140,6 +145,12 @@ const dataLicense = ref('AllRightsReserved')
 const dataUpload: Ref<File | null> = ref(null)
 const metaUpload: Ref<File | null> = ref(null)
 
+const uploadProgress = ref(0)
+
+function updateProgress(current: number, total: number) {
+  uploadProgress.value = Math.trunc(current / total * 100)
+}
+
 watch(dataUpload, (value) => {
   validationStates.value.set('dataUpload', dataUpload.value !== null)
   resourceName.value = value?.name ? value.name : resourceName.value
@@ -150,6 +161,7 @@ function dataFileChange(e) {
   let files: FileList = (e.target as HTMLInputElement).files || (e.dataTransfer as DataTransfer).files;
   if (files.length > 0) {
     dataUpload.value = files.item(0)
+    uploadProgress.value = 0
   } else {
     dataUpload.value = null
   }
@@ -206,11 +218,18 @@ function textAreaAutoHeight(domElement: HTMLTextAreaElement | null, offset = 0) 
   }
 }
 
+function openModal(modalId: string) {
+  let element = document.querySelector(`#${modalId}`) as HTMLElement
+  import('preline').then(({HSOverlay}) => {
+    HSOverlay.open(element)
+  })
+}
+
 async function submit() {
   // Create resource in server
   switch (resourceType.value) {
     case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
-      let request = {
+      await createProject({
         name: resourceName.value,
         title: resourceTitle.value,
         description: resourceDescription.value,
@@ -220,21 +239,21 @@ async function submit() {
         preferredEndpoint: '', //TODO
         metadataLicenseTag: metaLicense.value,
         defaultDataLicenseTag: dataLicense.value
-      } as v2CreateProjectRequest
-
-      await createProject(request)
-          .then(response => {
-            console.log(response)
-            //TODO: Display created Project
-          })
-          .catch(error => {
-            console.log(error)
-            //TODO: Display error message
-          })
+      }).then(project => {
+        console.log(project)
+        createdResource.value = project
+        creationError.value = undefined
+      }).catch(error => {
+        console.error(error)
+        creationError.value = error.toString()
+        createdResource.value = undefined
+      })
+      // Display created resource or error
+      openModal('object-display')
       break
     }
     case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION: {
-      let request = {
+      await createCollection({
         name: resourceName.value,
         title: resourceTitle.value,
         description: resourceDescription.value,
@@ -244,29 +263,29 @@ async function submit() {
         projectId: resourceParentId.value,
         metadataLicenseTag: metaLicense.value,
         defaultDataLicenseTag: dataLicense.value,
-        authors: Array.from(authors.value.values()),
-      } as v2CreateCollectionRequest
-
-      await createCollection(request)
-          .then(response => {
-            console.log(response)
-            //TODO: Display created Collection
-          })
-          .catch(error => {
-            console.log(error)
-            //TODO: Display error message
-          })
+        authors: Array.from(authors.value.values())
+      }).then(collection => {
+        console.log(collection)
+        createdResource.value = collection
+        creationError.value = undefined
+      }).catch(error => {
+        console.log(error)
+        creationError.value = error.toString()
+        createdResource.value = undefined
+      })
+      // Display created resource or error
+      openModal('object-display')
       break
     }
     case v2ResourceVariant.RESOURCE_VARIANT_DATASET: {
       // Fetch parent resource
       const parent = await fetchResource(resourceParentId.value)
       if (parent.resource?.dataset || parent.resource?.object) {
+        //TODO: Implement error handling -> Display error message
         throw Error("Parent is not a Collection or Project")
       }
 
-      // Create request and send
-      let request = {
+      await createDataset({
         name: resourceName.value,
         title: resourceTitle.value,
         description: resourceDescription.value,
@@ -277,29 +296,27 @@ async function submit() {
         collectionId: parent.resource?.collection ? resourceParentId.value : undefined,
         metadataLicenseTag: metaLicense.value,
         defaultDataLicenseTag: dataLicense.value,
-        authors: Array.from(authors.value.values()),
-      } as v2CreateDatasetRequest
-
-      await createDataset(request)
-          .then(response => {
-            console.log(response)
-            //TODO: Display created Collection
-          })
-          .catch(error => {
-            console.log(error)
-            //TODO: Display error message
-          })
+        authors: Array.from(authors.value.values())
+      }).then(dataset => {
+        console.log(dataset)
+        createdResource.value = dataset
+        creationError.value = undefined
+      }).catch(error => {
+        console.log(error)
+        creationError.value = error.toString()
+        createdResource.value = undefined
+      })
+      // Display created resource or error
+      openModal('object-display')
       break
     }
     case v2ResourceVariant.RESOURCE_VARIANT_OBJECT: {
       if (dataUpload.value) {
-        //TODO: Fetch parents until project ...
-
         // Create staging Object
         const stagingObject = await createObject(
             dataUpload.value.name,
             resourceTitle.value,
-            [], //TODO
+            Array.from(authors.value.values()),
             resourceDescription.value,
             Array.from(keyValues.value.values()),
             Array.from(relations.value.values()),
@@ -310,26 +327,59 @@ async function submit() {
             dataLicense.value
         ).catch(error => {
           console.error(error)
+          //TODO: Error handling
           //TODO: Display error message
         })
 
         if (stagingObject?.id) {
+          createdResource.value = stagingObject
           const url = await getUploadUrl(stagingObject.id)
 
           if (url.url) {
             const data = new Uint8Array(await dataUpload.value.arrayBuffer());
+
+            const xhr = new XMLHttpRequest()
+            xhr.open('put', url.url, true)
+            xhr.upload.onprogress = function (event) {
+              // Upload progress here
+              updateProgress(event.loaded, event.total)
+            }
+            xhr.onreadystatechange = function () {
+              if (xhr.readyState === 4) {
+                // Upload finished successful
+                console.log('Uploaded')
+                creationError.value = undefined
+              }
+            }
+            xhr.send(data)
+
+            /*
+            //TODO: Implement progress bar
+            const blob = new Blob([data])
+            const progressUpdateStream = new TransformStream({
+              transform(chunk, controller) {
+                //TODO: Implement progress bar update
+              }
+            })
+
             await $fetch(url.url, {
               method: "PUT",
               body: data
-            }).then(() => {
+            }).then(object => {
+              creationError.value = undefined
               //TODO: Display success message
             }).catch(error => {
               console.error()
+              //TODO: Error progress bar
+              //TODO: Delete staging object?
             })
+            */
           } else {
             console.error("Response does not contain upload url")
           }
         }
+        // Display created resource or error
+        openModal('object-display')
 
         /*
         //TODO: Choose "nearest" DataProxy
@@ -532,6 +582,20 @@ async function submit() {
     file:me-4
     file:py-3 file:px-4 file:sm:py-5
     dark:file:bg-gray-700 dark:file:text-gray-400">
+
+          <!-- Progress -->
+          <div class="flex items-center gap-x-3 whitespace-nowrap">
+            <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-gray-700" role="progressbar"
+                 :aria-valuenow="uploadProgress" aria-valuemin="0" aria-valuemax="100">
+              <div
+                  class="flex flex-col justify-center rounded-full overflow-hidden bg-blue-600 text-xs text-white text-center whitespace-nowrap transition duration-500 dark:bg-blue-500"
+                  :style="`width: ${uploadProgress}%`"></div>
+            </div>
+            <div class="w-10 text-end">
+              <span class="text-sm text-gray-800 dark:text-white">{{ uploadProgress }}%</span>
+            </div>
+          </div>
+          <!-- End Progress -->
         </form>
       </div>
 
@@ -714,5 +778,6 @@ async function submit() {
 
   <ModalKeyValue modalId="key-value-add" @add-key-value="addKeyValue"/>
   <ModalRelation modalId="relation-add" @add-relation="addRelation"/>
+  <ModalObjectDisplay modalId="object-display" :object="createdResource" :errorMsg="creationError"/>
   <Footer/>
 </template>

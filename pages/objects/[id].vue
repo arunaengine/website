@@ -36,7 +36,7 @@ async function downloadResource() {
 
         console.log(link)
         link.click();
-/*
+        /*
         // Simulate a click on the element <a>
         document.body.appendChild(link);
         link.click();
