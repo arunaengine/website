@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import {IconArrowLeft, IconArrowsSplit, IconExternalLink, IconFileInfo, IconTag, IconWebhook} from '@tabler/icons-vue';
-import {v2ResourceVariant} from "~/composables/aruna_api_json";
+import {v2DataClass, v2EndpointHostVariant, v2ResourceVariant} from "~/composables/aruna_api_json";
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
-import {
-  getSignedUrl,
-} from "@aws-sdk/s3-request-presigner";
+import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
+import {fetchEndpoint, getPublicResourceUrl} from "~/composables/api_wrapper";
 
 const route = useRoute()
 const objectInfo = await useFetch(`/api/resource?resourceId=${route.params.id}`)
@@ -26,25 +25,46 @@ const objectInfo = await useFetch(`/api/resource?resourceId=${route.params.id}`)
 async function downloadResource() {
   if (objectInfo) {
     if (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT) {
+      if (objectInfo.data_class === v2DataClass.DATA_CLASS_PUBLIC) {
+        //TODO: Choose nearest endpoint from object locations
+        const endpoint = await fetchEndpoint(objectInfo.endpoints[0])
+        const data_module = endpoint?.hostConfigs?.find(conf => conf.hostVariant === v2EndpointHostVariant.ENDPOINT_HOST_VARIANT_S3)
+
+        if (data_module?.url) {
+          // Create unsigned url and get object
+          const data_host = data_module.url.replace(/(^\w+:|^)\/\//, '');
+          await getPublicResourceUrl(data_host, objectInfo).then(download_url => {
+            // create element <a> for download ...
+            const link = document.createElement('a');
+            link.href = download_url;
+            link.target = '_blank';
+            link.download = objectInfo.name;
+            link.click();
+          })
+        }
+      }
+
+      /*
       let downloadUrl = await getDownloadUrl(objectInfo.id)
       if (downloadUrl.url) {
-        // create element <a> for download ... lolmao
+        /!*
+        let xhr = new XMLHttpRequest();
+        xhr.open('GET', downloadUrl.url, true);
+        xhr.responseType = 'blob';
+        xhr.onload = e => save(xhr.response as Blob, objectInfo.name)
+        xhr.send()
+        *!/
+
+        // create element <a> for download ...
         const link = document.createElement('a');
         link.href = downloadUrl.url;
         link.target = '_blank';
         link.download = objectInfo.name;
-
-        console.log(link)
         link.click();
-        /*
-        // Simulate a click on the element <a>
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        */
       }
+      */
     } else {
-      // Create unsigned download url
+      // Create presigned download url for temp bundle
       //TODO: Evaluate "nearest" DataProxy
       let endpointId = objectInfo.endpoints[0]
       // Fetch S3 credentials (includes host url)

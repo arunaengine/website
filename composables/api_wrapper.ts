@@ -16,16 +16,20 @@ import {
     type v2GetHierarchyResponse,
     type v2GetS3CredentialsUserTokenResponse,
     type v2GetUploadURLResponse,
+    v2InternalRelationVariant,
     type v2KeyValue,
     type v2Object,
     type v2Permission,
     type v2Project,
     type v2Relation,
+    v2RelationDirection,
     v2ResourceVariant,
-    type v2ResourceWithPermission, 
+    type v2ResourceWithPermission,
     type v2SearchResourcesResponse,
     type v2User
 } from "./aruna_api_json"
+import {type ObjectInfo, toObjectInfo} from "~/composables/proto_conversions";
+import obj from "svgo/lib/svgo/css-select-adapter";
 
 export async function searchResources(query: string): Promise<v2SearchResourcesResponse> {
     return await $fetch<v2SearchResourcesResponse>('api/search', {
@@ -41,6 +45,19 @@ export async function fetchEndpoints(): Promise<v2Endpoint[] | undefined> {
     // Fetch endpoints
     const endpoints = await $fetch('/api/endpoints')
     return endpoints
+}
+
+export async function fetchEndpoint(endpointId: string): Promise<v2Endpoint | undefined> {
+    // Fetch endpoints
+    return await $fetch<v2Endpoint>('/api/endpoint', {
+        method: 'GET',
+        query: {
+            endpointId: endpointId
+        }
+    }).catch(error => {
+        console.error(error)
+        throw Error("Failed to fetch endpoint")
+    })
 }
 
 export async function fetchLicenses(): Promise<modelsv2License[] | undefined> {
@@ -84,12 +101,10 @@ export async function createUserToken(name: string, scope: v2Permission | undefi
         expiresAt: expiry
     } as v2CreateAPITokenRequest
 
-    const response: v2CreateAPITokenResponse = await $fetch<v2CreateAPITokenResponse>('/api/user/tokens', {
+    return await $fetch<v2CreateAPITokenResponse>('/api/user/tokens', {
         method: 'POST',
         body: request
     })
-
-    return response
 }
 
 export async function createUserS3Credentials(endpointId: string): Promise<v2CreateS3CredentialsUserTokenResponse> {
@@ -237,4 +252,37 @@ export async function getResourceHierarchy(resourceId: string) {
         console.error(error)
         throw Error("Failed to fetch resource hierarchy. Please try again later.")
     })
+}
+
+export async function getPublicResourceUrl(endpointHost: string, resource: ObjectInfo): Promise<string> {
+    // Return obvious case
+    if (resource.variant === v2ResourceVariant.RESOURCE_VARIANT_PROJECT) {
+        return `https://${resource.name}`
+    }
+
+    // The damn rest
+    let key = resource.name
+    while (resource.variant !== v2ResourceVariant.RESOURCE_VARIANT_PROJECT) {
+        const parentRel = resource.relations.find(rel =>
+            rel.internal?.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND &&
+            rel.internal?.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO
+        )
+
+        if (parentRel?.internal?.resourceId) {
+            const parentObj = await fetchResource(parentRel.internal.resourceId)
+            const objectInfo = toObjectInfo(parentObj.resource, parentObj.permission)
+            if (objectInfo) {
+                if (objectInfo.variant !== v2ResourceVariant.RESOURCE_VARIANT_PROJECT) {
+                    key += `/${objectInfo.name}`
+                }
+                resource = objectInfo
+            } else {
+                throw Error("Conversion to ObjectOInfo failed")
+            }
+        } else {
+            throw Error(`Resource (${resource.id} has no parent relations ...`)
+        }
+    }
+
+    return `http://${resource.name}.${endpointHost}/${key}`
 }

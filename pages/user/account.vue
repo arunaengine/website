@@ -188,7 +188,7 @@ function hasEndpoint(endpointId: string | undefined): boolean {
                     <td class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium">
                       <button type="button"
                               class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-500 dark:hover:text-gray-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
-                        <IconTrash />
+                        <IconTrash/>
                       </button>
                     </td>
                   </tr>
@@ -220,7 +220,7 @@ function hasEndpoint(endpointId: string | undefined): boolean {
                class="flex flex-col space-y-1 bg-white border border-gray-200 shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
             <div class="flex flex-row font-bold items-center text-aruna-800 dark:text-aruna-700">
               {{ endpoint.id }}
-              <IconDiscountCheck class="lex-shrink-0 size-6 ms-4 text-green-700" v-if="hasEndpoint(endpoint.id)" />
+              <IconDiscountCheck class="lex-shrink-0 size-6 ms-4 text-green-700" v-if="hasEndpoint(endpoint.id)"/>
             </div>
             <div class="flex flex-row">
               <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Name:</span>
@@ -238,12 +238,18 @@ function hasEndpoint(endpointId: string | undefined): boolean {
               <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Status:</span>
               {{ toComponentStatusStr(endpoint.status) }}
             </div>
-            <div class="flex flex-row justify-end">
+            <div class="flex flex-row justify-end space-x-4">
+              <button v-if="hasEndpoint(endpoint.id)" type="button"
+                      @click="$refs.s3modal.getS3Credentials(endpoint.id)"
+                      class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                      data-hs-overlay="#s3-modal-generic">
+                Get Credentials
+              </button>
               <button type="button"
                       @click="$refs.s3modal.createS3Credentials(endpoint.id)"
                       class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
                       data-hs-overlay="#s3-modal-generic">
-                Get S3 Credentials
+                Create Credentials
               </button>
             </div>
           </div>
@@ -252,9 +258,9 @@ function hasEndpoint(endpointId: string | undefined): boolean {
     </div>
   </div>
 
-  <Footer />
+  <Footer/>
 
   <!-- Hidden modal dialogs -->
-  <ModalToken modalId="token-create-modal" />
-  <ModalS3credentials ref="s3modal" modalId="s3-modal-generic" />
+  <ModalToken modalId="token-create-modal"/>
+  <ModalS3credentials ref="s3modal" modalId="s3-modal-generic"/>
 </template>
