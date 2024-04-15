@@ -155,13 +155,6 @@ function reset() {
           </button>
         </div>
         <div class="p-4 overflow-y-auto space-y-4">
-<!--
-
-          <p class="my-2 text-gray-800 dark:text-gray-400 text-center">
-            Here you can create a new token.
-          </p>
--->
-
           <!-- Floating Input Token Name -->
           <div class="relative">
             <input v-model="tokenName" id="hs-floating-input-name" class="my-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
@@ -261,9 +254,8 @@ function reset() {
           <p :class="{ 'hidden': typeof tokenResourceErr === 'undefined'}" class="text-sm text-red-600 mt-2"
              id="hs-validation-name-error-helper">{{ tokenResourceErr }}
           </p>
-          <!-- End Floating Input Token Name -->
-
         </div>
+        <!-- End Floating Input Token Name -->
 
         <!-- Token Secret -->
         <div v-if="tokenSecret" class="flex flex-col text-center m-4 bg-white border shadow-sm rounded-xl p-4 md:p-5 dark:bg-neutral-900 dark:border-neutral-700 dark:shadow-neutral-700/70">
