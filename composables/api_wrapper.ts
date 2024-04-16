@@ -98,8 +98,7 @@ export async function deactivateUser(userId: string): Promise<boolean> {
 export async function createUserToken(
     name: string,
     scope: v2Permission | undefined,
-    expiry: string | undefined): Promise<v2CreateAPITokenResponse | undefined>
-{
+    expiry: string | undefined): Promise<v2CreateAPITokenResponse | undefined> {
     // Create request and send
     const request = {
         name: name,
@@ -205,8 +204,7 @@ export async function createObject(
     parentType: v2ResourceVariant,
     parentId: string,
     metaLicense: string,
-    dataLicense: string): Promise<v2Object | undefined>
-{
+    dataLicense: string): Promise<v2Object | undefined> {
     // Create request and send
     const request = {
         name: name,
@@ -261,13 +259,17 @@ export async function getResourceHierarchy(resourceId: string) {
 }
 
 export async function getPublicResourceUrl(endpointHost: string, resource: ObjectInfo): Promise<string> {
-    // Return obvious case
-    if (resource.variant === v2ResourceVariant.RESOURCE_VARIANT_PROJECT) {
-        return `https://${resource.name}`
+    // Hierarchy objects are downloaded through the special Objects bucket
+    if (resource.variant !== v2ResourceVariant.RESOURCE_VARIANT_OBJECT) {
+        return `https://objects.${endpointHost}/${resource.id}/${resource.name}.tar.gz`
     }
 
-    // The damn rest
-    let key = resource.name
+    // Else traverse hierarchy up
+    let project = undefined
+    let collection = undefined
+    let dataset = undefined
+    let object = resource.name
+
     while (resource.variant !== v2ResourceVariant.RESOURCE_VARIANT_PROJECT) {
         const parentRel = resource.relations.find(rel =>
             rel.internal?.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND &&
@@ -278,8 +280,19 @@ export async function getPublicResourceUrl(endpointHost: string, resource: Objec
             const parentObj = await fetchResource(parentRel.internal.resourceId)
             const objectInfo = toObjectInfo(parentObj.resource, parentObj.permission)
             if (objectInfo) {
-                if (objectInfo.variant !== v2ResourceVariant.RESOURCE_VARIANT_PROJECT) {
-                    key += `/${objectInfo.name}`
+                switch (objectInfo.variant) {
+                    case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
+                        project = resource.name
+                        break
+                    }
+                    case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION: {
+                        collection = resource.name
+                        break
+                    }
+                    case v2ResourceVariant.RESOURCE_VARIANT_DATASET: {
+                        dataset = resource.name
+                        break
+                    }
                 }
                 resource = objectInfo
             } else {
@@ -290,5 +303,11 @@ export async function getPublicResourceUrl(endpointHost: string, resource: Objec
         }
     }
 
-    return `http://${resource.name}.${endpointHost}/${key}`
+    // Build url from its parts
+    let url = `https://${project}.${endpointHost}`
+    url += collection ? `/${collection}` : ''
+    url += dataset ? `/${dataset}` : ''
+    url += `/${object}`
+
+    return url
 }
