@@ -51,6 +51,7 @@ const resourceName = ref('')
 const resourceNameError: Ref<string | undefined> = ref('Please enter a resource name')
 
 watch(resourceName, () => validateResourceName())
+
 function validateResourceName() {
   if (resourceName.value.length > 0) {
     switch (resourceType.value) {
@@ -183,6 +184,7 @@ function addAuthor(author: v2Author) {
 function removeAuthor(key: string) {
   authors.value.delete(key)
 }
+
 /* ----- End Resource Authors ----- */
 /* ----- Resource key-values ----- */
 const keyValues = ref(new Map())
@@ -194,6 +196,7 @@ function addKeyValue(key: string, val: string, type: v2KeyValueVariant) {
 function removeKeyValue(key: string) {
   keyValues.value.delete(key)
 }
+
 /* ----- End Resource key-values ----- */
 /* ----- Resource relations ----- */
 const relations: Ref<Map<string, v2Relation>> = ref(new Map())
@@ -205,6 +208,7 @@ function addRelation(relation: v2Relation) {
 function removeRelation(key: string) {
   relations.value.delete(key)
 }
+
 /* ----- End Resource relations ----- */
 
 // ----- Helper functions -----
@@ -315,6 +319,14 @@ async function submit() {
     }
     case v2ResourceVariant.RESOURCE_VARIANT_OBJECT: {
       if (dataUpload.value) {
+        // Fetch parent resource
+        const parent = await fetchResource(resourceParentId.value)
+        if (parent.resource?.object) {
+          //TODO: Implement error handling -> Display error message
+          throw Error("Parent is not a Collection, Dataset or Project")
+        }
+        const parentInfo = toObjectInfo(parent.resource, parent.permission)
+
         // Create staging Object
         const stagingObject = await createObject(
             dataUpload.value.name,
@@ -324,7 +336,7 @@ async function submit() {
             Array.from(keyValues.value.values()),
             Array.from(relations.value.values()),
             resourceDataclass.value,
-            v2ResourceVariant.RESOURCE_VARIANT_PROJECT,
+            parentInfo ? parentInfo.variant : v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED,
             resourceParentId.value,
             metaLicense.value,
             dataLicense.value
