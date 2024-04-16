@@ -9,8 +9,8 @@ export default defineEventHandler(async (event) => {
     // Search is public, resource fetch is semi-public and get endpoints is public
     if (request.toString().includes('api/search') ||
         request.toString().includes('api/resource') ||
-        (request.toString().includes('api/endpoint') && event.method === 'GET')
-    ) {
+        (request.toString().includes('api/endpoint') && event.method === 'GET'))
+    {
         return
     }
 

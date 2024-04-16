@@ -173,6 +173,17 @@ function dataFileChange(e) {
   }
 }
 
+/* ----- Resource Authors ----- */
+const authors: Ref<Map<string, v2Author>> = ref(new Map())
+
+function addAuthor(author: v2Author) {
+  authors.value.set(getUniqueId(), author)
+}
+
+function removeAuthor(key: string) {
+  authors.value.delete(key)
+}
+/* ----- End Resource Authors ----- */
 /* ----- Resource key-values ----- */
 const keyValues = ref(new Map())
 
@@ -183,7 +194,6 @@ function addKeyValue(key: string, val: string, type: v2KeyValueVariant) {
 function removeKeyValue(key: string) {
   keyValues.value.delete(key)
 }
-
 /* ----- End Resource key-values ----- */
 /* ----- Resource relations ----- */
 const relations: Ref<Map<string, v2Relation>> = ref(new Map())
@@ -195,20 +205,7 @@ function addRelation(relation: v2Relation) {
 function removeRelation(key: string) {
   relations.value.delete(key)
 }
-
 /* ----- End Resource relations ----- */
-/* ----- Resource Authors ----- */
-const authors: Ref<Map<string, v2Author>> = ref(new Map())
-
-function addAuthor(author: v2Author) {
-  authors.value.set(getUniqueId(), author)
-}
-
-function removeAuthor(key: string) {
-  authors.value.delete(key)
-}
-
-/* ----- End Resource Authors ----- */
 
 // ----- Helper functions -----
 let id = 0
@@ -783,6 +780,7 @@ async function submit() {
     </div>
   </div>
 
+  <ModalAuthor modalId="author-add" @add-author="addAuthor"/>
   <ModalKeyValue modalId="key-value-add" @add-key-value="addKeyValue"/>
   <ModalRelation modalId="relation-add" @add-relation="addRelation"/>
   <ModalObjectDisplay modalId="object-display" :object="createdResource" :errorMsg="creationError"/>

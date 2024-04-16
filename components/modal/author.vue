@@ -1,0 +1,239 @@
+<script lang="ts" setup>
+import {IconExclamationCircle, IconX} from "@tabler/icons-vue";
+import {type v2Author,} from "~/composables/aruna_api_json";
+import {ULID_REGEX, ORCID_REGEX} from "~/composables/constants";
+
+const props = defineProps<{
+  modalId: string,
+}>()
+
+const emit = defineEmits<{
+  'add-author': [relation: v2Author]
+}>()
+
+const firstName = ref('')
+const lastName = ref('')
+const email = ref('')
+const orcid = ref('')
+const orcidErr: Ref<string | undefined> = ref(undefined)
+const userId = ref('')
+const userIdErr: Ref<string | undefined> = ref(undefined)
+
+const validState = ref(true)
+const validationStates = ref(new Map<string, boolean>)
+validationStates.value.set('orcid', true)
+validationStates.value.set('userid', true)
+
+watch(orcid, () => validateOrcid())
+function validateOrcid() {
+  if (orcid.value.length > 0) {
+    const valid = ORCID_REGEX.test(orcid.value)
+    validationStates.value.set('orcid', valid)
+    orcidErr.value = valid ? undefined : 'Please enter a valid ORCID'
+  } else {
+    validationStates.value.set('orcid', true)
+    orcidErr.value = undefined
+  }
+  validation()
+}
+
+watch(userId, () => validateUserId())
+function validateUserId() {
+  if (userId.value.length > 0) {
+    const valid = ULID_REGEX.test(userId.value)
+    validationStates.value.set('userid', valid)
+    userIdErr.value = valid ? undefined : 'Please enter a valid ULID'
+  } else {
+    validationStates.value.set('userid', true)
+    userIdErr.value = undefined
+  }
+  validation()
+}
+
+function validation() {
+  for (const state of validationStates.value.values()) {
+    if (!state) {
+      validState.value = false
+      return
+    }
+  }
+  validState.value = true
+}
+
+function reset() {
+  firstName.value = ''
+  lastName.value = ''
+  email.value = ''
+  orcid.value = ''
+  userId.value = ''
+}
+
+function submit() {
+  emit('add-author', {
+    firstName: firstName.value,
+    lastName: lastName.value,
+    email: email.value,
+    orcid: orcid.value,
+    id: userId.value
+  })
+  reset()
+}
+</script>
+
+<template>
+  <div :id="props.modalId"
+       class="hs-overlay hidden size-full fixed top-0 start-0 z-[80] overflow-x-hidden overflow-y-auto pointer-events-none">
+    <div
+        class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
+      <div
+          class="flex flex-col bg-white border shadow-sm rounded-xl pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700 dark:shadow-neutral-700/70">
+        <div class="flex justify-between items-center py-3 px-4 border-b dark:border-neutral-700">
+          <h3 class="font-bold text-gray-800 dark:text-white">
+            Add Author
+          </h3>
+          <button :data-hs-overlay="`#${props.modalId}`" @click="reset"
+                  class="flex justify-center items-center size-7 text-sm font-semibold rounded-full border border-transparent text-gray-800 hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none dark:text-white dark:hover:bg-gray-700 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                  type="button">
+            <span class="sr-only">Close</span>
+            <IconX class="flex-shrink-0 size-4"/>
+          </button>
+        </div>
+
+        <div class="space-y-4 p-4 overflow-y-auto">
+          <!-- Author First Name -->
+          <div class="relative">
+            <input v-model="firstName"
+                   id="first-name-input"
+                   class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+                   focus:pt-6
+                   focus:pb-2
+                   [&:not(:placeholder-shown)]:pt-6
+                   [&:not(:placeholder-shown)]:pb-2
+                   autofill:pt-6
+                   autofill:pb-2" placeholder="Author first name" type="text">
+            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+            peer-focus:text-xs
+            peer-focus:-translate-y-1.5
+            peer-focus:text-gray-500
+            peer-[:not(:placeholder-shown)]:text-xs
+            peer-[:not(:placeholder-shown)]:-translate-y-1.5
+            peer-[:not(:placeholder-shown)]:text-gray-500" for="first-name-input">First Name</label>
+          </div>
+          <!-- End Author First Name -->
+
+          <!-- Author Last Name -->
+          <div class="relative">
+            <input v-model="lastName"
+                   id="last-name-input"
+                   class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+                   focus:pt-6
+                   focus:pb-2
+                   [&:not(:placeholder-shown)]:pt-6
+                   [&:not(:placeholder-shown)]:pb-2
+                   autofill:pt-6
+                   autofill:pb-2" placeholder="Author last name" type="text">
+            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+            peer-focus:text-xs
+            peer-focus:-translate-y-1.5
+            peer-focus:text-gray-500
+            peer-[:not(:placeholder-shown)]:text-xs
+            peer-[:not(:placeholder-shown)]:-translate-y-1.5
+            peer-[:not(:placeholder-shown)]:text-gray-500" for="last-name-input">Last Name</label>
+          </div>
+          <!-- End Author First Name -->
+
+          <!-- Author Email -->
+          <div class="relative">
+            <input v-model="email"
+                   id="author-email-input"
+                   class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+                   focus:pt-6
+                   focus:pb-2
+                   [&:not(:placeholder-shown)]:pt-6
+                   [&:not(:placeholder-shown)]:pb-2
+                   autofill:pt-6
+                   autofill:pb-2" placeholder="Author email" type="email">
+            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+            peer-focus:text-xs
+            peer-focus:-translate-y-1.5
+            peer-focus:text-gray-500
+            peer-[:not(:placeholder-shown)]:text-xs
+            peer-[:not(:placeholder-shown)]:-translate-y-1.5
+            peer-[:not(:placeholder-shown)]:text-gray-500" for="author-email-input">Email</label>
+          </div>
+          <!-- End Author Email -->
+
+          <!-- Author ORCID -->
+          <div class="relative">
+            <input v-model="orcid"
+                   id="author-orcid-input"
+                   class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+                   focus:pt-6
+                   focus:pb-2
+                   [&:not(:placeholder-shown)]:pt-6
+                   [&:not(:placeholder-shown)]:pb-2
+                   autofill:pt-6
+                   autofill:pb-2" placeholder="Author ORCID" type="email">
+            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+            peer-focus:text-xs
+            peer-focus:-translate-y-1.5
+            peer-focus:text-gray-500
+            peer-[:not(:placeholder-shown)]:text-xs
+            peer-[:not(:placeholder-shown)]:-translate-y-1.5
+            peer-[:not(:placeholder-shown)]:text-gray-500" for="author-orcid-input">ORCID</label>
+            <div :class="{ 'hidden': validationStates.get('orcid') }"
+                 class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
+              <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+            </div>
+          </div>
+          <p :class="{ 'hidden': validationStates.get('orcid') }" class="text-sm text-red-600"
+             id="hs-validation-name-error-helper">{{ orcidErr }}
+          </p>
+          <!-- End Author ORCID -->
+
+          <!-- Author User ID -->
+          <div class="relative">
+            <input v-model="userId"
+                   id="author-userid-input"
+                   class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+                   focus:pt-6
+                   focus:pb-2
+                   [&:not(:placeholder-shown)]:pt-6
+                   [&:not(:placeholder-shown)]:pb-2
+                   autofill:pt-6
+                   autofill:pb-2" placeholder="Author user id" type="email">
+            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+            peer-focus:text-xs
+            peer-focus:-translate-y-1.5
+            peer-focus:text-gray-500
+            peer-[:not(:placeholder-shown)]:text-xs
+            peer-[:not(:placeholder-shown)]:-translate-y-1.5
+            peer-[:not(:placeholder-shown)]:text-gray-500" for="author-userid-input">User ID</label>
+            <div :class="{ 'hidden': validationStates.get('userid') }"
+                 class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
+              <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+            </div>
+          </div>
+          <p :class="{ 'hidden': validationStates.get('userid') }" class="text-sm text-red-600"
+             id="hs-validation-name-error-helper">{{ userIdErr }}
+          </p>
+          <!-- End User ID -->
+        </div>
+
+        <div class="flex justify-end items-center gap-x-2 py-3 px-4 border-t dark:border-gray-700">
+          <button type="button" @click="reset"
+                  class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-white dark:hover:bg-gray-800"
+                  :data-hs-overlay="`#${props.modalId}`">
+            Close
+          </button>
+          <button type="button" :disabled="!validState"
+                  @click="submit"
+                  class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-aruna-800 text-white hover:bg-aruna-700 disabled:opacity-50 disabled:pointer-events-none"
+                  :data-hs-overlay="`#${props.modalId}`">
+            Add Author
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
