@@ -84,7 +84,7 @@ function validate() {
       validationStatus.value = false
       tokenResourceErr.value = 'Please enter a resource id'
       return
-    } else if (tokenResource.value.match(ULID_REGEX) === null) {
+    } else if (!ULID_REGEX.test(tokenResource.value)) {
       validationStatus.value = false
       tokenResourceErr.value = 'Resource id is not a valid ULID'
       return

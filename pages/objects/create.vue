@@ -48,23 +48,29 @@ function checkInputValidationStates(): boolean {
 // ----- Input bindings ----- //
 /* Resource name */
 const resourceName = ref('')
-const resourceNameError = ref('Please enter a resource name')
+const resourceNameError: Ref<string | undefined> = ref('Please enter a resource name')
 
-watch(resourceName, () => {
+watch(resourceName, () => validateResourceName())
+function validateResourceName() {
   if (resourceName.value.length > 0) {
     switch (resourceType.value) {
       case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
-        validationStates.value.set('resourceName', resourceName.value.match(PROJECT_REGEX) !== null)
-        resourceNameError.value = "Project names can only contain lowercase alphanumeric characters and hyphens."
+        const valid = PROJECT_REGEX.test(resourceName.value)
+        validationStates.value.set('resourceName', valid)
+        resourceNameError.value = valid ? undefined : "Project names can only contain lowercase alphanumeric characters and hyphens."
         break
       }
       case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION:
       case v2ResourceVariant.RESOURCE_VARIANT_DATASET: {
-        validationStates.value.set('resourceName', resourceName.value.match(S3_KEY_REGEX) !== null)
+        const valid = S3_KEY_REGEX.test(resourceName.value)
+        validationStates.value.set('resourceName', valid)
+        resourceNameError.value = valid ? undefined : 'Collection/Dataset names can only contain the following characters [a-zA-z0-9!-_.*\'()]'
         break
       }
       case v2ResourceVariant.RESOURCE_VARIANT_OBJECT: {
-        validationStates.value.set('resourceName', resourceName.value.match(OBJECT_REGEX) !== null)
+        const valid = OBJECT_REGEX.test(resourceName.value)
+        validationStates.value.set('resourceName', valid)
+        resourceNameError.value = valid ? undefined : 'Object names can only contain the following characters [a-zA-z0-9!-_.*\'()/]'
         break
       }
     }
@@ -73,7 +79,7 @@ watch(resourceName, () => {
     resourceNameError.value = "Please enter a resource name."
   }
   validate()
-})
+}
 
 /* Resource title */
 const resourceTitle = ref('')
@@ -112,19 +118,21 @@ watch(resourceType, () => {
       validateParentId()
     }
   }
+  validateResourceName()
   validate()
 })
 
 /* Resource parent ID */
 const resourceParentId = ref('')
-const resourceParentIdError = ref('Please enter a valid parent id')
+const resourceParentIdError: Ref<string | undefined> = ref('Please enter a valid parent id')
 
 watch(resourceParentId, () => validateParentId())
 
 function validateParentId() {
   if (resourceParentId.value.length > 0) {
-    validationStates.value.set('resourceParentId', resourceParentId.value.match(ULID_REGEX) !== null)
-    resourceParentIdError.value = 'Parent id is not a valid ULID'
+    const valid = ULID_REGEX.test(resourceParentId.value)
+    validationStates.value.set('resourceParentId', valid)
+    resourceParentIdError.value = valid ? undefined : 'Parent id is not a valid ULID'
   } else {
     validationStates.value.set('resourceParentId', false)
     resourceParentIdError.value = 'Please enter a valid parent id'

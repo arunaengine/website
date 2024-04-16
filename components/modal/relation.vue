@@ -41,13 +41,10 @@ enum RelationDirection {
 
 const resourceId = ref('')
 const resourceIdErr: Ref<string | undefined> = ref('Please enter a resource id.')
-
 const resourceVariant = ref(ResourceVariant.Project)
 const relationVariant = ref(InternalRelationVariant.BelongsTo)
-
 const customVariant = ref('')
 const customVariantErr: Ref<string | undefined> = ref(undefined)
-
 const relationDirection = ref(RelationDirection.Inbound)
 
 const validationState = ref(false)
@@ -63,7 +60,7 @@ function validate() {
     validationState.value = false
     resourceIdErr.value = 'Please enter a resource id'
     return
-  } else if (resourceId.value.match(ULID_REGEX) === null) {
+  } else if (!ULID_REGEX.test(resourceId.value)) {
     validationState.value = false
     resourceIdErr.value = 'Please enter a valid ULID'
     return
