@@ -282,21 +282,21 @@ export async function getPublicResourceUrl(endpointHost: string, resource: Objec
             if (objectInfo) {
                 switch (objectInfo.variant) {
                     case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
-                        project = resource.name
+                        project = objectInfo.name
                         break
                     }
                     case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION: {
-                        collection = resource.name
+                        collection = objectInfo.name
                         break
                     }
                     case v2ResourceVariant.RESOURCE_VARIANT_DATASET: {
-                        dataset = resource.name
+                        dataset = objectInfo.name
                         break
                     }
                 }
                 resource = objectInfo
             } else {
-                throw Error("Conversion to ObjectOInfo failed")
+                throw Error("Conversion to ObjectInfo failed")
             }
         } else {
             throw Error(`Resource (${resource.id} has no parent relations ...`)
