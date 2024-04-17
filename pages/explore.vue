@@ -237,6 +237,9 @@ onMounted(async () => await queryResources());
       <!-- Start Display Search Results -->
       <SearchResults :key="hits" :resources="hits" />
       <!-- End Display Search Results -->
+
+      <vue-awesome-paginate v-if="estimatedTotal > 20" :total-items="estimatedTotal" :items-per-page="20" :max-pages-shown="5"
+                            v-model="page" :on-click="paginationClickHandler" />
     </div>
   </div>
   
