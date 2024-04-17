@@ -26,7 +26,8 @@ import {fetchEndpoint, getPublicResourceUrl} from "~/composables/api_wrapper";
 import {toObjectStatusStr, toPermissionTypeStr} from "~/composables/enum_conversions";
 
 const route = useRoute()
-const objectInfo = await useFetch(`/api/resource?resourceId=${route.params.id}`)
+const resourceId = route.params.id as string
+const objectInfo = await useFetch(`/api/resource?resourceId=${resourceId}`)
     .then(res => {
       const resource = res.data.value
       if (resource) {
@@ -42,6 +43,16 @@ const objectInfo = await useFetch(`/api/resource?resourceId=${route.params.id}`)
       return undefined
     })
 
+function isDownloadable(): boolean {
+  if (objectInfo) {
+    return objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
+        objectInfo.object_status === modelsv2Status.STATUS_AVAILABLE &&
+        objectInfo.permission !== v2PermissionLevel.PERMISSION_LEVEL_UNSPECIFIED &&
+        objectInfo.permission !== v2PermissionLevel.PERMISSION_LEVEL_NONE
+  }
+  return false
+}
+
 async function downloadResource() {
   if (objectInfo) {
     if (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT) {
@@ -53,7 +64,7 @@ async function downloadResource() {
         if (data_module?.url) {
           // Create unsigned url and get object
           const data_host = data_module.url.replace(/(^\w+:|^)\/\//, '');
-          await getPublicResourceUrl(data_host, objectInfo).then(download_url => {
+          await getPublicResourceUrl(data_host, objectInfo, data_module.url.startsWith('https')).then(download_url => {
             // create element <a> for download ...
             const link = document.createElement('a');
             link.href = download_url;
@@ -62,27 +73,17 @@ async function downloadResource() {
             link.click();
           })
         }
-      }
+      } else {
+        const download_url = await getDownloadUrl(objectInfo.id)
+        // create element <a> for download ... lolmao
+        const link = document.createElement('a')
+        link.href = download_url.url
+        link.target = '_blank'
+        link.download = `${objectInfo.name}.tar.gz`
 
-      /*
-      let downloadUrl = await getDownloadUrl(objectInfo.id)
-      if (downloadUrl.url) {
-        /!*
-        let xhr = new XMLHttpRequest();
-        xhr.open('GET', downloadUrl.url, true);
-        xhr.responseType = 'blob';
-        xhr.onload = e => save(xhr.response as Blob, objectInfo.name)
-        xhr.send()
-        *!/
-
-        // create element <a> for download ...
-        const link = document.createElement('a');
-        link.href = downloadUrl.url;
-        link.target = '_blank';
-        link.download = objectInfo.name;
+        console.log(link)
         link.click();
       }
-      */
     } else {
       // Create presigned download url for temp bundle
       //TODO: Evaluate "nearest" DataProxy
@@ -114,39 +115,6 @@ async function downloadResource() {
       link.click();
     }
   }
-
-  /*
-  if (objectInfo) {
-    //TODO: Choose "nearest" DataProxy
-    let endpointId = objectInfo.endpoints[0]
-    //TODO: Fetch S3 credentials (includes host url)
-    const creds = await getUserS3Credentials(endpointId)
-    //TODO: Create S3 client
-    const client = new S3Client({
-      endpoint: creds.s3EndpointUrl ? creds.s3EndpointUrl : '',
-      region: 'region-one',
-      credentials: {
-        accessKeyId: creds.s3AccessKey ? creds.s3AccessKey : '',
-        secretAccessKey: creds.s3SecretKey ? creds.s3SecretKey : ''
-      }
-    });
-
-    //TODO: Get hierarchy
-    const hierarchy = await getResourceHierarchy(objectInfo.id)
-
-    //TODO: Create key from hierarchy
-    const key = createS3Key(hierarchy.collection, hierarchy.dataset, objectInfo.name)
-
-    //TODO: Send GetObjectCommand
-    const command = new GetObjectCommand({
-      Bucket: 'my',
-      Key: undefined
-    });
-    const item = await client.send(command);
-    item.Body.pipe(createWriteStream(fileName))
-    //TODO: Download body as stream
-  }
-  */
 }
 
 /* Back link to last page in navigation history */
@@ -204,78 +172,78 @@ const router = useRouter()
               title="Download Object"
               class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
             <IconCloudDown class="flex-shrink-0"/>
-      </button>
+          </button>
         </li>
       </ul>
     </div>
     <!-- End Badge Row -->
 
     <!-- General Info Row -->
-  <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 container mx-auto mb-6">
+    <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 container mx-auto mb-6">
       <CardSmallInfo :icon_id='"ID"' :text="objectInfo.id"/>
       <CardSmallInfo :icon_id='"Name"' :text="objectInfo.name"/>
       <CardStats :stats="objectInfo.stats"/>
-  </div>
+    </div>
     <!-- End General Info Row -->
 
     <!-- Description Row -->
-  <div class="flex items-center container mx-auto mb-6">
-    <div
-        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 text-gray-600 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-      <div class="flex flex-row justify-start items-center p-4 font-bold text-2xl">
-        <IconFileInfo class="flex-shrink-0 size-6 me-2 text-gray-600/[.75]"/>
-        Description
-      </div>
+    <div class="flex items-center container mx-auto mb-6">
       <div
-          class="flex grow p-4 text-gray-700 text-xl border-t border-gray-300 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-        {{ objectInfo?.description }}
+          class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 text-gray-600 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        <div class="flex flex-row justify-start items-center p-4 font-bold text-2xl">
+          <IconFileInfo class="flex-shrink-0 size-6 me-2 text-gray-600/[.75]"/>
+          Description
+        </div>
+        <div
+            class="flex grow p-4 text-gray-700 text-xl border-t border-gray-300 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+          {{ objectInfo?.description }}
+        </div>
       </div>
     </div>
-  </div>
     <!-- End Description Row -->
 
     <!-- Labels / Hooks Row -->
-  <div class="flex flex-wrap justify-between gap-x-4 gap-y-2 container mx-auto mb-6">
-    <div
-        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-        <IconTag class="flex-shrink-0 size-6 me-4"/>
-        <span class="">Labels</span>
+    <div class="flex flex-wrap justify-between gap-x-4 gap-y-2 container mx-auto mb-6">
+      <div
+          class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+          <IconTag class="flex-shrink-0 size-6 me-4"/>
+          <span class="">Labels</span>
+        </div>
+        <CardLabels :key_values="objectInfo?.key_values"/>
       </div>
-      <CardLabels :key_values="objectInfo?.key_values"/>
-    </div>
 
-    <div
-        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-        <IconWebhook class="flex-shrink-0 size-6 me-4"/>
-        <span class="">Hooks</span>
+      <div
+          class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+          <IconWebhook class="flex-shrink-0 size-6 me-4"/>
+          <span class="">Hooks</span>
+        </div>
+        <CardHooks :key_values="objectInfo?.key_values"/>
       </div>
-      <CardHooks :key_values="objectInfo?.key_values"/>
     </div>
-  </div>
     <!-- End Labels / Hooks Row -->
 
     <!-- Relations Row -->
-  <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
-    <div
-        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-        <IconExternalLink class="flex-shrink-0 size-6 me-4"/>
-        <span class="">External Relations</span>
+    <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
+      <div
+          class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+          <IconExternalLink class="flex-shrink-0 size-6 me-4"/>
+          <span class="">External Relations</span>
+        </div>
+        <CardRelations :relations="objectInfo?.relations" :external="true"/>
       </div>
-      <CardRelations :relations="objectInfo?.relations" :external="true"/>
-    </div>
 
-    <div
-        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-        <IconArrowsSplit class="flex-shrink-0 size-6 me-4"/>
-        <span class="">Internal Relations</span>
+      <div
+          class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+          <IconArrowsSplit class="flex-shrink-0 size-6 me-4"/>
+          <span class="">Internal Relations</span>
+        </div>
+        <CardRelations :relations="objectInfo?.relations" :external="false"/>
       </div>
-      <CardRelations :relations="objectInfo?.relations" :external="false"/>
     </div>
-  </div>
     <!-- End Relations Row -->
   </div>
   <div v-else class="">

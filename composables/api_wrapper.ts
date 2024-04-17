@@ -258,10 +258,12 @@ export async function getResourceHierarchy(resourceId: string) {
     })
 }
 
-export async function getPublicResourceUrl(endpointHost: string, resource: ObjectInfo): Promise<string> {
+export async function getPublicResourceUrl(endpointHost: string, resource: ObjectInfo, ssl: boolean): Promise<string> {
     // Hierarchy objects are downloaded through the special Objects bucket
     if (resource.variant !== v2ResourceVariant.RESOURCE_VARIANT_OBJECT) {
-        return `https://objects.${endpointHost}/${resource.id}/${resource.name}.tar.gz`
+        return ssl ?
+            `https://objects.${endpointHost}/${resource.id}/${resource.name}.tar.gz` :
+            `http://objects.${endpointHost}/${resource.id}/${resource.name}.tar.gz`
     }
 
     // Else traverse hierarchy up
