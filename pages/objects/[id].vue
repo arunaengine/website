@@ -1,9 +1,29 @@
 <script setup lang="ts">
-import {IconArrowLeft, IconArrowsSplit, IconExternalLink, IconFileInfo, IconTag, IconWebhook} from '@tabler/icons-vue';
-import {v2DataClass, v2EndpointHostVariant, v2ResourceVariant} from "~/composables/aruna_api_json";
+import {
+  IconArrowLeft,
+  IconArrowsSplit,
+  IconBucket,
+  IconCloudDown,
+  IconCloudLock,
+  IconExternalLink,
+  IconFileInfo,
+  IconLicense,
+  IconLockCog,
+  IconTag,
+  IconWebhook,
+  IconZoomCheck
+} from '@tabler/icons-vue';
+import {
+  modelsv2Status,
+  v2DataClass,
+  v2EndpointHostVariant,
+  v2PermissionLevel,
+  v2ResourceVariant
+} from "~/composables/aruna_api_json";
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
 import {fetchEndpoint, getPublicResourceUrl} from "~/composables/api_wrapper";
+import {toObjectStatusStr, toPermissionTypeStr} from "~/composables/enum_conversions";
 
 const route = useRoute()
 const objectInfo = await useFetch(`/api/resource?resourceId=${route.params.id}`)
@@ -146,7 +166,126 @@ const router = useRouter()
     </button>
   </div>
 
+  <div v-if="objectInfo">
+    <!-- Badge Row -->
+    <div class="flex flex-wrap justify-center container mx-auto mb-6">
+      <ul class="flex flex-col grow sm:flex-row">
+        <li class="inline-flex items-center bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+          <IconBucket class="flex-shrink-0 size-6"/>
+          <span class="font-bold">Type:</span> {{ toResourceTypeStr(objectInfo.variant) }}
+        </li>
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+          <IconLockCog class="flex-shrink-0 size-6"/>
+          <span class="font-bold">Dataclass:</span> {{ toDataClassStr(objectInfo.data_class) }}
+        </li>
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+          <IconZoomCheck class="flex-shrink-0 size-6"/>
+          <span class="font-bold">Status:</span> {{ toObjectStatusStr(objectInfo.object_status) }}
+        </li>
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+          <IconLicense class="flex-shrink-0 size-6"/>
+          <span class="font-bold">Metadata License:</span> {{ objectInfo.license }}
+        </li>
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+          <IconLicense class="flex-shrink-0 size-6"/>
+          <span class="font-bold">{{
+              objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT ? '' : 'Default'
+            }} Data License:</span> {{ objectInfo.data_license }}
+        </li>
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+          <IconCloudLock class="flex-shrink-0 size-6"/>
+          <span class="font-bold">Permission:</span> {{ toPermissionTypeStr(objectInfo.permission) }}
+        </li>
+        <li v-if="isDownloadable()"
+            class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+          <button
+              type="button"
+              @click="downloadResource()"
+              title="Download Object"
+              class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
+            <IconCloudDown class="flex-shrink-0"/>
+      </button>
+        </li>
+      </ul>
+    </div>
+    <!-- End Badge Row -->
+
+    <!-- General Info Row -->
+  <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 container mx-auto mb-6">
+      <CardSmallInfo :icon_id='"ID"' :text="objectInfo.id"/>
+      <CardSmallInfo :icon_id='"Name"' :text="objectInfo.name"/>
+      <CardStats :stats="objectInfo.stats"/>
+  </div>
+    <!-- End General Info Row -->
+
+    <!-- Description Row -->
+  <div class="flex items-center container mx-auto mb-6">
+    <div
+        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 text-gray-600 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+      <div class="flex flex-row justify-start items-center p-4 font-bold text-2xl">
+        <IconFileInfo class="flex-shrink-0 size-6 me-2 text-gray-600/[.75]"/>
+        Description
+      </div>
+      <div
+          class="flex grow p-4 text-gray-700 text-xl border-t border-gray-300 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        {{ objectInfo?.description }}
+      </div>
+    </div>
+  </div>
+    <!-- End Description Row -->
+
+    <!-- Labels / Hooks Row -->
+  <div class="flex flex-wrap justify-between gap-x-4 gap-y-2 container mx-auto mb-6">
+    <div
+        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+        <IconTag class="flex-shrink-0 size-6 me-4"/>
+        <span class="">Labels</span>
+      </div>
+      <CardLabels :key_values="objectInfo?.key_values"/>
+    </div>
+
+    <div
+        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+        <IconWebhook class="flex-shrink-0 size-6 me-4"/>
+        <span class="">Hooks</span>
+      </div>
+      <CardHooks :key_values="objectInfo?.key_values"/>
+    </div>
+  </div>
+    <!-- End Labels / Hooks Row -->
+
+    <!-- Relations Row -->
+  <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
+    <div
+        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+        <IconExternalLink class="flex-shrink-0 size-6 me-4"/>
+        <span class="">External Relations</span>
+      </div>
+      <CardRelations :relations="objectInfo?.relations" :external="true"/>
+    </div>
+
+    <div
+        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+        <IconArrowsSplit class="flex-shrink-0 size-6 me-4"/>
+        <span class="">Internal Relations</span>
+      </div>
+      <CardRelations :relations="objectInfo?.relations" :external="false"/>
+    </div>
+  </div>
+    <!-- End Relations Row -->
+  </div>
+  <div v-else class="">
+    <div class="flex flex-wrap justify-center container mx-auto mb-6">
+      Could not load resource: {{ resourceId }}
+    </div>
+  </div>
+
   <!-- Badge row -->
+  <!--
   <div class="flex flex-wrap container mx-auto mb-6">
     <div class="flex sm:flex-row md:flex-col">
       <BadgeResourceType :variant="objectInfo?.variant"/>
@@ -167,74 +306,5 @@ const router = useRouter()
       <BadgeResourcePermission :permission="objectInfo?.permission"/>
     </div>
   </div>
-  <div class="flex flex-wrap container mx-auto mb-6">
-    <div class="flex sm:flex-row md:flex-col">
-      <button type="button"
-              @click="downloadResource()"
-              class="py-2 px-2 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-500 hover:border-blue-600 hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600">
-        Download
-      </button>
-    </div>
-  </div>
-
-  <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 container mx-auto mb-6">
-    <CardSmallInfo :icon_id='"ID"' :text="objectInfo?.id"/>
-    <CardSmallInfo :icon_id='"Name"' :text="objectInfo?.name"/>
-    <CardStats :stats="objectInfo?.stats"/>
-  </div>
-
-  <div class="flex items-center container mx-auto mb-6">
-    <div
-        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 text-gray-600 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-      <div class="flex flex-row justify-start items-center p-4 font-bold text-2xl">
-        <IconFileInfo class="flex-shrink-0 size-6 me-2 text-gray-600/[.75]"/>
-        Description
-      </div>
-
-      <div
-          class="flex grow p-4 text-gray-700 text-xl border-t border-gray-300 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-        {{ objectInfo?.description }}
-      </div>
-    </div>
-  </div>
-
-  <div class="flex flex-wrap justify-between gap-x-4 gap-y-2 container mx-auto mb-6">
-    <div
-        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-        <IconTag class="flex-shrink-0 size-6 me-4"/>
-        <span class="">Labels</span>
-      </div>
-      <CardLabels :key_values="objectInfo?.key_values"/>
-    </div>
-
-    <div
-        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-        <IconWebhook class="flex-shrink-0 size-6 me-4"/>
-        <span class="">Hooks</span>
-      </div>
-      <CardHooks :key_values="objectInfo?.key_values"/>
-    </div>
-  </div>
-
-  <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
-    <div
-        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-        <IconExternalLink class="flex-shrink-0 size-6 me-4"/>
-        <span class="">External Relations</span>
-      </div>
-      <CardRelations :relations="objectInfo?.relations" :external="true"/>
-    </div>
-
-    <div
-        class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-      <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-        <IconArrowsSplit class="flex-shrink-0 size-6 me-4"/>
-        <span class="">Internal Relations</span>
-      </div>
-      <CardRelations :relations="objectInfo?.relations" :external="false"/>
-    </div>
-  </div>
+  -->
 </template>

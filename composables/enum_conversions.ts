@@ -1,9 +1,12 @@
 import {
+    modelsv2Status,
     storagemodelsv2ComponentStatus,
     v2DataClass,
     v2EndpointVariant,
     v2InternalRelationVariant,
-    v2KeyValueVariant, v2RelationDirection,
+    v2KeyValueVariant,
+    v2PermissionLevel,
+    v2RelationDirection,
     v2ResourceVariant
 } from "./aruna_api_json"
 
@@ -14,6 +17,29 @@ export function toResourceTypeStr(variant: v2ResourceVariant | undefined): strin
         case v2ResourceVariant.RESOURCE_VARIANT_DATASET: return "Dataset"
         case v2ResourceVariant.RESOURCE_VARIANT_OBJECT: return "Object"
         default: return "Unspecified"
+    }
+}
+
+export function toPermissionTypeStr(variant: v2PermissionLevel | undefined): string {
+    switch (variant) {
+        case v2PermissionLevel.PERMISSION_LEVEL_NONE: return "None"
+        case v2PermissionLevel.PERMISSION_LEVEL_READ: return "Read"
+        case v2PermissionLevel.PERMISSION_LEVEL_APPEND: return "Append"
+        case v2PermissionLevel.PERMISSION_LEVEL_WRITE: return "Write"
+        case v2PermissionLevel.PERMISSION_LEVEL_ADMIN: return "Admin"
+        default: return "Unspecified"
+    }
+}
+
+export function toObjectStatusStr(variant: modelsv2Status | undefined): string {
+    switch (variant) {
+        case modelsv2Status.STATUS_INITIALIZING: return 'Initializing'
+        case modelsv2Status.STATUS_VALIDATING: return 'Validating'
+        case modelsv2Status.STATUS_AVAILABLE: return 'Available'
+        case modelsv2Status.STATUS_UNAVAILABLE: return 'Unavailable'
+        case modelsv2Status.STATUS_DELETED: return 'Deleted'
+        case modelsv2Status.STATUS_ERROR: return 'Error'
+        default: return 'Unspecified'
     }
 }
 
