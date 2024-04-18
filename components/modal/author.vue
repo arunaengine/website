@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import {IconExclamationCircle, IconX} from "@tabler/icons-vue";
 import {type v2Author,} from "~/composables/aruna_api_json";
-import {ULID_REGEX, ORCID_REGEX} from "~/composables/constants";
+import {ULID_REGEX, ORCID_REGEX, EMAIL_REGEX} from "~/composables/constants";
 
 const props = defineProps<{
   modalId: string,
@@ -12,8 +12,11 @@ const emit = defineEmits<{
 }>()
 
 const firstName = ref('')
+const firstNameErr: Ref<string | undefined> = ref('Please enter a first name')
 const lastName = ref('')
+const lastNameErr: Ref<string | undefined> = ref('Please enter a last name')
 const email = ref('')
+const emailErr: Ref<string | undefined> = ref(undefined)
 const orcid = ref('')
 const orcidErr: Ref<string | undefined> = ref(undefined)
 const userId = ref('')
@@ -21,10 +24,45 @@ const userIdErr: Ref<string | undefined> = ref(undefined)
 
 const validState = ref(true)
 const validationStates = ref(new Map<string, boolean>)
+validationStates.value.set('firstname', false)
+validationStates.value.set('lastname', false)
+validationStates.value.set('email', true)
 validationStates.value.set('orcid', true)
 validationStates.value.set('userid', true)
 
+watch(firstName, () => validateName())
+watch(lastName, () => validateName())
+
+function validateName() {
+  // First name
+  const firstValid = firstName.value.length > 0
+  validationStates.value.set('firstname', firstValid)
+  firstNameErr.value = firstValid ? undefined : 'Please enter a first name'
+
+  // Last name
+  const lastValid = lastName.value.length > 0
+  validationStates.value.set('lastname', lastValid)
+  lastNameErr.value = lastValid ? undefined : 'Please enter a last name'
+
+  validation()
+}
+
+watch(email, () => validateEmail())
+
+function validateEmail() {
+  if (email.value.length > 0) {
+    const valid = EMAIL_REGEX.test(email.value)
+    validationStates.value.set('email', valid)
+    emailErr.value = valid ? undefined : 'Please enter a valid email address'
+  } else {
+    validationStates.value.set('email', true)
+    emailErr.value = undefined
+  }
+  validation()
+}
+
 watch(orcid, () => validateOrcid())
+
 function validateOrcid() {
   if (orcid.value.length > 0) {
     const valid = ORCID_REGEX.test(orcid.value)
@@ -38,6 +76,7 @@ function validateOrcid() {
 }
 
 watch(userId, () => validateUserId())
+
 function validateUserId() {
   if (userId.value.length > 0) {
     const valid = ULID_REGEX.test(userId.value)
@@ -101,122 +140,153 @@ function submit() {
 
         <div class="space-y-4 p-4 overflow-y-auto">
           <!-- Author First Name -->
-          <div class="relative">
-            <input v-model="firstName"
-                   id="first-name-input"
-                   class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+          <div class="space-y-0">
+            <div class="relative">
+              <input v-model="firstName" required
+                     id="first-name-input"
+                     class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6
                    [&:not(:placeholder-shown)]:pb-2
                    autofill:pt-6
                    autofill:pb-2" placeholder="Author first name" type="text">
-            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+              <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
             peer-focus:text-gray-500
             peer-[:not(:placeholder-shown)]:text-xs
             peer-[:not(:placeholder-shown)]:-translate-y-1.5
             peer-[:not(:placeholder-shown)]:text-gray-500" for="first-name-input">First Name</label>
+              <div :class="{ 'hidden': validationStates.get('firstname') }"
+                   class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
+                <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+              </div>
+            </div>
+            <p :class="{ 'hidden': validationStates.get('firstname') }" class="text-sm text-red-600"
+               id="hs-validation-name-error-helper">{{ firstNameErr }}
+            </p>
           </div>
           <!-- End Author First Name -->
 
           <!-- Author Last Name -->
-          <div class="relative">
-            <input v-model="lastName"
-                   id="last-name-input"
-                   class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+          <div class="space-y-0">
+
+            <div class="relative">
+              <input v-model="lastName" required
+                     id="last-name-input"
+                     class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6
                    [&:not(:placeholder-shown)]:pb-2
                    autofill:pt-6
                    autofill:pb-2" placeholder="Author last name" type="text">
-            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+              <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
             peer-focus:text-gray-500
             peer-[:not(:placeholder-shown)]:text-xs
             peer-[:not(:placeholder-shown)]:-translate-y-1.5
             peer-[:not(:placeholder-shown)]:text-gray-500" for="last-name-input">Last Name</label>
-          </div>
+              <div :class="{ 'hidden': validationStates.get('lastname') }"
+                   class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
+                <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+              </div>
+            </div>
+            <p :class="{ 'hidden': validationStates.get('lastname') }" class="text-sm text-red-600"
+               id="hs-validation-name-error-helper">{{ lastNameErr }}
+            </p></div>
           <!-- End Author First Name -->
 
           <!-- Author Email -->
-          <div class="relative">
-            <input v-model="email"
-                   id="author-email-input"
-                   class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+          <div class="space-y-0">
+            <div class="relative">
+              <input v-model="email"
+                     id="author-email-input"
+                     class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6
                    [&:not(:placeholder-shown)]:pb-2
                    autofill:pt-6
                    autofill:pb-2" placeholder="Author email" type="email">
-            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+              <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
             peer-focus:text-gray-500
             peer-[:not(:placeholder-shown)]:text-xs
             peer-[:not(:placeholder-shown)]:-translate-y-1.5
             peer-[:not(:placeholder-shown)]:text-gray-500" for="author-email-input">Email</label>
+              <div :class="{ 'hidden': validationStates.get('email') }"
+                   class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
+                <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+              </div>
+            </div>
+            <p :class="{ 'hidden': validationStates.get('email') }" class="text-sm text-red-600"
+               id="hs-validation-name-error-helper">{{ emailErr }}
+            </p>
           </div>
           <!-- End Author Email -->
 
           <!-- Author ORCID -->
-          <div class="relative">
-            <input v-model="orcid"
-                   id="author-orcid-input"
-                   class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+          <div class="space-y-0">
+            <div class="relative">
+              <input v-model="orcid"
+                     id="author-orcid-input"
+                     class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6
                    [&:not(:placeholder-shown)]:pb-2
                    autofill:pt-6
                    autofill:pb-2" placeholder="Author ORCID" type="email">
-            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+              <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
             peer-focus:text-gray-500
             peer-[:not(:placeholder-shown)]:text-xs
             peer-[:not(:placeholder-shown)]:-translate-y-1.5
             peer-[:not(:placeholder-shown)]:text-gray-500" for="author-orcid-input">ORCID</label>
-            <div :class="{ 'hidden': validationStates.get('orcid') }"
-                 class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
-              <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+              <div :class="{ 'hidden': validationStates.get('orcid') }"
+                   class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
+                <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+              </div>
             </div>
+            <p :class="{ 'hidden': validationStates.get('orcid') }" class="text-sm text-red-600"
+               id="hs-validation-name-error-helper">{{ orcidErr }}
+            </p>
           </div>
-          <p :class="{ 'hidden': validationStates.get('orcid') }" class="text-sm text-red-600"
-             id="hs-validation-name-error-helper">{{ orcidErr }}
-          </p>
           <!-- End Author ORCID -->
 
           <!-- Author User ID -->
-          <div class="relative">
-            <input v-model="userId"
-                   id="author-userid-input"
-                   class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+          <div class="space-y-0">
+            <div class="relative">
+              <input v-model="userId"
+                     id="author-userid-input"
+                     class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6
                    [&:not(:placeholder-shown)]:pb-2
                    autofill:pt-6
                    autofill:pb-2" placeholder="Author user id" type="email">
-            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+              <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
             peer-focus:text-gray-500
             peer-[:not(:placeholder-shown)]:text-xs
             peer-[:not(:placeholder-shown)]:-translate-y-1.5
             peer-[:not(:placeholder-shown)]:text-gray-500" for="author-userid-input">User ID</label>
-            <div :class="{ 'hidden': validationStates.get('userid') }"
-                 class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
-              <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+              <div :class="{ 'hidden': validationStates.get('userid') }"
+                   class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
+                <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+              </div>
             </div>
+            <p :class="{ 'hidden': validationStates.get('userid') }" class="text-sm text-red-600"
+               id="hs-validation-name-error-helper">{{ userIdErr }}
+            </p>
           </div>
-          <p :class="{ 'hidden': validationStates.get('userid') }" class="text-sm text-red-600"
-             id="hs-validation-name-error-helper">{{ userIdErr }}
-          </p>
           <!-- End User ID -->
         </div>
 
