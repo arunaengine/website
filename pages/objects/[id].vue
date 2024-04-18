@@ -41,14 +41,12 @@ const objectInfo = await fetchResource(resourceId)
 
 function isDownloadable(): boolean {
   if (objectInfo) {
-    if (objectInfo.data_class === v2DataClass.DATA_CLASS_PUBLIC) {
-      return true
-    }
-
-    return objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
+    return (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
+        objectInfo.data_class === v2DataClass.DATA_CLASS_PUBLIC) ||
+        (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
         objectInfo.object_status === modelsv2Status.STATUS_AVAILABLE &&
         objectInfo.permission !== v2PermissionLevel.PERMISSION_LEVEL_UNSPECIFIED &&
-        objectInfo.permission !== v2PermissionLevel.PERMISSION_LEVEL_NONE
+        objectInfo.permission !== v2PermissionLevel.PERMISSION_LEVEL_NONE)
   }
   return false
 }
