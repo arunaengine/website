@@ -181,7 +181,7 @@ const router = useRouter()
     <!-- General Info Row -->
     <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 container mx-auto mb-6">
       <CardSmallInfo :icon_id='"ID"' :text="objectInfo.id"/>
-      <CardSmallInfo :icon_id='"Name"' :text="objectInfo.name"/>
+      <CardName :name="objectInfo.name" :title="objectInfo.title"/>
       <CardStats :stats="objectInfo.stats"/>
     </div>
     <!-- End General Info Row -->

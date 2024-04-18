@@ -31,6 +31,7 @@ export function toObjectInfo(
         return {
             id: resource.project.id,
             name: resource.project.name,
+            title: resource.project.title,
             variant: v2ResourceVariant.RESOURCE_VARIANT_PROJECT,
             description: resource.project.description,
             key_values: resource.project.keyValues,
@@ -48,6 +49,7 @@ export function toObjectInfo(
         return {
             id: resource.collection.id,
             name: resource.collection.name,
+            title: resource.collection.title,
             variant: v2ResourceVariant.RESOURCE_VARIANT_COLLECTION,
             description: resource.collection.description,
             key_values: resource.collection.keyValues,
@@ -65,6 +67,7 @@ export function toObjectInfo(
         return {
             id: resource.dataset.id,
             name: resource.dataset.name,
+            title: resource.dataset.title,
             variant: v2ResourceVariant.RESOURCE_VARIANT_DATASET,
             description: resource.dataset.description,
             key_values: resource.dataset.keyValues,
@@ -82,6 +85,7 @@ export function toObjectInfo(
         return {
             id: resource.object.id,
             name: resource.object.name,
+            title: resource.object.title,
             variant: v2ResourceVariant.RESOURCE_VARIANT_OBJECT,
             description: resource.object.description,
             key_values: resource.object.keyValues,
