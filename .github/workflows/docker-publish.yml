@@ -18,6 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: arduino/setup-protoc@v2
+
+      - name: Clean up docker
+        run: docker system prune -af
+
       - name: Build image
         run: docker build . --file Dockerfile --tag $IMAGE_NAME
 
