@@ -22,25 +22,20 @@ import {
 } from "~/composables/aruna_api_json";
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
-import {fetchEndpoint, getPublicResourceUrl} from "~/composables/api_wrapper";
+import {fetchEndpoint, fetchResource, getPublicResourceUrl} from "~/composables/api_wrapper";
 import {toObjectStatusStr, toPermissionTypeStr} from "~/composables/enum_conversions";
 
 const route = useRoute()
 const resourceId = route.params.id as string
-const objectInfo = await useFetch(`/api/resource?resourceId=${resourceId}`)
-    .then(res => {
-      const resource = res.data.value
+
+const objectInfo = await fetchResource(resourceId)
+    .then(resource => {
       if (resource) {
-        try {
-          return toObjectInfo(resource.resource, resource.permission)
-        } catch (error) {
-          console.log(error)
-        }
+        return toObjectInfo(resource.resource, resource.permission)
       }
-      return undefined
-    }, error => {
-      console.log(error)
-      return undefined
+    }).catch(error => {
+      console.log(error.code)
+      console.log(error.message)
     })
 
 function isDownloadable(): boolean {
@@ -137,7 +132,7 @@ const router = useRouter()
   <div v-if="objectInfo">
     <!-- Badge Row -->
     <div class="flex flex-wrap justify-center container mx-auto mb-6">
-      <ul class="flex flex-col grow sm:flex-row">
+      <ul class="flex flex-col flex-wrap grow sm:flex-row">
         <li class="inline-flex items-center bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
           <IconBucket class="flex-shrink-0 size-6"/>
           <span class="font-bold">Type:</span> {{ toResourceTypeStr(objectInfo.variant) }}
@@ -251,28 +246,4 @@ const router = useRouter()
       Could not load resource: {{ resourceId }}
     </div>
   </div>
-
-  <!-- Badge row -->
-  <!--
-  <div class="flex flex-wrap container mx-auto mb-6">
-    <div class="flex sm:flex-row md:flex-col">
-      <BadgeResourceType :variant="objectInfo?.variant"/>
-    </div>
-    <div class="flex sm:flex-row md:flex-col">
-      <BadgeDataclass :dataClass="objectInfo?.data_class" :outline="true"/>
-    </div>
-    <div class="flex sm:flex-row md:flex-col">
-      <BadgeResourceStatus :status="objectInfo?.object_status"/>
-    </div>
-    <div class="flex sm:flex-row md:flex-col">
-      <BadgeResourceLicense :license="objectInfo?.license" :meta="true"/>
-    </div>
-    <div class="flex sm:flex-row md:flex-col">
-      <BadgeResourceLicense :license="objectInfo?.license" :meta="false"/>
-    </div>
-    <div class="flex sm:flex-row md:flex-col">
-      <BadgeResourcePermission :permission="objectInfo?.permission"/>
-    </div>
-  </div>
-  -->
 </template>

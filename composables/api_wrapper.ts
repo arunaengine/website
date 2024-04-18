@@ -14,6 +14,7 @@ import {
     type v2Endpoint,
     type v2GetDownloadURLResponse,
     type v2GetHierarchyResponse,
+    type v2GetResourceResponse,
     type v2GetS3CredentialsUserTokenResponse,
     type v2GetUploadURLResponse,
     v2InternalRelationVariant,
@@ -128,15 +129,20 @@ export async function getUserS3Credentials(endpointId: string): Promise<v2GetS3C
     })
 }
 
-export async function fetchResource(resourceId: string): Promise<v2ResourceWithPermission> {
-    return $fetch<v2ResourceWithPermission>('/api/resource', {
+export async function fetchResource(resourceId: string): Promise<v2ResourceWithPermission | undefined> {
+    return $fetch<v2GetResourceResponse>('/api/resource', {
         method: 'GET',
         query: {
             resourceId: resourceId
         }
+    }).then(response => {
+        return response.resource
     }).catch(error => {
-        console.error(error)
-        throw new Error("Resource fetch failed.")
+        if (error.message.includes('404')) {
+            return undefined // Not found
+        }
+        // Bubble every other error up
+        throw new Error("Failed to fetch resource")
     })
 }
 
@@ -280,28 +286,32 @@ export async function getPublicResourceUrl(endpointHost: string, resource: Objec
 
         if (parentRel?.internal?.resourceId) {
             const parentObj = await fetchResource(parentRel.internal.resourceId)
-            const objectInfo = toObjectInfo(parentObj.resource, parentObj.permission)
-            if (objectInfo) {
-                switch (objectInfo.variant) {
-                    case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
-                        project = objectInfo.name
-                        break
+            if (parentObj) {
+                const objectInfo = toObjectInfo(parentObj.resource, parentObj.permission)
+                if (objectInfo) {
+                    switch (objectInfo.variant) {
+                        case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
+                            project = objectInfo.name
+                            break
+                        }
+                        case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION: {
+                            collection = objectInfo.name
+                            break
+                        }
+                        case v2ResourceVariant.RESOURCE_VARIANT_DATASET: {
+                            dataset = objectInfo.name
+                            break
+                        }
                     }
-                    case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION: {
-                        collection = objectInfo.name
-                        break
-                    }
-                    case v2ResourceVariant.RESOURCE_VARIANT_DATASET: {
-                        dataset = objectInfo.name
-                        break
-                    }
+                    resource = objectInfo
+                } else {
+                    throw Error("Conversion to ObjectInfo failed")
                 }
-                resource = objectInfo
             } else {
-                throw Error("Conversion to ObjectInfo failed")
+                throw Error(`Parent resource (${parentRel.internal.resourceId}) does not exist`)
             }
         } else {
-            throw Error(`Resource (${resource.id} has no parent relations ...`)
+            throw Error(`Resource (${resource.id}:${resource.name}) has no parent relations`)
         }
     }
 
