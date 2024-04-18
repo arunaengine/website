@@ -1,12 +1,23 @@
-import { v2ResourceVariant } from './aruna_api_json';
-import type { modelsv2Status, v2DataClass, v2GenericResource, v2KeyValue, v2PermissionLevel, v2Relation, v2Stats } from '@/composables/aruna_api_json';
+import type {
+    modelsv2Status,
+    v2Author,
+    v2DataClass,
+    v2GenericResource,
+    v2KeyValue,
+    v2PermissionLevel,
+    v2Relation,
+    v2Stats,
+} from '@/composables/aruna_api_json';
+import {v2ResourceVariant} from "@/composables/aruna_api_json";
 
 /* Object info conversions */
 export type ObjectInfo = {
     id: string,
     name: string,
+    title: string,
     variant: v2ResourceVariant,
     description: string,
+    authors: v2Author[],
     key_values: v2KeyValue[],
     stats: v2Stats,
     data_class: v2DataClass,
@@ -34,6 +45,7 @@ export function toObjectInfo(
             title: resource.project.title,
             variant: v2ResourceVariant.RESOURCE_VARIANT_PROJECT,
             description: resource.project.description,
+            authors: resource.project.authors,
             key_values: resource.project.keyValues,
             stats: resource.project.stats,
             data_class: resource.project.dataClass,
@@ -52,6 +64,7 @@ export function toObjectInfo(
             title: resource.collection.title,
             variant: v2ResourceVariant.RESOURCE_VARIANT_COLLECTION,
             description: resource.collection.description,
+            authors: resource.collection.authors,
             key_values: resource.collection.keyValues,
             stats: resource.collection.stats,
             data_class: resource.collection.dataClass,
@@ -70,6 +83,7 @@ export function toObjectInfo(
             title: resource.dataset.title,
             variant: v2ResourceVariant.RESOURCE_VARIANT_DATASET,
             description: resource.dataset.description,
+            authors: resource.dataset.authors,
             key_values: resource.dataset.keyValues,
             stats: resource.dataset.stats,
             data_class: resource.dataset.dataClass,
@@ -88,6 +102,7 @@ export function toObjectInfo(
             title: resource.object.title,
             variant: v2ResourceVariant.RESOURCE_VARIANT_OBJECT,
             description: resource.object.description,
+            authors: resource.object.authors,
             key_values: resource.object.keyValues,
             stats: {
                 size: resource.object.contentLen,
@@ -198,7 +213,7 @@ export function formatBytes(bytes: number, decimals = 0) {
      * @returns String SI-prefix representation
      */
     if (bytes == 0) return '0 Bytes';
-    var k = 1024,
+    let k = 1024,
         dm = decimals || 1,
         sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'],
         i = Math.floor(Math.log(bytes) / Math.log(k));

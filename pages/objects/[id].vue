@@ -10,6 +10,7 @@ import {
   IconLicense,
   IconLockCog,
   IconTag,
+  IconUsers,
   IconWebhook,
   IconZoomCheck
 } from '@tabler/icons-vue';
@@ -181,21 +182,46 @@ const router = useRouter()
     </div>
     <!-- End General Info Row -->
 
-    <!-- Description Row -->
-    <div class="flex items-center container mx-auto mb-6">
+    <!-- Description / Authors Row -->
+    <div class="flex flex-col xl:flex-row justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
       <div
-          class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 text-gray-600 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+          class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+          <IconFileInfo class="flex-shrink-0 size-6 me-4"/>
+          <span class="">Description</span>
+        </div>
+        <div class="flex grow p-4 text-gray-700 text-xl border-t border-gray-300 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+          {{ objectInfo?.description }}
+        </div>
+      </div>
+      <div v-if="objectInfo.authors" class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+          <IconUsers class="flex-shrink-0 size-6 me-4"/>
+          <span class="">Authors</span>
+        </div>
+        <CardAuthors :authors="objectInfo.authors"/>
+      </div>
+    </div>
+    <!-- End Description / Authors Row -->
+
+
+
+
+    <!-- Description / Authors Row -->
+    <!--
+    <div class="flex items-center container mx-auto mb-6">
+      <div class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 text-gray-600 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-2xl">
           <IconFileInfo class="flex-shrink-0 size-6 me-2 text-gray-600/[.75]"/>
           Description
         </div>
-        <div
-            class="flex grow p-4 text-gray-700 text-xl border-t border-gray-300 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        <div class="flex grow p-4 text-gray-700 text-xl border-t border-gray-300 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
           {{ objectInfo?.description }}
         </div>
       </div>
     </div>
-    <!-- End Description Row -->
+    -->
+    <!-- End Description / Authors Row -->
 
     <!-- Labels / Hooks Row -->
     <div class="flex flex-wrap justify-between gap-x-4 gap-y-2 container mx-auto mb-6">
