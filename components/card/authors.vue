@@ -31,10 +31,13 @@ function getAuthors() {
               {{ author.firstName }} {{ author.lastName }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">
-              <a :href="`mailto:${author.email}`">{{ author.email }}</a>
+              <a class="text-aruna-800 hover:text-aruna-700" :href="`mailto:${author.email}`">{{ author.email }}</a>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">
-              <a v-if="author.orcid" :href="`https://:orcid.org/${author.orcid}`" target="_blank">{{ author.orcid }}</a>
+            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+              <a v-if="author.orcid" class="inline-flex items-center text-green-700 hover:text-green-600"
+                 :href="`https://orcid.org/${author.orcid}`" target="_blank">
+                <img :title="author.orcid" alt="orcid-icon" src="assets/imgs/ORCIDiD_icon24x24.png"/>
+              </a>
             </td>
           </tr>
           </tbody>

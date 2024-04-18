@@ -112,8 +112,8 @@ function submit() {
     firstName: firstName.value,
     lastName: lastName.value,
     email: email.value,
-    orcid: orcid.value,
-    id: userId.value
+    orcid: orcid.value.length > 0 ? orcid.value : undefined,
+    id: userId.value.length > 0 ? userId.value : undefined
   })
   reset()
 }
