@@ -225,7 +225,7 @@ export async function createObject(
         hashes: [],
         metadataLicenseTag: metaLicense,
         dataLicenseTag: dataLicense,
-        authors: []
+        authors: authors
     } as v2CreateObjectRequest
 
     return $fetch<v2Object>('/api/object', {

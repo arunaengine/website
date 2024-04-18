@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {IconSquareRoundedPlus, IconExclamationCircle, IconTrash, IconArrowLeft} from '@tabler/icons-vue';
 import {
   v2DataClass,
@@ -245,7 +244,8 @@ async function submit() {
         dataClass: resourceDataclass.value,
         preferredEndpoint: '', //TODO
         metadataLicenseTag: metaLicense.value,
-        defaultDataLicenseTag: dataLicense.value
+        defaultDataLicenseTag: dataLicense.value,
+        authors: Array.from(authors.value.values())
       }).then(project => {
         console.log(project)
         createdResource.value = project
