@@ -47,36 +47,48 @@ const customVariant = ref('')
 const customVariantErr: Ref<string | undefined> = ref(undefined)
 const relationDirection = ref(RelationDirection.Inbound)
 
-const validationState = ref(false)
+const validState = ref(false)
+const validationStates = ref(new Map<string, boolean>())
+validationStates.value.set('resource_id', false)
+validationStates.value.set('custom_variant', true)
+
 
 // Validation
-watch(resourceId, () => validate())
-watch(resourceVariant, () => validate())
-watch(relationVariant, () => validate())
-watch(customVariant, () => validate())
-
-function validate() {
-  if (resourceId.value.length <= 0) {
-    validationState.value = false
+watch(resourceId, () => validateResourceId())
+function validateResourceId() {
+  if (resourceId.value.length > 0) {
+    const valid = ULID_REGEX.test(resourceId.value)
+    validationStates.value.set('resource_id', valid)
+    resourceIdErr.value = valid ? undefined : 'Please enter a valid ULID'
+  } else {
+    validationStates.value.set('resource_id', false)
     resourceIdErr.value = 'Please enter a resource id'
-    return
-  } else if (!ULID_REGEX.test(resourceId.value)) {
-    validationState.value = false
-    resourceIdErr.value = 'Please enter a valid ULID'
-    return
-  } else {
-    resourceIdErr.value = undefined
   }
+  validate()
+}
 
+watch(resourceVariant, () => validate())
+watch(relationVariant, () => validateCustomVariant())
+watch(customVariant, () => validateCustomVariant())
+function validateCustomVariant() {
   if (relationVariant.value === InternalRelationVariant.Custom && customVariant.value.length <= 0) {
-    validationState.value = false
+    validationStates.value.set('custom_variant', false)
     customVariantErr.value = 'Please enter a custom relation name'
-    return
   } else {
+    validationStates.value.set('custom_variant', true)
     customVariantErr.value = undefined
   }
+  validate()
+}
 
-  validationState.value = true
+function validate() {
+  for (const state of validationStates.value.values()) {
+    if (!state) {
+      validState.value = false
+      return
+    }
+  }
+  validState.value = true
 }
 
 function convertResourceVariant(variant: ResourceVariant): v2ResourceVariant {
@@ -306,7 +318,7 @@ function submit() {
                   :data-hs-overlay="`#${props.modalId}`">
             Close
           </button>
-          <button type="button" :disabled="!validationState"
+          <button type="button" :disabled="!validState"
                   @click="submit"
                   class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-aruna-800 text-white hover:bg-aruna-700 disabled:opacity-50 disabled:pointer-events-none"
                   :data-hs-overlay="`#${props.modalId}`">
