@@ -1,15 +1,18 @@
 import {
+    type apistorageservicesv2DeleteObjectResponse,
     type modelsv2License,
-    type v2Author,
     type v2Collection,
     type v2CreateAPITokenRequest,
     type v2CreateAPITokenResponse,
     type v2CreateCollectionRequest,
+    type v2CreateCollectionResponse,
     type v2CreateDatasetRequest,
+    type v2CreateDatasetResponse,
     type v2CreateObjectRequest,
+    type v2CreateObjectResponse,
     type v2CreateProjectRequest,
+    type v2CreateProjectResponse,
     type v2CreateS3CredentialsUserTokenResponse,
-    v2DataClass,
     type v2Dataset,
     type v2Endpoint,
     type v2GetDownloadURLResponse,
@@ -18,11 +21,9 @@ import {
     type v2GetS3CredentialsUserTokenResponse,
     type v2GetUploadURLResponse,
     v2InternalRelationVariant,
-    type v2KeyValue,
     type v2Object,
     type v2Permission,
     type v2Project,
-    type v2Relation,
     v2RelationDirection,
     v2ResourceVariant,
     type v2ResourceWithPermission,
@@ -30,7 +31,7 @@ import {
     type v2User
 } from "./aruna_api_json"
 import {type ObjectInfo, toObjectInfo} from "~/composables/proto_conversions";
-import obj from "svgo/lib/svgo/css-select-adapter";
+import type {ArunaError} from "~/composables/ArunaError";
 
 export async function searchResources(query: string): Promise<v2SearchResourcesResponse> {
     return await $fetch<v2SearchResourcesResponse>('api/search', {
@@ -170,9 +171,11 @@ export async function fetchUserResources(user: v2User | undefined): Promise<v2Re
 }
 
 export async function createProject(request: v2CreateProjectRequest): Promise<v2Project | undefined> {
-    return $fetch<v2Project>('/api/project', {
+    return $fetch<v2CreateProjectResponse>('/api/project', {
         method: 'POST',
         body: request
+    }).then(response => {
+        return response.project
     }).catch(error => {
         console.error(error)
         throw new Error("Project creation failed.")
@@ -180,9 +183,11 @@ export async function createProject(request: v2CreateProjectRequest): Promise<v2
 }
 
 export async function createCollection(request: v2CreateCollectionRequest): Promise<v2Collection | undefined> {
-    return $fetch<v2Project>('/api/collection', {
+    return $fetch<v2CreateCollectionResponse>('/api/collection', {
         method: 'POST',
         body: request
+    }).then(response => {
+        return response.collection
     }).catch(error => {
         console.error(error)
         throw new Error("Collection creation failed.")
@@ -190,59 +195,51 @@ export async function createCollection(request: v2CreateCollectionRequest): Prom
 }
 
 export async function createDataset(request: v2CreateDatasetRequest): Promise<v2Dataset | undefined> {
-    return $fetch<v2Project>('/api/dataset', {
+    return $fetch<v2CreateDatasetResponse>('/api/dataset', {
         method: 'POST',
         body: request
+    }).then(response => {
+        return response.dataset
     }).catch(error => {
         console.error(error)
         throw new Error("Dataset creation failed.")
     })
 }
 
-export async function createObject(
-    name: string,
-    title: string,
-    authors: v2Author[],
-    description: string,
-    keyValues: v2KeyValue[],
-    relations: v2Relation[],
-    dataClass: v2DataClass,
-    parentType: v2ResourceVariant,
-    parentId: string,
-    metaLicense: string,
-    dataLicense: string): Promise<v2Object | undefined> {
-    // Create request and send
-    const request = {
-        name: name,
-        title: title,
-        description: description,
-        keyValues: keyValues,
-        relations: relations,
-        dataClass: dataClass,
-        projectId: parentType === v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? parentId : undefined,
-        collectionId: parentType === v2ResourceVariant.RESOURCE_VARIANT_COLLECTION ? parentId : undefined,
-        datasetId: parentType === v2ResourceVariant.RESOURCE_VARIANT_DATASET ? parentId : undefined,
-        hashes: [],
-        metadataLicenseTag: metaLicense,
-        dataLicenseTag: dataLicense,
-        authors: authors
-    } as v2CreateObjectRequest
-
-    return $fetch<v2Object>('/api/object', {
+export async function createObject(request: v2CreateObjectRequest): Promise<v2Object | undefined> {
+    return $fetch<v2CreateObjectResponse>('/api/object', {
         method: 'POST',
         body: request
+    }).then(response => {
+        return response.object
     }).catch(error => {
         console.error(error)
         throw new Error("Object creation failed.")
     })
 }
 
-export async function getUploadUrl(resourceId: string) {
-    return $fetch<v2GetUploadURLResponse>(`/api/object/${resourceId}/upload`, {
-        method: 'GET'
+export async function deleteObject(objectId: string, withRevisions: boolean): Promise<boolean> {
+    return $fetch<apistorageservicesv2DeleteObjectResponse>('/api/object', {
+        method: 'DELETE',
+        query: {
+            objectId: objectId
+        },
+        body: {
+            withRevisions: withRevisions
+        }
+    }).then(response => {
+        return typeof response !== 'undefined'
     }).catch(error => {
         console.error(error)
-        throw Error("Failed to fetch resource upload url. Please try again later.")
+        throw new Error("Object deletion failed.")
+    })
+}
+
+export async function getUploadUrl(resourceId: string) {
+    return $fetch<v2GetUploadURLResponse | ArunaError>(`/api/object/${resourceId}/upload`, {
+        method: 'GET'
+    }).catch(error => {
+        throw Error('Failed to fetch resource upload url. Please try again later')
     })
 }
 

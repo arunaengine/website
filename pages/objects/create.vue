@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {IconSquareRoundedPlus, IconExclamationCircle, IconTrash, IconArrowLeft} from '@tabler/icons-vue';
+import {IconSquareRoundedPlus, IconExclamationCircle, IconTrash, IconArrowLeft} from '@tabler/icons-vue'
 import {
   v2DataClass,
   v2KeyValueVariant,
@@ -7,10 +7,13 @@ import {
   type v2KeyValue,
   type v2Relation,
   type v2Author,
-  type v2Project
-} from '~/composables/aruna_api_json';
-import {toRelationDirectionStr, toRelationVariantStr} from "~/composables/enum_conversions";
-import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants";
+  type v2Project, type v2GetUploadURLResponse
+} from '~/composables/aruna_api_json'
+import {toRelationDirectionStr, toRelationVariantStr, toResourceTypeStr} from "~/composables/enum_conversions"
+import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants"
+import type {ObjectInfo} from "~/composables/proto_conversions"
+import {deleteObject} from "~/composables/api_wrapper"
+import type {ArunaError} from "~/composables/ArunaError";
 
 // Router to navigate back
 const router = useRouter()
@@ -33,9 +36,9 @@ function validate() {
 }
 
 function checkInputValidationStates(): boolean {
-  let vals = validationStates.value.values()
+  let states = validationStates.value.values()
   while (true) {
-    let result = vals.next();
+    let result = states.next();
     if (result.done) break;
     if (!result.value) {
       return false
@@ -124,15 +127,37 @@ watch(resourceType, () => {
 
 /* Resource parent ID */
 const resourceParentId = ref('')
+const resourceParent: Ref<ObjectInfo | undefined> = ref(undefined)
 const resourceParentIdError: Ref<string | undefined> = ref('Please enter a valid parent id')
 
-watch(resourceParentId, () => validateParentId())
+watch(resourceParentId, async () => await validateParentId())
 
-function validateParentId() {
+async function validateParentId() {
+  // Check if input field is empty
   if (resourceParentId.value.length > 0) {
+    // Check if input is a valid ULID
     const valid = ULID_REGEX.test(resourceParentId.value)
     validationStates.value.set('resourceParentId', valid)
     resourceParentIdError.value = valid ? undefined : 'Parent id is not a valid ULID'
+
+    if (valid) {
+      // Check if resource exists
+      await fetchResource(resourceParentId.value)
+          .then(response => {
+            if (response?.resource && response?.permission) {
+              resourceParent.value = toObjectInfo(response.resource, response.permission)
+            } else {
+              resourceParent.value = undefined
+              validationStates.value.set('resourceParentId', false)
+              resourceParentIdError.value = 'Resource with this id does not exist'
+            }
+          })
+          .catch(() => {
+            resourceParent.value = undefined
+            validationStates.value.set('resourceParentId', false)
+            resourceParentIdError.value = 'Parent fetch failed with error'
+          })
+    }
   } else {
     validationStates.value.set('resourceParentId', false)
     resourceParentIdError.value = 'Please enter a valid parent id'
@@ -285,13 +310,6 @@ async function submit() {
       break
     }
     case v2ResourceVariant.RESOURCE_VARIANT_DATASET: {
-      // Fetch parent resource
-      const parent = await fetchResource(resourceParentId.value)
-      if (parent.resource?.dataset || parent.resource?.object) {
-        //TODO: Implement error handling -> Display error message
-        throw Error("Parent is not a Collection or Project")
-      }
-
       await createDataset({
         name: resourceName.value,
         title: resourceTitle.value,
@@ -299,8 +317,8 @@ async function submit() {
         keyValues: Array.from(keyValues.value.values()),
         relations: Array.from(relations.value.values()),
         dataClass: resourceDataclass.value,
-        projectId: parent.resource?.project ? resourceParentId.value : undefined,
-        collectionId: parent.resource?.collection ? resourceParentId.value : undefined,
+        projectId: resourceParent.value?.variant === v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? resourceParentId.value : undefined,
+        collectionId: resourceParent.value?.variant === v2ResourceVariant.RESOURCE_VARIANT_COLLECTION ? resourceParentId.value : undefined,
         metadataLicenseTag: metaLicense.value,
         defaultDataLicenseTag: dataLicense.value,
         authors: Array.from(authors.value.values())
@@ -319,80 +337,80 @@ async function submit() {
     }
     case v2ResourceVariant.RESOURCE_VARIANT_OBJECT: {
       if (dataUpload.value) {
-        // Fetch parent resource
-        const parent = await fetchResource(resourceParentId.value)
-        if (parent.resource?.object) {
-          //TODO: Implement error handling -> Display error message
-          throw Error("Parent is not a Collection, Dataset or Project")
-        }
-        const parentInfo = toObjectInfo(parent.resource, parent.permission)
-
         // Create staging Object
-        const stagingObject = await createObject(
-            dataUpload.value.name,
-            resourceTitle.value,
-            Array.from(authors.value.values()),
-            resourceDescription.value,
-            Array.from(keyValues.value.values()),
-            Array.from(relations.value.values()),
-            resourceDataclass.value,
-            parentInfo ? parentInfo.variant : v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED,
-            resourceParentId.value,
-            metaLicense.value,
-            dataLicense.value
-        ).catch(error => {
-          console.error(error)
-          //TODO: Error handling
-          //TODO: Display error message
+        await createObject({
+          name: resourceName.value,
+          title: resourceTitle.value,
+          description: resourceDescription.value,
+          keyValues: Array.from(keyValues.value.values()),
+          relations: Array.from(relations.value.values()),
+          dataClass: resourceDataclass.value,
+          projectId: resourceParent.value?.variant === v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? resourceParentId.value : undefined,
+          collectionId: resourceParent.value?.variant === v2ResourceVariant.RESOURCE_VARIANT_COLLECTION ? resourceParentId.value : undefined,
+          datasetId: resourceParent.value?.variant === v2ResourceVariant.RESOURCE_VARIANT_DATASET ? resourceParentId.value : undefined,
+          metadataLicenseTag: metaLicense.value,
+          dataLicenseTag: dataLicense.value,
+          authors: Array.from(authors.value.values())
+        }).then(async stagingObject => {
+          if (stagingObject?.id) {
+            createdResource.value = stagingObject
+
+            await sleep(1000) // Replace with waiting for dataproxy sync
+
+            const url = await getUploadUrl(stagingObject.id)
+                .then(response => {
+                  if (response.type === 'ArunaError') {
+                    createdResource.value = undefined
+                    creationError.value = 'Could not authenticate user for upload.<br/>Please register at DataProxy first in your account.'
+                    return undefined
+                  }
+                  return response.url
+                }).catch(async error => {
+                  await deleteObject(stagingObject.id, false)
+                  createdResource.value = undefined
+                  creationError.value = error.message
+                  return undefined
+                })
+
+            if (url && dataUpload.value) {
+              const data = new Uint8Array(await dataUpload.value.arrayBuffer());
+              const xhr = new XMLHttpRequest()
+              xhr.open('PUT', url, true)
+              xhr.onload = async function () {
+                if (xhr.status != 200) { // analyze HTTP status of the response
+                  await deleteObject(stagingObject.id, false)
+                  createdResource.value = undefined
+                  creationError.value = `Upload Error ${xhr.status}: ${xhr.statusText}`
+                }
+              }
+              xhr.upload.onprogress = function (event) {
+                // Upload progress here
+                updateProgress(event.loaded, event.total)
+              }
+              xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                  // Upload finished successful
+                  console.log('Upload finished')
+                  creationError.value = undefined
+                }
+              }
+              /*
+              xhr.onerror = async function (event) {
+                console.error(event)
+                await deleteObject(stagingObject.id, false)
+                createdResource.value = undefined
+                creationError.value = 'Data upload failed'
+              }
+              */
+              xhr.send(data)
+            }
+          }
+        }).catch(error => {
+          console.log(error)
+          creationError.value = error.toString()
+          createdResource.value = undefined
         })
 
-        if (stagingObject?.id) {
-          createdResource.value = stagingObject
-          const url = await getUploadUrl(stagingObject.id)
-
-          if (url.url) {
-            const data = new Uint8Array(await dataUpload.value.arrayBuffer());
-
-            const xhr = new XMLHttpRequest()
-            xhr.open('put', url.url, true)
-            xhr.upload.onprogress = function (event) {
-              // Upload progress here
-              updateProgress(event.loaded, event.total)
-            }
-            xhr.onreadystatechange = function () {
-              if (xhr.readyState === 4) {
-                // Upload finished successful
-                console.log('Uploaded')
-                creationError.value = undefined
-              }
-            }
-            xhr.send(data)
-
-            /*
-            //TODO: Implement progress bar
-            const blob = new Blob([data])
-            const progressUpdateStream = new TransformStream({
-              transform(chunk, controller) {
-                //TODO: Implement progress bar update
-              }
-            })
-
-            await $fetch(url.url, {
-              method: "PUT",
-              body: data
-            }).then(object => {
-              creationError.value = undefined
-              //TODO: Display success message
-            }).catch(error => {
-              console.error()
-              //TODO: Error progress bar
-              //TODO: Delete staging object?
-            })
-            */
-          } else {
-            console.error("Response does not contain upload url")
-          }
-        }
         // Display created resource or error
         openModal('object-display')
 
@@ -433,6 +451,8 @@ async function submit() {
     }
   }
 }
+
+const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, delay))
 </script>
 
 <template>
@@ -525,24 +545,33 @@ async function submit() {
           </li>
         </ul>
 
-        <!-- Resource parent ID input -->
+        <!-- Resource Parent -->
         <div v-if="resourceType !== v2ResourceVariant.RESOURCE_VARIANT_PROJECT">
-          <label for="hs-validation-name-error"
+          <label for="parent-id-input"
                  class="block mt-6 text-lg font-medium mb-2 text-gray-700 dark:text-white">Parent ID</label>
-          <div class="relative">
-            <input type="text" v-model="resourceParentId" id="hs-validation-name-error" name="hs-validation-name-error"
-                   :class="[{ 'border-red-500': !validationStates.get('resourceParentId') }, { 'focus:border-red-500': !validationStates.get('resourceParentId') }, { 'focus:ring-red-500': !validationStates.get('resourceParentId') },]"
-                   class="py-3 px-4 block w-full rounded-lg text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400"
-                   required aria-describedby="hs-validation-name-error-helper">
-            <div :class="{ 'hidden': validationStates.get('resourceParentId') }"
-                 class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
-              <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+          <div class="flex rounded-lg">
+            <span
+                class="px-4 inline-flex items-center min-w-fit rounded-s-md border border-e-0 border-gray-200 bg-gray-50 text-sm text-gray-500 dark:bg-neutral-700 dark:border-neutral-700 dark:text-neutral-400">
+              {{ resourceParent ? toResourceTypeStr(resourceParent.variant) : 'Unspecified' }}
+            </span>
+            <div class="flex grow relative">
+              <input type="text"
+                     v-model="resourceParentId"
+                     id="parent-id-input"
+                     name="parent-id-input"
+                     :class="[{ 'border-red-500': !validationStates.get('resourceParentId') }, { 'focus:border-red-500': !validationStates.get('resourceParentId') }, { 'focus:ring-red-500': !validationStates.get('resourceParentId') },]"
+                     class="py-3 px-4 pe-11 block w-full border-gray-200 shadow-sm rounded-e-lg text-sm focus:z-10 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-400 dark:placeholder-neutral-500 dark:focus:ring-neutral-600"
+                     aria-describedby="hs-validation-name-error-helper">
+              <div :class="{ 'hidden': validationStates.get('resourceParentId') }"
+                   class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
+                <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
+              </div>
             </div>
           </div>
           <p :class="{ 'hidden': validationStates.get('resourceParentId') }" class="text-sm text-red-600 mt-2"
              id="hs-validation-name-error-helper">{{ resourceParentIdError }}</p>
         </div>
-        <!-- End Resource parent ID input -->
+        <!-- End Resource Parent -->
 
         <label for="name-input-label" class="block mt-6 text-lg font-medium mb-2 text-gray-700 dark:text-white">Data
           Class</label>
