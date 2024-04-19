@@ -41,12 +41,13 @@ const objectInfo = await fetchResource(resourceId)
 
 function isDownloadable(): boolean {
   if (objectInfo) {
-    return (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
-        objectInfo.data_class === v2DataClass.DATA_CLASS_PUBLIC) ||
+    return (objectInfo.data_class === v2DataClass.DATA_CLASS_PUBLIC &&
+            objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
+            objectInfo.object_status === modelsv2Status.STATUS_AVAILABLE) ||
         (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
-        objectInfo.object_status === modelsv2Status.STATUS_AVAILABLE &&
-        objectInfo.permission !== v2PermissionLevel.PERMISSION_LEVEL_UNSPECIFIED &&
-        objectInfo.permission !== v2PermissionLevel.PERMISSION_LEVEL_NONE)
+            objectInfo.object_status === modelsv2Status.STATUS_AVAILABLE &&
+            objectInfo.permission !== v2PermissionLevel.PERMISSION_LEVEL_UNSPECIFIED &&
+            objectInfo.permission !== v2PermissionLevel.PERMISSION_LEVEL_NONE)
   }
   return false
 }
@@ -192,11 +193,13 @@ const router = useRouter()
           <IconFileInfo class="flex-shrink-0 size-6 me-4"/>
           <span class="">Description</span>
         </div>
-        <div class="flex grow p-4 text-gray-700 text-xl border-t border-gray-300 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        <div
+            class="flex grow p-4 text-gray-700 text-xl border-t border-gray-300 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
           {{ objectInfo?.description }}
         </div>
       </div>
-      <div v-if="objectInfo.authors" class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+      <div v-if="objectInfo.authors"
+           class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
           <IconUsers class="flex-shrink-0 size-6 me-4"/>
           <span class="">Authors</span>

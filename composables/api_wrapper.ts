@@ -313,7 +313,8 @@ export async function getPublicResourceUrl(endpointHost: string, resource: Objec
     }
 
     // Build url from its parts
-    let url = `https://${project}.${endpointHost}`
+    const schema = ssl ? 'https' : 'http'
+    let url = `${schema}://${project}.${endpointHost}`
     url += collection ? `/${collection}` : ''
     url += dataset ? `/${dataset}` : ''
     url += `/${object}`
