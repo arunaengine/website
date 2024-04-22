@@ -99,18 +99,19 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
           </tr>
           </tbody>
           <tbody v-else class="divide-y divide-gray-200 dark:divide-gray-700">
-            <tr v-for="relation in inc_int_rel">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
-                <NuxtLink :to="`/objects/${relation.resourceId}`" exact=true class="">
-                  <div>
-                    <IconArrowBigLeftLines class="flex-shrink-0 size-6 inline-block" /> {{ relation.resourceId }}
-                  </div>
-                </NuxtLink>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
-                {{ toResourceTypeStr(relation.resourceVariant) }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+          <tr v-for="relation in inc_int_rel">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+              <NuxtLink :to="`/objects/${relation.resourceId}`" exact=true class="text-aruna-800 dark:text-aruna-700">
+                <div>
+                  <IconArrowBigRightLines class="flex-shrink-0 size-6 inline-block"/>
+                  {{ relation.resourceId }}
+                </div>
+              </NuxtLink>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+              {{ toResourceTypeStr(relation.resourceVariant) }}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
                 <span v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
               relation.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND">
                   Parent
