@@ -16,14 +16,19 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
   let inc_out: v2InternalRelation[] = []
   let ext: v2ExternalRelation[] = []
 
-  props.relations?.forEach((dingens) => {
-    if (dingens.external) {
-      ext.push(dingens.external)
-    } else if (dingens.internal) {
-      if (dingens.internal.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND) {
-        inc_int.push(dingens.internal)
-      } else if (dingens.internal.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND) {
-        inc_out.push(dingens.internal)
+  props.relations?.forEach((relation) => {
+    if (relation.external) {
+      ext.push(relation.external)
+    } else if (relation.internal) {
+      // Exclude deleted resources from list
+      if (relation.internal.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_DELETED)
+        return
+
+      // Split into incoming and outgoing relations
+      if (relation.internal.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND) {
+        inc_int.push(relation.internal)
+      } else if (relation.internal.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND) {
+        inc_out.push(relation.internal)
       }
     }
   })
