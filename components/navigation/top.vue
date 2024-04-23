@@ -57,12 +57,12 @@ onMounted(() => {
               </a>
               <a class="flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-300 dark:hover:bg-gray-700"
                 target="_blank"
-                href="https://arunastorage.github.io/Documentation/latest/get_started/basic_usage/00_index/">
+                href="https://arunastorage.github.io/documentation/latest/get_started/basic_usage/00_index/">
                 Getting Started
               </a>
               <a class="flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-300 dark:hover:bg-gray-700"
                 target="_blank"
-                href="https://arunastorage.github.io/Documentation/latest/internal_data_structure/internal_data_structure/">
+                href="https://arunastorage.github.io/documentation/latest/internal_data_structure/internal_data_structure/">
                 Data Structure
               </a>
             </div>

@@ -220,7 +220,7 @@ onMounted(async () => await queryResources());
             The currently available parameters to create custom filters can be
             looked up in the
             <NuxtLink class="text-aruna-800 dark:text-aruna-600" rel="noreferrer" target="_blank"
-              to="https://arunastorage.github.io/Documentation/latest/get_started/basic_usage/12_How-To-Search/">
+              to="https://arunastorage.github.io/documentation/latest/get_started/basic_usage/12_How-To-Search/">
               documentation
             </NuxtLink>
             .
