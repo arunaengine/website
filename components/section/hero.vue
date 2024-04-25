@@ -38,7 +38,7 @@ import {IconChevronRight} from "@tabler/icons-vue";
               Supported by
             </div>
 
-            <div class="mt-4 flex gap-x-8">
+            <div class="mt-4 flex gap-x-8 justify-center items-center">
               <div class="shrink">
                 <img src="assets/imgs/fair-ds-logo.png" class="w-40 object-bottom object-contain h-auto"/>
               </div>

@@ -24,10 +24,6 @@ const errorMsg = toRef(props, 'errorMsg')
         <div class="flex justify-between items-center py-3 px-4 dark:border-gray-700">
           <h3 v-if="object" class="font-bold text-gray-800 dark:text-white">
             Your Created Resource:
-            <!--
-            <span class="font-bold text-aruna-800"> {{ object.id }}</span>
-            <span class="font-bold text-aruna-800"> {{ object.title }}</span>
-            -->
           </h3>
           <button type="button"
                   :data-hs-overlay="`#${props.modalId}`"
@@ -60,6 +56,9 @@ const errorMsg = toRef(props, 'errorMsg')
                 </dd>
               </div>
             </dl>
+            <div v-if="object.dataLicenseTag" class="text-sm text-center font-medium leading-6 text-orange-500">
+              Please wait for your upload to finish before you leave the resource creation form.
+            </div>
           </div>
         </div>
       </div>
