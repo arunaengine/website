@@ -78,10 +78,14 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
           <tbody v-if="props.external" class="divide-y divide-gray-200 dark:divide-gray-700">
           <tr v-for="relation in ext_rel" class="hover:bg-gray-100 dark:hover:bg-gray-700">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
-              <a href="`${relation.external.identifier}`" exact=true class="ms-1">
+              <a v-if="relation.definedVariant == v2ExternalRelationVariant.EXTERNAL_RELATION_VARIANT_URL"
+                 :href="`${relation.identifier}`" target="_blank" class="ms-1">
                 <IconLink class="flex-shrink-0 size-4 inline-block"/>
                 {{ relation.identifier }}
               </a>
+              <span v-else>
+                {{ relation.identifier }}
+              </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
                 <span v-if="relation.definedVariant === v2ExternalRelationVariant.EXTERNAL_RELATION_VARIANT_URL">
