@@ -10,6 +10,8 @@ import {
   IconTrash
 } from '@tabler/icons-vue'
 import type {v2Endpoint, v2Token, v2User} from '~/composables/aruna_api_json'
+import {deleteUserToken} from "~/composables/api_wrapper";
+import EventBus from "~/composables/EventBus";
 
 // Router navigation
 const router = useRouter()
@@ -17,6 +19,12 @@ const router = useRouter()
 // Constants
 const arunaUser: Ref<v2User | undefined> = inject('userRef', ref(undefined))
 const endpoints: v2Endpoint[] | undefined = await fetchEndpoints()
+
+watch(arunaUser, () => {
+  console.log("User got updated")
+  // Refresh lists
+  console.log(arunaUser.value?.attributes?.tokens)
+})
 
 const get_user = () => {
   if (arunaUser.value === undefined || typeof arunaUser.value === "string") {
@@ -43,6 +51,11 @@ function getTokens(): v2Token[] {
     }
   }
   return []
+}
+
+async function deleteToken(tokenId: string) {
+  await deleteUserToken(tokenId)
+  EventBus.emit("updateUser")
 }
 
 function hasEndpoint(endpointId: string | undefined): boolean {
@@ -187,7 +200,8 @@ function hasEndpoint(endpointId: string | undefined): boolean {
 
                     <td class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium">
                       <button type="button"
-                              class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-500 dark:hover:text-gray-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+                              @click="deleteToken(token.id)"
+                              class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border p-1 me-2 border-slate-300 text-gray-700 hover:text-red-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
                         <IconTrash/>
                       </button>
                     </td>

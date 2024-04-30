@@ -114,6 +114,16 @@ export async function createUserToken(
     })
 }
 
+export async function deleteUserToken(token_id: string) {
+    return await $fetch<v2DeleteAPITokenResponse>('/api/user/token', {
+        method: 'DELETE',
+        query: {
+            tokenId: token_id
+        }
+    })
+}
+
+
 export async function createUserS3Credentials(endpointId: string): Promise<v2CreateS3CredentialsUserTokenResponse> {
     return await $fetch<v2CreateS3CredentialsUserTokenResponse>(`/api/user/s3_credentials/${endpointId}`, {
         method: 'PATCH',
