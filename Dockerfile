@@ -1,22 +1,26 @@
-# Dockerfile
-FROM node:current-alpine
+ARG NODE_IMAGE=oven/bun:1-alpine
 
-# create destination directory
-RUN mkdir -p /usr/src/nuxt-app
-WORKDIR /usr/src/nuxt-app
+FROM --platform=linux/amd64 $NODE_IMAGE AS base
+WORKDIR /usr/src/app
+RUN apk --no-cache add openssh g++ make python3 git
 
-# update and install dependency
-RUN apk update && apk upgrade
-RUN apk add git
+FROM base AS install
+RUN mkdir -p /temp
+COPY package.json bun.lockb /temp/
+RUN cd /temp && bun install --frozen-lockfile
 
-# copy the app, note .dockerignore
-COPY . /usr/src/nuxt-app/
-RUN npm install
-RUN npm run build
+FROM install AS prerelease
+COPY --from=install /temp/node_modules node_modules
+COPY . .
 
+ENV NODE_ENV=production
+RUN bun run build
+
+FROM base AS release
+COPY --chown=bun:bun --from=install /temp/node_modules node_modules
+COPY --chown=bun:bun --from=prerelease /usr/src/app/.output .
+
+USER bun
+ENV HOST 0.0.0.0
 EXPOSE 3000
-
-ENV NUXT_HOST=0.0.0.0
-ENV NUXT_PORT=3000
-
-ENTRYPOINT [ "node", ".output/server/index.mjs" ]
+ENTRYPOINT [ "bun", "run", "server/index.mjs" ]
