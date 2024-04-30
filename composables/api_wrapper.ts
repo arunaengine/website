@@ -1,34 +1,35 @@
 import {
-    type apistorageservicesv2DeleteObjectResponse,
-    type modelsv2License,
-    type v2Collection,
-    type v2CreateAPITokenRequest,
-    type v2CreateAPITokenResponse,
-    type v2CreateCollectionRequest,
-    type v2CreateCollectionResponse,
-    type v2CreateDatasetRequest,
-    type v2CreateDatasetResponse,
-    type v2CreateObjectRequest,
-    type v2CreateObjectResponse,
-    type v2CreateProjectRequest,
-    type v2CreateProjectResponse,
-    type v2CreateS3CredentialsUserTokenResponse,
-    type v2Dataset,
-    type v2Endpoint,
-    type v2GetDownloadURLResponse,
-    type v2GetHierarchyResponse,
-    type v2GetResourceResponse,
-    type v2GetS3CredentialsUserTokenResponse,
-    type v2GetUploadURLResponse,
-    v2InternalRelationVariant,
-    type v2Object,
-    type v2Permission,
-    type v2Project,
-    v2RelationDirection,
-    v2ResourceVariant,
-    type v2ResourceWithPermission,
-    type v2SearchResourcesResponse,
-    type v2User
+  type apistorageservicesv2DeleteObjectResponse,
+  type modelsv2License,
+  type v2Collection,
+  type v2CreateAPITokenRequest,
+  type v2CreateAPITokenResponse,
+  type v2CreateCollectionRequest,
+  type v2CreateCollectionResponse,
+  type v2CreateDatasetRequest,
+  type v2CreateDatasetResponse,
+  type v2CreateObjectRequest,
+  type v2CreateObjectResponse,
+  type v2CreateProjectRequest,
+  type v2CreateProjectResponse,
+  type v2CreateS3CredentialsUserTokenResponse,
+  type v2Dataset,
+  type v2DeleteAPITokenResponse,
+  type v2Endpoint,
+  type v2GetDownloadURLResponse,
+  type v2GetHierarchyResponse,
+  type v2GetResourceResponse,
+  type v2GetS3CredentialsUserTokenResponse,
+  type v2GetUploadURLResponse,
+  v2InternalRelationVariant,
+  type v2Object,
+  type v2Permission,
+  type v2Project,
+  v2RelationDirection,
+  v2ResourceVariant,
+  type v2ResourceWithPermission,
+  type v2SearchResourcesResponse,
+  type v2User
 } from "./aruna_api_json"
 import {type ObjectInfo, toObjectInfo} from "~/composables/proto_conversions";
 import type {ArunaError} from "~/composables/ArunaError";
@@ -66,20 +67,20 @@ export async function fetchEndpoint(endpointId: string): Promise<v2Endpoint | un
 
 export async function fetchLicenses(): Promise<modelsv2License[] | undefined> {
     // Fetch licenses
-    const licenses = await $fetch<modelsv2License[]>('/api/licenses')
-    return licenses
+    return await $fetch<modelsv2License[]>('/api/licenses')
 }
 
-export async function fetchUser(id: string | undefined): Promise<v2User | string> {
-    const user = await $fetch(id ? `/api/user?userId=${id}` : '/api/user').catch((e) => {
-        return e.toString()
-    })
-    return user
+export async function fetchUser(userId: string | undefined): Promise<v2User | ArunaError> {
+  return await $fetch<v2User | ArunaError>('/api/user', {
+    method: 'GET',
+    query: userId ? {
+      userId: userId
+    } : {}
+  })
 }
 
 export async function fetchUsers(): Promise<v2User[] | undefined> {
-    const users = await $fetch('/api/users')
-    return users
+    return await $fetch<v2User[] | undefined>('/api/users')
 }
 
 export async function activateUser(userId: string): Promise<boolean> {

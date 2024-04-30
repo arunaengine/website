@@ -59,6 +59,31 @@ function clearError() {
   fetchErrorMsg.value = ''
 }
 
+async function refreshTokens() {
+  const refresh_token = useCookie<string>('refresh_token')
+  const access_token = useCookie<string>('access_token')
+
+  // Check if tokens are set
+  if (refresh_token.value) {
+    const current_timestamp = Math.floor(Date.now() / 1000)
+    const refresh_expiry = parseJwt(refresh_token.value).exp
+    const refresh_expired = refresh_expiry - current_timestamp <= 0
+
+    // Is refresh token expired?
+    if (!refresh_expired) {
+      const access_expiry = access_token.value ? parseJwt(access_token.value).exp : 0
+      const access_expired = access_expiry - current_timestamp <= 60 // Only one minute left or less
+
+      console.log(`${refresh_expiry} - ${access_expiry} - ${current_timestamp} - ${access_expiry - current_timestamp} - ${access_expired}`)
+
+      if (access_expired) {
+        await $fetch('/auth/refresh')
+      }
+    }
+  }
+}
+
+onBeforeMount(() => setInterval(refreshTokens, 30000))
 onMounted(() => updateUser())
 </script>
 

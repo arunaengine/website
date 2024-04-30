@@ -1,7 +1,16 @@
-import type { v2CustomAttribute } from "./aruna_api_json/models/v2CustomAttribute";
-import type { v2Permission } from "./aruna_api_json/models/v2Permission";
-import type { v2Token } from "./aruna_api_json/models/v2Token";
-import type { v2User } from "./aruna_api_json/models/v2User";
+import type {
+    v2CustomAttribute,
+    v2Permission,
+    v2Token,
+    v2User
+} from "~/composables/aruna_api_json"
+
+import { Buffer } from 'node:buffer'
+
+export function parseJwt(token: any) {
+  return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+}
+
 
 /* ---------- USER ---------- */
 export function isUserAdmin(user: v2User | undefined): boolean {

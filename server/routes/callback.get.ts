@@ -1,15 +1,13 @@
-import { withQuery, parsePath } from 'ufo'
-
 export default defineEventHandler(async event => {
   const config = useRuntimeConfig().provider.local;
   const query = getQuery(event)
-  const { code } = query
+  const {code} = query
 
   if (!code) {
     return createError({
-        statusCode: 400,
-        message: 'Missing authorization code',
-      });
+      statusCode: 400,
+      message: 'Missing authorization code',
+    });
   }
 
   const realmURL = `${config.serverUrl}/realms/${config.realm}`
@@ -28,24 +26,25 @@ export default defineEventHandler(async event => {
       code: code as string,
     }).toString(),
   }).catch((error) => {
-    return { error }
+    return {error}
   })
 
-
-  setCookie(event, 'access_token', tokens.access_token, 
-    {
-        httpOnly: true,
+  setCookie(event, 'access_token', tokens.access_token,
+      {
+        httpOnly: false,
         secure: true,
         sameSite: 'none',
         maxAge: tokens.expires_in,
-    }
+      }
   )
-  setCookie(event, 'refresh_token', tokens.refresh_token, {
-        httpOnly: true,
+  setCookie(event, 'refresh_token', tokens.refresh_token,
+      {
+        httpOnly: false,
         secure: true,
         sameSite: 'none',
         maxAge: tokens.refresh_expires_in,
-    })
+      }
+  )
 
   return sendRedirect(event, "/")
 })

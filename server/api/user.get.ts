@@ -1,24 +1,18 @@
-
-import { v2GetUserResponse } from '~/composables/aruna_api_json'
+import {v2GetUserResponse} from '~/composables/aruna_api_json'
+import {ArunaError} from "~/composables/ArunaError";
 
 export default defineEventHandler(async event => {
-    const userId = getQuery(event)['userId']
-    const baseUrl = useRuntimeConfig().serverHostUrl
-    const fetchUrl = userId ? `${baseUrl}/v2/user?userId=${userId}` : `${baseUrl}/v2/user`
-    const response = await $fetch<v2GetUserResponse>(fetchUrl, {
-        headers: {
-            'Authorization': `Bearer ${event.context.access_token}`
-        }
-    }).catch((error) => {
-        if (error.data.message === "Not registered") {
-            return "not_registered" as string
-        }
-        return error.data.message as string
-    })
+  const userId = getQuery(event)['userId']
+  const baseUrl = useRuntimeConfig().serverHostUrl
+  const fetchUrl = `${baseUrl}/v2/user`
 
-    if (typeof response === "string") {
-        return response
-    }else{
-        return response.user
+  return await $fetch<v2GetUserResponse>(fetchUrl, {
+    headers: {
+      'Authorization': `Bearer ${event.context.access_token}`
     }
+  }).then(response => {
+    return response.user ? response.user : new ArunaError(15, 'Returned user is undefined')
+  }).catch(error => {
+    return new ArunaError(error.data.code, error.data.message)
+  })
 })

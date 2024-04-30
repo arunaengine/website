@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
         request.toString().includes('api/resource') ||
         (request.toString().includes('api/endpoint') && event.method === 'GET'))
     {
-        return
+        return // Just do nothing
     }
 
     const config = useRuntimeConfig().provider.local;
@@ -26,7 +26,8 @@ export default defineEventHandler(async (event) => {
         if (!access_token) {
             const refresh_token = getCookie(event, 'refresh_token')
             if (!refresh_token) {
-                return sendRedirect(event, '/login')
+                //return sendRedirect(event, '/auth/login')
+              return // Refresh impossible, so just do nothing
             } else {
                 const tokens: any = await $fetch(tokenURL, {
                     method: 'POST',
@@ -48,14 +49,14 @@ export default defineEventHandler(async (event) => {
 
                 setCookie(event, 'access_token', tokens.access_token,
                     {
-                        httpOnly: true,
+                        httpOnly: false,
                         secure: true,
                         sameSite: 'none',
                         maxAge: tokens.expires_in,
                     }
                 )
                 setCookie(event, 'refresh_token', tokens.refresh_token, {
-                    httpOnly: true,
+                    httpOnly: false,
                     secure: true,
                     sameSite: 'none',
                     maxAge: tokens.refresh_expires_in,
