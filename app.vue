@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import type { v2User } from "./composables/aruna_api_json";
+import type {v2User} from "./composables/aruna_api_json";
+import EventBus from "~/composables/EventBus";
+import type {ArunaError} from "~/composables/ArunaError";
+import {parseJwt} from "~/composables/utils";
 
 useHead({
   title: "Aruna | The data orchestration engine",
@@ -7,51 +10,73 @@ useHead({
     {
       name: "description",
       content:
-        "Aruna is a modern data orchestration engine that enables users to connect disparate data sources, transform and enrich data, and build data pipelines in a distributed multi-cloud.",
+          "Aruna is a modern data orchestration engine that enables users to connect disparate data sources, transform and enrich data, and build data pipelines in a distributed multi-cloud.",
     },
   ],
 });
 
-const user: v2User | string = await fetchUser(undefined);
-let userObject: v2User | undefined = undefined;
-
 // Provide user object globally read-only
-const userRef: Ref<v2User | undefined> = ref(undefined)
-provide('userRef', readonly(userRef))
+const fetchErrorMsg: Ref<string> = ref(''); // Can be displayed for the user
+const notRegistered = ref(false)
+const user: Ref<v2User | undefined> = ref(undefined)
+provide('userRef', readonly(user))
 
-const fetchError = ref(false);
-const fetchErrorMsg = ref(""); // Can be displayed for the user
+// Try to fetch user
+async function updateUser() {
+  await $fetch<v2User | ArunaError>('/api/user')
+      .then(response => {
+        if (typeof response === 'undefined') {
+          user.value = undefined
+          fetchErrorMsg.value = 'Response is undefined. Should not be possible :/'
 
-let isNotRegistered = false;
-if (typeof user === "string") {
-  userRef.value = undefined
-  if (user === "not_registered") {
-    console.log("User not registered")
-    isNotRegistered = true
-  }
-} else if (user.displayName === undefined) {
-  console.log("Should not exist anymore. What is going on?")
-} else {
-  userRef.value = user
-  userObject = user
+        } else if (response.type === 'ArunaError') {
+          user.value = undefined
+          //fetchErrorMsg.value = `${(response as ArunaError).code} - ${(response as ArunaError).message}`
+
+          if ((response as ArunaError).message === 'Not registered') {
+            notRegistered.value = true
+          } else if ((response as ArunaError).code === 14) {
+            fetchErrorMsg.value = 'Aruna server is currently unavailable.'
+          }
+        } else {
+          user.value = response as v2User
+          fetchErrorMsg.value = ''
+        }
+      })
+      .catch(error => {
+        user.value = undefined
+        fetchErrorMsg.value = error.message
+      })
 }
 
-const is_registered = useState("register", () => isNotRegistered)
-const user_state = useState("user", () => userObject)
+// Re-fetch user on demand
+EventBus.on('updateUser', () => {
+  console.log("Received user refresh event")
+  updateUser()
+})
+
+function clearError() {
+  fetchErrorMsg.value = ''
+}
+
+onMounted(() => updateUser())
 </script>
 
 <template>
   <!-- Header + Navigation -->
   <!-- Main body -->
   <div
-    class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent"
+      class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent"
   >
-    <ClientOnly fallback-tag="span" fallback="">
-      <ModalRegister v-if="isNotRegistered" />
-    </ClientOnly>
     <!-- Body -->
-    <NuxtLoadingIndicator />
-    <NuxtPage />
+    <NuxtLoadingIndicator/>
+    <NuxtPage/>
   </div>
-  <NavigationSidebar />
+  <NavigationSidebar/>
+
+  <ModalRegister v-if="notRegistered"/>
+
+  <!-- Toast -->
+  <ToastError @clearError="clearError" modalId="app-error-toast" :errorMsg="fetchErrorMsg"/>
+  <!-- End Toast -->
 </template>

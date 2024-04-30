@@ -3,8 +3,7 @@ import { IconBrandGithub, IconMenu2, IconMoon, IconSun, IconChevronDown, } from 
 import type { v2User } from "~/composables/aruna_api_json/models/v2User"
 
 // Fetch user from global state
-const user_state: globalThis.Ref<v2User | undefined> = useState("user")
-const isLoggedIn = computed(() => user_state.value !== undefined)
+const user_state: Ref<v2User | undefined> = inject('userRef', ref(undefined))
 const forceRefresh = ref(0)
 
 /* Dark mode toggle */
@@ -26,8 +25,8 @@ onMounted(() => {
       aria-label="Global">
       <div class="flex">
         <NuxtLink class="sm:order-2 font-semibold dark:text-white" href="/">
-          <img src="assets/imgs/aruna_light.png" class="dark:hidden w-24 h-auto align-middle" />
-          <img src="assets/imgs/aruna_dark.png" class="hidden dark:inline w-24 h-auto align-middle" />
+          <img alt="Aruna logo for light mode" src="assets/imgs/aruna_light.png" class="dark:hidden w-24 h-auto align-middle" />
+          <img alt="Aruna logo for dark mode" src="assets/imgs/aruna_dark.png" class="hidden dark:inline w-24 h-auto align-middle" />
         </NuxtLink>
       </div>
 
@@ -90,7 +89,7 @@ onMounted(() => {
 
         <button type="button"
           :key="forceRefresh"
-          :class="{'hidden' : !isLoggedIn}"
+          :class="{'hidden' : !user_state}"
           class="py-1 px-2 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 shadow-sm disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-white dark:hover:bg-gray-800 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
           data-hs-overlay="#docs-sidebar" aria-controls="docs-sidebar" aria-label="Toggle navigation">
           <span class="sr-only">Toggle Navigation</span>
@@ -100,7 +99,7 @@ onMounted(() => {
         </button>
         <button
           :key="forceRefresh"
-          :class="{'hidden' : isLoggedIn}"
+          :class="{'hidden' : user_state}"
           class="flex items-center gap-x-2 font-medium text-gray-600 sm:my-6 md:my-0 p-2 dark:text-gray-300">
           <a href="/auth/login">Login</a>
         </button>

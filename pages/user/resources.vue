@@ -6,8 +6,7 @@ import type { v2User } from "~/composables/aruna_api_json/models/v2User";
 // Check refresh and access before navigation
 
 //TODO: GetUserResources
-const user_state: globalThis.Ref<v2User | undefined> = useState("user")
-const isLoggedIn = computed(() => user_state.value !== undefined)
+const user_state: Ref<v2User | undefined> = inject('userRef', ref(undefined))
 const resources = await fetchUserResources(user_state.value)
 
 // Used for back link to last page in navigation history

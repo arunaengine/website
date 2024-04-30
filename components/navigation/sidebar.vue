@@ -7,7 +7,7 @@ import type { v2User } from '~/composables/aruna_api_json/models/v2User';
 
 const colorMode = useColorMode()
 
-const userState: globalThis.Ref<v2User | undefined> = useState("user")
+const userState: Ref<v2User | undefined> = inject('userRef', ref(undefined))
 const isLoggedIn = computed(() => userState.value !== undefined)
 </script>
 
