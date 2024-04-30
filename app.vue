@@ -74,8 +74,6 @@ async function refreshTokens() {
       const access_expiry = access_token.value ? parseJwt(access_token.value).exp : 0
       const access_expired = access_expiry - current_timestamp <= 60 // Only one minute left or less
 
-      console.log(`${refresh_expiry} - ${access_expiry} - ${current_timestamp} - ${access_expiry - current_timestamp} - ${access_expired}`)
-
       if (access_expired) {
         await $fetch('/auth/refresh')
       }

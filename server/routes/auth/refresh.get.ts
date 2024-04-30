@@ -16,8 +16,6 @@ export default defineEventHandler(async (event) => {
         const current_timestamp = Math.floor(Date.now() / 1000)
         const access_expired = access_expiry - current_timestamp <= 60 // Only one minute left or less
 
-        console.log(`${refresh_expiry} - ${access_expiry} - ${current_timestamp} - ${access_expiry - current_timestamp} - ${access_expired}`)
-
         if (refresh_expiry > current_timestamp && access_expired) {
             const tokens: any = await $fetch(tokenURL, {
                 method: 'POST',
