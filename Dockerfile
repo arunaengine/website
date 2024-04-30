@@ -6,8 +6,8 @@ RUN apk --no-cache add openssh g++ make python3 git
 
 FROM base AS install
 RUN mkdir -p /temp
-COPY package.json bun.lockb /temp/
-RUN cd /temp && bun install --frozen-lockfile
+COPY package.json /temp/
+RUN cd /temp && bun i
 
 FROM install AS prerelease
 COPY --from=install /temp/node_modules node_modules
