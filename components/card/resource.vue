@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import {
-  type v2GenericResource,
-} from '~/composables/aruna_api_json';
+import {modelsv2Status, type v2GenericResource,} from '~/composables/aruna_api_json';
 
 const props = defineProps<{
   resource: v2GenericResource
@@ -18,7 +16,8 @@ function displayDescription(description: string): string {
 
 <template>
   <div v-if="entry"
-    class="flex flex-auto my-3 p-4 gap-x-4 bg-white border border-l-4 border-l-aruna-700 shadow-sm rounded-xl dark:bg-slate-900 dark:border-gray-700 dark:border-t-blue-500 dark:shadow-slate-700/[.7]">
+    class="flex flex-auto my-3 p-4 gap-x-4 bg-white border border-l-4 border-l-aruna-700 shadow-sm rounded-xl dark:bg-slate-900 dark:border-gray-700 dark:border-t-blue-500 dark:shadow-slate-700/[.7]"
+    :class="{'border-l-red-500': entry.object_status === modelsv2Status.STATUS_DELETED}">
     <div class="flex flex-col basis-1/3 gap-y-3 border-e-gray-600">
       <!-- Start Name and ID display with links -->
       <NuxtLink :to="`/objects/${entry.id}`" class="text-aruna-800 font-bold">

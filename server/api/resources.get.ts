@@ -8,7 +8,7 @@ export default defineEventHandler(async event => {
 
     if (typeof resourceIds === 'string') {
         fetchUrl.searchParams.append('resourceIds', resourceIds)
-    } else {
+    } else if (Array.isArray(resourceIds)) {
         resourceIds.forEach(element => {
             fetchUrl.searchParams.append('resourceIds', element)
         });

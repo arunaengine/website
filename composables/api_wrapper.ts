@@ -165,17 +165,19 @@ export async function fetchUserResources(user: v2User | undefined): Promise<v2Re
 
     // Filter projects from user permissions
     const projectPermissions = user.attributes?.personalPermissions?.filter((perm) => perm.projectId)
+    let projectIds: string[] = [];
     // Fetch resources
     if (projectPermissions && projectPermissions.length > 0) {
-        let fetchUrl = '/api/resources?'
+        let fetchUrl = '/api/resources'
         projectPermissions.forEach((perm, idx, arr) => {
-            if (perm.projectId) {
-                fetchUrl += arr.length - 1 === idx ? `resourceIds=${perm.projectId}` : `resourceIds=${perm.projectId}&`
-            }
+            if (perm.projectId) projectIds.push(perm.projectId)
         })
 
-        const resources = await $fetch<v2ResourceWithPermission[]>(fetchUrl)
-        return resources
+      return await $fetch<v2ResourceWithPermission[]>(fetchUrl, {
+        query: {
+          resourceIds: projectIds
+        }
+      })
     }
 
     return []
