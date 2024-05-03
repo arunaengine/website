@@ -9,11 +9,14 @@ import {
   type v2Author,
   type v2Project, type v2GetUploadURLResponse
 } from '~/composables/aruna_api_json'
+
 import {toRelationDirectionStr, toRelationVariantStr, toResourceTypeStr} from "~/composables/enum_conversions"
 import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants"
 import type {ObjectInfo} from "~/composables/proto_conversions"
 import {deleteObject} from "~/composables/api_wrapper"
+import EventBus from "~/composables/EventBus";
 import type {ArunaError} from "~/composables/ArunaError";
+
 
 // Router to navigate back
 const router = useRouter()
@@ -177,9 +180,9 @@ const dataUpload: Ref<File | null> = ref(null)
 const metaUpload: Ref<File | null> = ref(null)
 
 const uploadProgress = ref(0)
-
 function updateProgress(current: number, total: number) {
-  uploadProgress.value = Math.trunc(current / total * 100)
+  const floatProgress = current / total * 100
+  uploadProgress.value = +floatProgress.toFixed(2)
 }
 
 watch(dataUpload, (value) => {
@@ -355,16 +358,19 @@ async function submit() {
           if (stagingObject?.id) {
             createdResource.value = stagingObject
 
+            // Display created resource or error
+            openModal('object-display')
+
             await sleep(1000) // Replace with waiting for dataproxy sync
 
             const url = await getUploadUrl(stagingObject.id)
                 .then(response => {
-                  if (response.type === 'ArunaError') {
+                  if ((response as ArunaError).type === 'ArunaError') {
                     createdResource.value = undefined
                     creationError.value = 'Could not authenticate user for upload.<br/>Please register at DataProxy first in your account.'
                     return undefined
                   }
-                  return response.url
+                  return (response as v2GetUploadURLResponse).url
                 }).catch(async error => {
                   await deleteObject(stagingObject.id, false)
                   createdResource.value = undefined
@@ -394,7 +400,7 @@ async function submit() {
                   creationError.value = undefined
                 }
               }
-              /*
+              /* Always fails as the DataProxy does not return CORS header with PUT request ...
               xhr.onerror = async function (event) {
                 console.error(event)
                 await deleteObject(stagingObject.id, false)
@@ -410,9 +416,6 @@ async function submit() {
           creationError.value = error.toString()
           createdResource.value = undefined
         })
-
-        // Display created resource or error
-        openModal('object-display')
 
         /*
         //TODO: Choose "nearest" DataProxy
@@ -630,20 +633,6 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
     file:me-4
     file:py-3 file:px-4 file:sm:py-5
     dark:file:bg-gray-700 dark:file:text-gray-400">
-
-          <!-- Progress -->
-          <div class="flex items-center gap-x-3 whitespace-nowrap">
-            <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-gray-700" role="progressbar"
-                 :aria-valuenow="uploadProgress" aria-valuemin="0" aria-valuemax="100">
-              <div
-                  class="flex flex-col justify-center rounded-full overflow-hidden bg-blue-600 text-xs text-white text-center whitespace-nowrap transition duration-500 dark:bg-blue-500"
-                  :style="`width: ${uploadProgress}%`"></div>
-            </div>
-            <div class="w-10 text-end">
-              <span class="text-sm text-gray-800 dark:text-white">{{ uploadProgress }}%</span>
-            </div>
-          </div>
-          <!-- End Progress -->
         </form>
       </div>
 
@@ -827,6 +816,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
   <ModalAuthor modalId="author-add" @add-author="addAuthor"/>
   <ModalKeyValue modalId="key-value-add" @add-key-value="addKeyValue"/>
   <ModalRelation modalId="relation-add" @add-relation="addRelation"/>
-  <ModalObjectDisplay modalId="object-display" :object="createdResource" :errorMsg="creationError"/>
+  <ModalObjectDisplay modalId="object-display" :object="createdResource" :progress="uploadProgress" :errorMsg="creationError"/>
+  <ModalProgress modalId="upload-progress" :progress="uploadProgress"/>
   <Footer/>
 </template>

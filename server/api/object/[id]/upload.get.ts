@@ -10,8 +10,6 @@ export default defineEventHandler(async event => {
             'Authorization': `Bearer ${event.context.access_token}`
         }
     }).catch(error => {
-        console.log(typeof error.data)
-
         // If unauthenticated propagate error data
         if (error.data.code === 13) {
             console.log('Return ArunaError')
