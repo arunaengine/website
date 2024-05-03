@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { IconCheck } from '@tabler/icons-vue'
-import { IconTags } from '@tabler/icons-vue'
 import { v2KeyValueVariant, type v2KeyValue } from '~/composables/aruna_api_json'
 
 const props = defineProps<{
