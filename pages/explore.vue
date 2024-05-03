@@ -21,15 +21,9 @@ const estimatedTotal = ref(0);
 
 /* Query */
 const query = ref("");
-
-async function updateQuery(event: Event) {
-  if (event.target != null) {
-    query.value = (event.target as HTMLInputElement).value;
-    await queryResources();
-  }
-}
-
-watch(query, async () => await queryResources());
+watch(query, async () => {
+  await queryResources(true)
+});
 
 /* Filter */
 const filter = ref("");
@@ -43,7 +37,8 @@ watch(customFilter, () => {
 
 watch(typeFilter, async () => {
   generateFilter();
-  await queryResources();
+  await queryResources(true);
+  page.value = 1
 });
 
 function generateFilter() {
@@ -79,7 +74,11 @@ function generateFilter() {
 }
 
 /* Update search results list */
-async function queryResources() {
+async function queryResources(pageReset: boolean) {
+  if (pageReset) {
+    page.value = 1
+  }
+
   const offset = (page.value - 1) * limit.value;
   const body = `{"query":"${query.value}", "filter":"${filter.value}", "limit":"${limit.value}", "offset":"${offset}"}`;
 
@@ -99,11 +98,10 @@ async function queryResources() {
 }
 
 const paginationClickHandler = (page: number) => {
-  console.log(page);
-  queryResources()
+  queryResources(false)
 };
 
-onMounted(async () => await queryResources());
+onMounted(async () => await queryResources(true));
 </script>
 
 <template>
@@ -202,7 +200,7 @@ onMounted(async () => await queryResources());
       <p class="mt-6 mb-2 text-sm uppercase text-slate-500 dark:text-white">
         Custom Filter
       </p>
-      <input v-model="customFilter" @keyup.enter="queryResources" type="text"
+      <input v-model="customFilter" @keyup.enter="queryResources(true)" type="text"
         class="py-3 px-4 block w-full border-gray-200 rounded text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
         placeholder="Custom filter" />
 
