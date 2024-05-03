@@ -817,6 +817,5 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
   <ModalKeyValue modalId="key-value-add" @add-key-value="addKeyValue"/>
   <ModalRelation modalId="relation-add" @add-relation="addRelation"/>
   <ModalObjectDisplay modalId="object-display" :object="createdResource" :progress="uploadProgress" :errorMsg="creationError"/>
-  <ModalProgress modalId="upload-progress" :progress="uploadProgress"/>
   <Footer/>
 </template>
