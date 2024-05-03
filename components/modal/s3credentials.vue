@@ -21,23 +21,30 @@ async function createS3Credentials(endpointId: string) {
         accessKeyId.value = response.s3AccessKey ? response.s3AccessKey : ''
         accessSecret.value = response.s3SecretKey ? response.s3SecretKey : ''
         errorMsg.value = undefined
+
+        EventBus.emit('updateUser')
       }).catch(error => {
         errorMsg.value = error.toString()
         reset(false)
       })
 }
 
-async function getS3Credentials(endpointId: string) {
-  await getUserS3Credentials(endpointId)
+async function getS3Credentials(endpointId: string): Promise<boolean> {
+  return await getUserS3Credentials(endpointId)
       .then(response => {
         endpointUlid.value = endpointId
         s3Host.value = response.s3EndpointUrl ? response.s3EndpointUrl : ''
         accessKeyId.value = response.s3AccessKey ? response.s3AccessKey : ''
         accessSecret.value = response.s3SecretKey ? response.s3SecretKey : ''
+        errorMsg.value = undefined
+
+        return true
       })
       .catch(error => {
         console.log(error)
         reset(false)
+
+        return false
       })
 }
 

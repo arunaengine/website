@@ -112,6 +112,9 @@ async function sendRequest() {
           tokenCreationErr.value = undefined
           validationStatus.value = false
           tokenSecret.value = response.tokenSecret
+          EventBus.emit('updateUser')
+        } else {
+          tokenCreationErr.value = 'Token secret in response was empty. Please try again later.'
         }
       }).catch(error => {
         tokenCreationErr.value = 'Token creation failed. Please try again later.'

@@ -450,6 +450,9 @@ async function submit() {
       }
     }
   }
+
+  // Emit user update event
+  EventBus.emit('updateUser')
 }
 
 const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, delay))

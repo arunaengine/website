@@ -5,11 +5,12 @@ import {
   IconCheck,
   IconDiscountCheck,
   IconPokeball,
+  IconTrash,
   IconUserScan,
-  IconX,
-  IconTrash
+  IconX
 } from '@tabler/icons-vue'
 import type {v2Endpoint, v2Token, v2User} from '~/composables/aruna_api_json'
+import {storagemodelsv2ComponentStatus} from "~/composables/aruna_api_json";
 import {deleteUserToken} from "~/composables/api_wrapper";
 import EventBus from "~/composables/EventBus";
 
@@ -73,6 +74,23 @@ function hasEndpoint(endpointId: string | undefined): boolean {
     }
     return found
   }
+}
+
+const s3modal = ref(null)
+async function executeModalFunction(method: string, endpointId: string) {
+  switch (method) {
+    case 'get': {
+      console.log(await s3modal.value.getS3Credentials(endpointId))
+      break
+    }
+    case 'create': {
+      console.log(await s3modal.value.createS3Credentials(endpointId))
+    }
+  }
+
+  import('preline').then(({HSOverlay}) => {
+    HSOverlay.open(document.querySelector('#s3-modal-generic') as HTMLElement)
+  })
 }
 </script>
 
@@ -199,7 +217,7 @@ function hasEndpoint(endpointId: string | undefined): boolean {
                     </td>
 
                     <td class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium">
-                      <button type="button"
+                      <button v-if="token.id" type="button"
                               @click="deleteToken(token.id)"
                               class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border p-1 me-2 border-slate-300 text-gray-700 hover:text-red-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
                         <IconTrash/>
@@ -253,14 +271,16 @@ function hasEndpoint(endpointId: string | undefined): boolean {
               {{ toComponentStatusStr(endpoint.status) }}
             </div>
             <div class="flex flex-row justify-end space-x-4">
-              <button v-if="hasEndpoint(endpoint.id)" type="button"
-                      @click="$refs.s3modal.getS3Credentials(endpoint.id)"
+              <button v-if="endpoint.id && hasEndpoint(endpoint.id)"
+                      type="button"
+                      @click="executeModalFunction('get', endpoint.id)"
                       class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
                       data-hs-overlay="#s3-modal-generic">
                 Get Credentials
               </button>
-              <button type="button"
-                      @click="$refs.s3modal.createS3Credentials(endpoint.id)"
+              <button v-if="endpoint.id && endpoint.status === storagemodelsv2ComponentStatus.COMPONENT_STATUS_AVAILABLE"
+                      type="button"
+                      @click="executeModalFunction('create', endpoint.id)"
                       class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
                       data-hs-overlay="#s3-modal-generic">
                 Create Credentials
