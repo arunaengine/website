@@ -1,0 +1,12 @@
+/* generated using openapi-typescript-codegen -- do no edit */
+/* istanbul ignore file */
+/* tslint:disable */
+/* eslint-disable */
+export enum v2EventVariant {
+    EVENT_VARIANT_UNSPECIFIED = 'EVENT_VARIANT_UNSPECIFIED',
+    EVENT_VARIANT_CREATED = 'EVENT_VARIANT_CREATED',
+    EVENT_VARIANT_AVAILABLE = 'EVENT_VARIANT_AVAILABLE',
+    EVENT_VARIANT_UPDATED = 'EVENT_VARIANT_UPDATED',
+    EVENT_VARIANT_DELETED = 'EVENT_VARIANT_DELETED',
+    EVENT_VARIANT_SNAPSHOTTED = 'EVENT_VARIANT_SNAPSHOTTED',
+}
