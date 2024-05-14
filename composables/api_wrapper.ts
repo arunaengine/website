@@ -133,7 +133,10 @@ export async function createUserS3Credentials(endpointId: string): Promise<v2Cre
     })
 }
 
-export async function getUserS3Credentials(endpointId: string): Promise<v2GetS3CredentialsUserTokenResponse> {
+export async function getUserS3Credentials(endpointId: string | undefined): Promise<v2GetS3CredentialsUserTokenResponse> {
+  if (endpointId === undefined)
+    throw Error('No endpoint id provided to fetch credentials')
+
     return await $fetch<v2GetS3CredentialsUserTokenResponse>(`/api/user/s3_credentials/${endpointId}`, {
         method: 'GET',
     }).catch(error => {
