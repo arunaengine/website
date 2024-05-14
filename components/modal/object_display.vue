@@ -34,7 +34,7 @@ const errorMsg = toRef(props, 'errorMsg')
             <IconX class="flex-shrink-0 size-4"/>
           </button>
         </div>
-        <div v-if="errorMsg" v-html="errorMsg" class="p-4 overflow-y-auto text-red-500"></div>
+        <div v-if="errorMsg" v-html="errorMsg" class="p-4 overflow-y-auto text-center text-red-500"></div>
 
         <div v-else-if="object" class="p-4 overflow-y-auto">
           <div class="border-t border-gray-100">

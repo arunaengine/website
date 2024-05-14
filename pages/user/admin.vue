@@ -136,4 +136,6 @@ onMounted(async () => await fillUsers())
       </div>
     </div>
   </div>
+
+  <Footer/>
 </template>

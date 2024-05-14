@@ -35,4 +35,6 @@
       storage layer that can be adapted to any data management solution in any domain.
     </p>
   </div>
+
+  <Footer/>
 </template>
