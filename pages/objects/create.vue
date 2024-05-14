@@ -7,16 +7,20 @@ import {
   type v2KeyValue,
   type v2Relation,
   type v2Author,
-  type v2Project, type v2GetUploadURLResponse
+  type v2Project,
+  type v2DataEndpoint,
+  type v2GetS3CredentialsUserTokenResponse,
 } from '~/composables/aruna_api_json'
 
 import {toRelationDirectionStr, toRelationVariantStr, toResourceTypeStr} from "~/composables/enum_conversions"
 import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants"
 import type {ObjectInfo} from "~/composables/proto_conversions"
-import {deleteObject} from "~/composables/api_wrapper"
+import {deleteObject, getObjectBucketAndKey} from "~/composables/api_wrapper"
 import EventBus from "~/composables/EventBus";
-import type {ArunaError} from "~/composables/ArunaError";
 
+import {HeadObjectCommand, S3Client, type S3ClientConfig} from "@aws-sdk/client-s3";
+import {Upload} from "@aws-sdk/lib-storage";
+import type {v2Object} from "~/composables/aruna_api_json";
 
 // Router to navigate back
 const router = useRouter()
@@ -180,7 +184,10 @@ const dataUpload: Ref<File | null> = ref(null)
 const metaUpload: Ref<File | null> = ref(null)
 
 const uploadProgress = ref(0)
-function updateProgress(current: number, total: number) {
+
+function updateProgress(current: number, total: number | undefined) {
+  if (!total) return 0
+
   const floatProgress = current / total * 100
   uploadProgress.value = +floatProgress.toFixed(2)
 }
@@ -260,6 +267,10 @@ function openModal(modalId: string) {
 }
 
 async function submit() {
+  // Better safe than sorry.
+  createdResource.value = undefined
+  creationError.value = undefined
+
   // Create resource in server
   switch (resourceType.value) {
     case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
@@ -339,8 +350,11 @@ async function submit() {
       break
     }
     case v2ResourceVariant.RESOURCE_VARIANT_OBJECT: {
-      if (dataUpload.value) {
-        // Create staging Object
+      if (dataUpload.value !== null) {
+        // Display created resource or error
+        openModal('object-display')
+
+        // Promise chain time
         await createObject({
           name: resourceName.value,
           title: resourceTitle.value,
@@ -355,107 +369,120 @@ async function submit() {
           dataLicenseTag: dataLicense.value,
           authors: Array.from(authors.value.values())
         }).then(async stagingObject => {
-          if (stagingObject?.id) {
-            createdResource.value = stagingObject
+          // Set created resource and reset error
+          createdResource.value = stagingObject
+          creationError.value = undefined
 
-            // Display created resource or error
-            openModal('object-display')
+          // Take any full sync dataproxy of the object and fetch credentials
+          const endpoint: v2DataEndpoint | undefined = createdResource.value.endpoints?.find(ep => !ep.partialSync)
+          return [stagingObject, await getUserS3Credentials(endpoint?.id)]
+        }).then(async ([stagingObject, response]) => {
+          // Fetch any fullsync bucket and key for upload
+          let [bucket, key] = await getObjectBucketAndKey((stagingObject as v2Object).id)
 
-            await sleep(1000) // Replace with waiting for dataproxy sync
-
-            const url = await getUploadUrl(stagingObject.id)
-                .then(response => {
-                  if ((response as ArunaError).type === 'ArunaError') {
-                    createdResource.value = undefined
-                    creationError.value = 'Could not authenticate user for upload.<br/>Please register at DataProxy first in your account.'
-                    return undefined
-                  }
-                  return (response as v2GetUploadURLResponse).url
-                }).catch(async error => {
-                  await deleteObject(stagingObject.id, false)
-                  createdResource.value = undefined
-                  creationError.value = error.message
-                  return undefined
-                })
-
-            if (url && dataUpload.value) {
-              const data = new Uint8Array(await dataUpload.value.arrayBuffer());
-              const xhr = new XMLHttpRequest()
-              xhr.open('PUT', url, true)
-              xhr.onload = async function () {
-                if (xhr.status != 200) { // analyze HTTP status of the response
-                  await deleteObject(stagingObject.id, false)
-                  createdResource.value = undefined
-                  creationError.value = `Upload Error ${xhr.status}: ${xhr.statusText}`
-                }
-              }
-              xhr.upload.onprogress = function (event) {
-                // Upload progress here
-                updateProgress(event.loaded, event.total)
-              }
-              xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4) {
-                  // Upload finished successful
-                  console.log('Upload finished')
-                  creationError.value = undefined
-                }
-              }
-              /* Always fails as the DataProxy does not return CORS header with PUT request ...
-              xhr.onerror = async function (event) {
-                console.error(event)
-                await deleteObject(stagingObject.id, false)
-                createdResource.value = undefined
-                creationError.value = 'Data upload failed'
-              }
-              */
-              xhr.send(data)
+          // Create S3 client for staging object
+          const s3client = new S3Client({
+            endpoint: (response as v2GetS3CredentialsUserTokenResponse).s3EndpointUrl,
+            region: 'region-one',
+            credentials: {
+              accessKeyId: (response as v2GetS3CredentialsUserTokenResponse).s3AccessKey,
+              secretAccessKey: (response as v2GetS3CredentialsUserTokenResponse).s3SecretKey
             }
-          }
+          } as S3ClientConfig)
+          /*
+          // Add CORS header to client requests [broken]
+          s3client.middlewareStack.add(
+              (next, context) => (args) => {
+                args.request.headers["access-control-request-headers"] = "access-control-allow-origin"
+                return next(args)
+              },
+              {
+                step: "build",
+              },
+          );
+          */
+
+          return [s3client, bucket, key]
+        }).then(async ([s3client, bucket, key]) => {
+          return [s3client, bucket, key, await waitForSync((s3client as S3Client), (bucket as string), (key as string))]
+        }).then(async ([s3client, bucket, key, synced]) => {
+          // Check if sync was successful
+          if (!synced)
+            throw Error('Object sync to DataProxy timed out')
+
+          const upload = new Upload({
+            client: s3client as S3Client,
+            queueSize: 4, // 4 uploads concurrently
+            partSize: dataUpload.value.size > 5 * 1024 * 1024 * 1024 ? 50 * 1024 * 1024 : 5 * 1024 * 1024, // 5MiB parts up to 5GiB; then 50MiB parts
+            leavePartsOnError: false, // Remove uploaded parts on error
+            params: {
+              Bucket: bucket as string,
+              Key: key as string,
+              Body: dataUpload.value
+            },
+          })
+
+          // Update progress bar value
+          upload.on("httpUploadProgress", progress =>
+              updateProgress(progress.loaded ? progress.loaded : 0, progress.total))
+
+          // Do something after upload succeeded
+          return await upload.done() //.then(() => console.log('Upload succeeded'))
+        }).then(response => {
+          console.log(`Upload completed with status code: ${response.$metadata.httpStatusCode}`)
         }).catch(error => {
+          // Delete Object if already created
+          if (createdResource.value?.id)
+            deleteObject(createdResource.value.id, false).catch(error => console.log(error))
+
+          // Set error; unset created resource
           console.log(error)
           creationError.value = error.toString()
           createdResource.value = undefined
         })
-
-        /*
-        //TODO: Choose "nearest" DataProxy
-        // Fetch S3 credentials and create S3 client
-        const creds = await getUserS3Credentials(endpointId)
-        const client = new S3Client({
-          endpoint: creds.s3EndpointUrl,
-          region: 'region-one',
-          credentials: {
-            accessKeyId: creds.s3AccessKey,
-            secretAccessKey: creds.s3SecretKey
-          }
-        });
-
-        // Upload file to Dataproxy
-        //TODO: Fetch parent Project for bucket info
-        const data = new Uint8Array(await dataUpload.value.arrayBuffer());
-        const command = new PutObjectCommand({
-          Bucket: "myproject",
-          Key: dataUpload.value.name,
-          Body: data,
-          ContentLength: dataUpload.value.size
-        });
-
-        try {
-          const response = await client.send(command);
-          console.log(response);
-        } catch (err) {
-          console.error(err);
-          //TODO: Delete staging object
-        }
-        */
       } else {
-        //TODO: Display error
+        // Display error toast that no file was selected for upload.
       }
+    }
+
+      // Emit user update event
+      EventBus.emit('updateUser')
+  }
+}
+
+async function waitForSync(s3client: S3Client, bucket: string, key: string): Promise<boolean> {
+  // Define head object command
+  const command = new HeadObjectCommand({
+    Bucket: bucket,
+    Key: key
+  })
+
+  // Wait until object is synced
+  let synced = false
+  let tryCounter = 0
+  while (!synced) {
+    try {
+      tryCounter++
+      await s3client.send(command)
+          .then(response => {
+            console.log(response.$metadata.httpStatusCode)
+            synced = response.$metadata.httpStatusCode === 200
+          })
+    } catch (error: any) {
+      //console.error(error)
+      if (error.message.includes('NetworkError')) {
+        throw Error('CORS Error.<br/>Please check the CORS rules of your projects.')
+
+      } else if (tryCounter > 10) {
+        console.error('Wait for sync retries exhausted')
+        throw Error('Wait for sync retries exhausted')
+      }
+
+      await sleep(Math.pow(2, tryCounter))
     }
   }
 
-  // Emit user update event
-  EventBus.emit('updateUser')
+  return synced // Still false if try counter was exhausted
 }
 
 const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, delay))
@@ -816,6 +843,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
   <ModalAuthor modalId="author-add" @add-author="addAuthor"/>
   <ModalKeyValue modalId="key-value-add" @add-key-value="addKeyValue"/>
   <ModalRelation modalId="relation-add" @add-relation="addRelation"/>
-  <ModalObjectDisplay modalId="object-display" :object="createdResource" :progress="uploadProgress" :errorMsg="creationError"/>
+  <ModalObjectDisplay modalId="object-display" :object="createdResource" :progress="uploadProgress"
+                      :errorMsg="creationError"/>
   <Footer/>
 </template>
