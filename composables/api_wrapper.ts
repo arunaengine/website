@@ -277,12 +277,27 @@ export async function getResourceHierarchy(resourceId: string) {
     })
 }
 
-export async function getPublicResourceUrl(endpointHost: string, resource: ObjectInfo, ssl: boolean): Promise<string> {
+export async function getObjectBucketAndKey(resourceId: string | undefined): Promise<string[]> {
+  if (resourceId === undefined)
+    throw Error('No resource id provided')
+
+  return await getDownloadUrl(resourceId)
+      .then(response => {
+        if (response.url) {
+          const url = new URL(response.url)
+          return [url.host.split('.')[0], url.pathname.substring(1)]
+        }
+        throw new Error('Download url in response was undefined')
+      })
+}
+
+export async function getPublicResourceUrl(
+    endpointHost: string,
+    resource: ObjectInfo, ssl: boolean
+): Promise<string> {
     // Hierarchy objects are downloaded through the special Objects bucket
     if (resource.variant !== v2ResourceVariant.RESOURCE_VARIANT_OBJECT) {
-        return ssl ?
-            `https://objects.${endpointHost}/${resource.id}/${resource.name}.tar.gz` :
-            `http://objects.${endpointHost}/${resource.id}/${resource.name}.tar.gz`
+    return 'http' + (ssl ? 's' : '') + `://objects.${endpointHost}/${resource.id}/${resource.name}.tar.gz`
     }
 
     // Else traverse hierarchy up
