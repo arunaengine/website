@@ -258,4 +258,6 @@ const router = useRouter()
       Could not load resource: {{ resourceId }}
     </div>
   </div>
+
+  <Footer />
 </template>
