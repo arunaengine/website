@@ -32,6 +32,7 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    logRequests: true,
     serverHostUrl: "http://localhost:8080",
     provider: {
       local: {
