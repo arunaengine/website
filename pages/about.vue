@@ -1,4 +1,6 @@
 <template>
+  <NavigationTop/>
+
   <div class="md:container sm:mx-1 md:mx-auto mt-4 p-4 border rounded-lg">
     <h1 class="text-3xl font-bold text-gray-800 dark:text-white">
       About us
