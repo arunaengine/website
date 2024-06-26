@@ -32,8 +32,11 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    logRequests: true,
     serverHostUrl: "http://localhost:8080",
+    logRequests: true,
+    mailingListHost: 'https://mailing-lists.example.de',
+    mailingListUrl: 'https://mailing-lists.example.de/lists/aruna/',
+    mailingListSubscribe: 'https://mailing-lists.example.de/lists/aruna/anonymous_subscribe',
     provider: {
       local: {
         clientId: "test",
