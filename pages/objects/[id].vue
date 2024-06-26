@@ -57,7 +57,7 @@ async function downloadResource() {
     if (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT) {
       if (objectInfo.data_class === v2DataClass.DATA_CLASS_PUBLIC) {
         //TODO: Choose nearest endpoint from object locations
-        const endpoint = await fetchEndpoint(objectInfo.endpoints[0])
+        const endpoint = await fetchEndpoint(objectInfo.endpoints[0].id)
         const data_module = endpoint?.hostConfigs?.find(conf => conf.hostVariant === v2EndpointHostVariant.ENDPOINT_HOST_VARIANT_S3)
 
         if (data_module?.url) {
@@ -86,7 +86,7 @@ async function downloadResource() {
     } else {
       // Create presigned download url for temp bundle
       //TODO: Evaluate "nearest" DataProxy
-      let endpointId = objectInfo.endpoints[0]
+      let endpointId = objectInfo.endpoints[0].id
       // Fetch S3 credentials (includes host url)
       const creds = await getUserS3Credentials(endpointId)
       // Create S3 client and pre-sign url
@@ -252,6 +252,19 @@ const router = useRouter()
       </div>
     </div>
     <!-- End Relations Row -->
+
+    <!-- Alternative Download Locations -->
+    <div v-if="isDownloadable()" class="flex flex-wrap justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
+      <div
+          class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+          <IconExternalLink class="flex-shrink-0 size-6 me-4"/>
+          <span class="">Alternative Download Locations</span>
+        </div>
+        <CardDownloads :endpoints="objectInfo?.endpoints" />
+      </div>
+    </div>
+    <!-- End Alternative Download Locations -->
   </div>
   <div v-else class="">
     <div class="flex flex-wrap justify-center container mx-auto mb-6">
