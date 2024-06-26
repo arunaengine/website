@@ -2,12 +2,8 @@ name: Docker
 
 on:
   push:
-    branches:
-      - main
-      - dev
     tags:
       - v*
-
 env:
   IMAGE_NAME: aruna-web
 jobs:
