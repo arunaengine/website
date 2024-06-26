@@ -66,11 +66,12 @@ function validation() {
   }
   validState.value = true
 }
+
 // ----- End Form Validation ----- //
 
 async function submitRegistration() {
   await $fetch<v2RegisterUserResponse>('/api/register', {
-    method : 'POST',
+    method: 'POST',
     body: {
       displayName: userName.value,
       email: userMail.value,
@@ -126,7 +127,8 @@ function closeModal(modalId: string) {
             <!-- User Display Name -->
             <div class="space-y-0">
               <div class="relative">
-                <input required autofocus
+                <input required
+                       autofocus
                        type="text"
                        id="user-name-input"
                        v-model="userName"

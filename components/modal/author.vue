@@ -143,6 +143,7 @@ function submit() {
           <div class="space-y-0">
             <div class="relative">
               <input v-model="firstName" required
+                     autofocus
                      id="first-name-input"
                      class="mt-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
                    focus:pt-6
