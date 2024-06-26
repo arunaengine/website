@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { v2ResourceVariant } from "@/composables/aruna_api_json";
+import {v2ResourceVariant} from "@/composables/aruna_api_json";
 import type {
   v2GenericResource,
   v2SearchResourcesResponse,
@@ -80,7 +80,12 @@ async function queryResources(pageReset: boolean) {
   }
 
   const offset = (page.value - 1) * limit.value;
-  const body = `{"query":"${query.value}", "filter":"${filter.value}", "limit":"${limit.value}", "offset":"${offset}"}`;
+  const body = JSON.stringify({
+    query: query.value,
+    filter: filter.value,
+    limit: limit.value,
+    offset: offset,
+  })
 
   try {
     const response = await searchResources(body)
@@ -88,8 +93,8 @@ async function queryResources(pageReset: boolean) {
     customFilterValid.value = true;
     hits.value = response.resources ? response.resources : [];
     estimatedTotal.value = response.estimatedTotal
-      ? Number(response.estimatedTotal)
-      : 0;
+        ? Number(response.estimatedTotal)
+        : 0;
   } catch (error) {
     console.warn(error);
     customFilterValid.value = false;
@@ -105,7 +110,7 @@ onMounted(async () => await queryResources(true));
 </script>
 
 <template>
-  <NavigationTop />
+  <NavigationTop/>
 
   <!-- Start Hits + Search Input -->
   <div class="flex sm:flex-col md:flex-row items-center md:container w-full mx-auto mt-10">
@@ -122,13 +127,12 @@ onMounted(async () => await queryResources(true));
         <label class="sr-only" for="hs-trailing-button-add-on-with-icon">Label</label>
         <div class="flex rounded-lg shadow-sm">
           <input v-model="query" id="hs-trailing-button-add-on-with-icon"
-            class="py-3 px-4 pe-11 block w-full border-gray-200 shadow-sm rounded-s-lg text-sm focus:z-10 focus:border-slate-300-50 focus:ring-slate-300 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
-            name="hs-trailing-button-add-on-with-icon" placeholder="Search Aruna Objects" type="text" />
+                 class="py-3 px-4 pe-11 block w-full border-gray-200 shadow-sm rounded-s-lg text-sm focus:z-10 focus:border-slate-300-50 focus:ring-slate-300 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
+                 name="hs-trailing-button-add-on-with-icon" placeholder="Search Aruna Objects" type="text"/>
 
-          <button
-            class="w-[2.875rem] h-[2.875rem] flex-shrink-0 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-e-md border border-transparent bg-aruna-800 text-white hover:bg-aruna-700 disabled:opacity-50 disabled:pointer-events-none dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-            type="button">
-            <IconSearch class="flex-shrink-0 size-6" />
+          <button type="button"
+                  class="w-[2.875rem] h-[2.875rem] flex-shrink-0 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-e-md border border-transparent bg-aruna-800 text-white hover:bg-aruna-700 disabled:opacity-50 disabled:pointer-events-none dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+            <IconSearch class="flex-shrink-0 size-6"/>
           </button>
         </div>
       </div>
@@ -145,53 +149,52 @@ onMounted(async () => await queryResources(true));
           Resource Type
         </p>
 
-        <label
-          class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
-          for="resource-type-all">
+        <label for="resource-type-all"
+               class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
           <input v-model="typeFilter" id="resource-type-all"
-            class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-aruna-800 dark:checked:border-aruna-800 dark:focus:ring-offset-gray-800"
-            name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED" checked />
-          <IconWorldSearch class="flex-shrink-0 size-5 mx-2 text-gray-500 ms-5 dark:text-gray-400" />
+                 class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-aruna-800 dark:checked:border-aruna-800 dark:focus:ring-offset-gray-800"
+                 name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED"
+                 checked/>
+          <IconWorldSearch class="flex-shrink-0 size-5 mx-2 text-gray-500 ms-5 dark:text-gray-400"/>
           <span class="text-sm text-gray-500 dark:text-gray-400">All</span>
         </label>
 
-        <label
-          class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
-          for="resource-type-projects">
+        <label for="resource-type-projects"
+               class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
           <input v-model="typeFilter" id="resource-type-projects"
-            class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
-            name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_PROJECT" />
-          <IconFolders class="flex-shrink-0 size-5 mx-2 text-gray-500 ms-5 dark:text-gray-400" />
+                 class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
+                 name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_PROJECT"/>
+          <IconFolders class="flex-shrink-0 size-5 mx-2 text-gray-500 ms-5 dark:text-gray-400"/>
           <span class="text-sm text-gray-500 dark:text-gray-400">Projects</span>
         </label>
 
         <label
-          class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
-          for="resource-type-collections">
+            class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
+            for="resource-type-collections">
           <input v-model="typeFilter" id="resource-type-collections"
-            class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
-            name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_COLLECTION" />
-          <IconFolder class="flex-shrink-0 size-5 mx-2 text-gray-500 ms-5 dark:text-gray-400" />
+                 class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
+                 name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_COLLECTION"/>
+          <IconFolder class="flex-shrink-0 size-5 mx-2 text-gray-500 ms-5 dark:text-gray-400"/>
           <span class="text-sm text-gray-500 dark:text-gray-400">Collections</span>
         </label>
 
         <label
-          class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
-          for="resource-type-datasets">
+            class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
+            for="resource-type-datasets">
           <input v-model="typeFilter" id="resource-type-datasets"
-            class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
-            name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_DATASET" />
-          <IconFiles class="flex-shrink-0 size-5 mx-2 text-gray-500 ms-5 dark:text-gray-400" />
+                 class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
+                 name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_DATASET"/>
+          <IconFiles class="flex-shrink-0 size-5 mx-2 text-gray-500 ms-5 dark:text-gray-400"/>
           <span class="text-sm text-gray-500 dark:text-gray-400">Datasets</span>
         </label>
 
         <label
-          class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
-          for="resource-type-objects">
+            class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
+            for="resource-type-objects">
           <input v-model="typeFilter" id="resource-type-objects"
-            class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
-            name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_OBJECT" />
-          <IconFile class="flex-shrink-0 size-5 mx-2 text-gray-500 ms-5 dark:text-gray-400" />
+                 class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
+                 name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_OBJECT"/>
+          <IconFile class="flex-shrink-0 size-5 mx-2 text-gray-500 ms-5 dark:text-gray-400"/>
           <span class="text-sm text-gray-500 dark:text-gray-400">Objects</span>
         </label>
       </div>
@@ -201,11 +204,11 @@ onMounted(async () => await queryResources(true));
         Custom Filter
       </p>
       <input v-model="customFilter" @keyup.enter="queryResources(true)" type="text"
-        class="py-3 px-4 block w-full border-gray-200 rounded text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
-        placeholder="Custom filter" />
+             class="py-3 px-4 block w-full border-gray-200 rounded text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
+             placeholder="Custom filter"/>
 
       <div
-        class="my-6 bg-white border border-l-4 border-l-aruna-700 shadow-sm rounded-xl dark:bg-slate-900 dark:border-gray-700 dark:border-t-blue-500 dark:shadow-slate-700/[.7]">
+          class="my-6 bg-white border border-l-4 border-l-aruna-700 shadow-sm rounded-xl dark:bg-slate-900 dark:border-gray-700 dark:border-t-blue-500 dark:shadow-slate-700/[.7]">
         <div class="p-4 md:p-5">
           <h3 class="font-bold text-aruna-800 dark:text-white">
             Filter arguments by value.
@@ -218,7 +221,7 @@ onMounted(async () => await queryResources(true));
             The currently available parameters to create custom filters can be
             looked up in the
             <NuxtLink class="text-aruna-800 dark:text-aruna-600" rel="noreferrer" target="_blank"
-              to="https://arunastorage.github.io/documentation/latest/get_started/basic_usage/12_How-To-Search/">
+                      to="https://arunastorage.github.io/documentation/latest/get_started/basic_usage/12_How-To-Search/">
               documentation
             </NuxtLink>
             .
@@ -230,18 +233,19 @@ onMounted(async () => await queryResources(true));
 
     <div class="p-4 sm:mt-3 md:basis-3/4 md:mt-0">
       <vue-awesome-paginate :total-items="estimatedTotal" :items-per-page="20" :max-pages-shown="5"
-        v-model="page" :on-click="paginationClickHandler" />
+                            v-model="page" :on-click="paginationClickHandler"/>
 
       <!-- Start Display Search Results -->
-      <SearchResults :key="hits" :resources="hits" />
+      <SearchResults :key="hits" :resources="hits"/>
       <!-- End Display Search Results -->
 
-      <vue-awesome-paginate v-if="estimatedTotal > 20" :total-items="estimatedTotal" :items-per-page="20" :max-pages-shown="5"
-                            v-model="page" :on-click="paginationClickHandler" />
+      <vue-awesome-paginate v-if="estimatedTotal > 20" :total-items="estimatedTotal" :items-per-page="20"
+                            :max-pages-shown="5"
+                            v-model="page" :on-click="paginationClickHandler"/>
     </div>
   </div>
-  
-  <Footer />
+
+  <Footer/>
 </template>
 
 <style>
