@@ -12,6 +12,23 @@ export function parseJwt(token: any) {
 }
 
 
+// Modal magic
+export function openModal(modalId: string) {
+  let element = document.querySelector(`#${modalId}`) as HTMLElement
+  import('preline').then(({HSOverlay}) => {
+    HSOverlay.open(element)
+  })
+}
+
+export function closeModal(modalId: string) {
+  let element = document.querySelector(`#${modalId}`) as HTMLElement
+  import('preline').then(({HSOverlay}) => {
+    HSOverlay.close(element)
+  })
+}
+
+
+
 /* ---------- USER ---------- */
 export function isUserAdmin(user: v2User | undefined): boolean {
     if (user?.attributes?.globalAdmin) {

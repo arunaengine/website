@@ -1,23 +1,13 @@
-import { v2RegisterUserRequest } from "~/composables/aruna_api_json/models/v2RegisterUserRequest"
+import {v2RegisterUserResponse} from "~/composables/aruna_api_json";
 
 export default defineEventHandler(async event => {
-    const request = await readBody(event)
-
-    const final_body = {
-        displayName: request.name,
-        email: request.email,
-        project: request.project,
-    }
-
+    const body = await readBody(event)
     const baseUrl = useRuntimeConfig().serverHostUrl
-    const fetchUrl = `${baseUrl}/v2/user/register` 
-    const response = await $fetch<v2RegisterUserRequest>(fetchUrl, {
+    return await $fetch<v2RegisterUserResponse>(`${baseUrl}/v2/user/register`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${event.context.access_token}`
         },
-        body: final_body
+        body: body
     })
-
-    return response.displayName
 })

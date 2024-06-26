@@ -28,19 +28,22 @@ async function updateUser() {
         if (typeof response === 'undefined') {
           user.value = undefined
           fetchErrorMsg.value = 'Response is undefined. Should not be possible :/'
-
         } else if (response.type === 'ArunaError') {
           user.value = undefined
-          //fetchErrorMsg.value = `${(response as ArunaError).code} - ${(response as ArunaError).message}`
-
           if ((response as ArunaError).message === 'Not registered') {
             notRegistered.value = true
+            openModal('register-user')
           } else if ((response as ArunaError).code === 14) {
+            notRegistered.value = false
             fetchErrorMsg.value = 'Aruna server is currently unavailable.'
+          } else {
+            notRegistered.value = false
+            //fetchErrorMsg.value = `${(response as ArunaError).code} - ${(response as ArunaError).message}`
           }
         } else {
+          notRegistered.value = false
           user.value = response as v2User
-          fetchErrorMsg.value = ''
+          fetchErrorMsg.value = user.value.active ? '' : 'Please wait until your account gets activated by an administrator.'
         }
       })
       .catch(error => {
@@ -88,16 +91,16 @@ onMounted(() => updateUser())
 <template>
   <!-- Header + Navigation -->
   <!-- Main body -->
-  <div
-      class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent"
-  >
+  <div class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent to-aruna-800/[.10]">
     <!-- Body -->
     <NuxtLoadingIndicator/>
     <NuxtPage/>
   </div>
   <NavigationSidebar/>
 
-  <ModalRegister v-if="notRegistered"/>
+  <!-- Registration Modal -->
+  <ModalRegister modalId="register-user"/>
+  <!-- End Registration Modal -->
 
   <!-- Toast -->
   <ToastError @clearError="clearError" modalId="app-error-toast" :errorMsg="fetchErrorMsg"/>

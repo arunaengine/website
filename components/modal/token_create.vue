@@ -135,7 +135,7 @@ function reset() {
 
 <template>
   <div :id="props.modalId"
-       class="hs-overlay hidden size-full fixed top-0 start-0 z-[80] overflow-x-hidden overflow-y-auto [--overlay-backdrop:static]"
+       class="hs-overlay hidden size-full fixed top-0 start-0 z-[80] overflow-x-hidden overflow-y-auto [--overlay-backdrop:static] [--tab-accessibility-limited:false]"
        data-hs-overlay-keyboard="false">
     <div
         class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
@@ -160,7 +160,10 @@ function reset() {
         <div class="p-4 overflow-y-auto space-y-4">
           <!-- Floating Input Token Name -->
           <div class="relative">
-            <input v-model="tokenName" id="hs-floating-input-name" class="my-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+            <input v-model="tokenName"
+                   autofocus
+                   id="hs-floating-input-name"
+                   class="my-2 peer p-4 block w-full border-gray-200 rounded-lg text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6
@@ -261,7 +264,8 @@ function reset() {
         <!-- End Floating Input Token Name -->
 
         <!-- Token Secret -->
-        <div v-if="tokenSecret" class="flex flex-col text-center m-4 bg-white border shadow-sm rounded-xl p-4 md:p-5 dark:bg-neutral-900 dark:border-neutral-700 dark:shadow-neutral-700/70">
+        <div v-if="tokenSecret"
+             class="flex flex-col text-center m-4 bg-white border shadow-sm rounded-xl p-4 md:p-5 dark:bg-neutral-900 dark:border-neutral-700 dark:shadow-neutral-700/70">
           <h3 class="text-lg font-bold text-gray-800 dark:text-white">
             Token Secret
           </h3>
@@ -271,7 +275,7 @@ function reset() {
           <p class="mt-1 text-xs font-medium uppercase text-orange-500 dark:text-neutral-500">
             Store it in a secure location before you close this window.
           </p>
-          <hr class="my-4" />
+          <hr class="my-4"/>
           <p class="mt-2 text-wrap break-words text-gray-800 dark:text-neutral-400">
             {{ tokenSecret }}
           </p>
