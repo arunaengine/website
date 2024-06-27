@@ -496,13 +496,13 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
       Resource creation
     </h1>
     <button @click="router.back()"
-            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-gray-700 hover:bg-gray-300 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/30 dark:hover:text-gray-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-md border border-transparent text-gray-700 hover:bg-gray-300 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/30 dark:hover:text-gray-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
       <IconArrowLeft class="icon"/>
     </button>
   </div>
 
   <div
-      class="flex flex-col space-x-2 space-y-2 md:container sm:mx-1 md:mx-auto mt-4 p-4 border border-gray-500 rounded-lg">
+      class="flex flex-col space-x-2 space-y-2 md:container sm:mx-1 md:mx-auto mt-4 p-4 border border-gray-500 rounded-md">
     <div class="flex flex-col md:flex-row">
       <div class="flex flex-row md:flex-col px-4 grow border-e-gray-300">
         <!-- Resource Name Input -->
@@ -511,7 +511,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         <div class="relative">
           <input type="text" v-model="resourceName" id="hs-validation-name-error" name="hs-validation-name-error"
                  :class="[{ 'border-red-500': !validationStates.get('resourceName') }, { 'focus:border-red-500': !validationStates.get('resourceName') }, { 'focus:ring-red-500': !validationStates.get('resourceName') },]"
-                 class="py-3 px-4 block w-full rounded-lg text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 disabled:text-gray-500 disabled:bg-gray-200 disabled:dark:bg-gray-700"
+                 class="py-3 px-4 block w-full rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 disabled:text-gray-500 disabled:bg-gray-200 disabled:dark:bg-gray-700"
                  :disabled="dataUpload !== null"
                  aria-describedby="hs-validation-name-error-helper"
                  placeholder="Name of the resource" required>
@@ -528,7 +528,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         <label for="name-input-label"
                class="block mt-6 text-lg font-medium mb-2 text-gray-700 dark:text-white">Title</label>
         <input type="text" v-model="resourceTitle" id="name-input-label"
-               class="py-3 px-4 block w-full border-gray-400 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
+               class="py-3 px-4 block w-full border-gray-400 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
                placeholder="Display name for the resource">
         <!-- End Resource Title Input -->
         <!-- Resource Description Input -->
@@ -538,7 +538,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
           <textarea id="hs-textarea-ex-1" v-model="resourceDescription" ref="textAreaElement"
                     @input="textAreaAutoHeight(textAreaElement, 3)"
                     :class="[{ 'border-red-500': !validationStates.get('resourceDescription') }, { 'focus:border-red-500': !validationStates.get('resourceDescription') }, { 'focus:ring-red-500': !validationStates.get('resourceDescription') }]"
-                    class="p-4 pb-12 block w-full border-gray-400 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
+                    class="p-4 pb-12 block w-full border-gray-400 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
                     placeholder="A concise description of the resource"></textarea>
           <!-- Toolbar -->
           <div class="absolute bottom-px inset-x-px p-2 rounded-b-md bg-white dark:bg-slate-900">
@@ -582,7 +582,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         <div v-if="resourceType !== v2ResourceVariant.RESOURCE_VARIANT_PROJECT">
           <label for="parent-id-input"
                  class="block mt-6 text-lg font-medium mb-2 text-gray-700 dark:text-white">Parent ID</label>
-          <div class="flex rounded-lg">
+          <div class="flex rounded-md">
             <span
                 class="px-4 inline-flex items-center min-w-fit rounded-s-md border border-e-0 border-gray-200 bg-gray-50 text-sm text-gray-500 dark:bg-neutral-700 dark:border-neutral-700 dark:text-neutral-400">
               {{ resourceParent ? toResourceTypeStr(resourceParent.variant) : 'Unspecified' }}
@@ -633,7 +633,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
                    class="block text-lg font-medium mb-2 text-gray-700 dark:text-white">Metadata
               License</label>
             <select id="meta-license-select" v-model="metaLicense"
-                    class="py-3 px-4 pe-9 block w-full border-gray-400 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600">
+                    class="py-3 px-4 pe-9 block w-full border-gray-400 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600">
               <option v-for="license in licenses" :value="license.tag"
                       v-bind:selected="license.tag === 'AllRightsReserved'">{{ license.name }}
               </option>
@@ -643,7 +643,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
             <label for="data-license-select" class="block text-lg font-medium mb-2 text-gray-700 dark:text-white">Data
               License</label>
             <select id="data-license-select" v-model="dataLicense"
-                    class="py-3 px-4 pe-9 block w-full border-gray-400 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600">
+                    class="py-3 px-4 pe-9 block w-full border-gray-400 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600">
               <option v-for="license in licenses" :value="license.tag" class="bg-aruna-500"
                       v-bind:selected="license.tag === 'AllRightsReserved'">{{ license.name }}
               </option>
@@ -652,10 +652,11 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         </div>
 
         <form class="mt-6" v-if="resourceType === v2ResourceVariant.RESOURCE_VARIANT_OBJECT">
-          <h3 class="block mb-2 text-lg font-medium text-gray-700 dark:text-white">Upload (Choose file or Drag 'n
-            Drop)</h3>
+          <h3 class="block mb-2 text-lg font-medium text-gray-700 dark:text-white">
+            Upload (Choose file or Drag 'n Drop)
+          </h3>
           <label for="large-file-input" class="sr-only">Choose file or Drag 'n Drop</label>
-          <input type="file" v-on:change="dataFileChange" name="large-file-input" id="large-file-input" class="block w-full border border-gray-200 shadow-sm rounded-lg text-sm focus:z-10 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400
+          <input type="file" v-on:change="dataFileChange" name="large-file-input" id="large-file-input" class="block w-full border border-gray-200 shadow-sm rounded-md text-sm focus:z-10 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400
     file:bg-gray-200 file:border-0
     file:me-4
     file:py-3 file:px-4 file:sm:py-5
@@ -783,20 +784,23 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
             <IconSquareRoundedPlus class="flex-shrink-0 size-6"/>
           </button>
         </div>
-        <!-- <p class="p-4 mt-2 text-center border rounded-lg">Coming soon ...</p> -->
         <div class="-m-1.5 overflow-x-auto">
           <div class="p-1.5 min-w-full inline-block align-middle">
             <div class="overflow-hidden border border-gray-400 dark:border-gray-700">
               <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">Resource Id
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                    Resource Id
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">Resource Type
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                    Resource Type
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">Relation Type
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                    Relation Type
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">Direction
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                    Direction
                   </th>
                   <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
                     Actions
@@ -834,7 +838,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
 
     <div class="flex flex-row grow justify-end">
       <button type="button" v-bind:disabled="!validState" @click="submit"
-              class="py-3 px-4 inline-flex gap-x-2 text-md font-semibold rounded-lg bg-aruna-800 border border-gray-200 text-white hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+              class="py-3 px-4 inline-flex gap-x-2 text-md font-semibold rounded-md bg-aruna-800 border border-gray-200 text-white hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
         Create Resource
       </button>
     </div>
