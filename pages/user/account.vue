@@ -77,6 +77,7 @@ function hasEndpoint(endpointId: string | undefined): boolean {
 }
 
 const s3modal = ref(null)
+
 async function executeModalFunction(method: string, endpointId: string) {
   switch (method) {
     case 'get': {
@@ -102,14 +103,14 @@ async function executeModalFunction(method: string, endpointId: string) {
       Hej {{ get_user()?.displayName }},
     </h1>
     <button @click="router.back()"
-            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-gray-700 hover:bg-gray-300 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/30 dark:hover:text-gray-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-md border border-transparent text-gray-700 hover:bg-gray-300 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/30 dark:hover:text-gray-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
       <IconArrowLeft class="icon"/>
     </button>
   </div>
 
   <div
-      class="md:container sm:mx-1 md:mx-auto mt-4 p-4 border border-gray-300 rounded-lg bg-white/[.5] dark:bg-white/[.75]">
-    <div class="border-b border-gray-300 dark:border-gray-700">
+      class="md:container sm:mx-1 md:mx-auto mt-4 p-4 border-2 border-gray-400 rounded-md  dark:bg-white/[.75]">
+    <div class="border-b border-gray-400 dark:border-gray-700">
       <nav class="flex space-x-6" aria-label="Tabs" role="tablist">
         <button type="button"
                 class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-lg whitespace-nowrap text-gray-500 hover:text-aruna-800 focus:outline-none focus:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 active"
@@ -140,8 +141,8 @@ async function executeModalFunction(method: string, endpointId: string) {
         <div
             class="bg-yellow-100 border border-yellow-200 text-sm text-yellow-800 rounded-lg p-4 dark:bg-yellow-800/10 dark:border-yellow-900 dark:text-yellow-500"
             role="alert" v-if="!is_active()">
-          <span class="font-bold">Info: </span> Your account is currently not active. We will activate your account as
-          soon as possible.
+          <span class="font-bold">Info: </span>
+          Your account is currently not active. We will activate your account as soon as possible.
         </div>
         <div class="flex flex-auto gap-4">
 
@@ -185,26 +186,28 @@ async function executeModalFunction(method: string, endpointId: string) {
             </p>
           </div>
         </div>
-
       </div>
+
       <div id="tabs-with-icons-2" class="hidden" role="tabpanel" aria-labelledby="tabs-with-icons-item-2">
         <div class="flex flex-col">
           <div class="-m-1.5 overflow-x-auto">
             <div class="p-1.5 min-w-full inline-block align-middle">
               <div class="overflow-hidden">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <table class="min-w-full divide-y divide-gray-400 dark:divide-gray-700">
                   <thead>
                   <tr>
-                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase">ID</th>
-                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase">Last Used
+                    <th scope="col" class="px-6 py-3 text-start text-md font-medium text-gray-500 uppercase">ID</th>
+                    <th scope="col" class="px-6 py-3 text-start text-md font-medium text-gray-500 uppercase">Name</th>
+                    <th scope="col" class="px-6 py-3 text-start text-md font-medium text-gray-500 uppercase">Last Used
                     </th>
-                    <th scope="col" class="px-6 py-3 text-end text-xs font-medium text-gray-500 uppercase">Actions
+                    <th scope="col" class="px-6 py-3 text-start text-md font-medium text-gray-500 uppercase">Expiry date
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-end text-md font-medium text-gray-500 uppercase">Actions
                     </th>
                   </tr>
                   </thead>
 
-                  <tbody v-if="getTokens().length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody v-if="getTokens().length > 0" class="divide-y divide-gray-400 dark:divide-gray-700">
                   <tr v-for="token in getTokens()" class="hover:bg-gray-100 dark:hover:bg-gray-700">
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">
                       {{ token.id }}
@@ -214,6 +217,9 @@ async function executeModalFunction(method: string, endpointId: string) {
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                       Not yet implemented
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                      {{ token.expiresAt }}
                     </td>
 
                     <td class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium">
@@ -278,11 +284,12 @@ async function executeModalFunction(method: string, endpointId: string) {
                       data-hs-overlay="#s3-modal-generic">
                 Get Credentials
               </button>
-              <button v-if="endpoint.id && endpoint.status === storagemodelsv2ComponentStatus.COMPONENT_STATUS_AVAILABLE"
-                      type="button"
-                      @click="executeModalFunction('create', endpoint.id)"
-                      class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                      data-hs-overlay="#s3-modal-generic">
+              <button
+                  v-if="endpoint.id && endpoint.status === storagemodelsv2ComponentStatus.COMPONENT_STATUS_AVAILABLE"
+                  type="button"
+                  @click="executeModalFunction('create', endpoint.id)"
+                  class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                  data-hs-overlay="#s3-modal-generic">
                 Create Credentials
               </button>
             </div>

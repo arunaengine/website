@@ -1,22 +1,20 @@
 <template>
   <!-- FAQ -->
   <div
-    class="max-w-[85rem] w-full px-2 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto border-2 shadow-lg rounded-3xl border-gray-300"
-  >
+    class="container w-full mt-6 px-2 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto border-2 rounded-md border-gray-400">
     <!-- Title -->
     <div class="max-w-2xl mx-auto text-center mb-10 lg:mb-14">
-      <h2
-        class="text-2xl font-bold md:text-3xl md:leading-tight text-gray-800 dark:text-gray-200"
-      >
+      <h2 class="text-2xl font-bold md:text-3xl md:leading-tight text-gray-800 dark:text-gray-200">
         Frequently Asked Questions
       </h2>
     </div>
     <!-- End Title -->
 
-    <div class="max-w-5xl mx-auto">
+    <div class="mx-auto">
       <!-- Grid -->
-      <div class="grid sm:grid-cols-2 gap-6 md:gap-12">
-        <div>
+<!--      <div class="grid sm:grid-cols-2 gap-6 md:gap-12">-->
+      <div class="md:columns-2 lg:columns-3 space-y-6 px-12">
+        <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
             What is ARUNA?
           </h3>
@@ -32,19 +30,19 @@
         </div>
         <!-- End Col -->
 
-        <div>
+        <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
             Who develops ARUNA ?
           </h3>
           <p class="mt-2 text-gray-600 dark:text-gray-400">
             ARUNA is developed by a small team at Justus-Liebig-University
             Giessen for the NFDI4Biodiversity and NFDI4Microbiota projects, as
-            well as the GAIA-X connector project FAIR-Dataspaces.
+            well as the GAIA-X connector project FAIR Data Spaces.
           </p>
         </div>
         <!-- End Col -->
 
-        <div>
+        <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
             Why should i use ARUNA for my project ?
           </h3>
@@ -58,7 +56,7 @@
         </div>
         <!-- End Col -->
 
-        <div>
+        <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
             How can I log in ?
           </h3>
@@ -70,7 +68,7 @@
         </div>
         <!-- End Col -->
 
-        <div>
+        <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
             Is there a maximum storage capacity ?
           </h3>
@@ -82,7 +80,7 @@
           </p>
         </div>
 
-        <div>
+        <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
             Who can see my data ?
           </h3>
@@ -96,7 +94,7 @@
           </p>
         </div>
 
-        <div>
+        <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
             Is my data secure ?
           </h3>
@@ -108,7 +106,7 @@
           </p>
         </div>
 
-        <div>
+        <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
             What is a data proxy ?
           </h3>
@@ -122,7 +120,7 @@
           </p>
         </div>
 
-        <div>
+        <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
             How many projects can I create ?
           </h3>
@@ -137,3 +135,5 @@
   </div>
   <!-- End FAQ -->
 </template>
+<script setup lang="ts">
+</script>

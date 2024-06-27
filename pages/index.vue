@@ -1,12 +1,12 @@
 <template>
-  <div class="flex flex-col space-y-6 flex-grow md:h-auto">
+  <div class="flex flex-col flex-grow md:h-auto">
     <!-- Header + Navigation -->
-    <NavigationTop />
-    <SectionHero />
-    <SectionFeatures />
-    <SectionFeatures2 />
-    <SectionNewsletter />
-    <SectionFaq />
-    <Footer />
+    <NavigationTop/>
+    <SectionHero/>
+    <SectionFeatures/>
+    <SectionFeatures2/>
+    <SectionNewsletter/>
+    <SectionFaq/>
+    <Footer/>
   </div>
 </template>
