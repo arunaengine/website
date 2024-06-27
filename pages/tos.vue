@@ -1,7 +1,7 @@
 <template>
   <NavigationTop />
 
-  <div class="container mx-auto mt-4 p-4 border border-gray-400 rounded-md">
+  <div class="container mx-auto mt-4 p-4 border-2 border-gray-400 rounded-md">
     <div class="border-b border-gray-400 px-4 dark:border-gray-700">
       <nav class="flex space-x-2" aria-label="Tabs" role="tablist">
         <button type="button"

@@ -6,7 +6,7 @@ import {IconMail} from '@tabler/icons-vue';
 <template>
   <NavigationTop/>
 
-  <div class="container mx-auto mt-4 p-4 border border-gray-400 rounded-md">
+  <div class="container mx-auto mt-4 p-4 border-2 border-gray-400 rounded-md">
     <h1 class="text-3xl font-bold text-gray-800 dark:text-white">
       Imprint
     </h1>

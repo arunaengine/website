@@ -1,7 +1,7 @@
 <template>
   <NavigationTop/>
 
-  <div class="md:container sm:mx-1 md:mx-auto mt-4 p-4 border border-gray-400 rounded-md">
+  <div class="md:container sm:mx-1 md:mx-auto mt-4 p-4 border-2 border-gray-400 rounded-md">
     <h1 class="text-3xl font-bold text-gray-800 dark:text-white">
       About us
     </h1>
