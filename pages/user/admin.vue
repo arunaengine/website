@@ -9,6 +9,21 @@ const forceRefresh = ref(0)
 
 async function fillUsers() {
   users.value = await fetchUsers()
+
+  // Sort by admin status, then name and then id (just in case)
+  if (users.value && users.value.every(user => user.attributes?.globalAdmin !== undefined)) {
+    users.value.sort((a, b) => {
+      if (a.attributes?.globalAdmin && !b.attributes?.globalAdmin)
+        return -1
+      else if (!a.attributes?.globalAdmin && b.attributes?.globalAdmin)
+        return 1
+      else if (a.displayName && b.displayName)
+        return a.displayName.localeCompare(b.displayName)
+      else
+        return (a.id || '').localeCompare(b.id || '')
+    })
+  }
+
   forceRefresh.value += 1
 }
 
