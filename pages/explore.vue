@@ -125,9 +125,9 @@ onMounted(async () => await queryResources(true));
     <div class="md:basis-3/4 sm:mt-3 md:mt-0">
       <div>
         <label class="sr-only" for="hs-trailing-button-add-on-with-icon">Label</label>
-        <div class="flex rounded-lg shadow-sm">
+        <div class="flex rounded-md shadow-sm">
           <input v-model="query" id="hs-trailing-button-add-on-with-icon"
-                 class="py-3 px-4 pe-11 block w-full border-gray-200 shadow-sm rounded-s-lg text-sm focus:z-10 focus:border-slate-300-50 focus:ring-slate-300 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
+                 class="py-3 px-4 pe-11 block w-full border-gray-200 shadow-sm rounded-s-md text-sm focus:z-10 focus:border-slate-300-50 focus:ring-slate-300 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
                  name="hs-trailing-button-add-on-with-icon" placeholder="Search Aruna Objects" type="text"/>
 
           <button type="button"
@@ -150,7 +150,7 @@ onMounted(async () => await queryResources(true));
         </p>
 
         <label for="resource-type-all"
-               class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+               class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
           <input v-model="typeFilter" id="resource-type-all"
                  class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-aruna-800 dark:checked:border-aruna-800 dark:focus:ring-offset-gray-800"
                  name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED"
@@ -160,7 +160,7 @@ onMounted(async () => await queryResources(true));
         </label>
 
         <label for="resource-type-projects"
-               class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+               class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
           <input v-model="typeFilter" id="resource-type-projects"
                  class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
                  name="resource-type-select" type="radio" :value="v2ResourceVariant.RESOURCE_VARIANT_PROJECT"/>
@@ -169,7 +169,7 @@ onMounted(async () => await queryResources(true));
         </label>
 
         <label
-            class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
+            class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
             for="resource-type-collections">
           <input v-model="typeFilter" id="resource-type-collections"
                  class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
@@ -179,7 +179,7 @@ onMounted(async () => await queryResources(true));
         </label>
 
         <label
-            class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
+            class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
             for="resource-type-datasets">
           <input v-model="typeFilter" id="resource-type-datasets"
                  class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
@@ -189,7 +189,7 @@ onMounted(async () => await queryResources(true));
         </label>
 
         <label
-            class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
+            class="cursor-pointer max-w-xs flex p-3 w-full bg-white border border-gray-200 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400"
             for="resource-type-objects">
           <input v-model="typeFilter" id="resource-type-objects"
                  class="shrink-0 mt-0.5 border-gray-200 rounded-full text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-blue-500 dark:checked:border-blue-500 dark:focus:ring-offset-gray-800"
@@ -204,18 +204,18 @@ onMounted(async () => await queryResources(true));
         Custom Filter
       </p>
       <input v-model="customFilter" @keyup.enter="queryResources(true)" type="text"
-             class="py-3 px-4 block w-full border-gray-200 rounded text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
+             class="py-3 px-4 block w-full border-gray-200 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
              placeholder="Custom filter"/>
 
       <div
-          class="my-6 bg-white border border-l-4 border-l-aruna-700 shadow-sm rounded-xl dark:bg-slate-900 dark:border-gray-700 dark:border-t-blue-500 dark:shadow-slate-700/[.7]">
+          class="my-6 bg-white border border-l-4 border-l-aruna-700 shadow-sm rounded-md dark:bg-slate-900 dark:border-gray-700 dark:border-t-blue-500 dark:shadow-slate-700/[.7]">
         <div class="p-4 md:p-5">
           <h3 class="font-bold text-aruna-800 dark:text-white">
             Filter arguments by value.
           </h3>
           <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
             E.g: <strong>size > 1024</strong> or
-            <strong>labels.key = akey</strong>
+            <strong>labels.key = some-key</strong>
           </p>
           <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
             The currently available parameters to create custom filters can be
@@ -257,21 +257,22 @@ onMounted(async () => await queryResources(true));
 .paginate-buttons {
   height: 24px;
   width: 24px;
-  border-radius: 8px;
+  border-radius: 0.375rem;
   cursor: pointer;
-  background-color: #007bc2;
+  background-color: #005299;
   font-size: x-small;
+  font-weight: bold;
   /*border: 1px solid #005299;*/
   color: white;
 }
 
 .paginate-buttons:hover {
-  background-color: #00A0CC;
+  background-color: #007BC2;
 }
 
 .active-page {
-  background-color: #3498db;
-  border: 1px solid #3498db;
+  background-color: #007BC2;
+  border: 1px solid #007BC2;
   color: white;
 }
 
