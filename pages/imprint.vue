@@ -1,27 +1,27 @@
 <script setup lang="ts">
-import { IconMail } from '@tabler/icons-vue';
+import {IconMail} from '@tabler/icons-vue';
 
 </script>
 
 <template>
-  <NavigationTop />
-  
-  <div class="container mx-auto mt-4 p-4 border rounded-lg bg-white/[.25]">
+  <NavigationTop/>
+
+  <div class="container mx-auto mt-4 p-4 border border-gray-400 rounded-md">
     <h1 class="text-3xl font-bold text-gray-800 dark:text-white">
       Imprint
     </h1>
-    <hr class="border-gray-200 my-5">
+    <hr class="border-gray-400 my-6">
 
-    <div class="border-b border-gray-200 px-4 dark:border-gray-700">
+    <div class="border-b border-gray-400 px-4 dark:border-gray-700">
       <nav class="flex space-x-2" aria-label="Tabs" role="tablist">
         <button type="button"
-          class="hs-tab-active:font-semibold hs-tab-active:border-arunaPrimary hs-tab-active:text-arunaPrimary py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-arunaPrimary disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600 active"
-          id="basic-tabs-item-1" data-hs-tab="#basic-tabs-1" aria-controls="basic-tabs-1" role="tab">
+                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-arunaPrimary disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600 active"
+                id="basic-tabs-item-1" data-hs-tab="#basic-tabs-1" aria-controls="basic-tabs-1" role="tab">
           Datenschutzerklärung
         </button>
         <button type="button"
-          class="hs-tab-active:font-semibold hs-tab-active:border-arunaPrimary hs-tab-active:text-arunaPrimary py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-arunaPrimary disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-          id="basic-tabs-item-2" data-hs-tab="#basic-tabs-2" aria-controls="basic-tabs-2" role="tab">
+                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-arunaPrimary disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                id="basic-tabs-item-2" data-hs-tab="#basic-tabs-2" aria-controls="basic-tabs-2" role="tab">
           Privacy Policy
         </button>
       </nav>
@@ -40,64 +40,73 @@ import { IconMail } from '@tabler/icons-vue';
           gespeichert werden.
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           1. Verantwortlicher
         </h3>
-        <div><strong>Verantwortlicher für die Datenverarbeitung ist:</strong></div>
-        <div>Präsidentin die</div>
-        <div>Justus-Liebig-Universität Gießen</div>
-        <div>Ludwigstraße 23</div>
-        <div>35390 Giessen</div>
-        <div>Germany</div>
-        <div>
-          <NuxtLink
-            class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-            to="mailto:support@aruna-storage.org" target="_blank">
-            <IconMail class="flex-shrink-0 size-4" /> support@aruna-storage.org
-          </NuxtLink>
+        <hr class="border-gray-400">
+        <div class="mt-2 ps-4 font-bold">Verantwortlicher für die Datenverarbeitung ist:</div>
+        <div class="ps-8 pb-4">
+          <div>Präsidentin die</div>
+          <div>Justus-Liebig-Universität Gießen</div>
+          <div>Ludwigstraße 23</div>
+          <div>35390 Giessen</div>
+          <div>Germany</div>
+          <div>
+            <NuxtLink
+                class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                to="mailto:support@aruna-storage.org" target="_blank">
+              <IconMail class="flex-shrink-0 size-4"/>
+              support@aruna-storage.org
+            </NuxtLink>
+          </div>
         </div>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           2. Erhebung von personenbezogenen Daten
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           Wir erheben personenbezogene Daten von Ihnen, wenn Sie sich für einen Account auf unserer Website oder im
-          Email-verteiler registrieren. <br />Folgende personenbezogene Daten werden erhoben:
+          Email-verteiler registrieren. <br/>Folgende personenbezogene Daten werden erhoben:
         </p>
-        <ul class="list-disc list-inside p-4">
+        <ul class="list-disc list-inside ps-4 pb-4">
           <li>Einen selbst zu vergebenen Namen</li>
           <li>Eine E-Mail-Adresse zur Kontaktaufnahme</li>
         </ul>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           3. Zweck der Datenverarbeitung
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           Die von Ihnen angegebenen personenbezogenen Daten werden ausschließlich zur Erstellung Ihres Accounts oder der
           Verarbeitung des Email verteilers verwendet. Falls eine Emailadresse hinterlegt wurde, informieren wir Sie
           über Account relevante Ereignisse und allgemeine Ereignisse des Systems (Updates, Status etc.).
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           4. Rechtsgrundlage für die Datenverarbeitung
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           Die Rechtsgrundlage für die Verarbeitung Ihrer personenbezogenen Daten zur Erstellung Ihres Accounts ist Art.
           6 Abs. 1 lit. b DSGVO.
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           5. Speicherdauer der Daten
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           Ihre personenbezogenen Daten werden für die Dauer Ihres Accounts bei uns gespeichert. Wenn Sie Ihren Account
           löschen, werden Ihre Daten umgehend gelöscht.
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           6. Ihre Rechte als betroffene Person
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           Sie haben das Recht, Auskunft über die bei uns gespeicherten personenbezogenen Daten zu erhalten sowie das
           Recht auf Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer personenbezogenen Daten (Art. 15, 16
           und 18 der Europäischen Datenschutzgrundverordnung). Falls Sie die Datenverarbeitung für rechtswidrig halten,
@@ -109,40 +118,45 @@ import { IconMail } from '@tabler/icons-vue';
           anderen Verantwortlichen übermitteln zu lassen (Art. 20 EU-DSGVO).
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           7. Kontakt
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           Wenn Sie Fragen zur Erhebung, Verarbeitung oder Nutzung Ihrer personenbezogenen Daten haben, kontaktieren Sie
           uns bitte per E-Mail unter
-          <NuxtLink
-            class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-            to="mailto:datenschutz@aruna-storage.org" target="_blank">
-            <IconMail class="flex-shrink-0 size-4" /> datenschutz@aruna-storage.org
-          </NuxtLink>.
+          <NuxtLink to="mailto:datenschutz@aruna-storage.org" target="_blank"
+                    class="inline-flex justify-center underline items-center gap-x-1 rounded-md border border-transparent text-aruna-800 hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+            <IconMail class="flex-shrink-0 size-4"/>
+            datenschutz@aruna-storage.org
+          </NuxtLink>
+          .
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           8. Datenschutzbeauftragte
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           <strong>
             Die Kontaktdaten des behördlichen Datenschutzbeauftragten der Justus-Liebig-Universität sind:
           </strong>
         </p>
-        <div>Justus-Liebig-Universität Gießen</div>
-        <div>Der behördliche Datenschutzbeauftragte</div>
-        <div>Ludwigstraße 23</div>
-        <div>35390 Gießen</div>
-        <div>Tel: 0641-99 122 30 / 0641-99 122 70</div>
-        <NuxtLink
-          class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-          to="mailto:datenschutz@aruna-storage.org" target="_blank">
-          <IconMail class="flex-shrink-0 size-4" /> datenschutz@aruna-storage.org
-        </NuxtLink>
-        <div>Last updated: 20. April 2023</div>
-        <hr class="border-gray-200 my-5">
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <div class="pb-4 ps-8">
+          <div>Justus-Liebig-Universität Gießen</div>
+          <div>Der behördliche Datenschutzbeauftragte</div>
+          <div>Ludwigstraße 23</div>
+          <div>35390 Gießen</div>
+          <div>Tel: 0641-99 122 30 / 0641-99 122 70</div>
+          <NuxtLink to="mailto:datenschutz@aruna-storage.org" target="_blank"
+                    class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+            <IconMail class="flex-shrink-0 size-4"/>
+            datenschutz@aruna-storage.org
+          </NuxtLink>
+          <div>Last updated: 20. April 2023</div>
+        </div>
+        <hr class="border-2 border-gray-400 my-5">
+        <p class="mt-2 text-center font-bold text-gray-800 dark:text-gray-400">
           Bitte beachten Sie, dass diese Datenschutzerklärung jederzeit geändert werden kann. Eine jeweils aktuelle
           Version finden Sie auf dieser Website.
         </p>
@@ -160,65 +174,73 @@ import { IconMail } from '@tabler/icons-vue';
           of what kind of personal data is collected, for what purpose and how long it is stored.
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           1. Responsible
         </h3>
-        <div><strong>Responsible for data processing is:</strong></div>
-        <div>President of the</div>
-        <div>Justus-Liebig-University Giessen</div>
-        <div>Ludwigstraße 23</div>
-        <div>35390 Giessen</div>
-        <div>Germany</div>
-        <div>
-          <NuxtLink
-            class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-            to="mailto:support@aruna-storage.org" target="_blank">
-            <IconMail class="flex-shrink-0 size-4" /> support@aruna-storage.org
-          </NuxtLink>
+        <hr class="border-gray-400">
+        <div class="mt-2 ps-4 font-bold">Responsible for data processing is:</div>
+        <div class="ps-8 pb-4">
+          <div>President of the</div>
+          <div>Justus-Liebig-University Giessen</div>
+          <div>Ludwigstraße 23</div>
+          <div>35390 Giessen</div>
+          <div>Germany</div>
+          <div>
+            <NuxtLink to="mailto:support@aruna-storage.org" target="_blank"
+                      class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+              <IconMail class="flex-shrink-0 size-4"/>
+              support@aruna-storage.org
+            </NuxtLink>
+          </div>
         </div>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           2. Collection of personal data
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           We collect personal data from you when you register for an account or join the mailing-list on our
-          website. <br />The following personal data is collected:
+          website. <br/>The following personal data is collected:
         </p>
         <ul class="list-disc list-inside p-4">
           <li>A self-selected name</li>
           <li>Email address for contact</li>
         </ul>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           3. Purpose of data processing
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           The personal data provided by you is exclusively used for the creation of your account. If an email address is
           provided, we will inform you about account-related events. If you join the mailing-list, we will send you
           information about the project in irregular intervals.
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           4. Legal basis for data processing
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           The legal basis for the processing of your personal data for the creation of your account is Art. 6 para. 1
           lit. b
           GDPR.
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           5. Storage period of the data
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           Your personal data will be stored for the duration of your account with us. If you delete your account,
           your data will be deleted immediately.
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           6. Your rights as a data subject
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           You have the right to request information about the personal data stored by us as well as the right to
           correction,
           deletion and restriction of the processing of your personal data (Art. 15, 16 and 18 of the European General
@@ -234,45 +256,50 @@ import { IconMail } from '@tabler/icons-vue';
           or have it transferred to another controller (Art. 20 EU-GDPR).
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
           7. Contact
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           If you have any questions about the collection, processing or use of your personal data, please contact us by
           email at
-          <NuxtLink
-            class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-            to="mailto:datenschutz@aruna-storage.org" target="_blank">
-            <IconMail class="flex-shrink-0 size-4" /> datenschutz@aruna-storage.org
-          </NuxtLink>.
+          <NuxtLink to="mailto:datenschutz@aruna-storage.org" target="_blank"
+                    class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+            <IconMail class="flex-shrink-0 size-4"/>
+            datenschutz@aruna-storage.org
+          </NuxtLink>
+          .
         </p>
 
         <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
           8. Data Protection Officer
         </h3>
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <hr class="border-gray-400">
+        <p class="mt-2 p-4 text-gray-800 dark:text-gray-400">
           <strong>
             The contact details of the official data protection officers at Justus Liebig University are:
           </strong>
         </p>
-        <div>Justus-Liebig-Universität Gießen</div>
-        <div>Der behördliche Datenschutzbeauftragte</div>
-        <div>Ludwigstraße 23</div>
-        <div>35390 Gießen</div>
-        <div>Tel: 0641-99 122 30 / 0641-99 122 70</div>
-        <NuxtLink
-          class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-          to="mailto:datenschutz@aruna-storage.org" target="_blank">
-          <IconMail class="flex-shrink-0 size-4" /> datenschutz@aruna-storage.org
-        </NuxtLink>
-        <div>Last updated: 20. April 2023</div>
-        <hr class="border-gray-200 my-5">
-        <p class="mt-2 text-gray-800 dark:text-gray-400">
+        <div class="pb-4 ps-8">
+          <div>Justus-Liebig-Universität Gießen</div>
+          <div>Der behördliche Datenschutzbeauftragte</div>
+          <div>Ludwigstraße 23</div>
+          <div>35390 Gießen</div>
+          <div>Tel: 0641-99 122 30 / 0641-99 122 70</div>
+          <NuxtLink to="mailto:datenschutz@aruna-storage.org" target="_blank"
+                    class="inline-flex items-center gap-x-1 text-sm font-semibold rounded-lg border border-transparent text-arunaPrimary hover:text-blue-600 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+            <IconMail class="flex-shrink-0 size-4"/>
+            datenschutz@aruna-storage.org
+          </NuxtLink>
+          <div>Last updated: 20. April 2023</div>
+        </div>
+        <hr class="border-2 border-gray-400 my-5">
+        <p class="mt-2 text-center font-bold text-gray-800 dark:text-gray-400">
           Please note that this privacy policy may be changed at any time. You can find the current version on
           this website.
         </p>
       </div>
     </div>
   </div>
-  <Footer />
+  <Footer/>
 </template>
