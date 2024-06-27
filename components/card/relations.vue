@@ -117,11 +117,11 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
                 <span v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
-              relation.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND">
+                            relation.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND">
                   Parent
                 </span>
               <span v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
-              relation.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND">
+                               relation.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND">
                   Child
                 </span>
               <span
@@ -164,26 +164,21 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
               </NuxtLink>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
-                <span v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
-              relation.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND">
-                  Parent
-                </span>
-              <span v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
-              relation.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND">
-                  Child
-                </span>
+              {{ toResourceTypeStr(relation.resourceVariant) }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
-              <span
-                  v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO">
-                  Belongs To
-                </span>
-              <span
-                  v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_ORIGIN">
+              <span v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
+                            relation.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND">
+                  Parent
+              </span>
+              <span v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
+                               relation.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND">
+                  Child
+              </span>
+              <span v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_ORIGIN">
                   Origin
                 </span>
-              <span
-                  v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_VERSION">
+              <span v-else-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_VERSION">
                   Version
                 </span>
               <span
