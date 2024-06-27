@@ -62,8 +62,10 @@ import {IconChevronRight} from "@tabler/icons-vue";
         <!-- End Col -->
 
         <div class="relative ms-4 border-gray-300">
-          <img class="w-full dark:hidden" src="~/assets/imgs/hero_bright.gif" alt="Aruna Search Demo"/>
-          <img class="w-full hidden dark:inline" src="~/assets/imgs/hero_dark.gif" alt="Aruna Search Demo"/>
+          <img class="w-full rounded-md dark:hidden" src="assets/imgs/hero_person_light.png"
+               alt="Scientist with two batons orchestrates his data streams."/>
+          <img class="w-full rounded-md hidden dark:inline" src="assets/imgs/hero_person_dark.png"
+               alt="Scientist with two batons orchestrates his data streams.>"/>
         </div>
         <!-- End Col -->
       </div>
