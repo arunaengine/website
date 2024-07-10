@@ -5,6 +5,8 @@ import {type EndpointInfo} from '~/composables/api_wrapper';
 const props = defineProps<{
   endpoints: EndpointInfo[] | undefined
 }>()
+
+const emit = defineEmits<{(e: 'download', endpointId: string): void}>()
 </script>
 
 <template>
@@ -38,8 +40,8 @@ const props = defineProps<{
                 <button
                     type="button"
                     title="Download Object"
+                    @click="emit('download', endpoint.id)"
                     class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
-                    <!-- @click="downloadResource(endpoint.id)" -->
                     <IconCloudDown class="flex-shrink-0"/>
                 </button>
             </td>

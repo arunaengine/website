@@ -52,12 +52,15 @@ function isDownloadable(): boolean {
   return false
 }
 
-async function downloadResource() {
+async function downloadResource(endpointId?: string) {
   if (objectInfo) {
+    if (typeof endpointId === "undefined") {
+      endpointId = objectInfo.endpoints[0].id
+    }
     if (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT) {
       if (objectInfo.data_class === v2DataClass.DATA_CLASS_PUBLIC) {
         //TODO: Choose nearest endpoint from object locations
-        const endpoint = await fetchEndpoint(objectInfo.endpoints[0].id)
+        const endpoint = await fetchEndpoint(endpointId)
         const data_module = endpoint?.hostConfigs?.find(conf => conf.hostVariant === v2EndpointHostVariant.ENDPOINT_HOST_VARIANT_S3)
 
         if (data_module?.url) {
@@ -86,7 +89,6 @@ async function downloadResource() {
     } else {
       // Create presigned download url for temp bundle
       //TODO: Evaluate "nearest" DataProxy
-      let endpointId = objectInfo.endpoints[0].id
       // Fetch S3 credentials (includes host url)
       const creds = await getUserS3Credentials(endpointId)
       // Create S3 client and pre-sign url
@@ -261,7 +263,7 @@ const router = useRouter()
           <IconExternalLink class="flex-shrink-0 size-6 me-4"/>
           <span class="">Alternative Download Locations</span>
         </div>
-        <CardDownloads :endpoints="objectInfo?.endpoints" />
+        <CardDownloads :endpoints="objectInfo?.endpoints" @download="downloadResource"/>
       </div>
     </div>
     <!-- End Alternative Download Locations -->
