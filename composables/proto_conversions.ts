@@ -28,7 +28,7 @@ export type ObjectInfo = {
     permission: v2PermissionLevel,
     license: string,
     data_license: string,
-    endpoints: string[]
+    endpoints: EndpointInfo[]
 }
 
 export type EndpointInfo = {

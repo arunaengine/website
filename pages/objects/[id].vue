@@ -255,18 +255,18 @@ const router = useRouter()
     </div>
     <!-- End Relations Row -->
 
-    <!-- Alternative Download Locations -->
+    <!-- Locations -->
     <div v-if="isDownloadable()" class="flex flex-wrap justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
       <div
           class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-          <IconExternalLink class="flex-shrink-0 size-6 me-4"/>
-          <span class="">Alternative Download Locations</span>
+          <IconCloudDown class="flex-shrink-0 size-6 me-4"/>
+          <span class="">Locations</span>
         </div>
         <CardDownloads :endpoints="objectInfo?.endpoints" @download="downloadResource"/>
       </div>
     </div>
-    <!-- End Alternative Download Locations -->
+    <!-- End Locations -->
   </div>
   <div v-else class="">
     <div class="flex flex-wrap justify-center container mx-auto mb-6">

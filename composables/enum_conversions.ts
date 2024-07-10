@@ -1,6 +1,7 @@
 import {
   modelsv2Status,
   storagemodelsv2ComponentStatus,
+  storagemodelsv2ReplicationStatus,
   v2AnnouncementType,
   v2DataClass,
   v2EndpointVariant,
@@ -111,6 +112,16 @@ export function toRelationDirectionStr(variant: v2RelationDirection | undefined)
     switch (variant) {
         case v2RelationDirection.RELATION_DIRECTION_INBOUND: return "Inbound"
         case v2RelationDirection.RELATION_DIRECTION_OUTBOUND: return "Outbound"
+        default: return 'Unspecified'
+    }
+}
+
+export function toReplicationStatusStr(variant: storagemodelsv2ReplicationStatus | undefined): string {
+    switch (variant) {
+        case storagemodelsv2ReplicationStatus.REPLICATION_STATUS_WAITING: return "Waiting"
+        case storagemodelsv2ReplicationStatus.REPLICATION_STATUS_RUNNING: return "Running"
+        case storagemodelsv2ReplicationStatus.REPLICATION_STATUS_FINISHED: return "Finshed"
+        case storagemodelsv2ReplicationStatus.REPLICATION_STATUS_ERROR: return "Error"
         default: return 'Unspecified'
     }
 }
