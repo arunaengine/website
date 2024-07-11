@@ -1,9 +1,5 @@
 <script lang="ts" setup>
-import {v2ResourceVariant} from "@/composables/aruna_api_json";
-import type {
-  v2GenericResource,
-  v2SearchResourcesResponse,
-} from "@/composables/aruna_api_json";
+import {v2ResourceVariant, type v2GenericResource} from "~/composables/aruna_api_json";
 import {
   IconFile,
   IconFiles,
@@ -13,6 +9,7 @@ import {
   IconWorldSearch,
 } from "@tabler/icons-vue";
 import {searchResources} from "~/composables/api_wrapper";
+import {VueAwesomePaginate} from "vue-awesome-paginate";
 
 const page = ref(1);
 const limit = ref(20);
@@ -102,7 +99,7 @@ async function queryResources(pageReset: boolean) {
   }
 }
 
-const paginationClickHandler = (page: number) => {
+const paginationClickHandler = () => {
   queryResources(false)
 };
 
@@ -232,16 +229,23 @@ onMounted(async () => await queryResources(true));
     </div>
 
     <div class="p-4 sm:mt-3 md:basis-3/4 md:mt-0">
-      <vue-awesome-paginate :total-items="estimatedTotal" :items-per-page="20" :max-pages-shown="5"
-                            v-model="page" :on-click="paginationClickHandler"/>
+      <VueAwesomePaginate v-if="estimatedTotal > 0"
+                          v-model="page"
+                          :total-items="estimatedTotal"
+                          :items-per-page="20"
+                          :max-pages-shown="5"
+                          @click="paginationClickHandler"/>
 
       <!-- Start Display Search Results -->
       <SearchResults :key="hits" :resources="hits"/>
       <!-- End Display Search Results -->
 
-      <vue-awesome-paginate v-if="estimatedTotal > 20" :total-items="estimatedTotal" :items-per-page="20"
-                            :max-pages-shown="5"
-                            v-model="page" :on-click="paginationClickHandler"/>
+      <VueAwesomePaginate v-if="estimatedTotal > 20"
+                          v-model="page"
+                          :total-items="estimatedTotal"
+                          :items-per-page="20"
+                          :max-pages-shown="5"
+                          @click="paginationClickHandler"/>
     </div>
   </div>
 
