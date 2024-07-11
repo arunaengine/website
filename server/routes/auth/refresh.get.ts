@@ -1,6 +1,6 @@
 
 export default defineEventHandler(async (event) => {
-    if (process.client) {
+    if (import.meta.client) {
         return
     }
 
