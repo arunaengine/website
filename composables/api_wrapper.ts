@@ -1,6 +1,7 @@
 import {
   type apistorageservicesv2DeleteObjectResponse,
   type modelsv2License,
+  type v2Announcement,
   type v2Collection,
   type v2CreateAPITokenRequest,
   type v2CreateAPITokenResponse,
@@ -16,6 +17,7 @@ import {
   type v2Dataset,
   type v2DeleteAPITokenResponse,
   type v2Endpoint,
+  type v2GetAnnouncementsResponse,
   type v2GetDownloadURLResponse,
   type v2GetHierarchyResponse,
   type v2GetResourceResponse,
@@ -33,6 +35,35 @@ import {
 } from "./aruna_api_json"
 import {type ObjectInfo, toObjectInfo} from "~/composables/proto_conversions";
 import type {ArunaError} from "~/composables/ArunaError";
+
+
+export async function getAnnouncements(start_after: string | undefined, limit: number | undefined): Promise<v2Announcement[]> {
+  return await $fetch<v2GetAnnouncementsResponse>('/api/announcements', {
+    query: {
+      'page.startAfter': start_after || '',
+      'page.pageSize': limit && limit > 0 ? limit : -1
+    }
+  })
+      .then(response => {
+        return response.announcements ? response.announcements : []
+      })
+      .catch(error => {
+        console.error(error)
+        return []
+      })
+}
+
+export async function getAnnouncement(announcementId: string): Promise<v2Announcement | undefined> {
+  console.log(announcementId)
+  return await $fetch<v2Announcement | undefined>('/api/announcement', {
+    query: {
+      announcementId: announcementId
+    }
+  }).catch(error => {
+    console.error(error)
+    return undefined
+  })
+}
 
 export async function searchResources(query: string): Promise<v2SearchResourcesResponse> {
   return await $fetch<v2SearchResourcesResponse>('api/search', {
