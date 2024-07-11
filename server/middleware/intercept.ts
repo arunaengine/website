@@ -7,11 +7,12 @@ export default defineEventHandler(async (event) => {
     const request = getRequestURL(event)
 
     // Search is public, resource fetch is semi-public and get endpoints is public
-    if (request.toString().includes('api/search') ||
+    if ((request.toString().includes('api/announcement') && event.method === 'GET') ||
+        request.toString().includes('api/search') ||
         request.toString().includes('api/resource') ||
         (request.toString().includes('api/endpoint') && event.method === 'GET'))
     {
-        return // Just do nothing
+      return // No authentication needed
     }
 
     const config = useRuntimeConfig().provider.local;
