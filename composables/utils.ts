@@ -27,8 +27,6 @@ export function closeModal(modalId: string) {
   })
 }
 
-
-
 /* ---------- USER ---------- */
 export function isUserAdmin(user: v2User | undefined): boolean {
     if (user?.attributes?.globalAdmin) {
