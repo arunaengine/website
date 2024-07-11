@@ -5,6 +5,7 @@ import {
   IconBrandGithub,
   IconBucket,
   IconLogout,
+  IconNews,
   IconSearch,
   IconUserScan,
   IconUserUp
@@ -15,6 +16,10 @@ const colorMode = useColorMode()
 
 const userState: Ref<v2User | undefined> = inject('userRef', ref(undefined))
 const isLoggedIn = computed(() => userState.value !== undefined)
+
+function closeSidebar() {
+  closeModal('docs-sidebar')
+}
 </script>
 
 <template>
@@ -31,6 +36,7 @@ const isLoggedIn = computed(() => userState.value !== undefined)
       <ul class="space-y-1.5">
         <li v-if="isLoggedIn && isUserAdmin(userState)">
           <NuxtLink to="/user/admin"
+                    @click="closeSidebar"
                     class="flex items-center gap-x-2 py-2 px-3 rounded-lg cursor-pointer text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700">
             <IconUserUp class="size-4"/>
             Administration
@@ -40,6 +46,7 @@ const isLoggedIn = computed(() => userState.value !== undefined)
 
         <li class="sm:hidden">
           <NuxtLink to="/explore"
+                    @click="closeSidebar"
                     class="flex items-center gap-x-2 py-2 px-3 rounded-lg cursor-pointer text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700">
             <IconSearch class="flex-shrink-0 size-4"/>
             Search
@@ -48,6 +55,7 @@ const isLoggedIn = computed(() => userState.value !== undefined)
 
         <li v-if="isLoggedIn">
           <NuxtLink to="/user/account"
+                    @click="closeSidebar"
                     class="flex items-center gap-x-2 py-2 px-3 rounded-lg cursor-pointer text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700">
             <IconUserScan class="size-4"/>
             Account
@@ -56,6 +64,7 @@ const isLoggedIn = computed(() => userState.value !== undefined)
 
         <li v-if="isLoggedIn">
           <a href="/user/messages"
+             @click="closeSidebar"
              class="flex items-center gap-x-2 py-2 px-3 rounded-lg cursor-pointer text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700 opacity-50 pointer-events-none">
             <IconBell class="size-4"/>
             Messages
@@ -64,14 +73,23 @@ const isLoggedIn = computed(() => userState.value !== undefined)
 
         <li v-if="isLoggedIn">
           <NuxtLink to="/user/resources"
+                    @click="closeSidebar"
                     class="flex items-center gap-x-2 py-2 px-3 rounded-lg cursor-pointer text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700">
             <IconBucket class="size-4"/>
             Resources
           </NuxtLink>
         </li>
 
-        <li class="hs-accordion sm:hidden" id="docs-sidebar-accordion">
+        <li class="sm:hidden">
           <hr class="border-gray-200 my-5"/>
+          <NuxtLink to="/news"
+                    @click="closeSidebar"
+                    class="flex items-center gap-x-2 py-2 px-3 rounded-lg cursor-pointer text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700">
+            <IconNews class="flex-shrink-0 size-4"/>
+            News
+          </NuxtLink>
+        </li>
+        <li class="hs-accordion sm:hidden" id="docs-sidebar-accordion">
           <button type="button"
                   class="hs-accordion-toggle hs-accordion-active:hover:bg-transparent w-full text-start flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 dark:hs-accordion-active:text-white">
             <IconBook class="flex-shrink-0 size-4"/>
