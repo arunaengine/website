@@ -29,5 +29,8 @@
     "vue": "^3.4.30",
     "vue-awesome-paginate": "^1.2.0",
     "vue-router": "^4.4.0"
+  },
+  "devDependencies": {
+    "bun-types": "^1.1.18"
   }
 }
