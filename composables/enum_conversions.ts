@@ -1,14 +1,26 @@
 import {
-    modelsv2Status,
-    storagemodelsv2ComponentStatus,
-    v2DataClass,
-    v2EndpointVariant,
-    v2InternalRelationVariant,
-    v2KeyValueVariant,
-    v2PermissionLevel,
-    v2RelationDirection,
-    v2ResourceVariant
+  modelsv2Status,
+  storagemodelsv2ComponentStatus,
+  v2AnnouncementType,
+  v2DataClass,
+  v2EndpointVariant,
+  v2InternalRelationVariant,
+  v2KeyValueVariant,
+  v2PermissionLevel,
+  v2RelationDirection,
+  v2ResourceVariant
 } from "./aruna_api_json"
+
+export function toAnnouncementTypeStr(variant: v2AnnouncementType | undefined): string {
+  switch (variant) {
+    case v2AnnouncementType.ANNOUNCEMENT_TYPE_ORGA: return "Orga"
+    case v2AnnouncementType.ANNOUNCEMENT_TYPE_RELEASE: return "Release"
+    case v2AnnouncementType.ANNOUNCEMENT_TYPE_UPDATE: return "Update"
+    case v2AnnouncementType.ANNOUNCEMENT_TYPE_MAINTENANCE: return "Maintenance"
+    case v2AnnouncementType.ANNOUNCEMENT_TYPE_BLOG: return "Blog"
+    default: return "Unspecified"
+  }
+}
 
 export function toResourceTypeStr(variant: v2ResourceVariant | undefined): string {
     switch (variant) {
