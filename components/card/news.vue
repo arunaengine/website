@@ -46,9 +46,9 @@ function displayDate() {
     <div class="aspect-w-16 aspect-h-11">
       <img v-if="imageUrl" class="w-full object-cover rounded-md"
            :src="imageUrl"
-           alt="News article preview image">
+           alt="Announcement preview image">
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_RELEASE'" class="w-full object-cover rounded-md"
-           src="assets/imgs/blog_blog2.webp"
+           src="assets/imgs/blog_release.webp"
            alt="Default image for release announcements">
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_UPDATE'" class="w-full object-cover rounded-md"
            src="assets/imgs/blog_update.webp"
