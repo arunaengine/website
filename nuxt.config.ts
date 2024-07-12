@@ -46,6 +46,24 @@ export default defineNuxtConfig({
         realm: "test",
         scope: ["openid"],
       }
+    },
+    public: {
+      markdownCss: {
+        h1: ['text-3xl', 'font-bold', 'text-center', 'text-gray-700', 'dark:text-white'],
+        h2: ['mt-6', 'mb-2', 'text-2xl', 'font-bold', 'text-gray-600', 'dark:text-gray-500'],
+        h3: ['mt-6', 'mb-2', 'text-xl', 'font-bold', 'uppercase', 'text-gray-600', 'dark:text-gray-500'],
+        p: ['mt-2', 'p-4', 'text-gray-800', 'dark:text-gray-400'],
+        a: ['text-aruna-800', 'hover:text-aruna-700'],
+        hr: ['border-gray-400'],
+        ul: ['list-disc', 'list-outside', 'space-y-5', 'p-5', 'text-lg', 'text-gray-800', 'dark:text-gray-400'],
+        ol: ['list-decimal', 'list-outside', 'space-y-5', 'ps-5', 'text-lg', 'text-gray-800', 'dark:text-gray-400'],
+        li: ['ps-2'],
+        img: ['rounded-md'],
+        code: ['p-4'],
+        dl: ['p-4'],
+        dt: ['pt-4', 'font-medium', 'leading-6', 'text-gray-900'],
+        dd: ['mt-1', 'ps-4', 'leading-6', 'text-gray-700', 'sm:col-span-2', 'sm:mt-0']
+      }
     }
   },
 })
