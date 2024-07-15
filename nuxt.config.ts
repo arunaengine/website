@@ -63,7 +63,11 @@ export default defineNuxtConfig({
         dl: ['p-4'],
         dt: ['pt-4', 'font-medium', 'leading-6', 'text-gray-900'],
         dd: ['mt-1', 'ps-4', 'leading-6', 'text-gray-700', 'sm:col-span-2', 'sm:mt-0']
-      }
+      },
+      infoBannerActive: true,
+      infoBannerTitle: 'Info banner title: ',
+      infoBannerText: 'Info banner custom text with important information ',
+      infoBannerLink: '/news'
     }
   },
 })
