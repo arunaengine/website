@@ -5,9 +5,9 @@ const props = defineProps<{
   modalId: string,
 }>()
 
-const infoTitle = useRuntimeConfig().public.infoBannerTitle
-const infoText = useRuntimeConfig().public.infoBannerText
-const infoLink = useRuntimeConfig().public.infoBannerLink
+const infoTitle = useRuntimeConfig().public.infoBanner.title
+const infoText = useRuntimeConfig().public.infoBanner.text
+const infoLink = useRuntimeConfig().public.infoBanner.link
 
 </script>
 <template>
