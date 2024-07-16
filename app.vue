@@ -92,6 +92,8 @@ onMounted(() => updateUser())
   <!-- Header + Navigation -->
   <!-- Main body -->
   <div class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent to-aruna-800/[.10]">
+    <ToastInfo v-if="useRuntimeConfig().public.infoBanner.active" modalId="info-toast" infoMsg="Hello"/>
+
     <!-- Body -->
     <NuxtLoadingIndicator/>
     <NuxtPage/>

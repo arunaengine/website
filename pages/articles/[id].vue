@@ -32,10 +32,34 @@ async function markdownToHtml(markdown: string | undefined): Promise<string> {
   return md.render(markdown)
 }
 
+function displayDate() {
+  const c_date = new Date(announcement.createdAt)
+  const m_date = new Date(announcement.modifiedAt)
+  //const locale = (navigator && navigator.language) || "de-DE";
+
+  if (m_date > c_date) {
+    const date_str = m_date.toLocaleDateString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+    return `${date_str} (modified)`
+  } else {
+    return c_date.toLocaleDateString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+}
+
 onBeforeMount(async () => {
   content.value = await markdownToHtml(announcement?.content)
 })
-
 </script>
 <style>
 code {
@@ -73,18 +97,13 @@ code .line::before {
               <div>
 
                 <span class="font-semibold text-gray-800 dark:text-neutral-200">
-                    The Aruna Team
+                    {{ announcement?.createdBy }}
                 </span>
 
                 <ul class="text-xs text-gray-500 dark:text-neutral-500">
                   <li class="inline-block relative pe-6 last:pe-0 last-of-type:before:hidden before:absolute before:top-1/2 before:end-2 before:-translate-y-1/2 before:size-1 before:bg-gray-500 before:rounded-full dark:text-neutral-400 dark:before:bg-neutral-600">
-                    {{ announcement?.createdAt }}
+                    {{ displayDate() }}
                   </li>
-                  <!--
-                  <li class="inline-block relative pe-6 last:pe-0 last-of-type:before:hidden before:absolute before:top-1/2 before:end-2 before:-translate-y-1/2 before:size-1 before:bg-gray-500 before:rounded-full dark:text-neutral-400 dark:before:bg-neutral-600">
-                    8 min read
-                  </li>
-                  -->
                 </ul>
               </div>
 
