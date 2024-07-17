@@ -10,6 +10,7 @@ const props = defineProps<{
 const emit = defineEmits<{(e: 'download', endpointId: string): void}>()
 
 
+#TODO change to fetchEndpoints
 const endpointData = {};
 await Promise.all(props.endpoints.map(async (endpointInfo: EndpointInfo) => {
   try {
@@ -50,9 +51,6 @@ function toReplicationStatusColor(variant: storagemodelsv2ReplicationStatus | un
           <thead>
           <tr>
             <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
-              Endpoint ID
-            </th>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
               Endpoint Name
             </th>
             <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
@@ -67,14 +65,11 @@ function toReplicationStatusColor(variant: storagemodelsv2ReplicationStatus | un
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
           <tr v-for="endpoint in props.endpoints" class="hover:bg-gray-100 dark:hover:bg-gray-700">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
-                {{ endpoint.id }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
                 {{ endpointData[endpoint.id].name }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200 flex item-center gap-2">
-              <component :is="toReplicationStatusIcon(endpoint.status)" class="flex-shrink-0" :color="toReplicationStatusColor(endpoint.status)"></component>
               <span class="">{{ toReplicationStatusStr(endpoint.status) }}</span>
+              <component :is="toReplicationStatusIcon(endpoint.status)" class="flex-shrink-0" :color="toReplicationStatusColor(endpoint.status)"></component>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
                 <center>
