@@ -9,6 +9,7 @@ import type {
     v2Stats,
 } from '@/composables/aruna_api_json';
 import {v2ResourceVariant} from "@/composables/aruna_api_json";
+import {storagemodelsv2ReplicationStatus} from './aruna_api_json';
 
 /* Object info conversions */
 export type ObjectInfo = {
@@ -27,7 +28,12 @@ export type ObjectInfo = {
     permission: v2PermissionLevel,
     license: string,
     data_license: string,
-    endpoints: string[]
+    endpoints: EndpointInfo[]
+}
+
+export type EndpointInfo = {
+    id?: string,
+    status?: storagemodelsv2ReplicationStatus
 }
 
 export function toObjectInfo(
@@ -55,7 +61,7 @@ export function toObjectInfo(
             permission: permission,
             license: resource.project.metadataLicenseTag,
             data_license: resource.project.defaultDataLicenseTag,
-            endpoints: resource.project.endpoints?.map(x => x.id)
+            endpoints: resource.project.endpoints?.map(x => ({id: x.id, status: x.status} as EndpointInfo))
         } as ObjectInfo
     } else if (resource.collection) {
         return {
@@ -74,7 +80,7 @@ export function toObjectInfo(
             permission: permission,
             license: resource.collection.metadataLicenseTag,
             data_license: resource.collection.defaultDataLicenseTag,
-            endpoints: resource.collection.endpoints?.map(x => x.id)
+            endpoints: resource.collection.endpoints?.map(x => ({id: x.id, status: x.status} as EndpointInfo))
         } as ObjectInfo
     } else if (resource.dataset) {
         return {
@@ -93,7 +99,7 @@ export function toObjectInfo(
             permission: permission,
             license: resource.dataset.metadataLicenseTag,
             data_license: resource.dataset.defaultDataLicenseTag,
-            endpoints: resource.dataset.endpoints?.map(x => x.id)
+            endpoints: resource.dataset.endpoints?.map(x => ({id: x.id, status: x.status} as EndpointInfo))
         } as ObjectInfo
     } else if (resource.object) {
         return {
@@ -116,7 +122,7 @@ export function toObjectInfo(
             permission: permission,
             license: resource.object.metadataLicenseTag,
             data_license: resource.object.dataLicenseTag,
-            endpoints: resource.object.endpoints?.map(x => x.id)
+            endpoints: resource.object.endpoints?.map(x => ({id: x.id, status: x.status} as EndpointInfo))
         } as ObjectInfo
     }
 
