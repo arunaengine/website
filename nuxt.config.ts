@@ -50,12 +50,12 @@ export default defineNuxtConfig({
     public: {
       markdownCss: {
         h1: ['text-3xl', 'font-bold', 'text-center', 'text-gray-700', 'dark:text-white'],
-        h2: ['mt-6', 'mb-2', 'text-2xl', 'font-bold', 'text-gray-600', 'dark:text-gray-500'],
-        h3: ['mt-6', 'mb-2', 'text-xl', 'font-bold', 'uppercase', 'text-gray-600', 'dark:text-gray-500'],
-        p: ['mt-2', 'p-4', 'text-gray-800', 'dark:text-gray-400'],
-        a: ['text-aruna-800', 'hover:text-aruna-700'],
+        h2: ['mt-6', 'mb-2', 'text-2xl', 'font-bold', 'text-gray-600', 'dark:text-gray-300'],
+        h3: ['mt-6', 'mb-2', 'text-xl', 'font-bold', 'uppercase', 'text-gray-600', 'dark:text-gray-300'],
+        p: ['mt-2', 'px-4', 'py-2', 'text-gray-800', 'dark:text-gray-200'],
+        a: ['text-aruna-800', 'hover:text-aruna-700', 'dark:text-aruna-700', 'dark:hover:text-aruna-600'],
         hr: ['border-gray-400'],
-        ul: ['list-disc', 'list-outside', 'space-y-5', 'p-5', 'text-lg', 'text-gray-800', 'dark:text-gray-400'],
+        ul: ['list-disc', 'list-outside', 'space-y-5', 'ps-4', 'py-2', 'text-lg', 'text-gray-800', 'dark:text-gray-400'],
         ol: ['list-decimal', 'list-outside', 'space-y-5', 'ps-5', 'text-lg', 'text-gray-800', 'dark:text-gray-400'],
         li: ['ps-2'],
         img: ['rounded-md'],
