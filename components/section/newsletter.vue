@@ -45,7 +45,8 @@ async function submit() {
 
 </script>
 <template>
-  <div class="container w-full my-6 border-2 border-gray-400 rounded-md px-4 py-10 sm:px-6 lg:px-8 lg:py-16 mx-auto">
+  <div id="mailing-list"
+       class="container w-full my-6 border-2 border-gray-400 rounded-md px-4 py-10 sm:px-6 lg:px-8 lg:py-16 mx-auto">
     <div class="grid md:grid-cols-2 gap-8">
       <div class="max-w-md">
         <h2 class="text-2xl font-bold md:text-3xl md:leading-tight dark:text-white">
