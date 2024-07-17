@@ -5,12 +5,10 @@ import { storagemodelsv2ReplicationStatus } from '../../composables/aruna_api_js
 
 const props = defineProps<{
   endpoints: EndpointInfo[] | undefined
-}>()
+}>();
 
-const emit = defineEmits<{(e: 'download', endpointId: string): void}>()
+const emit = defineEmits<{(e: 'download', endpointId: string): void}>();
 
-
-#TODO change to fetchEndpoints
 const endpointData = {};
 await Promise.all(props.endpoints.map(async (endpointInfo: EndpointInfo) => {
   try {
@@ -77,6 +75,7 @@ function toReplicationStatusColor(variant: storagemodelsv2ReplicationStatus | un
                       type="button"
                       title="Download Object"
                       @click="emit('download', endpoint.id)"
+                      :disabled="endpoint.status != storagemodelsv2ReplicationStatus.REPLICATION_STATUS_FINISHED"
                       class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
                       <IconCloudDown class="flex-shrink-0"/>
                   </button>
