@@ -24,6 +24,7 @@ import type {v2Object} from "~/composables/aruna_api_json";
 
 // Router to navigate back
 const router = useRouter()
+const route = useRoute()
 const licenses = await fetchLicenses()
 
 const createdResource: Ref<v2Project | undefined> = ref(undefined)
@@ -136,6 +137,15 @@ watch(resourceType, () => {
 const resourceParentId = ref('')
 const resourceParent: Ref<ObjectInfo | undefined> = ref(undefined)
 const resourceParentIdError: Ref<string | undefined> = ref('Please enter a valid parent id')
+
+// Set resourceParentId from query parameter if it exists
+const resourceParentIdParam = route.query.resourceParentId;
+if (Array.isArray(resourceParentIdParam)) {
+  // Use the first value if multiple values are provided
+  resourceParentId.value = resourceParentIdParam[0];
+} else if (typeof resourceParentIdParam === 'string') {
+  resourceParentId.value = resourceParentIdParam;
+}
 
 watch(resourceParentId, async () => await validateParentId())
 

@@ -5,6 +5,7 @@ import {
   IconBucket,
   IconCloudDown,
   IconCloudLock,
+  IconCloudPlus,
   IconExternalLink,
   IconFileInfo,
   IconLicense,
@@ -118,6 +119,13 @@ async function downloadResource() {
 
 /* Back link to last page in navigation history */
 const router = useRouter()
+
+const redirectToCreateChild = () => {
+  if (objectInfo) {
+    const id = objectInfo.id;
+    router.push({ path: '/objects/create', query: { resourceParentId: id } });
+  }
+};
 </script>
 
 <template>
@@ -171,6 +179,16 @@ const router = useRouter()
               title="Download Object"
               class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
             <IconCloudDown class="flex-shrink-0"/>
+          </button>
+        </li>
+        <li v-else
+          class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+          <button
+              type="button"
+              @click="redirectToCreateChild"
+              title="Create Child"
+              class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
+            <IconCloudPlus class="flex-shrink-0"/>
           </button>
         </li>
       </ul>
