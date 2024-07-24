@@ -33,6 +33,15 @@ export function toResourceTypeStr(variant: v2ResourceVariant | undefined): strin
     }
 }
 
+export function getChildResourceType(variant: v2ResourceVariant | undefined): v2ResourceVariant {
+  switch (variant) {
+    case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: return v2ResourceVariant.RESOURCE_VARIANT_COLLECTION
+    case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION: return v2ResourceVariant.RESOURCE_VARIANT_DATASET
+    case v2ResourceVariant.RESOURCE_VARIANT_DATASET: return v2ResourceVariant.RESOURCE_VARIANT_OBJECT
+    default: return v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED
+  }
+}
+
 export function toPermissionTypeStr(variant: v2PermissionLevel | undefined): string {
     switch (variant) {
         case v2PermissionLevel.PERMISSION_LEVEL_NONE: return "None"

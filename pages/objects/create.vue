@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import {IconSquareRoundedPlus, IconExclamationCircle, IconTrash, IconArrowLeft} from '@tabler/icons-vue'
+import {IconArrowLeft, IconExclamationCircle, IconSquareRoundedPlus, IconTrash} from '@tabler/icons-vue'
 import {
-  v2DataClass,
-  v2KeyValueVariant,
-  v2ResourceVariant,
-  type v2KeyValue,
-  type v2Relation,
   type v2Author,
-  type v2Project,
+  v2DataClass,
   type v2DataEndpoint,
   type v2GetS3CredentialsUserTokenResponse,
-} from '~/composables/aruna_api_json'
+  v2InternalRelationVariant,
+  type v2KeyValue,
+  v2KeyValueVariant,
+  type v2Object,
+  type v2Project,
+  type v2Relation,
+  v2RelationDirection,
+  v2ResourceVariant
+} from "~/composables/aruna_api_json";
 
 import {toRelationDirectionStr, toRelationVariantStr, toResourceTypeStr} from "~/composables/enum_conversions"
 import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants"
@@ -20,7 +23,35 @@ import EventBus from "~/composables/EventBus";
 
 import {HeadObjectCommand, S3Client, type S3ClientConfig} from "@aws-sdk/client-s3";
 import {Upload} from "@aws-sdk/lib-storage";
-import type {v2Object} from "~/composables/aruna_api_json";
+
+// Route query evaluation
+const route = useRoute()
+
+function setQueryParams() {
+  const queryParams = route.query;
+  console.log(queryParams)
+
+  if (queryParams) {
+    if (queryParams.resourceType) {
+      resourceType.value = queryParams.resourceType as v2ResourceVariant
+    }
+    if (queryParams.parentId) {
+      resourceParentId.value = queryParams.parentId as string
+    }
+    if (queryParams.relId && queryParams.relType) {
+      addRelation({
+        internal: {
+          resourceId: queryParams.relId,
+          resourceVariant: queryParams.relType,
+          definedVariant: v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_METADATA,
+          direction: v2RelationDirection.RELATION_DIRECTION_OUTBOUND
+        }
+      } as v2Relation)
+    }
+  }
+}
+
+onMounted(() => setQueryParams())
 
 // Router to navigate back
 const router = useRouter()
