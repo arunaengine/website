@@ -25,7 +25,7 @@ import {
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
 import {fetchEndpoint, fetchResource, getPublicResourceUrl} from "~/composables/api_wrapper";
-import {toObjectStatusStr, toPermissionTypeStr} from "~/composables/enum_conversions";
+import {toObjectStatusStr, toPermissionTypeStr, toResourceTypeStr, getChildResourceType} from "~/composables/enum_conversions";
 
 const route = useRoute()
 const resourceId = route.params.id as string
@@ -123,7 +123,8 @@ const router = useRouter()
 const redirectToCreateChild = () => {
   if (objectInfo) {
     const id = objectInfo.id;
-    router.push({ path: '/objects/create', query: { resourceParentId: id } });
+    const childResourceType = toResourceTypeStr(getChildResourceType(objectInfo.variant)).toLowerCase();
+    router.push({ path: '/objects/create', query: { resourceParentId: id, resourceType: childResourceType} });
   }
 };
 </script>
