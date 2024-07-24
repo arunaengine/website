@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import {IconSquareRoundedPlus, IconExclamationCircle, IconTrash, IconArrowLeft} from '@tabler/icons-vue'
+import {IconArrowLeft, IconExclamationCircle, IconSquareRoundedPlus, IconTrash} from '@tabler/icons-vue'
 import {
   v2DataClass,
+  v2InternalRelationVariant,
   v2KeyValueVariant,
+  v2RelationDirection,
   v2ResourceVariant,
-  type v2KeyValue,
-  type v2Relation,
   type v2Author,
-  type v2Project,
   type v2DataEndpoint,
   type v2GetS3CredentialsUserTokenResponse,
+  type v2KeyValue,
+  type v2Object,
+  type v2Project,
+  type v2Relation,
 } from '~/composables/aruna_api_json'
 
 import {toRelationDirectionStr, toRelationVariantStr, toResourceTypeStr, fromResourceTypeStr} from "~/composables/enum_conversions"
@@ -20,7 +23,6 @@ import EventBus from "~/composables/EventBus";
 
 import {HeadObjectCommand, S3Client, type S3ClientConfig} from "@aws-sdk/client-s3";
 import {Upload} from "@aws-sdk/lib-storage";
-import type {v2Object} from "~/composables/aruna_api_json";
 
 // Router to navigate back
 const router = useRouter()
@@ -29,6 +31,42 @@ const licenses = await fetchLicenses()
 
 const createdResource: Ref<v2Project | undefined> = ref(undefined)
 const creationError: Ref<string | undefined> = ref(undefined)
+
+// ----- Query Parameter ----- //
+function getParamSingle(param_name: string) {
+  const value = route.query[param_name];
+  if (Array.isArray(value)) {
+    return value[0];
+  } else if (typeof value === 'string') {
+    return value;
+  }
+}
+
+function setQueryParams() {
+  if (route.query) {
+    const resourceTypeParam = getParamSingle("resourceType");
+    if (resourceTypeParam) {
+      resourceType.value = fromResourceTypeStr(resourceTypeParam, v2ResourceVariant.RESOURCE_VARIANT_PROJECT);
+    }
+    const parentIdParam = getParamSingle("parentId");
+    if (parentIdParam) {
+      resourceParentId.value = parentIdParam;
+    }
+    const relIdParam = getParamSingle("relId");
+    const relTypeParam = getParamSingle("relType");
+    if (relIdParam && relTypeParam) {
+      addRelation({
+        internal: {
+          resourceId: relIdParam,
+          resourceVariant: fromResourceTypeStr(relTypeParam),
+          definedVariant: v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_METADATA,
+          direction: v2RelationDirection.RELATION_DIRECTION_OUTBOUND
+        }
+      } as v2Relation)
+    }
+  }
+}
+onMounted(() => setQueryParams());
 
 // ----- Form validation ----- //
 const validState = ref(false)
@@ -134,16 +172,6 @@ watch(resourceType, () => {
   validate()
 })
 
-// Set resourceType from query parameter if it exists
-const resourceTypeParam = route.query.resourceType;
-if (Array.isArray(resourceTypeParam)) {
-  // Use the first value if multiple values are provided
-  resourceType.value = fromResourceTypeStr(resourceTypeParam[0], v2ResourceVariant.RESOURCE_VARIANT_PROJECT);
-} else if (typeof resourceTypeParam === 'string') {
-  resourceType.value = fromResourceTypeStr(resourceTypeParam, v2ResourceVariant.RESOURCE_VARIANT_PROJECT);
-}
-
-
 /* Resource parent ID */
 const resourceParentId = ref('')
 const resourceParent: Ref<ObjectInfo | undefined> = ref(undefined)
@@ -182,15 +210,6 @@ async function validateParentId() {
     resourceParentIdError.value = 'Please enter a valid parent id'
   }
   validate()
-}
-
-// Set resourceParentId from query parameter if it exists
-const resourceParentIdParam = route.query.resourceParentId;
-if (Array.isArray(resourceParentIdParam)) {
-  // Use the first value if multiple values are provided
-  resourceParentId.value = resourceParentIdParam[0];
-} else if (typeof resourceParentIdParam === 'string') {
-  resourceParentId.value = resourceParentIdParam;
 }
 
 /* Resource data class */

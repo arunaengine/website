@@ -3,13 +3,16 @@ import {
   IconArrowLeft,
   IconArrowsSplit,
   IconBucket,
+  IconChevronDown,
   IconCloudDown,
   IconCloudLock,
-  IconCloudPlus,
   IconExternalLink,
   IconFileInfo,
+  IconFileSignal,
+  IconLeaf,
   IconLicense,
   IconLockCog,
+  IconReplace,
   IconTag,
   IconUsers,
   IconWebhook,
@@ -25,7 +28,7 @@ import {
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
 import {fetchEndpoint, fetchResource, getPublicResourceUrl} from "~/composables/api_wrapper";
-import {toObjectStatusStr, toPermissionTypeStr, toResourceTypeStr, getChildResourceType} from "~/composables/enum_conversions";
+import {getChildResourceType, toObjectStatusStr, toPermissionTypeStr, toResourceTypeStr} from "~/composables/enum_conversions";
 
 const route = useRoute()
 const resourceId = route.params.id as string
@@ -121,14 +124,6 @@ async function downloadResource(endpointId?: string) {
 
 /* Back link to last page in navigation history */
 const router = useRouter()
-
-const redirectToCreateChild = () => {
-  if (objectInfo) {
-    const id = objectInfo.id;
-    const childResourceType = toResourceTypeStr(getChildResourceType(objectInfo.variant)).toLowerCase();
-    router.push({ path: '/objects/create', query: { resourceParentId: id, resourceType: childResourceType} });
-  }
-};
 </script>
 
 <template>
@@ -139,7 +134,7 @@ const redirectToCreateChild = () => {
       Overview Resource
     </h1>
     <button @click="router.back()"
-            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:bg-blue-100 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:bg-blue-800/30 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-md border border-transparent text-blue-600 hover:bg-blue-100 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:bg-blue-800/30 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
       <IconArrowLeft class="icon"/>
     </button>
   </div>
@@ -174,25 +169,49 @@ const redirectToCreateChild = () => {
           <IconCloudLock class="flex-shrink-0 size-6"/>
           <span class="font-bold">Permission:</span> {{ toPermissionTypeStr(objectInfo.permission) }}
         </li>
-        <li v-if="isDownloadable()"
-            class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
-          <button
-              type="button"
-              @click="downloadResource()"
-              title="Download Object"
-              class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
-            <IconCloudDown class="flex-shrink-0"/>
-          </button>
-        </li>
-        <li v-else
-          class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
-          <button
-              type="button"
-              @click="redirectToCreateChild"
-              title="Create Child"
-              class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
-            <IconCloudPlus class="flex-shrink-0"/>
-          </button>
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+          <!-- Actions Dropdown Menu -->
+          <div class="hs-dropdown relative inline-flex">
+            <button id="hs-dropdown-with-icons" type="button"
+                    class="hs-dropdown-toggle inline-flex items-center gap-x-2 text-sm font-medium rounded-md text-gray-800 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-800">
+              Actions
+              <IconChevronDown class="hs-dropdown-open:rotate-180 size-4"/>
+            </button>
+
+            <div
+                class="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden min-w-60 bg-white shadow-md rounded-md p-2 mt-2 divide-y divide-gray-200 dark:bg-neutral-800 dark:border dark:border-neutral-700 dark:divide-neutral-700"
+                aria-labelledby="hs-dropdown-with-icons">
+              <div class="py-2 first:pt-0 last:pb-0">
+                <button v-if="objectInfo.variant == v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
+                        type="button"
+                        @click="downloadResource()"
+                        :disabled="!isDownloadable()"
+                        title="Download Object"
+                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none">
+                  <IconCloudDown class="flex-shrink-0 size-4"/>
+                  Download
+                </button>
+                <button type="button"
+                        title="Replicate resource"
+                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700">
+                  <IconReplace class="flex-shrink-0 size-4"/>
+                  Replicate
+                </button>
+                <NuxtLink :to="{path:'/objects/create', query: {relId: objectInfo.id, relType: toResourceTypeStr(objectInfo.variant), resourceType: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), parentId: objectInfo.variant == v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? objectInfo.id : null /* TODO where to get the ID of the parent from? */}}"
+                          class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700">
+                  <IconFileSignal class="flex-shrink-0 size-4"/>
+                  Create Meta File
+                </NuxtLink>
+                <NuxtLink v-if="objectInfo.variant != v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
+                          :to="{path:'/objects/create', query: {parentId: objectInfo.id, resourceType: toResourceTypeStr(getChildResourceType(objectInfo.variant)) }}"
+                          class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700">
+                  <IconLeaf class="flex-shrink-0 size-4"/>
+                  Create Child Resource
+                </NuxtLink>
+              </div>
+            </div>
+          </div>
+          <!-- End Actions Dropdown Menu -->
         </li>
       </ul>
     </div>
@@ -293,5 +312,5 @@ const redirectToCreateChild = () => {
     </div>
   </div>
 
-  <Footer />
+  <Footer/>
 </template>
