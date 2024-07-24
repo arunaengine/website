@@ -23,7 +23,10 @@ import {
   v2DataClass,
   v2EndpointHostVariant,
   v2PermissionLevel,
-  v2ResourceVariant
+  v2ResourceVariant,
+  v2InternalRelationVariant,
+  v2RelationDirection,
+  type v2Relation
 } from "~/composables/aruna_api_json";
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
@@ -122,6 +125,22 @@ async function downloadResource(endpointId?: string) {
   }
 }
 
+function find_parent(relations: v2Relation[]): string | undefined {
+  for (const relation of relations) {
+    if (!relation.internal) {
+      continue;
+    }
+    if (relation.internal.definedVariant !== v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO) {
+      continue;
+    }
+    if (relation.internal.direction !== v2RelationDirection.RELATION_DIRECTION_INBOUND) {
+      continue;
+    }
+    return relation.internal.resourceId;
+  }
+  return null;
+}
+
 /* Back link to last page in navigation history */
 const router = useRouter()
 </script>
@@ -197,7 +216,7 @@ const router = useRouter()
                   <IconReplace class="flex-shrink-0 size-4"/>
                   Replicate
                 </button>
-                <NuxtLink :to="{path:'/objects/create', query: {relId: objectInfo.id, relType: toResourceTypeStr(objectInfo.variant), resourceType: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), parentId: objectInfo.variant == v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? objectInfo.id : null /* TODO where to get the ID of the parent from? */}}"
+                <NuxtLink :to="{path:'/objects/create', query: {relId: objectInfo.id, relType: toResourceTypeStr(objectInfo.variant), resourceType: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), parentId: objectInfo.variant == v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? objectInfo.id : find_parent(objectInfo.relations)}}"
                           class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700">
                   <IconFileSignal class="flex-shrink-0 size-4"/>
                   Create Meta File
