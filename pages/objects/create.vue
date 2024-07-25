@@ -12,7 +12,7 @@ import {
   type v2GetS3CredentialsUserTokenResponse,
 } from '~/composables/aruna_api_json'
 
-import {toRelationDirectionStr, toRelationVariantStr, toResourceTypeStr} from "~/composables/enum_conversions"
+import {toRelationDirectionStr, toRelationVariantStr, toResourceTypeStr, fromResourceTypeStr} from "~/composables/enum_conversions"
 import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants"
 import type {ObjectInfo} from "~/composables/proto_conversions"
 import {deleteObject, getObjectBucketAndKey} from "~/composables/api_wrapper"
@@ -24,6 +24,7 @@ import type {v2Object} from "~/composables/aruna_api_json";
 
 // Router to navigate back
 const router = useRouter()
+const route = useRoute()
 const licenses = await fetchLicenses()
 
 const createdResource: Ref<v2Project | undefined> = ref(undefined)
@@ -106,6 +107,7 @@ watch(resourceDescription, () => {
 
 /* ----- Resource type ----- */
 const resourceType = ref(v2ResourceVariant.RESOURCE_VARIANT_PROJECT)
+
 watch(resourceType, () => {
   switch (resourceType.value) {
     case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
@@ -131,6 +133,16 @@ watch(resourceType, () => {
   validateResourceName()
   validate()
 })
+
+// Set resourceType from query parameter if it exists
+const resourceTypeParam = route.query.resourceType;
+if (Array.isArray(resourceTypeParam)) {
+  // Use the first value if multiple values are provided
+  resourceType.value = fromResourceTypeStr(resourceTypeParam[0], v2ResourceVariant.RESOURCE_VARIANT_PROJECT);
+} else if (typeof resourceTypeParam === 'string') {
+  resourceType.value = fromResourceTypeStr(resourceTypeParam, v2ResourceVariant.RESOURCE_VARIANT_PROJECT);
+}
+
 
 /* Resource parent ID */
 const resourceParentId = ref('')
@@ -170,6 +182,15 @@ async function validateParentId() {
     resourceParentIdError.value = 'Please enter a valid parent id'
   }
   validate()
+}
+
+// Set resourceParentId from query parameter if it exists
+const resourceParentIdParam = route.query.resourceParentId;
+if (Array.isArray(resourceParentIdParam)) {
+  // Use the first value if multiple values are provided
+  resourceParentId.value = resourceParentIdParam[0];
+} else if (typeof resourceParentIdParam === 'string') {
+  resourceParentId.value = resourceParentIdParam;
 }
 
 /* Resource data class */
@@ -567,8 +588,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
               <div class="flex items-center h-5">
                 <input type="radio" :id="`resource-type-radio-${idx}`" name="resource-type-radio" v-model="resourceType"
                        :value="value"
-                       class="border-gray-200 rounded-full disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 focus:bg-aruna-800 checked:bg-aruna-800 dark:checked:bg-aruna-600 dark:checked:border-aruna-600 dark:focus:ring-offset-gray-800"
-                       v-bind:checked="value === v2ResourceVariant.RESOURCE_VARIANT_PROJECT">
+                       class="border-gray-200 rounded-full disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 focus:bg-aruna-800 checked:bg-aruna-800 dark:checked:bg-aruna-600 dark:checked:border-aruna-600 dark:focus:ring-offset-gray-800">
               </div>
               <label :for="`resource-type-radio-${idx}`"
                      class="ms-3 block w-full text-sm font-bold text-gray-600 dark:text-gray-500">
