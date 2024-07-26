@@ -13,31 +13,6 @@ const props = defineProps<{
   modified_by: string,
   modified_at: string
 }>()
-
-function displayDate() {
-  const c_date = new Date(props.created_at)
-  const m_date = new Date(props.modified_at)
-  //const locale = (navigator && navigator.language) || "de-DE";
-
-  if (m_date > c_date) {
-    const date_str = m_date.toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-    return `${date_str} (modified)`
-  } else {
-    return c_date.toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-}
 </script>
 <template>
   <!-- Card -->
@@ -79,8 +54,18 @@ function displayDate() {
           <h4 class="text-sm text-gray-800 dark:text-neutral-200">
             {{ author }}
           </h4>
-          <p class="text-xs text-gray-500 dark:text-neutral-500">
-            {{ displayDate() }}
+          <div v-if="created_at !== modified_at"
+               class="hs-tooltip [--placement:right] inline-block">
+            <button type="button" class="hs-tooltip-toggle text-xs text-gray-500 dark:text-neutral-500">
+              {{ displayDate(created_at, modified_at) }}
+            </button>
+            <span role="tooltip"
+                  class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded shadow-sm dark:bg-neutral-700">
+              Originally posted: {{ formatDate(created_at) }}
+            </span>
+          </div>
+          <p v-else class="inline-block text-xs text-gray-500 dark:text-neutral-500">
+            {{ formatDate(created_at) }}
           </p>
         </div>
       </div>

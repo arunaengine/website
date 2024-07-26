@@ -46,7 +46,20 @@ code .line::before {
 
                 <ul class="text-xs text-gray-500 dark:text-neutral-500">
                   <li class="inline-block relative pe-6 last:pe-0 last-of-type:before:hidden before:absolute before:top-1/2 before:end-2 before:-translate-y-1/2 before:size-1 before:bg-gray-500 before:rounded-full dark:text-neutral-400 dark:before:bg-neutral-600">
-                    {{ displayDate() }}
+                    <div v-if="announcement?.createdAt !== announcement?.modifiedAt"
+                         class="hs-tooltip [--placement:right] inline-block">
+                      <button type="button" class="hs-tooltip-toggle text-xs text-gray-500 dark:text-neutral-500">
+                        {{ displayDate(announcement?.createdAt, announcement?.modifiedAt) }}
+                      </button>
+                      <span
+                          role="tooltip"
+                          class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded shadow-sm dark:bg-neutral-700">
+                        Originally posted: {{ formatDate(announcement?.createdAt) }}
+                      </span>
+                    </div>
+                    <p v-else class="inline-block text-xs text-gray-500 dark:text-neutral-500">
+                      {{ formatDate(announcement?.createdAt) }}
+                    </p>
                   </li>
                 </ul>
               </div>
