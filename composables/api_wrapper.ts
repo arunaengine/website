@@ -59,7 +59,7 @@ export async function getAnnouncement(announcementId: string): Promise<v2Announc
       announcementId: announcementId
     },
   }).catch(error => {
-    console.log(error)
+    console.error(error)
     return undefined
   })
 }
