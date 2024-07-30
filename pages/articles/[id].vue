@@ -1,65 +1,10 @@
 <script setup lang="ts">
 import {IconChevronLeft} from '@tabler/icons-vue'
-import MarkdownIt from 'markdown-it'
-import MarkdownItClass from 'markdown-it-class'
-import MarkdownItDefList from 'markdown-it-deflist';
-import Shiki from '@shikijs/markdown-it'
+import type {v2Announcement} from "~/composables/aruna_api_json";
 
 const route = useRoute()
 const router = useRouter()
-const markdownClasses = useRuntimeConfig().public.markdownCss
-const announcement = await getAnnouncement(route.params.id as string)
-const content = ref('')
-
-async function markdownToHtml(markdown: string | undefined): Promise<string> {
-  console.log(markdown)
-  if (markdown === undefined)
-    return ""
-
-  const md = MarkdownIt()
-      .use(MarkdownItDefList)
-      .use(await Shiki({
-        theme: 'catppuccin-macchiato',
-        transformers: [
-          {
-            pre(node) {
-              this.addClassToHast(node, 'm-4 p-4 overflow-x-auto rounded-md dark:border dark:border-gray-500')
-            },
-          }
-        ]
-      })).use(MarkdownItClass, markdownClasses)
-
-  return md.render(markdown)
-}
-
-function displayDate() {
-  const c_date = new Date(announcement.createdAt)
-  const m_date = new Date(announcement.modifiedAt)
-  //const locale = (navigator && navigator.language) || "de-DE";
-
-  if (m_date > c_date) {
-    const date_str = m_date.toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-    return `${date_str} (modified)`
-  } else {
-    return c_date.toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-}
-
-onBeforeMount(async () => {
-  content.value = await markdownToHtml(announcement?.content)
-})
+const announcement: Ref<v2Announcement | undefined> = ref(await getAnnouncement(route.params.id as string))
 </script>
 <style>
 code {
@@ -95,14 +40,26 @@ code .line::before {
           <div class="grow">
             <div class="flex justify-between items-center gap-x-2">
               <div>
-
                 <span class="font-semibold text-gray-800 dark:text-neutral-200">
                     {{ announcement?.createdBy }}
                 </span>
 
                 <ul class="text-xs text-gray-500 dark:text-neutral-500">
                   <li class="inline-block relative pe-6 last:pe-0 last-of-type:before:hidden before:absolute before:top-1/2 before:end-2 before:-translate-y-1/2 before:size-1 before:bg-gray-500 before:rounded-full dark:text-neutral-400 dark:before:bg-neutral-600">
-                    {{ displayDate() }}
+                    <div v-if="announcement?.createdAt !== announcement?.modifiedAt"
+                         class="hs-tooltip [--placement:right] inline-block">
+                      <button type="button" class="hs-tooltip-toggle text-xs text-gray-500 dark:text-neutral-500">
+                        {{ displayDate(announcement?.createdAt, announcement?.modifiedAt) }}
+                      </button>
+                      <span
+                          role="tooltip"
+                          class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded shadow-sm dark:bg-neutral-700">
+                        Originally posted: {{ formatDate(announcement?.createdAt) }}
+                      </span>
+                    </div>
+                    <p v-else class="inline-block text-xs text-gray-500 dark:text-neutral-500">
+                      {{ formatDate(announcement?.createdAt) }}
+                    </p>
                   </li>
                 </ul>
               </div>
@@ -124,7 +81,7 @@ code .line::before {
       <!-- End Avatar Media -->
 
       <!-- Content -->
-      <div v-html="content" :key="content" class=""/>
+      <div v-html="announcement?.content" :key="announcement?.content" class=""/>
       <!-- End Content -->
 
     </div>

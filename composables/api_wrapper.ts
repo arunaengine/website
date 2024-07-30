@@ -54,11 +54,10 @@ export async function getAnnouncements(start_after: string | undefined, limit: n
 }
 
 export async function getAnnouncement(announcementId: string): Promise<v2Announcement | undefined> {
-  console.log(announcementId)
   return await $fetch<v2Announcement | undefined>('/api/announcement', {
     query: {
       announcementId: announcementId
-    }
+    },
   }).catch(error => {
     console.error(error)
     return undefined

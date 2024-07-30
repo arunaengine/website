@@ -13,7 +13,7 @@ const props = defineProps<{
 
 <template>
   <div
-    class="flex flex-col grow items-start bg-white/[.5] border border-gray-400 shadow-sm rounded-md p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+    class="flex flex-col grow items-start bg-white/[.5] border border-gray-400 shadow-sm p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
     <div class="flex flex-row items-stretch">
       <!-- Icon column -->
       <div v-if="icon_id === 'ID'" class="flex flex-col text-white bg-aruna-800 p-3">
