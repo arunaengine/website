@@ -57,9 +57,9 @@ function reset() {
 function submit() {
   if (currentSelection.value) {
     emit('add-key-value',
-        'app.aruna-storage.org/ontology-iri', currentSelection.value.iri, v2KeyValueVariant.KEY_VALUE_VARIANT_STATIC_LABEL)
-    emit('add-key-value',
-        'app.aruna-storage.org/ts-metadata', createMetadataLink(currentSelection.value.id), v2KeyValueVariant.KEY_VALUE_VARIANT_STATIC_LABEL)
+        'https://purl.org/dc/terms/conformsTo',
+        `{"@type": "CreativeWork", "@id": "${currentSelection.value.iri}", "url": "${createMetadataLink(currentSelection.value.id)}"}`,
+        v2KeyValueVariant.KEY_VALUE_VARIANT_STATIC_LABEL)
     reset()
   }
 }
@@ -131,7 +131,9 @@ function submit() {
                                     class="hs-tooltip-toggle font-semibold text-aruna-800 dark:text-aruna-600">
                             <IconExternalLink class="size-6 flex-shrink-0"/>
                           </NuxtLink>
-                          <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded shadow-sm dark:bg-neutral-700" role="tooltip">
+                          <span
+                              class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded shadow-sm dark:bg-neutral-700"
+                              role="tooltip">
                             Tooltip on bottom
                           </span>
                         </div>
