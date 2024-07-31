@@ -26,6 +26,7 @@ import EventBus from "~/composables/EventBus";
 import {HeadObjectCommand, S3Client, type S3ClientConfig} from "@aws-sdk/client-s3";
 import {Upload} from "@aws-sdk/lib-storage";
 import type {v2Object} from "~/composables/aruna_api_json";
+import {prettyDisplayJson} from "~/composables/utils";
 
 // Router to navigate back
 const router = useRouter()
@@ -689,7 +690,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         </form>
       </div>
 
-      <div class="flex px-4 grow flex-row md:flex-col">
+      <div class="flex px-4 grow flex-row md:flex-col overflow-x-auto">
         <div class="flex flex-row mb-2 justify-start items-center">
           <label for="key-values-input"
                  class="block text-lg font-medium text-gray-700 dark:text-white">Authors</label>
@@ -751,13 +752,13 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
           </button>
 
           <button type="button"
-                  class="ms-4 inline-flex text-sm items-center gap-x-2 px-1 py-0.5  border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
+                  class="ms-4 inline-flex text-sm items-center gap-x-2 px-1 py-0.5 border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
                   data-hs-overlay="#ontology-add">
-            <!--<IconBraces class="flex-shrink-0 size-5"/>--> Add Ontology
+            Add Ontology
           </button>
         </div>
 
-        <div class="-m-1.5 overflow-x-auto">
+        <div class="-m-1.5 overflow-hidden overflow-x-auto">
           <div class="p-1.5 min-w-full inline-block align-middle">
             <div class="overflow-hidden border border-gray-400 dark:border-gray-700">
               <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -781,9 +782,8 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
                       key
                     }}
                   </td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-                    {{ value.value }}
-                  </td>
+                  <td v-html="prettyDisplayJson(value.value)"
+                      class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200"></td>
                   <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                     {{ toKeyValueVariantStr(value.variant) }}
                   </td>
@@ -815,6 +815,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
             <IconPlus class="flex-shrink-0 size-4"/>
           </button>
         </div>
+
         <div class="-m-1.5 overflow-x-auto">
           <div class="p-1.5 min-w-full inline-block align-middle">
             <div class="overflow-hidden border border-gray-400 dark:border-gray-700">
