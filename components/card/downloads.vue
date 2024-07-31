@@ -45,7 +45,7 @@ function toReplicationStatusColor(variant: storagemodelsv2ReplicationStatus | un
   <div class="-m-1.5 overflow-x-auto">
     <div class="p-1.5 min-w-full inline-block align-middle">
       <div class="overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead>
           <tr>
             <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
