@@ -11,6 +11,16 @@ export function parseJwt(token: any) {
   return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
 }
 
+export function debounce(fn: Function, timeout: number) {
+  let timeoutId: NodeJS.Timeout;
+  return (...args: any[]) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      fn(...args);
+    }, timeout);
+  };
+}
+
 // Some datetime related helper functions //
 // -------------------------------------- //
 export function formatDate(dateStr: string | undefined) {
