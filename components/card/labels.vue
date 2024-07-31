@@ -15,18 +15,6 @@ function getLabels(): v2KeyValue[] | undefined {
     }
   })
 }
-
-function displayLabelValue(value: string | undefined): string {
-  if (value) {
-    try {
-      return `<pre>${JSON.stringify(JSON.parse(value), null, 2)}</pre>`
-    } catch (error) {
-      return value
-    }
-  }
-
-  return ''
-}
 </script>
 
 <template>
@@ -45,12 +33,10 @@ function displayLabelValue(value: string | undefined): string {
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
             <tr v-for="label in getLabels()" class="hover:bg-gray-100 dark:hover:bg-gray-700">
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">
-                <!-- <a href=format!( "/search?filter_key={}&filter_value={}" , key.clone(), value.clone(), ) exact=true class=""></a> -->
                  {{ label.key }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-                <!-- <a href=format!( "/search?filter_key={}&filter_value={}" , key.clone(), value.clone(), ) exact=true class=""></a> -->
-                <div v-html="displayLabelValue(label.value)" />
+                <div v-html="prettyDisplayJson(label.value)" />
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                 <span v-if="label.variant === v2KeyValueVariant.KEY_VALUE_VARIANT_STATIC_LABEL"
