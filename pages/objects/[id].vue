@@ -31,7 +31,7 @@ import {
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
 import {fetchEndpoint, fetchResource, getPublicResourceUrl} from "~/composables/api_wrapper";
-import {getChildResourceType, toObjectStatusStr, toPermissionTypeStr, toResourceTypeStr} from "~/composables/enum_conversions";
+import {getChildResourceType, toDataClassStr, toObjectStatusStr, toPermissionTypeStr, toResourceTypeStr} from "~/composables/enum_conversions";
 
 const route = useRoute()
 const resourceId = route.params.id as string
@@ -210,19 +210,13 @@ const router = useRouter()
                   <IconCloudDown class="flex-shrink-0 size-4"/>
                   Download
                 </button>
-                <button type="button"
-                        title="Replicate resource"
-                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700">
-                  <IconReplace class="flex-shrink-0 size-4"/>
-                  Replicate
-                </button>
-                <NuxtLink :to="{path:'/objects/create', query: {relId: objectInfo.id, relType: toResourceTypeStr(objectInfo.variant), resourceType: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), parentId: objectInfo.variant == v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? objectInfo.id : find_parent(objectInfo.relations)}}"
+                <NuxtLink :to="{path:'/objects/create', query: {type: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), class: toDataClassStr(objectInfo.data_class), relId: objectInfo.id, relType: toResourceTypeStr(objectInfo.variant), parentId: objectInfo.variant == v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? objectInfo.id : find_parent(objectInfo.relations)}}"
                           class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700">
                   <IconFileSignal class="flex-shrink-0 size-4"/>
                   Create Meta File
                 </NuxtLink>
                 <NuxtLink v-if="objectInfo.variant != v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
-                          :to="{path:'/objects/create', query: {parentId: objectInfo.id, resourceType: toResourceTypeStr(getChildResourceType(objectInfo.variant)) }}"
+                          :to="{path:'/objects/create', query: {type: toResourceTypeStr(getChildResourceType(objectInfo.variant)), class: toDataClassStr(objectInfo.data_class), parentId: objectInfo.id }}"
                           class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700">
                   <IconLeaf class="flex-shrink-0 size-4"/>
                   Create Child Resource

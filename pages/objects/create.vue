@@ -15,7 +15,7 @@ import {
   type v2Relation,
 } from '~/composables/aruna_api_json'
 
-import {toRelationDirectionStr, toRelationVariantStr, toResourceTypeStr, fromResourceTypeStr} from "~/composables/enum_conversions"
+import {fromDataClassStr, fromResourceTypeStr, toRelationDirectionStr, toRelationVariantStr, toResourceTypeStr} from "~/composables/enum_conversions"
 import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants"
 import type {ObjectInfo} from "~/composables/proto_conversions"
 import {deleteObject, getObjectBucketAndKey} from "~/composables/api_wrapper"
@@ -44,9 +44,13 @@ function getParamSingle(param_name: string) {
 
 function setQueryParams() {
   if (route.query) {
-    const resourceTypeParam = getParamSingle("resourceType");
+    const resourceTypeParam = getParamSingle("type");
     if (resourceTypeParam) {
       resourceType.value = fromResourceTypeStr(resourceTypeParam, v2ResourceVariant.RESOURCE_VARIANT_PROJECT);
+    }
+    const dataClassParam = getParamSingle("class");
+    if (dataClassParam) {
+      resourceDataclass.value = fromDataClassStr(dataClassParam);
     }
     const parentIdParam = getParamSingle("parentId");
     if (parentIdParam) {
