@@ -62,22 +62,30 @@ const errorMsg = toRef(props, 'errorMsg')
                 </dd>
               </div>
             </dl>
-            <div v-if="object.dataLicenseTag" class="text-sm text-center font-medium leading-6 text-orange-500">
+            <div v-if="object.dataLicenseTag" class="text-sm text-center font-medium leading-6">
               <hr class="border-gray-200 my-5">
-              Please wait for your upload to finish before you leave the resource creation form.
+              <span class="text-orange-500">Please wait for your upload to finish before you leave the resource creation form.</span>
               <!-- Progress -->
               <div class="flex items-center my-2 gap-x-3 whitespace-nowrap">
-                <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-gray-700"
+                <div class="flex w-5/6 h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-gray-700"
                      role="progressbar"
                      :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
                   <div
                       class="flex flex-col justify-center rounded-full overflow-hidden bg-aruna-800 text-xs text-white text-center whitespace-nowrap transition duration-500 dark:bg-blue-500"
                       :style="`width: ${progress}%`"></div>
                 </div>
-                <div class="w-10 text-end">
-                  <span v-if="progress <= 0" class="animate-spin inline-block size-4 border-[3px] border-current border-t-transparent text-gray-500 rounded-full" role="status" aria-label="loading"></span>
-                  <span v-else-if="progress < 100" class="text-sm text-gray-800 dark:text-white">{{ progress }}%</span>
-                  <IconCircleCheck v-else class="text-teal-500"/>
+                <span>
+                  {{ progress }}%
+                </span>
+                <div class="w-1/6 text-end">
+                  <button
+                    type="button"
+                    @click="closeModal(props.modalId)"
+                    :data-hs-overlay="`#${props.modalId}`"
+                    class="py-3 px-4 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none"
+                    :disabled="progress < 100">
+                    Close
+                  </button>
                 </div>
               </div>
               <!-- End Progress -->
