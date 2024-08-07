@@ -59,6 +59,10 @@ function isDownloadable(): boolean {
   return false
 }
 
+function canCreateChild(level: v2PermissionLevel): boolean {
+  return level == v2PermissionLevel.PERMISSION_LEVEL_ADMIN || level == v2PermissionLevel.PERMISSION_LEVEL_WRITE;
+}
+
 async function downloadResource(endpointId?: string) {
   if (objectInfo) {
     if (typeof endpointId === "undefined") {
@@ -128,8 +132,7 @@ async function downloadResource(endpointId?: string) {
 async function find_parent(): Promise<string | undefined> {
   if (objectInfo) {
     if (objectInfo.variant == v2ResourceVariant.RESOURCE_VARIANT_PROJECT) {
-      let permission = objectInfo.permission;
-      if (permission == v2PermissionLevel.PERMISSION_LEVEL_WRITE || permission == v2PermissionLevel.PERMISSION_LEVEL_ADMIN) {
+      if (canCreateChild(objectInfo.permission)) {
         return objectInfo.id
       }
     } else {
@@ -144,8 +147,7 @@ async function find_parent(): Promise<string | undefined> {
           continue;
         }
         let parentResource = await fetchResource(relation.internal.resourceId);
-        let permission = parentResource.permission;
-        if (permission != v2PermissionLevel.PERMISSION_LEVEL_WRITE && permission != v2PermissionLevel.PERMISSION_LEVEL_ADMIN) {
+        if (!canCreateChild(parentResource.permission)) {
           continue
         }
         return relation.internal.resourceId;
