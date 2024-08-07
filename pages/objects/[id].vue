@@ -12,7 +12,6 @@ import {
   IconLeaf,
   IconLicense,
   IconLockCog,
-  IconReplace,
   IconTag,
   IconUsers,
   IconWebhook,
@@ -26,7 +25,6 @@ import {
   v2ResourceVariant,
   v2InternalRelationVariant,
   v2RelationDirection,
-  type v2Relation
 } from "~/composables/aruna_api_json";
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
