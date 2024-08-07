@@ -156,10 +156,20 @@ async function find_parent(): Promise<string | undefined> {
 }
 
 const metadataParentId = await find_parent()
+const showCreateChildButton = objectInfo && canCreateChild(objectInfo.permission);
+
 
 /* Back link to last page in navigation history */
 const router = useRouter()
 </script>
+
+<style scoped>
+.disabled {
+  pointer-events: none;
+  cursor: default;
+  opacity: 0.5;
+}
+</style>
 
 <template>
   <NavigationTop/>
@@ -232,8 +242,9 @@ const router = useRouter()
                   Create Meta File
                 </NuxtLink>
                 <NuxtLink v-if="objectInfo.variant != v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
-                          :to="{path:'/objects/create', query: {type: toResourceTypeStr(getChildResourceType(objectInfo.variant)), class: toDataClassStr(objectInfo.data_class), parentId: objectInfo.id }}"
-                          class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700">
+                          :to="showCreateChildButton ? {path:'/objects/create', query: {type: toResourceTypeStr(getChildResourceType(objectInfo.variant)), class: toDataClassStr(objectInfo.data_class), parentId: objectInfo.id }} : null"
+                          class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700"
+                          :class="{disabled: !showCreateChildButton}">
                   <IconLeaf class="flex-shrink-0 size-4"/>
                   Create Child Resource
                 </NuxtLink>
