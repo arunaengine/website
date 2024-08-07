@@ -15,7 +15,13 @@ import {
   type v2Relation,
 } from '~/composables/aruna_api_json'
 
-import {fromDataClassStr, fromResourceTypeStr, toRelationDirectionStr, toRelationVariantStr, toResourceTypeStr} from "~/composables/enum_conversions"
+import {
+  toRelationDirectionStr,
+  toRelationVariantStr,
+  toResourceTypeStr,
+  fromDataClassStr,
+  fromResourceTypeStr
+} from "~/composables/enum_conversions"
 import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants"
 import type {ObjectInfo} from "~/composables/proto_conversions"
 import {deleteObject, getObjectBucketAndKey} from "~/composables/api_wrapper"
@@ -23,6 +29,7 @@ import EventBus from "~/composables/EventBus";
 
 import {HeadObjectCommand, S3Client, type S3ClientConfig} from "@aws-sdk/client-s3";
 import {Upload} from "@aws-sdk/lib-storage";
+import {prettyDisplayJson} from "~/composables/utils";
 
 // Router to navigate back
 const router = useRouter()
@@ -707,14 +714,14 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         </form>
       </div>
 
-      <div class="flex px-4 grow flex-row md:flex-col">
+      <div class="flex px-4 grow flex-row md:flex-col overflow-x-auto">
         <div class="flex flex-row mb-2 justify-start items-center">
           <label for="key-values-input"
                  class="block text-lg font-medium text-gray-700 dark:text-white">Authors</label>
           <button type="button"
-                  class="inline-flex flex-shrink-0 justify-center items-center size-8 rounded-full ms-4 text-gray-500 hover:bg-blue-100 hover:text-blue-800 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:bg-blue-900 dark:hover:text-blue-200 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
                   data-hs-overlay="#author-add">
-            <IconSquareRoundedPlus class="flex-shrink-0 size-6"/>
+            <IconPlus class="flex-shrink-0 size-4"/>
           </button>
         </div>
 
@@ -763,13 +770,19 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
           <label for="key-values-input"
                  class="block text-lg font-medium text-gray-700 dark:text-white">Key-Values</label>
           <button type="button"
-                  class="inline-flex flex-shrink-0 justify-center items-center size-8 rounded-full ms-4 text-gray-500 hover:bg-blue-100 hover:text-blue-800 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:bg-blue-900 dark:hover:text-blue-200 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
                   data-hs-overlay="#key-value-add">
-            <IconSquareRoundedPlus class="flex-shrink-0 size-6"/>
+            <IconPlus class="flex-shrink-0 size-4"/>
+          </button>
+
+          <button type="button"
+                  class="ms-4 inline-flex text-sm items-center gap-x-2 px-1 py-0.5 border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
+                  data-hs-overlay="#ontology-add">
+            Add Ontology
           </button>
         </div>
 
-        <div class="-m-1.5 overflow-x-auto">
+        <div class="-m-1.5 overflow-hidden overflow-x-auto">
           <div class="p-1.5 min-w-full inline-block align-middle">
             <div class="overflow-hidden border border-gray-400 dark:border-gray-700">
               <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -793,9 +806,8 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
                       key
                     }}
                   </td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-                    {{ value.value }}
-                  </td>
+                  <td v-html="prettyDisplayJson(value.value)"
+                      class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200"></td>
                   <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                     {{ toKeyValueVariantStr(value.variant) }}
                   </td>
@@ -822,11 +834,12 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
           <label for="key-values-input"
                  class="block text-lg font-medium text-gray-700 dark:text-white">Additional Relations</label>
           <button type="button"
-                  class="inline-flex flex-shrink-0 justify-center items-center size-8 rounded-full ms-4 text-gray-500 hover:bg-blue-100 hover:text-blue-800 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:bg-blue-900 dark:hover:text-blue-200 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
                   data-hs-overlay="#relation-add">
-            <IconSquareRoundedPlus class="flex-shrink-0 size-6"/>
+            <IconPlus class="flex-shrink-0 size-4"/>
           </button>
         </div>
+
         <div class="-m-1.5 overflow-x-auto">
           <div class="p-1.5 min-w-full inline-block align-middle">
             <div class="overflow-hidden border border-gray-400 dark:border-gray-700">
@@ -889,6 +902,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
 
   <ModalAuthor modalId="author-add" @add-author="addAuthor"/>
   <ModalKeyValue modalId="key-value-add" @add-key-value="addKeyValue"/>
+  <ModalOntology modalId="ontology-add" @add-key-value="addKeyValue"/>
   <ModalRelation modalId="relation-add" @add-relation="addRelation"/>
   <ModalObjectDisplay modalId="object-display" :object="createdResource" :progress="uploadProgress"
                       :errorMsg="creationError"/>
