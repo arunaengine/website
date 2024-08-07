@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {IconArrowLeft, IconExclamationCircle, IconSquareRoundedPlus, IconTrash} from '@tabler/icons-vue'
+import {IconArrowLeft, IconExclamationCircle, IconPlus, IconTrash} from '@tabler/icons-vue'
 import {
   v2DataClass,
   v2InternalRelationVariant,
