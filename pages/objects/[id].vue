@@ -63,6 +63,11 @@ function canCreateChild(level: v2PermissionLevel): boolean {
       || level == v2PermissionLevel.PERMISSION_LEVEL_APPEND;
 }
 
+function canCreateMetafile(level: v2PermissionLevel): boolean {
+  return level == v2PermissionLevel.PERMISSION_LEVEL_ADMIN
+      || level == v2PermissionLevel.PERMISSION_LEVEL_WRITE;
+}
+
 async function downloadResource(endpointId?: string) {
   if (objectInfo) {
     if (typeof endpointId === "undefined") {
@@ -158,20 +163,13 @@ async function find_parent(): Promise<string | undefined> {
 }
 
 const metadataParentId = await find_parent()
-const showCreateChildButton = objectInfo && canCreateChild(objectInfo.permission);
+const enableCreateMetafile = objectInfo && canCreateMetafile(objectInfo.permission);
+const enableCreateChild = objectInfo && canCreateChild(objectInfo.permission);
 
 
 /* Back link to last page in navigation history */
 const router = useRouter()
 </script>
-
-<style scoped>
-.disabled {
-  pointer-events: none;
-  cursor: default;
-  opacity: 0.5;
-}
-</style>
 
 <template>
   <NavigationTop/>
@@ -238,15 +236,16 @@ const router = useRouter()
                   <IconCloudDown class="flex-shrink-0 size-4"/>
                   Download
                 </button>
-                <NuxtLink :to="{path:'/objects/create', query: {type: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), class: toDataClassStr(objectInfo.data_class), relId: objectInfo.id, relType: toResourceTypeStr(objectInfo.variant), parentId: metadataParentId}}"
-                          class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700">
+                <NuxtLink :to="enableCreateMetafile ? {path:'/objects/create', query: {type: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), class: toDataClassStr(objectInfo.data_class), relId: objectInfo.id, relType: toResourceTypeStr(objectInfo.variant), parentId: metadataParentId}} : null"
+                          class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700"
+                          :class="{'disabled-link': !enableCreateMetafile}">
                   <IconFileSignal class="flex-shrink-0 size-4"/>
                   Create Meta File
                 </NuxtLink>
                 <NuxtLink v-if="objectInfo.variant != v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
-                          :to="showCreateChildButton ? {path:'/objects/create', query: {type: toResourceTypeStr(getChildResourceType(objectInfo.variant)), class: toDataClassStr(objectInfo.data_class), parentId: objectInfo.id }} : null"
+                          :to="enableCreateChild ? {path:'/objects/create', query: {type: toResourceTypeStr(getChildResourceType(objectInfo.variant)), class: toDataClassStr(objectInfo.data_class), parentId: objectInfo.id }} : null"
                           class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700"
-                          :class="{disabled: !showCreateChildButton}">
+                          :class="{'disabled-link': !enableCreateChild}">
                   <IconLeaf class="flex-shrink-0 size-4"/>
                   Create Child Resource
                 </NuxtLink>

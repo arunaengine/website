@@ -19,6 +19,12 @@ html {
 	@apply px-[5%] md:px-[25%];
 }
 
+.disabled-link {
+	pointer-events: none;
+	cursor: default;
+	opacity: 0.5;
+  }
+
 /*
 html,
 body {
