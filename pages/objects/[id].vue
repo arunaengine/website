@@ -125,21 +125,37 @@ async function downloadResource(endpointId?: string) {
   }
 }
 
-function find_parent(relations: v2Relation[]): string | undefined {
-  for (const relation of relations) {
-    if (!relation.internal) {
-      continue;
+async function find_parent(): Promise<string | undefined> {
+  if (objectInfo) {
+    if (objectInfo.variant == v2ResourceVariant.RESOURCE_VARIANT_PROJECT) {
+      let permission = objectInfo.permission;
+      if (permission == v2PermissionLevel.PERMISSION_LEVEL_WRITE || permission == v2PermissionLevel.PERMISSION_LEVEL_ADMIN) {
+        return objectInfo.id
+      }
+    } else {
+      for (const relation of objectInfo.relations) {
+        if (!relation.internal) {
+          continue;
+        }
+        if (relation.internal.definedVariant !== v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO) {
+          continue;
+        }
+        if (relation.internal.direction !== v2RelationDirection.RELATION_DIRECTION_INBOUND) {
+          continue;
+        }
+        let parentResource = await fetchResource(relation.internal.resourceId);
+        let permission = parentResource.permission;
+        if (permission != v2PermissionLevel.PERMISSION_LEVEL_WRITE && permission != v2PermissionLevel.PERMISSION_LEVEL_ADMIN) {
+          continue
+        }
+        return relation.internal.resourceId;
+      }
     }
-    if (relation.internal.definedVariant !== v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO) {
-      continue;
-    }
-    if (relation.internal.direction !== v2RelationDirection.RELATION_DIRECTION_INBOUND) {
-      continue;
-    }
-    return relation.internal.resourceId;
   }
-  return null;
+  return undefined
 }
+
+const metadataParentId = await find_parent()
 
 /* Back link to last page in navigation history */
 const router = useRouter()
@@ -210,7 +226,7 @@ const router = useRouter()
                   <IconCloudDown class="flex-shrink-0 size-4"/>
                   Download
                 </button>
-                <NuxtLink :to="{path:'/objects/create', query: {type: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), class: toDataClassStr(objectInfo.data_class), relId: objectInfo.id, relType: toResourceTypeStr(objectInfo.variant), parentId: objectInfo.variant == v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? objectInfo.id : find_parent(objectInfo.relations)}}"
+                <NuxtLink :to="{path:'/objects/create', query: {type: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), class: toDataClassStr(objectInfo.data_class), relId: objectInfo.id, relType: toResourceTypeStr(objectInfo.variant), parentId: metadataParentId}}"
                           class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700">
                   <IconFileSignal class="flex-shrink-0 size-4"/>
                   Create Meta File
