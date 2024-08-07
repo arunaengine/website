@@ -58,7 +58,9 @@ function isDownloadable(): boolean {
 }
 
 function canCreateChild(level: v2PermissionLevel): boolean {
-  return level == v2PermissionLevel.PERMISSION_LEVEL_ADMIN || level == v2PermissionLevel.PERMISSION_LEVEL_WRITE;
+  return level == v2PermissionLevel.PERMISSION_LEVEL_ADMIN
+      || level == v2PermissionLevel.PERMISSION_LEVEL_WRITE
+      || level == v2PermissionLevel.PERMISSION_LEVEL_APPEND;
 }
 
 async function downloadResource(endpointId?: string) {
