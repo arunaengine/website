@@ -57,7 +57,7 @@ function reset() {
 function submit() {
   if (currentSelection.value) {
     emit('add-key-value',
-        'https://purl.org/dc/terms/conformsTo',
+        'http://purl.org/dc/terms/conformsTo',
         `{"@type": "CreativeWork", "@id": "${currentSelection.value.iri}", "url": "${createMetadataLink(currentSelection.value.id)}"}`,
         v2KeyValueVariant.KEY_VALUE_VARIANT_STATIC_LABEL)
     reset()
