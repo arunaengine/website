@@ -54,8 +54,8 @@ function toReplicationStatusColor(variant: storagemodelsv2ReplicationStatus | un
             <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
               Replication Status
             </th>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
-              <center>Download</center>
+            <th scope="col" class="px-6 py-3 text-center text-sm font-medium text-gray-500 uppercase">
+              Download
             </th>
           </tr>
           </thead>
@@ -69,17 +69,15 @@ function toReplicationStatusColor(variant: storagemodelsv2ReplicationStatus | un
               <span class="">{{ toReplicationStatusStr(endpoint.status) }}</span>
               <component :is="toReplicationStatusIcon(endpoint.status)" class="flex-shrink-0" :color="toReplicationStatusColor(endpoint.status)"></component>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
-                <center>
-                  <button
-                      type="button"
-                      title="Download Object"
-                      @click="emit('download', endpoint.id)"
-                      :disabled="endpoint.status != storagemodelsv2ReplicationStatus.REPLICATION_STATUS_FINISHED"
-                      class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
-                      <IconCloudDown class="flex-shrink-0"/>
-                  </button>
-                </center>
+            <td class="px-6 py-4 text-center whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+              <button
+                  type="button"
+                  title="Download Object"
+                  @click="emit('download', endpoint.id)"
+                  :disabled="endpoint.status != storagemodelsv2ReplicationStatus.REPLICATION_STATUS_FINISHED"
+                  class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
+                  <IconCloudDown class="flex-shrink-0"/>
+              </button>
             </td>
           </tr>
           </tbody>

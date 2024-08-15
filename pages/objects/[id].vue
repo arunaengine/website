@@ -356,7 +356,7 @@ useHead({
     <!-- End Relations Row -->
 
     <!-- Locations -->
-    <div v-if="isDownloadable()" class="flex flex-wrap justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
+    <div v-if="objectInfo.variant == v2ResourceVariant.RESOURCE_VARIANT_OBJECT" class="flex flex-wrap justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
       <div
           class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
