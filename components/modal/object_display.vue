@@ -12,7 +12,6 @@ const props = defineProps<{
 const object = toRef(props, 'object')
 const progress = toRef(props, 'progress')
 const errorMsg = toRef(props, 'errorMsg')
-
 </script>
 
 <template>
@@ -37,25 +36,25 @@ const errorMsg = toRef(props, 'errorMsg')
         <div v-if="errorMsg" v-html="errorMsg" class="p-4 overflow-y-auto text-center text-red-500"></div>
 
         <div v-else-if="object" class="p-4 overflow-y-auto">
-          <div class="border-t border-gray-100">
-            <dl class="divide-y divide-gray-100">
+          <div class="">
+            <dl class="border-y border-gray-100 divide-y divide-gray-100 mb-5">
               <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-gray-900">ID</dt>
+                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-200">ID</dt>
                 <dd class="mt-1 text-sm leading-6 font-bold text-aruna-800 dark:text-aruna-700 sm:col-span-2 sm:mt-0">
                   {{ object.id }}
                 </dd>
               </div>
               <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-gray-900">Name</dt>
-                <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">{{ object.name }}</dd>
+                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-200">Name</dt>
+                <dd class="mt-1 text-sm leading-6 text-gray-700 dark:text-gray-300 sm:col-span-2 sm:mt-0">{{ object.name }}</dd>
               </div>
               <div v-if="object.title" class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-gray-900">Title</dt>
-                <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">{{ object.title }}</dd>
+                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-200">Title</dt>
+                <dd class="mt-1 text-sm leading-6 text-gray-700 dark:text-gray-300 sm:col-span-2 sm:mt-0">{{ object.title }}</dd>
               </div>
               <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-gray-900">Link</dt>
-                <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
+                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-200">Link</dt>
+                <dd class="mt-1 text-sm leading-6 text-gray-700 dark:text-gray-300 sm:col-span-2 sm:mt-0">
                   <a :href="`/objects/${object.id}`">
                     <IconExternalLink/>
                   </a>
@@ -63,8 +62,9 @@ const errorMsg = toRef(props, 'errorMsg')
               </div>
             </dl>
             <div v-if="object.dataLicenseTag" class="text-sm text-center font-medium leading-6">
-              <hr class="border-gray-200 my-5">
+              <!-- <hr class="border-gray-200 my-5"> -->
               <span class="text-orange-500">Please wait for your upload to finish before you leave the resource creation form.</span>
+
               <!-- Progress -->
               <div class="flex items-center my-2 gap-x-3 whitespace-nowrap">
                 <div class="flex w-5/6 h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-gray-700"
@@ -74,15 +74,16 @@ const errorMsg = toRef(props, 'errorMsg')
                       class="flex flex-col justify-center rounded-full overflow-hidden bg-aruna-800 text-xs text-white text-center whitespace-nowrap transition duration-500 dark:bg-blue-500"
                       :style="`width: ${progress}%`"></div>
                 </div>
-                <span>
-                  {{ progress }}%
+                <span v-if="progress < 100">
+                  {{ progress }}% 
                 </span>
-                <div class="w-1/6 text-end">
+                <IconCircleCheck v-else class="text-teal-500"/>
+                <div class="ms-4 text-end">
                   <button
                     type="button"
                     @click="closeModal(props.modalId)"
                     :data-hs-overlay="`#${props.modalId}`"
-                    class="py-3 px-4 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none"
+                    class="py-2 px-4 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-aruna-800 text-white hover:bg-aruna-700 focus:outline-none focus:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none"
                     :disabled="progress < 100">
                     Close
                   </button>
