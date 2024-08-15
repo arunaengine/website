@@ -69,10 +69,10 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
             Display deleted resources
           </label>
         </div>
-        <a href="/objects/create"
-           class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-gray-400 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+        <NuxtLink to="/objects/create"
+                  class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-gray-400 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
           Create new resource
-        </a>
+        </NuxtLink>
       </div>
 
       <hr class="my-5 border-gray-500 dark:border-gray-200">

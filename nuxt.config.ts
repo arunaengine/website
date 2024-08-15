@@ -37,6 +37,10 @@ export default defineNuxtConfig({
     mailingListHost: 'https://mailing-lists.example.de',
     mailingListUrl: 'https://mailing-lists.example.de/lists/aruna/',
     mailingListSubscribe: 'https://mailing-lists.example.de/lists/aruna/anonymous_subscribe',
+    terminologyService: {
+      host: 'https://terminology.tib.eu/ts',
+      api: 'https://service.tib.eu/ts4tib/api'
+    },
     cache: {
       maxAge: 60 * 60 * 24, // 1 day
     },
@@ -67,6 +71,7 @@ export default defineNuxtConfig({
       dd: ['mt-1', 'ps-4', 'leading-6', 'text-gray-700', 'sm:col-span-2', 'sm:mt-0']
     },
     public: {
+      websiteHost: 'http://localhost:3000',
       infoBanner: {
         active: false,
         title: 'Info banner title: ',

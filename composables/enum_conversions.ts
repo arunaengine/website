@@ -106,6 +106,16 @@ export function toDataClassStr(variant: v2DataClass | undefined): string {
     }
 }
 
+export function fromDataClassStr(string: string | undefined): v2DataClass {
+    switch (string.toLowerCase()) {
+        case "public" : return v2DataClass.DATA_CLASS_PUBLIC
+        case "private" : return v2DataClass.DATA_CLASS_PRIVATE
+        case "workspace" : return v2DataClass.DATA_CLASS_WORKSPACE
+        case "confidential" : return v2DataClass.DATA_CLASS_CONFIDENTIAL
+        default: return v2DataClass.DATA_CLASS_UNSPECIFIED
+    }
+}
+
 export function toKeyValueVariantStr(variant: v2KeyValueVariant | undefined): string {
     switch (variant) {
         case v2KeyValueVariant.KEY_VALUE_VARIANT_LABEL: return "Label"

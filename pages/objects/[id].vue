@@ -3,11 +3,13 @@ import {
   IconArrowLeft,
   IconArrowsSplit,
   IconBucket,
+  IconChevronDown,
   IconCloudDown,
   IconCloudLock,
-  IconCloudPlus,
   IconExternalLink,
   IconFileInfo,
+  IconFileSignal,
+  IconLeaf,
   IconLicense,
   IconLockCog,
   IconTag,
@@ -20,46 +22,71 @@ import {
   v2DataClass,
   v2EndpointHostVariant,
   v2PermissionLevel,
-  v2ResourceVariant
+  v2ResourceVariant,
+  v2InternalRelationVariant,
+  v2RelationDirection,
 } from "~/composables/aruna_api_json";
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
-import {fetchEndpoint, fetchResource, getPublicResourceUrl} from "~/composables/api_wrapper";
-import {toObjectStatusStr, toPermissionTypeStr, toResourceTypeStr, getChildResourceType} from "~/composables/enum_conversions";
+import {fetchEndpoint, getPublicResourceUrl} from "~/composables/api_wrapper";
+import {
+  getChildResourceType,
+  toDataClassStr,
+  toObjectStatusStr,
+  toPermissionTypeStr,
+  toResourceTypeStr
+} from "~/composables/enum_conversions";
+import {ResourceInfo} from "~/composables/ResourceInfo";
 
-const route = useRoute()
-const resourceId = route.params.id as string
+interface ResourceInfoResponse extends Response {
+  resource: ResourceInfo
+  jsonLd: Object
+}
 
-const objectInfo = await fetchResource(resourceId)
-    .then(resource => {
-      if (resource) {
-        return toObjectInfo(resource.resource, resource.permission)
-      }
-    }).catch(error => {
-      console.log(error.code)
-      console.log(error.message)
-    })
+const router = useRouter() // Used for back link
+const resourceId = useRoute().params.id as string
+const loading: Ref<boolean> = ref(true)
+const {resource, jsonLd}: ResourceInfoResponse = await $fetch<ResourceInfoResponse>('/api/resource-info', {
+  query: {
+    resourceId: resourceId,
+    noLicenseText: true
+  }
+}).then((response: ResourceInfoResponse) => {
+  loading.value = false
+  return response
+})
 
 function isDownloadable(): boolean {
-  if (objectInfo) {
-    return (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
-            objectInfo.data_class === v2DataClass.DATA_CLASS_PUBLIC &&
-            objectInfo.object_status === modelsv2Status.STATUS_AVAILABLE) ||
-        (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
-            objectInfo.object_status === modelsv2Status.STATUS_AVAILABLE &&
+  if (resource) {
+    return (resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
+            resource.dataClass === v2DataClass.DATA_CLASS_PUBLIC &&
+            resource.objectStatus === modelsv2Status.STATUS_AVAILABLE) ||
+        (resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT &&
+            resource.objectStatus === modelsv2Status.STATUS_AVAILABLE &&
             ![v2PermissionLevel.PERMISSION_LEVEL_UNSPECIFIED,
-              v2PermissionLevel.PERMISSION_LEVEL_NONE].includes(objectInfo.permission))
+              v2PermissionLevel.PERMISSION_LEVEL_NONE].includes(resource.permission))
   }
   return false
 }
 
+function canCreateChild(level: v2PermissionLevel): boolean {
+  return level == v2PermissionLevel.PERMISSION_LEVEL_ADMIN
+      || level == v2PermissionLevel.PERMISSION_LEVEL_WRITE
+      || level == v2PermissionLevel.PERMISSION_LEVEL_APPEND;
+}
+
+function canCreateMetafile(level: v2PermissionLevel): boolean {
+  return level == v2PermissionLevel.PERMISSION_LEVEL_ADMIN
+      || level == v2PermissionLevel.PERMISSION_LEVEL_WRITE;
+}
+
 async function downloadResource(endpointId?: string) {
-  if (objectInfo) {
+  if (resource) {
     if (typeof endpointId === "undefined") {
-      endpointId = objectInfo.endpoints[0].id
+      endpointId = resource.endpoints[0].id
     }
-    if (objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT) {
-      if (objectInfo.data_class === v2DataClass.DATA_CLASS_PUBLIC) {
+    if (resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT) {
+      if (resource.dataClass === v2DataClass.DATA_CLASS_PUBLIC) {
         //TODO: Choose nearest endpoint from object locations
         const endpoint = await fetchEndpoint(endpointId)
         const data_module = endpoint?.hostConfigs?.find(conf => conf.hostVariant === v2EndpointHostVariant.ENDPOINT_HOST_VARIANT_S3)
@@ -67,22 +94,22 @@ async function downloadResource(endpointId?: string) {
         if (data_module?.url) {
           // Create unsigned url and get object
           const data_host = data_module.url.replace(/(^\w+:|^)\/\//, '');
-          await getPublicResourceUrl(data_host, objectInfo, data_module.url.startsWith('https')).then(download_url => {
+          await getPublicResourceUrl(data_host, resource, data_module.url.startsWith('https')).then(download_url => {
             // create element <a> for download ...
             const link = document.createElement('a');
             link.href = download_url;
             link.target = '_blank';
-            link.download = objectInfo.name;
+            link.download = resource.name;
             link.click();
           })
         }
       } else {
-        const download_url = await getDownloadUrl(objectInfo.id)
+        const download_url = await getDownloadUrl(resource.id)
         // create element <a> for download ... lolmao
         const link = document.createElement('a')
         link.href = download_url.url
         link.target = '_blank'
-        link.download = `${objectInfo.name}.tar.gz`
+        link.download = `${resource.name}.tar.gz`
 
         console.log(link)
         link.click();
@@ -103,7 +130,7 @@ async function downloadResource(endpointId?: string) {
       });
       const command = new GetObjectCommand({
         Bucket: 'objects',
-        Key: `${objectInfo.id}/${objectInfo.name}.tar.gz`
+        Key: `${resource.id}/${resource.name}.tar.gz`
       })
       const download_url = await getSignedUrl(client, command, {expiresIn: 3600})
 
@@ -111,7 +138,7 @@ async function downloadResource(endpointId?: string) {
       const link = document.createElement('a')
       link.href = download_url
       link.target = '_blank'
-      link.download = `${objectInfo.name}.tar.gz`
+      link.download = `${resource.name}.tar.gz`
 
       console.log(link)
       link.click();
@@ -119,16 +146,44 @@ async function downloadResource(endpointId?: string) {
   }
 }
 
-/* Back link to last page in navigation history */
-const router = useRouter()
-
-const redirectToCreateChild = () => {
-  if (objectInfo) {
-    const id = objectInfo.id;
-    const childResourceType = toResourceTypeStr(getChildResourceType(objectInfo.variant)).toLowerCase();
-    router.push({ path: '/objects/create', query: { resourceParentId: id, resourceType: childResourceType} });
+async function find_parent(): Promise<string | undefined> {
+  if (resource) {
+    if (resource.variant == v2ResourceVariant.RESOURCE_VARIANT_PROJECT) {
+      if (canCreateChild(resource.permission)) {
+        return resource.id
+      }
+    } else {
+      for (const relation of resource.relations) {
+        if (!relation.internal) {
+          continue;
+        }
+        if (relation.internal.definedVariant !== v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO) {
+          continue;
+        }
+        if (relation.internal.direction !== v2RelationDirection.RELATION_DIRECTION_INBOUND) {
+          continue;
+        }
+        let parentResource = await fetchResource(relation.internal.resourceId);
+        if (!canCreateChild(resource.permission)) {
+          continue
+        }
+        return relation.internal.resourceId;
+      }
+    }
   }
-};
+  return undefined
+}
+
+
+const metadataParentId = await find_parent()
+const enableCreateMetafile = resource && canCreateMetafile(resource.permission)
+const enableCreateChild = resource && canCreateChild(resource.permission)
+
+useHead({
+  script: [{id: resource.id, type: 'application/ld+json', innerHTML: JSON.stringify(jsonLd, null, 2)}]
+}, {
+  mode: 'server'
+})
 </script>
 
 <template>
@@ -136,63 +191,89 @@ const redirectToCreateChild = () => {
 
   <div class="flex flex-wrap justify-between container mx-auto mt-10">
     <h1 class="text-3xl font-bold text-gray-700 dark:text-white my-4">
-      Overview Resource
+      Resource Overview
     </h1>
     <button @click="router.back()"
-            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:bg-blue-100 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:bg-blue-800/30 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-md border border-transparent text-blue-600 hover:bg-blue-100 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:bg-blue-800/30 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
       <IconArrowLeft class="icon"/>
     </button>
   </div>
 
-  <div v-if="objectInfo">
+  <div v-if="!loading && resource">
     <!-- Badge Row -->
     <div class="flex flex-wrap justify-center container mx-auto mb-6">
       <ul class="flex flex-col flex-wrap grow sm:flex-row">
         <li class="inline-flex items-center bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
           <IconBucket class="flex-shrink-0 size-6"/>
-          <span class="font-bold">Type:</span> {{ toResourceTypeStr(objectInfo.variant) }}
+          <span class="font-bold">Type:</span> {{ toResourceTypeStr(resource.variant) }}
         </li>
         <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
           <IconLockCog class="flex-shrink-0 size-6"/>
-          <span class="font-bold">Dataclass:</span> {{ toDataClassStr(objectInfo.data_class) }}
+          <span class="font-bold">Dataclass:</span> {{ toDataClassStr(resource.dataClass) }}
         </li>
         <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
           <IconZoomCheck class="flex-shrink-0 size-6"/>
-          <span class="font-bold">Status:</span> {{ toObjectStatusStr(objectInfo.object_status) }}
+          <span class="font-bold">Status:</span> {{ toObjectStatusStr(resource.objectStatus) }}
         </li>
         <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
           <IconLicense class="flex-shrink-0 size-6"/>
-          <span class="font-bold">Metadata License:</span> {{ objectInfo.license }}
+          <span class="font-bold">Metadata License:</span> {{ resource.metaLicense.name }}
         </li>
         <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
           <IconLicense class="flex-shrink-0 size-6"/>
-          <span class="font-bold">{{
-              objectInfo.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT ? '' : 'Default'
-            }} Data License:</span> {{ objectInfo.data_license }}
+          <span class="font-bold">
+            {{
+              resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT ? '' : 'Default'
+            }} Data License:</span> {{ resource.dataLicense.name }}
         </li>
+
         <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
           <IconCloudLock class="flex-shrink-0 size-6"/>
-          <span class="font-bold">Permission:</span> {{ toPermissionTypeStr(objectInfo.permission) }}
+          <span class="font-bold">Permission:</span> {{ toPermissionTypeStr(resource.permission) }}
         </li>
-        <li v-if="isDownloadable()"
-            class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
-          <button
-              type="button"
-              @click="downloadResource()"
-              title="Download Object"
-              class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
-            <IconCloudDown class="flex-shrink-0"/>
-          </button>
-        </li>
-        <li v-else
-          class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
-          <button
-              type="button"
-              @click="redirectToCreateChild"
-              title="Create Child"
-              class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-600 dark:text-white hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none">
-            <IconCloudPlus class="flex-shrink-0"/>
-          </button>
+
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+          <!-- Actions Dropdown Menu -->
+          <div class="hs-dropdown relative inline-flex">
+            <button id="hs-dropdown-with-icons" type="button"
+                    class="hs-dropdown-toggle inline-flex items-center gap-x-2 text-sm font-medium rounded-md text-gray-800 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-800">
+              Actions
+              <IconChevronDown class="hs-dropdown-open:rotate-180 size-4"/>
+            </button>
+
+            <div
+                class="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden min-w-60 bg-white shadow-md rounded-md p-2 mt-2 divide-y divide-gray-200 dark:bg-neutral-800 dark:border dark:border-neutral-700 dark:divide-neutral-700"
+                aria-labelledby="hs-dropdown-with-icons">
+              <div class="py-2 first:pt-0 last:pb-0">
+                <ClientOnly>
+                  <button v-if="resource.variant == v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
+                          type="button"
+                          @click="downloadResource()"
+                          :disabled="!isDownloadable()"
+                          title="Download Object"
+                          class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none">
+                    <IconCloudDown class="flex-shrink-0 size-4"/>
+                    Download
+                  </button>
+                  <NuxtLink
+                      :to="enableCreateMetafile ? {path:'/objects/create', query: {type: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), class: toDataClassStr(resource.dataClass), relId: resource.id, relType: toResourceTypeStr(resource.variant), parentId: metadataParentId}} : null"
+                      class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700"
+                      :class="{'disabled-link': !enableCreateMetafile}">
+                    <IconFileSignal class="flex-shrink-0 size-4"/>
+                    Create Meta File
+                  </NuxtLink>
+                  <NuxtLink v-if="resource.variant != v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
+                            :to="enableCreateChild ? {path:'/objects/create', query: {type: toResourceTypeStr(getChildResourceType(resource.variant)), class: toDataClassStr(resource.dataClass), parentId: resource.id }} : null"
+                            class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700"
+                            :class="{'disabled-link': !enableCreateChild}">
+                    <IconLeaf class="flex-shrink-0 size-4"/>
+                    Create Child Resource
+                  </NuxtLink>
+                </ClientOnly>
+              </div>
+            </div>
+          </div>
+          <!-- End Actions Dropdown Menu -->
         </li>
       </ul>
     </div>
@@ -200,9 +281,9 @@ const redirectToCreateChild = () => {
 
     <!-- General Info Row -->
     <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 container mx-auto mb-6">
-      <CardSmallInfo :icon_id='"ID"' :text="objectInfo.id"/>
-      <CardName :name="objectInfo.name" :title="objectInfo.title"/>
-      <CardStats :stats="objectInfo.stats"/>
+      <CardSmallInfo :icon_id='"ID"' :text="resource.id"/>
+      <CardName :name="resource.name" :title="resource.title"/>
+      <CardStats :stats="resource.stats"/>
     </div>
     <!-- End General Info Row -->
 
@@ -216,16 +297,16 @@ const redirectToCreateChild = () => {
         </div>
         <div
             class="flex grow p-4 text-gray-700 text-xl border-t border-gray-300 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-          {{ objectInfo?.description }}
+          {{ resource?.description }}
         </div>
       </div>
-      <div v-if="objectInfo.authors"
+      <div v-if="resource.authors"
            class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
           <IconUsers class="flex-shrink-0 size-6 me-4"/>
           <span class="">Authors</span>
         </div>
-        <CardAuthors :authors="objectInfo.authors"/>
+        <CardAuthors :authors="resource.authors"/>
       </div>
     </div>
     <!-- End Description / Authors Row -->
@@ -238,7 +319,7 @@ const redirectToCreateChild = () => {
           <IconTag class="flex-shrink-0 size-6 me-4"/>
           <span class="">Labels</span>
         </div>
-        <CardLabels :key_values="objectInfo?.key_values"/>
+        <CardLabels :key_values="resource.keyValues"/>
       </div>
 
       <div
@@ -247,7 +328,7 @@ const redirectToCreateChild = () => {
           <IconWebhook class="flex-shrink-0 size-6 me-4"/>
           <span class="">Hooks</span>
         </div>
-        <CardHooks :key_values="objectInfo?.key_values"/>
+        <CardHooks :key_values="resource.keyValues"/>
       </div>
     </div>
     <!-- End Labels / Hooks Row -->
@@ -260,7 +341,7 @@ const redirectToCreateChild = () => {
           <IconExternalLink class="flex-shrink-0 size-6 me-4"/>
           <span class="">External Relations</span>
         </div>
-        <CardRelations :relations="objectInfo?.relations" :external="true"/>
+        <CardRelations :relations="resource?.relations" :external="true"/>
       </div>
 
       <div
@@ -269,7 +350,7 @@ const redirectToCreateChild = () => {
           <IconArrowsSplit class="flex-shrink-0 size-6 me-4"/>
           <span class="">Internal Relations</span>
         </div>
-        <CardRelations :relations="objectInfo?.relations" :external="false"/>
+        <CardRelations :relations="resource?.relations" :external="false"/>
       </div>
     </div>
     <!-- End Relations Row -->
@@ -282,16 +363,33 @@ const redirectToCreateChild = () => {
           <IconCloudDown class="flex-shrink-0 size-6 me-4"/>
           <span class="">Locations</span>
         </div>
-        <CardDownloads :endpoints="objectInfo?.endpoints" @download="downloadResource"/>
+        <CardDownloads :endpoints="resource?.endpoints" @download="downloadResource"/>
       </div>
     </div>
     <!-- End Locations -->
   </div>
+
+  <div v-else-if="loading">
+    class="flex flex-wrap justify-center container mx-auto mb-6">
+    <div
+        class="animate-spin inline-flex size-8 border-[3px] border-current border-t-transparent text-aruna-800 rounded-full"
+        role="status"
+        aria-label="loading">
+      <span class="sr-only">Loading...</span>
+    </div>
+  </div>
+
   <div v-else class="">
     <div class="flex flex-wrap justify-center container mx-auto mb-6">
       Could not load resource: {{ resourceId }}
     </div>
+    <div class="flex flex-wrap justify-center container mx-auto mb-6">
+      {{ resource === undefined }}
+    </div>
+    <div class="flex flex-wrap justify-center container mx-auto mb-6">
+      {{ loading }}
+    </div>
   </div>
 
-  <Footer />
+  <Footer/>
 </template>
