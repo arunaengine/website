@@ -1,7 +1,3 @@
-const animate = require("tailwindcss-animate")
-const forms = require("@tailwindcss/forms")
-const preline = require("preline/plugin")
-
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["selector"],
@@ -97,6 +93,9 @@ module.exports = {
       },
     },
   },
-  plugins: [forms, preline],
-  //plugins: [animate, forms, preline],
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@tailwindcss/forms"),
+    require("preline/plugin"),
+  ],
 }
