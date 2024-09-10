@@ -1,5 +1,10 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  app: {
+    head: {
+      title: 'Aruna',
+    }
+  },
   devtools: { enabled: true },
   experimental: {
     clientNodeCompat: true
@@ -7,30 +12,23 @@ export default defineNuxtConfig({
   plugins: [
     "~/plugins/preline.client.ts",
   ],
-  modules: [
-    '@nuxtjs/color-mode',
-  ],
+  modules: ['@nuxtjs/color-mode', '@nuxtjs/tailwindcss', "shadcn-nuxt"],
   css: [
     '~/assets/styles/main.css',
   ],
-  postcss: {
-    plugins: {
-      tailwindcss: {},
-      autoprefixer: {},
-    },
+  tailwindcss: {
+    cssPath: ['~/assets/styles/main.css', {injectPosition: "first"}],
+    configPath: 'tailwind.config',
   },
-  app: {
-    head: {
-      title: 'Aruna',
-    }
+  shadcn: {
+    prefix: '',
+    componentDir: './components/ui'
   },
-  
   colorMode: {
     classSuffix: '',
     preference: 'light',
     fallback: 'light',
   },
-
   runtimeConfig: {
     serverHostUrl: "http://localhost:8080",
     logRequests: true,
@@ -80,5 +78,6 @@ export default defineNuxtConfig({
       }
     }
   },
-})
 
+  compatibilityDate: '2024-08-21',
+})
