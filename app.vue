@@ -4,6 +4,7 @@ import EventBus from "~/composables/EventBus";
 import type {ArunaError} from "~/composables/ArunaError";
 import {parseJwt} from "~/composables/utils";
 
+import RegistrationDialog from "@/components/custom-ui/RegistrationDialog.vue";
 useHead({
   title: "Aruna | The data orchestration engine",
   meta: [
@@ -89,9 +90,12 @@ onMounted(() => updateUser())
 </script>
 
 <template>
+  <RegistrationDialog @closeRegisterDialog="notRegistered=false" :withButton="false" :initialOpen="notRegistered"/>
+
   <!-- Header + Navigation -->
   <!-- Main body -->
-  <div class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent to-aruna-800/[.10]">
+  <div
+      class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent to-aruna-800/[.10]">
     <ToastInfo v-if="useRuntimeConfig().public.infoBanner.active" modalId="info-toast" infoMsg="Hello"/>
 
     <!-- Body -->
@@ -100,9 +104,6 @@ onMounted(() => updateUser())
   </div>
   <NavigationSidebar/>
 
-  <!-- Registration Modal -->
-  <ModalRegister modalId="register-user"/>
-  <!-- End Registration Modal -->
 
   <!-- Toast -->
   <ToastError @clearError="clearError" modalId="app-error-toast" :errorMsg="fetchErrorMsg"/>
