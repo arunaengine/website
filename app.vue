@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import {IconPlant} from "@tabler/icons-vue";
 import type {v2User} from "./composables/aruna_api_json";
 import EventBus from "~/composables/EventBus";
 import type {ArunaError} from "~/composables/ArunaError";
 import {parseJwt} from "~/composables/utils";
 
+import {h} from 'vue';
+import Toaster from '@/components/ui/toast/Toaster.vue'
 import RegistrationDialog from "@/components/custom-ui/RegistrationDialog.vue";
+import {useToast} from '@/components/ui/toast/use-toast'
+const {toast} = useToast()
+
 useHead({
   title: "Aruna | The data orchestration engine",
   meta: [
@@ -28,28 +34,70 @@ async function updateUser() {
       .then(response => {
         if (typeof response === 'undefined') {
           user.value = undefined
-          fetchErrorMsg.value = 'Response is undefined. Should not be possible :/'
+          toast({
+            title: 'Error',
+            //description: 'Something went wrong. If this problem persists please contact an administrator.',
+            description: 'User fetch response is undefined. This should not be possible :/',
+            variant: 'destructive',
+            duration: 10000,
+          })
         } else if (response.type === 'ArunaError') {
           user.value = undefined
           if ((response as ArunaError).message === 'Not registered') {
             notRegistered.value = true
-            openModal('register-user')
-          } else if ((response as ArunaError).code === 14) {
+          } else if ((response as ArunaError).code === 13) {
+            // gRPC code 13 = Internal
             notRegistered.value = false
-            fetchErrorMsg.value = 'Aruna server is currently unavailable.'
+            toast({
+              title: 'Error',
+              //description: 'Something went wrong. If this problem persists please contact an administrator.',
+              description: `${(response as ArunaError).code} - ${(response as ArunaError).message}`,
+              variant: 'destructive',
+              duration: 10000,
+            })
+
+          } else if ((response as ArunaError).code === 14) {
+            // gRPC code 14 = Unavailable
+            notRegistered.value = false
+            toast({
+              title: 'Error',
+              description: 'Aruna server is currently unavailable.',
+              variant: 'destructive',
+              duration: 10000,
+            })
+          }  else if ((response as ArunaError).code === 16) {
+            // gRPC code 16 = Unauthorized
+            notRegistered.value = false
           } else {
             notRegistered.value = false
-            //fetchErrorMsg.value = `${(response as ArunaError).code} - ${(response as ArunaError).message}`
+            console.error((response as ArunaError).message)
           }
         } else {
           notRegistered.value = false
           user.value = response as v2User
-          fetchErrorMsg.value = user.value.active ? '' : 'Please wait until your account gets activated by an administrator.'
+
+          if (!user.value.active)
+            toast({
+              //title: 'Info',
+              description: h('div',
+                  {class: 'flex space-x-2 items-center justify-center'},
+                  [
+                    h(IconPlant, {class: 'flex-shrink-0 size-5 text-gray-700'}),
+                    h('span', {class: 'text-aruna-800'}, ['Please wait until your account gets activated by an administrator.'])
+                  ]),
+              duration: 10000
+            })
         }
       })
       .catch(error => {
         user.value = undefined
-        fetchErrorMsg.value = error.message
+        toast({
+          title: 'Error',
+          //description: 'Something went wrong. If this problem persists please contact an administrator.',
+          description: error.message,
+          variant: 'destructive',
+          duration: 10000,
+        })
       })
 }
 
@@ -58,10 +106,6 @@ EventBus.on('updateUser', () => {
   console.log("Received user refresh event")
   updateUser()
 })
-
-function clearError() {
-  fetchErrorMsg.value = ''
-}
 
 async function refreshTokens() {
   const refresh_token = useCookie<string>('refresh_token')
@@ -103,9 +147,6 @@ onMounted(() => updateUser())
     <NuxtPage/>
   </div>
   <NavigationSidebar/>
-
-
-  <!-- Toast -->
-  <ToastError @clearError="clearError" modalId="app-error-toast" :errorMsg="fetchErrorMsg"/>
-  <!-- End Toast -->
+  
+  <Toaster/>
 </template>
