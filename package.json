@@ -20,6 +20,8 @@
     "@shikijs/markdown-it": "^1.10.0",
     "@tabler/icons-vue": "^2.47.0",
     "@tailwindcss/forms": "^0.5.7",
+    "@vee-validate/zod": "^4.13.2",
+    "@vueuse/core": "^11.0.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "dom-parser": "^1.1.5",
@@ -31,9 +33,11 @@
     "shadcn-nuxt": "^0.10.4",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
+    "vee-validate": "^4.13.2",
     "vue": "^3.4.34",
     "vue-awesome-paginate": "^1.2.0",
-    "vue-router": "^4.4.0"
+    "vue-router": "^4.4.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.1",
