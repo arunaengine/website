@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import {toTypedSchema} from '@vee-validate/zod'
-import * as z from 'zod'
-
 import {IconHelp, IconTrophy} from "@tabler/icons-vue"
-
 import {Button} from '@/components/ui/button'
 import {Checkbox} from '@/components/ui/checkbox'
 import {
@@ -25,10 +21,13 @@ import {
 import {Input} from '@/components/ui/input'
 import {Popover, PopoverTrigger, PopoverContent} from '@/components/ui/popover'
 import {useToast} from '@/components/ui/toast/use-toast'
-
-const {toast} = useToast()
 import type {v2RegisterUserResponse} from "~/composables/aruna_api_json";
 import {useForm} from "vee-validate";
+import {toTypedSchema} from '@vee-validate/zod'
+import {h} from "vue";
+import * as z from 'zod'
+
+const {toast} = useToast()
 
 /* ----- PROPERTIES ----- */
 const props = defineProps<{
@@ -49,7 +48,7 @@ const formSchema = toTypedSchema(z.object({
   firstName: z.string({required_error: "First name is required."}).min(2).max(128),
   lastName: z.string({required_error: "Last name is required."}).min(2).max(128),
   displayName: z.string({required_error: "Display name is required."}).min(2).max(256),
-  email: z.string({required_error: "Valid email is required."}).email().trim().min(1),
+  email: z.string({required_error: "Valid email is required."}).email('Invalid email format.').trim().min(1),
   project: z.string().optional(),
   tosAccepted: z.boolean({required_error: "Is not active man."}).default(false).refine(val => val, {message: "You have to accept the ToS"})
 }))
@@ -62,8 +61,6 @@ const form = useForm({
 })
 
 const onSubmit = form.handleSubmit(async (values) => {
-  console.log('Called onSubmit', values)
-
   await $fetch<v2RegisterUserResponse>('/api/register', {
     method: 'POST',
     body: {
@@ -74,14 +71,15 @@ const onSubmit = form.handleSubmit(async (values) => {
   }).then(response => {
     if (response.userId) {
       toast({
-        //title: 'Info',
         description: h('div',
             {class: 'flex space-x-2 items-center justify-center'},
             [
               h(IconTrophy, {class: 'flex-shrink-0 size-5 text-gray-700'}),
-              h('span', {class: 'text-green-900'}, ['Your registration was successful.'])
+              h('span',
+                  {class: 'text-green-900'},
+                  ['Your registration was successful. Please check your mails for more information.'])
             ]),
-        duration: 1000000
+        duration: 10000
       })
       emit('closeRegisterDialog')
     }
@@ -185,8 +183,8 @@ const onSubmit = form.handleSubmit(async (values) => {
                 <PopoverTrigger>
                   <IconHelp class="size-4 text-aruna-800 font-bold"/>
                 </PopoverTrigger>
-                <PopoverContent class="bg-gray-100">
-                  Here you should enter the NFDI consortium you are associated with.
+                <PopoverContent class="text-sm rounded-sm">
+                  If available, you can enter the project / consortium you are associated with here.
                 </PopoverContent>
               </Popover>
             </FormLabel>

@@ -23,7 +23,6 @@ useHead({
 });
 
 // Provide user object globally read-only
-const fetchErrorMsg: Ref<string> = ref(''); // Can be displayed for the user
 const notRegistered = ref(false)
 const user: Ref<v2User | undefined> = ref(undefined)
 provide('userRef', readonly(user))
@@ -48,14 +47,7 @@ async function updateUser() {
           } else if ((response as ArunaError).code === 13) {
             // gRPC code 13 = Internal
             notRegistered.value = false
-            toast({
-              title: 'Error',
-              //description: 'Something went wrong. If this problem persists please contact an administrator.',
-              description: `${(response as ArunaError).code} - ${(response as ArunaError).message}`,
-              variant: 'destructive',
-              duration: 10000,
-            })
-
+            console.error(`${(response as ArunaError).code} - ${(response as ArunaError).message}`)
           } else if ((response as ArunaError).code === 14) {
             // gRPC code 14 = Unavailable
             notRegistered.value = false
@@ -69,6 +61,7 @@ async function updateUser() {
             // gRPC code 16 = Unauthorized
             notRegistered.value = false
           } else {
+            // Nuxt server-side error
             notRegistered.value = false
             console.error((response as ArunaError).message)
           }
@@ -78,7 +71,6 @@ async function updateUser() {
 
           if (!user.value.active)
             toast({
-              //title: 'Info',
               description: h('div',
                   {class: 'flex space-x-2 items-center justify-center'},
                   [
@@ -91,10 +83,10 @@ async function updateUser() {
       })
       .catch(error => {
         user.value = undefined
+        notRegistered.value = false
         toast({
           title: 'Error',
-          //description: 'Something went wrong. If this problem persists please contact an administrator.',
-          description: error.message,
+          description: 'Something unexpected went wrong. If this problem persists please contact an administrator.',
           variant: 'destructive',
           duration: 10000,
         })
