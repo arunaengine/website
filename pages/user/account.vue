@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {
-  IconArrowLeft,
   IconBuildingWarehouse,
   IconCheck,
   IconDiscountCheck,
+  IconLoader,
   IconPokeball,
   IconTrash,
   IconUserScan,
@@ -13,9 +13,11 @@ import type {v2Endpoint, v2Token, v2User} from '~/composables/aruna_api_json'
 import {storagemodelsv2ComponentStatus} from "~/composables/aruna_api_json";
 import {deleteUserToken} from "~/composables/api_wrapper";
 import EventBus from "~/composables/EventBus";
+import {useToast} from "~/components/ui/toast";
+import CredentialsDialog from "~/components/custom-ui/dialog/CredentialsDialog.vue";
 
-// Router navigation
-const router = useRouter()
+// Toast for notifications
+const {toast} = useToast()
 
 // Constants
 const arunaUser: Ref<v2User | undefined> = inject('userRef', ref(undefined))
@@ -76,37 +78,148 @@ function hasEndpoint(endpointId: string | undefined): boolean {
   }
 }
 
-const s3modal = ref(null)
-
-async function executeModalFunction(method: string, endpointId: string) {
-  switch (method) {
-    case 'get': {
-      console.log(await s3modal.value.getS3Credentials(endpointId))
-      break
-    }
-    case 'create': {
-      console.log(await s3modal.value.createS3Credentials(endpointId))
-    }
-  }
-
-  import('preline').then(({HSOverlay}) => {
-    HSOverlay.open(document.querySelector('#s3-modal-generic') as HTMLElement)
-  })
+/* ----- CREDENTIALS DIALOG ----- */
+const enum Dialogs {
+  TokenDialog,
+  CredentialsDialog
 }
+
+type EndpointCredentials = {
+  endpointId: string,
+  endpointName?: string,
+  endpointHost: string,
+  accessKeyId: string,
+  accessSecret: string,
+}
+
+const credentials: Ref<EndpointCredentials | undefined> = ref(undefined)
+const loading: Ref<string | undefined> = ref(undefined)
+const credentialsDialogOpen = ref(false)
+
+function setVisibility(dialog: Dialogs, visible: boolean): void {
+  console.log('[Set Visibility]', dialog, visible)
+  switch (dialog) {
+    case Dialogs.TokenDialog:
+      break
+    case Dialogs.CredentialsDialog:
+      credentialsDialogOpen.value = visible
+      break
+    default:
+      console.log('Dialog does not exist here.')
+  }
+}
+
+function clear() {
+  console.log('Clear credentials')
+  credentials.value = undefined
+  credentialsDialogOpen.value = false
+}
+
+async function createS3Credentials(endpoint: v2Endpoint) {
+  // Indicate async loading in progress (disable buttons)
+  loading.value = `${endpoint.id}_create`
+  // Create S3 credentials
+  await createUserS3Credentials(endpoint.id)
+      .then(response => {
+        loading.value = undefined // Re-activate buttons
+        if (response) {
+          credentials.value = {
+            endpointId: endpoint.id,
+            endpointName: endpoint.name,
+            endpointHost: response.s3EndpointUrl,
+            accessKeyId: response.s3AccessKey,
+            accessSecret: response.s3SecretKey
+          } as EndpointCredentials
+          setVisibility(Dialogs.CredentialsDialog, true)
+        } else {
+          // Empty remaining credentials and close if open
+          credentials.value = undefined
+          setVisibility(Dialogs.CredentialsDialog, false)
+
+          // Notify with error
+          toast({
+            title: 'Error',
+            description: 'Received empty response. If this problem persists please contact an administrator.',
+            variant: 'destructive',
+            duration: 10000,
+          })
+        }
+
+        EventBus.emit('updateUser')
+      }).catch(error => {
+        loading.value = undefined // Re-activate buttons
+        // Empty remaining credentials
+        credentials.value = undefined
+
+        // Notify with error
+        toast({
+          title: 'Error',
+          //description: 'Something went wrong. If this problem persists please contact an administrator.',
+          description: error.message,
+          variant: 'destructive',
+          duration: 10000,
+        })
+      })
+}
+
+async function getS3Credentials(endpoint: v2Endpoint) {
+// Indicate async loading in progress (disable buttons)
+  loading.value = `${endpoint.id}_create`
+  // Fetch existing S3 credentials
+  return await getUserS3Credentials(endpoint.id)
+      .then(response => {
+        loading.value = undefined // Re-activate buttons
+        if (response) {
+          credentials.value = {
+            endpointId: endpoint.id,
+            endpointName: endpoint.name,
+            endpointHost: response.s3EndpointUrl,
+            accessKeyId: response.s3AccessKey,
+            accessSecret: response.s3SecretKey
+          } as EndpointCredentials
+          setVisibility(Dialogs.CredentialsDialog, true)
+        } else {
+          // Empty remaining credentials and close if open
+          credentials.value = undefined
+          setVisibility(Dialogs.CredentialsDialog, false)
+
+          // Notify with error
+          toast({
+            title: 'Error',
+            description: 'Received empty response. If this problem persists please contact an administrator.',
+            variant: 'destructive',
+            duration: 10000,
+          })
+        }
+      }).catch(error => {
+        loading.value = undefined // Re-activate buttons
+        // Empty remaining credentials
+        credentials.value = undefined
+
+        // Notify with error
+        toast({
+          title: 'Error',
+          //description: 'Something went wrong. If this problem persists please contact an administrator.',
+          description: error.message,
+          variant: 'destructive',
+          duration: 10000,
+        })
+      })
+}
+/* ----- END CREDENTIALS DIALOG ----- */
 </script>
 
 <template>
   <NavigationTop/>
 
-  <div class="flex flex-wrap justify-between container mx-auto my-10">
-    <h1 class="text-3xl font-bold text-gray-700 dark:text-white">
-      Hej {{ get_user()?.displayName }},
-    </h1>
-    <button @click="router.back()"
-            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-md border border-transparent text-gray-700 hover:bg-gray-300 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/30 dark:hover:text-gray-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
-      <IconArrowLeft class="icon"/>
-    </button>
-  </div>
+  <CredentialsDialog :initial-open="credentialsDialogOpen"
+                     :with-button="false"
+                     :host-id="credentials?.endpointId || ''"
+                     :host-name="credentials?.endpointName || ''"
+                     :host-url="credentials?.endpointHost || ''"
+                     :access-key-id="credentials?.accessKeyId || ''"
+                     :access-secret="credentials?.accessSecret || ''"
+                     @update:open="clear"/>
 
   <div
       class="md:container sm:mx-1 md:mx-auto mt-4 p-4 border-2 border-gray-400 rounded-md  dark:bg-white/[.75]">
@@ -252,46 +365,48 @@ async function executeModalFunction(method: string, endpointId: string) {
         </div>
       </div>
 
-      <div id="tabs-with-icons-3" class="hidden" role="tabpanel" aria-labelledby="tabs-with-icons-item-3">
-        <div class="flex flex-auto flex-wrap gap-x-4 text-gray-600">
-          <div v-for="endpoint in endpoints"
-               class="flex flex-col space-y-1 bg-white border border-gray-200 shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
-            <div class="flex flex-row font-bold items-center text-aruna-800 dark:text-aruna-700">
-              {{ endpoint.id }}
-              <IconDiscountCheck class="lex-shrink-0 size-6 ms-4 text-green-700" v-if="hasEndpoint(endpoint.id)"/>
-            </div>
-            <div class="flex flex-row">
-              <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Name:</span>
-              {{ endpoint.name }}
-            </div>
-            <div class="flex flex-row">
-              <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Variant:</span>
-              {{ toEndpointVariantStr(endpoint.epVariant) }}
-            </div>
-            <div class="flex flex-row">
-              <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Public:</span>
-              {{ endpoint.isPublic }}
-            </div>
-            <div class="flex flex-row">
-              <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Status:</span>
-              {{ toComponentStatusStr(endpoint.status) }}
-            </div>
-            <div class="flex flex-row justify-end space-x-4">
-              <button v-if="endpoint.id && hasEndpoint(endpoint.id)"
-                      type="button"
-                      @click="executeModalFunction('get', endpoint.id)"
-                      class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                      data-hs-overlay="#s3-modal-generic">
-                Get Credentials
-              </button>
-              <button
-                  v-if="endpoint.id && endpoint.status === storagemodelsv2ComponentStatus.COMPONENT_STATUS_AVAILABLE"
-                  type="button"
-                  @click="executeModalFunction('create', endpoint.id)"
-                  class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-lg bg-aruna-800 border border-gray-200 text-slate-100 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                  data-hs-overlay="#s3-modal-generic">
-                Create Credentials
-              </button>
+        <div id="tabs-with-icons-3" class="hidden" role="tabpanel" aria-labelledby="tabs-with-icons-item-3">
+          <div class="flex flex-auto flex-wrap gap-x-4 gap-y-4 text-gray-600">
+            <div v-for="endpoint in endpoints"
+                 class="flex flex-col space-y-1 bg-white border border-gray-200 shadow-sm rounded-xl p-4 md:p-5 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
+              <div class="flex flex-row font-bold items-center justify-between text-aruna-800 dark:text-aruna-700">
+                <span>{{ endpoint.name }}</span>
+                <IconDiscountCheck class="lex-shrink-0 size-6 ms-4 text-green-700" v-if="hasEndpoint(endpoint.id)"/>
+              </div>
+              <div class="flex flex-row">
+                <span class="font-bold me-2 text-gray-700 dark:text-gray-500">ID:</span>
+                {{ endpoint.id }}
+              </div>
+              <div class="flex flex-row">
+                <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Variant:</span>
+                {{ toEndpointVariantStr(endpoint.epVariant) }}
+              </div>
+              <div class="flex flex-row">
+                <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Public:</span>
+                {{ endpoint.isPublic }}
+              </div>
+              <div class="flex flex-row">
+                <span class="font-bold me-2 text-gray-700 dark:text-gray-500">Status:</span>
+                {{ toComponentStatusStr(endpoint.status) }}
+              </div>
+
+              <div class="flex flex-row justify-end space-x-4">
+                <Button v-if="endpoint.id && hasEndpoint(endpoint.id)"
+                        :disabled="loading"
+                        @click="getS3Credentials(endpoint)"
+                        class="mt-2 bg-aruna-800 hover:bg-aruna-700 text-white text-md rounded-sm">
+                  <IconLoader v-if="loading === endpoint.id+'_get'" class="w-4 h-4 mr-2 animate-spin"/>
+                  Get Credentials
+                </Button>
+                <Button
+                    v-if="endpoint.id && endpoint.status === storagemodelsv2ComponentStatus.COMPONENT_STATUS_AVAILABLE"
+                    :disabled="loading"
+                    @click="createS3Credentials(endpoint)"
+                    class="mt-2 bg-aruna-800 hover:bg-aruna-700 text-white text-md rounded-sm">
+                  <IconLoader v-if="loading === endpoint.id+'_create'" class="w-4 h-4 mr-2 animate-spin"/>
+                  Create Credentials
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -303,5 +418,4 @@ async function executeModalFunction(method: string, endpointId: string) {
 
   <!-- Hidden modal dialogs -->
   <ModalTokenCreate modalId="token-create-modal"/>
-  <ModalS3credentials ref="s3modal" modalId="s3-modal-generic"/>
 </template>

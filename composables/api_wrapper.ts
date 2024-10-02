@@ -155,7 +155,10 @@ export async function deleteUserToken(token_id: string) {
 }
 
 
-export async function createUserS3Credentials(endpointId: string): Promise<v2CreateS3CredentialsUserTokenResponse> {
+export async function createUserS3Credentials(endpointId: string | undefined): Promise<v2CreateS3CredentialsUserTokenResponse> {
+  if (endpointId === undefined)
+    throw Error('No endpoint id provided to fetch credentials')
+
   return await $fetch<v2CreateS3CredentialsUserTokenResponse>(`/api/user/s3_credentials/${endpointId}`, {
     method: 'PATCH',
   }).catch(error => {
