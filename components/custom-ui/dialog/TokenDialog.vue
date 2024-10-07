@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {IconCalendar, IconHelp} from "@tabler/icons-vue"
+import {IconCalendar} from "@tabler/icons-vue"
 import {Button} from '@/components/ui/button'
 import {
   Dialog,
@@ -133,7 +133,9 @@ function formatPermissionLevel(variant: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-const value = computed({
+const tokenSecret: Ref<string | undefined> = ref(undefined)
+
+const calendarValue = computed({
   get: () => values.expiryDate ? parseDate(values.expiryDate) : undefined,
   set: val => val,
 })
@@ -142,23 +144,17 @@ const df = new DateFormatter((navigator && navigator.language) || "de-DE", {
   dateStyle: 'long',
 })
 
-const tokenSecret: Ref<string | undefined> = ref(undefined)
+
 
 function clear(visibility: boolean) {
   console.log(`Changed open state: ${visibility}`)
   if (!visibility) {
-
     tokenSecret.value = undefined
     setFieldValue('tokenName', undefined)
     setFieldValue('tokenScope', Scopes.Personal)
+    setFieldValue('expiryDate', today(getLocalTimeZone()).add({days: 1}).toString())
   }
 }
-
-onActivated(() => {
-  console.log('Activate Dialog')
-  setFieldValue('tokenScope', Scopes.Personal)
-  setFieldValue('expiryDate', today(getLocalTimeZone()).add({days: 1}).toString())
-})
 </script>
 
 <template>
@@ -226,8 +222,8 @@ onActivated(() => {
                   <PopoverTrigger as-child>
                     <FormControl>
                       <Button variant="outline"
-                              :class="cn('flex w-full ps-3 text-start font-normal', !value && 'text-muted-foreground',)">
-                        <span>{{ value ? df.format(toDate(value)) : "Pick a date" }}</span>
+                              :class="cn('flex w-full ps-3 text-start font-normal', !calendarValue && 'text-muted-foreground',)">
+                        <span>{{ calendarValue ? df.format(toDate(calendarValue)) : "Pick a date" }}</span>
                         <IconCalendar class="ms-auto h-4 w-4 opacity-50"/>
                       </Button>
                       <input hidden>
@@ -235,7 +231,7 @@ onActivated(() => {
                   </PopoverTrigger>
                   <PopoverContent class="w-auto p-0">
                     <Calendar
-                        v-model="value"
+                        v-model="calendarValue"
                         calendar-label="Date of birth"
                         initial-focus
                         :default-value="today(getLocalTimeZone()).add({days: 1})"
