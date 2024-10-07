@@ -53,7 +53,7 @@ watch(externalTrigger, () => open.value = externalTrigger.value)
 
 /* ----- FORM SCHEMA ----- */
 const formSchema = toTypedSchema(z.object({
-  tokenName: z.string({required_error: "First name is required."}).trim().min(2).max(256),
+  tokenName: z.string({required_error: "Some token name is required."}).trim().min(2).max(256),
   tokenScope: z.nativeEnum(Scopes).default(Scopes.Personal),
   expiryDate: z.string().date('Invalid expiry date format.'),
   resourceId: z.string().regex(ULID_REGEX, 'Not a valid ULID').optional(),
@@ -87,6 +87,8 @@ const {handleSubmit, values, setFieldValue} = useForm({
 })
 
 const onSubmit = handleSubmit(async (values) => {
+  // Prepare request values
+  const expiry = new Date(values.expiryDate)
   const perm = values.tokenScope === Scopes.Personal ? undefined : {
     projectId: values.tokenScope === Scopes.Project ? values.resourceId : undefined,
     collectionId: values.tokenScope === Scopes.Collection ? values.resourceId  : undefined,
@@ -95,17 +97,7 @@ const onSubmit = handleSubmit(async (values) => {
     permissionLevel: values.permissionLevel
   } as v2Permission
 
-  const expiry = new Date(values.expiryDate)
-
-  toast({
-    title: 'You submitted the following request:',
-    description: h('pre', {class: 'mt-2 w-[340px] rounded-md bg-slate-950 p-4'}, h('code', {class: 'text-white'}, JSON.stringify({
-      name: values.tokenName,
-      permission: perm,
-      expiresAt: expiry.toISOString()
-    }, null, 2))),
-  })
-
+  // Send request to create token
   await createUserToken(values.tokenName, perm, expiry.toISOString())
       .then(response => {
         if (response?.tokenSecret) {
@@ -155,7 +147,9 @@ const tokenSecret: Ref<string | undefined> = ref(undefined)
 function clear(visibility: boolean) {
   console.log(`Changed open state: ${visibility}`)
   if (!visibility) {
+
     tokenSecret.value = undefined
+    setFieldValue('tokenName', undefined)
     setFieldValue('tokenScope', Scopes.Personal)
   }
 }
