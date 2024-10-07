@@ -15,9 +15,16 @@ import {deleteUserToken} from "~/composables/api_wrapper";
 import EventBus from "~/composables/EventBus";
 import {useToast} from "~/components/ui/toast";
 import CredentialsDialog from "~/components/custom-ui/dialog/CredentialsDialog.vue";
+import TokenDialog from "~/components/custom-ui/dialog/TokenDialog.vue";
+import {DateFormatter} from "@internationalized/date";
 
 // Toast for notifications
 const {toast} = useToast()
+
+// DateFormatter for token expiry dates
+const df = new DateFormatter((navigator && navigator.language) || "de-DE", {
+  dateStyle: 'long',
+})
 
 // Constants
 const arunaUser: Ref<v2User | undefined> = inject('userRef', ref(undefined))
@@ -94,23 +101,24 @@ type EndpointCredentials = {
 
 const credentials: Ref<EndpointCredentials | undefined> = ref(undefined)
 const loading: Ref<string | undefined> = ref(undefined)
+
 const credentialsDialogOpen = ref(false)
+const tokenDialogOpen = ref(false)
 
 function setVisibility(dialog: Dialogs, visible: boolean): void {
-  console.log('[Set Visibility]', dialog, visible)
   switch (dialog) {
     case Dialogs.TokenDialog:
+      tokenDialogOpen.value = visible
       break
     case Dialogs.CredentialsDialog:
       credentialsDialogOpen.value = visible
       break
     default:
-      console.log('Dialog does not exist here.')
+      console.log(`Dialog ${dialog} does not exist here.`)
   }
 }
 
 function clear() {
-  console.log('Clear credentials')
   credentials.value = undefined
   credentialsDialogOpen.value = false
 }
@@ -220,6 +228,10 @@ async function getS3Credentials(endpoint: v2Endpoint) {
                      :access-key-id="credentials?.accessKeyId || ''"
                      :access-secret="credentials?.accessSecret || ''"
                      @update:open="clear"/>
+
+  <TokenDialog :initial-open="tokenDialogOpen"
+               :with-button="false"
+               @update:open="setVisibility(Dialogs.TokenDialog, false)"/>
 
   <div
       class="md:container sm:mx-1 md:mx-auto mt-4 p-4 border-2 border-gray-400 rounded-md  dark:bg-white/[.75]">
@@ -332,7 +344,7 @@ async function getS3Credentials(endpoint: v2Endpoint) {
                       Not yet implemented
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-                      {{ token.expiresAt }}
+                      {{ token.expiresAt ? df.format(new Date(token.expiresAt)) : 'Expiry date is undefined' }}
                     </td>
 
                     <td class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium">
@@ -357,11 +369,10 @@ async function getS3Credentials(endpoint: v2Endpoint) {
           </div>
         </div>
         <div class="flex flex-row justify-end">
-          <button type="button"
-                  class="py-3 px-4 inline-flex gap-x-2 text-md font-semibold rounded-lg bg-aruna-800 border border-gray-200 text-slate-300 hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-                  data-hs-overlay="#token-create-modal">
-            Create token
-          </button>
+          <Button @click="setVisibility(Dialogs.TokenDialog, true)"
+                  class="mt-2 bg-aruna-800 hover:bg-aruna-700 text-white text-md rounded-sm">
+            Create Token
+          </Button>
         </div>
       </div>
 
@@ -412,10 +423,6 @@ async function getS3Credentials(endpoint: v2Endpoint) {
         </div>
       </div>
     </div>
-  </div>
 
   <Footer/>
-
-  <!-- Hidden modal dialogs -->
-  <ModalTokenCreate modalId="token-create-modal"/>
 </template>
