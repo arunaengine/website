@@ -8,11 +8,22 @@ import {
   IconSearch,
   IconWorldSearch,
 } from "@tabler/icons-vue";
-import {searchResources} from "~/composables/api_wrapper";
-import {VueAwesomePaginate} from "vue-awesome-paginate";
+import {Button} from '@/components/ui/button'
+import {
+  Pagination,
+  PaginationEllipsis,
+  PaginationFirst,
+  PaginationLast,
+  PaginationList,
+  PaginationListItem,
+  PaginationNext,
+  PaginationPrev,
+} from '@/components/ui/pagination'
 
-const page = ref(1);
-const limit = ref(20);
+import {searchResources} from "~/composables/api_wrapper";
+
+const currentPage: Ref<number> = ref(1);
+const limit: Ref<number> = ref(20);
 const hits: Ref<v2GenericResource[]> = ref([]);
 const estimatedTotal = ref(0);
 
@@ -35,7 +46,7 @@ watch(customFilter, () => {
 watch(typeFilter, async () => {
   generateFilter();
   await queryResources(true);
-  page.value = 1
+  currentPage.value = 1
 });
 
 function generateFilter() {
@@ -73,10 +84,10 @@ function generateFilter() {
 /* Update search results list */
 async function queryResources(pageReset: boolean) {
   if (pageReset) {
-    page.value = 1
+    currentPage.value = 1
   }
 
-  const offset = (page.value - 1) * limit.value;
+  const offset = (currentPage.value - 1) * limit.value;
   const body = JSON.stringify({
     query: query.value,
     filter: filter.value,
@@ -99,9 +110,10 @@ async function queryResources(pageReset: boolean) {
   }
 }
 
-const paginationClickHandler = () => {
+function paginate(requestedPage: number) {
+  currentPage.value = requestedPage
   queryResources(false)
-};
+}
 
 onMounted(async () => await queryResources(true));
 </script>
@@ -229,58 +241,77 @@ onMounted(async () => await queryResources(true));
     </div>
 
     <div class="p-4 sm:mt-3 md:basis-3/4 md:mt-0">
-      <VueAwesomePaginate v-if="estimatedTotal > 0"
-                          v-model="page"
-                          :total-items="estimatedTotal"
-                          :items-per-page="20"
-                          :max-pages-shown="5"
-                          @click="paginationClickHandler"/>
+      <Pagination v-if="estimatedTotal > limit"
+                  v-slot="{ page }"
+                  :total="estimatedTotal"
+                  v-model:page="currentPage"
+                  :items-per-page="limit"
+                  :sibling-count="1"
+                  :default-page="1"
+                  @update:page="value => {
+                    currentPage = value
+                    queryResources(false)
+                  }"
+                  show-edges>
+        <PaginationList v-slot="{ items }" class="my-4 flex items-center gap-1">
+          <PaginationFirst class="w-8 h-8 p-0 rounded-sm border-gray-400 bg-gray-900"/>
+          <PaginationPrev class="w-8 h-8 p-0 rounded-sm border-gray-400 bg-slate-900" />
+          <template v-for="(item, index) in items">
+            <PaginationListItem v-if="item.type === 'page'"
+                                :key="index"
+                                :value="item.value"
+                                class="rounded-sm"
+                                as-child>
+              <Button @click="paginate(item.value)"
+                      class="w-8 h-8 p-0 rounded-sm"
+                      :class="cn('text-white border-gray-400', item.value === page ? 'bg-aruna-700' : 'bg-aruna-800')"
+                      :variant="item.value === page ? 'default' : 'outline'">
+                {{ item.value }}
+              </Button>
+            </PaginationListItem>
+            <PaginationEllipsis v-else :key="item.type" :index="index" />
+          </template>
+          <PaginationNext class="w-8 h-8 p-0 rounded-sm border-gray-400 bg-gray-900" />
+          <PaginationLast class="w-8 h-8 p-0 rounded-sm border-gray-400 bg-gray-900" />
+        </PaginationList>
+      </Pagination>
 
       <!-- Start Display Search Results -->
       <SearchResults :key="hits" :resources="hits"/>
       <!-- End Display Search Results -->
 
-      <VueAwesomePaginate v-if="estimatedTotal > 20"
-                          v-model="page"
-                          :total-items="estimatedTotal"
-                          :items-per-page="20"
-                          :max-pages-shown="5"
-                          @click="paginationClickHandler"/>
+      <Pagination v-if="estimatedTotal > limit"
+                  v-slot="{ page }"
+                  :total="estimatedTotal"
+                  v-model:page="currentPage"
+                  :items-per-page="limit"
+                  :sibling-count="1"
+                  :default-page="1"
+                  show-edges>
+        <PaginationList v-slot="{ items }" class="my-4 flex items-center gap-1">
+          <PaginationFirst class="w-8 h-8 p-0 rounded-sm border-gray-400 bg-gray-900"/>
+          <PaginationPrev class="w-8 h-8 p-0 rounded-sm border-gray-400 bg-slate-900" />
+          <template v-for="(item, index) in items">
+            <PaginationListItem v-if="item.type === 'page'"
+                                :key="index"
+                                :value="item.value"
+                                class="rounded-sm"
+                                as-child>
+              <Button @click="paginate(item.value)"
+                      class="w-8 h-8 p-0 rounded-sm"
+                      :class="cn('text-white border-gray-400', item.value === page ? 'bg-aruna-700' : 'bg-aruna-800')"
+                      :variant="item.value === page ? 'default' : 'outline'">
+                {{ item.value }}
+              </Button>
+            </PaginationListItem>
+            <PaginationEllipsis v-else :key="item.type" :index="index" />
+          </template>
+          <PaginationNext class="w-8 h-8 p-0 rounded-sm border-gray-400 bg-gray-900" />
+          <PaginationLast class="w-8 h-8 p-0 rounded-sm border-gray-400 bg-gray-900" />
+        </PaginationList>
+      </Pagination>
     </div>
   </div>
 
   <Footer/>
 </template>
-
-<style>
-.pagination-container {
-  display: flex;
-  column-gap: 10px;
-}
-
-.paginate-buttons {
-  height: 24px;
-  width: 24px;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  background-color: #005299;
-  font-size: x-small;
-  font-weight: bold;
-  /*border: 1px solid #005299;*/
-  color: white;
-}
-
-.paginate-buttons:hover {
-  background-color: #007BC2;
-}
-
-.active-page {
-  background-color: #007BC2;
-  border: 1px solid #007BC2;
-  color: white;
-}
-
-.active-page:hover {
-  background-color: #007BC2;
-}
-</style>
