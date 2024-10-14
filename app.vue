@@ -29,6 +29,10 @@ provide('userRef', readonly(user))
 
 // Try to fetch user
 async function updateUser() {
+  // Only fetch user if not in maintenance mode
+  if (useRuntimeConfig().public.maintenanceMode)
+    return
+
   await $fetch<v2User | ArunaError>('/api/user')
       .then(response => {
         if (typeof response === 'undefined') {
