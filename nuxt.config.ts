@@ -69,6 +69,7 @@ export default defineNuxtConfig({
       dd: ['mt-1', 'ps-4', 'leading-6', 'text-gray-700', 'sm:col-span-2', 'sm:mt-0']
     },
     public: {
+      maintenanceMode: true,
       websiteHost: 'http://localhost:3000',
       infoBanner: {
         active: false,
