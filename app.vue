@@ -126,7 +126,7 @@ async function refreshTokens() {
 }
 
 onBeforeMount(() => setInterval(refreshTokens, 30000))
-onMounted(() => updateUser())
+onBeforeMount(() => updateUser())
 </script>
 
 <template>
@@ -134,11 +134,13 @@ onMounted(() => updateUser())
 
   <!-- Header + Navigation -->
   <!-- Main body -->
-  <div
-      class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent to-aruna-800/[.10]">
-    <ToastInfo v-if="useRuntimeConfig().public.infoBanner.active" modalId="info-toast" infoMsg="Hello"/>
+  <div v-if="useRuntimeConfig().public.maintenanceMode"
+       class="h-[100vh] w-[100vw] bg-[url('_nuxt/assets/imgs/maintenance_sm.webp')] md:bg-[url('_nuxt/assets/imgs/maintenance_md.webp')] lg:bg-[url('_nuxt/assets/imgs/maintenance_lg.webp')] bg-no-repeat bg-center bg-cover to-transparent">
+  </div>
 
-    <!-- Body -->
+  <div v-else
+       class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent to-aruna-800/[.10]">
+    <ToastInfo v-if="useRuntimeConfig().public.infoBanner.active" modalId="info-toast" infoMsg="Hello"/>
     <NuxtLoadingIndicator/>
     <NuxtPage/>
   </div>
