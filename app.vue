@@ -9,6 +9,7 @@ import {h} from 'vue';
 import Toaster from '@/components/ui/toast/Toaster.vue'
 import RegistrationDialog from "@/components/custom-ui/RegistrationDialog.vue";
 import {useToast} from '@/components/ui/toast/use-toast'
+
 const {toast} = useToast()
 
 useHead({
@@ -61,7 +62,7 @@ async function updateUser() {
               variant: 'destructive',
               duration: 10000,
             })
-          }  else if ((response as ArunaError).code === 16) {
+          } else if ((response as ArunaError).code === 16) {
             // gRPC code 16 = Unauthorized
             notRegistered.value = false
           } else {
@@ -84,8 +85,7 @@ async function updateUser() {
               duration: 10000
             })
         }
-      })
-      .catch(error => {
+      }).catch(() => {
         user.value = undefined
         notRegistered.value = false
         toast({
