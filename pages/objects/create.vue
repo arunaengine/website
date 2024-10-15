@@ -26,6 +26,7 @@ import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composabl
 import type {ObjectInfo} from "~/composables/proto_conversions"
 import {deleteObject, getObjectBucketAndKey} from "~/composables/api_wrapper"
 import EventBus from "~/composables/EventBus";
+import TokenDialog from "~/components/custom-ui/dialog/TokenDialog.vue";
 
 import {HeadObjectCommand, S3Client, type S3ClientConfig} from "@aws-sdk/client-s3";
 import {Upload} from "@aws-sdk/lib-storage";
@@ -273,6 +274,7 @@ function removeAuthor(key: string) {
 /* ----- End Resource Authors ----- */
 /* ----- Resource key-values ----- */
 const keyValues = ref(new Map())
+const tokenDialogOpen = ref(false)
 
 function addKeyValue(key: string, val: string, type: v2KeyValueVariant) {
   keyValues.value.set(key, {key: key, value: val, variant: type} as v2KeyValue)
@@ -769,6 +771,10 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         <div class="flex flex-row mb-2 mt-6 justify-start items-center">
           <label for="key-values-input"
                  class="block text-lg font-medium text-gray-700 dark:text-white">Key-Values</label>
+          <Button @click="tokenDialogOpen = true"
+                  class="mt-2 bg-aruna-800 hover:bg-aruna-700 text-white text-md rounded-sm">
+            Create Token
+          </Button>
           <button type="button"
                   class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
                   data-hs-overlay="#key-value-add">
@@ -901,7 +907,10 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
   </div>
 
   <ModalAuthor modalId="author-add" @add-author="addAuthor"/>
-  <ModalKeyValue modalId="key-value-add" @add-key-value="addKeyValue"/>
+  <!-- <ModalKeyValue modalId="key-value-add" @add-key-value="addKeyValue"/> -->
+  <TokenDialog :initial-open="tokenDialogOpen"
+               :with-button="false"
+               @update:open="tokenDialogOpen = false"/>
   <ModalOntology modalId="ontology-add" @add-key-value="addKeyValue"/>
   <ModalRelation modalId="relation-add" @add-relation="addRelation"/>
   <ModalObjectDisplay modalId="object-display" :object="createdResource" :progress="uploadProgress"
