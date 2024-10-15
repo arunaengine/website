@@ -19,6 +19,15 @@ import {
 } from '@/components/ui/form'
 import {Input} from '@/components/ui/input'
 import {Popover, PopoverTrigger, PopoverContent} from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {type v2Permission, v2PermissionLevel,} from "~/composables/aruna_api_json";
 import {useForm} from "vee-validate";
 import {toTypedSchema} from '@vee-validate/zod'
