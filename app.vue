@@ -139,7 +139,7 @@ onBeforeMount(() => updateUser())
   </div>
 
   <div v-else
-       class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent to-aruna-800/[.10]">
+       class="flex flex-col flex-grow md:min-h-screen bg-[url('/_nuxt/assets/imgs/global-bg.webp')] bg-cover bg-fixed bg-center bg-no-repeat">
     <ToastInfo v-if="useRuntimeConfig().public.infoBanner.active" modalId="info-toast" infoMsg="Hello"/>
     <NuxtLoadingIndicator/>
     <NuxtPage/>
