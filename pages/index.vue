@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import Supporters from "~/components/custom-ui/frontpage/Supporters.vue";
+import FeaturesAruna from "~/components/custom-ui/frontpage/FeaturesAruna.vue";
+import FeaturesGeneral from "~/components/custom-ui/frontpage/FeaturesGeneral.vue";
 </script>
 <template>
   <div class="flex flex-col flex-grow">
@@ -9,8 +11,8 @@ import Supporters from "~/components/custom-ui/frontpage/Supporters.vue";
 
     <!-- Frontpage Sections -->
     <SectionHero/>
-    <SectionFeatures/>
-    <SectionFeatures2/>
+    <FeaturesAruna/>
+    <FeaturesGeneral/>
     <SectionNewsletter/>
     <SectionFaq/>
     <Supporters/>
