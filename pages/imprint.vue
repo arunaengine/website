@@ -6,7 +6,7 @@ import {IconMail} from '@tabler/icons-vue';
 <template>
   <NavigationTop/>
 
-  <div class="container mx-auto mt-4 p-4 border-2 border-gray-400 rounded-md">
+  <div class="container mx-auto mt-4 p-4 border-2 border-gray-400 rounded-md bg-[#080d1f]">
     <h1 class="text-3xl font-bold text-gray-800 dark:text-white">
       Imprint
     </h1>
@@ -15,12 +15,12 @@ import {IconMail} from '@tabler/icons-vue';
     <div class="border-b border-gray-400 px-4 dark:border-gray-700">
       <nav class="flex space-x-2" aria-label="Tabs" role="tablist">
         <button type="button"
-                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-arunaPrimary disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600 active"
+                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-700 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-arunaPrimary disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600 active"
                 id="basic-tabs-item-1" data-hs-tab="#basic-tabs-1" aria-controls="basic-tabs-1" role="tab">
           Datenschutzerklärung
         </button>
         <button type="button"
-                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-arunaPrimary disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-700 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-arunaPrimary disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
                 id="basic-tabs-item-2" data-hs-tab="#basic-tabs-2" aria-controls="basic-tabs-2" role="tab">
           Privacy Policy
         </button>
@@ -40,7 +40,7 @@ import {IconMail} from '@tabler/icons-vue';
           gespeichert werden.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           1. Verantwortlicher
         </h3>
         <hr class="border-gray-400">
@@ -61,7 +61,7 @@ import {IconMail} from '@tabler/icons-vue';
           </div>
         </div>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           2. Erhebung von personenbezogenen Daten
         </h3>
         <hr class="border-gray-400">
@@ -74,7 +74,7 @@ import {IconMail} from '@tabler/icons-vue';
           <li>Eine E-Mail-Adresse zur Kontaktaufnahme</li>
         </ul>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           3. Zweck der Datenverarbeitung
         </h3>
         <hr class="border-gray-400">
@@ -84,7 +84,7 @@ import {IconMail} from '@tabler/icons-vue';
           über Account relevante Ereignisse und allgemeine Ereignisse des Systems (Updates, Status etc.).
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           4. Rechtsgrundlage für die Datenverarbeitung
         </h3>
         <hr class="border-gray-400">
@@ -93,7 +93,7 @@ import {IconMail} from '@tabler/icons-vue';
           6 Abs. 1 lit. b DSGVO.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           5. Speicherdauer der Daten
         </h3>
         <hr class="border-gray-400">
@@ -102,7 +102,7 @@ import {IconMail} from '@tabler/icons-vue';
           löschen, werden Ihre Daten umgehend gelöscht.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           6. Ihre Rechte als betroffene Person
         </h3>
         <hr class="border-gray-400">
@@ -118,7 +118,7 @@ import {IconMail} from '@tabler/icons-vue';
           anderen Verantwortlichen übermitteln zu lassen (Art. 20 EU-DSGVO).
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           7. Kontakt
         </h3>
         <hr class="border-gray-400">
@@ -133,7 +133,7 @@ import {IconMail} from '@tabler/icons-vue';
           .
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           8. Datenschutzbeauftragte
         </h3>
         <hr class="border-gray-400">
@@ -174,7 +174,7 @@ import {IconMail} from '@tabler/icons-vue';
           of what kind of personal data is collected, for what purpose and how long it is stored.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           1. Responsible
         </h3>
         <hr class="border-gray-400">
@@ -194,7 +194,7 @@ import {IconMail} from '@tabler/icons-vue';
           </div>
         </div>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           2. Collection of personal data
         </h3>
         <hr class="border-gray-400">
@@ -207,7 +207,7 @@ import {IconMail} from '@tabler/icons-vue';
           <li>Email address for contact</li>
         </ul>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           3. Purpose of data processing
         </h3>
         <hr class="border-gray-400">
@@ -217,7 +217,7 @@ import {IconMail} from '@tabler/icons-vue';
           information about the project in irregular intervals.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           4. Legal basis for data processing
         </h3>
         <hr class="border-gray-400">
@@ -227,7 +227,7 @@ import {IconMail} from '@tabler/icons-vue';
           GDPR.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           5. Storage period of the data
         </h3>
         <hr class="border-gray-400">
@@ -236,7 +236,7 @@ import {IconMail} from '@tabler/icons-vue';
           your data will be deleted immediately.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           6. Your rights as a data subject
         </h3>
         <hr class="border-gray-400">
@@ -256,7 +256,7 @@ import {IconMail} from '@tabler/icons-vue';
           or have it transferred to another controller (Art. 20 EU-GDPR).
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           7. Contact
         </h3>
         <hr class="border-gray-400">
@@ -271,7 +271,7 @@ import {IconMail} from '@tabler/icons-vue';
           .
         </p>
 
-        <h3 class="mt-4 mb-2 text-xl font-medium uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           8. Data Protection Officer
         </h3>
         <hr class="border-gray-400">
