@@ -17,7 +17,7 @@ const props = defineProps<{
 <template>
   <!-- Card -->
   <NuxtLink :to="`/articles/${id}`"
-            class="group flex flex-col h-full border border-gray-400 hover:border-aruna-800 hover:shadow-2xl transition-all duration-300 rounded-md p-5 dark:border-neutral-700 dark:hover:border-transparent dark:hover:shadow-white/40">
+            class="bg-[#080d1f] group flex flex-col h-full border-2 border-gray-400 hover:border-aruna-800 hover:shadow-2xl transition-all duration-300 rounded-md p-5 dark:border-neutral-700 dark:hover:border-transparent dark:hover:shadow-white/40">
     <div class="aspect-w-16 aspect-h-11">
       <img v-if="imageUrl" class="w-full object-cover rounded-md"
            :src="imageUrl"
