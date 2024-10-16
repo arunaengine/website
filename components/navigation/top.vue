@@ -83,16 +83,6 @@ onMounted(() => {
       </div>
 
       <div class="sm:order-3 flex items-center gap-x-2">
-        <button type="button" class="group flex items-center px-3 text-gray-600 font-medium dark:text-gray-300"
-          @click="toggleTheme">
-          <IconMoon v-show="colorMode.preference === 'light'"
-            class="theme-icon w-5 h-auto text-typography_primary_light dark:text-typography_primary_dark" width="28"
-            height="28" />
-          <IconSun v-show="colorMode.preference === 'dark'"
-            class="theme-icon w-5 h-auto text-typography_primary_light dark:text-typography_primary_dark" width="28"
-            height="28" />
-        </button>
-
         <button type="button"
           :key="forceRefresh"
           :class="{'hidden' : !user_state}"
