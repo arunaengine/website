@@ -1,16 +1,16 @@
 <template>
   <NavigationTop />
 
-  <div class="container mx-auto mt-4 p-4 border-2 border-gray-400 rounded-md">
+  <div class="container mx-auto mt-4 p-4 border-2 border-gray-400 rounded-md bg-[#080d1f]">
     <div class="border-b border-gray-400 px-4 dark:border-gray-700">
       <nav class="flex space-x-2" aria-label="Tabs" role="tablist">
         <button type="button"
-          class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600 active"
+          class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-700 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600 active"
           id="basic-tabs-item-1" data-hs-tab="#basic-tabs-1" aria-controls="basic-tabs-1" role="tab">
           Nutzungsbedingungen
         </button>
         <button type="button"
-          class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-800 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+          class="hs-tab-active:font-semibold hs-tab-active:border-aruna-800 hs-tab-active:text-aruna-700 py-4 px-1 inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:text-gray-400 dark:hover:text-blue-500 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
           id="basic-tabs-item-2" data-hs-tab="#basic-tabs-2" aria-controls="basic-tabs-2" role="tab">
           Terms of Service
         </button>
@@ -29,7 +29,7 @@
           Gießen. Die Nutzungsbedingungen sind für alle Nutzenden bindend, unabhängig davon, wie der Zugang erfolgt.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Zustimmung zur Nutzung
         </h3>
         <hr class="border-gray-400">
@@ -39,7 +39,7 @@
           Services.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Nutzungsberechtigung
         </h3>
         <hr class="border-gray-400">
@@ -49,7 +49,7 @@
           hochgeladenen Daten.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Verfügbarkeit
         </h3>
         <hr class="border-gray-400">
@@ -60,7 +60,7 @@
           Fehlerfreiheit gegeben werden. Inbesondere wird kein Service Level vereinbart.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Datenschutz und Vertraulichkeit
         </h3>
         <hr class="border-gray-400">
@@ -70,7 +70,7 @@
           vorgeschrieben oder erforderlich, um den Webservice bereitzustellen.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Sicherheit
         </h3>
         <hr class="border-gray-400">
@@ -79,7 +79,7 @@
           und Metadaten zu gewährleisten und unbefugten Zugriff, unbefugte Offenlegung oder Datenverlust zu verhindern.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Geistiges Eigentum
         </h3>
         <hr class="border-gray-400">
@@ -89,7 +89,7 @@
           Metadaten im Rahmen des Betriebs und der Bereitstellung des Aruna Services
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Haftungsausschluss
         </h3>
         <hr class="border-gray-400">
@@ -99,7 +99,7 @@
           Betreibers des Aruna Services.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Datenlöschung
         </h3>
         <hr class="border-gray-400">
@@ -109,7 +109,7 @@
           berechtigten Gründe für die Aufbewahrung der Daten vorliegen.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Änderungen der Nutzungsbedingungen
         </h3>
         <hr class="border-gray-400">
@@ -140,7 +140,7 @@
           long it is stored.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Consent of use
         </h3>
         <hr class="border-gray-400">
@@ -149,7 +149,7 @@
           legal agreement between you and the operator of the Aruna Service.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Authorization
         </h3>
         <hr class="border-gray-400">
@@ -162,7 +162,7 @@
           you upload through this web service. You are solely responsible for the data you upload.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Availability
         </h3>
         <hr class="border-gray-400">
@@ -174,7 +174,7 @@
           service level is agreed upon.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Data protection and confidentiality
         </h3>
         <hr class="border-gray-400">
@@ -186,7 +186,7 @@
           provide the web service.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Security
         </h3>
         <hr class="border-gray-400">
@@ -195,7 +195,7 @@
           research data and metadata preventing unauthorized access, disclosure, or loss of data.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Intellectual Property
         </h3>
         <hr class="border-gray-400">
@@ -207,7 +207,7 @@
           operating and providing the Aruna Service.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Data Deletion
         </h3>
         <hr class="border-gray-400">
@@ -219,7 +219,7 @@
           keeping the data.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-gray-600 dark:text-gray-500">
+        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-white">
           Changes to Terms of Service
         </h3>
         <hr class="border-gray-400">
