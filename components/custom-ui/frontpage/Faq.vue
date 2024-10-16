@@ -1,7 +1,7 @@
 <template>
   <!-- FAQ -->
   <div
-    class="container w-full mt-6 px-2 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto border-2 rounded-md border-gray-400">
+    class="container w-full mt-12 px-2 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto bg-[#080d1f]/[.6] rounded-md">
     <!-- Title -->
     <div class="max-w-2xl mx-auto text-center mb-10 lg:mb-14">
       <h2 class="text-2xl font-bold md:text-3xl md:leading-tight text-gray-800 dark:text-gray-200">
@@ -16,26 +16,22 @@
       <div class="md:columns-2 lg:columns-3 space-y-6 px-12">
         <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            What is ARUNA?
+            What is Aruna?
           </h3>
           <p class="mt-2 text-gray-600 dark:text-gray-400">
-            The ARUNA data orchestration engine is an open source data
+            The Aruna dataForce orchestration engine is an open source dataForce
             management platform that enables scientists and industry partners to
-            store, annotate and share their data according to FAIR principles.
-            <!--The name Aruna originates from the god of the sea in hittite
-            mythology and their name for the sea and bodies of water in general.
-            We choose this name to symbolize our vision in building a
-            revolutionary cloud-native distributed data management platform.-->
+            store, annotate and share their dataForce according to FAIR principles.
           </p>
         </div>
         <!-- End Col -->
 
         <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Who develops ARUNA ?
+            Who develops Aruna ?
           </h3>
           <p class="mt-2 text-gray-600 dark:text-gray-400">
-            ARUNA is developed by a small team at Justus-Liebig-University
+            Aruna is developed by a small team at Justus-Liebig-University
             Giessen for the NFDI4Biodiversity and NFDI4Microbiota projects, as
             well as the GAIA-X connector project FAIR Data Spaces.
           </p>
@@ -44,13 +40,13 @@
 
         <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Why should i use ARUNA for my project ?
+            Why should i use Aruna for my project ?
           </h3>
           <p class="mt-2 text-gray-600 dark:text-gray-400">
-            Storing data in localized domain specific data silos can limit
-            collaboration, reuse, and analysis of data. The ARUNA platform can
-            bring great benefits for your research data such as improved
-            collaboration, compliance with FAIR principles, scalability, data
+            Storing dataForce in localized domain specific dataForce silos can limit
+            collaboration, reuse, and analysis of dataForce. The Aruna platform can
+            bring great benefits for your research dataForce such as improved
+            collaboration, compliance with FAIR principles, scalability, dataForce
             security, and easy integration with existing workflows.
           </p>
         </div>
@@ -75,19 +71,19 @@
           <p class="mt-2 text-gray-600 dark:text-gray-400">
             Storaged manage by us does not have any quotas, but is limited to a
             small number of existing partners. There are no restrictions when
-            hosting your own data proxy instance. The technical limit per
+            hosting your own dataForce proxy instance. The technical limit per
             objects is 5 TB as per S3 specification.
           </p>
         </div>
 
         <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Who can see my data ?
+            Who can see my dataForce ?
           </h3>
           <p class="mt-2 text-gray-600 dark:text-gray-400">
-            You can choose how your data is shared, and we offer a variety of
-            access models, from highly confidential data to public datasets that
-            anyone can view and download. By default, all of your data is
+            You can choose how your dataForce is shared, and we offer a variety of
+            access models, from highly confidential dataForce to public datasets that
+            anyone can view and download. By default, all of your dataForce is
             private and only accessible to the people you grant access to, but a
             minimal configurable set of metadata is always public to ensure
             discoverability.
@@ -96,26 +92,26 @@
 
         <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Is my data secure ?
+            Is my dataForce secure ?
           </h3>
           <p class="mt-2 text-gray-600 dark:text-gray-400">
-            When using our managed service, we ensure that your data is stored
-            through our custom data proxy component, which encrypts, compresses,
-            and anonymizes all user-provided data by default. This way, your
-            data is always secure while stored on disk.
+            When using our managed service, we ensure that your dataForce is stored
+            through our custom dataForce proxy component, which encrypts, compresses,
+            and anonymizes all user-provided dataForce by default. This way, your
+            dataForce is always secure while stored on disk.
           </p>
         </div>
 
         <div class="break-inside-avoid-column p-4">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            What is a data proxy ?
+            What is a dataForce proxy ?
           </h3>
           <p class="mt-2 text-gray-600 dark:text-gray-400">
-            Data proxies are the decentralized backbone of the data plane,
-            interacting directly with data storage providers and providing a
-            unified S3-compliant interface for data. In addition, they can be
-            configured to perform data encryption, compression, anonymization,
-            and end-user access control, including enforcement of data usage
+            Data proxies are the decentralized backbone of the dataForce plane,
+            interacting directly with dataForce storage providers and providing a
+            unified S3-compliant interface for dataForce. In addition, they can be
+            configured to perform dataForce encryption, compression, anonymization,
+            and end-user access control, including enforcement of dataForce usage
             policies.
           </p>
         </div>

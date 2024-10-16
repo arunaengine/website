@@ -3,6 +3,7 @@ import Supporters from "~/components/custom-ui/frontpage/Supporters.vue";
 import FeaturesAruna from "~/components/custom-ui/frontpage/FeaturesAruna.vue";
 import FeaturesGeneral from "~/components/custom-ui/frontpage/FeaturesGeneral.vue";
 import Newsletter from "~/components/custom-ui/frontpage/Newsletter.vue";
+import Faq from "~/components/custom-ui/frontpage/Faq.vue";
 </script>
 <template>
   <div class="flex flex-col flex-grow">
@@ -15,7 +16,7 @@ import Newsletter from "~/components/custom-ui/frontpage/Newsletter.vue";
     <FeaturesAruna/>
     <FeaturesGeneral/>
     <Newsletter/>
-    <SectionFaq/>
+    <Faq/>
     <Supporters/>
     <!-- END Frontpage Sections -->
 
