@@ -26,7 +26,7 @@ code .line::before {
   <NavigationTop/>
 
   <!-- Blog Article -->
-  <div class="container max-w-5xl px-4 pt-6 lg:pt-10 pb-12 sm:px-6 lg:px-8 mx-auto">
+  <div class="container max-w-5xl px-4 pt-6 lg:pt-10 pb-12 sm:px-6 lg:px-8 mx-auto mt-10 bg-muted/80 rounded-sm">
     <div class="max-w-5xl">
       <!-- Avatar Media -->
       <div class="flex justify-between items-center mb-6">
