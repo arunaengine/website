@@ -72,7 +72,7 @@ function submit() {
       <div
           class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
         <div
-            class="flex flex-col bg-white border shadow-sm rounded-md pointer-events-auto dark:bg-neutral-800 dark:border-neutral-700 dark:shadow-neutral-700/70">
+            class="flex flex-col bg-white border shadow-sm rounded-md pointer-events-auto dark:bg-gray-800 dark:border-neutral-700 dark:shadow-neutral-700/70">
           <div class="flex justify-between items-center py-3 px-4 border-b dark:border-neutral-700">
             <h3 class="font-bold text-gray-800 dark:text-white">
               Add Ontology Definition
@@ -91,40 +91,39 @@ function submit() {
             <div v-if="currentSelection">
               <div>
                 <div class="px-4 sm:px-0">
-                  <h3 class="text-base font-semibold leading-7 text-gray-900">Currently selected ontology:</h3>
-                  <p class="mt-1 font-bold max-w-2xl leading-6 text-gray-500">
+                  <h3 class="text-base font-semibold leading-7 text-gray-300">Currently selected ontology:</h3>
+                  <p class="mt-1 font-bold max-w-2xl leading-6 text-aruna-700">
                     {{ currentSelection.label }}
                   </p>
                 </div>
                 <div class="my-6 border-y border-gray-100">
                   <dl class="divide-y divide-gray-100">
                     <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                      <dt class="text-sm font-medium leading-6 text-gray-900">Id</dt>
-                      <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">{{
-                          currentSelection.id
-                        }}
+                      <dt class="text-sm font-bold leading-6 text-gray-400">Id</dt>
+                      <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">
+                        {{ currentSelection.id }}
                       </dd>
                     </div>
                     <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                      <dt class="text-sm font-medium leading-6 text-gray-900">IRI</dt>
-                      <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
+                      <dt class="text-sm font-bold leading-6 text-gray-400">IRI</dt>
+                      <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">
                         <NuxtLink :to="currentSelection.iri"
                                   target="_blank"
-                                  class="hs-tooltip-toggle text-aruna-800 dark:text-aruna-600">
+                                  class="hs-tooltip-toggle text-aruna-800 dark:text-aruna-700 hover:text-aruna-600">
                           {{ currentSelection.iri }}
                         </NuxtLink>
 
                       </dd>
                     </div>
                     <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                      <dt class="text-sm font-medium leading-6 text-gray-900">Description</dt>
-                      <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
+                      <dt class="text-sm font-bold leading-6 text-gray-400">Description</dt>
+                      <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">
                         {{ currentSelection.description.join(' ') }}
                       </dd>
                     </div>
                     <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                      <dt class="text-sm font-medium leading-6 text-gray-900">More Information</dt>
-                      <dd class="inline-flex mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
+                      <dt class="text-sm font-bold leading-6 text-gray-400">More Information</dt>
+                      <dd class="inline-flex mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">
                         <div class="hs-tooltip [--placement:bottom] inline-block">
                           <NuxtLink :to="createLandingPageLink(currentSelection.id)"
                                     target="_blank"
@@ -149,7 +148,7 @@ function submit() {
               </div>
             </div>
             <div v-else>
-              <h3 class="text-base font-semibold leading-7 text-gray-900">Currently selected ontology: None</h3>
+              <h3 class="text-base font-semibold leading-7 text-gray-300">Currently selected ontology: None</h3>
             </div>
             <!-- End display current selection -->
 

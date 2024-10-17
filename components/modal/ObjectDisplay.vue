@@ -21,7 +21,7 @@ const errorMsg = toRef(props, 'errorMsg')
     <div
         class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all md:max-w-2xl md:w-full m-3 md:mx-auto">
       <div
-          class="flex flex-col rounded-lg bg-white border shadow-sm  pointer-events-auto dark:bg-gray-800 dark:border-gray-700 dark:shadow-slate-700/[.7]">
+          class="flex flex-col rounded-md bg-white border shadow-sm pointer-events-auto dark:bg-gray-800 dark:border-gray-700 dark:shadow-slate-700/[.7]">
         <div class="flex justify-between items-center py-3 px-4 dark:border-gray-700">
           <h3 v-if="object" class="font-bold text-gray-800 dark:text-white">
             Your Created Resource:
@@ -39,21 +39,21 @@ const errorMsg = toRef(props, 'errorMsg')
           <div class="">
             <dl class="border-y border-gray-100 divide-y divide-gray-100 mb-5">
               <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-200">ID</dt>
+                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-400">ID</dt>
                 <dd class="mt-1 text-sm leading-6 font-bold text-aruna-800 dark:text-aruna-700 sm:col-span-2 sm:mt-0">
                   {{ object.id }}
                 </dd>
               </div>
               <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-200">Name</dt>
+                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-400">Name</dt>
                 <dd class="mt-1 text-sm leading-6 text-gray-700 dark:text-gray-300 sm:col-span-2 sm:mt-0">{{ object.name }}</dd>
               </div>
               <div v-if="object.title" class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-200">Title</dt>
+                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-400">Title</dt>
                 <dd class="mt-1 text-sm leading-6 text-gray-700 dark:text-gray-300 sm:col-span-2 sm:mt-0">{{ object.title }}</dd>
               </div>
               <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-200">Link</dt>
+                <dt class="text-sm font-medium leading-6 text-gray-900 dark:text-gray-400">Link</dt>
                 <dd class="mt-1 text-sm leading-6 text-gray-700 dark:text-gray-300 sm:col-span-2 sm:mt-0">
                   <a :href="`/objects/${object.id}`">
                     <IconExternalLink/>
@@ -83,7 +83,7 @@ const errorMsg = toRef(props, 'errorMsg')
                     type="button"
                     @click="closeModal(props.modalId)"
                     :data-hs-overlay="`#${props.modalId}`"
-                    class="py-2 px-4 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-aruna-800 text-white hover:bg-aruna-700 focus:outline-none focus:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none"
+                    class="py-2 px-4 inline-flex items-center gap-x-2 text-sm font-medium rounded-md border border-transparent bg-aruna-800 text-white hover:bg-aruna-700 focus:outline-none focus:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none"
                     :disabled="progress < 100">
                     Close
                   </button>
