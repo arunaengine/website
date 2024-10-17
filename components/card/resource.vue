@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import {modelsv2Status, type v2GenericResource,} from '~/composables/aruna_api_json';
 
-const props = defineProps<{
+/* ----- PROPERTIES ----- */
+interface ResourceCardProps {
   resource: v2GenericResource
-}>()
-const entry = toSearchResult(props.resource)
+}
+const {resource} = defineProps<ResourceCardProps>()
+const entry = toSearchResult(resource)
+/* ----- END PROPERTIES ----- */
 
 function displayDescription(description: string): string {
-  if (description.length > 1000) {
-    return description.slice(0, 1000) + " ..."
+  if (description.length > 512) {
+    return description.slice(0, 512) + " ..."
   }
   return description
 }
