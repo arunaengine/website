@@ -6,7 +6,7 @@ import {IconAdjustmentsCog, IconBrandOpenSource, IconChevronRight} from "@tabler
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 items-center gap-2">
 
       <!-- Icon Block -->
-      <NuxtLink to="https://github.com/ArunaStorage/aruna/tree/main/LICENSE"
+      <NuxtLink to="https://github.com/ArunaStorage/aruna/tree/main?tab=readme-ov-file#license"
                 target="_blank"
                 class="group flex flex-col justify-center rounded-md p-4 md:p-7 hover:bg-gray-50 transition-all ease-in-out delay-50 duration-500 dark:hover:bg-aruna-700/[.15] dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
         <div class="flex justify-center items-center mx-auto size-12 bg-aruna-800 rounded-md">

@@ -56,7 +56,7 @@ onMounted(() => {
             <div
               class="hs-dropdown-menu transition-[opacity,margin] duration-[0.1ms] sm:duration-[150ms] hs-dropdown-open:opacity-100 opacity-0 sm:w-48 z-10 bg-white sm:shadow-md rounded-md p-2 dark:bg-gray-800 sm:dark:border dark:border-gray-700 dark:divide-gray-700 before:absolute top-full sm:border before:-top-5 before:start-0 before:w-full before:h-5 hidden"
               style="">
-              <a class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-300 dark:hover:bg-gray-70"
+              <a class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-800 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 dark:text-gray-300 dark:hover:bg-gray-700"
                 target="_blank" href="https://github.com/ArunaStorage/api">
                 API
               </a>
@@ -77,7 +77,6 @@ onMounted(() => {
           <a class="font-medium text-gray-600 dark:text-gray-300 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
             target="_blank" href="https://github.com/ArunaStorage">
             <IconBrandGithub class="flex-shrink-0 align-middle w-5 h-auto me-2 inline-block" />
-            Source Code
           </a>
         </div>
       </div>

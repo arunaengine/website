@@ -9,7 +9,8 @@ const last_id = ref('')
 
 async function extendDisplay() {
   const fetched_announcements = await getAnnouncements(last_id.value, 3)
-  const fetched_last_id = fetched_announcements[fetched_announcements.length - 1].announcementId
+
+  const fetched_last_id = fetched_announcements[fetched_announcements.length - 1] ? fetched_announcements[fetched_announcements.length - 1].announcementId : undefined
 
   exhausted.value = fetched_last_id == undefined || fetched_announcements.length < 3
   last_id.value = fetched_last_id ? fetched_last_id : last_id.value
