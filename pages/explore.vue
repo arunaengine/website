@@ -121,7 +121,7 @@ onMounted(async () => await queryResources(true));
 <template>
   <NavigationTop/>
 
-  <div class="min-h-[calc(100vh-120px)]">
+  <div class="min-h-[calc(100vh-110px)]">
     <!-- Start Hits + Search Input -->
     <div class="flex sm:flex-col md:flex-row items-center md:container w-full mx-auto mt-10">
       <div class="md:basis-1/4">
