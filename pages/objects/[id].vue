@@ -189,61 +189,57 @@ useHead({
 <template>
   <NavigationTop/>
 
-  <div class="flex flex-wrap justify-between container mx-auto mt-10">
-    <h1 class="text-3xl font-bold text-gray-700 dark:text-white my-4">
-      Resource Overview
-    </h1>
-    <button @click="router.back()"
-            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-md border border-transparent text-blue-600 hover:bg-blue-100 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none dark:text-blue-500 dark:hover:bg-blue-800/30 dark:hover:text-blue-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
-      <IconArrowLeft class="icon"/>
-    </button>
-  </div>
-
-  <div v-if="!loading && resource">
+  <!-- Nav + Margin + Footer = 218px -->
+  <div v-if="!loading && resource" class="min-h-[calc(100vh-110px)]">
     <!-- Badge Row -->
-    <div class="flex flex-wrap justify-center container mx-auto mb-6">
+    <div class="flex flex-wrap justify-center max-w-screen-2xl mx-auto my-10">
       <ul class="flex flex-col flex-wrap grow sm:flex-row">
-        <li class="inline-flex items-center bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+        <li class="inline-flex items-center bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-white -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-slate-900 dark:border-neutral-700">
           <IconBucket class="flex-shrink-0 size-6"/>
-          <span class="font-bold">Type:</span> {{ toResourceTypeStr(resource.variant) }}
+          <span class="font-bold">Type:</span>
+          <span class="text-gray-300">{{ toResourceTypeStr(resource.variant) }}</span>
         </li>
-        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-white -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-slate-900 dark:border-neutral-700 dark:text-white">
           <IconLockCog class="flex-shrink-0 size-6"/>
-          <span class="font-bold">Dataclass:</span> {{ toDataClassStr(resource.dataClass) }}
+          <span class="font-bold">Dataclass:</span>
+          <span class="text-gray-300">{{ toDataClassStr(resource.dataClass) }}</span>
         </li>
-        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-white -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-slate-900 dark:border-neutral-700 dark:text-white">
           <IconZoomCheck class="flex-shrink-0 size-6"/>
-          <span class="font-bold">Status:</span> {{ toObjectStatusStr(resource.objectStatus) }}
+          <span class="font-bold">Status:</span>
+          <span class="text-gray-300">{{ toObjectStatusStr(resource.objectStatus) }}</span>
         </li>
-        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-white -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-slate-900 dark:border-neutral-700 dark:text-white">
           <IconLicense class="flex-shrink-0 size-6"/>
-          <span class="font-bold">Metadata License:</span> {{ resource.metaLicense.name }}
+          <span class="font-bold">Metadata License:</span>
+          <span class="text-gray-300">{{ resource.metaLicense.name }}</span>
         </li>
-        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-white -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-slate-900 dark:border-neutral-700 dark:text-white">
           <IconLicense class="flex-shrink-0 size-6"/>
           <span class="font-bold">
             {{
               resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT ? '' : 'Default'
-            }} Data License:</span> {{ resource.dataLicense.name }}
+            }} Data License:</span>
+          <span class="text-gray-300">{{ resource.dataLicense.name }}</span>
         </li>
 
-        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-white -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-slate-900 dark:border-neutral-700 dark:text-white">
           <IconCloudLock class="flex-shrink-0 size-6"/>
-          <span class="font-bold">Permission:</span> {{ toPermissionTypeStr(resource.permission) }}
+          <span class="font-bold">Permission:</span>
+          <span class="text-gray-300">{{ toPermissionTypeStr(resource.permission) }}</span>
         </li>
 
-        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-neutral-900 dark:border-neutral-700 dark:text-white">
+        <li class="inline-flex items-center grow bg-white/[.5] gap-x-1 py-3 px-4 text-sm font-medium border border-gray-400 text-white -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-slate-900 dark:border-neutral-700 dark:text-white">
           <!-- Actions Dropdown Menu -->
           <div class="hs-dropdown relative inline-flex">
             <button id="hs-dropdown-with-icons" type="button"
-                    class="hs-dropdown-toggle inline-flex items-center gap-x-2 text-sm font-medium rounded-md text-gray-800 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-800">
+                    class="hs-dropdown-toggle inline-flex items-center gap-x-2 text-sm font-medium disabled:opacity-50 disabled:pointer-events-none border-neutral-700 text-white">
               Actions
               <IconChevronDown class="hs-dropdown-open:rotate-180 size-4"/>
             </button>
 
-            <div
-                class="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden min-w-60 bg-white shadow-md rounded-md p-2 mt-2 divide-y divide-gray-200 dark:bg-neutral-800 dark:border dark:border-neutral-700 dark:divide-neutral-700"
-                aria-labelledby="hs-dropdown-with-icons">
+            <div aria-labelledby="hs-dropdown-with-icons"
+                 class="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden min-w-60 shadow-md rounded-md p-2 mt-2 divide-y divide-gray-200 dark:bg-slate-900 dark:border dark:border-neutral-700 dark:divide-neutral-700">
               <div class="py-2 first:pt-0 last:pb-0">
                 <ClientOnly>
                   <button v-if="resource.variant == v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
@@ -280,7 +276,7 @@ useHead({
     <!-- End Badge Row -->
 
     <!-- General Info Row -->
-    <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 container mx-auto mb-6">
+    <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 max-w-screen-2xl mx-auto mb-6">
       <CardSmallInfo :icon_id='"ID"' :text="resource.id"/>
       <CardName :name="resource.name" :title="resource.title"/>
       <CardStats :stats="resource.stats"/>
@@ -288,7 +284,7 @@ useHead({
     <!-- End General Info Row -->
 
     <!-- Description / Authors Row -->
-    <div class="flex flex-col xl:flex-row justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
+    <div class="flex flex-col xl:flex-row justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
       <div
           class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
@@ -312,7 +308,7 @@ useHead({
     <!-- End Description / Authors Row -->
 
     <!-- Labels / Hooks Row -->
-    <div class="flex flex-wrap justify-between gap-x-4 gap-y-2 container mx-auto mb-6">
+    <div class="flex flex-wrap justify-between gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
       <div
           class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
@@ -334,7 +330,7 @@ useHead({
     <!-- End Labels / Hooks Row -->
 
     <!-- Relations Row -->
-    <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
+    <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
       <div
           class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
@@ -356,7 +352,8 @@ useHead({
     <!-- End Relations Row -->
 
     <!-- Locations -->
-    <div v-if="resource.variant == v2ResourceVariant.RESOURCE_VARIANT_OBJECT" class="flex flex-wrap justify-center gap-x-4 gap-y-2 container mx-auto mb-6">
+    <div v-if="resource.variant == v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
+         class="flex flex-wrap justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
       <div
           class="flex flex-col grow p-2 bg-white/[.5] border border-gray-400 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
