@@ -161,13 +161,13 @@ function submit() {
     <div
         class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto">
       <div
-          class="flex flex-col bg-white border shadow-sm rounded-md pointer-events-auto dark:bg-gray-800 dark:border-neutral-700 dark:shadow-neutral-700/70">
-        <div class="flex justify-between items-center py-3 px-4 border-b dark:border-neutral-700">
-          <h3 class="font-bold text-gray-800 dark:text-white">
+          class="flex flex-col bg-gray-800 border border-neutral-700 shadow-sm rounded-md pointer-events-auto shadow-neutral-700/70">
+        <div class="flex justify-between items-center py-3 px-4 border-b border-neutral-700">
+          <h3 class="font-bold text-gray-200">
             Add Internal Relation
           </h3>
           <button :data-hs-overlay="`#${props.modalId}`" @click="reset"
-                  class="flex justify-center items-center size-7 text-sm font-semibold rounded-full border border-transparent text-gray-800 hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none dark:text-white dark:hover:bg-gray-700 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+                  class="flex justify-center items-center size-7 text-sm font-semibold rounded-full border border-transparent text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-aruna-700"
                   type="button">
             <span class="sr-only">Close</span>
             <IconX class="flex-shrink-0 size-4"/>
@@ -181,20 +181,23 @@ function submit() {
               <input v-model="resourceId"
                      autofocus
                      id="hs-floating-input-resource"
-                     class="mt-2 peer p-4 block w-full border-gray-200 rounded-md text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-300 dark:focus:ring-gray-600
+                     class="mt-2 peer p-4 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm placeholder:text-transparent focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6
                    [&:not(:placeholder-shown)]:pb-2
                    autofill:pt-6
-                   autofill:pb-2" placeholder="A resource id" type="text">
-              <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+                   autofill:pb-2"
+                     placeholder="A resource id"
+                     type="text">
+              <label for="hs-floating-input-resource"
+                     class="text-gray-300 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
             peer-focus:text-gray-500
             peer-[:not(:placeholder-shown)]:text-xs
             peer-[:not(:placeholder-shown)]:-translate-y-1.5
-            peer-[:not(:placeholder-shown)]:text-gray-500" for="hs-floating-input-resource">Resource ID</label>
+            peer-[:not(:placeholder-shown)]:text-gray-500">Resource ID</label>
               <div :class="{ 'hidden': typeof resourceIdErr === 'undefined'}"
                    class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
                 <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
@@ -209,7 +212,7 @@ function submit() {
           <!-- Resource variant -->
           <div class="relative">
             <select v-model="resourceVariant"
-                    class="my-2 peer p-4 pe-9 block w-full border-gray-200 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-300 dark:focus:ring-gray-600
+                    class="my-2 peer p-4 pe-9 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none
                     focus:pt-6
                     focus:pb-2
                     [&:not(:placeholder-shown)]:pt-6
@@ -221,7 +224,7 @@ function submit() {
                 {{ variant }}
               </option>
             </select>
-            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+            <label class="text-gray-300 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
             peer-focus:text-gray-500
@@ -234,7 +237,7 @@ function submit() {
           <!-- Relation direction -->
           <div class="relative">
             <select v-model="relationDirection"
-                    class="my-2 peer p-4 pe-9 block w-full border-gray-200 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-300 dark:focus:ring-gray-600
+                    class="my-2 peer p-4 pe-9 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none
                     focus:pt-6
                     focus:pb-2
                     [&:not(:placeholder-shown)]:pt-6
@@ -246,7 +249,7 @@ function submit() {
                 {{ direction }}
               </option>
             </select>
-            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+            <label class="text-gray-300 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
             peer-focus:text-gray-500
@@ -259,7 +262,7 @@ function submit() {
           <!-- Relation variant -->
           <div class="relative">
             <select v-model="relationVariant"
-                    class="my-2 peer p-4 pe-9 block w-full border-gray-200 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-300 dark:focus:ring-gray-600
+                    class="my-2 peer p-4 pe-9 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none
                     focus:pt-6
                     focus:pb-2
                     [&:not(:placeholder-shown)]:pt-6
@@ -271,7 +274,7 @@ function submit() {
                 {{ variant }}
               </option>
             </select>
-            <label class="text-slate-400 absolute top-0 start-0 p-4 h-full truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+            <label class="text-gray-300 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
             peer-focus:text-gray-500
@@ -286,20 +289,21 @@ function submit() {
             <div class="relative">
               <input v-model="customVariant"
                      id="hs-floating-input-resource"
-                     class="mt-2 peer p-4 block w-full border-gray-200 rounded-md text-sm placeholder:text-transparent focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600
+                     class="mt-2 peer p-4 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm placeholder:text-transparent focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6
                    [&:not(:placeholder-shown)]:pb-2
                    autofill:pt-6
                    autofill:pb-2" placeholder="A resource id" type="text">
-              <label class="text-slate-400 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent dark:text-white peer-disabled:opacity-50 peer-disabled:pointer-events-none
+              <label for="hs-floating-input-resource"
+                     class="text-gray-300 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
             peer-focus:text-gray-500
             peer-[:not(:placeholder-shown)]:text-xs
             peer-[:not(:placeholder-shown)]:-translate-y-1.5
-            peer-[:not(:placeholder-shown)]:text-gray-500" for="hs-floating-input-resource">Custom Variant</label>
+            peer-[:not(:placeholder-shown)]:text-gray-500">Custom Variant</label>
               <div :class="{ 'hidden': typeof customVariantErr === 'undefined'}"
                    class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
                 <IconExclamationCircle class="flex-shrink-0 size-4 text-red-500"/>
@@ -313,15 +317,16 @@ function submit() {
         </div>
         <!-- End Relation variant -->
 
-        <div class="flex justify-end items-center gap-x-2 py-3 px-4 border-t dark:border-gray-700">
-          <button type="button" @click="reset"
-                  class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-white dark:hover:bg-gray-800"
+        <div class="flex justify-end items-center gap-x-2 py-3 px-4 border-t border-gray-700">
+          <button type="button"
+                  @click="reset"
+                  class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-md border border-gray-700 bg-slate-900 text-white shadow-sm hover:bg-gray-800 disabled:opacity-50 disabled:pointer-events-none"
                   :data-hs-overlay="`#${props.modalId}`">
             Close
           </button>
           <button type="button" :disabled="!validState"
                   @click="submit"
-                  class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-md border border-transparent bg-aruna-800 text-white hover:bg-aruna-700 disabled:opacity-50 disabled:pointer-events-none"
+                  class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-md border border-transparent bg-aruna-700 text-white hover:bg-aruna-800 disabled:opacity-50 disabled:pointer-events-none"
                   :data-hs-overlay="`#${props.modalId}`">
             Add Relation
           </button>

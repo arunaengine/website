@@ -40,24 +40,24 @@ code .line::before {
           <div class="grow">
             <div class="flex justify-between items-center gap-x-2">
               <div>
-                <span class="font-semibold text-gray-800 dark:text-neutral-200">
+                <span class="font-semibold text-gray-300">
                     {{ announcement?.createdBy }}
                 </span>
 
-                <ul class="text-xs text-gray-500 dark:text-neutral-500">
-                  <li class="inline-block relative pe-6 last:pe-0 last-of-type:before:hidden before:absolute before:top-1/2 before:end-2 before:-translate-y-1/2 before:size-1 before:bg-gray-500 before:rounded-full dark:text-neutral-400 dark:before:bg-neutral-600">
+                <ul class="text-xs text-gray-500">
+                  <li class="inline-block relative pe-6 last:pe-0 last-of-type:before:hidden before:absolute before:top-1/2 before:end-2 before:-translate-y-1/2 before:size-1 before:rounded-full text-neutral-400 before:bg-muted">
                     <div v-if="announcement?.createdAt !== announcement?.modifiedAt"
                          class="hs-tooltip [--placement:right] inline-block">
-                      <button type="button" class="hs-tooltip-toggle text-xs text-gray-500 dark:text-neutral-500">
+                      <button type="button"
+                              class="hs-tooltip-toggle text-xs text-gray-500">
                         {{ displayDate(announcement?.createdAt, announcement?.modifiedAt) }}
                       </button>
-                      <span
-                          role="tooltip"
-                          class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded shadow-sm dark:bg-neutral-700">
+                      <span role="tooltip"
+                            class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-muted text-gray-300 text-xs font-medium text-white rounded shadow-sm">
                         Originally posted: {{ formatDate(announcement?.createdAt) }}
                       </span>
                     </div>
-                    <p v-else class="inline-block text-xs text-gray-500 dark:text-neutral-500">
+                    <p v-else class="inline-block text-xs text-gray-500">
                       {{ formatDate(announcement?.createdAt) }}
                     </p>
                   </li>
@@ -68,7 +68,7 @@ code .line::before {
               <div>
                 <button type="button"
                         @click="router.back()"
-                        class="py-1.5 px-2.5 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-800">
+                        class="py-1.5 px-2.5 inline-flex items-center gap-x-2 text-sm font-medium rounded-md border border-gray-500 bg-[#080d1f] text-gray-400 shadow-sm disabled:opacity-50 disabled:pointer-events-none hover:bg-[#080d1f]/50">
                   <IconChevronLeft class="size-3.5"/>
                   Back
                 </button>

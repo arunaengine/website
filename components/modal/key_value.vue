@@ -60,13 +60,14 @@ function submit() {
     <div
         class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all lg:max-w-4xl lg:w-full m-3 lg:mx-auto">
       <div
-          class="flex flex-col bg-white border shadow-sm rounded-md pointer-events-auto dark:bg-gray-800 dark:border-gray-700 dark:shadow-slate-700/[.7]">
-        <div class="flex justify-between items-center py-3 px-4 border-b dark:border-gray-700">
-          <h3 class="font-bold text-gray-800 dark:text-white">
+          class="flex flex-col bg-gray-800 border border-gray-700 shadow-sm rounded-md pointer-events-auto shadow-slate-700/[.7]">
+        <div class="flex justify-between items-center py-3 px-4 border-b border-gray-700">
+          <h3 class="font-bold text-gray-200">
             Add Key-Value
           </h3>
-          <button :data-hs-overlay="`#${props.modalId}`" @click="reset"
-                  class="flex justify-center items-center size-7 text-sm font-semibold rounded-full border border-transparent text-gray-800 hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none dark:text-white dark:hover:bg-gray-700 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
+          <button :data-hs-overlay="`#${props.modalId}`"
+                  @click="reset"
+                  class="flex justify-center items-center size-7 text-sm font-semibold rounded-full border border-transparent text-gray-200 hover:bg-gray-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-aruna-700"
                   type="button">
             <span class="sr-only">Close</span>
             <IconX class="flex-shrink-0 size-4" />
@@ -74,22 +75,25 @@ function submit() {
         </div>
         <div class="flex flex-row space-x-4 p-4 overflow-y-auto">
           <div class="flex flex-col grow">
-            <label for="key-input-label" class="block text-sm font-medium mb-2 dark:text-white">Key</label>
+            <label for="key-input-label"
+                   class="block text-sm font-medium mb-2 text-gray-200">Key</label>
             <input v-model="kvKey" type="text" id="key-input-label"
-                   class="py-3 px-4 block w-full border-gray-200 rounded-md text-sm focus:border-aruna-800 focus:ring-aruna-800 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-300"
+                   class="py-3 px-4 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-800 focus:ring-aruna-800"
                    placeholder="Enter a key" autofocus>
           </div>
           <div class="flex flex-col grow">
-            <label for="value-input-label" class="block text-sm font-medium mb-2 dark:text-white">Value</label>
+            <label for="value-input-label"
+                   class="block text-sm font-medium mb-2 text-gray-200">Value</label>
             <input v-model="kvValue" type="text" id="value-input-label"
-                   class="py-3 px-4 block w-full border-gray-200 rounded-md text-sm focus:border-aruna-800 focus:ring-aruna-800 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-300"
+                   class="py-3 px-4 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-800 focus:ring-aruna-800"
                    placeholder="Enter a value">
           </div>
 
           <div class="flex flex-col grow">
-            <label for="key-input-label" class="block text-sm font-medium mb-2 dark:text-white">Variant</label>
+            <label for="type-input-select"
+                   class="block text-sm font-medium mb-2 text-gray-200">Variant</label>
             <select v-model="kvType" id="type-input-select"
-                    class="py-3 px-4 pe-9 block w-full border-gray-200 rounded-md text-sm focus:border-aruna-800 focus:ring-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-300 dark:focus:ring-gray-600">
+                    class="py-3 px-4 pe-9 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none">
               <option v-for="kvv in KeyValueVariant" :value="kvv"
                       v-bind:selected="kvv === KeyValueVariant.Label">
                 {{ displayKeyValueVariant(kvv) }}
@@ -99,13 +103,15 @@ function submit() {
 
           </div>
         </div>
-        <div class="flex justify-end items-center gap-x-2 py-3 px-4 border-t dark:border-gray-700">
-          <button type="button" @click="reset"
-                  class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-white dark:hover:bg-gray-800"
+        <div class="flex justify-end items-center gap-x-2 py-3 px-4 border-t border-gray-700">
+          <button type="button"
+                  @click="reset"
+                  class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-md border border-gray-700 bg-slate-900 text-white shadow-sm hover:bg-gray-800 disabled:opacity-50 disabled:pointer-events-none"
                   :data-hs-overlay="`#${props.modalId}`">
             Close
           </button>
-          <button type="button" @click="submit"
+          <button type="button"
+                  @click="submit"
                   class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-md border border-transparent bg-aruna-800 text-white hover:bg-aruna-700 disabled:opacity-50 disabled:pointer-events-none"
                   :data-hs-overlay="`#${props.modalId}`">
             Add KeyValue

@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import {modelsv2Status, type v2GenericResource,} from '~/composables/aruna_api_json';
+import {modelsv2Status, v2DataClass, type v2GenericResource, v2ResourceVariant,} from '~/composables/aruna_api_json';
 
 /* ----- PROPERTIES ----- */
 interface ResourceCardProps {
   resource: v2GenericResource
 }
+
 const {resource} = defineProps<ResourceCardProps>()
 const entry = toSearchResult(resource)
+
 /* ----- END PROPERTIES ----- */
 
 function displayDescription(description: string): string {
@@ -15,51 +17,79 @@ function displayDescription(description: string): string {
   }
   return description
 }
+function displayDataClass(dataClass: v2DataClass): string {
+  switch (dataClass) {
+    case v2DataClass.DATA_CLASS_PUBLIC: return 'Public'
+    case v2DataClass.DATA_CLASS_PRIVATE: return 'Private'
+    default: return 'Unspecified'
+  }
+}
+function dataClassCss(dataClass: v2DataClass): string {
+  switch (dataClass) {
+    case v2DataClass.DATA_CLASS_PUBLIC: return 'border-green-600 text-green-600'
+    case v2DataClass.DATA_CLASS_PRIVATE: return 'border-red-600/80 text-red-600/80'
+    case v2DataClass.DATA_CLASS_CONFIDENTIAL: return 'border-white text-white'
+    case v2DataClass.DATA_CLASS_WORKSPACE: return 'border-indigo-600 text-indigo-600'
+    default: return 'border-gray-500 text-gray-500'
+  }
+}
 </script>
 
 <template>
   <div v-if="entry"
-    class="flex flex-auto my-3 p-4 gap-x-4 bg-white border border-l-4 border-l-aruna-700 shadow-sm rounded-md dark:bg-slate-900 dark:border-gray-700 dark:border-t-blue-500 dark:shadow-slate-700/[.7]"
-    :class="{'border-l-red-500': entry.object_status === modelsv2Status.STATUS_DELETED}">
+       class="flex flex-auto my-3 p-4 gap-x-4 bg-slate-900 border border-l-4 border-l-aruna-700 shadow-sm rounded-md border-gray-700 shadow-slate-700/[.7]"
+       :class="{'border-l-red-500': entry.object_status === modelsv2Status.STATUS_DELETED}">
     <div class="flex flex-col basis-1/3 gap-y-3 border-e-gray-600">
-      <!-- Start Name and ID display with links -->
-      <NuxtLink :to="`/objects/${entry.id}`" class="text-aruna-800 font-bold">
+      <!-- Name and ID display with links -->
+      <NuxtLink :to="`/objects/${entry.id}`"
+                class="text-aruna-700 font-bold">
         <h3>{{ entry.name }}</h3>
       </NuxtLink>
 
-      <NuxtLink :to="`/objects/${entry.id}`" class="text-sm text-slate-400 font-bold">
+      <NuxtLink :to="`/objects/${entry.id}`"
+                class="text-sm text-slate-400 font-bold">
         <h4>{{ entry.id }}</h4>
       </NuxtLink>
-      <!-- End Name and ID display with links -->
+      <!-- END Name and ID display with links -->
 
-      <div class="flex sm:flex-col md:flex-row">
-        <!-- Start DataClass -->
-        <BadgeDataclass :dataClass="entry.data_class" :outline="true" />
-        <!-- End DataClass -->
-
-        <!-- Start Stats -->
-        <BadgeStats :count="entry.stats.count" :objectSize="entry.stats.size" />
-        <!-- End Stats -->
+      <!-- Badges -->
+      <div class="flex flex-col md:flex-row mt-2 gap-x-2 gap-y-2">
+        <!-- DataClass Badge -->
+        <Badge :class="cn('px-2 py-1 bg-transparent hover:bg-transparent border', dataClassCss(entry.data_class))">
+          {{ displayDataClass(entry.data_class) }}
+        </Badge>
+        <!-- END DataClass -->
+        <!-- Stats Badge -->
+        <Badge v-if="entry.variant !== v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
+               class="px-2 py-1 bg-transparent hover:bg-transparent border border-slate-400 text-slate-400">
+          Children: {{ entry.stats.count }}
+        </Badge>
+        <Badge class="px-2 py-1 bg-transparent hover:bg-transparent border border-slate-400 text-slate-400">
+          {{ entry.stats.size ? formatBytes(+entry.stats.size) : "N/A Bytes" }}
+        </Badge>
+        <!-- END Stats Badge -->
       </div>
+      <!-- END Badges -->
     </div>
 
     <div class="mx-2 grow flex-col basis-2/3">
-      <h4 class="text-sm my-3 uppercase text-gray-500 dark:text-gray-400">Description</h4>
-      <p v-if="entry.description.length > 0" class="mt-2 text-gray-600 dark:text-gray-200">
-        {{displayDescription(entry.description) }}
+      <h4 class="text-sm my-3 uppercase text-gray-400">Description</h4>
+      <p v-if="entry.description.length > 0" class="mt-2 text-gray-200">
+        {{ displayDescription(entry.description) }}
       </p>
 
-      <hr v-if="entry.key_values.length > 0" class="my-4 text-gray-500 " />
+      <hr v-if="entry.key_values.length > 0" class="my-4 text-gray-500 "/>
 
       <!-- Basic Label Display -->
       <div class="flex flex-row flex-wrap">
         <div v-for="label in entry.key_values" class="flex flex-row my-1 me-2 last:me-0">
-          <span :class="{ 'me-2 rounded-lg': label.value === '' || label.value === undefined, 'rounded-l-lg': label.value && label.value.length > 0 }"
-            class="truncate max-w-60 whitespace-nowrap items-center gap-x-1.5 py-1.5 px-3 rounded-l-lg text-xs font-medium bg-aruna-800 text-slate-300 dark:bg-blue-800/30 dark:text-blue-500">
+          <span
+              :class="{ 'me-2 rounded-md': label.value === '' || label.value === undefined, 'rounded-l-md': label.value && label.value.length > 0 }"
+              class="text-xs font-medium truncate max-w-60 whitespace-nowrap items-center gap-x-1.5 py-1.5 px-3 rounded-l-md text-aruna-700 border border-aruna-800">
             {{ label.key }}
           </span>
           <span v-if="label.value"
-            class="truncate max-w-60 whitespace-nowrap items-center gap-x-1.5 py-1.5 px-3 rounded-r-lg text-xs font-medium border text-blue-800 dark:bg-blue-800/30 dark:text-blue-500">
+                class="truncate max-w-60 whitespace-nowrap items-center gap-x-1.5 py-1.5 px-3 rounded-r-lg text-xs font-medium border border-l-0 border-aruna-800 text-aruna-700 bg-aruna-800/30">
             {{ label.value }}</span>
         </div>
       </div>
