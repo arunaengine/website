@@ -35,12 +35,6 @@ onMounted(() => forceRefresh.value += 1);
 
           <NuxtLink
               class="font-medium text-gray-300 focus:outline-none focus:ring-2 focus:ring-aruna-700"
-              to="/user/dashboard">
-            Dashboard
-          </NuxtLink>
-
-          <NuxtLink
-              class="font-medium text-gray-300 focus:outline-none focus:ring-2 focus:ring-aruna-700"
               to="/news">
             News
           </NuxtLink>
