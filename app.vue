@@ -7,7 +7,7 @@ import {parseJwt} from "~/composables/utils";
 
 import {h} from 'vue';
 import Toaster from '@/components/ui/toast/Toaster.vue'
-import RegistrationDialog from "@/components/custom-ui/RegistrationDialog.vue";
+import RegistrationDialog from "~/components/custom-ui/dialog/RegistrationDialog.vue";
 import {useToast} from '@/components/ui/toast/use-toast'
 
 const {toast} = useToast()
@@ -79,8 +79,10 @@ async function updateUser() {
               description: h('div',
                   {class: 'flex space-x-2 items-center justify-center'},
                   [
-                    h(IconPlant, {class: 'flex-shrink-0 size-5 text-gray-700'}),
-                    h('span', {class: 'text-aruna-800'}, ['Please wait until your account gets activated by an administrator.'])
+                    h(IconPlant, {class: 'flex-shrink-0 size-5 text-green-400'}),
+                    h('span',
+                        {class: 'text-fuchsia-50'},
+                        ['Please wait until your account gets activated by an administrator.'])
                   ]),
               duration: 10000
             })
@@ -139,7 +141,7 @@ onBeforeMount(() => updateUser())
   </div>
 
   <div v-else
-       class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent to-aruna-800/[.10]">
+       class="flex flex-col flex-grow md:min-h-screen bg-[url('/_nuxt/assets/imgs/global-bg.webp')] bg-cover bg-fixed bg-center bg-no-repeat">
     <ToastInfo v-if="useRuntimeConfig().public.infoBanner.active" modalId="info-toast" infoMsg="Hello"/>
     <NuxtLoadingIndicator/>
     <NuxtPage/>

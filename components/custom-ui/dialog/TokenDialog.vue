@@ -144,8 +144,6 @@ const df = new DateFormatter((navigator && navigator.language) || "de-DE", {
   dateStyle: 'long',
 })
 
-
-
 function clear(visibility: boolean) {
   console.log(`Changed open state: ${visibility}`)
   if (!visibility) {
@@ -167,8 +165,8 @@ function clear(visibility: boolean) {
     <DialogContent class="sm:max-w-xl sm:rounded-md"
                    @pointer-down-outside="(event) => event.preventDefault()">
       <DialogHeader>
-        <DialogTitle class="mb-2 text-center text-aruna-800 font-bold">Create Token</DialogTitle>
-        <DialogDescription class="text-center">
+        <DialogTitle class="mb-2 text-center text-aruna-700 font-bold">Create Token</DialogTitle>
+        <DialogDescription class="text-center text-gray-300">
           Create an individual Aruna access token
         </DialogDescription>
       </DialogHeader>
@@ -290,8 +288,8 @@ function clear(visibility: boolean) {
         <!-- Token Secret -->
 
         <div v-if="tokenSecret"
-             class="flex flex-col text-center bg-white border shadow-sm rounded-sm p-4 md:p-5 dark:bg-neutral-900 dark:border-neutral-700 dark:shadow-neutral-700/70">
-          <h3 class="text-lg font-bold text-gray-800 dark:text-white">
+             class="flex flex-col text-center bg-neutral-900 border border-gray-700 shadow-sm rounded-sm p-4 md:p-5">
+          <h3 class="text-lg font-bold text-gray-200">
             Token Secret
           </h3>
           <p class="mt-1 text-xs font-medium uppercase text-orange-500">

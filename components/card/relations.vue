@@ -42,28 +42,27 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
 </script>
 
 <template>
-
   <div class="-m-1.5 overflow-x-auto">
     <div class="p-1.5 min-w-full inline-block align-middle">
       <div class="overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <table class="min-w-full divide-y divide-gray-500">
           <thead>
           <tr v-if="props.external">
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
+            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">
               Identifier
             </th>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
+            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">
               Type
             </th>
           </tr>
           <tr v-else>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
+            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">
               ID
             </th>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
+            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">
               Resource
             </th>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">
+            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">
               Type
             </th>
           </tr>
@@ -71,13 +70,13 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
 
           <thead v-if="!props.external && inc_int_rel.length > 0">
           <tr>
-            <th colspan="3" class="px-6 py-3 text-start text-sm font-medium text-gray-600 uppercase">Incoming</th>
+            <th colspan="3" class="px-6 py-3 text-start text-sm font-medium text-gray-300 uppercase">Incoming</th>
           </tr>
           </thead>
 
-          <tbody v-if="props.external" class="divide-y divide-gray-200 dark:divide-gray-700">
-          <tr v-for="relation in ext_rel" class="hover:bg-gray-100 dark:hover:bg-gray-700">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+          <tbody v-if="props.external" class="divide-y divide-gray-300">
+          <tr v-for="relation in ext_rel" class="hover:bg-gray-700">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
               <a v-if="relation.definedVariant == v2ExternalRelationVariant.EXTERNAL_RELATION_VARIANT_URL"
                  :href="`${relation.identifier}`" target="_blank" class="ms-1">
                 <IconLink class="flex-shrink-0 size-4 inline-block"/>
@@ -87,7 +86,7 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
                 {{ relation.identifier }}
               </span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
                 <span v-if="relation.definedVariant === v2ExternalRelationVariant.EXTERNAL_RELATION_VARIANT_URL">
                   URL
                 </span>
@@ -102,20 +101,20 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
             </td>
           </tr>
           </tbody>
-          <tbody v-else class="divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody v-else class="divide-y divide-gray-500">
           <tr v-for="relation in inc_int_rel">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
-              <NuxtLink :to="`/objects/${relation.resourceId}`" exact=true class="text-aruna-800 dark:text-aruna-700">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
+              <NuxtLink :to="`/objects/${relation.resourceId}`" exact=true class="text-aruna-700 hover:text-aruna-800">
                 <div>
                   <IconArrowBigRightLines class="flex-shrink-0 size-6 inline-block"/>
                   {{ relation.resourceId }}
                 </div>
               </NuxtLink>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
               {{ toResourceTypeStr(relation.resourceVariant) }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
                 <span v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
                             relation.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND">
                   Parent
@@ -150,23 +149,23 @@ function splitRelations(): [v2InternalRelation[], v2InternalRelation[], v2Extern
 
           <thead v-if="!props.external && inc_out_rel.length > 0">
           <tr>
-            <th colspan="3" class="px-6 py-3 text-start text-sm font-medium text-gray-600 uppercase">Outgoing</th>
+            <th colspan="3" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">Outgoing</th>
           </tr>
           </thead>
-          <tbody v-if="!props.external && inc_out_rel.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody v-if="!props.external && inc_out_rel.length > 0" class="divide-y divide-gray-500">
           <tr v-for="relation in inc_out_rel">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
-              <NuxtLink :to="`/objects/${relation.resourceId}`" exact=true class="text-aruna-800 dark:text-aruna-700">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
+              <NuxtLink :to="`/objects/${relation.resourceId}`" exact=true class="text-aruna-700 hover:text-aruna-800">
                 <div>
                   <IconArrowBigLeftLines class="flex-shrink-0 size-6 inline-block"/>
                   {{ relation.resourceId }}
                 </div>
               </NuxtLink>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
               {{ toResourceTypeStr(relation.resourceVariant) }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
               <span v-if="relation.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO &&
                             relation.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND">
                   Parent
