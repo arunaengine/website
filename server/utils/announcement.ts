@@ -36,7 +36,7 @@ async function mdToHtml(mdContent: string | undefined): Promise<string> {
           transformers: [
             {
               pre(node) {
-                this.addClassToHast(node, 'm-4 p-4 overflow-x-auto rounded-md dark:border dark:border-gray-500')
+                this.addClassToHast(node, 'm-4 p-4 overflow-x-auto rounded-md border border-gray-500')
               },
             }
           ]

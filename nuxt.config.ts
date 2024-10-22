@@ -12,7 +12,7 @@ export default defineNuxtConfig({
   plugins: [
     "~/plugins/preline.client.ts",
   ],
-  modules: ['@nuxtjs/color-mode', '@nuxtjs/tailwindcss', "shadcn-nuxt"],
+  modules: ['@nuxtjs/tailwindcss', "shadcn-nuxt"],
   css: [
     '~/assets/styles/main.css',
   ],
@@ -23,11 +23,6 @@ export default defineNuxtConfig({
   shadcn: {
     prefix: '',
     componentDir: './components/ui'
-  },
-  colorMode: {
-    classSuffix: '',
-    preference: 'light',
-    fallback: 'light',
   },
   runtimeConfig: {
     serverHostUrl: "http://localhost:8080",
@@ -53,22 +48,23 @@ export default defineNuxtConfig({
       }
     },
     markdownCss: {
-      h1: ['text-3xl', 'font-bold', 'text-center', 'text-gray-700', 'dark:text-white'],
-      h2: ['mt-6', 'mb-2', 'text-2xl', 'font-bold', 'text-gray-600', 'dark:text-gray-300'],
-      h3: ['mt-6', 'mb-2', 'text-xl', 'font-bold', 'uppercase', 'text-gray-600', 'dark:text-gray-300'],
-      p: ['mt-2', 'px-4', 'py-2', 'text-gray-800', 'dark:text-gray-200'],
-      a: ['text-aruna-800', 'hover:text-aruna-700', 'dark:text-aruna-700', 'dark:hover:text-aruna-600'],
+      h1: ['text-3xl', 'font-bold', 'text-center', 'text-gray-200'],
+      h2: ['mt-6', 'mb-2', 'text-2xl', 'font-bold', 'text-gray-300'],
+      h3: ['mt-6', 'mb-2', 'text-xl', 'font-bold', 'uppercase', 'text-gray-300'],
+      p: ['mt-2', 'px-4', 'py-2', 'text-gray-300'],
+      a: ['text-aruna-700', 'hover:text-aruna-800'],
       hr: ['border-gray-400'],
-      ul: ['list-disc', 'list-outside', 'space-y-5', 'ps-4', 'py-2', 'text-lg', 'text-gray-800', 'dark:text-gray-400'],
-      ol: ['list-decimal', 'list-outside', 'space-y-5', 'ps-5', 'text-lg', 'text-gray-800', 'dark:text-gray-400'],
+      ul: ['list-disc', 'list-outside', 'space-y-5', 'ps-4', 'py-2', 'text-lg', 'text-gray-300'],
+      ol: ['list-decimal', 'list-outside', 'space-y-5', 'ps-5', 'text-lg', 'text-gray-300'],
       li: ['ps-2'],
       img: ['rounded-md'],
       code: ['p-4'],
       dl: ['p-4'],
-      dt: ['pt-4', 'font-medium', 'leading-6', 'text-gray-900'],
-      dd: ['mt-1', 'ps-4', 'leading-6', 'text-gray-700', 'sm:col-span-2', 'sm:mt-0']
+      dt: ['pt-4', 'font-medium', 'leading-6', 'text-gray-400'],
+      dd: ['mt-1', 'ps-4', 'leading-6', 'text-gray-300', 'sm:col-span-2', 'sm:mt-0']
     },
     public: {
+      maintenanceMode: false,
       websiteHost: 'http://localhost:3000',
       infoBanner: {
         active: false,

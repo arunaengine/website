@@ -544,27 +544,28 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
 <template>
   <NavigationTop/>
 
-  <div class="flex flex-wrap justify-between container mx-auto my-10">
-    <h1 class="text-3xl font-bold text-gray-700 dark:text-white">
+
+  <div class="min-h-[calc(100vh-110px)]">
+  <div
+      class="flex flex-col space-x-2 space-y-2 md:max-w-screen-2xl sm:mx-1 md:mx-auto my-10 p-4 border border-gray-500 rounded-md bg-muted/90">
+    <h1 class="text-3xl font-bold text-gray-200">
       Resource creation
     </h1>
-    <button @click="router.back()"
-            class="cursor-pointer px-4 inline-flex items-center gap-x-2 text-sm font-semibold rounded-md border border-transparent text-gray-700 hover:bg-gray-300 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/30 dark:hover:text-gray-400 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
-      <IconArrowLeft class="icon"/>
-    </button>
-  </div>
 
-  <div
-      class="flex flex-col space-x-2 space-y-2 md:container sm:mx-1 md:mx-auto mt-4 p-4 border border-gray-500 rounded-md">
+    <Separator class="my-10 bg-gray-500"/>
+
     <div class="flex flex-col md:flex-row">
       <div class="flex flex-row md:flex-col px-4 grow border-e-gray-300">
         <!-- Resource Name Input -->
         <label for="hs-validation-name-error"
-               class="block text-lg font-medium mb-2 text-gray-700 dark:text-white">Name</label>
+               class="block text-lg font-medium mb-2 text-gray-300">Name</label>
         <div class="relative">
-          <input type="text" v-model="resourceName" id="hs-validation-name-error" name="hs-validation-name-error"
-                 :class="[{ 'border-red-500': !validationStates.get('resourceName') }, { 'focus:border-red-500': !validationStates.get('resourceName') }, { 'focus:ring-red-500': !validationStates.get('resourceName') },]"
-                 class="py-3 px-4 block w-full rounded-md text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 disabled:text-gray-500 disabled:bg-gray-200 disabled:dark:bg-gray-700"
+          <input type="text"
+                 v-model="resourceName"
+                 id="hs-validation-name-error"
+                 name="hs-validation-name-error"
+                 :class="[{'border-red-500 focus:border-red-500 focus:ring-red-500': !validationStates.get('resourceName')}]"
+                 class="py-3 px-4 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none"
                  :disabled="dataUpload !== null"
                  aria-describedby="hs-validation-name-error-helper"
                  placeholder="Name of the resource" required>
@@ -578,23 +579,27 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         </p>
         <!-- End Resource Name Input -->
         <!-- Resource Title Input -->
-        <label for="name-input-label"
-               class="block mt-6 text-lg font-medium mb-2 text-gray-700 dark:text-white">Title</label>
-        <input type="text" v-model="resourceTitle" id="name-input-label"
-               class="py-3 px-4 block w-full border-gray-400 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
+        <label for="display-name-input"
+               class="block mt-6 text-lg font-medium mb-2 text-gray-300">Title</label>
+        <input type="text"
+               v-model="resourceTitle"
+               id="display-name-input"
+               class="py-3 px-4 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none"
                placeholder="Display name for the resource">
         <!-- End Resource Title Input -->
         <!-- Resource Description Input -->
         <div class="relative">
           <label for="hs-textarea-ex-1"
-                 class="block mt-6 text-lg font-medium mb-2 text-gray-700 dark:text-white">Description</label>
-          <textarea id="hs-textarea-ex-1" v-model="resourceDescription" ref="textAreaElement"
+                 class="block mt-6 text-lg font-medium mb-2 text-gray-300">Description</label>
+          <textarea id="hs-textarea-ex-1"
+                    v-model="resourceDescription"
+                    ref="textAreaElement"
                     @input="textAreaAutoHeight(textAreaElement, 3)"
-                    :class="[{ 'border-red-500': !validationStates.get('resourceDescription') }, { 'focus:border-red-500': !validationStates.get('resourceDescription') }, { 'focus:ring-red-500': !validationStates.get('resourceDescription') }]"
-                    class="p-4 pb-12 block w-full border-gray-400 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600"
+                    :class="[{'border-red-500 focus:border-red-500 focus:ring-red-500': !validationStates.get('resourceDescription')}]"
+                    class="p-4 pb-12 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none"
                     placeholder="A concise description of the resource"></textarea>
           <!-- Toolbar -->
-          <div class="absolute bottom-px inset-x-px p-2 rounded-b-md bg-white dark:bg-slate-900">
+          <div class="absolute bottom-px inset-x-px p-2 rounded-b-md bg-slate-900">
             <hr class="my-2 border-gray-200"/>
             <div class="flex justify-end items-center">
               <!-- Button Group -->
@@ -610,20 +615,23 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         <!-- End Description Input -->
 
         <label for="resource-type-radio-label"
-               class="block mt-6 text-lg font-medium mb-2 text-gray-700 dark:text-white">Resource
+               class="block mt-6 text-lg font-medium mb-2 text-gray-300">Resource
           Type</label>
         <ul class="flex flex-col sm:flex-row">
           <li
               v-for="(value, idx) in [v2ResourceVariant.RESOURCE_VARIANT_PROJECT, v2ResourceVariant.RESOURCE_VARIANT_COLLECTION, v2ResourceVariant.RESOURCE_VARIANT_DATASET, v2ResourceVariant.RESOURCE_VARIANT_OBJECT]"
-              class="inline-flex items-center gap-x-2.5 py-3 px-4 text-sm font-medium bg-white border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+              class="inline-flex items-center gap-x-2.5 py-3 px-4 text-gray-300 text-sm font-medium bg-slate-900 border border-gray-700 -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-md sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-md sm:last:rounded-es-none sm:last:rounded-se-md">
             <div class="relative flex items-start w-full">
               <div class="flex items-center h-5">
-                <input type="radio" :id="`resource-type-radio-${idx}`" name="resource-type-radio" v-model="resourceType"
+                <input type="radio"
+                       :id="`resource-type-radio-${idx}`"
+                       name="resource-type-radio"
+                       v-model="resourceType"
                        :value="value"
-                       class="border-gray-200 rounded-full disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 focus:bg-aruna-800 checked:bg-aruna-800 dark:checked:bg-aruna-600 dark:checked:border-aruna-600 dark:focus:ring-offset-gray-800">
+                       class="border-gray-700 rounded-full disabled:opacity-50 bg-gray-800 focus:bg-aruna-800 checked:bg-aruna-700 checked:border-aruna-700 focus:ring-offset-gray-800">
               </div>
               <label :for="`resource-type-radio-${idx}`"
-                     class="ms-3 block w-full text-sm font-bold text-gray-600 dark:text-gray-500">
+                     class="ms-3 block w-full text-sm font-bold text-gray-300">
                 {{ toResourceTypeStr(value) }}
               </label>
             </div>
@@ -633,10 +641,12 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         <!-- Resource Parent -->
         <div v-if="resourceType !== v2ResourceVariant.RESOURCE_VARIANT_PROJECT">
           <label for="parent-id-input"
-                 class="block mt-6 text-lg font-medium mb-2 text-gray-700 dark:text-white">Parent ID</label>
+                 class="block mt-6 text-lg font-medium mb-2 text-gray-300">
+            Parent ID
+          </label>
           <div class="flex rounded-md">
             <span
-                class="px-4 inline-flex items-center min-w-fit rounded-s-md border border-e-0 border-gray-200 bg-gray-50 text-sm text-gray-500 dark:bg-neutral-700 dark:border-neutral-700 dark:text-neutral-400">
+                class="px-4 inline-flex items-center min-w-fit rounded-s-md border border-e-0 border-gray-700 bg-gray-700 text-sm text-gray-300">
               {{ resourceParent ? toResourceTypeStr(resourceParent.variant) : 'Unspecified' }}
             </span>
             <div class="flex grow relative">
@@ -644,8 +654,8 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
                      v-model="resourceParentId"
                      id="parent-id-input"
                      name="parent-id-input"
-                     :class="[{ 'border-red-500': !validationStates.get('resourceParentId') }, { 'focus:border-red-500': !validationStates.get('resourceParentId') }, { 'focus:ring-red-500': !validationStates.get('resourceParentId') },]"
-                     class="py-3 px-4 pe-11 block w-full border-gray-200 shadow-sm rounded-e-lg text-sm focus:z-10 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-400 dark:placeholder-neutral-500 dark:focus:ring-neutral-600"
+                     :class="[{'border-red-500 focus:border-red-500 focus:ring-red-500': !validationStates.get('resourceParentId') }]"
+                     class="py-3 px-4 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none rounded-s-none"
                      aria-describedby="hs-validation-name-error-helper">
               <div :class="{ 'hidden': validationStates.get('resourceParentId') }"
                    class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
@@ -658,21 +668,26 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         </div>
         <!-- End Resource Parent -->
 
-        <label for="name-input-label" class="block mt-6 text-lg font-medium mb-2 text-gray-700 dark:text-white">Data
-          Class</label>
+        <label for="name-input-label"
+               class="block mt-6 text-lg font-medium mb-2 text-gray-3">
+          Data Class
+        </label>
         <ul class="flex flex-col sm:flex-row">
           <li
               v-for="(value, idx) in [v2DataClass.DATA_CLASS_PUBLIC, v2DataClass.DATA_CLASS_PRIVATE, v2DataClass.DATA_CLASS_WORKSPACE, v2DataClass.DATA_CLASS_CONFIDENTIAL]"
-              class="inline-flex items-center gap-x-2.5 py-3 px-4 text-sm font-medium bg-white border border-gray-400 text-gray-800 -mt-px first:rounded-t-lg first:mt-0 last:rounded-b-lg sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-lg sm:last:rounded-es-none sm:last:rounded-se-lg dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+              class="inline-flex items-center gap-x-2.5 py-3 px-4 text-gray-300 text-sm font-medium bg-slate-900 border border-gray-700 -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-md sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-md sm:last:rounded-es-none sm:last:rounded-se-md">
             <div class="relative flex items-start w-full">
               <div class="flex items-center h-5">
-                <input type="radio" :id="`resource-dataclass-radio-${idx}`" name="hs-horizontal-list-group-item-radio"
-                       v-model="resourceDataclass" :value="value"
-                       class="border-gray-200 rounded-full disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 focus:bg-aruna-800 checked:bg-aruna-800 dark:checked:bg-aruna-600 dark:checked:border-aruna-600 dark:focus:ring-offset-gray-800"
+                <input type="radio"
+                       :id="`resource-dataclass-radio-${idx}`"
+                       name="hs-horizontal-list-group-item-radio"
+                       v-model="resourceDataclass"
+                       :value="value"
+                       class="border-gray-700 rounded-full disabled:opacity-50 bg-gray-800 focus:bg-aruna-800 checked:bg-aruna-700 checked:border-aruna-700 focus:ring-offset-gray-800"
                        v-bind:checked="value === v2DataClass.DATA_CLASS_PUBLIC">
               </div>
               <label :for="`resource-dataclass-radio-${idx}`"
-                     class="ms-3 block w-full text-sm font-bold text-gray-600 dark:text-gray-500">
+                     class="ms-3 block w-full text-sm font-bold text-gray-300">
                 {{ toDataClassStr(value) }}
               </label>
             </div>
@@ -682,20 +697,23 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         <div class="flex flex-row space-x-4 mt-6">
           <div class="flex flex-col basis-1/2">
             <label for="meta-license-select"
-                   class="block text-lg font-medium mb-2 text-gray-700 dark:text-white">Metadata
-              License</label>
+                   class="block text-lg font-medium mb-2 text-gray-300">
+              Metadata License
+            </label>
             <select id="meta-license-select" v-model="metaLicense"
-                    class="py-3 px-4 pe-9 block w-full border-gray-400 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600">
+                    class="py-3 px-4 pe-9 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none">
               <option v-for="license in licenses" :value="license.tag"
                       v-bind:selected="license.tag === 'AllRightsReserved'">{{ license.name }}
               </option>
             </select>
           </div>
           <div class="flex flex-col grow">
-            <label for="data-license-select" class="block text-lg font-medium mb-2 text-gray-700 dark:text-white">Data
-              License</label>
+            <label for="data-license-select"
+                   class="block text-lg font-medium mb-2 text-gray-300">
+              Data License
+            </label>
             <select id="data-license-select" v-model="dataLicense"
-                    class="py-3 px-4 pe-9 block w-full border-gray-400 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400 dark:focus:ring-gray-600">
+                    class="py-3 px-4 pe-9 block w-full border-gray-700 rounded-md bg-slate-900 text-gray-300 text-sm focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none">
               <option v-for="license in licenses" :value="license.tag" class="bg-aruna-500"
                       v-bind:selected="license.tag === 'AllRightsReserved'">{{ license.name }}
               </option>
@@ -704,24 +722,30 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         </div>
 
         <form class="mt-6" v-if="resourceType === v2ResourceVariant.RESOURCE_VARIANT_OBJECT">
-          <h3 class="block mb-2 text-lg font-medium text-gray-700 dark:text-white">
+          <h3 class="block mb-2 text-lg font-medium text-gray-300">
             Upload (Choose file or Drag 'n Drop)
           </h3>
           <label for="large-file-input" class="sr-only">Choose file or Drag 'n Drop</label>
-          <input type="file" v-on:change="dataFileChange" name="large-file-input" id="large-file-input" class="block w-full border border-gray-200 shadow-sm rounded-md text-sm focus:z-10 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400
-    file:bg-gray-200 file:border-0
-    file:me-4
-    file:py-3 file:px-4 file:sm:py-5
-    dark:file:bg-gray-700 dark:file:text-gray-400">
+          <input type="file"
+                 v-on:change="dataFileChange"
+                 name="large-file-input"
+                 id="large-file-input"
+                 class="block w-full border border-gray-700 shadow-sm rounded-md bg-slate-900 text-gray-300 text-sm focus:z-10 focus:border-aruna-700 focus:ring-aruna-700 disabled:opacity-50 disabled:pointer-events-none
+                        file:bg-gray-700 file:border-0
+                        file:me-4
+                        file:py-3
+                        file:px-4
+                        file:sm:py-5
+                        file:text-gray-300">
         </form>
       </div>
 
       <div class="flex px-4 grow flex-row md:flex-col overflow-x-auto">
         <div class="flex flex-row mb-2 justify-start items-center">
           <label for="key-values-input"
-                 class="block text-lg font-medium text-gray-700 dark:text-white">Authors</label>
+                 class="block text-lg font-medium text-gray-300">Authors</label>
           <button type="button"
-                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
+                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-300 rounded-md text-gray-300 hover:text-aruna-700 hover:border-aruna-700 focus:outline-none disabled:opacity-50 disabled:pointer-events-none"
                   data-hs-overlay="#author-add">
             <IconPlus class="flex-shrink-0 size-4"/>
           </button>
@@ -729,35 +753,39 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
 
         <div class="-m-1.5 overflow-x-auto">
           <div class="p-1.5 min-w-full inline-block align-middle">
-            <div class="overflow-hidden border border-gray-400 dark:border-gray-700">
-              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
+            <div class="overflow-hidden border border-gray-700">
+              <table class="min-w-full divide-y divide-gray-700">
+                <thead class="bg-slate-900">
                 <tr>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">Name
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-300 uppercase">
+                    Name
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">Email
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-300 uppercase">
+                    Email
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">Orcid
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-300 uppercase">
+                    Orcid
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                  <th scope="col" class="px-6 py-3 text-center text-sm font-bold text-gray-300 uppercase">
                     Actions
                   </th>
                 </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody class="divide-y divide-gray-500">
                 <tr v-for="[key, value] in authors">
-                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-300">
                     {{ value.firstName }} {{ value.lastName }}
                   </td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-300">
                     {{ value.email }}
                   </td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-300">
                     {{ value.orcid }}
                   </td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm font-medium">
-                    <button type="button" @click="removeAuthor(key)"
-                            class="inline-flex flex-shrink-0 justify-center items-center size-8 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-800 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:bg-blue-900 dark:hover:text-blue-200 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+                  <td class="px-6 py-2 whitespace-nowrap text-sm font-medium text-center">
+                    <button type="button"
+                            @click="removeAuthor(key)"
+                            class="inline-flex flex-shrink-0 justify-center items-center size-8 rounded-full text-gray-500 hover:text-red-700 focus:z-10 focus:outline-none focus:ring-2 focus:ring-aruna-700">
                       <IconTrash class="flex-shrink-0 size-6"/>
                     </button>
                   </td>
@@ -770,19 +798,19 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
 
         <div class="flex flex-row mb-2 mt-6 justify-start items-center">
           <label for="key-values-input"
-                 class="block text-lg font-medium text-gray-700 dark:text-white">Key-Values</label>
+                 class="block text-lg font-medium text-gray-300">Key-Values</label>
           <Button @click="tokenDialogOpen = true"
-                  class="mt-2 bg-aruna-800 hover:bg-aruna-700 text-white text-md rounded-sm">
+                  class="mt-2 bg-aruna-800 hover:bg-aruna-300 text-white text-md rounded-sm">
             Create Token
           </Button>
           <button type="button"
-                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
+                  class="ms-4 px-1 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-300 rounded-md text-gray-300 text-sm hover:text-aruna-700 hover:border-aruna-700 focus:outline-none disabled:opacity-50 disabled:pointer-events-none"
                   data-hs-overlay="#key-value-add">
             <IconPlus class="flex-shrink-0 size-4"/>
           </button>
 
           <button type="button"
-                  class="ms-4 inline-flex text-sm items-center gap-x-2 px-1 py-0.5 border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
+                  class="ms-4 px-1 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-300 rounded-md text-gray-300 text-sm hover:text-aruna-700 hover:border-aruna-700 focus:outline-none disabled:opacity-50 disabled:pointer-events-none"
                   data-hs-overlay="#ontology-add">
             Add Ontology
           </button>
@@ -790,42 +818,35 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
 
         <div class="-m-1.5 overflow-hidden overflow-x-auto">
           <div class="p-1.5 min-w-full inline-block align-middle">
-            <div class="overflow-hidden border border-gray-400 dark:border-gray-700">
-              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
+            <div class="overflow-hidden border border-gray-700">
+              <table class="min-w-full divide-y divide-gray-700">
+                <thead class="bg-slate-900">
                 <tr>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">Key
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-300 uppercase">Key
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">Value
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-300 uppercase">Value
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">Type
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-300 uppercase">Type
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                  <th scope="col" class="px-6 py-3 text-center text-sm font-bold text-gray-300 uppercase">
                     Actions
                   </th>
                 </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody class="divide-y divide-gray-700">
                 <tr v-for="[key, value] in keyValues">
-                  <td class="px-6 py-2 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">
-                    {{
-                      key
-                    }}
+                  <td class="px-6 py-2 whitespace-nowrap text-sm font-medium text-gray-300">
+                    {{ key }}
                   </td>
                   <td v-html="prettyDisplayJson(value.value)"
-                      class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200"></td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                      class="px-6 py-2 whitespace-nowrap text-sm text-gray-300"></td>
+                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-300">
                     {{ toKeyValueVariantStr(value.variant) }}
                   </td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm font-medium">
-                    <!--
+                  <td class="px-6 py-2 whitespace-nowrap text-center text-sm font-medium">
                     <button type="button"
-                            class="inline-flex flex-shrink-0 justify-center items-center size-8 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-800 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:bg-blue-900 dark:hover:text-blue-200 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
-                      <IconPencil class="flex-shrink-0 size-6"/>
-                    </button>
-                    -->
-                    <button type="button" @click="removeKeyValue(key)"
-                            class="inline-flex flex-shrink-0 justify-center items-center size-8 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-800 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:bg-blue-900 dark:hover:text-blue-200 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+                            @click="removeKeyValue(key)"
+                            class="inline-flex flex-shrink-0 justify-center items-center size-8 rounded-full text-gray-500 hover:text-red-500 focus:z-10 focus:outline-none focus:ring-2 focus:ring-aruna-700">
                       <IconTrash class="flex-shrink-0 size-6"/>
                     </button>
                   </td>
@@ -838,9 +859,9 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
 
         <div class="flex flex-row mb-2 justify-start items-center mt-6 ">
           <label for="key-values-input"
-                 class="block text-lg font-medium text-gray-700 dark:text-white">Additional Relations</label>
+                 class="block text-lg font-medium text-gray-300">Additional Relations</label>
           <button type="button"
-                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-400 rounded-md text-gray-500 hover:text-blue-800 hover:border-blue-800 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-600 dark:text-white dark:hover:text-aruna-700 dark:focus:bg-neutral-700"
+                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-300 rounded-md text-gray-300 hover:text-aruna-700 hover:border-aruna-700 focus:outline-none disabled:opacity-50 disabled:pointer-events-none"
                   data-hs-overlay="#relation-add">
             <IconPlus class="flex-shrink-0 size-4"/>
           </button>
@@ -848,44 +869,45 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
 
         <div class="-m-1.5 overflow-x-auto">
           <div class="p-1.5 min-w-full inline-block align-middle">
-            <div class="overflow-hidden border border-gray-400 dark:border-gray-700">
-              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
+            <div class="overflow-hidden border border-gray-700">
+              <table class="min-w-full divide-y divide-gray-700">
+                <thead class="bg-slate-900">
                 <tr>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-300 uppercase">
                     Resource Id
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-300 uppercase">
                     Resource Type
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-300 uppercase">
                     Relation Type
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-300 uppercase">
                     Direction
                   </th>
-                  <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-gray-500 uppercase">
+                  <th scope="col" class="px-6 py-3 text-center text-sm font-bold text-gray-300 uppercase">
                     Actions
                   </th>
                 </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody class="divide-y divide-gray-700">
                 <tr v-for="[key, value] in relations">
-                  <td class="px-6 py-2 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">
+                  <td class="px-6 py-2 whitespace-nowrap text-sm font-medium text-gray-300">
                     {{ value.internal?.resourceId }}
                   </td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-300">
                     {{ toResourceTypeStr(value.internal?.resourceVariant) }}
                   </td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-300">
                     {{ toRelationVariantStr(value.internal?.definedVariant) }}
                   </td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                  <td class="px-6 py-2 whitespace-nowrap text-sm text-gray-300">
                     {{ toRelationDirectionStr(value.internal?.direction) }}
                   </td>
-                  <td class="px-6 py-2 whitespace-nowrap text-sm font-medium">
-                    <button type="button" @click="removeRelation(key)"
-                            class="inline-flex flex-shrink-0 justify-center items-center size-8 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-800 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:bg-blue-900 dark:hover:text-blue-200 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+                  <td class="px-6 py-2 whitespace-nowrap text-center text-sm font-medium">
+                    <button type="button"
+                            @click="removeRelation(key)"
+                            class="inline-flex flex-shrink-0 justify-center items-center size-8 rounded-full text-gray-500 hover:text-red-700 focus:z-10 focus:outline-none focus:ring-2 focus:ring-aruna-700">
                       <IconTrash class="flex-shrink-0 size-6"/>
                     </button>
                   </td>
@@ -900,12 +922,12 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
 
     <div class="flex flex-row grow justify-end">
       <button type="button" v-bind:disabled="!validState" @click="submit"
-              class="py-3 px-4 inline-flex gap-x-2 text-md font-semibold rounded-md bg-aruna-800 border border-gray-200 text-white hover:border-aruna-800 hover:text-aruna-800 disabled:opacity-50 disabled:pointer-events-none dark:border-gray-700 dark:text-gray-400 dark:hover:text-blue-500 dark:hover:border-blue-600 dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600">
+              class="py-3 px-4 inline-flex gap-x-2 text-md font-semibold rounded-md bg-aruna-800 text-white hover:border-aruna-700 hover:bg-aruna-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-aruna-800">
         Create Resource
       </button>
     </div>
   </div>
-
+  </div>
   <ModalAuthor modalId="author-add" @add-author="addAuthor"/>
   <!-- <ModalKeyValue modalId="key-value-add" @add-key-value="addKeyValue"/> -->
   <TokenDialog :initial-open="tokenDialogOpen"

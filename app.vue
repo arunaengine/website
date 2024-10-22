@@ -7,8 +7,9 @@ import {parseJwt} from "~/composables/utils";
 
 import {h} from 'vue';
 import Toaster from '@/components/ui/toast/Toaster.vue'
-import RegistrationDialog from "@/components/custom-ui/RegistrationDialog.vue";
+import RegistrationDialog from "~/components/custom-ui/dialog/RegistrationDialog.vue";
 import {useToast} from '@/components/ui/toast/use-toast'
+
 const {toast} = useToast()
 
 useHead({
@@ -29,6 +30,10 @@ provide('userRef', readonly(user))
 
 // Try to fetch user
 async function updateUser() {
+  // Only fetch user if not in maintenance mode
+  if (useRuntimeConfig().public.maintenanceMode)
+    return
+
   await $fetch<v2User | ArunaError>('/api/user')
       .then(response => {
         if (typeof response === 'undefined') {
@@ -57,7 +62,7 @@ async function updateUser() {
               variant: 'destructive',
               duration: 10000,
             })
-          }  else if ((response as ArunaError).code === 16) {
+          } else if ((response as ArunaError).code === 16) {
             // gRPC code 16 = Unauthorized
             notRegistered.value = false
           } else {
@@ -74,14 +79,15 @@ async function updateUser() {
               description: h('div',
                   {class: 'flex space-x-2 items-center justify-center'},
                   [
-                    h(IconPlant, {class: 'flex-shrink-0 size-5 text-gray-700'}),
-                    h('span', {class: 'text-aruna-800'}, ['Please wait until your account gets activated by an administrator.'])
+                    h(IconPlant, {class: 'flex-shrink-0 size-5 text-green-400'}),
+                    h('span',
+                        {class: 'text-fuchsia-50'},
+                        ['Please wait until your account gets activated by an administrator.'])
                   ]),
               duration: 10000
             })
         }
-      })
-      .catch(error => {
+      }).catch(() => {
         user.value = undefined
         notRegistered.value = false
         toast({
@@ -122,7 +128,7 @@ async function refreshTokens() {
 }
 
 onBeforeMount(() => setInterval(refreshTokens, 30000))
-onMounted(() => updateUser())
+onBeforeMount(() => updateUser())
 </script>
 
 <template>
@@ -130,11 +136,13 @@ onMounted(() => updateUser())
 
   <!-- Header + Navigation -->
   <!-- Main body -->
-  <div
-      class="flex flex-col flex-grow md:min-h-screen px-6 py-2 bg-gradient-to-b from-aruna-800/[.30] via-transparent to-aruna-800/[.10]">
-    <ToastInfo v-if="useRuntimeConfig().public.infoBanner.active" modalId="info-toast" infoMsg="Hello"/>
+  <div v-if="useRuntimeConfig().public.maintenanceMode"
+       class="h-[100vh] w-[100vw] bg-[url('_nuxt/assets/imgs/maintenance_sm.webp')] md:bg-[url('_nuxt/assets/imgs/maintenance_md.webp')] lg:bg-[url('_nuxt/assets/imgs/maintenance_lg.webp')] bg-no-repeat bg-center bg-cover to-transparent">
+  </div>
 
-    <!-- Body -->
+  <div v-else
+       class="flex flex-col flex-grow md:min-h-screen bg-[url('/_nuxt/assets/imgs/global-bg.webp')] bg-cover bg-fixed bg-center bg-no-repeat">
+    <ToastInfo v-if="useRuntimeConfig().public.infoBanner.active" modalId="info-toast" infoMsg="Hello"/>
     <NuxtLoadingIndicator/>
     <NuxtPage/>
   </div>

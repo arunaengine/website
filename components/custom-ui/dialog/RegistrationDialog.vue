@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {IconHelp, IconTrophy} from "@tabler/icons-vue"
-import {Button} from '@/components/ui/button'
-import {Checkbox} from '@/components/ui/checkbox'
+import {Button} from '~/components/ui/button'
+import {Checkbox} from '~/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -10,17 +10,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from '~/components/ui/dialog'
 import {
   FormControl,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form'
-import {Input} from '@/components/ui/input'
-import {Popover, PopoverTrigger, PopoverContent} from '@/components/ui/popover'
-import {useToast} from '@/components/ui/toast/use-toast'
+} from '~/components/ui/form'
+import {Input} from '~/components/ui/input'
+import {Popover, PopoverTrigger, PopoverContent} from '~/components/ui/popover'
+import {useToast} from '~/components/ui/toast/use-toast'
 import type {v2RegisterUserResponse} from "~/composables/aruna_api_json";
 import {useForm} from "vee-validate";
 import {toTypedSchema} from '@vee-validate/zod'
@@ -72,11 +72,11 @@ const onSubmit = form.handleSubmit(async (values) => {
     if (response.userId) {
       toast({
         description: h('div',
-            {class: 'flex space-x-2 items-center justify-center'},
+            {class: 'flex space-x-2 items-center justify-center text-gray-200'},
             [
-              h(IconTrophy, {class: 'flex-shrink-0 size-5 text-gray-700'}),
+              h(IconTrophy, {class: 'flex-shrink-0 size-5 text-yellow-200'}),
               h('span',
-                  {class: 'text-green-900'},
+                  {class: 'text-fuchsia-50'},
                   ['Your registration was successful. Please check your mails for more information.'])
             ]),
         duration: 10000
@@ -203,7 +203,7 @@ const onSubmit = form.handleSubmit(async (values) => {
             <div class="space-y-1 leading-none">
               <FormLabel>
                 I accept the <a href="/tos" target="_blank"
-                                class="text-aruna-800 dark:text-aruna-700 hover:text-aruna-700 dark:hover:text-aruna-600">Terms
+                                class="text-aruna-700 hover:text-aruna-800">Terms
                 of Service</a>
               </FormLabel>
               <FormMessage/>
@@ -213,7 +213,7 @@ const onSubmit = form.handleSubmit(async (values) => {
       </form>
 
       <DialogFooter>
-        <Button type="submit" form="dialogForm" class="bg-aruna-800 hover:bg-aruna-700">
+        <Button type="submit" form="dialogForm" class="bg-aruna-700 hover:bg-aruna-800 text-gray-200">
           Submit
         </Button>
       </DialogFooter>

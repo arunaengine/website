@@ -27,23 +27,21 @@ function getHooks(): v2KeyValue[] | undefined {
   <div class="-m-1.5 overflow-x-auto">
     <div class="p-1.5 min-w-full inline-block align-middle">
       <div class="overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <table class="min-w-full divide-y divide-gray-500">
           <thead>
           <tr>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">Key</th>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">Value</th>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-500 uppercase">Status
+            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">Key</th>
+            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">Value</th>
+            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">Status
             </th>
           </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-          <tr v-for="hook in getHooks()" class="hover:bg-gray-100 dark:hover:bg-gray-700">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">
-              <!-- <a href=format!( "/search?filter_key={}&filter_value={}" , key.clone(), value.clone(), ) exact=true class=""></a> -->
+          <tbody class="divide-y divide-gray-500">
+          <tr v-for="hook in getHooks()" class="hover:bg-gray-700">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
               {{ hook.key }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-              <!-- <a href=format!( "/search?filter_key={}&filter_value={}" , key.clone(), value.clone(), ) exact=true class=""></a> -->
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
               {{ hook.value }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
