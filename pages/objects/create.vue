@@ -33,6 +33,7 @@ import {HeadObjectCommand, S3Client, type S3ClientConfig} from "@aws-sdk/client-
 import {Upload} from "@aws-sdk/lib-storage";
 import {prettyDisplayJson} from "~/composables/utils";
 import { ValueIcon } from '@radix-icons/vue'
+import OntologyDialog from "~/components/custom-ui/dialog/OntologyDialog.vue";
 
 // Router to navigate back
 const router = useRouter()
@@ -264,7 +265,7 @@ function dataFileChange(e) {
 
 /* ----- Resource Authors ----- */
 const authors: Ref<Map<string, v2Author>> = ref(new Map())
-  const authorDialogOpen = ref(false);
+const authorDialogOpen = ref(false);
 
 function addAuthor(author: v2Author) {
   authors.value.set(getUniqueId(), author)
@@ -275,9 +276,11 @@ function removeAuthor(key: string) {
 }
 
 /* ----- End Resource Authors ----- */
+
 /* ----- Resource key-values ----- */
 const keyValues = ref(new Map())
 const keyValueDialogOpen = ref(false);
+const ontologyDialogOpen = ref(false);
 
 function addKeyValue(key: string, val: string, type: v2KeyValueVariant) {
   keyValues.value.set(key, {key: key, value: val, variant: type} as v2KeyValue)
@@ -288,6 +291,7 @@ function removeKeyValue(key: string) {
 }
 
 /* ----- End Resource key-values ----- */
+
 /* ----- Resource relations ----- */
 const relations: Ref<Map<string, v2Relation>> = ref(new Map())
 
@@ -814,6 +818,11 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
                   data-hs-overlay="#ontology-add">
             Add Ontology
           </button>
+          <button type="button"
+                  @click="ontologyDialogOpen = true"
+                  class="ms-4 px-1 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-300 rounded-md text-gray-300 text-sm hover:text-aruna-700 hover:border-aruna-700 focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
+            Add Ontology
+          </button>
         </div>
 
         <div class="-m-1.5 overflow-hidden overflow-x-auto">
@@ -947,6 +956,17 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
       ({ key, value, variant }) => {
         addKeyValue(key, value, variant);
         keyValueDialogOpen = false;
+      }
+    "
+  />
+  <OntologyDialog
+      :initial-open="ontologyDialogOpen"
+      :with-button="false"
+      @update:open="ontologyDialogOpen = false"
+      @add-author="
+      (author) => {
+        // addAuthor(author);
+        ontologyDialogOpen = false;
       }
     "
   />
