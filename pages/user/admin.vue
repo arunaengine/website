@@ -42,48 +42,48 @@ onMounted(async () => await fillUsers())
   <NavigationTop/>
 
   <div class="min-h-[calc(100vh-110px)]">
-    <div class="md:container sm:mx-1 md:mx-auto mt-10 p-4 border-2 border-gray-400 rounded-lg bg-muted/40">
+    <div class="md:container sm:mx-1 md:mx-auto mt-10 p-4 border border-aruna-text rounded-lg bg-aruna-bg/90">
       <h1 class="text-3xl font-bold text-white">
         User Administration
       </h1>
-      <Separator class="bg-gray-300 my-4"/>
+      <Separator class="bg-aruna-text my-4"/>
 
       <div class="flex flex-col">
         <div class="-m-1.5 overflow-x-auto">
           <div class="p-1.5 min-w-full inline-block align-middle">
             <div class="overflow-hidden">
-              <table class="min-w-full divide-y divide-gray-600">
+              <table class="min-w-full divide-y divide-aruna-text">
                 <thead>
                 <tr>
-                  <th scope="col" class="px-6 py-3 text-start text-md font-medium text-gray-400 uppercase">ID</th>
-                  <th scope="col" class="px-6 py-3 text-start text-md font-medium text-gray-400 uppercase">Name</th>
-                  <th scope="col" class="px-6 py-3 text-start text-md font-medium text-gray-400 uppercase">Email</th>
-                  <th scope="col" class="px-6 py-3 text-center text-md font-medium text-gray-400 uppercase">Status</th>
-                  <th scope="col" class="px-6 py-3 text-center text-md font-medium text-gray-400 uppercase">Actions</th>
+                  <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">ID</th>
+                  <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">Name</th>
+                  <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">Email</th>
+                  <th scope="col" class="px-6 py-3 text-center text-md font-medium text-aruna-text-accent uppercase">Status</th>
+                  <th scope="col" class="px-6 py-3 text-center text-md font-medium text-aruna-text-accent uppercase">Actions</th>
                 </tr>
                 </thead>
 
-                <tbody v-if="users" class="divide-y divide-600">
+                <tbody v-if="users" class="divide-y divide-aruna-text/50">
                 <tr v-for="user in users"
                     :key="forceRefresh"
-                    class="hover:bg-gray-700">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-200">
+                    class="hover:bg-aruna-fg">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-aruna-text">
                     {{ user.id }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-200">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-aruna-text">
                     {{ user.displayName }}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-200">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-aruna-text">
                     {{ user.email ? user.email : "No email provided" }}
                   </td>
                   <td
-                      class="flex justify-center space-x-2 px-6 py-4 whitespace-nowrap text-center content-center text-sm text-gray-200">
+                      class="flex justify-center space-x-2 px-6 py-4 whitespace-nowrap text-center content-center text-sm text-aruna-text">
                     <span v-if="user.attributes?.globalAdmin"
                           class="inline-flex items-center gap-x-1.5 py-1.5 px-3 rounded-full text-xs font-medium text-red-500 bg-red-800/30 ">
                       Admin
                     </span>
                     <span v-else
-                          class="inline-flex items-center gap-x-1.5 py-1.5 px-3 rounded-full text-xs font-medium text-aruna-700 bg-aruna-800/50">
+                          class="inline-flex items-center gap-x-1.5 py-1.5 px-3 rounded-full text-xs font-medium text-aruna-highlight bg-aruna-highlight/50">
                       User
                     </span>
 
@@ -102,7 +102,7 @@ onMounted(async () => await fillUsers())
                   <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                     <Button variant="ghost"
                             disabled
-                            class="me-2 p-1 rounded-sm border border-slate-300 text-gray-400 disabled:border-gray-600 disabled:text-gray-600">
+                            class="me-2 p-1 rounded-sm border border-aruna-text text-aruna-text disabled:border-aruna-text/50 disabled:text-aruna-text/50">
                       <IconSearch/>
                     </Button>
                     <TooltipProvider>
@@ -111,17 +111,17 @@ onMounted(async () => await fillUsers())
                           <Button v-if="user.active && user.id"
                                   variant="ghost"
                                   @click="deactivate(user.id)"
-                                  class="me-2 p-1 rounded-sm border border-slate-300 text-gray-400 disabled:border-gray-600 disabled:text-gray-600">
+                                  class="me-2 p-1 rounded-sm border border-aruna-text text-aruna-text disabled:border-aruna-text/50 disabled:text-aruna-text/50">
                             <IconMinus class="flex-shrink-0"/>
                           </Button>
                           <Button v-if="!user.active && user.id"
                                   variant="ghost"
                                   @click="activate(user.id)"
-                                  class="me-2 p-1 rounded-sm border border-slate-300 text-gray-400 disabled:border-gray-600 disabled:text-gray-600">
+                                  class="me-2 p-1 rounded-sm border border-aruna-text text-aruna-text disabled:border-aruna-text/50 disabled:text-aruna-text/50">
                             <IconPlus class="flex-shrink-0"/>
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent class="rounded-sm border-gray-400 bg-muted text-gray-300">
+                        <TooltipContent class="rounded-sm border-aruna-text bg-aruna-muted text-aruna-text">
                           <p>{{ user.active && user.id ? 'Deactivate' : 'Activate' }} this user</p>
                         </TooltipContent>
                       </Tooltip>
@@ -130,8 +130,8 @@ onMounted(async () => await fillUsers())
                 </tr>
                 </tbody>
                 <tbody v-else>
-                <tr class="hover:bg-gray-700">
-                  <td colspan="5" class="px-6 py-4 whitespace-nowrap text-center text-md text-gray-200">
+                <tr>
+                  <td colspan="5" class="px-6 py-4 whitespace-nowrap text-center text-md text-aruna-text-accent">
                     <strong>Looks like no users are available!</strong>
                   </td>
                 </tr>

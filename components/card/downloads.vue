@@ -45,37 +45,39 @@ function toReplicationStatusColor(variant: storagemodelsv2ReplicationStatus | un
   <div class="-m-1.5 overflow-x-auto">
     <div class="p-1.5 min-w-full inline-block align-middle">
       <div class="overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-500">
+        <table class="min-w-full divide-y divide-aruna-text/50">
           <thead>
           <tr>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">
+            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-aruna-text-accent uppercase">
               Endpoint Name
             </th>
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">
+            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-aruna-text-accent uppercase">
               Replication Status
             </th>
-            <th scope="col" class="px-6 py-3 text-center text-sm font-medium text-gray-400 uppercase">
+            <th scope="col" class="px-6 py-3 text-center text-sm font-medium text-aruna-text-accent uppercase">
               Download
             </th>
           </tr>
           </thead>
 
-          <tbody class="divide-y divide-gray-500">
-          <tr v-for="endpoint in props.endpoints" class="hover:bg-gray-700">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
+          <tbody class="divide-y divide-aruna-text/50">
+          <tr v-for="endpoint in props.endpoints" class="hover:bg-aruna-fg">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-aruna-text">
                 {{ endpointData[endpoint.id].name }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300 flex item-center gap-2">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-aruna-text flex item-center gap-2">
               <span class="">{{ toReplicationStatusStr(endpoint.status) }}</span>
-              <component :is="toReplicationStatusIcon(endpoint.status)" class="flex-shrink-0" :color="toReplicationStatusColor(endpoint.status)"></component>
+              <component :is="toReplicationStatusIcon(endpoint.status)"
+                         class="flex-shrink-0"
+                         :color="toReplicationStatusColor(endpoint.status)"></component>
             </td>
-            <td class="px-6 py-4 text-center whitespace-nowrap text-sm font-medium text-gray-300">
+            <td class="px-6 py-4 text-center whitespace-nowrap text-sm font-medium text-aruna-text">
               <button
                   type="button"
                   title="Download Object"
                   @click="emit('download', endpoint.id)"
                   :disabled="endpoint.status != storagemodelsv2ReplicationStatus.REPLICATION_STATUS_FINISHED"
-                  class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-gray-300 hover:text-aruna-700 disabled:opacity-50 disabled:pointer-events-none">
+                  class="inline-flex grow justify-center font-semibold rounded-lg border border-transparent text-aruna-text-accent hover:text-aruna-highlight disabled:opacity-50 disabled:pointer-events-none">
                   <IconCloudDown class="flex-shrink-0"/>
               </button>
             </td>
