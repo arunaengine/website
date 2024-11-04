@@ -13,24 +13,27 @@ const props = defineProps<{
 
 <template>
   <div
-    class="flex flex-col grow items-start bg-slate-900 border border-gray-500 shadow-sm p-4 md:p-5 text-gray-300">
+    class="flex flex-col grow items-start bg-aruna-muted border border-aruna-text/50 shadow-sm p-4 md:p-5 text-aruna-text">
     <div class="flex flex-row items-stretch">
       <!-- Icon column -->
-      <div v-if="icon_id === 'ID'" class="flex flex-col text-gray-200 bg-aruna-800 p-3">
-        <IconId class="flex-shrink-0 size-8" />
+      <div v-if="icon_id === 'ID'"
+           class="flex flex-col items-center justify-center text-aruna-highlight">
+        <IconId class="flex-shrink-0 size-10" />
       </div>
-      <div v-if="icon_id === 'Name'" class="flex flex-col ext-gray-200 bg-aruna-800 p-3">
-        <IconFileText class="flex-shrink-0 size-8" />
+      <div v-if="icon_id === 'Name'"
+           class="flex flex-col items-center justify-center text-aruna-highlight">
+        <IconFileText class="flex-shrink-0 size-10" />
       </div>
-      <div v-if="icon_id === 'Analytics'" class="flex flex-col ext-gray-200 bg-aruna-800 p-3">
-        <IconFileAnalytics class="flex-shrink-0 size-8" />
+      <div v-if="icon_id === 'Analytics'"
+           class="flex flex-col items-center justify-center text-aruna-highlight">
+        <IconFileAnalytics class="flex-shrink-0 size-10" />
       </div>
       <!-- End Icon column -->
 
       <!-- Text column -->
       <div class="flex flex-col px-4">
-        <div class="text-lg text-gray-400">{{ icon_id }}</div>
-        <div class="font-bold text-lg text-aruna-700">{{ text }}</div>
+        <div class="text-lg text-aruna-text">{{ icon_id }}</div>
+        <div class="font-bold text-lg text-aruna-text-accent">{{ text }}</div>
       </div>
       <!-- End Text column -->
     </div>

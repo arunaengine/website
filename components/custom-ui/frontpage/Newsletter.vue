@@ -46,13 +46,13 @@ async function submit() {
 </script>
 <template>
   <div id="mailing-list"
-       class="container w-full mt-12 bg-[#080d1f]/[.6] rounded-md px-4 py-10 sm:px-6 lg:px-8 lg:py-16 mx-auto">
+       class="container w-full mt-12 border border-aruna-text/50 bg-aruna-bg/90 rounded-md px-4 py-10 sm:px-6 lg:px-8 lg:py-16 mx-auto">
     <div class="grid md:grid-cols-2 gap-8">
       <div class="max-w-md">
-        <h2 class="text-2xl font-bold md:text-3xl md:leading-tight text-white">
+        <h2 class="text-2xl font-bold md:text-3xl md:leading-tight text-aruna-text-accent">
           Mailing List
         </h2>
-        <p class="mt-3 text-gray-400">
+        <p class="mt-3 text-aruna-text">
           Subscribe and get all the latest Aruna updates and news.
         </p>
       </div>
@@ -68,29 +68,29 @@ async function submit() {
                          id="user-mail-input"
                          v-model="email"
                          placeholder="Your email address"
-                         class="peer p-4 block w-full rounded-md text-sm placeholder:text-transparent focus:border-aruna-800 focus:ring-aruna-800 disabled:opacity-50 disabled:pointer-events-none bg-slate-900 border-gray-700 text-gray-300
+                         class="peer p-4 block w-full rounded-md text-sm placeholder:text-transparent focus:border-aruna-highlight focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none bg-aruna-muted border-aruna-text/50 text-aruna-text
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6
                    [&:not(:placeholder-shown)]:pb-2
                    autofill:pt-6
                    autofill:pb-2">
-                  <label class="text-gray-300 absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent peer-disabled:opacity-50 peer-disabled:pointer-events-none
+                  <label class="text-aruna-text absolute top-0 start-0 p-4 h-full text-sm truncate pointer-events-none transition ease-in-out duration-100 border border-transparent peer-disabled:opacity-50 peer-disabled:pointer-events-none
             peer-focus:text-xs
             peer-focus:-translate-y-1.5
-            peer-focus:text-gray-500
+            peer-focus:text-aruna-text/75
             peer-[:not(:placeholder-shown)]:text-xs
             peer-[:not(:placeholder-shown)]:-translate-y-1.5
-            peer-[:not(:placeholder-shown)]:text-gray-500" for="user-mail-input">Your email address</label>
+            peer-[:not(:placeholder-shown)]:text-aruna-text/75" for="user-mail-input">Your email address</label>
                   <div :class="{ 'hidden': emailInputInfo === undefined }"
                        class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
                     <IconCircleCheck v-if="success" class="flex-shrink-0 size-4 text-green-500"/>
-                    <IconExclamationCircle v-else class="flex-shrink-0 size-4 text-red-500"/>
+                    <IconExclamationCircle v-else class="flex-shrink-0 size-4 text-destructive"/>
                   </div>
                 </div>
                 <p id="user-mail-input-helper"
                    class="mt-2 text-sm text-center"
-                   :class="{'hidden': emailInputInfo === undefined, 'text-red-600': !success, 'text-green-700': success}"
+                   :class="{'hidden': emailInputInfo === undefined, 'text-destructive': !success, 'text-green-700': success}"
                    v-html="emailInputInfo"/>
               </div>
               <!-- End User Email Address -->
@@ -98,12 +98,12 @@ async function submit() {
             <button type="button"
                     @click="submit"
                     :disabled="processing"
-                    class="w-full sm:w-auto whitespace-nowrap px-4 py-2 h-14 gap-x-2 text-sm font-semibold rounded-md bg-aruna-800 text-white hover:bg-aruna-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-aruna-700">
+                    class="w-full sm:w-auto whitespace-nowrap px-4 py-2 h-14 gap-x-2 text-sm font-semibold rounded-md border border-aruna-highlight bg-transparent text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-aruna-700">
               Subscribe
             </button>
 
           </div>
-          <p class="mt-3 text-sm text-gray-500">
+          <p class="mt-3 text-sm text-aruna-text">
             No spam, unsubscribe at any time.
           </p>
         </div>
