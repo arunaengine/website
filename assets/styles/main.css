@@ -8,6 +8,12 @@
     }
 
     :root {
+        --aruna-background: 227 59% 8%;
+        --aruna-foreground: 217 50% 25%;
+        --aruna-highlight: 193 100% 40%;
+        --aruna-text: 231 5% 72%;
+        --aruna-text-accent: 0 0% 100%;
+
         --background: 222.2 84% 4.9%;
         --foreground: 210 40% 98%;
 
