@@ -8,14 +8,14 @@
 
       <div class="flex flex-col sm:flex-row gap-x-8 gap-y-8 container justify-between items-center">
         <div class="shrink">
-          <img src="/imgs/fair-ds-opt.webp"
+          <img src="/imgs/fairds.webp"
                alt="Logo of the FAIR Data Spaces project"
                class="w-60 object-bottom object-contain h-auto"/>
         </div>
         <div class="shrink">
-          <img src="/imgs/microbiota_better.webp"
+          <img src="/imgs/microbiota.webp"
                alt="Logo of the NFDI4Microbiota project"
-               class="w-60 object-bottom object-contain h-auto"/>
+               class="w-36 object-bottom object-contain h-auto"/>
         </div>
         <div class="shrink">
           <img src="/imgs/biodiv_white.webp"
