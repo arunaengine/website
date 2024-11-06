@@ -193,27 +193,27 @@ useHead({
     <!-- Badge Row -->
     <div class="flex flex-wrap justify-center max-w-screen-2xl mx-auto my-10">
       <ul class="flex flex-col flex-wrap grow sm:flex-row">
-        <li class="inline-flex grow items-center bg-aruna-muted gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconBucket class="flex-shrink-0 size-6"/>
           <span class="font-bold">Type:</span>
           <span class="text-aruna-text">{{ toResourceTypeStr(resource.variant) }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-aruna-muted gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconLockCog class="flex-shrink-0 size-6"/>
           <span class="font-bold">Dataclass:</span>
           <span class="text-aruna-text">{{ toDataClassStr(resource.dataClass) }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-aruna-muted gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconZoomCheck class="flex-shrink-0 size-6"/>
           <span class="font-bold">Status:</span>
           <span class="text-aruna-text">{{ toObjectStatusStr(resource.objectStatus) }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-aruna-muted gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconLicense class="flex-shrink-0 size-6"/>
           <span class="font-bold">Metadata License:</span>
           <span class="text-aruna-text">{{ resource.metaLicense.name }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-aruna-muted gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconLicense class="flex-shrink-0 size-6"/>
           <span class="font-bold">
             {{
@@ -221,12 +221,12 @@ useHead({
             }} Data License:</span>
           <span class="text-aruna-text">{{ resource.dataLicense.name }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-aruna-muted gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconCloudLock class="flex-shrink-0 size-6"/>
           <span class="font-bold">Permission:</span>
           <span class="text-aruna-text">{{ toPermissionTypeStr(resource.permission) }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-aruna-muted gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <!-- Actions Dropdown Menu -->
           <div class="hs-dropdown relative inline-flex">
             <button id="hs-dropdown-with-icons" type="button"
@@ -282,17 +282,17 @@ useHead({
 
     <!-- Description / Authors Row -->
     <div class="flex flex-col xl:flex-row justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
-      <div class="flex flex-col grow p-2 bg-aruna-muted border border-aruna-text/50 text-aruna-text-accent">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
           <IconFileInfo class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Description</span>
         </div>
-        <div class="flex grow p-4 bg-aruna-muted text-aruna-text text-lg border-t border-aruna-text/50">
+        <div class="flex grow p-4 bg-aruna-bg/90 text-aruna-text text-lg border-t border-aruna-text/50">
           {{ resource?.description }}
         </div>
       </div>
       <div v-if="resource.authors"
-           class="flex flex-col grow p-2 bg-aruna-muted border border-aruna-text/50 text-aruna-text-accent">
+           class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
           <IconUsers class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Authors</span>
@@ -304,7 +304,7 @@ useHead({
 
     <!-- Labels / Hooks Row -->
     <div class="flex flex-wrap justify-between gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
-      <div class="flex flex-col grow p-2 bg-aruna-muted border border-aruna-text/50 text-aruna-text-accent">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
           <IconTag class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Labels</span>
@@ -312,7 +312,7 @@ useHead({
         <CardLabels :key_values="resource.keyValues"/>
       </div>
 
-      <div class="flex flex-col grow p-2 bg-aruna-muted border border-aruna-text/50 text-aruna-text-accent">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
           <IconWebhook class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Hooks</span>
@@ -324,7 +324,7 @@ useHead({
 
     <!-- Relations Row -->
     <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
-      <div class="flex flex-col grow p-2 bg-aruna-muted border border-aruna-text/50 text-aruna-text-accent">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
           <IconExternalLink class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">External Relations</span>
@@ -332,7 +332,7 @@ useHead({
         <CardRelations :relations="resource?.relations" :external="true"/>
       </div>
 
-      <div class="flex flex-col grow p-2 bg-aruna-muted border border-aruna-text/50 text-aruna-text-accent">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
           <IconArrowsSplit class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Internal Relations</span>
@@ -345,7 +345,7 @@ useHead({
     <!-- Locations -->
     <div v-if="resource.variant == v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
          class="flex flex-wrap justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
-      <div class="flex flex-col grow p-2 bg-aruna-muted border border-aruna-text/50 text-aruna-text-accent">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
           <IconCloudDown class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Locations</span>

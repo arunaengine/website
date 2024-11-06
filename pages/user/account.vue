@@ -278,21 +278,21 @@ async function getS3Credentials(endpoint: v2Endpoint) {
           </div>
 
           <div class="flex flex-col gap-y-4 lg:flex-row justify-between">
-            <Card class="basis-1/5 bg-aruna-muted">
+            <Card class="basis-1/5 bg-aruna-muted border-aruna-text/50">
               <CardHeader class="text-center">
                 <CardTitle class="text-xl text-aruna-text-accent">User Id</CardTitle>
                 <CardDescription class="text-lg text-aruna-text">{{ get_user()?.id || '-' }}</CardDescription>
               </CardHeader>
             </Card>
 
-            <Card class="basis-1/5 bg-aruna-muted">
+            <Card class="basis-1/5 bg-aruna-muted border-aruna-text/50">
               <CardHeader class="text-center">
                 <CardTitle class="text-xl text-aruna-text-accent">Display Name</CardTitle>
                 <CardDescription class="text-lg text-aruna-text">{{ get_user()?.displayName || '-' }}</CardDescription>
               </CardHeader>
             </Card>
 
-            <Card class="basis-1/5 bg-aruna-muted">
+            <Card class="basis-1/5 bg-aruna-muted border-aruna-text/50">
               <CardHeader class="text-center">
                 <CardTitle class="text-xl text-aruna-text-accent">Email</CardTitle>
                 <CardDescription class="text-lg text-aruna-text">{{ get_user()?.email ? get_user()?.email : "No email provided" }}
@@ -300,7 +300,7 @@ async function getS3Credentials(endpoint: v2Endpoint) {
               </CardHeader>
             </Card>
 
-            <Card class="basis-1/5 bg-aruna-muted">
+            <Card class="basis-1/5 bg-aruna-muted border-aruna-text/50">
               <CardHeader class="text-center">
                 <CardTitle class="text-xl text-aruna-text-accent">Active</CardTitle>
                 <CardDescription class="flex text-lg items-center justify-center">

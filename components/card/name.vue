@@ -10,7 +10,7 @@ const props = defineProps<{
 
 <template>
 
-  <div class="flex flex-col grow items-start bg-aruna-muted border border-aruna-text/50 shadow-sm p-4 md:p-5 text-aruna-text">
+  <div class="flex flex-col grow items-start bg-aruna-bg/90 border border-aruna-text/50 shadow-sm p-4 md:p-5 text-aruna-text">
     <div class="flex flex-row grow">
       <!-- Big Icon Column -->
       <div class="flex flex-col items-center justify-center text-aruna-highlight">
