@@ -58,6 +58,7 @@ module.exports = {
           text: "hsl(var(--aruna-text))",
           'text-accent': "hsl(var(--aruna-text-accent))",
           highlight: "hsl(var(--aruna-highlight))",
+          muted: "hsl(var(--aruna-muted))",
           bg: "hsl(var(--aruna-background))",
           fg: "hsl(var(--aruna-foreground))"
         },
