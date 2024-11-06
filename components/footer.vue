@@ -38,7 +38,7 @@ import {IconBrandGithub} from "@tabler/icons-vue";
         <!-- Social Brands -->
         <div class="md:text-end space-x-2">
           <a target="_blank"
-             href="https://github.com/ArunaStorage"
+             href="https://github.com/arunaengine"
              class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full border border-aruna-text-accent text-aruna-text-accent hover:text-aruna-highlight hover:border-aruna-highlight disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-aruna-700">
             <IconBrandGithub class="flex-shrink-0 size-4"/>
           </a>

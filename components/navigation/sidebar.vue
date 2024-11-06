@@ -115,14 +115,14 @@ function closeSidebar() {
                class="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden">
             <ul class="pt-2 ps-2">
               <li>
-                <NuxtLink to="https://github.com/ArunaStorage/api"
+                <NuxtLink to="https://github.com/arunaengine/api"
                           target="_blank"
                           class="flex items-center gap-x-2 py-2 px-4 text-sm text-aruna-text-accent rounded-md hover:bg-aruna-fg">
                   API
                 </NuxtLink>
               </li>
               <li>
-                <NuxtLink to="https://arunastorage.github.io/documentation/latest/get_started/basic_usage/00_index/"
+                <NuxtLink to="https://docs.aruna-engine.org/latest/get_started/basic_usage/00_index/"
                           target="_blank"
                           class="flex items-center gap-x-2 py-2 px-4 text-sm text-aruna-text-accent rounded-md hover:bg-aruna-fg">
                   Getting Started
@@ -130,7 +130,7 @@ function closeSidebar() {
               </li>
               <li>
                 <NuxtLink
-                    to="https://arunastorage.github.io/documentation/latest/internal_data_structure/internal_data_structure/"
+                    to="https://docs.aruna-engine.org/latest/internal_data_structure/internal_data_structure/"
                     target="_blank"
                     class="flex items-center gap-x-2 py-2 px-4 text-sm text-aruna-text-accent rounded-md hover:bg-aruna-fg">
                   Data Structure
@@ -140,7 +140,7 @@ function closeSidebar() {
           </div>
         </li>
         <li class="">
-          <NuxtLink to="https://github.com/ArunaStorage"
+          <NuxtLink to="https://github.com/arunaengine"
                     target="_blank"
                     class="flex items-center gap-x-2 py-2 px-3 rounded-md cursor-pointer text-sm text-aruna-text-accent hover:bg-aruna-fg focus:outline-none focus:ring-1 focus:ring-aruna-highlight">
             <IconBrandGithub class="flex-shrink-0 size-4"/>
