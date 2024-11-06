@@ -137,11 +137,12 @@ onBeforeMount(() => updateUser())
   <!-- Header + Navigation -->
   <!-- Main body -->
   <div v-if="useRuntimeConfig().public.maintenanceMode"
-       class="h-[100vh] w-[100vw] bg-[url('_nuxt/assets/imgs/maintenance_sm.webp')] md:bg-[url('_nuxt/assets/imgs/maintenance_md.webp')] lg:bg-[url('_nuxt/assets/imgs/maintenance_lg.webp')] bg-no-repeat bg-center bg-cover to-transparent">
+       class="h-[100vh] w-[100vw] bg-[url('/public/imgs/maintenance_sm.webp')] md:bg-[url('/public/imgs/maintenance_md.webp')] lg:bg-[url('/public/imgs/maintenance_lg.webp')] bg-no-repeat bg-center bg-cover to-transparent">
   </div>
 
   <div v-else
-       class="flex flex-col flex-grow md:min-h-screen bg-[url('/_nuxt/assets/imgs/global-bg.webp')] bg-cover bg-fixed bg-center bg-no-repeat">
+       class="flex flex-col flex-grow md:min-h-screen ">
+
     <ToastInfo v-if="useRuntimeConfig().public.infoBanner.active" modalId="info-toast" infoMsg="Hello"/>
     <NuxtLoadingIndicator/>
     <NuxtPage/>
