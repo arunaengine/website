@@ -8,7 +8,7 @@ import {IconBook, IconAdjustmentsCog, IconBrandOpenSource, IconChevronRight} fro
       <!-- Icon Block -->
       <NuxtLink class="group flex flex-col justify-center rounded-md p-4 md:p-7 transition-all ease-in-out delay-50 duration-500 focus:scale-105 hover:scale-105 hover:bg-aruna-fg focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
                 target="_blank"
-                to="https://github.com/ArunaStorage/aruna/tree/main?tab=readme-ov-file#license">
+                to="https://github.com/arunaengine/aruna/tree/main?tab=readme-ov-file#license">
         <div class="flex px-4 py-1 justify-center items-center mx-auto text-aruna-highlight rounded-md border border-aruna-highlight">
           <IconBrandOpenSource class="flex-shrink-0 size-20"/>
         </div>
@@ -30,7 +30,7 @@ import {IconBook, IconAdjustmentsCog, IconBrandOpenSource, IconChevronRight} fro
       <!-- Icon Block -->
       <NuxtLink class="group flex flex-col justify-center rounded-md p-4 md:p-7 transition-all ease-in-out delay-50 duration-500 focus:scale-105 hover:scale-105 hover:bg-aruna-fg focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
                 target="_blank"
-                to="https://github.com/ArunaStorage/aruna?tab=readme-ov-file#getting-started">
+                to="https://github.com/arunaengine/aruna?tab=readme-ov-file#getting-started">
         <div class="flex px-4 py-1 justify-center items-center mx-auto text-aruna-highlight rounded-md border border-aruna-highlight">
           <IconAdjustmentsCog class="flex-shrink-0 size-20"/>
         </div>
@@ -51,7 +51,7 @@ import {IconBook, IconAdjustmentsCog, IconBrandOpenSource, IconChevronRight} fro
 
       <!-- Icon Block -->
       <NuxtLink class="group flex flex-col justify-center rounded-md p-4 md:p-7 transition-all ease-in-out delay-50 duration-500 focus:scale-105 hover:scale-105 hover:bg-aruna-fg focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
-                href="https://arunastorage.github.io/documentation/latest"
+                href="https://docs.aruna-engine.org/latest"
                 target="_blank">
         <div class="flex px-4 py-1 justify-center items-center mx-auto text-aruna-highlight rounded-md border border-aruna-highlight">
           <!--<IconBook class="flex-shrink-0 size-20"/>-->

@@ -13,7 +13,7 @@
         </p>
         <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-x-6 gap-y-6">
           <a class="py-3 px-4 inline-flex justify-center items-center text-lg font-semibold bg-transparent border border-aruna-highlight rounded-sm text-aruna-highlight hover:text-aruna-text-accent hover:bg-aruna-highlight disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
-             href="https://arunastorage.github.io/documentation/latest/get_started/basic_usage/01_Get-Storage-Access/"
+             href="https://docs.aruna-engine.org/latest/get_started/basic_usage/01_Get-Storage-Access/"
              target="_blank">
             Get Started
           </a>

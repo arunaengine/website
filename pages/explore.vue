@@ -242,7 +242,7 @@ onMounted(async () => await queryResources(true));
             <div class="mt-2 text-sm text-aruna-text">
               The currently available parameters to create custom filters can be
               looked up in the
-              <NuxtLink to="https://arunastorage.github.io/documentation/latest/get_started/basic_usage/12_How-To-Search/"
+              <NuxtLink to="https://docs.aruna-engine.org/latest/get_started/basic_usage/12_How-To-Search/"
                         rel="noreferrer"
                         target="_blank"
                         class="text-aruna-highlight hover:text-aruna-highlight/80">
