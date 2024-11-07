@@ -26,30 +26,30 @@ code .line::before {
   <NavigationTop/>
 
   <!-- Blog Article -->
-  <div class="container max-w-5xl px-4 pt-6 lg:pt-10 pb-12 sm:px-6 lg:px-8 mx-auto mt-10 bg-muted/80 rounded-sm">
+  <div class="container max-w-5xl px-4 pt-6 lg:pt-10 pb-12 sm:px-6 lg:px-8 mx-auto my-10 bg-aruna-bg/90 rounded-sm border border-aruna-text/50">
     <div class="max-w-5xl">
       <!-- Avatar Media -->
       <div class="flex justify-between items-center mb-6">
         <div class="flex w-full sm:items-center gap-x-5 sm:gap-x-3">
           <div class="flex-shrink-0">
-            <img class="size-12 rounded-full"
-                 src="assets/imgs/aruna_icon.png"
-                 alt="Image Description">
+            <img src="/imgs/aruna_icon.webp"
+                     alt="Image Description"
+                     class="size-12 rounded-full"/>
           </div>
 
           <div class="grow">
             <div class="flex justify-between items-center gap-x-2">
               <div>
-                <span class="font-semibold text-gray-300">
+                <span class="font-semibold text-aruna-text-accent">
                     {{ announcement?.createdBy }}
                 </span>
 
-                <ul class="text-xs text-gray-500">
-                  <li class="inline-block relative pe-6 last:pe-0 last-of-type:before:hidden before:absolute before:top-1/2 before:end-2 before:-translate-y-1/2 before:size-1 before:rounded-full text-neutral-400 before:bg-muted">
+                <ul class="text-xs text-aruna-text">
+                  <li class="inline-block relative pe-6 last:pe-0 last-of-type:before:hidden before:absolute before:top-1/2 before:end-2 before:-translate-y-1/2 before:size-1 before:rounded-full text-aruna-text before:bg-aruna-bg-90">
                     <div v-if="announcement?.createdAt !== announcement?.modifiedAt"
                          class="hs-tooltip [--placement:right] inline-block">
                       <button type="button"
-                              class="hs-tooltip-toggle text-xs text-gray-500">
+                              class="hs-tooltip-toggle text-xs text-aruna-text">
                         {{ displayDate(announcement?.createdAt, announcement?.modifiedAt) }}
                       </button>
                       <span role="tooltip"
@@ -57,7 +57,7 @@ code .line::before {
                         Originally posted: {{ formatDate(announcement?.createdAt) }}
                       </span>
                     </div>
-                    <p v-else class="inline-block text-xs text-gray-500">
+                    <p v-else class="inline-block text-xs text-aruna-text">
                       {{ formatDate(announcement?.createdAt) }}
                     </p>
                   </li>
@@ -68,7 +68,7 @@ code .line::before {
               <div>
                 <button type="button"
                         @click="router.back()"
-                        class="py-1.5 px-2.5 inline-flex items-center gap-x-2 text-sm font-medium rounded-md border border-gray-500 bg-[#080d1f] text-gray-400 shadow-sm disabled:opacity-50 disabled:pointer-events-none hover:bg-[#080d1f]/50">
+                        class="py-1.5 px-2.5 inline-flex items-center gap-x-2 text-sm font-medium rounded-md border border-aruna-text/50 bg-aruna-bg/90 text-aruna-text shadow-sm disabled:opacity-50 disabled:pointer-events-none hover:bg-aruna-muted">
                   <IconChevronLeft class="size-3.5"/>
                   Back
                 </button>

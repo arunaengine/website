@@ -17,60 +17,67 @@ const props = defineProps<{
 <template>
   <!-- Card -->
   <NuxtLink :to="`/articles/${id}`"
-            class="group flex flex-col h-full p-5 border-2 border-gray-700 rounded-md bg-[#080d1f] transition-all delay-50 duration-500 hover:border-aruna-800 hover:shadow-2xl hover:scale-105 hover:shadow-white/40 focus:outline-none focus:ring-2 focus:ring-aruna-700">
+            class="group flex flex-col h-full p-5 border-2 border-aruna-text/50 rounded-md bg-aruna-bg/90 transition-all delay-50 duration-500 hover:border-aruna-highlight hover:shadow-2xl hover:scale-105 hover:shadow-aruna-highlight/40 focus:outline-none focus:ring-2 focus:ring-aruna-highlight">
     <div class="aspect-w-16 aspect-h-11">
-      <img v-if="imageUrl" class="w-full object-cover rounded-md"
+      <img v-if="imageUrl"
            :src="imageUrl"
-           alt="Announcement preview image">
-      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_RELEASE'" class="w-full object-cover rounded-md"
-           src="assets/imgs/blog_release.webp"
-           alt="Default image for release announcements">
-      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_UPDATE'" class="w-full object-cover rounded-md"
-           src="assets/imgs/blog_update.webp"
-           alt="Default image for update announcements">
-      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_BLOG'" class="w-full object-cover rounded-md"
-           src="assets/imgs/blog_blog.webp"
-           alt="Default image for blog articles">
-      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_MAINTENANCE'" class="w-full object-cover rounded-md"
-           src="assets/imgs/blog_maintenance.webp"
-           alt="Default image for maintenance announcements">
-      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_ORGA'" class="w-full object-cover rounded-md"
-           src="assets/imgs/blog_orga.webp"
-           alt="Default image for organizational announcements">
+           alt="Announcement preview image"
+           class="w-full object-cover rounded-md"/>
+      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_RELEASE'"
+               src="/imgs/blog_release.webp"
+               class="w-full object-cover rounded-md"
+               alt="Default image for release announcements"/>
+      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_UPDATE'"
+               src="/imgs/blog_update.webp"
+               alt="Default image for update announcements"
+               class="w-full object-cover rounded-md"/>
+      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_BLOG'"
+               src="/imgs/blog_blog.webp"
+               alt="Default image for blog articles"
+               class="w-full object-cover rounded-md"/>
+      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_MAINTENANCE'"
+               src="/imgs/blog_maintenance.webp"
+               alt="Default image for maintenance announcements"
+               class="w-full object-cover rounded-md"/>
+      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_ORGA'"
+               src="/imgs/blog_orga.webp"
+               alt="Default image for organizational announcements"
+               class="w-full object-cover rounded-md"/>
     </div>
     <div class="my-6">
-      <h3 class="text-xl font-semibold text-white">
+      <h3 class="text-xl font-semibold text-aruna-text-accent">
         {{ title }}
       </h3>
-      <p class="mt-5 text-gray-300">
+      <p class="mt-5 text-aruna-text">
         {{ teaser }}
       </p>
     </div>
     <div class="mt-auto flex justify-between items-center gap-x-3">
       <div class="flex">
-        <img class="size-8 rounded-full" src="assets/imgs/aruna_icon.png"
-             alt="Minimalistic Aruna icon in the form of a wave">
+        <img src="/imgs/aruna_icon.webp"
+                 alt="Minimalistic Aruna icon in the form of a wave"
+                 class="size-8 rounded-full"/>
         <div class="ms-2.5 sm:ms-4">
-          <h4 class="text-sm text-gray-400">
+          <h4 class="text-sm text-aruna-text">
             {{ author }}
           </h4>
           <div v-if="created_at !== modified_at"
                class="hs-tooltip [--placement:right] inline-block">
-            <button type="button" class="hs-tooltip-toggle text-xs text-gray-500">
+            <button type="button" class="hs-tooltip-toggle text-xs text-aruna-text">
               {{ displayDate(created_at, modified_at) }}
             </button>
             <span role="tooltip"
-                  class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-neutral-700 text-xs font-medium text-white rounded shadow-sm">
+                  class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-aruna-muted text-xs font-medium text-white rounded shadow-sm">
               Originally posted: {{ formatDate(created_at) }}
             </span>
           </div>
-          <p v-else class="inline-block text-xs text-gray-500">
+          <p v-else class="inline-block text-xs text-aruna-text">
             {{ formatDate(created_at) }}
           </p>
         </div>
       </div>
       <div
-          class="flex px-4 py-2 ms-2.5 sm:ms-4 font-bold text-aruna-700 rounded-md border border-aruna-700/[.5]">
+          class="flex px-4 py-2 ms-2.5 sm:ms-4 font-bold text-aruna-highlight rounded-md border border-aruna-highlight">
         {{ toAnnouncementTypeStr(type) }}
       </div>
     </div>

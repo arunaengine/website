@@ -54,7 +54,13 @@ module.exports = {
           700: '#007BC2',
           800: '#005299',
           900: '#00208A',
-          950: '#0E0075'
+          950: '#0E0075',
+          text: "hsl(var(--aruna-text))",
+          'text-accent': "hsl(var(--aruna-text-accent))",
+          highlight: "hsl(var(--aruna-highlight))",
+          muted: "hsl(var(--aruna-muted))",
+          bg: "hsl(var(--aruna-background))",
+          fg: "hsl(var(--aruna-foreground))"
         },
       },
       borderRadius: {

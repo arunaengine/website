@@ -48,20 +48,20 @@ export default defineNuxtConfig({
       }
     },
     markdownCss: {
-      h1: ['text-3xl', 'font-bold', 'text-center', 'text-gray-200'],
-      h2: ['mt-6', 'mb-2', 'text-2xl', 'font-bold', 'text-gray-300'],
-      h3: ['mt-6', 'mb-2', 'text-xl', 'font-bold', 'uppercase', 'text-gray-300'],
-      p: ['mt-2', 'px-4', 'py-2', 'text-gray-300'],
-      a: ['text-aruna-700', 'hover:text-aruna-800'],
-      hr: ['border-gray-400'],
-      ul: ['list-disc', 'list-outside', 'space-y-5', 'ps-4', 'py-2', 'text-lg', 'text-gray-300'],
-      ol: ['list-decimal', 'list-outside', 'space-y-5', 'ps-5', 'text-lg', 'text-gray-300'],
+      h1: ['text-3xl', 'font-bold', 'text-center', 'text-aruna-text-accent'],
+      h2: ['mt-6', 'mb-2', 'text-2xl', 'font-bold', 'text-aruna-text-accent'],
+      h3: ['mt-6', 'mb-2', 'text-xl', 'font-bold', 'uppercase', 'text-aruna-text-accent'],
+      p: ['mt-2', 'px-4', 'py-2', 'text-aruna-text'],
+      a: ['text-aruna-highlight', 'hover:text-aruna-highlight/80'],
+      hr: ['border-aruna-text/50'],
+      ul: ['list-disc', 'list-outside', 'space-y-5', 'ps-4', 'py-2', 'text-lg', 'text-aruna-text'],
+      ol: ['list-decimal', 'list-outside', 'space-y-5', 'ps-5', 'text-lg', 'text-aruna-text'],
       li: ['ps-2'],
       img: ['rounded-md'],
       code: ['p-4'],
       dl: ['p-4'],
-      dt: ['pt-4', 'font-medium', 'leading-6', 'text-gray-400'],
-      dd: ['mt-1', 'ps-4', 'leading-6', 'text-gray-300', 'sm:col-span-2', 'sm:mt-0']
+      dt: ['pt-4', 'font-medium', 'leading-6', 'text-aruna-text-accent'],
+      dd: ['mt-1', 'ps-4', 'leading-6', 'text-aruna-text', 'sm:col-span-2', 'sm:mt-0']
     },
     public: {
       maintenanceMode: false,
