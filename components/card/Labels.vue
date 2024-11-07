@@ -21,28 +21,27 @@ function getLabels(): v2KeyValue[] | undefined {
   <div class="-m-1.5 overflow-x-auto">
     <div class="p-1.5 min-w-full inline-block align-middle">
       <div class="overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-500">
+        <table class="min-w-full divide-y divide-aruna-text/50">
           <thead>
             <tr>
-              <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">Key</th>
-              <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">Value</th>
-              <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-gray-400 uppercase">Static
+              <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-aruna-text-accent uppercase">Key</th>
+              <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-aruna-text-accent uppercase">Value</th>
+              <th scope="col" class="px-6 py-3 text-center text-sm font-medium text-aruna-text-accent uppercase">Static
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-500">
-            <tr v-for="label in getLabels()" class="hover:bg-gray-700">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
+          <tbody class="divide-y divide-aruna-text/50">
+            <tr v-for="label in getLabels()" class="hover:bg-aruna-fg">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-aruna-text">
                  {{ label.key }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-aruna-text">
                 <div v-html="prettyDisplayJson(label.value)" />
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                <span v-if="label.variant === v2KeyValueVariant.KEY_VALUE_VARIANT_STATIC_LABEL"
-                  class="status status-green">
-                  <IconCheck :size="24" />
-                </span>
+                  <IconCheck v-if="label.variant === v2KeyValueVariant.KEY_VALUE_VARIANT_STATIC_LABEL"
+                             :size="24"
+                             class="inline-flex text-aruna-highlight"/>
               </td>
             </tr>
           </tbody>

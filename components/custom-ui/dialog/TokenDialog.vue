@@ -162,11 +162,11 @@ function clear(visibility: boolean) {
         Create Token
       </Button>
     </DialogTrigger>
-    <DialogContent class="sm:max-w-xl sm:rounded-md"
+    <DialogContent class="sm:max-w-xl sm:rounded-md border-aruna-text/50"
                    @pointer-down-outside="(event) => event.preventDefault()">
       <DialogHeader>
-        <DialogTitle class="mb-2 text-center text-aruna-700 font-bold">Create Token</DialogTitle>
-        <DialogDescription class="text-center text-gray-300">
+        <DialogTitle class="mb-2 text-center text-aruna-highlight font-bold">Create Token</DialogTitle>
+        <DialogDescription class="text-center text-aruna-text">
           Create an individual Aruna access token
         </DialogDescription>
       </DialogHeader>
@@ -310,7 +310,8 @@ function clear(visibility: boolean) {
       <DialogFooter>
         <Button type="submit"
                 form="dialogForm"
-                class="bg-aruna-800 hover:bg-aruna-700 text-white rounded-sm"
+                variant="outline"
+                class="border border-aruna-highlight bg-transparent text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent rounded-sm"
                 :disabled="tokenSecret">
           Create Token
         </Button>
