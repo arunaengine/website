@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import {
-  IconDatabase,
   IconFileInfo,
   IconRocket,
   IconSearch,

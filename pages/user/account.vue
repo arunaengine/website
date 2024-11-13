@@ -3,7 +3,9 @@ import {
   IconBuildingWarehouse,
   IconCheck,
   IconDiscountCheck,
+  IconExclamationCircle,
   IconLoader,
+  IconPlant,
   IconPokeball,
   IconTrash,
   IconUserScan,
@@ -17,6 +19,8 @@ import {useToast} from "~/components/ui/toast";
 import CredentialsDialog from "~/components/custom-ui/dialog/CredentialsDialog.vue";
 import TokenDialog from "~/components/custom-ui/dialog/TokenDialog.vue";
 import {DateFormatter} from "@internationalized/date";
+import {Button} from "~/components/ui/button";
+import {h} from "vue";
 
 // Toast for notifications
 const {toast} = useToast()
@@ -216,6 +220,37 @@ async function getS3Credentials(endpoint: v2Endpoint) {
 }
 
 /* ----- END CREDENTIALS DIALOG ----- */
+
+/* ----- ALTERNATIVE CALLBACK RESPONSE -----*/
+const route = useRoute()
+const add_response = route.query['add']
+
+if (add_response === 'success') {
+  toast({
+    description: h('div',
+        {class: 'flex space-x-2 items-center justify-center'},
+        [
+          h(IconPlant, {class: 'flex-shrink-0 size-5 text-green-400'}),
+          h('span',
+              {class: 'text-fuchsia-50'},
+              ['Successfully added the login to your Aruna account.'])
+        ]),
+    duration: 10000
+  })
+} else if (add_response === 'failure') {
+  toast({
+    description: h('div',
+        {class: 'flex space-x-2 items-center justify-center'},
+        [
+          h(IconExclamationCircle, {class: 'flex-shrink-0 size-5 text-destructive'}),
+          h('span',
+              {class: 'text-aruna-text-accent'},
+              ['Adding the login to your Aruna account failed. Please try again later.'])
+        ]),
+    duration: 10000
+  })
+}
+/* ----- END ALTERNATIVE CALLBACK RESPONSE -----*/
 </script>
 
 <template>
@@ -269,7 +304,9 @@ async function getS3Credentials(endpoint: v2Endpoint) {
       </div>
 
       <div class="mt-3">
-        <div id="tabs-with-icons-1" role="tabpanel" aria-labelledby="tabs-with-icons-item-1">
+        <div id="tabs-with-icons-1"
+             role="tabpanel"
+             aria-labelledby="tabs-with-icons-item-1">
           <div v-if="!is_active()"
                class="my-6 text-center bg-yellow-800/10 border border-yellow-900 text-yellow-500 text-sm rounded-lg p-4"
                role="alert">
@@ -295,7 +332,8 @@ async function getS3Credentials(endpoint: v2Endpoint) {
             <Card class="basis-1/5 bg-aruna-muted border-aruna-text/50">
               <CardHeader class="text-center">
                 <CardTitle class="text-xl text-aruna-text-accent">Email</CardTitle>
-                <CardDescription class="text-lg text-aruna-text">{{ get_user()?.email ? get_user()?.email : "No email provided" }}
+                <CardDescription class="text-lg text-aruna-text">
+                  {{ get_user()?.email ? get_user()?.email : "No email provided" }}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -310,6 +348,28 @@ async function getS3Credentials(endpoint: v2Endpoint) {
               </CardHeader>
             </Card>
           </div>
+
+          <Separator class="my-8 bg-aruna-text"/>
+
+          <Card class="max-w-md mx-auto bg-aruna-muted border-aruna-text/50">
+            <CardHeader class="text-center">
+              <CardTitle class="text-xl text-aruna-text-accent">Connect AAI</CardTitle>
+              <CardDescription class="flex flex-col">
+                <p>Connect your LifeScience RI accounts to the Aruna account you're currently logged in with.</p>
+                <Button variant="outline"
+                        class="inline-flex shrink mx-auto mt-4 px-4 border-aruna-text/50 text-lg hover:bg-aruna-fg">
+                  <a href="/auth/login?provider=lifescience&add_idp=true" class="flex">
+                    <img src="/imgs/ls-ri.webp"
+                         alt="LifeScience Login"
+                         class="h-6 mr-2"/>
+                    Connect LifeScience RI
+                  </a>
+                </Button>
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+
         </div>
 
         <div id="tabs-with-icons-2" class="hidden" role="tabpanel" aria-labelledby="tabs-with-icons-item-2">
@@ -320,15 +380,22 @@ async function getS3Credentials(endpoint: v2Endpoint) {
                   <table class="min-w-full divide-y divide-aruna-text/50">
                     <thead>
                     <tr>
-                      <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">ID</th>
-                      <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">Name</th>
-                      <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">Last
+                      <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">
+                        ID
+                      </th>
+                      <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">
+                        Name
+                      </th>
+                      <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">
+                        Last
                         Used
                       </th>
-                      <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">Expiry
+                      <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">
+                        Expiry
                         date
                       </th>
-                      <th scope="col" class="px-6 py-3 text-center text-md font-medium text-aruna-text-accent uppercase">Actions
+                      <th scope="col"
+                          class="px-6 py-3 text-center text-md font-medium text-aruna-text-accent uppercase">Actions
                       </th>
                     </tr>
                     </thead>
