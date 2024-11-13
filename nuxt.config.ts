@@ -41,10 +41,13 @@ export default defineNuxtConfig({
       local: {
         clientId: "test",
         clientSecret: "QgBl9I2CD3eVhL7LFvkHrYUK7oKL3LE2",
-        serverUrl: "http://localhost:1998",
+        issuer: "http://localhost:1998",
         redirectUrl: "http://localhost:3000/callback",
-        realm: "test",
+        authUrl: 'http://localhost:1998/realms/test/protocol/openid-connect/auth',
+        tokenUrl: 'http://localhost:1998/realms/test/protocol/openid-connect/token',
+        revokeUrl: 'http://localhost:1998/realms/test/protocol/openid-connect/revoke',
         scope: ["openid"],
+        code_challenge: false
       }
     },
     markdownCss: {
@@ -75,5 +78,5 @@ export default defineNuxtConfig({
     }
   },
 
-  compatibilityDate: '2024-08-21',
+  compatibilityDate: '2024-11-08',
 })

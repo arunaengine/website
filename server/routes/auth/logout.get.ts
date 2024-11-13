@@ -1,5 +1,9 @@
 export default defineEventHandler(async event => {
-    setCookie(event, 'access_token', "")
-    setCookie(event, 'refresh_token', "")
+  // Delete token cookies on logout
+  deleteCookie(event, 'access_token')
+  deleteCookie(event, 'refresh_token')
+  deleteCookie(event, 'code_verifier') // Just for good measure
+
+  // Redirect to homepage
   return sendRedirect(event, "/" )
 })
