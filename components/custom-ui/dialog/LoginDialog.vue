@@ -50,7 +50,7 @@ const local = computed(() => window.location.hostname.includes('localhost'))
       <Button variant="outline"
               class="px-4 border-aruna-text/50 text-lg  hover:bg-aruna-fg">
         <a href="/auth/login?provider=gfbio" class="flex">
-          <img src="/imgs/gfbio_alt.webp"
+          <img src="/imgs/gfbio.webp"
                alt="GFBio Logo"
                class="h-6 mr-2"/>
           GFBio SSO
