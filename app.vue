@@ -189,7 +189,6 @@ onBeforeMount(() => updateUser())
     <NuxtLoadingIndicator/>
     <NuxtPage/>
   </div>
-  <NavigationSidebar/>
-  
+
   <Toaster/>
 </template>
