@@ -1,6 +1,7 @@
 <template>
-  <div class="min-h-[calc(100vh-46px)]">
-    <div class="mx-auto max-w-4xl pt-[15vh] sm:pt-[20vh] text-center">
+  <div class="min-h-[calc(100vh-46px)] p-4 sm:p-0">
+    <div class="flex flex-col mx-auto max-w-4xl pt-[5vh] sm:pt-[10vh] md:pt-[15vh] text-center items-center justify-center gap-y-6">
+      <img alt="Aruna logo" src="/imgs/aruna_dark.webp" class="max-w-xs"/>
       <h1 class="inline font-bold text-5xl sm:text-7xl text-aruna-highlight">Orchestrate your data!</h1>
     </div>
     <div class="mx-auto max-w-2xl pb-[25vh] sm:pb-[40vh]">
@@ -26,7 +27,6 @@
     </div>
   </div>
 
-
   <div class="relative">
     <svg class="absolute -top-4 md:-top-5 xl:-top-12 2xl:-top-14 bg-transparent z-20"
          fill="none"
@@ -37,5 +37,4 @@
             fill="#020817"></path>
     </svg>
   </div>
-
 </template>
