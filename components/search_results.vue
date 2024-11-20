@@ -9,7 +9,7 @@ const {resources} = defineProps<SearchResultListProps>()
 
 <template>
   <div v-if="resources.length == 0">
-    <h2 class="text-slate-500 font-bold text-center">No results found</h2>
+    <h2 class="text-aruna-text-accent font-bold text-center">No results found</h2>
   </div>
 
   <CardResource v-for="hit in resources" :resource="hit" />

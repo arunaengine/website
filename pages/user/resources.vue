@@ -11,7 +11,10 @@ const display: Ref<v2ResourceWithPermission[]> = ref([])
 
 const displayDeleted = ref(false)
 const forceRefresh = ref(0)
-watch(displayDeleted, () => fillDisplay())
+watch(displayDeleted, () => {
+  console.log(displayDeleted)
+  fillDisplay()
+})
 
 async function fetchResources() {
   // Wait for user injection
@@ -47,21 +50,17 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
   <NavigationTop/>
 
   <div class="min-h-[calc(100vh-110px)]">
-    <div class="flex md:container sm:mx-1 md:mx-auto my-10 p-4 border border-gray-500 rounded-md bg-muted/40">
+    <div class="flex md:container sm:mx-1 md:mx-auto my-10 p-4 border border-aruna-text/50 rounded-md bg-muted/40">
       <div class="flex flex-col grow">
         <div class="flex flex-row grow justify-between">
-          <div class="flex items-center">
-            <input type="checkbox"
-                   v-model="displayDeleted"
-                   id="display-deleted-checkbox"
-                   class="relative w-[3.25rem] h-7 p-px bg-neutral-800 border-neutral-700 text-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:ring-transparent disabled:opacity-50 disabled:pointer-events-none checked:bg-none checked:text-aruna-800 focus:checked:border-aruna-800 checked:bg-aruna-800 checked:border-aruna-800 focus:ring-offset-aruna-700
-                        before:inline-block before:size-6 before:translate-x-0 checked:before:translate-x-full before:rounded-full before:shadow before:transform before:ring-0 before:transition before:ease-in-out before:duration-200 before:bg-neutral-400 checked:before:bg-blue-200">
-            <label for="display-deleted-checkbox" class="text-sm text-gray-400 ms-3">
-              Display deleted resources
-            </label>
+          <div class="flex items-center space-x-2">
+            <Switch @update:checked="(v) => displayDeleted = v"
+                    id="display-deleted"
+                    class="border border-aruna-text/50 data-[state=checked]:bg-aruna-highlight data-[state=unchecked]:bg-aruna-text/50"/>
+            <Label for="display-deleted">Display deleted resources</Label>
           </div>
           <NuxtLink to="/objects/create"
-                    class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-md bg-aruna-800 border text-white hover:bg-aruna-700">
+                    class="py-1 px-2 mt-2 inline-flex gap-x-2 text-md rounded-md bg-transparent border border-aruna-highlight text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
             Create new resource
           </NuxtLink>
         </div>

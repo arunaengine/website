@@ -36,28 +36,28 @@ const emit = defineEmits(['closeCredentialsDialog'])
         Show Credentials
       </Button>
     </DialogTrigger>
-    <DialogContent @close="emit('closeCredentialsDialog')" class="sm:max-w-lg sm:rounded-md">
+    <DialogContent @close="emit('closeCredentialsDialog')" class="sm:max-w-lg sm:rounded-md border-aruna-text/50">
       <DialogHeader>
-        <DialogTitle class="mb-2 text-center text-aruna-700 font-bold">DataProxy Credentials</DialogTitle>
-        <DialogDescription v-if="hostName" class="text-center">
-          <p class="mb-2 text-md">Your S3 credentials for: <span class="font-bold italic">{{ hostName }}</span></p>
-          <p class="text-sm">{{ hostId }}</p>
+        <DialogTitle class="mb-2 text-center text-aruna-highlight font-bold">DataProxy Credentials</DialogTitle>
+        <DialogDescription v-if="hostName" class="text-center text-aruna-text">
+          <p class="mb-2 text-md">Your S3 credentials for: <span class="font-bold italic text-aruna-text-accent">{{ hostName }}</span></p>
+          <p class="text-sm font-bold">{{ hostId }}</p>
         </DialogDescription>
       </DialogHeader>
       <div class="p-4 overflow-y-auto">
-        <div class="border-y border-gray-100">
-          <dl class="divide-y divide-gray-100">
-            <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-              <dt class="text-sm font-medium leading-6 text-gray-400">Host URL</dt>
-              <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">{{ hostUrl }}</dd>
+        <div class="border-y border-aruna-text">
+          <dl>
+            <div class="p-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt class="text-sm font-medium leading-6 text-aruna-text">Host URL</dt>
+              <dd class="mt-1 text-sm leading-6 text-aruna-text-accent sm:col-span-2 sm:mt-0">{{ hostUrl }}</dd>
             </div>
-            <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-              <dt class="text-sm font-medium leading-6 text-gray-400">Access Key ID</dt>
-              <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">{{ accessKeyId }}</dd>
+            <div class="p-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt class="text-sm font-medium leading-6 text-aruna-text">Access Key ID</dt>
+              <dd class="mt-1 text-sm leading-6 text-aruna-text-accent sm:col-span-2 sm:mt-0">{{ accessKeyId }}</dd>
             </div>
-            <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-              <dt class="text-sm font-medium leading-6 text-gray-400">Access Secret</dt>
-              <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">{{ accessSecret }}</dd>
+            <div class="p-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt class="text-sm font-medium leading-6 text-aruna-text">Access Secret</dt>
+              <dd class="mt-1 text-sm leading-6 text-aruna-text-accent sm:col-span-2 sm:mt-0">{{ accessSecret }}</dd>
             </div>
           </dl>
         </div>
