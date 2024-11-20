@@ -75,7 +75,7 @@ import {IconMail} from '@tabler/icons-vue';
           Wir erheben personenbezogene Daten von Ihnen, wenn Sie sich für einen Account auf unserer Website oder im
           Email-verteiler registrieren. <br/>Folgende personenbezogene Daten werden erhoben:
         </p>
-        <ul class="list-disc list-inside ps-4 pb-4 text-aruna-text">
+        <ul class="list-disc list-inside ps-6 pb-4 text-aruna-text">
           <li>Einen selbst zu vergebenen Namen</li>
           <li>Eine E-Mail-Adresse zur Kontaktaufnahme</li>
         </ul>
@@ -186,7 +186,7 @@ import {IconMail} from '@tabler/icons-vue';
         </h3>
         <hr class="border-aruna-text">
         <div class="mt-2 ps-4 font-bold text-aruna-text">Responsible for data processing is:</div>
-        <div class="ps-8 pb-4 text-aruna-text">
+        <div class="ps-8 pb-4 text-aruna-text-accent">
           <div>President of the</div>
           <div>Justus-Liebig-University Giessen</div>
           <div>Ludwigstraße 23</div>
@@ -210,7 +210,7 @@ import {IconMail} from '@tabler/icons-vue';
           We collect personal data from you when you register for an account or join the mailing-list on our
           website. <br/>The following personal data is collected:
         </p>
-        <ul class="list-disc list-inside p-4">
+        <ul class="list-disc list-inside ps-6 pb-4 text-aruna-text">
           <li>A self-selected name</li>
           <li>Email address for contact</li>
         </ul>
