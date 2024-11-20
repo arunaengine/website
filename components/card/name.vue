@@ -10,25 +10,25 @@ const props = defineProps<{
 
 <template>
 
-  <div class="flex flex-col grow items-start bg-slate-900 border border-gray-500 shadow-sm p-4 md:p-5 text-gray-300">
+  <div class="flex flex-col grow items-start bg-aruna-bg/90 border border-aruna-text/50 shadow-sm p-4 md:p-5 text-aruna-text">
     <div class="flex flex-row grow">
       <!-- Big Icon Column -->
-      <div class="flex flex-col text-gray-200 bg-aruna-800 p-3">
-        <IconIdBadge2 class="flex-shrink-0 size-8"/>
+      <div class="flex flex-col items-center justify-center text-aruna-highlight">
+        <IconIdBadge2 class="flex-shrink-0 size-10"/>
       </div>
       <!-- END Big Icon Column -->
 
       <!-- Name & Title Column -->
       <div class="flex flex-col ms-6">
-        <div class="flex flex-row space-x-2 border-gray-400">
-          <div class="text-lg text-gray-400">Name:</div>
-          <div class="font-bold text-xl text-gray-300">{{ props.name }}</div>
+        <div class="flex flex-row space-x-2 border-aruna-text/50">
+          <div class="text-lg text-aruna-text">Name:</div>
+          <div class="font-bold text-xl text-aruna-text-accent">{{ props.name }}</div>
         </div>
 
-        <div class="flex flex-row space-x-2 border-gray-400">
-          <div class="text-lg text-gray-400">Title:</div>
-          <div v-if="props.title" class="font-bold text-xl text-gray-300">{{ props.title }}</div>
-          <div v-else class="font-bold text-xl text-gray-300">N/A</div>
+        <div class="flex flex-row space-x-2 border-aruna-text/50">
+          <div class="text-lg text-aruna-text">Title:</div>
+          <div v-if="props.title" class="font-bold text-xl text-aruna-text-accent">{{ props.title }}</div>
+          <div v-else class="font-bold text-xl text-aruna-text-accent">N/A</div>
         </div>
       </div>
       <!-- END Name Column -->

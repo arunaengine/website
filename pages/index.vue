@@ -8,12 +8,14 @@ import Hero from "~/components/custom-ui/frontpage/Hero.vue";
 </script>
 <template>
   <div class="flex flex-col flex-grow">
-    <!-- Header + Navigation -->
-    <NavigationTop/>
-    <!-- END Header + Navigation -->
+    <div class="bg-[url('/public/imgs/global-bg.webp')] bg-cover bg-fixed bg-center bg-no-repeat">
+      <!-- Header + Navigation -->
+      <NavigationTop/>
+      <!-- END Header + Navigation -->
 
-    <!-- Frontpage Sections -->
-    <Hero/>
+      <!-- Frontpage Sections -->
+      <Hero/>
+    </div>
     <FeaturesAruna/>
     <FeaturesGeneral/>
     <Newsletter/>

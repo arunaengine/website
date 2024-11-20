@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import { buttonVariants } from '@/components/ui/button'
-import { cn } from '@/utils/shadcn'
-import { ChevronLeftIcon } from '@radix-icons/vue'
+import { type HTMLAttributes, computed } from 'vue'
 import { CalendarPrev, type CalendarPrevProps, useForwardProps } from 'radix-vue'
-import { computed, type HTMLAttributes } from 'vue'
+import { ChevronLeftIcon } from '@radix-icons/vue'
+import { cn } from '@/utils/shadcn'
+import { buttonVariants } from '@/components/ui/button'
 
 const props = defineProps<CalendarPrevProps & { class?: HTMLAttributes['class'] }>()
 

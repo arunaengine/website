@@ -48,7 +48,7 @@ onBeforeMount(async () => await extendDisplay())
           <ClientOnly>
             <button @click="extendDisplay"
                     :class="{hidden: exhausted}"
-                    class="py-3 px-4 inline-flex items-center gap-x-1 text-sm font-medium rounded-full border border-gray-700 bg-[#080d1f] hover:bg-[#080d1f]/75 text-aruna-700 hover:text-aruna-800 shadow-sm disabled:opacity-50 disabled:pointer-events-none">
+                    class="py-3 px-4 inline-flex items-center gap-x-1 text-sm font-medium rounded-full border border-aruna-highlight bg-aruna-bg/90 hover:bg-aruna-muted text-aruna-highlight hover:text-aruna-highlight/80 shadow-sm disabled:opacity-50 disabled:pointer-events-none">
               Show older news
               <IconChevronDown class="flex-shrink-0 size-4"/>
             </button>

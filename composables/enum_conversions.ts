@@ -151,7 +151,7 @@ export function toReplicationStatusStr(variant: storagemodelsv2ReplicationStatus
     switch (variant) {
         case storagemodelsv2ReplicationStatus.REPLICATION_STATUS_WAITING: return "Waiting"
         case storagemodelsv2ReplicationStatus.REPLICATION_STATUS_RUNNING: return "Running"
-        case storagemodelsv2ReplicationStatus.REPLICATION_STATUS_FINISHED: return "Finshed"
+        case storagemodelsv2ReplicationStatus.REPLICATION_STATUS_FINISHED: return "Finished"
         case storagemodelsv2ReplicationStatus.REPLICATION_STATUS_ERROR: return "Error"
         default: return 'Unspecified'
     }

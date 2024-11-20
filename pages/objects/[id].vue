@@ -193,50 +193,50 @@ useHead({
     <!-- Badge Row -->
     <div class="flex flex-wrap justify-center max-w-screen-2xl mx-auto my-10">
       <ul class="flex flex-col flex-wrap grow sm:flex-row">
-        <li class="inline-flex grow items-center bg-slate-900 gap-x-1 py-3 px-4 text-sm font-medium border border-gray-500 text-white -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconBucket class="flex-shrink-0 size-6"/>
           <span class="font-bold">Type:</span>
-          <span class="text-gray-300">{{ toResourceTypeStr(resource.variant) }}</span>
+          <span class="text-aruna-text">{{ toResourceTypeStr(resource.variant) }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-slate-900 gap-x-1 py-3 px-4 text-sm font-medium border border-gray-500 text-white -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconLockCog class="flex-shrink-0 size-6"/>
           <span class="font-bold">Dataclass:</span>
-          <span class="text-gray-300">{{ toDataClassStr(resource.dataClass) }}</span>
+          <span class="text-aruna-text">{{ toDataClassStr(resource.dataClass) }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-slate-900 gap-x-1 py-3 px-4 text-sm font-medium border border-gray-500 text-white -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconZoomCheck class="flex-shrink-0 size-6"/>
           <span class="font-bold">Status:</span>
-          <span class="text-gray-300">{{ toObjectStatusStr(resource.objectStatus) }}</span>
+          <span class="text-aruna-text">{{ toObjectStatusStr(resource.objectStatus) }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-slate-900 gap-x-1 py-3 px-4 text-sm font-medium border border-gray-500 text-white -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconLicense class="flex-shrink-0 size-6"/>
           <span class="font-bold">Metadata License:</span>
-          <span class="text-gray-300">{{ resource.metaLicense.name }}</span>
+          <span class="text-aruna-text">{{ resource.metaLicense.name }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-slate-900 gap-x-1 py-3 px-4 text-sm font-medium border border-gray-500 text-white -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconLicense class="flex-shrink-0 size-6"/>
           <span class="font-bold">
             {{
               resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT ? '' : 'Default'
             }} Data License:</span>
-          <span class="text-gray-300">{{ resource.dataLicense.name }}</span>
+          <span class="text-aruna-text">{{ resource.dataLicense.name }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-slate-900 gap-x-1 py-3 px-4 text-sm font-medium border border-gray-500 text-white -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <IconCloudLock class="flex-shrink-0 size-6"/>
           <span class="font-bold">Permission:</span>
-          <span class="text-gray-300">{{ toPermissionTypeStr(resource.permission) }}</span>
+          <span class="text-aruna-text">{{ toPermissionTypeStr(resource.permission) }}</span>
         </li>
-        <li class="inline-flex grow items-center bg-slate-900 gap-x-1 py-3 px-4 text-sm font-medium border border-gray-500 text-white -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
+        <li class="inline-flex grow items-center bg-aruna-bg/90 gap-x-1 py-3 px-4 text-sm font-medium border border-aruna-text/50 text-aruna-text-accent -mt-px first:rounded-t-sm first:mt-0 last:rounded-b-sm sm:-ms-px sm:mt-0 sm:first:rounded-se-none sm:first:rounded-es-sm sm:last:rounded-es-none sm:last:rounded-se-sm">
           <!-- Actions Dropdown Menu -->
           <div class="hs-dropdown relative inline-flex">
             <button id="hs-dropdown-with-icons" type="button"
-                    class="hs-dropdown-toggle inline-flex items-center gap-x-2 text-sm font-medium disabled:opacity-50 disabled:pointer-events-none border-neutral-700 text-white">
+                    class="hs-dropdown-toggle inline-flex items-center gap-x-2 text-sm font-medium disabled:opacity-50 disabled:pointer-events-none text-white">
               Actions
               <IconChevronDown class="hs-dropdown-open:rotate-180 size-4"/>
             </button>
 
             <div aria-labelledby="hs-dropdown-with-icons"
-                 class="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden min-w-60 shadow-md rounded-md p-2 mt-2 divide-y bg-gray-800 border-gray-700 border divide-neutral-700">
+                 class="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden min-w-60 shadow-md rounded-md p-2 mt-2 divide-y bg-aruna-bg/90 border-aruna-text/50 border divide-neutral-700">
               <div class="py-2 first:pt-0 last:pb-0">
                 <ClientOnly>
                   <button v-if="resource.variant == v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
@@ -244,20 +244,20 @@ useHead({
                           @click="downloadResource()"
                           :disabled="!isDownloadable()"
                           title="Download Object"
-                          class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-300 hover:bg-gray-700 focus:outline-none focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none">
+                          class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-aruna-fg hover:text-aruna-text-accent focus:outline-none focus:bg-aruna-fg focus:text-aruna-text-accent disabled:opacity-50 disabled:pointer-events-none">
                     <IconCloudDown class="flex-shrink-0 size-4"/>
                     Download
                   </button>
                   <NuxtLink
                       :to="enableCreateMetafile ? {path:'/objects/create', query: {type: toResourceTypeStr(v2ResourceVariant.RESOURCE_VARIANT_OBJECT), class: toDataClassStr(resource.dataClass), relId: resource.id, relType: toResourceTypeStr(resource.variant), parentId: metadataParentId}} : null"
-                      class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-300 hover:bg-gray-700 focus:outline-none focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none"
+                      class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-aruna-fg hover:text-aruna-text-accent focus:outline-none focus:bg-aruna-fg focus:text-aruna-text-accent disabled:opacity-50 disabled:pointer-events-none"
                       :class="{'disabled-link': !enableCreateMetafile}">
                     <IconFileSignal class="flex-shrink-0 size-4"/>
                     Create Meta File
                   </NuxtLink>
                   <NuxtLink v-if="resource.variant != v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
                             :to="enableCreateChild ? {path:'/objects/create', query: {type: toResourceTypeStr(getChildResourceType(resource.variant)), class: toDataClassStr(resource.dataClass), parentId: resource.id }} : null"
-                            class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-gray-300 hover:bg-gray-700 focus:outline-none focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none"
+                            class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-aruna-fg hover:text-aruna-text-accent focus:outline-none focus:bg-aruna-fg focus:text-aruna-text-accent disabled:opacity-50 disabled:pointer-events-none"
                             :class="{'disabled-link': !enableCreateChild}">
                     <IconLeaf class="flex-shrink-0 size-4"/>
                     Create Child Resource
@@ -282,19 +282,19 @@ useHead({
 
     <!-- Description / Authors Row -->
     <div class="flex flex-col xl:flex-row justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
-      <div class="flex flex-col grow p-2 bg-slate-900 border border-gray-500 text-gray-300">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-          <IconFileInfo class="flex-shrink-0 size-6 me-4"/>
+          <IconFileInfo class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Description</span>
         </div>
-        <div class="flex grow p-4 bg-slate-900 text-gray-300 text-lg border-t border-gray-500">
+        <div class="flex grow p-4 bg-aruna-bg/90 text-aruna-text text-lg border-t border-aruna-text/50">
           {{ resource?.description }}
         </div>
       </div>
       <div v-if="resource.authors"
-           class="flex flex-col grow p-2 bg-slate-900 border border-gray-500 text-gray-300">
+           class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-          <IconUsers class="flex-shrink-0 size-6 me-4"/>
+          <IconUsers class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Authors</span>
         </div>
         <CardAuthors :authors="resource.authors"/>
@@ -304,17 +304,17 @@ useHead({
 
     <!-- Labels / Hooks Row -->
     <div class="flex flex-wrap justify-between gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
-      <div class="flex flex-col grow p-2 bg-slate-900 border border-gray-500 text-gray-300">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-          <IconTag class="flex-shrink-0 size-6 me-4"/>
+          <IconTag class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Labels</span>
         </div>
         <CardLabels :key_values="resource.keyValues"/>
       </div>
 
-      <div class="flex flex-col grow p-2 bg-slate-900 border border-gray-500 text-gray-300">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-          <IconWebhook class="flex-shrink-0 size-6 me-4"/>
+          <IconWebhook class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Hooks</span>
         </div>
         <CardHooks :key_values="resource.keyValues"/>
@@ -324,17 +324,17 @@ useHead({
 
     <!-- Relations Row -->
     <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
-      <div class="flex flex-col grow p-2 bg-slate-900 border border-gray-500 text-gray-300">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-          <IconExternalLink class="flex-shrink-0 size-6 me-4"/>
+          <IconExternalLink class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">External Relations</span>
         </div>
         <CardRelations :relations="resource?.relations" :external="true"/>
       </div>
 
-      <div class="flex flex-col grow p-2 bg-slate-900 border border-gray-500 text-gray-300">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-          <IconArrowsSplit class="flex-shrink-0 size-6 me-4"/>
+          <IconArrowsSplit class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Internal Relations</span>
         </div>
         <CardRelations :relations="resource?.relations" :external="false"/>
@@ -345,9 +345,9 @@ useHead({
     <!-- Locations -->
     <div v-if="resource.variant == v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
          class="flex flex-wrap justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
-      <div class="flex flex-col grow p-2 bg-slate-900 border border-gray-500 text-gray-300">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-          <IconCloudDown class="flex-shrink-0 size-6 me-4"/>
+          <IconCloudDown class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Locations</span>
         </div>
         <CardDownloads :endpoints="resource?.endpoints" @download="downloadResource"/>
