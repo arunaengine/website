@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {IconArrowLeft, IconExclamationCircle, IconPlus, IconTrash} from '@tabler/icons-vue'
+import {IconExclamationCircle, IconPlus, IconTrash} from '@tabler/icons-vue'
 import {
   v2DataClass,
   v2InternalRelationVariant,
@@ -28,12 +28,11 @@ import {deleteObject, getObjectBucketAndKey} from "~/composables/api_wrapper"
 import EventBus from "~/composables/EventBus";
 import AuthorDialog from "~/components/custom-ui/dialog/AuthorDialog.vue";
 import KeyValueDialog from "~/components/custom-ui/dialog/KeyValueDialog.vue";
+import OntologyDialog from "~/components/custom-ui/dialog/OntologyDialog.vue";
 
 import {HeadObjectCommand, S3Client, type S3ClientConfig} from "@aws-sdk/client-s3";
 import {Upload} from "@aws-sdk/lib-storage";
 import {prettyDisplayJson} from "~/composables/utils";
-import { ValueIcon } from '@radix-icons/vue'
-import OntologyDialog from "~/components/custom-ui/dialog/OntologyDialog.vue";
 
 // Router to navigate back
 const router = useRouter()
@@ -803,24 +802,18 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
           </div>
         </div>
 
-        <div class="flex flex-row mb-2 mt-6 justify-start items-center">
+        <div class="flex flex-row mb-2 mt-6 justify-start items-center gap-x-4">
           <label for="key-values-input"
                  class="block text-lg font-medium text-aruna-text-accent">Key-Values</label>
           <button type="button"
                   @click="keyValueDialogOpen = true"
-                  class="ms-4 px-1 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-aruna-text-accent rounded-md text-aruna-text-accent text-sm hover:text-aruna-highlight hover:border-aruna-highlight focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
+                  class="px-1 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-aruna-text-accent rounded-md text-aruna-text-accent text-sm hover:text-aruna-highlight hover:border-aruna-highlight focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
             <IconPlus class="flex-shrink-0 size-4"/>
           </button>
-          <button type="button"
-                  class="ms-4 px-1 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-aruna-text-accent rounded-md text-aruna-text-accent text-sm hover:text-aruna-highlight hover:border-aruna-highlight focus:outline-none disabled:opacity-50 disabled:pointer-events-none"
-                  data-hs-overlay="#ontology-add">
-            Add Ontology
-          </button>
-          <button type="button"
-                  @click="ontologyDialogOpen = true"
-                  class="ms-4 px-1 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-gray-300 rounded-md text-gray-300 text-sm hover:text-aruna-700 hover:border-aruna-700 focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
-            Add Ontology
-          </button>
+          <OntologyDialog :initial-open="false"
+                          :with-button="true"
+                          button-css="h-auto p-0.5 px-1 rounded-md font-normal text-aruna-text-accent border-aruna-text-accent hover:border-aruna-highlight hover:bg-transparent hover:text-aruna-highlight"
+                          @add-key-value="addKeyValue"/>
         </div>
 
         <div class="-m-1.5 overflow-x-auto">
@@ -938,40 +931,23 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
     </div>
   </div>
   </div>
-  <AuthorDialog
-    :initial-open="authorDialogOpen"
-    :with-button="false"
-    @update:open="authorDialogOpen = false"
-    @add-author="
-      (author) => {
-        addAuthor(author);
-        authorDialogOpen = false;
-      }
-    "
-  />
-  <KeyValueDialog
-    :initial-open="keyValueDialogOpen"
-    :with-button="false"
-    @update:open="keyValueDialogOpen = false"
-    @add-key-value="
-      ({ key, value, variant }) => {
-        addKeyValue(key, value, variant);
-        keyValueDialogOpen = false;
-      }
-    "
-  />
-  <OntologyDialog
-      :initial-open="ontologyDialogOpen"
-      :with-button="false"
-      @update:open="ontologyDialogOpen = false"
-      @add-author="
-      (author) => {
-        // addAuthor(author);
-        ontologyDialogOpen = false;
-      }
-    "
-  />
-  <ModalOntology modalId="ontology-add" @add-key-value="addKeyValue"/>
+
+  <AuthorDialog :initial-open="authorDialogOpen"
+                :with-button="false"
+                @update:open="authorDialogOpen = false"
+                @add-author="(author) => {
+                  addAuthor(author);
+                  authorDialogOpen = false;
+                }"/>
+
+  <KeyValueDialog :initial-open="keyValueDialogOpen"
+                  :with-button="false"
+                  @update:open="keyValueDialogOpen = false"
+                  @add-key-value="({ key, value, variant }) => {
+                    addKeyValue(key, value, variant);
+                    keyValueDialogOpen = false;
+                  }"/>
+
   <ModalRelation modalId="relation-add" @add-relation="addRelation"/>
   <ModalObjectDisplay modalId="object-display" :object="createdResource" :progress="uploadProgress"
                       :errorMsg="creationError"/>
