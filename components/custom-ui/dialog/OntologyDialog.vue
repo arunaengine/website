@@ -1,132 +1,202 @@
 <script setup lang="ts">
-
-import {v2KeyValueVariant} from "~/composables/aruna_api_json";
-import {toTypedSchema} from "@vee-validate/zod";
-import {z} from "zod";
-import {useForm} from "vee-validate";
+/* ----- PROPERTIES ----- */
 import {
   Dialog,
   DialogContent,
-  DialogDescription, DialogFooter,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger
 } from "~/components/ui/dialog";
 import {Button} from "~/components/ui/button";
 import type {OntologyDoc} from "~/composables/ts_api/OntologyDoc";
-import {ComboboxAnchor} from "radix-vue";
+import {IconBraces, IconExternalLink, IconLoader2} from "@tabler/icons-vue";
+import {v2KeyValueVariant} from "~/composables/aruna_api_json";
 
 /* ----- PROPERTIES ----- */
 const props = defineProps<{
-  initialOpen: boolean,
+  initialOpen: boolean
   withButton: boolean
+  buttonCss: string
 }>()
 const externalTrigger = toRef(props, 'initialOpen')
-const dialogOpen = ref(props.initialOpen)
-watch(externalTrigger, () => dialogOpen.value = externalTrigger.value)
+const open = ref(props.initialOpen)
+watch(externalTrigger, () => (open.value = externalTrigger.value))
 /* ----- END PROPERTIES ----- */
 
-/* ----- EVENT EMITS ----- */
+/* ----- EMITS ----- */
 const emit = defineEmits<{
   'add-key-value': [key: string, value: string, kvType: v2KeyValueVariant]
 }>()
-/* ----- END EVENT EMITS ----- */
+/* ----- END EMITS ----- */
 
-const currentSelection: Ref<OntologyDoc | undefined> = ref(undefined);
-const popoverOpen: Ref<boolean> = ref(false);
+const queryInput = ref('')
+const fetching = ref(false)
+const results: Ref<OntologyDoc[]> = ref([]) //ref([{label: 'test'}, {label: 'test2'}, {label: 'test3'}])
+const currentSelection: Ref<OntologyDoc | undefined> = ref(undefined)
+
+// Debounce input to decrease number of requests
+watch(queryInput, () => {
+  // Empty input only clears results
+  if (!queryInput.value) {
+    results.value = []
+    return
+  }
+
+  fetching.value = true
+  results.value = []
+  debouncedInput()
+})
+const debouncedInput = debounce(async () => await searchOntologies(queryInput.value), 250)
+
+async function searchOntologies(ontologyName: string): Promise<void> {
+  // No need to search with empty input
+  if (!ontologyName) {
+    results.value = []
+    return
+  }
+
+  results.value = await $fetch<OntologyDoc[]>('/api/ontology', {
+    query: {
+      ontologyName: ontologyName
+    }
+  }).catch(error => {
+    console.log(error)
+    return []
+  })
+  fetching.value = false
+}
+
+function selectOntology(selection: OntologyDoc) {
+  currentSelection.value = selection
+  queryInput.value = ''
+  results.value = []
+}
+
+function createLandingPageLink(id: string) {
+  id = id.replace(':', '')
+  return `https://terminology.tib.eu/ts/ontologies/${id}`
+}
 
 function createMetadataLink(id: string) {
   id = id.replace(':', '')
   return `https://service.tib.eu/ts4tib/api/ontologies/${id}`
 }
 
-function reset() {
-  currentSelection.value = undefined;
-}
-
 function submit() {
   if (currentSelection.value) {
     emit('add-key-value',
         'http://purl.org/dc/terms/conformsTo',
-        `{
-          "@type": "CreativeWork",
-          "@id": "${currentSelection.value.iri}",
-          "url": "${createMetadataLink(currentSelection.value.id)}"
-         }`,
+        `{"@type": "CreativeWork", "@id": "${currentSelection.value.iri}", "url": "${createMetadataLink(currentSelection.value.id)}"}`,
         v2KeyValueVariant.KEY_VALUE_VARIANT_STATIC_LABEL)
-    reset()
+    clear()
+    open.value = false
   }
+}
+
+function clear() {
+  currentSelection.value = undefined
+  results.value = []
 }
 </script>
 
 <template>
-
-  <Dialog v-model:open="dialogOpen">
+  <Dialog v-model:open="open" @update:open="clear">
     <DialogTrigger v-if="withButton" as-child>
-      <Button variant="outline">
-        Add Author
+      <Button variant="outline"
+              :class="cn('rounded-sm text-aruna-highlight border border-aruna-highlight bg-transparent hover:bg-aruna-highlight hover:text-aruna-text-accent', props.buttonCss)">
+        Add Ontology
       </Button>
     </DialogTrigger>
-
-    <DialogContent class="sm:max-w-[425px] sm:rounded-md"
-                   @pointer-down-outside="(event) => event.preventDefault()">
+    <DialogContent class="sm:max-w-2xl sm:rounded-md"
+                   @pointer-down-outside="event => event.preventDefault()">
       <DialogHeader>
-        <DialogTitle class="mb-2 text-center text-aruna-800 font-bold">Add Ontology Definition</DialogTitle>
-        <DialogDescription class="text-center">
-          Add an ontology definition to the resource.
-        </DialogDescription>
+        <DialogTitle class="mb-2 text-center text-aruna-highlight font-bold">Add Ontology Definition</DialogTitle>
       </DialogHeader>
 
-      <Popover v-model:open="popoverOpen">
-        <PopoverTrigger as-child>
-          <Button
-              variant="outline"
-              role="combobox"
-              :aria-expanded="popoverOpen"
-              class="w-[200px] justify-between"
-          >
-            {{ value
-              ? frameworks.find((framework) => framework.value === value)?.label
-              : "Select framework..." }}
-            <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent class="w-[200px] p-0">
-          <Command>
-            <CommandInput class="h-9" placeholder="Search framework..." />
-            <CommandEmpty>No framework found.</CommandEmpty>
-            <CommandList>
-              <CommandGroup>
-                <CommandItem
-                    v-for="framework in frameworks"
-                    :key="framework.value"
-                    :value="framework.value"
-                    @select="(ev) => {
-                if (typeof ev.detail.value === 'string') {
-                  value = ev.detail.value
-                }
-                popoverOpen = false
-              }"
-                >
-                  {{ framework.label }}
-                  <Check
-                      :class="cn(
-                  'ml-auto h-4 w-4',
-                  value === framework.value ? 'opacity-100' : 'opacity-0',
-                )"
-                  />
-                </CommandItem>
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      <!-- Display current selection -->
+      <div class="rounded-sm border border-aruna-text/50 p-4">
+        <div class="flex flex-wrap items-center px-4 sm:px-0">
+          <h3 class="text-base font-semibold leading-7 text-aruna-text-accent">Currently selected ontology:</h3>
+          <p class="ms-4 font-bold max-w-2xl leading-6 text-aruna-highlight">
+            {{ currentSelection ? currentSelection.label : 'None' }}
+          </p>
+
+        </div>
+
+        <Separator v-if="currentSelection" class="my-4 bg-aruna-text/50"/>
+
+        <div v-if="currentSelection">
+          <dl>
+            <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt class="text-sm font-bold leading-6 text-aruna-text-accent">Id</dt>
+              <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                {{ currentSelection.id }}
+              </dd>
+            </div>
+            <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt class="text-sm font-bold leading-6 text-aruna-text-accent">IRI</dt>
+              <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                <NuxtLink :to="currentSelection.iri"
+                          target="_blank"
+                          class="hs-tooltip-toggle text-aruna-highlight hover:text-aruna-highlight/80">
+                  {{ currentSelection.iri }}
+                </NuxtLink>
+
+              </dd>
+            </div>
+            <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt class="text-sm font-bold leading-6 text-aruna-text-accent">Description</dt>
+              <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                {{ currentSelection.description.join(' ') }}
+              </dd>
+            </div>
+            <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt class="text-sm font-bold leading-6 text-aruna-text-accent">More Information</dt>
+              <dd class="inline-flex mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                <NuxtLink :to="createLandingPageLink(currentSelection.id)"
+                          target="_blank"
+                          class="font-semibold text-aruna-highlight hover:text-aruna-highlight/80">
+                  <IconExternalLink class="size-6 flex-shrink-0"/>
+                </NuxtLink>
+                <NuxtLink :to="createMetadataLink(currentSelection.id)"
+                          target="_blank"
+                          class="font-semibold text-aruna-highlight hover:text-aruna-highlight/80">
+                  <IconBraces class="ms-6 size-6 flex-shrink-0"/>
+                </NuxtLink>
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+      <!-- End display current selection -->
+
+      <!-- COMMAND -->
+      <Command class="rounded-sm border">
+        <CommandInput placeholder="Search here for an ontology"
+                      class="border-0 focus:border-0 outline-0 focus:outline-0 focus:ring-0"
+                      @input="(event) => queryInput = event.target.value"/>
+        <CommandList class="gap-y-2">
+          <CommandEmpty v-if="queryInput && results.length <= 0 && fetching"
+                        class="flex items-center justify-center gap-x-4">
+            Fetching ontologies <IconLoader2 class="mr-2 animate-spin"/>
+          </CommandEmpty>
+          <CommandEmpty v-if="queryInput && results.length <= 0 && !fetching">
+            No ontologies found.
+          </CommandEmpty>
+          <CommandItem v-for="ontology in results"
+                       :value="ontology"
+                       @select="selectOntology(ontology)">
+            {{ ontology.label }}
+          </CommandItem>
+        </CommandList>
+      </Command>
+      <!-- END COMMAND -->
 
       <DialogFooter>
-        <Button
-            type="submit"
-            :disabled="currentSelection === undefined"
-            class="bg-aruna-800 hover:bg-aruna-700">
+        <Button variant="outline"
+                @click="submit"
+                class="rounded-sm text-aruna-highlight border border-aruna-highlight bg-transparent hover:bg-aruna-highlight hover:text-aruna-text-accent">
           Add Ontology
         </Button>
       </DialogFooter>
