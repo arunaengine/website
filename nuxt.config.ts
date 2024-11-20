@@ -93,9 +93,12 @@ export default defineNuxtConfig({
       websiteHost: 'http://localhost:3000',
       infoBanner: {
         active: false,
-        title: 'Info banner title: ',
-        text: 'Info banner custom text with important information ',
-        link:  '/news'
+        type: 'info', // ['info', 'release', 'maintenance', 'downtime', 'error']
+        title: 'Banner Title',
+        text: 'Info banner custom text with important <a href="/news" class="text-aruna-highlight hover:text-aruna-highlight/80">information<a/>',
+        customImg: '', // URL to external or internal image
+        validFrom: '', // Some valid date string
+        validTo: '', // Some valid date string
       }
     }
   },
