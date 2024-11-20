@@ -9,6 +9,8 @@ import {h} from 'vue';
 import Toaster from '@/components/ui/toast/Toaster.vue'
 import RegistrationDialog from "~/components/custom-ui/dialog/RegistrationDialog.vue";
 import {useToast} from '@/components/ui/toast/use-toast'
+import Banner from "~/components/custom-ui/Banner.vue";
+import {addSeconds} from "date-fns";
 
 const {toast} = useToast()
 
@@ -22,6 +24,41 @@ useHead({
     },
   ],
 });
+
+// App wide info banner
+const bannerConf = useRuntimeConfig().public.infoBanner
+const bannerCookie: Ref<string | undefined> = useCookie('banner', {sameSite: true})
+const bannerVisible = computed(() => {
+  // Configuration dependent actions
+  if (bannerConf.active) {
+    const currentTimestamp = Date.now()
+    const validFrom = Date.parse(bannerConf.validFrom) || 0
+    const validTo = Date.parse(bannerConf.validTo) || Number.MAX_SAFE_INTEGER
+
+    // Check if in specified time range
+    if ((currentTimestamp-validFrom)*(currentTimestamp-validTo) <= 0) {
+      // Check if cookie is already present
+      if (bannerCookie.value) {
+        const cookieDate = Date.parse(bannerCookie.value)
+        // Check if cookie value is valid date string
+        if (!isNaN(cookieDate))
+          return currentTimestamp > cookieDate
+        else
+          bannerCookie.value = undefined // Safe to delete cookie if value is not a valid date string
+      }
+      return true
+    } else {
+      // Delete cookie if banner is not active
+      bannerCookie.value = undefined
+      return false
+    }
+  }
+  return false
+})
+
+function hideBanner() {
+  bannerCookie.value = addSeconds(new Date(), bannerConf.hidePeriod).toISOString()
+}
 
 // Provide user object globally read-only
 const notRegistered = ref(false)
@@ -143,11 +180,15 @@ onBeforeMount(() => updateUser())
   <div v-else
        class="flex flex-col flex-grow md:min-h-screen ">
 
-    <ToastInfo v-if="useRuntimeConfig().public.infoBanner.active" modalId="info-toast" infoMsg="Hello"/>
+    <Banner v-if="bannerVisible"
+            @hide-banner="hideBanner"
+            :type="bannerConf.type"
+            :title="bannerConf.title"
+            :text="bannerConf.text"
+            :custom-img="bannerConf.customImg"/>
     <NuxtLoadingIndicator/>
     <NuxtPage/>
   </div>
-  <NavigationSidebar/>
-  
+
   <Toaster/>
 </template>
