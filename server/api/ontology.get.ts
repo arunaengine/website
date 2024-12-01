@@ -1,4 +1,4 @@
-import {SelectOntologyResponse} from "~/composables/ts_api/SelectOntologyResponse";
+import {SelectOntologyResponse} from "~/types/SelectOntologyResponse";
 
 export default defineEventHandler(async event => {
   const queryParams = getQuery(event)
