@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {EMAIL_REGEX} from "~/composables/constants";
+import {EMAIL_REGEX} from "~/utils/constants";
 import {IconCircleCheck, IconExclamationCircle} from "@tabler/icons-vue";
 
 const email = ref('')

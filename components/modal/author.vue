@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import {IconExclamationCircle, IconX} from "@tabler/icons-vue";
 import {type v2Author,} from "~/composables/aruna_api_json";
-import {ULID_REGEX, ORCID_REGEX, EMAIL_REGEX} from "~/composables/constants";
+import {ULID_REGEX, ORCID_REGEX, EMAIL_REGEX} from "~/utils/constants";
 
 const props = defineProps<{
   modalId: string,

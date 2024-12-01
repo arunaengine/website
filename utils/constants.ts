@@ -1,4 +1,3 @@
-
 export const PROJECT_REGEX: RegExp = new RegExp('^[a-z0-9\-]+$')
 export const S3_KEY_REGEX: RegExp = new RegExp('^[a-zA-Z0-9\-\!\_\.\*\_\'\(\)]+$')
 export const OBJECT_REGEX: RegExp = new RegExp('^[a-zA-Z0-9\-\!\_\.\*\_\'\(\)\/]+$')

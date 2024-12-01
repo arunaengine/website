@@ -22,7 +22,7 @@ import {
   fromDataClassStr,
   fromResourceTypeStr
 } from "~/composables/enum_conversions"
-import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/composables/constants"
+import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/utils/constants"
 import type {ObjectInfo} from "~/composables/proto_conversions"
 import {deleteObject, getObjectBucketAndKey} from "~/composables/api_wrapper"
 import EventBus from "~/composables/EventBus";
