@@ -1,4 +1,4 @@
-import type {OntologyDoc} from "~/composables/ts_api/OntologyDoc";
+import type {OntologyDoc} from "~/types/OntologyDoc";
 
 export type SelectOntologyResponse = {
   // There are lots of other properties in the response

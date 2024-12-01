@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import {IconBraces, IconExternalLink, IconX} from "@tabler/icons-vue";
 import {v2KeyValueVariant} from "~/composables/aruna_api_json";
-import type {OntologyDoc} from "~/composables/ts_api/OntologyDoc";
+import type {OntologyDoc} from "~/types/OntologyDoc";
 
 const props = defineProps<{
   modalId: string,
