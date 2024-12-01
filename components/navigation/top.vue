@@ -11,11 +11,11 @@ import {
   IconNews,
   IconBook
 } from "@tabler/icons-vue"
-import type {v2User} from "~/composables/aruna_api_json/models/v2User"
 import LoginDialog from "~/components/custom-ui/dialog/LoginDialog.vue";
+import type {User} from "~/composables/api_wrapper";
 
 // Fetch user from global state
-const user_state: Ref<v2User | undefined> = inject('userRef', ref(undefined))
+const user_state: Ref<User | undefined> = inject('userRef', ref(undefined))
 const forceRefresh = ref(0)
 
 onMounted(() => forceRefresh.value += 1);
