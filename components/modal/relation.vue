@@ -7,7 +7,7 @@ import {
   v2RelationDirection,
   v2ResourceVariant
 } from "~/composables/aruna_api_json";
-import {ULID_REGEX} from "~/composables/constants";
+import {ULID_REGEX} from "~/utils/constants";
 
 const props = defineProps<{
   modalId: string,
