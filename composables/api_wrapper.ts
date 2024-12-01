@@ -36,6 +36,12 @@ import {
 import {type ObjectInfo, type EndpointInfo, toObjectInfo} from "~/composables/proto_conversions";
 import type {ArunaError} from "~/composables/ArunaError";
 
+/* ----- V3 ----- */
+import type {paths, components} from "~/types/aruna-v3"
+// ----- Responses
+export type GetUserResponse = paths["/api/v3/users"]["get"]["responses"][200]["content"]["application/json"];
+export type RegisterUserResponse = paths["/api/v3/users"]["post"]["responses"][200]["content"]["application/json"];
+export type User = components["schemas"]["User"]
 
 export async function getAnnouncements(start_after: string | undefined, limit: number | undefined): Promise<v2Announcement[]> {
   return await $fetch<v2GetAnnouncementsResponse>('/api/announcements', {
