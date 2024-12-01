@@ -21,13 +21,11 @@ import {
 import {Input} from '~/components/ui/input'
 import {Popover, PopoverTrigger, PopoverContent} from '~/components/ui/popover'
 import {useToast} from '~/components/ui/toast/use-toast'
-import type {v2RegisterUserResponse} from "~/composables/aruna_api_json";
 import {useForm} from "vee-validate";
 import {toTypedSchema} from '@vee-validate/zod'
 import {h} from "vue";
 import * as z from 'zod'
-
-const {toast} = useToast()
+import type {RegisterUserResponse} from "~/composables/api_wrapper";
 
 /* ----- PROPERTIES ----- */
 const props = defineProps<{
@@ -47,29 +45,31 @@ const emit = defineEmits(['closeRegisterDialog'])
 const formSchema = toTypedSchema(z.object({
   firstName: z.string({required_error: "First name is required."}).min(2).max(128),
   lastName: z.string({required_error: "Last name is required."}).min(2).max(128),
-  displayName: z.string({required_error: "Display name is required."}).min(2).max(256),
   email: z.string({required_error: "Valid email is required."}).email('Invalid email format.').trim().min(1),
-  project: z.string().optional(),
+  identifiers: z.array(z.string()).optional(),
   tosAccepted: z.boolean({required_error: "Is not active man."}).default(false).refine(val => val, {message: "You have to accept the ToS"})
 }))
 
 const form = useForm({
   validationSchema: formSchema,
   initialValues: {
+    identifiers: [],
     tosAccepted: false,
   },
 })
 
+const {toast} = useToast()
 const onSubmit = form.handleSubmit(async (values) => {
-  await $fetch<v2RegisterUserResponse>('/api/register', {
+  await $fetch<RegisterUserResponse>('/api/v3/user', {
     method: 'POST',
     body: {
-      displayName: values.displayName,
+      first_name: values.firstName,
+      last_name: values.lastName,
       email: values.email,
-      project: values.project
+      identifier: '',
     }
   }).then(response => {
-    if (response.userId) {
+    if (response.user) {
       toast({
         description: h('div',
             {class: 'flex space-x-2 items-center justify-center text-gray-200'},
@@ -77,9 +77,17 @@ const onSubmit = form.handleSubmit(async (values) => {
               h(IconTrophy, {class: 'flex-shrink-0 size-5 text-yellow-200'}),
               h('span',
                   {class: 'text-fuchsia-50'},
-                  ['Your registration was successful. Please check your mails for more information.'])
+                  [
+                    'Your registration was successful. Have fun exploring the Aruna universe. Also check out the ',
+                    h('a', {
+                      href: 'https://docs.aruna-engine.org/latest',
+                      target: '_blank',
+                      class: 'text-aruna-highlight hover:text-aruna-highlight/80'
+                    }, ['documentation']),
+                    '.'
+                  ])
             ]),
-        duration: 10000
+        duration: 60000 // One Minute
       })
       emit('closeRegisterDialog')
     }
@@ -135,26 +143,6 @@ const onSubmit = form.handleSubmit(async (values) => {
           </div>
         </div>
 
-        <FormField v-slot="{ componentField }" name="displayName">
-          <FormItem>
-            <div class="flex items-center justify-between">
-              <FormLabel>Display Name</FormLabel>
-              <Popover>
-                <PopoverTrigger>
-                  <IconHelp class="size-4 text-aruna-800 font-bold"/>
-                </PopoverTrigger>
-                <PopoverContent class="text-sm rounded-sm">
-                  This name will be publicly displayed for your user.
-                </PopoverContent>
-              </Popover>
-            </div>
-            <FormControl>
-              <Input type="text" placeholder="An arbitrary display name" v-bind="componentField"/>
-            </FormControl>
-            <FormMessage/>
-          </FormItem>
-        </FormField>
-
         <FormField v-slot="{ componentField }" name="email">
           <FormItem>
             <div class="flex items-center justify-between">
@@ -170,26 +158,6 @@ const onSubmit = form.handleSubmit(async (values) => {
             </div>
             <FormControl>
               <Input type="text" placeholder="A valid email address" v-bind="componentField"/>
-            </FormControl>
-            <FormMessage/>
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ componentField }" name="project">
-          <FormItem>
-            <FormLabel class="flex items-center justify-between">
-              <span>Associated Project</span>
-              <Popover>
-                <PopoverTrigger>
-                  <IconHelp class="size-4 text-aruna-800 font-bold"/>
-                </PopoverTrigger>
-                <PopoverContent class="text-sm rounded-sm">
-                  If available, you can enter the project / consortium you are associated with here.
-                </PopoverContent>
-              </Popover>
-            </FormLabel>
-            <FormControl>
-              <Input type="text" placeholder="Your NFDI project / consortium" v-bind="componentField"/>
             </FormControl>
             <FormMessage/>
           </FormItem>

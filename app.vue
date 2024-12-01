@@ -1,18 +1,12 @@
 <script setup lang="ts">
-import {IconPlant} from "@tabler/icons-vue";
-import type {v2User} from "./composables/aruna_api_json";
 import EventBus from "~/composables/EventBus";
-import type {ArunaError} from "~/composables/ArunaError";
 import {parseJwt} from "~/composables/utils";
+import {useUser} from '~/composables/User'
 
-import {h} from 'vue';
-import Toaster from '@/components/ui/toast/Toaster.vue'
+import Toaster from '~/components/ui/toast/Toaster.vue'
 import RegistrationDialog from "~/components/custom-ui/dialog/RegistrationDialog.vue";
-import {useToast} from '@/components/ui/toast/use-toast'
 import Banner from "~/components/custom-ui/Banner.vue";
 import {addSeconds} from "date-fns";
-
-const {toast} = useToast()
 
 useHead({
   title: "Aruna | The data orchestration engine",
@@ -36,7 +30,7 @@ const bannerVisible = computed(() => {
     const validTo = Date.parse(bannerConf.validTo) || Number.MAX_SAFE_INTEGER
 
     // Check if in specified time range
-    if ((currentTimestamp-validFrom)*(currentTimestamp-validTo) <= 0) {
+    if ((currentTimestamp - validFrom) * (currentTimestamp - validTo) <= 0) {
       // Check if cookie is already present
       if (bannerCookie.value) {
         const cookieDate = Date.parse(bannerCookie.value)
@@ -61,87 +55,16 @@ function hideBanner() {
 }
 
 // Provide user object globally read-only
-const notRegistered = ref(false)
-const user: Ref<v2User | undefined> = ref(undefined)
+const {user, unregistered, refreshUser} = await useUser(useRuntimeConfig().public.maintenanceMode)
 provide('userRef', readonly(user))
 
-// Try to fetch user
-async function updateUser() {
-  // Only fetch user if not in maintenance mode
-  if (useRuntimeConfig().public.maintenanceMode)
-    return
-
-  await $fetch<v2User | ArunaError>('/api/user')
-      .then(response => {
-        if (typeof response === 'undefined') {
-          user.value = undefined
-          toast({
-            title: 'Error',
-            //description: 'Something went wrong. If this problem persists please contact an administrator.',
-            description: 'User fetch response is undefined. This should not be possible :/',
-            variant: 'destructive',
-            duration: 10000,
-          })
-        } else if (response.type === 'ArunaError') {
-          user.value = undefined
-          if ((response as ArunaError).message === 'Not registered') {
-            notRegistered.value = true
-          } else if ((response as ArunaError).code === 13) {
-            // gRPC code 13 = Internal
-            notRegistered.value = false
-            console.error(`${(response as ArunaError).code} - ${(response as ArunaError).message}`)
-          } else if ((response as ArunaError).code === 14) {
-            // gRPC code 14 = Unavailable
-            notRegistered.value = false
-            toast({
-              title: 'Error',
-              description: 'Aruna server is currently unavailable.',
-              variant: 'destructive',
-              duration: 10000,
-            })
-          } else if ((response as ArunaError).code === 16) {
-            // gRPC code 16 = Unauthorized
-            notRegistered.value = false
-          } else {
-            // Nuxt server-side error
-            notRegistered.value = false
-            console.error((response as ArunaError).message)
-          }
-        } else {
-          notRegistered.value = false
-          user.value = response as v2User
-
-          if (!user.value.active)
-            toast({
-              description: h('div',
-                  {class: 'flex space-x-2 items-center justify-center'},
-                  [
-                    h(IconPlant, {class: 'flex-shrink-0 size-5 text-green-400'}),
-                    h('span',
-                        {class: 'text-fuchsia-50'},
-                        ['Please wait until your account gets activated by an administrator.'])
-                  ]),
-              duration: 10000
-            })
-        }
-      }).catch(() => {
-        user.value = undefined
-        notRegistered.value = false
-        toast({
-          title: 'Error',
-          description: 'Something unexpected went wrong. If this problem persists please contact an administrator.',
-          variant: 'destructive',
-          duration: 10000,
-        })
-      })
-}
-
 // Re-fetch user on demand
-EventBus.on('updateUser', () => {
+EventBus.on('updateUser', async () => {
   console.log("Received user refresh event")
-  updateUser()
+  await refreshUser() //updateUser()
 })
 
+// Auto-refresh access/refresh token before expiry
 async function refreshTokens() {
   const refresh_token = useCookie<string>('refresh_token')
   const access_token = useCookie<string>('access_token')
@@ -165,16 +88,17 @@ async function refreshTokens() {
 }
 
 onBeforeMount(() => setInterval(refreshTokens, 30000))
-onBeforeMount(() => updateUser())
 </script>
 
 <template>
-  <RegistrationDialog @closeRegisterDialog="notRegistered=false" :withButton="false" :initialOpen="notRegistered"/>
+  <RegistrationDialog @closeRegisterDialog="refreshUser()" :withButton="false" :initialOpen="unregistered"/>
 
-  <!-- Header + Navigation -->
   <!-- Main body -->
   <div v-if="useRuntimeConfig().public.maintenanceMode"
-       class="h-[100vh] w-[100vw] bg-[url('/public/imgs/maintenance_sm.webp')] md:bg-[url('/public/imgs/maintenance_md.webp')] lg:bg-[url('/public/imgs/maintenance_lg.webp')] bg-no-repeat bg-center bg-cover to-transparent">
+       class="h-[100vh] w-[100vw] bg-no-repeat bg-center bg-cover to-transparent
+              bg-[url('/imgs/maintenance_sm.webp')]
+              md:bg-[url('/imgs/maintenance_md.webp')]
+              lg:bg-[url('/imgs/maintenance_lg.webp')]">
   </div>
 
   <div v-else
@@ -189,6 +113,7 @@ onBeforeMount(() => updateUser())
     <NuxtLoadingIndicator/>
     <NuxtPage/>
   </div>
+  <!-- End Main body -->
 
   <Toaster/>
 </template>
