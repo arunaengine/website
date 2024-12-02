@@ -41,7 +41,7 @@ export default defineNuxtConfig({
       local: {
         clientId: "test",
         clientSecret: "QgBl9I2CD3eVhL7LFvkHrYUK7oKL3LE2",
-        issuer: "http://localhost:1998",
+        issuer: "http://localhost:1998/realms/test",
         redirectUrl: "http://localhost:3000/callback",
         authUrl: 'http://localhost:1998/realms/test/protocol/openid-connect/auth',
         tokenUrl: 'http://localhost:1998/realms/test/protocol/openid-connect/token',
@@ -97,6 +97,7 @@ export default defineNuxtConfig({
         title: 'Banner Title',
         text: 'Info banner custom text with important <a href="/news" class="text-aruna-highlight hover:text-aruna-highlight/80">information<a/>',
         customImg: '', // URL to external or internal image
+        hidePeriod: 60 * 60 * 24, // Hide banner per default for one day
         validFrom: '', // Some valid date string
         validTo: '', // Some valid date string
       }

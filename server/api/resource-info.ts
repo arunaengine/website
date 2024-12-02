@@ -1,5 +1,6 @@
 import type {v2GetResourceResponse} from '~/composables/aruna_api_json'
 import {ResourceInfo} from "~/composables/ResourceInfo";
+import {fetchCachedLicense} from "~/server/utils/licence";
 
 export default defineEventHandler(async event => {
   const access_token = getCookie(event, 'access_token') // Does not matter if undefined
