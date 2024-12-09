@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/form'
 import {Input} from '@/components/ui/input'
 import {Popover, PopoverTrigger, PopoverContent} from '@/components/ui/popover'
-import {type v2Permission, v2PermissionLevel,} from "~/composables/aruna_api_json";
+import {type v2Permission} from "~/composables/aruna_api_json";
 import {useForm} from "vee-validate";
 import {toTypedSchema} from '@vee-validate/zod'
 import * as z from 'zod'
@@ -28,23 +28,30 @@ import {useToast} from "~/components/ui/toast";
 
 import {toDate} from 'radix-vue/date'
 import {DateFormatter, getLocalTimeZone, parseDate, today} from '@internationalized/date'
+import {Permission} from "~/types/aruna-v3-enums";
 
 const {toast} = useToast();
 
 /* ----- CUSTOM ENUMS ----- */
 enum Scopes {
   Personal = 'Personal',
+  Resource = 'Resource'
+  /*
   Project = 'Project',
   Collection = 'Collection',
   Dataset = 'Dataset',
   Object = 'Object'
+  */
 }
+
 /* ----- END CUSTOM ENUMS ----- */
 
 /* ----- PROPERTIES ----- */
 const props = defineProps<{
   initialOpen: boolean,
-  withButton: boolean
+  withButton: boolean,
+  realms: Realm[],
+  groups: Group[]
 }>()
 const externalTrigger = toRef(props, 'initialOpen')
 const open = ref(props.initialOpen)
@@ -57,7 +64,7 @@ const formSchema = toTypedSchema(z.object({
   tokenScope: z.nativeEnum(Scopes).default(Scopes.Personal),
   expiryDate: z.string().date('Invalid expiry date format.'),
   resourceId: z.string().regex(ULID_REGEX, 'Not a valid ULID').optional(),
-  permissionLevel: z.nativeEnum(v2PermissionLevel).optional(),
+  permissionLevel: z.nativeEnum(Permission).optional(),
 }).superRefine((values, ctx) => {
   if (values.tokenScope !== Scopes.Personal && !values.resourceId) {
     ctx.addIssue({
@@ -87,53 +94,52 @@ const {handleSubmit, values, setFieldValue} = useForm({
 })
 
 const onSubmit = handleSubmit(async (values) => {
-  // Prepare request values
-  const expiry = new Date(values.expiryDate)
-  const perm = values.tokenScope === Scopes.Personal ? undefined : {
-    projectId: values.tokenScope === Scopes.Project ? values.resourceId : undefined,
-    collectionId: values.tokenScope === Scopes.Collection ? values.resourceId  : undefined,
-    datasetId: values.tokenScope === Scopes.Dataset ? values.resourceId  : undefined,
-    objectId: values.tokenScope === Scopes.Object ? values.resourceId  : undefined,
-    permissionLevel: values.permissionLevel
-  } as v2Permission
+  // Prepare request body
+  const scope = values.tokenScope === Scopes.Personal ? Scopes.Personal : {
+    resourceId: values.resourceId,
+    permission: values.permissionLevel,
+  }
+  const body = {
+    name: values.tokenName,
+    expires_at: new Date(values.expiryDate).toISOString(),
+    group_id: undefined,
+    realm_id: undefined,
+    scope: scope
+  } as CreateTokenRequest
 
-  // Send request to create token
-  await createUserToken(values.tokenName, perm, expiry.toISOString())
-      .then(response => {
-        if (response?.tokenSecret) {
-          tokenSecret.value = response.tokenSecret
-          EventBus.emit('updateUser')
-        } else {
-          // Notify with error
-          toast({
-            title: 'Error',
-            //description: 'Something went wrong. If this problem persists please contact an administrator.',
-            description: 'Token secret in response was empty. Please try again later.',
-            variant: 'destructive',
-            duration: 10000,
-          })
-        }
-      }).catch(error => {
-        // Notify with error
-        toast({
-          title: 'Error',
-          //description: 'Something went wrong. If this problem persists please contact an administrator.',
-          description: error.message, // 'Token creation failed. Please try again later.',
-          variant: 'destructive',
-          duration: 10000,
-        })
-      })
+  // Create token
+  await $fetch<CreateTokenResponse>('/api/v3/tokens', {
+    method: 'POST',
+    body: body
+  }).then(response => {
+    if (response.secret) {
+      tokenSecret.value = response.secret
+      EventBus.emit('updateTokens')
+      return
+    }
+    // Show error if secret is undefined
+    toast({
+      title: 'Error',
+      //description: 'Something went wrong. If this problem persists please contact an administrator.',
+      description: 'Token secret in response was empty. Please try again later.',
+      variant: 'destructive',
+      duration: 10000,
+    })
+  }).catch(error => {
+    console.dir('[TokenDialog] Create Error:', error.data)
+    // Notify with error
+    toast({
+      title: 'Error',
+      //description: 'Something went wrong. If this problem persists please contact an administrator.',
+      description: `Token creation failed: ${error.data.data}.`, // 'Token creation failed. Please try again later.',
+      variant: 'destructive',
+      duration: 10000,
+    })
+  })
 })
-/* ----- END FORM SCHEMA ----- */
-
-const validPermissionLevels = computed(() => Object.keys(v2PermissionLevel).filter(variant => variant !== 'PERMISSION_LEVEL_UNSPECIFIED'))
-
-function formatPermissionLevel(variant: string): string {
-  const label = variant.replace('PERMISSION_LEVEL_', '').replace('_', ' ').toLowerCase()
-  return label.charAt(0).toUpperCase() + label.slice(1)
-}
 
 const tokenSecret: Ref<string | undefined> = ref(undefined)
+/* ----- END FORM SCHEMA ----- */
 
 const calendarValue = computed({
   get: () => values.expiryDate ? parseDate(values.expiryDate) : undefined,
@@ -273,8 +279,8 @@ function clear(visibility: boolean) {
                   </FormControl>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem class="" v-for="level in validPermissionLevels" :value="level">
-                        {{ formatPermissionLevel(level) }}
+                      <SelectItem class="" v-for="level in Permission" :value="level">
+                        {{ level }}
                       </SelectItem>
                     </SelectGroup>
                   </SelectContent>
