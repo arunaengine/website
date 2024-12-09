@@ -137,10 +137,10 @@ onMounted(async () => await queryResources(true));
                    v-model="query"
                    id="search-query-input-with-icon"
                    name="search-query-input-with-icon"
-                   class="py-3 px-4 pe-11 block w-full border-e-0 border-aruna-text/50 shadow-sm rounded-s-md text-sm focus:z-10 focus:ring-1 focus:ring-aruna-highlight focus:border-aruna-highlight disabled:opacity-50 disabled:pointer-events-none bg-aruna-muted text-aruna-text"
+                   class="py-3 px-4 pe-11 block w-full border-e-0 border-aruna-text/50 rounded-s-md text-sm focus:z-10 focus:ring-1 focus:ring-aruna-highlight focus:border-aruna-highlight disabled:opacity-50 disabled:pointer-events-none bg-aruna-bg/90 text-aruna-text"
                    placeholder="Search Aruna Resources"/>
             <button type="button"
-                    class="w-[2.875rem] h-[2.875rem] flex-shrink-0 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-e-md border border-aruna-highlight bg-aruna-muted text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-aruna-highlight">
+                    class="w-[2.875rem] h-[2.875rem] flex-shrink-0 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-e-md border border-aruna-highlight bg-aruna-bg/90 text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-aruna-highlight">
               <IconSearch class="flex-shrink-0 size-6"/>
             </button>
           </div>
@@ -159,7 +159,7 @@ onMounted(async () => await queryResources(true));
           </p>
 
           <label for="resource-type-all"
-                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-muted border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
+                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-bg/90 border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
             <input type="radio"
                    v-model="typeFilter"
                    :value="v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED"
@@ -171,7 +171,7 @@ onMounted(async () => await queryResources(true));
           </label>
 
           <label for="resource-type-projects"
-                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-muted border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
+                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-bg/90 border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
             <input type="radio"
                    checked
                    v-model="typeFilter"
@@ -184,7 +184,7 @@ onMounted(async () => await queryResources(true));
           </label>
 
           <label for="resource-type-collections"
-                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-muted border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
+                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-bg/90 border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
             <input type="radio"
                    v-model="typeFilter"
                    :value="v2ResourceVariant.RESOURCE_VARIANT_COLLECTION"
@@ -196,7 +196,7 @@ onMounted(async () => await queryResources(true));
           </label>
 
           <label for="resource-type-datasets"
-                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-muted border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
+                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-bg/90 border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
             <input type="radio"
                    v-model="typeFilter"
                    :value="v2ResourceVariant.RESOURCE_VARIANT_DATASET"
@@ -208,7 +208,7 @@ onMounted(async () => await queryResources(true));
           </label>
 
           <label for="resource-type-objects"
-                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-muted border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
+                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-bg/90 border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
             <input type="radio"
                    v-model="typeFilter"
                    :value="v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
@@ -227,7 +227,7 @@ onMounted(async () => await queryResources(true));
         <input type="text"
                v-model="customFilter"
                @keyup.enter="queryResources(true)"
-               class="py-3 px-4 block w-full rounded-md bg-aruna-muted border-aruna-text/50 text-aruna-text text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none"
+               class="py-3 px-4 block w-full rounded-md bg-aruna-bg/90 border-aruna-text/50 text-aruna-text text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none"
                placeholder="Custom filter"/>
 
         <div class="my-6 rounded-md bg-aruna-muted border border-aruna-text/50 border-t-4 border-t-aruna-highlight">
