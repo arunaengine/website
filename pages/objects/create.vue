@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {IconArrowLeft, IconExclamationCircle, IconPlus, IconTrash} from '@tabler/icons-vue'
+import {IconExclamationCircle, IconPlus, IconTrash} from '@tabler/icons-vue'
 import {
   v2DataClass,
   v2InternalRelationVariant,
@@ -26,6 +26,9 @@ import {OBJECT_REGEX, PROJECT_REGEX, S3_KEY_REGEX, ULID_REGEX} from "~/utils/con
 import type {ObjectInfo} from "~/composables/proto_conversions"
 import {deleteObject, getObjectBucketAndKey} from "~/composables/api_wrapper"
 import EventBus from "~/composables/EventBus";
+import AuthorDialog from "~/components/custom-ui/dialog/AuthorDialog.vue";
+import KeyValueDialog from "~/components/custom-ui/dialog/KeyValueDialog.vue";
+import OntologyDialog from "~/components/custom-ui/dialog/OntologyDialog.vue";
 
 import {HeadObjectCommand, S3Client, type S3ClientConfig} from "@aws-sdk/client-s3";
 import {Upload} from "@aws-sdk/lib-storage";
@@ -262,6 +265,7 @@ function dataFileChange(e) {
 
 /* ----- Resource Authors ----- */
 const authors: Ref<Map<string, v2Author>> = ref(new Map())
+const authorDialogOpen = ref(false);
 
 function addAuthor(author: v2Author) {
   authors.value.set(getUniqueId(), author)
@@ -272,8 +276,11 @@ function removeAuthor(key: string) {
 }
 
 /* ----- End Resource Authors ----- */
+
 /* ----- Resource key-values ----- */
 const keyValues = ref(new Map())
+const keyValueDialogOpen = ref(false);
+const ontologyDialogOpen = ref(false);
 
 function addKeyValue(key: string, val: string, type: v2KeyValueVariant) {
   keyValues.value.set(key, {key: key, value: val, variant: type} as v2KeyValue)
@@ -284,6 +291,7 @@ function removeKeyValue(key: string) {
 }
 
 /* ----- End Resource key-values ----- */
+
 /* ----- Resource relations ----- */
 const relations: Ref<Map<string, v2Relation>> = ref(new Map())
 
@@ -742,11 +750,12 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         <div class="flex flex-row mb-2 justify-start items-center">
           <label for="key-values-input"
                  class="block text-lg font-medium text-aruna-text-accent">Authors</label>
-          <button type="button"
-                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-aruna-text-accent rounded-md text-aruna-text-accent hover:text-aruna-highlight hover:border-aruna-highlight focus:outline-none disabled:opacity-50 disabled:pointer-events-none"
-                  data-hs-overlay="#author-add">
-            <IconPlus class="flex-shrink-0 size-4"/>
-          </button>
+            <button
+              type="button"
+              @click="authorDialogOpen = true"
+              class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-aruna-text-accent rounded-md text-aruna-text-accent hover:text-aruna-highlight hover:border-aruna-highlight focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
+              <IconPlus class="flex-shrink-0 size-4" />
+            </button>
         </div>
 
         <div class="-m-1.5 overflow-x-auto">
@@ -794,20 +803,18 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
           </div>
         </div>
 
-        <div class="flex flex-row mb-2 mt-6 justify-start items-center">
+        <div class="flex flex-row mb-2 mt-6 justify-start items-center gap-x-4">
           <label for="key-values-input"
                  class="block text-lg font-medium text-aruna-text-accent">Key-Values</label>
           <button type="button"
-                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-aruna-text-accent rounded-md text-aruna-text-accent hover:text-aruna-highlight hover:border-aruna-highlight focus:outline-none disabled:opacity-50 disabled:pointer-events-none"
-                  data-hs-overlay="#key-value-add">
+                  @click="keyValueDialogOpen = true"
+                  class="px-1 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-aruna-text-accent rounded-md text-aruna-text-accent text-sm hover:text-aruna-highlight hover:border-aruna-highlight focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
             <IconPlus class="flex-shrink-0 size-4"/>
           </button>
-
-          <button type="button"
-                  class="ms-4 px-1 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-aruna-text-accent rounded-md text-aruna-text-accent text-sm hover:text-aruna-highlight hover:border-aruna-highlight focus:outline-none disabled:opacity-50 disabled:pointer-events-none"
-                  data-hs-overlay="#ontology-add">
-            Add Ontology
-          </button>
+          <OntologyDialog :initial-open="false"
+                          :with-button="true"
+                          button-css="h-auto p-0.5 px-1 rounded-md font-normal text-aruna-text-accent border-aruna-text-accent hover:border-aruna-highlight hover:bg-transparent hover:text-aruna-highlight"
+                          @add-key-value="addKeyValue"/>
         </div>
 
         <div class="-m-1.5 overflow-x-auto">
@@ -925,9 +932,23 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
     </div>
   </div>
   </div>
-  <ModalAuthor modalId="author-add" @add-author="addAuthor"/>
-  <ModalKeyValue modalId="key-value-add" @add-key-value="addKeyValue"/>
-  <ModalOntology modalId="ontology-add" @add-key-value="addKeyValue"/>
+
+  <AuthorDialog :initial-open="authorDialogOpen"
+                :with-button="false"
+                @update:open="authorDialogOpen = false"
+                @add-author="(author) => {
+                  addAuthor(author);
+                  authorDialogOpen = false;
+                }"/>
+
+  <KeyValueDialog :initial-open="keyValueDialogOpen"
+                  :with-button="false"
+                  @update:open="keyValueDialogOpen = false"
+                  @add-key-value="({ key, value, variant }) => {
+                    addKeyValue(key, value, variant);
+                    keyValueDialogOpen = false;
+                  }"/>
+
   <ModalRelation modalId="relation-add" @add-relation="addRelation"/>
   <ModalObjectDisplay modalId="object-display" :object="createdResource" :progress="uploadProgress"
                       :errorMsg="creationError"/>
