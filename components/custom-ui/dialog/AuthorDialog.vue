@@ -27,7 +27,8 @@ import * as z from 'zod'
 /* ----- PROPERTIES ----- */
 const props = defineProps<{
   initialOpen: boolean,
-  withButton: boolean
+  withButton: boolean,
+  buttonCss?: string
 }>()
 const externalTrigger = toRef(props, 'initialOpen')
 const open = ref(props.initialOpen)
@@ -67,8 +68,9 @@ const onSubmit = form.handleSubmit(async (values) => {
 <template>
   <Dialog v-model:open="open">
     <DialogTrigger v-if="withButton" as-child>
-      <Button variant="outline">
-        Add Author
+      <Button variant="outline"
+              :class="cn('rounded-sm text-aruna-highlight border border-aruna-highlight bg-transparent hover:bg-aruna-highlight hover:text-aruna-text-accent', props.buttonCss)">
+      Add Author
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-[425px] sm:rounded-md"
