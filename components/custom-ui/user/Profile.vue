@@ -12,9 +12,10 @@ import {Skeleton} from '@/components/ui/skeleton'
 import type {User} from "~/composables/api_wrapper";
 import GroupDialog from "~/components/custom-ui/dialog/GroupDialog.vue";
 
+/* ----- PROPERTIES ----- */
 interface ProfileProps {
   user: User,
-  groups: GroupInfo[]
+  groups: GroupInfo[] | null
 }
 
 const props = defineProps<ProfileProps>()
@@ -22,6 +23,7 @@ const user = toRef(() => props.user)
 const groups = toRef(() => props.groups)
 
 watch(groups, () => console.log('[Profile] Updated groups: ', groups))
+/* ----- END PROPERTIES ----- */
 
 
 function displayDescription(description: string, maxLength: number = 50): string {
@@ -30,7 +32,7 @@ function displayDescription(description: string, maxLength: number = 50): string
 </script>/
 <template>
   <!-- Display Profile Infos -->
-  <div class="m-4 pb-6 flex flex-col lg:flex-row flex-wrap justify-start gap-x-6 gap-y-6">
+  <div v-if="user" class="m-4 pb-6 flex flex-col lg:flex-row flex-wrap justify-start gap-x-6 gap-y-6">
     <!-- User Id Card -->
     <Card class="lg:basis-1/5">
       <ClientOnly fallback-tag="span">
@@ -67,7 +69,7 @@ function displayDescription(description: string, maxLength: number = 50): string
       </CardHeader>
       <CardContent>
         <div class="text-xl font-bold text-aruna-700">
-          {{ user.first_name }} {{ user.last_name }}
+          {{ user.first_name || '' }} {{ user.last_name || 'N/A' }}
         </div>
       </CardContent>
     </Card>
@@ -116,7 +118,7 @@ function displayDescription(description: string, maxLength: number = 50): string
           <TableHead class="text-lg">PermissionLevel</TableHead>
         </TableRow>
       </TableHeader>
-      <TableBody>
+      <TableBody v-if="groups">
         <TableRow v-for="group in groups" :key="group.group.name">
           <TableCell class="font-medium">
             {{ group.group.id }}
