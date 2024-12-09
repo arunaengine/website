@@ -38,10 +38,58 @@ import type {ArunaError} from "~/composables/ArunaError";
 
 /* ----- V3 ----- */
 import type {paths, components} from "~/types/aruna-v3"
+import type {GetGroupsFromUserResponseGroups} from "~/types/aruna-v3-enums";
+
+// ----- Requests
+export type CreateGroupRequest = paths["/api/v3/groups"]["post"]["requestBody"]["content"]["application/json"];
+export type CreateTokenRequest = paths["/api/v3/users/tokens"]["post"]["requestBody"]["content"]["application/json"];
+
 // ----- Responses
+export type GetEventsResponse = paths["/api/v3/info/events"]["get"]["responses"][200]["content"]["application/json"];
+export type GetStatsResponse = paths["/api/v3/info/stats"]["get"]["responses"][200]["content"]["application/json"];
+export type SearchResponse = paths["/api/v3/info/search"]["get"]["responses"][200]["content"]["application/json"];
+
 export type GetUserResponse = paths["/api/v3/users"]["get"]["responses"][200]["content"]["application/json"];
 export type RegisterUserResponse = paths["/api/v3/users"]["post"]["responses"][200]["content"]["application/json"];
+
+export type GetRealmsFromUserResponse = paths["/api/v3/users/realms"]["get"]["responses"][200]["content"]["application/json"];
+export type GetGroupsFromUserResponse = paths["/api/v3/users/groups"]["get"]["responses"][200]["content"]["application/json"];
+export type GetTokensFromUserResponse = paths["/api/v3/users/tokens"]["get"]["responses"][200]["content"]["application/json"];
+export type GetS3CredentialsFromUserResponse = paths["/api/v3/users/s3credentials"]["get"]["responses"][200]["content"]["application/json"];
+
+export type GetRelationsResponse = paths["/api/v3/resources/{id}/relations"]["get"]["responses"][200]["content"]["application/json"];
+export type GetResourcesResponse = paths["/api/v3/resources"]["get"]["responses"][200]["content"]["application/json"];
+
+export type GetRealmComponentsResponse = paths["/api/v3/realms/{id}/components"]["get"]["responses"][200]["content"]["application/json"];
+
+export type CreateProjectResponse = paths["/api/v3/resources/projects"]["post"]["responses"][200]["content"]["application/json"];
+export type CreateResourceResponse = paths["/api/v3/resources"]["post"]["responses"][200]["content"]["application/json"];
+export type CreateTokenResponse = paths["/api/v3/users/tokens"]["post"]["responses"][200]["content"]["application/json"];
+export type CreateRealmResponse = paths["/api/v3/realms"]["post"]["responses"][200]["content"]["application/json"];
+export type CreateGroupResponse = paths["/api/v3/groups"]["post"]["responses"][200]["content"]["application/json"];
+
+
+// ----- Structs
+export type Author = components["schemas"]["Author"]
+export type Group = components["schemas"]["Group"]
+export type KeyValue = components["schemas"]["KeyValue"]
+export type Realm = components["schemas"]["Realm"]
+export type Resource = components["schemas"]["Resource"]
+export type Token = components["schemas"]["Token"]
 export type User = components["schemas"]["User"]
+
+// ----- Custom
+export type ResourceElement = Resource & {
+  children: ResourceElement[]
+}
+
+export type GroupInfo = {
+  group: Group,
+  permission: GetGroupsFromUserResponseGroups
+}
+
+
+/* ----- END V3 ----- */
 
 export async function getAnnouncements(start_after: string | undefined, limit: number | undefined): Promise<v2Announcement[]> {
   return await $fetch<v2GetAnnouncementsResponse>('/api/announcements', {
