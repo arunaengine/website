@@ -1,10 +1,5 @@
 import EventBus from "~/composables/EventBus";
-import type {GetGroupsFromUserResponseGroups} from "~/types/aruna-v3-enums";
-
-export type GroupInfo = {
-  group: Group,
-  permission: GetGroupsFromUserResponseGroups
-}
+import type {GroupInfo} from '~/composables/api_wrapper'
 
 // by convention, composable function names start with "use"
 export async function useGroups() {
