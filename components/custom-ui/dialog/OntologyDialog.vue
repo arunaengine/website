@@ -9,7 +9,7 @@ import {
   DialogTrigger
 } from "~/components/ui/dialog";
 import {Button} from "~/components/ui/button";
-import type {OntologyDoc} from "~/composables/ts_api/OntologyDoc";
+import type {OntologyDoc} from "~/types/OntologyDoc";
 import {IconBraces, IconExternalLink, IconLoader2} from "@tabler/icons-vue";
 import {v2KeyValueVariant} from "~/composables/aruna_api_json";
 
@@ -173,7 +173,7 @@ function clear() {
 
       <!-- COMMAND -->
       <Command class="rounded-sm border">
-        <CommandInput placeholder="Search here for an ontology"
+        <CommandInput placeholder="Search for an ontology :)"
                       class="border-0 focus:border-0 outline-0 focus:outline-0 focus:ring-0"
                       @input="(event) => queryInput = event.target.value"/>
         <CommandList class="gap-y-2">
