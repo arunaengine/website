@@ -39,7 +39,7 @@ import Profile from "~/components/custom-ui/user/Profile.vue";
 import Tokens from "~/components/custom-ui/user/Tokens.vue";
 import Proxies from "~/components/custom-ui/user/Proxies.vue";
 
-import {notifis, v3_events} from './data-notifications'
+import {v3_events} from './data-notifications'
 import type {User} from '~/composables/api_wrapper'
 import {toast} from "~/components/ui/toast";
 import {useStats} from "~/composables/Stats";
@@ -54,16 +54,17 @@ const props = defineProps<{
   user: User | undefined
 }>()
 const user = toRef(() => props.user)
-watchEffect(() => {
-  console.log('[Dashboard Component]', `User got updated: ${user.value ? user.value.id : 'Undefined'}`)
-})
+const user_id = toRef(() => user.value?.id)
+
+watch(user, () => console.log('[Dashboard Component]', `User got updated: ${user.value ? user.value.id : 'Undefined'}`))
+watch(user_id, () => console.log('[Dashboard Component]', `User Id updated: ${user_id.value}`))
 
 const route = useRoute()
 const tab = route.query.tab
 
 const endpoints = ref([]) //await fetchEndpoints() TODO
 
-const {events, refreshEvents} = await useEvents([user], user)
+const {events, refreshEvents} = await useEvents([user], user_id)
 const {realms, refreshRealms} = await useRealms()
 const {groups, refreshGroups} = await useGroups()
 const {tokens, refreshTokens} = await useTokens()
@@ -80,9 +81,7 @@ EventBus.on('updateRealms', async () => await refreshRealms())
 EventBus.on('updateGroups', async () => await refreshGroups())
 EventBus.on('updateProjects', async () => await refreshProjects())
 
-
-//const notifications = ref(3)
-const unreadEvents = computed(() => events.value ? events.value.filter((n: any) => !n.read).length : 0)
+const unreadEvents = computed(() => events.value ? events.value.length : 0)
 
 /* ----- DASHBOARD CONTENT ----- */
 const currentContent: Ref<string> = ref(tab as string || 'OverviewStats')
