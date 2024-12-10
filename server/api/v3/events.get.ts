@@ -6,6 +6,9 @@ export default defineEventHandler(async event => {
   const fetchUrl = `${baseUrl}/api/v3/info/events`
 
   console.log('[GetEventsRoute]', query)
+  if (!query.subscriber_id) {
+    return {events: []}
+  }
 
   return await $fetch<GetEventsResponse>(fetchUrl, {
     headers: {
@@ -14,7 +17,7 @@ export default defineEventHandler(async event => {
     query: query
   }).then(response => {
     if (response) {
-      console.log('[GetEventsRoute]', response)
+      //console.log('[GetEventsRoute]', response)
       return response
     }
   })

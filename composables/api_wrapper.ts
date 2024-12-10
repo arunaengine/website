@@ -78,9 +78,6 @@ export type Resource = components["schemas"]["Resource"]
 export type Token = components["schemas"]["Token"]
 export type User = components["schemas"]["User"]
 
-export type Endpoint = components["schemas"]["Endpoint"]
-export type Component = components["schemas"]["Component"]
-
 // ----- Custom
 export type ResourceElement = Resource & {
   children: ResourceElement[]
@@ -91,26 +88,86 @@ export type GroupInfo = {
   permission: GetGroupsFromUserResponseGroups
 }
 
-export type EventUser = {
-  user_id: string,
-  auth_method: {
-    Aruna: number
-  },
-  impersonated_by: any | null
+// ----- Events
+export enum EventTypes {
+  RegisterUser = 'RegisterUserRequestTx',
+  CreateToken = 'CreateTokenRequestTx',
+  CreateRealm = 'CreateRealmRequestTx',
+  CreateGroup = 'CreateGroupRequestTx',
+  CreateComponent = 'CreateComponentRequestTx',
+  CreateResource = 'CreateResourceRequestTx',
+  TODO = 'Complete this enum'
 }
 
-export type EventUserUnregistered = {
-  oidc_realm: string,
+export type Oidc = {
+  oidc_realm: string
   oidc_subject: string
 }
 
-export type v3Notification = {
-  event_id: string,
-  id: string,
-  type: string,
-  req: any,
-  requester: EventUser | EventUserUnregistered
+export type TxUser = {
+  user_id: string
+  auth_method: {
+    oidc?: Oidc
+  } | {
+    Aruna: number
+  }
+  impersonated_by: TxUser | null
 }
+
+export type BaseTx = {
+  id: string
+  event_id: string
+  type: EventTypes,
+  requester: {
+    Unregistered?: Oidc
+    User?: TxUser
+  }
+}
+
+export type RegisterUserTx = BaseTx & {
+  req: {
+    first_name: string,
+    last_name: string,
+    email: string,
+    identifier: string
+  }
+}
+
+export type CreateTokenTx = BaseTx & {
+  req: {
+    name: string,
+    scope: 'Personal' | 'Resource',
+    expires_at: Date,
+    group_id: string | null,
+    realm_id: string | null
+  }
+}
+
+export type CreateGroupTx = BaseTx & {
+  req: {
+    name: string,
+    description: string,
+  }
+  generated_group: {
+    id: string
+    name: string
+    description: string
+  }
+}
+
+export type CreateRealmTx = BaseTx & {
+  req: {
+    tag: string,
+    name: string,
+    description: string,
+  }
+  generated_group: {
+    id: string
+    name: string
+    description: string
+  }
+}
+
 
 // ----- Combined convenience
 export async function fetchChildren(resource_id: string): Promise<ResourceElement[]> {

@@ -1,9 +1,8 @@
 <script lang="ts" setup>
 import {IconSearch} from '@tabler/icons-vue'
 import {refDebounced} from '@vueuse/core'
-import {type Mail, type Notification} from './data-notifications'
-import NotificationList from './NotificationList.vue'
-import NotificationDisplay from './NotificationsDisplay.vue'
+import EventList from './EventList.vue'
+import EventDisplay from './EventDisplay.vue'
 import {Separator} from '@/components/ui/separator'
 import {Input} from '@/components/ui/input'
 import {
@@ -15,55 +14,45 @@ import {
 import {TooltipProvider} from '@/components/ui/tooltip'
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable'
 
-interface MailProps {
-  accounts: {
-    label: string
-    email: string
-    icon: string
-  }[]
-  mails: Notification[] //Mail[]
+interface EventsProps {
+  events: BaseTx[]
   defaultLayout?: number[]
   defaultCollapsed?: boolean
   navCollapsedSize: number
 }
 
-const props = withDefaults(defineProps<MailProps>(), {
+const props = withDefaults(defineProps<EventsProps>(), {
   defaultCollapsed: false,
   defaultLayout: () => [440, 655],
 })
 
+const events = toRef(() => props.events)
+
+watch(events, (newVal) => console.log('[EventsComponent]', newVal))
+
 const isCollapsed = ref(props.defaultCollapsed)
-const selectedMail = ref<string | undefined>(props.mails[0].id)
+const selectedEvent = ref<string | undefined>(events.value[0].id)
 const searchValue = ref('')
 const debouncedSearch = refDebounced(searchValue, 250)
 
 const filteredMailList = computed(() => {
-  let output: Notification[] //Mail[] = []
+  let output: BaseTx[]
   const searchValue = debouncedSearch.value?.trim()
   if (!searchValue) {
-    output = props.mails
+    output = events.value
   } else {
-    output = props.mails.filter((item) => {
-      return item.message.includes(debouncedSearch.value)
-          || item.variant.includes(debouncedSearch.value)
-          || item.from.includes(debouncedSearch.value)
-
-      /*
-      return item.name.includes(debouncedSearch.value)
-          || item.email.includes(debouncedSearch.value)
-          || item.name.includes(debouncedSearch.value)
-          || item.subject.includes(debouncedSearch.value)
-          || item.text.includes(debouncedSearch.value)
-      */
+    output = events.value.filter((item) => {
+      return item.event_id.includes(debouncedSearch.value)
+          || item.type.includes(debouncedSearch.value)
     })
   }
 
+  console.log('[EventsComponent] Search Value:', searchValue)
   return output
 })
 
-const unreadMailList = computed(() => filteredMailList.value.filter(item => !item.read))
-
-const selectedMailData = computed(() => props.mails.find(item => item.id === selectedMail.value))
+const unreadEventsList = computed(() => filteredMailList.value.filter(item => true))
+const selectedEventData = computed(() => props.events.find(item => item.id === selectedEvent.value))
 
 function onCollapse() {
   isCollapsed.value = true
@@ -105,16 +94,16 @@ function onExpand() {
             </form>
           </div>
           <TabsContent value="all" class="m-0">
-            <NotificationList v-model:selected-mail="selectedMail" :items="filteredMailList"/>
+            <EventList v-model:selected-mail="selectedEvent" :items="filteredMailList"/>
           </TabsContent>
           <TabsContent value="unread" class="m-0">
-            <NotificationList v-model:selected-mail="selectedMail" :items="unreadMailList"/>
+            <EventList v-model:selected-mail="selectedEvent" :items="unreadEventsList"/>
           </TabsContent>
         </Tabs>
       </ResizablePanel>
       <ResizableHandle id="resiz-handle-1" with-handle/>
       <ResizablePanel id="resize-panel-2" :default-size="defaultLayout[1]">
-        <NotificationDisplay :mail="selectedMailData"/>
+        <EventDisplay :eventData="selectedEventData"/>
       </ResizablePanel>
     </ResizablePanelGroup>
   </TooltipProvider>
