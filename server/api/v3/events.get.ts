@@ -5,10 +5,17 @@ export default defineEventHandler(async event => {
   const baseUrl = useRuntimeConfig().serverHostUrl
   const fetchUrl = `${baseUrl}/api/v3/info/events`
 
+  console.log('[GetEventsRoute]', query)
+
   return await $fetch<GetEventsResponse>(fetchUrl, {
     headers: {
       'Authorization': `Bearer ${event.context.access_token}`
     },
     query: query
+  }).then(response => {
+    if (response) {
+      console.log('[GetEventsRoute]', response)
+      return response
+    }
   })
 })
