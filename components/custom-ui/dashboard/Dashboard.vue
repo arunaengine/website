@@ -38,6 +38,7 @@ import Notifications from "~/components/custom-ui/dashboard/Notifications.vue";
 import Profile from "~/components/custom-ui/user/Profile.vue";
 import Tokens from "~/components/custom-ui/user/Tokens.vue";
 import Proxies from "~/components/custom-ui/user/Proxies.vue";
+import SearchBar from "~/components/custom-ui/SearchBar.vue";
 
 import {notifis, v3_events} from './data-notifications'
 import type {User} from '~/composables/api_wrapper'
@@ -314,12 +315,7 @@ EventBus.on('spinStop', () => spinBaby.value = false)
               <Skeleton class="h-auto w-[300px]"/>
             </template>
           </ClientOnly>
-          <div class="relative flex">
-            <IconSearch class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"/>
-            <Input type="search"
-                   placeholder="Search Resources"
-                   class="w-[400px] appearance-none bg-background pl-8 shadow-none "/>
-          </div>
+          <SearchBar />
         </div>
         <DropdownMenu>
           <ClientOnly fallbackTag="span">
