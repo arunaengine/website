@@ -43,6 +43,12 @@ onMounted(() => forceRefresh.value += 1);
             Search
           </NuxtLink>
 
+          <NuxtLink v-if="user_state"
+              class="font-medium text-aruna-text-accent focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
+              to="/user/dashboard">
+            Dashboard
+          </NuxtLink>
+
           <NuxtLink
               class="font-medium text-aruna-text-accent focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
               to="/news">
@@ -91,39 +97,23 @@ onMounted(() => forceRefresh.value += 1);
           <div>
             <DropdownMenu v-if="user_state">
               <DropdownMenuTrigger class="px-2 py-1 flex items-center justify-center gap-x-2 rounded-sm border border-aruna-text-accent">
-                {{ user_state?.displayName }}
+                {{ user_state?.first_name }} {{ user_state?.last_name }}
                 <IconMenu2 class="size-5"/>
               </DropdownMenuTrigger>
               <DropdownMenuContent class="bg-aruna-muted">
-                <DropdownMenuLabel v-if="user_state && user_state.attributes?.globalAdmin"
+                <DropdownMenuLabel v-if="user_state"
                                    class="flex hover:bg-aruna-fg focus:bg-aruna-fg">
-                  <NuxtLink to="/user/admin"
-                            class="flex items-center gap-x-2">
-                    <IconUserUp class="size-4"/>
-                    Administration
-                  </NuxtLink>
-                </DropdownMenuLabel>
-
-                <DropdownMenuSeparator v-if="user_state && user_state.attributes?.globalAdmin"/>
-
-                <DropdownMenuLabel class="flex hover:bg-aruna-fg focus:bg-aruna-fg">
-                  <NuxtLink to="/user/account"
+                  <NuxtLink to="/user/dashboard"
                             class="flex items-center gap-x-2">
                     <IconUserScan class="size-4"/>
-                    Account
-                  </NuxtLink>
-                </DropdownMenuLabel>
-                <DropdownMenuLabel class="flex hover:bg-aruna-fg focus:bg-aruna-fg">
-                  <NuxtLink to="/user/resources"
-                            class="flex items-center gap-x-2">
-                    <IconBucket class="size-4"/>
-                    Resources
+                    Dashboard
                   </NuxtLink>
                 </DropdownMenuLabel>
 
                 <DropdownMenuSeparator/>
 
-                <DropdownMenuLabel class="flex sm:hidden hover:bg-aruna-fg focus:bg-aruna-fg">
+                <DropdownMenuLabel v-if="user_state"
+                                   class="flex sm:hidden hover:bg-aruna-fg focus:bg-aruna-fg">
                   <NuxtLink to="/explore"
                             class="flex items-center gap-x-2">
                     <IconSearch class="flex-shrink-0 size-4"/>
