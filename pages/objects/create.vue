@@ -33,7 +33,6 @@ import OntologyDialog from "~/components/custom-ui/dialog/OntologyDialog.vue";
 import {HeadObjectCommand, S3Client, type S3ClientConfig} from "@aws-sdk/client-s3";
 import {Upload} from "@aws-sdk/lib-storage";
 import {prettyDisplayJson} from "~/composables/utils";
-import OntologyDialog from "~/components/custom-ui/dialog/OntologyDialog.vue";
 
 // Router to navigate back
 const router = useRouter()
