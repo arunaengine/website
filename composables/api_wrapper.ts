@@ -78,6 +78,9 @@ export type Resource = components["schemas"]["Resource"]
 export type Token = components["schemas"]["Token"]
 export type User = components["schemas"]["User"]
 
+export type Endpoint = components["schemas"]["Endpoint"]
+export type Component = components["schemas"]["Component"]
+
 // ----- Custom
 export type ResourceElement = Resource & {
   children: ResourceElement[]
@@ -88,6 +91,59 @@ export type GroupInfo = {
   permission: GetGroupsFromUserResponseGroups
 }
 
+export type EventUser = {
+  user_id: string,
+  auth_method: {
+    Aruna: number
+  },
+  impersonated_by: any | null
+}
+
+export type EventUserUnregistered = {
+  oidc_realm: string,
+  oidc_subject: string
+}
+
+export type v3Notification = {
+  event_id: string,
+  id: string,
+  type: string,
+  req: any,
+  requester: EventUser | EventUserUnregistered
+}
+
+// ----- Combined convenience
+export async function fetchChildren(resource_id: string): Promise<ResourceElement[]> {
+  const children_ids = await $fetch<GetRelationsResponse>(`/api/v3/relations`, {
+    query: {
+      node: resource_id,
+      direction: 'Outgoing',
+      offset: 0,
+      page_size: Number.MAX_SAFE_INTEGER
+    }
+  }).then(response => {
+    return response.relations.filter(rel => rel.relation_type === 'HasPart').map(rel => rel.to_id)
+  })
+
+  if (children_ids.length <= 0) {
+    console.info('[fetchChildren] Resource ${resource_id} has no children')
+    return []
+  }
+
+  return await $fetch<GetResourcesResponse>('/api/v3/resources', {
+    query: {
+      ids: children_ids
+    }
+  }).then(response => {
+    let resources: ResourceElement[] = []
+    for (const resource of response.resources) {
+      let extended = resource as any // lol, cast to any to allow dynamic adding of properties
+      extended.children = []
+      resources.push(extended as ResourceElement)
+    }
+    return resources
+  })
+}
 
 /* ----- END V3 ----- */
 
