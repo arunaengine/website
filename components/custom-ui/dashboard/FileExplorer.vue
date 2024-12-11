@@ -114,6 +114,16 @@ function closeInfo() {
   infoOpen.value = false
 }
 
+async function deleteResource(id: string) {
+  console.log('[FileExplorer] Try to delete resource:', id)
+  await $fetch<DeleteResourcesResponse>('/api/v3/resource', {
+    method: 'DELETE',
+    query: {
+      id: id
+    }
+  }).then(response => console.log(response))
+}
+
 function navigateBack(resourceId: string) {
   // Clear met info field:
   infoOpen.value = false
@@ -507,6 +517,13 @@ function checkDirection(): 'horizontal' | 'vertical' {
                     @click="closeInfo"
                     class="inline-flex w-fit bg-transparent text-aruna-highlight border border-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
               Close
+            </Button>
+
+            <Button v-if="infoSelection"
+                    variant="outline"
+                    @click="deleteResource(infoSelection.id)"
+                    class="inline-flex w-fit bg-transparent text-aruna-highlight border border-destructive hover:bg-aruna-highlight hover:text-aruna-text-accent">
+              Delete
             </Button>
           </div>
 
