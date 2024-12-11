@@ -484,16 +484,20 @@ function checkDirection(): 'horizontal' | 'vertical' {
               </div>
               <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
                 <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Locked:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.locked || 'N/A'
-                  }}
+                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.locked || 'N/A' }}
                 </dd>
               </div>
               <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
                 <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Visibility:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.visibility || ''
-                  }}
+                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.visibility || '' }}
+                </dd>
+              </div>
+              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Deleted:</dt>
+                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.deleted }}
                 </dd>
               </div>
 
