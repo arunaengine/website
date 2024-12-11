@@ -2,6 +2,8 @@
 import {
   IconFile,
   IconFolder,
+  IconFolderPlus,
+  IconFolderSymlink,
   IconInfoCircle,
   IconLock,
   IconPlus,
@@ -281,27 +283,42 @@ function checkDirection(): 'horizontal' | 'vertical' {
         <!-- Flexbox Resource Display -->
         <div class="flex flex-row flex-wrap content-start items-start justify-start gap-x-6 gap-y-6 my-4">
           <Card v-for="resource in displayedResources"
-                class="rounded-sm flex flex-col items-center justify-center min-w-[300px] h-fit"
+                class="rounded-sm border-aruna-text/50 flex flex-col items-center justify-center min-w-[200px] max-w-[300px] h-fit truncate overflow-ellipsis"
                 @dblclick="navigateForward(resource)">
-            <CardContent class="group flex flex-col items-center">
-              <div class="flex h-20 w-full items-center justify-center">
-                <IconWorld v-if="resource.variant === ResourceVariant.Project"
-                           class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
-                <IconFolder v-else-if="resource.variant === ResourceVariant.Folder"
-                            class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
-                <IconFile v-else-if="resource.variant === ResourceVariant.Object"
-                          class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
+            <CardContent class="p-0 flex flex-col items-center w-full">
+              <div class="w-full flex gap-x-2">
+                <div class="group flex flex-col grow py-4 ps-4 items-center justify-center">
+                  <div class="flex h-fit w-full items-center justify-center">
+                    <IconWorld v-if="resource.variant === ResourceVariant.Project"
+                               :class="{'text-destructive group-hover:text-destructive': resource.deleted}"
+                               class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
+                    <IconFolder v-else-if="resource.variant === ResourceVariant.Folder"
+                                :class="{'text-destructive group-hover:text-destructive': resource.deleted}"
+                                class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
+                    <IconFile v-else-if="resource.variant === ResourceVariant.Object"
+                              :class="{'text-destructive group-hover:text-destructive': resource.deleted}"
+                              class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
+                  </div>
+                  <div v-if="!resource.deleted" class="flex gap-x-2">
+                    {{ resource.title ? resource.title : resource.name }}
+                  </div>
+                  <div v-else class="text-destructive">DELETED</div>
+                  <span v-if="resource.variant === ResourceVariant.Object" class="text-aruna-text">
+                    {{ `Size: ${formatBytes(resource.content_len)}` }}
+                  </span>
+                  <span v-else class="text-aruna-text">
+                    {{ `Children: ${resource.children.length}` }}
+                  </span>
+                </div>
+                <div class="flex flex-col justify-between border-l text-aruna-text">
+                  <IconInfoCircle @click="openInfo(resource)"
+                                  class="m-2 hover:cursor-pointer hover:text-aruna-highlight"/>
+                  <IconFolderPlus class="m-2 hover:cursor-pointer hover:text-aruna-highlight"/>
+                  <IconFolderSymlink @click="navigateForward(resource)"
+                                     class="m-2 hover:cursor-pointer hover:text-aruna-highlight"/>
+
+                </div>
               </div>
-              <div class="flex gap-x-2">
-                {{ resource.title ? resource.title : resource.name }}
-                <IconInfoCircle @click="openInfo(resource)"/>
-              </div>
-              <span v-if="resource.variant === ResourceVariant.Object" class="text-aruna-text">
-              {{ `Size: ${formatBytes(resource.content_len)}` }}
-            </span>
-              <span v-else class="text-aruna-text">
-              {{ `Children: ${resource.children.length}` }}
-            </span>
             </CardContent>
           </Card>
 
