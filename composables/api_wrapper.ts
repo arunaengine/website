@@ -59,6 +59,7 @@ export type GetS3CredentialsFromUserResponse = paths["/api/v3/users/s3credential
 
 export type GetRelationsResponse = paths["/api/v3/resources/{id}/relations"]["get"]["responses"][200]["content"]["application/json"];
 export type GetResourcesResponse = paths["/api/v3/resources"]["get"]["responses"][200]["content"]["application/json"];
+export type DeleteResourcesResponse = paths["/api/v3/resources/{id}"]["delete"]["responses"][200]["content"]["application/json"];
 
 export type GetRealmComponentsResponse = paths["/api/v3/realms/{id}/components"]["get"]["responses"][200]["content"]["application/json"];
 
