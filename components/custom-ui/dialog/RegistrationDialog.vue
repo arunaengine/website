@@ -72,24 +72,26 @@ const onSubmit = form.handleSubmit(async (values) => {
     if (response.user) {
       toast({
         description: h('div',
-            {class: 'flex space-x-2 items-center justify-center text-gray-200'},
+            {class: 'flex space-x-2 items-center justify-center text-aruna-text-accent'},
             [
-              h(IconTrophy, {class: 'flex-shrink-0 size-5 text-yellow-200'}),
+              h(IconTrophy, {class: 'flex-shrink-0 size-6 text-aruna-highlight'}),
               h('span',
                   {class: 'text-fuchsia-50'},
                   [
-                    'Your registration was successful. Have fun exploring the Aruna universe. Also check out the ',
+                    'Your registration was successful.', h('br'), 'Have fun exploring the Aruna universe. Also check out the ',
                     h('a', {
                       href: 'https://docs.aruna-engine.org/latest',
                       target: '_blank',
-                      class: 'text-aruna-highlight hover:text-aruna-highlight/80'
+                      class: 'font-bold text-aruna-highlight hover:text-aruna-highlight/80'
                     }, ['documentation']),
                     '.'
                   ])
             ]),
         duration: 60000 // One Minute
       })
+      EventBus.emit('updateUser')
       emit('closeRegisterDialog')
+      useRouter().push('/user/dashboard')
     }
   }).catch(error => {
     toast({
