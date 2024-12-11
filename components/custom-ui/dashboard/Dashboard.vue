@@ -74,7 +74,6 @@ watch(realms, () => console.log('[Dashboard] Realms updated to value:', realms.v
 watch(groups, () => console.log('[Dashboard] Groups updated to value:', groups.value))
 watch(events, () => console.log('[Dashboard] Events updated to value:', events.value))
 
-
 EventBus.on('updateStats', async () => await refreshStats())
 EventBus.on('updateRealms', async () => await refreshRealms())
 EventBus.on('updateGroups', async () => await refreshGroups())
@@ -141,6 +140,13 @@ EventBus.on('setTab', (tabId: string) => setTab(tabId))
 /* ----- END EXTERNAL TAB SWITCH ----- */
 
 /* ----- REALM SWITCH ----- */
+function addRealm(realm: Realm) {
+  if (realms.value)
+    realms.value.push(realm)
+  else
+    realms.value = [realm]
+}
+
 function setRealm(realmId: string) {
   //ToDo: Re-fetch things
   console.log('[Dashboard Component]', `Switched realm to: ${realmId}`)
@@ -306,7 +312,9 @@ EventBus.on('spinStop', () => spinBaby.value = false)
 
         <div class="flex flex-col sm:flex-row w-full space-x-4">
           <ClientOnly fallbackTag="span">
-            <RealmSwitcher :realms="realms" class="flex"/>
+            <RealmSwitcher class="flex"
+                           :realms="realms"
+                           @add-realm="addRealm" />
             <template #fallback>
               <Skeleton class="h-auto w-[300px]"/>
             </template>
