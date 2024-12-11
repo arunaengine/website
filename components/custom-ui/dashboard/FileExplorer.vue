@@ -227,7 +227,7 @@ function checkDirection(): 'horizontal' | 'vertical' {
 <template>
   <div class="flex flex-col h-full w-full py-6 ps-6">
     <!-- Header -->
-    <div class="flex h-14 items-center justify-between border-b bg-gray-100 px-6 dark:border-gray-800 dark:bg-gray-900">
+    <div class="flex h-14 items-center justify-between border-b px-6 border-gray-800 bg-gray-900">
       <nav aria-label="breadcrumb">
         <Breadcrumb>
           <BreadcrumbList>
