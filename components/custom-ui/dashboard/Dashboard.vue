@@ -39,7 +39,6 @@ import Profile from "~/components/custom-ui/user/Profile.vue";
 import Tokens from "~/components/custom-ui/user/Tokens.vue";
 import Proxies from "~/components/custom-ui/user/Proxies.vue";
 
-import {v3_events} from './data-notifications'
 import type {User} from '~/composables/api_wrapper'
 import {toast} from "~/components/ui/toast";
 import {useStats} from "~/composables/Stats";
