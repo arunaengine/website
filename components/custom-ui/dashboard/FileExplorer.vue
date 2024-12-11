@@ -114,14 +114,13 @@ function closeInfo() {
   infoOpen.value = false
 }
 
-async function deleteResource(id: string) {
-  console.log('[FileExplorer] Try to delete resource:', id)
+async function deleteResource(resource: ResourceElement) {
   await $fetch<DeleteResourcesResponse>('/api/v3/resource', {
     method: 'DELETE',
     query: {
-      id: id
+      id: resource.id
     }
-  }).then(response => console.log(response))
+  }).then(response => resource.deleted = true)
 }
 
 function navigateBack(resourceId: string) {
@@ -230,7 +229,7 @@ function checkDirection(): 'horizontal' | 'vertical' {
     <div class="flex h-14 items-center justify-between border-b px-6 border-gray-800 bg-gray-900">
       <nav aria-label="breadcrumb">
         <Breadcrumb>
-          <BreadcrumbList>
+          <BreadcrumbList class="text-aruna-text-accent">
             <BreadcrumbItem @click="navigateBack('root')"
                             class="hover:cursor-pointer">Your Projects
             </BreadcrumbItem>
@@ -239,9 +238,12 @@ function checkDirection(): 'horizontal' | 'vertical' {
               <BreadcrumbSeparator/>
               <BreadcrumbItem v-if="ele.variant !== ResourceVariant.Object"
                               @click="navigateBack(ele.id)"
-                              class="hover:cursor-pointer">{{ ele.name }}
+                              class="hover:cursor-pointer">
+                {{ !ele.deleted ? ele.name : 'DELETED' }}
               </BreadcrumbItem>
-              <BreadcrumbItem v-else>{{ ele.name }}</BreadcrumbItem>
+              <BreadcrumbItem v-else>
+                {{ !ele.deleted ? ele.name : 'DELETED' }}
+              </BreadcrumbItem>
             </div>
           </BreadcrumbList>
         </Breadcrumb>
@@ -525,8 +527,8 @@ function checkDirection(): 'horizontal' | 'vertical' {
 
             <Button v-if="infoSelection"
                     variant="outline"
-                    @click="deleteResource(infoSelection.id)"
-                    class="inline-flex w-fit bg-transparent text-aruna-highlight border border-destructive hover:bg-aruna-highlight hover:text-aruna-text-accent">
+                    @click="deleteResource(infoSelection)"
+                    class="inline-flex w-fit bg-transparent text-destructive border border-destructive hover:bg-destructive/25">
               Delete
             </Button>
           </div>
