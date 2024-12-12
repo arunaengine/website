@@ -425,14 +425,14 @@ function checkDirection(): 'horizontal' | 'vertical' {
 
             <Label for="license">License</Label>
             <Select>
-              <SelectTrigger class="w-fit bg-aruna-muted">
+              <SelectTrigger class="bg-aruna-muted w-full max-w-[450px]">
                 <SelectValue placeholder="Select a license for your resource"/>
               </SelectTrigger>
-              <SelectContent class="bg-aruna-bg/90">
+              <SelectContent class="bg-aruna-bg/90 truncate overflow-ellipsis">
                 <SelectGroup>
                   <SelectItem v-for="license in licenses" :value="license.tag"
                               class="hover:bg-aruna-fg">
-                    {{ license.tag }}
+                    {{ license.label }}
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
