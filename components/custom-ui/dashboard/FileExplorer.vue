@@ -283,7 +283,7 @@ function checkDirection(): 'horizontal' | 'vertical' {
         <!-- Flexbox Resource Display -->
         <div class="flex flex-row flex-wrap content-start items-start justify-start gap-x-6 gap-y-6 my-4">
           <Card v-for="resource in displayedResources"
-                class="rounded-sm border-aruna-text/50 flex flex-col items-center justify-center min-w-[200px] max-w-[300px] h-fit truncate overflow-ellipsis"
+                class="rounded-sm border-aruna-text/50 flex flex-col items-center justify-center min-w-[200px] max-w-[300px] h-fit"
                 @dblclick="navigateForward(resource)">
             <CardContent class="p-0 flex flex-col items-center w-full">
               <div class="w-full flex gap-x-2">
@@ -299,7 +299,7 @@ function checkDirection(): 'horizontal' | 'vertical' {
                               :class="{'text-destructive group-hover:text-destructive': resource.deleted}"
                               class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
                   </div>
-                  <div v-if="!resource.deleted" class="flex gap-x-2">
+                  <div v-if="!resource.deleted" class="max-w-52 truncate overflow-ellipsis">
                     {{ resource.title ? resource.title : resource.name }}
                   </div>
                   <div v-else class="text-destructive">DELETED</div>
