@@ -30,7 +30,6 @@
     "markdown-it": "^14.1.0",
     "markdown-it-deflist": "^3.0.0",
     "nuxt": "^3.14.1592",
-    "preline": "^2.6.0",
     "radix-vue": "^1.9.11",
     "vee-validate": "^4.14.7",
     "vue-router": "^4.5.0"
