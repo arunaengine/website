@@ -1,9 +1,7 @@
 <script lang="ts" setup>
-import {formatDistanceToNow} from 'date-fns'
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {cn} from '@/utils/shadcn'
 import {Badge} from '@/components/ui/badge'
-import {v2PersonalNotificationVariant} from "~/composables/aruna_api_json";
 
 interface EventListProps {
   items: BaseTx[] //Mail[]
@@ -11,25 +9,10 @@ interface EventListProps {
 
 defineProps<EventListProps>()
 const selectedMail = defineModel<string>('selectedMail', {required: false})
-
-function getBadgeVariantFromLabel(label: string) {
-  if (['work'].includes(label.toLowerCase()))
-    return 'default'
-
-  if (['personal', 'permission'].includes(label.toLowerCase()))
-    return 'outline'
-
-  return 'secondary'
-}
-
-function displayVariant(variant: v2PersonalNotificationVariant) {
-  const label = variant.replace('PERSONAL_NOTIFICATION_VARIANT_', '').replace('_', ' ').toLowerCase()
-  return label.charAt(0).toUpperCase() + label.slice(1)
-}
 </script>
 
 <template>
-  <ScrollArea class="h-screen flex">
+  <ScrollArea class="h-full flex">
     <div class="flex-1 flex flex-col gap-2 p-4 pt-0">
       <TransitionGroup name="list" appear>
         <button v-for="item of items"
@@ -69,10 +52,9 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
             <!--{{ item.text.substring(0, 300) }}-->
           </div>
           <div class="flex items-center gap-2">
-            <Badge variant="outline">Unregistered</Badge>
-            <Badge variant="default">Impersonated</Badge>
-            <Badge variant="secondary">User</Badge>
-
+            <Badge v-if="item.requester.Unregistered" variant="outline">Unregistered</Badge>
+            <Badge v-if="item.requester.User" variant="secondary">User</Badge>
+            <Badge v-if="item.requester.User?.impersonated_by" variant="default">Impersonated</Badge>
             <!--
             <Badge v-for="label of item.labels" :key="label" :variant="getBadgeVariantFromLabel(label)">
               {{ label }}

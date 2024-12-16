@@ -68,9 +68,9 @@ function onExpand() {
     <ResizablePanelGroup
         id="resize-panel-group-1"
         direction="horizontal"
-        class="h-full max-h-[calc(100vh-225px)] items-stretch">
+        class="h-full max-h-[calc(100vh-200px)] items-stretch">
       <ResizablePanel id="resize-panel-1" :default-size="defaultLayout[0]" :min-size="30">
-        <Tabs default-value="all">
+        <Tabs default-value="all" class="h-full">
           <div class="flex items-center px-4 py-2">
             <h1 class="text-xl font-bold">
               Inbox
@@ -93,7 +93,7 @@ function onExpand() {
               </div>
             </form>
           </div>
-          <TabsContent value="all" class="m-0">
+          <TabsContent value="all" class="m-0 h-full">
             <EventList v-model:selected-mail="selectedEvent" :items="filteredMailList"/>
           </TabsContent>
           <TabsContent value="unread" class="m-0">
