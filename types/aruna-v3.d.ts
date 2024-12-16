@@ -191,6 +191,41 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
+  "/api/v3/license": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get licenses */
+    get: operations["get_licenses"];
+    put?: never;
+    /** Register a license */
+    post: operations["create_license"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v3/license/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get license */
+    get: operations["get_license"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v3/realms": {
     parameters: {
       query?: never;
@@ -697,7 +732,8 @@ export type components = {
       description?: string;
       identifiers?: string[];
       labels?: components["schemas"]["KeyValue"][];
-      license_tag?: string;
+      /** Format: ulid */
+      license_id?: string | null;
       name: string;
       parent: components["schemas"]["Parent"];
       title?: string;
@@ -735,6 +771,15 @@ export type components = {
     CreateGroupResponse: {
       group: components["schemas"]["Group"];
     };
+    CreateLicenseRequest: {
+      description: string;
+      license_terms: string;
+      name: string;
+    };
+    CreateLicenseResponse: {
+      /** Format: ulid */
+      license_id: string;
+    };
     CreateProjectRequest: {
       authors?: components["schemas"]["Author"][];
       /** Format: ulid */
@@ -744,7 +789,8 @@ export type components = {
       group_id?: string;
       identifiers?: string[];
       labels?: components["schemas"]["KeyValue"][];
-      license_tag?: string;
+      /** Format: ulid */
+      license_id?: string | null;
       name: string;
       /** Format: ulid */
       realm_id?: string;
@@ -789,7 +835,8 @@ export type components = {
       description?: string;
       identifiers?: string[];
       labels?: components["schemas"]["KeyValue"][];
-      license_tag?: string;
+      /** Format: ulid */
+      license_id?: string | null;
       name: string;
       /** Format: ulid */
       parent_id: string;
@@ -871,6 +918,9 @@ export type components = {
     }) | (components["schemas"]["Component"] & {
       /** @enum {string} */
       type: GenericNodeType;
+    }) | (components["schemas"]["License"] & {
+      /** @enum {string} */
+      type: GenericNodeType;
     });
     GetEventsResponse: {
       events: {
@@ -894,6 +944,12 @@ export type components = {
         },
         GetGroupsFromUserResponseGroups
       ][];
+    };
+    GetLicenseResponse: {
+      license: components["schemas"]["License"];
+    };
+    GetLicensesResponse: {
+      licenses: components["schemas"]["License"][];
     };
     GetRealmComponentsResponse: {
       components: components["schemas"]["Component"][];
@@ -951,6 +1007,14 @@ export type components = {
       key: string;
       locked: boolean;
       value: string;
+    };
+    License: {
+      deleted: boolean;
+      description: string;
+      /** Format: ulid */
+      id: string;
+      name: string;
+      terms: string;
     };
     Parent: {
       /** Format: ulid */
@@ -1016,7 +1080,8 @@ export type components = {
       labels: components["schemas"]["KeyValue"][];
       /** Format: date-time */
       last_modified: string;
-      license_tag: string;
+      /** Format: ulid */
+      license_id: string;
       location: components["schemas"]["DataLocation"][];
       locked: boolean;
       name: string;
@@ -1109,7 +1174,8 @@ export type components = {
     UpdateResourceLicenseRequest: {
       /** Format: ulid */
       id: string;
-      license_tag: string;
+      /** Format: ulid */
+      license_id: string;
     };
     UpdateResourceLicenseResponse: {
       resource: components["schemas"]["Resource"];
@@ -1161,7 +1227,6 @@ export type components = {
   pathItems: never;
 };
 export type $defs = Record<string, never>;
-
 export interface operations {
   create_component: {
     parameters: {
@@ -1925,6 +1990,226 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["GetStatsResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            error: string;
+            name: string;
+          };
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            error: string;
+            name: string;
+          };
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+    };
+  };
+  get_licenses: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GetLicensesResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            error: string;
+            name: string;
+          };
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            error: string;
+            name: string;
+          };
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+    };
+  };
+  create_license: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateLicenseRequest"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CreateLicenseResponse"];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            error: string;
+            name: string;
+          };
+        };
+      };
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            error: string;
+            name: string;
+          };
+        };
+      };
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+    };
+  };
+  get_license: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description License ID */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GetLicenseResponse"];
         };
       };
       400: {
@@ -3489,7 +3774,7 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
-        /** @description Resource ID (Must be object) */
+        /** @description Resource ID */
         id: string;
       };
       cookie?: never;
