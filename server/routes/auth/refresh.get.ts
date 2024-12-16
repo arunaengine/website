@@ -32,11 +32,11 @@ export default defineEventHandler(async (event) => {
       throw new Error(`Unknown or unsupported issuer: ${issuer}`)
     }
 
-    const parsed_access_token = parseJwt(access_token) // Should also exist if refresh token is present
-    const access_expiry: number = parsed_access_token.exp || 0
+    const parsed_access_token = access_token ? parseJwt(access_token) : undefined
+    const access_expiry: number = parsed_access_token ? parsed_access_token.exp : 0
     if (refresh_expiry > current_timestamp && access_expiry - current_timestamp <= 60) {
       // Fetch refreshed tokens from issuer
-      const tokens: any = await $fetch(config.tokenUrl, {
+      await $fetch(config.tokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
