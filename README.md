@@ -1,8 +1,8 @@
 # ArunaWeb 5.0
 
-This is another total revised version for the Aruna website. Powered by [Vue 3](https://vuejs.org/), [Nuxt 3](https://nuxt.com/), [Tailwind CSS](https://tailwindcss.com/) and [Preline](https://preline.co/). 
+This is another total revised version for the Aruna website. Powered by [Vue 3](https://vuejs.org/), [Nuxt 3](https://nuxt.com/), [Tailwind CSS](https://tailwindcss.com/) and [shadcn-vue](https://www.shadcn-vue.com/). 
 
-This version is intended to be used with version **2.x.x** of Aruna, so to start a local test instance, you need a running Aruna instance and a running API Gateway to translate the RESTful http calls into native gRPC for the Aruna server.
+This version is intended to be used with version **3.x.x** of Aruna, so to start a local test instance, you need a running Aruna instance and a running API Gateway to translate the RESTful http calls into native gRPC for the Aruna server.
 
 1. How to start a local Aruna instance is described in the [Getting started instructions of the Aruna main repository](https://github.com/arunaengine/aruna?tab=readme-ov-file#getting-started) which guides you through the individual steps.
 

@@ -97,7 +97,6 @@ module.exports = {
   },
   plugins: [
     require("tailwindcss-animate"),
-    require("@tailwindcss/forms"),
-    require("preline/plugin"),
+    require("@tailwindcss/forms")
   ],
 }
