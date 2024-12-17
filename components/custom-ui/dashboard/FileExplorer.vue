@@ -2,6 +2,8 @@
 import {
   IconFile,
   IconFolder,
+  IconFolderPlus,
+  IconFolderSymlink,
   IconInfoCircle,
   IconLock,
   IconPlus,
@@ -114,6 +116,15 @@ function closeInfo() {
   infoOpen.value = false
 }
 
+async function deleteResource(resource: ResourceElement) {
+  await $fetch<DeleteResourcesResponse>('/api/v3/resource', {
+    method: 'DELETE',
+    query: {
+      id: resource.id
+    }
+  }).then(response => resource.deleted = true)
+}
+
 function navigateBack(resourceId: string) {
   // Clear met info field:
   infoOpen.value = false
@@ -217,10 +228,10 @@ function checkDirection(): 'horizontal' | 'vertical' {
 <template>
   <div class="flex flex-col h-full w-full py-6 ps-6">
     <!-- Header -->
-    <div class="flex h-14 items-center justify-between border-b bg-gray-100 px-6 dark:border-gray-800 dark:bg-gray-900">
+    <div class="flex h-14 items-center justify-between border-b px-6 border-gray-800 bg-gray-900">
       <nav aria-label="breadcrumb">
         <Breadcrumb>
-          <BreadcrumbList>
+          <BreadcrumbList class="text-aruna-text-accent">
             <BreadcrumbItem @click="navigateBack('root')"
                             class="hover:cursor-pointer">Your Projects
             </BreadcrumbItem>
@@ -229,9 +240,12 @@ function checkDirection(): 'horizontal' | 'vertical' {
               <BreadcrumbSeparator/>
               <BreadcrumbItem v-if="ele.variant !== ResourceVariant.Object"
                               @click="navigateBack(ele.id)"
-                              class="hover:cursor-pointer">{{ ele.name }}
+                              class="hover:cursor-pointer">
+                {{ !ele.deleted ? ele.name : 'DELETED' }}
               </BreadcrumbItem>
-              <BreadcrumbItem v-else>{{ ele.name }}</BreadcrumbItem>
+              <BreadcrumbItem v-else>
+                {{ !ele.deleted ? ele.name : 'DELETED' }}
+              </BreadcrumbItem>
             </div>
           </BreadcrumbList>
         </Breadcrumb>
@@ -269,27 +283,42 @@ function checkDirection(): 'horizontal' | 'vertical' {
         <!-- Flexbox Resource Display -->
         <div class="flex flex-row flex-wrap content-start items-start justify-start gap-x-6 gap-y-6 my-4">
           <Card v-for="resource in displayedResources"
-                class="rounded-sm flex flex-col items-center justify-center min-w-[300px] h-fit"
+                class="rounded-sm border-aruna-text/50 flex flex-col items-center justify-center min-w-[200px] max-w-[300px] h-fit"
                 @dblclick="navigateForward(resource)">
-            <CardContent class="group flex flex-col items-center">
-              <div class="flex h-20 w-full items-center justify-center">
-                <IconWorld v-if="resource.variant === ResourceVariant.Project"
-                           class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
-                <IconFolder v-else-if="resource.variant === ResourceVariant.Folder"
-                            class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
-                <IconFile v-else-if="resource.variant === ResourceVariant.Object"
-                          class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
+            <CardContent class="p-0 flex flex-col items-center w-full">
+              <div class="w-full flex gap-x-2">
+                <div class="group flex flex-col grow py-4 ps-4 items-center justify-center">
+                  <div class="flex h-fit w-full items-center justify-center">
+                    <IconWorld v-if="resource.variant === ResourceVariant.Project"
+                               :class="{'text-destructive group-hover:text-destructive': resource.deleted}"
+                               class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
+                    <IconFolder v-else-if="resource.variant === ResourceVariant.Folder"
+                                :class="{'text-destructive group-hover:text-destructive': resource.deleted}"
+                                class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
+                    <IconFile v-else-if="resource.variant === ResourceVariant.Object"
+                              :class="{'text-destructive group-hover:text-destructive': resource.deleted}"
+                              class="h-12 w-12 text-aruna-text-accent group-hover:text-aruna-highlight"/>
+                  </div>
+                  <div v-if="!resource.deleted" class="max-w-52 truncate overflow-ellipsis">
+                    {{ resource.title ? resource.title : resource.name }}
+                  </div>
+                  <div v-else class="text-destructive">DELETED</div>
+                  <span v-if="resource.variant === ResourceVariant.Object" class="text-aruna-text">
+                    {{ `Size: ${formatBytes(resource.content_len)}` }}
+                  </span>
+                  <span v-else class="text-aruna-text">
+                    {{ `Children: ${resource.children.length}` }}
+                  </span>
+                </div>
+                <div class="flex flex-col justify-between border-l text-aruna-text">
+                  <IconInfoCircle @click="openInfo(resource)"
+                                  class="m-2 hover:cursor-pointer hover:text-aruna-highlight"/>
+                  <IconFolderPlus class="m-2 hover:cursor-pointer hover:text-aruna-highlight"/>
+                  <IconFolderSymlink @click="navigateForward(resource)"
+                                     class="m-2 hover:cursor-pointer hover:text-aruna-highlight"/>
+
+                </div>
               </div>
-              <div class="flex gap-x-2">
-                {{ resource.title ? resource.title : resource.name }}
-                <IconInfoCircle @click="openInfo(resource)"/>
-              </div>
-              <span v-if="resource.variant === ResourceVariant.Object" class="text-aruna-text">
-              {{ `Size: ${formatBytes(resource.content_len)}` }}
-            </span>
-              <span v-else class="text-aruna-text">
-              {{ `Children: ${resource.children.length}` }}
-            </span>
             </CardContent>
           </Card>
 
@@ -396,14 +425,14 @@ function checkDirection(): 'horizontal' | 'vertical' {
 
             <Label for="license">License</Label>
             <Select>
-              <SelectTrigger class="w-fit bg-aruna-muted">
+              <SelectTrigger class="bg-aruna-muted w-full max-w-[450px]">
                 <SelectValue placeholder="Select a license for your resource"/>
               </SelectTrigger>
-              <SelectContent class="bg-aruna-bg/90">
+              <SelectContent class="bg-aruna-bg/90 truncate overflow-ellipsis">
                 <SelectGroup>
                   <SelectItem v-for="license in licenses" :value="license.tag"
                               class="hover:bg-aruna-fg">
-                    {{ license.tag }}
+                    {{ license.label }}
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -474,16 +503,20 @@ function checkDirection(): 'horizontal' | 'vertical' {
               </div>
               <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
                 <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Locked:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.locked || 'N/A'
-                  }}
+                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.locked || 'N/A' }}
                 </dd>
               </div>
               <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
                 <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Visibility:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.visibility || ''
-                  }}
+                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.visibility || '' }}
+                </dd>
+              </div>
+              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Deleted:</dt>
+                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.deleted }}
                 </dd>
               </div>
 
@@ -507,6 +540,13 @@ function checkDirection(): 'horizontal' | 'vertical' {
                     @click="closeInfo"
                     class="inline-flex w-fit bg-transparent text-aruna-highlight border border-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
               Close
+            </Button>
+
+            <Button v-if="infoSelection"
+                    variant="outline"
+                    @click="deleteResource(infoSelection)"
+                    class="inline-flex w-fit bg-transparent text-destructive border border-destructive hover:bg-destructive/25">
+              Delete
             </Button>
           </div>
 

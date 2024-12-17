@@ -9,9 +9,6 @@ export default defineNuxtConfig({
   experimental: {
     clientNodeCompat: true
   },
-  plugins: [
-    "~/plugins/preline.client.ts",
-  ],
   modules: ['@nuxtjs/tailwindcss', "shadcn-nuxt"],
   css: [
     '~/assets/styles/main.css',

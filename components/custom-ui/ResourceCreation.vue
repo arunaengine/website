@@ -268,13 +268,6 @@ function textAreaAutoHeight(domElement: HTMLTextAreaElement | null, offset = 0) 
     domElement.style.height = `${domElement.scrollHeight + offset}px`
   }
 }
-
-function openModal(modalId: string) {
-  let element = document.querySelector(`#${modalId}`) as HTMLElement
-  import('preline').then(({HSOverlay}) => {
-    HSOverlay.open(element)
-  })
-}
 */
 
 /*
