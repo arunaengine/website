@@ -44,31 +44,33 @@ const {toast} = useToast()
 
 /* ----- PROPERTIES ----- */
 interface RealmSwitcherProps {
-  realms: Realm[] | null
+  realms: Realm[] | undefined
 }
+
 const props = defineProps<RealmSwitcherProps>()
-console.log('[RealmSwitcher] Realms props type:', typeof props.realms)
-/* ----- END PROPERTIES ----- */
 const realms = toRef(() => props.realms)
 watch(realms, () => {
   console.log('[RealmSwitcher] Updated realms:', realms.value)
   if (realms.value && realms.value.length > 0 && selectedRealm.value.tag === 'placeholder')
     selectedRealm.value = realms.value[0]
 })
+/* ----- END PROPERTIES ----- */
 
-const realmsData = reactive({
-  label: 'Your Realms',
-  realms: realms
-})
-watch(realmsData, () => console.log('[RealmSwitcher] Updated realms data:', realmsData.realms ? realmsData.realms.length : 'null'))
+
+/* ----- EVENT EMITS ----- */
+const emit = defineEmits<{
+  'add-realm': [realm: Realm]
+}>()
+/* ----- END EVENT EMITS ----- */
 
 const open = ref(false)
 const showNewRealmDialog = ref(false)
-const selectedRealm = ref<Realm>(realms.value && realms.value.length > 0 ? realmsData.realms[0] : {
+const selectedRealm = ref<Realm>(realms.value && realms.value.length > 0 ? realms.value[0] : {
   id: '',
   name: 'Not a member of any realm',
   tag: 'placeholder',
-  description: ''
+  description: '',
+  deleted: false
 })
 
 function emitRealmSwitch() {
@@ -78,10 +80,7 @@ function emitRealmSwitch() {
 
 function addRealm(realm: Realm) {
   console.log('[RealmSwitcher]', `Emitted realm add: ${realm.name}`)
-  realmsData.realms ? realmsData.realms.push(realm) : realmsData.realms = [realm]
-
-  if (selectedRealm.value.tag === 'placeholder')
-    selectedRealm.value = realm
+  emit('add-realm', realm)
 }
 
 /* ----- FORM SCHEMA ----- */
@@ -164,8 +163,8 @@ const onSubmit = form.handleSubmit(async values => {
           <CommandList>
             <CommandInput placeholder="Search realm..." class="my-1 focus:ring-aruna-800 focus:border-0"/>
             <CommandEmpty>No realm found.</CommandEmpty>
-            <CommandGroup :key="realmsData.label" :heading="realmsData.label">
-              <CommandItem v-for="realm in realmsData.realms"
+            <CommandGroup heading="Your Realms">
+              <CommandItem v-for="realm in realms"
                            :key="realm.tag"
                            :value="realm"
                            class="text-sm"
@@ -174,14 +173,6 @@ const onSubmit = form.handleSubmit(async values => {
                              open = false
                              emitRealmSwitch()
                            }">
-                <!--
-                <Avatar class="mr-2 h-5 w-5">
-                  <AvatarImage
-                      :src="realm.logo || '/imgs/aruna_icon.webp'"
-                      :alt="realm.label"/>
-                  <AvatarFallback>SC</AvatarFallback>
-                </Avatar>
-                -->
                 <Avatar class="mr-2 h-5 w-5">
                   <AvatarImage
                       src="/imgs/aruna_icon.webp"
@@ -233,9 +224,9 @@ const onSubmit = form.handleSubmit(async values => {
               <Input type="text"
                      placeholder="A name for your realm"
                      v-bind="componentField"
-                     class="mt-0" />
+                     class="mt-0"/>
             </FormControl>
-            <FormMessage />
+            <FormMessage/>
           </FormItem>
         </FormField>
 
@@ -246,9 +237,9 @@ const onSubmit = form.handleSubmit(async values => {
               <Input type="text"
                      placeholder="A short tag for your realm"
                      v-bind="componentField"
-                     class="mt-0" />
+                     class="mt-0"/>
             </FormControl>
-            <FormMessage />
+            <FormMessage/>
           </FormItem>
         </FormField>
 
@@ -258,9 +249,9 @@ const onSubmit = form.handleSubmit(async values => {
             <FormControl>
               <Textarea v-bind="componentField"
                         :rows="5"
-                        placeholder="A concise description of your realm." />
+                        placeholder="A concise description of your realm."/>
             </FormControl>
-            <FormMessage />
+            <FormMessage/>
           </FormItem>
         </FormField>
       </form>

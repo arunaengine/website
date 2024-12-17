@@ -10,7 +10,6 @@ import {
 } from "@tabler/icons-vue";
 
 import {format} from 'date-fns/format'
-import type { Mail, Notification } from './data-notifications'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 import {Avatar, AvatarFallback} from '@/components/ui/avatar'
 import {Button} from '@/components/ui/button'
@@ -18,11 +17,11 @@ import {Separator} from '@/components/ui/separator'
 import {Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip'
 import {v2PersonalNotificationVariant} from "~/composables/aruna_api_json";
 
-interface MailDisplayProps {
-  mail: Notification | undefined //Mail | undefined
+interface EventDisplayProps {
+  eventData: BaseTx | undefined //Mail | undefined
 }
 
-const props = defineProps<MailDisplayProps>()
+const props = defineProps<EventDisplayProps>()
 
 const mailFallbackName = computed(() => {
   return 'A' //ToDo
@@ -48,7 +47,7 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
       <div class="flex items-center gap-2">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" :disabled="!mail">
+            <Button variant="ghost" size="icon" :disabled="!eventData">
               <IconArchive class="size-4"/>
               <span class="sr-only">Archive</span>
             </Button>
@@ -57,7 +56,7 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" :disabled="!mail">
+            <Button variant="ghost" size="icon" :disabled="!eventData">
               <IconArchiveOff class="size-4"/>
               <span class="sr-only">Move to junk</span>
             </Button>
@@ -66,7 +65,7 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" :disabled="!mail">
+            <Button variant="ghost" size="icon" :disabled="!eventData">
               <IconTrash class="size-4"/>
               <span class="sr-only">Move to trash</span>
             </Button>
@@ -141,7 +140,7 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
       <div class="ml-auto flex items-center gap-2">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" :disabled="!mail">
+            <Button variant="ghost" size="icon" :disabled="!eventData">
               <IconCornerUpLeft class="size-4"/>
               <span class="sr-only">Reply</span>
             </Button>
@@ -150,7 +149,7 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" :disabled="!mail">
+            <Button variant="ghost" size="icon" :disabled="!eventData">
               <IconCornerUpLeftDouble class="size-4"/>
               <span class="sr-only">Reply all</span>
             </Button>
@@ -159,7 +158,7 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" :disabled="!mail">
+            <Button variant="ghost" size="icon" :disabled="!eventData">
               <IconCornerUpRight class="size-4"/>
               <span class="sr-only">Forward</span>
             </Button>
@@ -170,7 +169,7 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
       <Separator orientation="vertical" class="mx-2 h-6"/>
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <Button variant="ghost" size="icon" :disabled="!mail">
+          <Button variant="ghost" size="icon" :disabled="!eventData">
             <IconDotsVertical class="size-4"/>
             <span class="sr-only">More</span>
           </Button>
@@ -184,7 +183,7 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
       </DropdownMenu>
     </div>
     <Separator/>
-    <div v-if="mail" class="flex flex-1 flex-col">
+    <div v-if="eventData" class="flex flex-1 flex-col">
       <div class="flex items-start p-4">
         <div class="flex items-start gap-4 text-sm">
           <Avatar>
@@ -194,11 +193,12 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
           </Avatar>
           <div class="grid gap-1">
             <div class="font-semibold">
-              {{ mail.from }}
+              {{ eventData.id }}
               <!--{{ mail.name || 'Aruna System' }}-->
             </div>
             <div class="line-clamp-1 text-xs">
-              {{ displayVariant(mail.variant) }}
+              {{ eventData.type }}
+              <!-- {{ displayVariant(eventData.variant) }} -->
               <!--{{ mail.subject }}-->
             </div>
             <div class="line-clamp-1 text-xs">
@@ -208,14 +208,16 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
             </div>
           </div>
         </div>
-        <div v-if="mail.date" class="ml-auto text-xs text-muted-foreground">
-          {{ format(new Date(mail.date), "PPpp") }}
+        <!--
+        <div v-if="eventData.date" class="ml-auto text-xs text-muted-foreground">
+          {{ format(new Date(eventData.date), "PPpp") }}
         </div>
+        -->
       </div>
 
       <Separator/>
       <div class="flex-1 whitespace-pre-wrap p-4 text-sm">
-        {{ mail.message }}
+        <pre>{{ JSON.stringify(eventData, null, 2).trim() }}</pre>
         <!--{{ mail.text }}-->
       </div>
       <!--

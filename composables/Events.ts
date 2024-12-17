@@ -1,28 +1,32 @@
 import EventBus from "~/composables/EventBus";
 
 // by convention, composable function names start with "use"
-export async function useEvents(refs: Ref[], user: Ref<User | undefined>) {
-
-  watch(user, () => console.log('[GetEvents] User updated:', user.value ? user.value.id : 'Undefined'))
-
+export async function useEvents(refs: Ref[], user_id: Ref<string | undefined>) {
   // state encapsulated and managed by the composable
-  const events: Ref<any[] | null> = ref(null)
+  const events: Ref<BaseTx[] | null> = ref(null)
   const {refresh: refreshEvents} = await useFetch<GetEventsResponse>('/api/v3/events', {
     server: false,
     lazy: true,
     watch: refs,
     query: {
-      subscriber_id: user.value ? user.value.id : ''
+      subscriber_id: user_id
     },
     onResponse({response}) {
+      let v3Events: any[] = []
       if (response.ok) {
-        console.log('[GetEvents]', response)
-        events.value = response._data.events
-        return
+        for (const event of response._data.events) {
+          const event_id = Object.keys(event)[0]
+          if (event_id) {
+            let eventMeta = event[event_id]
+            eventMeta.event_id = event_id
+            v3Events.push(eventMeta)
+          }
+        }
+      } else {
+        console.warn('[GetEvents] Response was not ok', response)
       }
 
-      console.warn('[GetEvents] Response was not ok', response)
-      events.value = []
+      events.value = v3Events
     },
     onResponseError({response}) {
       console.error('[GetEvents] Error response:', response)

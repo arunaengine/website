@@ -34,13 +34,12 @@ import Realms from "~/components/custom-ui/dashboard/Realms.vue";
 import DummyAnalytics from "~/components/custom-ui/dashboard/DummyAnalytics.vue";
 import ResourceCreation from "~/components/custom-ui/ResourceCreation.vue";
 import RealmSwitcher from "~/components/custom-ui/dashboard/RealmSwitcher.vue";
-import Notifications from "~/components/custom-ui/dashboard/Notifications.vue";
+import Events from "~/components/custom-ui/dashboard/Events.vue";
 import Profile from "~/components/custom-ui/user/Profile.vue";
 import Tokens from "~/components/custom-ui/user/Tokens.vue";
 import Proxies from "~/components/custom-ui/user/Proxies.vue";
 import SearchBar from "~/components/custom-ui/SearchBar.vue";
 
-import {notifis, v3_events} from './data-notifications'
 import type {User} from '~/composables/api_wrapper'
 import {toast} from "~/components/ui/toast";
 import {useStats} from "~/composables/Stats";
@@ -55,16 +54,17 @@ const props = defineProps<{
   user: User | undefined
 }>()
 const user = toRef(() => props.user)
-watchEffect(() => {
-  console.log('[Dashboard Component]', `User got updated: ${user.value ? user.value.id : 'Undefined'}`)
-})
+const user_id = toRef(() => user.value?.id)
+
+watch(user, () => console.log('[Dashboard Component]', `User got updated: ${user.value ? user.value.id : 'Undefined'}`))
+watch(user_id, () => console.log('[Dashboard Component]', `User Id updated: ${user_id.value}`))
 
 const route = useRoute()
 const tab = route.query.tab
 
 const endpoints = ref([]) //await fetchEndpoints() TODO
 
-const {events, refreshEvents} = await useEvents([user], user)
+const {events, refreshEvents} = await useEvents([user], user_id)
 const {realms, refreshRealms} = await useRealms()
 const {groups, refreshGroups} = await useGroups()
 const {tokens, refreshTokens} = await useTokens()
@@ -75,20 +75,17 @@ watch(realms, () => console.log('[Dashboard] Realms updated to value:', realms.v
 watch(groups, () => console.log('[Dashboard] Groups updated to value:', groups.value))
 watch(events, () => console.log('[Dashboard] Events updated to value:', events.value))
 
-
 EventBus.on('updateStats', async () => await refreshStats())
 EventBus.on('updateRealms', async () => await refreshRealms())
 EventBus.on('updateGroups', async () => await refreshGroups())
 EventBus.on('updateProjects', async () => await refreshProjects())
 
-
-//const notifications = ref(3)
-const unreadEvents = computed(() => events.value ? events.value.filter((n: any) => !n.read).length : 0)
+const unreadEvents = computed(() => events.value ? events.value.length : 0)
 
 /* ----- DASHBOARD CONTENT ----- */
 const currentContent: Ref<string> = ref(tab as string || 'OverviewStats')
 const contentComponents = {
-  'Notifications': {component: Notifications},
+  'Events': {component: Events},
   'OverviewStats': {component: OverviewStats},
   'FileExplorer': {component: FileExplorer},
   'ResourceCreation': {component: ResourceCreation},
@@ -104,7 +101,7 @@ const componentProps = computed(() => {
       return stats.value
     case 'Events':
       return {
-        events: v3_events,
+        events: events.value,
         navCollapsedSize: 4
       }
     case 'FileExplorer':
@@ -144,6 +141,13 @@ EventBus.on('setTab', (tabId: string) => setTab(tabId))
 /* ----- END EXTERNAL TAB SWITCH ----- */
 
 /* ----- REALM SWITCH ----- */
+function addRealm(realm: Realm) {
+  if (realms.value)
+    realms.value.push(realm)
+  else
+    realms.value = [realm]
+}
+
 function setRealm(realmId: string) {
   //ToDo: Re-fetch things
   console.log('[Dashboard Component]', `Switched realm to: ${realmId}`)
@@ -175,15 +179,14 @@ EventBus.on('spinStop', () => spinBaby.value = false)
           </div>
 
           <div class="flex relative">
-            <Button disabled
-                    key="Notifications"
-                    :class="[{'bg-muted': currentContent === 'Notifications', 'text-primary': currentContent === 'Notifications' }]"
+            <Button key="Events"
+                    :class="[{'bg-muted': currentContent === 'Events', 'text-primary': currentContent === 'Events' }]"
                     class="ml-auto h-8 w-8"
                     size="icon"
                     variant="outline"
-                    @click="currentContent = 'Notifications'">
+                    @click="currentContent = 'Events'">
               <IconBell class="h-4 w-4"/>
-              <span class="sr-only">Toggle notifications</span>
+              <span class="sr-only">Toggle events</span>
             </Button>
             <Badge v-if="unreadEvents > 0"
                    class="absolute animate-bounce -bottom-1 -right-1 -mb-1 -mr-1 bg-red-400 hover:bg-red-400 text-white text-xs font-bold w-4 h-4 flex items-center justify-center rounded-full">
@@ -310,7 +313,9 @@ EventBus.on('spinStop', () => spinBaby.value = false)
 
         <div class="flex flex-col sm:flex-row w-full space-x-4">
           <ClientOnly fallbackTag="span">
-            <RealmSwitcher :realms="realms" class="flex"/>
+            <RealmSwitcher class="flex"
+                           :realms="realms"
+                           @add-realm="addRealm" />
             <template #fallback>
               <Skeleton class="h-auto w-[300px]"/>
             </template>
