@@ -2,13 +2,18 @@
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {cn} from '@/utils/shadcn'
 import {Badge} from '@/components/ui/badge'
+import {decodeTime} from 'ulid'
+import {formatDate} from '~/composables/utils'
+import {formatDistanceToNow} from "date-fns";
 
+/* ----- Component Properties ----- */
 interface EventListProps {
   items: BaseTx[] //Mail[]
 }
 
 defineProps<EventListProps>()
-const selectedMail = defineModel<string>('selectedMail', {required: false})
+const selectedEvent = defineModel<string>('selectedEvent', {required: false})
+/* ----- End Component Properties ----- */
 </script>
 
 <template>
@@ -16,34 +21,37 @@ const selectedMail = defineModel<string>('selectedMail', {required: false})
     <div class="flex-1 flex flex-col gap-2 p-4 pt-0">
       <TransitionGroup name="list" appear>
         <button v-for="item of items"
-                :key="item.id"
+                :key="item.event_id"
                 :class="cn('flex flex-col items-start gap-2 rounded-lg border p-3 text-left text-sm transition-all hover:bg-accent',
-                selectedMail === item.id && 'bg-muted',)"
-                @click="selectedMail = item.id">
+                selectedEvent === item.event_id && 'bg-muted',)"
+                @click="selectedEvent = item.event_id">
           <div class="flex w-full flex-col gap-1">
             <div class="flex items-center">
               <div class="flex items-center gap-2">
                 <div class="font-semibold">
-                  {{ item.id }}
+                  {{ item.type }}
                   <!--{{ item.name }}-->
                 </div>
                 <!--
                 <span v-if="!item.read" class="flex h-2 w-2 rounded-full bg-blue-600"/>
                 -->
               </div>
-              <div
-                  :class="cn(
-                  'ml-auto text-xs',
-                  selectedMail === item.id
-                    ? 'text-foreground'
-                    : 'text-muted-foreground',)">
-                <!-- {{ formatDistanceToNow(new Date(item.date), {addSuffix: true}) }} -->
+              <div :class="cn('ml-auto text-xs', selectedEvent === item.event_id ? 'text-foreground' : 'text-muted-foreground',)">
+                <TooltipProvider :delay-duration="100">
+                  <Tooltip>
+                    <TooltipTrigger>
+                      {{ formatDistanceToNow(new Date(decodeTime(item.event_id))) + ' ago' }}
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{{ formatDate(new Date(decodeTime(item.event_id)).toString()) }}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
 
             <div class="text-xs font-medium">
-              {{ item.type }}
-              <!--{{ item.subject }}-->
+              {{ item.event_id }}
             </div>
           </div>
           <div class="line-clamp-2 text-xs text-muted-foreground">

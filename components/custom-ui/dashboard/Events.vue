@@ -14,6 +14,7 @@ import {
 import {TooltipProvider} from '@/components/ui/tooltip'
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable'
 
+/* ----- PROPERTIES ----- */
 interface EventsProps {
   events: BaseTx[]
   defaultLayout?: number[]
@@ -27,11 +28,12 @@ const props = withDefaults(defineProps<EventsProps>(), {
 })
 
 const events = toRef(() => props.events)
-
 watch(events, (newVal) => console.log('[EventsComponent]', newVal))
+/* ----- END PROPERTIES ----- */
 
 const isCollapsed = ref(props.defaultCollapsed)
-const selectedEvent = ref<string | undefined>(events.value[0].id)
+const selectedEvent = ref<string | undefined>(events.value[0].event_id)
+
 const searchValue = ref('')
 const debouncedSearch = refDebounced(searchValue, 250)
 
@@ -52,7 +54,7 @@ const filteredMailList = computed(() => {
 })
 
 const unreadEventsList = computed(() => filteredMailList.value.filter(item => true))
-const selectedEventData = computed(() => props.events.find(item => item.id === selectedEvent.value))
+const selectedEventData = computed(() => props.events.find(item => item.event_id === selectedEvent.value))
 
 function onCollapse() {
   isCollapsed.value = true
@@ -94,10 +96,10 @@ function onExpand() {
             </form>
           </div>
           <TabsContent value="all" class="m-0 h-full">
-            <EventList v-model:selected-mail="selectedEvent" :items="filteredMailList"/>
+            <EventList v-model:selected-event="selectedEvent" :items="filteredMailList"/>
           </TabsContent>
           <TabsContent value="unread" class="m-0">
-            <EventList v-model:selected-mail="selectedEvent" :items="unreadEventsList"/>
+            <EventList v-model:selected-event="selectedEvent" :items="unreadEventsList"/>
           </TabsContent>
         </Tabs>
       </ResizablePanel>

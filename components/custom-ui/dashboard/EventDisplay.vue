@@ -8,37 +8,27 @@ import {
     IconDotsVertical,
     IconTrash
 } from "@tabler/icons-vue";
-
 import {format} from 'date-fns/format'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 import {Avatar, AvatarFallback} from '@/components/ui/avatar'
 import {Button} from '@/components/ui/button'
 import {Separator} from '@/components/ui/separator'
 import {Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip'
-import {v2PersonalNotificationVariant} from "~/composables/aruna_api_json";
 
+/* ----- PROPERTIES ----- */
 interface EventDisplayProps {
   eventData: BaseTx | undefined //Mail | undefined
 }
 
 const props = defineProps<EventDisplayProps>()
+/* ----- END PROPERTIES ----- */
 
-const mailFallbackName = computed(() => {
-  return 'A' //ToDo
-  /*
-  return props.mail?.name
-      .split(' ')
-      .map(chunk => chunk[0])
-      .join('')
-  */
+const eventAbbreviation = computed(() => {
+  const parts = props.eventData?.type.match(/[A-Z][a-z]+/g)
+  return parts?.map(chunk => chunk[0]).join('')
 })
 
 const today = new Date()
-
-function displayVariant(variant: v2PersonalNotificationVariant) {
-  const label = variant.replace('PERSONAL_NOTIFICATION_VARIANT_', '').replace('_', ' ').toLowerCase()
-  return label.charAt(0).toUpperCase() + label.slice(1)
-}
 </script>
 
 <template>
@@ -92,8 +82,7 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
                 <div class="grid min-w-[250px] gap-1">
                   <Button
                       variant="ghost"
-                      class="justify-start font-normal"
-                  >
+                      class="justify-start font-normal">
                     Later today
                     <span class="ml-auto text-muted-foreground">
                       {{ format(addHours(today, 4), "E, h:m b") }}
@@ -188,12 +177,12 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
         <div class="flex items-start gap-4 text-sm">
           <Avatar>
             <AvatarFallback>
-              {{ mailFallbackName }}
+              {{ eventAbbreviation }}
             </AvatarFallback>
           </Avatar>
           <div class="grid gap-1">
             <div class="font-semibold">
-              {{ eventData.id }}
+              {{ eventData.event_id }}
               <!--{{ mail.name || 'Aruna System' }}-->
             </div>
             <div class="line-clamp-1 text-xs">
@@ -217,16 +206,16 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
 
       <Separator/>
       <div class="flex-1 whitespace-pre-wrap p-4 text-sm">
-        <pre>{{ JSON.stringify(eventData, null, 2).trim() }}</pre>
-        <!--{{ mail.text }}-->
+        <pre class="break-words text-wrap">{{ JSON.stringify(eventData, null, 2).trim() }}</pre>
+        <!-- TODO: Human readable event summary -->
       </div>
-      <!--
+
       <Separator class="mt-auto"/>
       <div class="p-4">
         <form>
           <div class="grid gap-4">
             <Textarea class="p-4"
-                      :placeholder="`Reply ${mail.name}...`"/>
+                      :placeholder="`Reply ${eventData.type}...`"/>
             <div class="flex items-center">
               <Label html-for="mute"
                      class="flex items-center gap-2 text-xs font-normal">
@@ -242,7 +231,7 @@ function displayVariant(variant: v2PersonalNotificationVariant) {
           </div>
         </form>
       </div>
-      -->
+
     </div>
     <div v-else class="p-8 text-center text-muted-foreground">
       No message selected
