@@ -1,46 +1,73 @@
 <script setup lang="ts">
+import {IconCaretUpDown, IconCubePlus} from "@tabler/icons-vue";
 import {VisSingleContainer, VisGraph, VisTooltip} from '@unovis/vue'
 import {Graph, GraphLayoutType, Position, Tooltip} from '@unovis/ts'
 import {ref, computed} from "vue"
+import DataproxyDialog from "~/components/custom-ui/dialog/DataproxyDialog.vue";
+import RealmComponentDialog from "~/components/custom-ui/dialog/RealmComponentDialog.vue";
 
-const realms = [
-  {
-    name: 'FAIR DS',
-    status: 'Active',
-    description: 'FAIR DS aims to create a comprehensive infrastructure that promotes the Findability, Accessibility, Interoperability, and Reusability (FAIR) of research data across various disciplines. By establishing data spaces that bridge different scientific fields, FAIR DS facilitates data sharing and collaboration on a national and international scale.',
-    quota: '2.3 / 5.0 TiB',
-  },
-  {
-    name: 'NFDI4Biodiversity',
-    status: 'Active',
-    description: 'NFDI4Biodiversity develops a digital infrastructure for biodiversity research, enabling the integration, sharing, and analysis of diverse biodiversity datasets. By providing resources and tools, it supports researchers and policymakers in understanding and addressing biodiversity-related challenges at local and global levels.',
-    quota: '1.4 / 5.0 TiB',
-  },
-  {
-    name: 'NFDI4Microbiota',
-    status: 'Active',
-    description: 'NFDI4Microbiota focuses on building a research data infrastructure specifically for microbiome and microbiota research. It provides standardized tools, protocols, and data management services to support data sharing, analysis, and long-term storage, fostering collaboration among microbiologists and related disciplines.',
-    quota: '2.9 / 5.0 TiB',
-  },
-  {
-    name: 'NFDI4Health',
-    status: 'Inactive',
-    description: 'NFDI4Health aims to establish a research data infrastructure tailored to public health and epidemiology. It provides tools, standards, and services to facilitate the secure collection, management, and sharing of health-related data. By promoting interoperability and supporting data-driven research, NFDI4Health enables researchers and policymakers to gain insights into population health trends and improve public health outcomes.',
-    quota: '4.6 / 5.0 TiB',
-  },
-]
+/* ----- Deprecated imports ----- */
+import {useToast} from '~/components/ui/toast/use-toast'
+
+const {toast} = useToast()
+import {nodes, links, sites, StatusMap, type NodeDatum, type LinkDatum} from './data-circular'
+import type {v2Endpoint} from "~/composables/aruna_api_json";
+/* ----- End Deprecated imports ----- */
+
+
+/* ----- PROPERTIES ----- */
+interface RealmsProps {
+  realms: Realm[]
+}
+
+const props = defineProps<RealmsProps>()
+const realms = toRef(() => props.realms)
+const currentRealm = ref<string | undefined>(undefined)
+/* ----- END PROPERTIES ----- */
+
+const realmComponents = ref<v3Component[]>([])
+const realmContext = ref<string | undefined>(undefined)
+watch(realmContext, async () => {
+  await $fetch<GetRealmComponentsResponse>('/api/v3/components', {
+    query: {
+      id: realmContext.value
+    }
+  }).then(response => {
+    console.info('[Realms Component]', response)
+    realmComponents.value = response.components
+  })
+})
+EventBus.on('switchRealm', (realmId: string) => realmContext.value = realmId)
+
 
 function displayDescription(description: string, maxLength: number = 50): string {
   return description.length > maxLength ? description.slice(0, maxLength) + " ..." : description
+}
+
+function splitDescription(description: string) {
+  const splitIndex = description.indexOf('.')
+  console.info('[Realms Component]', [description.slice(0, splitIndex), description.slice(splitIndex + 1)])
+  return [description.slice(0, splitIndex), description.slice(splitIndex + 1)]
 }
 
 const disableTooltips = ref<boolean>(false)
 const container = document.body
 watch(disableTooltips, () => console.log('[Disabled Tooltips]', disableTooltips.value))
 
-import {nodes, links, sites, StatusMap, type NodeDatum, type LinkDatum} from './data-circular'
-import type {v2Endpoint} from "~/composables/aruna_api_json";
-import DataproxyDialog from "~/components/custom-ui/dialog/DataproxyDialog.vue";
+
+const componentDialogOpen = ref<boolean>(false)
+
+function openComponentCreation(realmId: string) {
+  currentRealm.value = realmId
+  componentDialogOpen.value = true
+}
+
+function addComponent(component: v3Component) {
+  toast({
+    title: 'Event Received',
+    description: `Received "AddComponent" event: ${component.id}`
+  })
+}
 
 // Reactive statements
 const expanded = ref<string[]>(['instance-gi', 'instance-bi', 'instance-be', 'instance-tu'])
@@ -91,7 +118,7 @@ const triggers = computed(() => {
   }
 })
 
-const clickedEndpoint: Ref<v2Endpoint  | undefined> = ref(undefined)
+const clickedEndpoint: Ref<v2Endpoint | undefined> = ref(undefined)
 const detailDialogOpen = ref<boolean>(false)
 
 // Graph config
@@ -135,33 +162,79 @@ const graphConfig = computed(() => ({
                    :endpoint="clickedEndpoint"
                    @update:open="detailDialogOpen = false"/>
 
-  <div class="flex flex-col">
+  <RealmComponentDialog :initial-open="componentDialogOpen"
+                        :with-button="false"
+                        :realm-id="currentRealm"
+                        @add-component=""
+                        @update:open="componentDialogOpen = false"/>
+
+  <div class="mx-4 mt-4 flex flex-col">
     <div class="flex flex-row items-center justify-center max-w-screen-2xl lg:max-w-[80vw]">
       <Table>
         <TableCaption>A list of your active realms</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead class="text-lg">Realm</TableHead>
-            <TableHead class="text-lg">Status</TableHead>
             <TableHead class="text-lg">Description</TableHead>
-            <TableHead class="text-lg text-center">Quota</TableHead>
+            <TableHead class="text-lg">Id</TableHead>
+            <TableHead class="text-lg">Tag</TableHead>
+            <TableHead class="text-lg text-center">Deleted</TableHead>
+            <TableHead class="text-lg text-center">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow v-for="realm in realms" :key="realm.name">
-            <TableCell class="font-medium">
-              {{ realm.name }}
+            <TableCell class="font-bold">{{ realm.name }}</TableCell>
+            <!--<TableCell>{{ displayDescription(realm.description, 128) }}</TableCell>-->
+            <TableCell>
+
+              <Collapsible>
+                <div class="flex justify-between">
+                  {{ splitDescription(realm.description)[0] }}.
+                  <CollapsibleTrigger class="text-left">
+                    <Button variant="ghost" class="p-0 text-aruna-highlight size-4">
+                      <IconCaretUpDown/>
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
+                <CollapsibleContent class="mt-2">
+                  {{ splitDescription(realm.description)[1] }}
+                </CollapsibleContent>
+              </Collapsible>
+
             </TableCell>
-            <TableCell>{{ realm.status }}</TableCell>
-            <TableCell>{{ displayDescription(realm.description, 128) }}</TableCell>
-            <TableCell class="text-right">
-              {{ realm.quota }}
+            <TableCell class="font-medium">{{ realm.id }}</TableCell>
+            <TableCell>{{ realm.tag }}</TableCell>
+            <TableCell class="text-center">{{ realm.deleted }}</TableCell>
+            <TableCell class="h-full flex justify-center items-center text-center">
+              <IconCubePlus title="Create a new realm component"
+                            class="text-aruna-text-accent hover:text-aruna-highlight hover:cursor-pointer"
+                            @click="openComponentCreation(realm.id)"/>
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
     </div>
+
     <Separator class="my-6"/>
+
+    <h2 class="mb-6 text-2xl font-bold md:text-3xl md:leading-tight text-aruna-text-accent">
+      Components of currently selected realm:
+    </h2>
+    <Card v-for="component in realmComponents" class="w-fit">
+      <CardHeader>
+        <CardTitle>{{ component.name }}</CardTitle>
+        <CardDescription>{{ component.id }}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <pre>{{ JSON.stringify(component, null, 2) }}</pre>
+      </CardContent>
+      <CardFooter>
+        This component is public: {{ component.public }}
+      </CardFooter>
+    </Card>
+
+    <!--
     <div class="flex flex-col chart">
       <VisSingleContainer :data="data" height="60vh">
         <VisGraph v-bind="graphConfig"
@@ -184,6 +257,7 @@ const graphConfig = computed(() => ({
 
       </VisSingleContainer>
     </div>
+    -->
   </div>
 </template>
 
