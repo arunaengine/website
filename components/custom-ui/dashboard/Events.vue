@@ -70,7 +70,7 @@ function onExpand() {
     <ResizablePanelGroup
         id="resize-panel-group-1"
         direction="horizontal"
-        class="h-full max-h-[calc(100vh-200px)] items-stretch">
+        class="h-full max-h-[calc(100vh-130px)] items-stretch">
       <ResizablePanel id="resize-panel-1" :default-size="defaultLayout[0]" :min-size="30">
         <Tabs default-value="all" class="h-full">
           <div class="flex items-center px-4 py-2">
