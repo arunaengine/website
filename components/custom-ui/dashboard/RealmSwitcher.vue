@@ -49,6 +49,15 @@ interface RealmSwitcherProps {
 
 const props = defineProps<RealmSwitcherProps>()
 const realms = toRef(() => props.realms)
+const selected = defineModel<Realm>('realmSelection', {
+  default: {
+    id: '',
+    name: 'Not a member of any realm',
+    tag: 'placeholder',
+    description: '',
+    deleted: false
+  }
+})
 watch(realms, () => {
   console.log('[RealmSwitcher] Updated realms:', realms.value)
   if (realms.value && realms.value.length > 0 && selectedRealm.value.tag === 'placeholder')
@@ -61,6 +70,17 @@ watch(realms, () => {
 const emit = defineEmits<{
   'add-realm': [realm: Realm]
 }>()
+
+function addRealm(realm: Realm) {
+  //console.info('[RealmSwitcher]', `Emitted realm add: ${realm.name}`)
+  emit('add-realm', realm)
+}
+
+function emitRealmSwitch() {
+  //console.info('[RealmSwitcher]', `Emitted realm switch to: ${selectedRealm.value.name}`)
+  EventBus.emit('switchRealm', selectedRealm.value.id)
+}
+
 /* ----- END EVENT EMITS ----- */
 
 const open = ref(false)
@@ -72,16 +92,6 @@ const selectedRealm = ref<Realm>(realms.value && realms.value.length > 0 ? realm
   description: '',
   deleted: false
 })
-
-function emitRealmSwitch() {
-  console.log('[RealmSwitcher]', `Emitted realm switch to: ${selectedRealm.value.name}`)
-  EventBus.emit('switchRealm', selectedRealm.value.name)
-}
-
-function addRealm(realm: Realm) {
-  console.log('[RealmSwitcher]', `Emitted realm add: ${realm.name}`)
-  emit('add-realm', realm)
-}
 
 /* ----- FORM SCHEMA ----- */
 const formSchema = toTypedSchema(
@@ -107,8 +117,11 @@ const onSubmit = form.handleSubmit(async values => {
       addRealm(response.realm)
       toast({
         title: 'Info',
-        description: `Realm creation succeeded. Switched realm to: ${response.realm.name}`
+        description: realms.value && realms.value.length > 0 ?
+            'Realm creation succeeded.' :
+            `Realm creation succeeded. Switched realm to: ${response.realm.name}`
       })
+      showNewRealmDialog.value = false
     } else {
       toast({
         title: 'Error',
@@ -134,24 +147,14 @@ const onSubmit = form.handleSubmit(async values => {
   <Dialog v-model:open="showNewRealmDialog">
     <Popover v-model:open="open">
       <PopoverTrigger as-child>
-        <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded="open"
-            aria-label="Select a team"
-            :class="cn('w-[300px] justify-between hover:bg-[#1F375E]', $attrs.class ?? '')">
-          <!--
+        <Button variant="outline"
+                role="combobox"
+                aria-expanded="open"
+                aria-label="Select a team"
+                :class="cn('w-[300px] justify-between hover:bg-[#1F375E]', $attrs.class ?? '')">
           <Avatar class="mr-2 h-5 w-5">
-            <AvatarImage
-                :src="selectedRealm.logo || '/imgs/aruna_icon.webp'"
-                :alt="selectedRealm.name"/>
-            <AvatarFallback>SC</AvatarFallback>
-          </Avatar>
-          -->
-          <Avatar class="mr-2 h-5 w-5">
-            <AvatarImage
-                src="/imgs/aruna_icon.webp"
-                :alt="selectedRealm.name"/>
+            <AvatarImage src="/imgs/aruna_icon.webp"
+                         :alt="selectedRealm.name"/>
             <AvatarFallback>SC</AvatarFallback>
           </Avatar>
           {{ selectedRealm.name }}
@@ -159,7 +162,7 @@ const onSubmit = form.handleSubmit(async values => {
         </Button>
       </PopoverTrigger>
       <PopoverContent class="w-[300px] p-1">
-        <Command :filter-function="(list, term) => list.filter(i => i.name?.toLowerCase()?.includes(term)) ">
+        <Command :filter-function="(list: Realm[], term: string) => list.filter(i => i.name?.toLowerCase()?.includes(term)) ">
           <CommandList>
             <CommandInput placeholder="Search realm..." class="my-1 focus:ring-aruna-800 focus:border-0"/>
             <CommandEmpty>No realm found.</CommandEmpty>
@@ -170,18 +173,17 @@ const onSubmit = form.handleSubmit(async values => {
                            class="text-sm"
                            @select="() => {
                              selectedRealm = realm
+                             selected = realm
                              open = false
                              emitRealmSwitch()
                            }">
                 <Avatar class="mr-2 h-5 w-5">
-                  <AvatarImage
-                      src="/imgs/aruna_icon.webp"
-                      :alt="selectedRealm.name"/>
+                  <AvatarImage src="/imgs/aruna_icon.webp"
+                               :alt="selectedRealm.name"/>
                   <AvatarFallback>SC</AvatarFallback>
                 </Avatar>
                 {{ realm.name }}
-                <IconCheck
-                    :class="cn('ml-auto h-4 w-4',
+                <IconCheck :class="cn('ml-auto h-4 w-4',
                              selectedRealm.tag === realm.tag
                                ? 'opacity-100'
                                : 'opacity-0',
@@ -255,40 +257,6 @@ const onSubmit = form.handleSubmit(async values => {
           </FormItem>
         </FormField>
       </form>
-
-      <!--
-      <div>
-        <div class="space-y-4 pb-4">
-          <div class="space-y-2">
-            <Label for="name">Realm name</Label>
-            <Input id="name" placeholder="A name for your realm"/>
-          </div>
-          <div class="space-y-2">
-            <Label for="plan">Subscription plan</Label>
-            <Select>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a plan"/>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="free">
-                  <span class="font-medium">Free</span> -
-                  <span class="text-muted-foreground">
-                    Trial for two weeks
-                  </span>
-                </SelectItem>
-                <SelectItem value="pro">
-                  <span class="font-medium">Pro</span> -
-                  <span class="text-muted-foreground">
-                    $90/month per user
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-      -->
-
       <DialogFooter>
         <Button variant="outline"
                 class="text-aruna-text border border-aruna-text"
