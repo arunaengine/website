@@ -117,8 +117,7 @@ const triggers = computed(() => {
     },
   }
 })
-
-const clickedEndpoint: Ref<v2Endpoint | undefined> = ref(undefined)
+const clickedComponent: Ref<v3Component | undefined> = ref(undefined)
 const detailDialogOpen = ref<boolean>(false)
 
 // Graph config
@@ -157,9 +156,9 @@ const graphConfig = computed(() => ({
 </script>
 
 <template>
-  <DataproxyDialog :initial-open="detailDialogOpen"
+  <ComponentDialog :initial-open="detailDialogOpen"
                    :with-button="false"
-                   :endpoint="clickedEndpoint"
+                   :component="clickedComponent"
                    @update:open="detailDialogOpen = false"/>
 
   <RealmComponentDialog :initial-open="componentDialogOpen"

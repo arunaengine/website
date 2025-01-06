@@ -14,7 +14,7 @@ import type {v2Endpoint} from "~/composables/aruna_api_json";
 const props = defineProps<{
   initialOpen: boolean,
   withButton: boolean,
-  endpoint: v2Endpoint
+  component: v3Component
 }>()
 const externalTrigger = toRef(props, 'initialOpen')
 const open = ref(props.initialOpen)
@@ -30,15 +30,15 @@ const emit = defineEmits(['closeCredentialsDialog'])
   <Dialog v-model:open="open">
     <DialogTrigger v-if="withButton" as-child>
       <Button variant="outline">
-        Show DataProxy
+        Component Details
       </Button>
     </DialogTrigger>
     <DialogContent @close="emit('closeCredentialsDialog')"
                    class="sm:max-w-screen-md sm:rounded-md">
       <DialogHeader>
-        <DialogTitle class="mb-2 text-center text-aruna-700 font-bold">{{ endpoint.name }}</DialogTitle>
-        <DialogDescription v-if="endpoint.name" class="text-center">
-          <p class="mb-2 text-md"><span class="font-bold italic">{{ endpoint.id }}</span></p>
+        <DialogTitle class="mb-2 text-center text-aruna-700 font-bold">{{ component.name }}</DialogTitle>
+        <DialogDescription v-if="component.name" class="text-center">
+          <p class="mb-2 text-md"><span class="font-bold italic">{{ component.id }}</span></p>
           <!--<p class="text-sm">{{ endpoint.id }}</p>-->
         </DialogDescription>
       </DialogHeader>
@@ -46,24 +46,21 @@ const emit = defineEmits(['closeCredentialsDialog'])
         <div class="border-y border-gray-100">
           <dl class="divide-y divide-gray-100">
             <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-              <dt class="text-sm font-medium leading-6 text-gray-400">Status</dt>
-              <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">{{ endpoint.status }}</dd>
-            </div>
-            <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-              <dt class="text-sm font-medium leading-6 text-gray-400">Public Endpoint</dt>
-              <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">{{ endpoint.isPublic }}</dd>
-            </div>
-            <!--
-            <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-              <dt class="text-sm font-medium leading-6 text-gray-400">Has Modules</dt>
+              <dt class="text-sm font-medium leading-6 text-gray-400">Type</dt>
               <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">
-                {{ endpoint.hostConfigs && endpoint.hostConfigs.length > 0 }}
+                {{ component.component_type }}
               </dd>
-            </div>-->
-            <div v-if="endpoint.hostConfigs && endpoint.isPublic" class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-              <dt class="text-sm font-medium leading-6 text-gray-400">Modules</dt>
+            </div>
+            <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt class="text-sm font-medium leading-6 text-gray-400">Is publicly accessible</dt>
               <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">
-                <pre>{{ JSON.stringify(endpoint.hostConfigs, null, 2) }}</pre>
+                {{ component.public}}
+              </dd>
+            </div>
+            <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt class="text-sm font-medium leading-6 text-gray-400">Endpoints</dt>
+              <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">
+                <pre class="flex gap-x-2" v-for="endpoint in component.endpoints"><span class="font-bold">{{ Object.keys(endpoint)[0] }}:</span>{{ Object.entries(endpoint)[0][1] }}</pre>
               </dd>
             </div>
           </dl>
