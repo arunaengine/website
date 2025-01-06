@@ -63,11 +63,8 @@ const selectedEvent = defineModel<string>('selectedEvent', {required: false})
             <Badge v-if="item.requester.Unregistered" variant="outline">Unregistered</Badge>
             <Badge v-if="item.requester.User" variant="secondary">User</Badge>
             <Badge v-if="item.requester.User?.impersonated_by" variant="default">Impersonated</Badge>
-            <!--
-            <Badge v-for="label of item.labels" :key="label" :variant="getBadgeVariantFromLabel(label)">
-              {{ label }}
-            </Badge>
-            -->
+            <Badge v-if="item.requester.User?.auth_method.Oidc" variant="default">OIDC</Badge>
+            <Badge v-if="item.requester.User?.auth_method.Aruna" variant="default">Aruna</Badge>
           </div>
         </button>
       </TransitionGroup>
