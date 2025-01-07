@@ -140,6 +140,8 @@ EventBus.on('setTab', (tabId: string) => setTab(tabId))
 /* ----- END EXTERNAL TAB SWITCH ----- */
 
 /* ----- REALM SWITCH ----- */
+const selectedRealm = ref<Realm | undefined>(realms.value ? realms.value[0] : undefined)
+watch(selectedRealm, () => console.info('[Dashboard Component] Bidirectional Realm Switch:', selectedRealm.value))
 function addRealm(realm: Realm) {
   if (realms.value)
     realms.value.push(realm)
@@ -314,6 +316,7 @@ EventBus.on('spinStop', () => spinBaby.value = false)
           <ClientOnly fallbackTag="span">
             <RealmSwitcher class="flex"
                            :realms="realms"
+                           v-model:realm-selection="selectedRealm"
                            @add-realm="addRealm" />
             <template #fallback>
               <Skeleton class="h-auto w-[300px]"/>
