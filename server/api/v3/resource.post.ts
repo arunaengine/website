@@ -1,4 +1,4 @@
-import {CreateResourceResponse} from "~/composables/aruna_v3/CreateResourceResponse";
+import {CreateResourceResponse} from "~/composables/api_wrapper";
 
 export default defineEventHandler(async event => {
   const body = await readBody(event)
