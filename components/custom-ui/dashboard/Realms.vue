@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import {IconBucket, IconCaretUpDown, IconCubePlus, IconProgressCheck, IconServer} from "@tabler/icons-vue";
+import {IconBucket, IconCaretUpDown, IconCubePlus, IconProgressCheck, IconServer, IconTrophy} from "@tabler/icons-vue";
 import {VisGraph, VisSingleContainer, VisTooltip} from '@unovis/vue'
 import {Graph, GraphLayoutType, GraphNodeShape, type GraphPanelConfig, Position, TrimMode} from '@unovis/ts'
 import {computed, ref} from "vue"
+import {addYears} from "date-fns"
 import ComponentDialog from "~/components/custom-ui/dialog/ComponentDialog.vue";
 import RealmComponentDialog from "~/components/custom-ui/dialog/RealmComponentDialog.vue";
 
@@ -116,7 +117,7 @@ watch(expandedRealms, () => console.info('[Realms Component] Expanded realms: ',
 const graphData = computed(() => {
   console.info('[Realms Component] Re-compute data for graph visualization with realm v3:', selectedRealm.value.name, realmComponents.value.length)
   const sites: Map<string, Site> = new Map()
-  const serverIds: Set<string> = new Set()
+  let serverIds: string[] = []
   for (const component of realmComponents.value) {
     // Parse and store location of component
     const siteLocation: string = JSON.parse(component.description).location //TODO: Error handling
@@ -162,7 +163,9 @@ const graphData = computed(() => {
         node.shape = GraphNodeShape.Square
         node.icon = '&#xf542;'
         site?.server.push(node)
-        serverIds.add(component.id)
+        if (!serverIds.includes(component.id) && expandedRealms.value.has(siteLocation)) {
+          serverIds.push(component.id)
+        }
         break
       case ComponentType.Data:
         node.shape = GraphNodeShape.Hexagon
@@ -216,6 +219,23 @@ const graphData = computed(() => {
       })
     } else {
       nodes.push(site.root)
+      serverIds.push(site.root.id)
+    }
+  }
+
+  console.info('[Realms Component] Server Ids: ', serverIds)
+
+  // Connect server instances
+  if (serverIds.length > 1) {
+    for (const[i, id] of serverIds.entries()) {
+      if (i < serverIds.length - 1) {
+        links.push({
+          source: id,
+          target: serverIds[i+1],
+          status: Status.Healthy,
+          showTraffic: true
+        } as LinkDatum)
+      }
     }
   }
 
@@ -265,13 +285,13 @@ function addComponent(component: v3Component) {
   })
 }
 
-async function createS3Credentials(component_id: string) {
+async function createS3Credentials(component: v3Component) {
   const request = {
-    component_id: component_id,
-    name: 'Some Credentials',
-    expires_at: new Date(1735040153000).toISOString(),
-    group_id: '01JFAP0EA748E60QQ55F452A2V', //TODO: ... ???
-    realm_id: '01JFAP0EA7KDWQKPYWA7DV3VQ7', //TODO: Currently selected?
+    component_id: component.id,
+    name: `${component.name} S3 credentials`,
+    expires_at: addYears(new Date(), 1).toISOString(), // Current default lifetime: 1 year
+    realm_id: selectedRealm.value.id,
+    group_id: '01JGXXBK17Q7A83WBQ45Q5GGW1', //TODO: ... ???
     scope: Scope.Personal
   } as CreateS3CredentialsRequest
 
@@ -280,6 +300,10 @@ async function createS3Credentials(component_id: string) {
     body: request
   }).then(response => {
     console.info('[CreateS3Credentials Client] Response', response)
+    toast({
+      title: 'Successfully created credentials:',
+      description: `Access Key Id: ${response.access_key} | Secret Key: ${response.secret_key}`
+    })
   })
 }
 
@@ -390,7 +414,7 @@ const expandedDescription = ref<Set<string>>(new Set())
                         @add-component=""
                         @update:open="componentDialogOpen = false"/>
 
-  <div class="mx-4 mt-4 flex flex-col">
+  <div class="mx-4 mt-4 h-full flex flex-col">
     <div class="flex flex-row items-center justify-center max-w-screen-2xl lg:max-w-[80vw]">
       <Table>
         <TableCaption>A list of your active realms</TableCaption>
@@ -443,15 +467,14 @@ const expandedDescription = ref<Set<string>>(new Set())
 
     <Separator class="my-6"/>
 
-    <div>
+    <div class="flex flex-col flex-grow">
       <div class="flex gap-x-12 items-center mb-8">
         <h2 class="text-2xl font-bold md:text-3xl md:leading-tight text-aruna-text-accent">
           Realm Components of <span class="text-aruna-highlight">{{ selectedRealm.name }}</span>
         </h2>
 
         <div class="flex items-center gap-x-2">
-          <Switch v-model:checked="displayAsCards"/>
-          Display as Cards
+          <Switch v-model:checked="displayAsCards"/> Display as Cards
         </div>
       </div>
 
@@ -500,14 +523,14 @@ const expandedDescription = ref<Set<string>>(new Set())
                       class="p-6 flex flex-col gap-y-4 items-start">
             <div class="w-full flex gap-x-2 justify-between">
               <Button variant="outline" @click="getS3Credentials(component.id)">Get Credentials</Button>
-              <Button variant="outline" @click="createS3Credentials(component.id)">Create Credentials</Button>
+              <Button variant="outline" @click="createS3Credentials(component)">Create Credentials</Button>
             </div>
           </CardFooter>
         </Card>
       </div>
 
       <div v-else class="w-full h-full chart">
-        <VisSingleContainer :data="graphData.data" height="60vh">
+        <VisSingleContainer :data="graphData.data" class="h-full">
           <VisGraph v-bind="graphConfig"
                     :layoutType="GraphLayoutType.Parallel"
                     :layoutGroupOrder="[]"
