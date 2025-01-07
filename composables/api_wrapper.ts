@@ -38,39 +38,56 @@ import type {ArunaError} from "~/composables/ArunaError";
 
 /* ----- V3 ----- */
 import type {paths, components} from "~/types/aruna-v3"
-import type {GetGroupsFromUserResponseGroups} from "~/types/aruna-v3-enums";
+import {type GetGroupsFromUserResponseGroups} from "~/types/aruna-v3-enums";
 
-// ----- Requests
+// ----- Requests -----
+export type RegisterUserRequest = paths["/api/v3/users"]["post"]["requestBody"]["content"]["application/json"];
+export type CreateComponentRequest = paths["/api/v3/global/components"]["post"]["requestBody"]["content"]["application/json"];
 export type CreateGroupRequest = paths["/api/v3/groups"]["post"]["requestBody"]["content"]["application/json"];
+export type CreateRealmRequest = paths["/api/v3/realms"]["post"]["requestBody"]["content"]["application/json"];
 export type CreateTokenRequest = paths["/api/v3/users/tokens"]["post"]["requestBody"]["content"]["application/json"];
+export type CreateResourceRequest = paths["/api/v3/resources"]["post"]["requestBody"]["content"]["application/json"];
+export type CreateS3CredentialsRequest = paths["/api/v3/users/s3credentials"]["post"]["requestBody"]["content"]["application/json"];
 
-// ----- Responses
+
+// ----- Responses -----
+// Global
+export type CreateComponentResponse = paths["/api/v3/global/components"]["post"]["responses"][200]["content"]["application/json"];
+
+// Groups
+export type CreateGroupResponse = paths["/api/v3/groups"]["post"]["responses"][200]["content"]["application/json"];
+
+// Info
 export type GetEventsResponse = paths["/api/v3/info/events"]["get"]["responses"][200]["content"]["application/json"];
 export type GetStatsResponse = paths["/api/v3/info/stats"]["get"]["responses"][200]["content"]["application/json"];
 export type SearchResponse = paths["/api/v3/info/search"]["get"]["responses"][200]["content"]["application/json"];
 
-export type GetUserResponse = paths["/api/v3/users"]["get"]["responses"][200]["content"]["application/json"];
-export type RegisterUserResponse = paths["/api/v3/users"]["post"]["responses"][200]["content"]["application/json"];
+// Realms
+export type CreateRealmResponse = paths["/api/v3/realms"]["post"]["responses"][200]["content"]["application/json"];
+export type GetRealmComponentsResponse = paths["/api/v3/realms/{id}/components"]["get"]["responses"][200]["content"]["application/json"];
+export type AddComponentToRealmResponse = paths["/api/v3/realms/{id}/components/{component_id}"]["patch"]["responses"][200]["content"]["application/json"];
 
+// Resources
+export type CreateProjectResponse = paths["/api/v3/resources/projects"]["post"]["responses"][200]["content"]["application/json"];
+export type CreateResourceResponse = paths["/api/v3/resources"]["post"]["responses"][200]["content"]["application/json"];
+export type GetResourcesResponse = paths["/api/v3/resources"]["get"]["responses"][200]["content"]["application/json"];
+export type GetRelationsResponse = paths["/api/v3/resources/{id}/relations"]["get"]["responses"][200]["content"]["application/json"];
+export type DeleteResourcesResponse = paths["/api/v3/resources/{id}"]["delete"]["responses"][200]["content"]["application/json"];
+
+// Users
+export type RegisterUserResponse = paths["/api/v3/users"]["post"]["responses"][200]["content"]["application/json"];
+export type GetUserResponse = paths["/api/v3/users"]["get"]["responses"][200]["content"]["application/json"];
+export type CreateTokenResponse = paths["/api/v3/users/tokens"]["post"]["responses"][200]["content"]["application/json"];
 export type GetRealmsFromUserResponse = paths["/api/v3/users/realms"]["get"]["responses"][200]["content"]["application/json"];
 export type GetGroupsFromUserResponse = paths["/api/v3/users/groups"]["get"]["responses"][200]["content"]["application/json"];
 export type GetTokensFromUserResponse = paths["/api/v3/users/tokens"]["get"]["responses"][200]["content"]["application/json"];
+export type CreateS3CredentialsResponse = paths["/api/v3/users/s3credentials"]["post"]["responses"][200]["content"]["application/json"];
 export type GetS3CredentialsFromUserResponse = paths["/api/v3/users/s3credentials"]["get"]["responses"][200]["content"]["application/json"];
 
-export type GetRelationsResponse = paths["/api/v3/resources/{id}/relations"]["get"]["responses"][200]["content"]["application/json"];
-export type GetResourcesResponse = paths["/api/v3/resources"]["get"]["responses"][200]["content"]["application/json"];
-export type DeleteResourcesResponse = paths["/api/v3/resources/{id}"]["delete"]["responses"][200]["content"]["application/json"];
-
-export type GetRealmComponentsResponse = paths["/api/v3/realms/{id}/components"]["get"]["responses"][200]["content"]["application/json"];
-
-export type CreateProjectResponse = paths["/api/v3/resources/projects"]["post"]["responses"][200]["content"]["application/json"];
-export type CreateResourceResponse = paths["/api/v3/resources"]["post"]["responses"][200]["content"]["application/json"];
-export type CreateTokenResponse = paths["/api/v3/users/tokens"]["post"]["responses"][200]["content"]["application/json"];
-export type CreateRealmResponse = paths["/api/v3/realms"]["post"]["responses"][200]["content"]["application/json"];
-export type CreateGroupResponse = paths["/api/v3/groups"]["post"]["responses"][200]["content"]["application/json"];
-
-
-// ----- Structs
+// ----- Models -----
+// v3
+export type v3Component = components["schemas"]["Component"]
+export type Endpoint = components["schemas"]["Endpoint"]
 export type Author = components["schemas"]["Author"]
 export type Group = components["schemas"]["Group"]
 export type KeyValue = components["schemas"]["KeyValue"]
@@ -78,8 +95,10 @@ export type Realm = components["schemas"]["Realm"]
 export type Resource = components["schemas"]["Resource"]
 export type Token = components["schemas"]["Token"]
 export type User = components["schemas"]["User"]
+export type License = components["schemas"]["License"]
+export type S3Credential = components["schemas"]["S3Credential"]
 
-// ----- Custom
+// Custom
 export type ResourceElement = Resource & {
   children: ResourceElement[]
 }
@@ -89,7 +108,12 @@ export type GroupInfo = {
   permission: GetGroupsFromUserResponseGroups
 }
 
-// ----- Events
+export type SimpleCredentials = {
+  access_key: string
+  secret_key: string
+}
+
+// ----- Events -----
 export enum EventTypes {
   RegisterUser = 'RegisterUserRequestTx',
   CreateToken = 'CreateTokenRequestTx',
