@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {IconPlus, IconTrash} from '@tabler/icons-vue'
-import {type v2Author, type v2KeyValue, v2KeyValueVariant,} from '~/composables/aruna_api_json'
+import {type v2Author} from '~/composables/aruna_api_json'
 import {
   TagsInput,
   TagsInputInput,
@@ -162,11 +162,6 @@ const {handleSubmit, values, setFieldValue} = useForm({
 
 const {toast} = useToast()
 const onSubmit = handleSubmit(async (values) => {
-  toast({
-    title: 'You submitted the following values:',
-    description: h('pre', {class: 'mt-2 w-[500px] rounded-md bg-slate-950 p-4'}, h('code', {class: 'text-white'}, JSON.stringify(values, null, 2))),
-  })
-
   const request = {
     name: values.name,
     title: values.title,
@@ -179,8 +174,13 @@ const onSubmit = handleSubmit(async (values) => {
     identifiers: values.identifiers,
     license_tag: values.license_tag,
     authors: values.authors,
-    labels: values.labels,
+    labels: Array.from(keyValues.value.values()),
   }
+
+  toast({
+    title: 'You submitted the following values:',
+    description: h('pre', {class: 'mt-2 w-[500px] rounded-md bg-slate-950 p-4'}, h('code', {class: 'text-white'}, JSON.stringify(request, null, 2))),
+  })
 
   // Create resource in Aruna
   const api_endpoint = values.variant === ResourceVariant.Project ? '/api/v3/project' : '/api/v3/resource'
@@ -228,12 +228,12 @@ function removeAuthor(key: string) {
 /* ----- End Resource Authors ----- */
 
 /* ----- Resource key-values ----- */
-const keyValues = ref(new Map())
+const keyValues: Ref<Map<string, KeyValue>> = ref(new Map())
 const keyValueDialogOpen = ref(false);
 //const ontologyDialogOpen = ref(false);
 
-function addKeyValue(key: string, val: string, type: v2KeyValueVariant) {
-  keyValues.value.set(key, {key: key, value: val, variant: type} as v2KeyValue)
+function addKeyValue(key: string, val: string, locked: boolean) {
+  keyValues.value.set(key, {key: key, value: val, locked: locked} as KeyValue)
 }
 
 function removeKeyValue(key: string) {
@@ -871,7 +871,7 @@ async function waitForSync(s3client: S3Client, bucket: string, key: string): Pro
                         Value
                       </th>
                       <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-aruna-text-accent uppercase">
-                        Type
+                        Locked
                       </th>
                       <th scope="col" class="px-6 py-3 text-center text-sm font-bold text-aruna-text-accent uppercase">
                         Actions
@@ -886,7 +886,7 @@ async function waitForSync(s3client: S3Client, bucket: string, key: string): Pro
                       <td v-html="prettyDisplayJson(value.value)"
                           class="px-6 py-2 whitespace-nowrap text-sm text-aruna-text"></td>
                       <td class="px-6 py-2 whitespace-nowrap text-sm text-aruna-text">
-                        {{ toKeyValueVariantStr(value.variant) }}
+                        {{ value.locked }}
                       </td>
                       <td class="px-6 py-2 whitespace-nowrap text-center text-sm font-medium">
                         <button type="button"
@@ -927,12 +927,14 @@ async function waitForSync(s3client: S3Client, bucket: string, key: string): Pro
   <KeyValueDialog :initial-open="keyValueDialogOpen"
                   :with-button="false"
                   @update:open="keyValueDialogOpen = false"
-                  @add-key-value="({ key, value, variant }) => {
-                    addKeyValue(key, value, variant);
+                  @add-key-value="({ key, value, locked }) => {
+                    addKeyValue(key, value, locked);
                     keyValueDialogOpen = false;
                   }"/>
 
   <!-- TODO -->
-  <ModalObjectDisplay modalId="object-display" :object="createdResource" :progress="uploadProgress"
+  <ModalObjectDisplay modalId="object-display"
+                      :object="createdResource"
+                      :progress="uploadProgress"
                       :errorMsg="creationError"/>
 </template>
