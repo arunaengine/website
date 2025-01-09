@@ -1,12 +1,16 @@
 <script lang="ts" setup>
 import {
+  IconCheck,
+  IconExclamationCircle,
   IconFile,
   IconFolder,
   IconFolderPlus,
   IconFolderSymlink,
   IconInfoCircle,
+  IconLoader3,
   IconLock,
   IconPlus,
+  IconTreadmill,
   IconUpload,
   IconWorld,
 } from '@tabler/icons-vue'
@@ -14,15 +18,34 @@ import {Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator,} from '
 
 import type {GetRelationsResponse, ResourceElement} from "~/composables/api_wrapper"
 import {fetchChildren} from "~/composables/api_wrapper";
-import {ResourceVariant} from "~/types/aruna-v3-enums"
+import {ResourceVariant, SyncingStatus, VisibilityClass} from "~/types/aruna-v3-enums"
 import {toast} from "~/components/ui/toast";
 import {h} from "vue";
 
+const StatusMap = {
+  [SyncingStatus.Pending]: IconLoader3,
+  [SyncingStatus.Running]: IconTreadmill,
+  [SyncingStatus.Finished]: IconCheck,
+  [SyncingStatus.Error]: IconExclamationCircle,
+}
+
 const licenses = [
-  {tag: 'CC0', label: 'Creative Commons Zero (CC0 1.0)'},
-  {tag: 'CC-BY-SA 4.0', label: 'Attribution-ShareAlike 4.0 International (CC-BY-SA 4.0)'},
-  {tag: 'CC-BY-NC 4.0', label: 'Attribution-NonCommercial 4.0 International (CC-BY-NC)'},
-  {tag: 'CC-BY-NC-SA 4.0', label: 'Attribution-NonCommercial-ShareAlike 4.0 International (CC-BY-NC-SA)'}
+  {id: '01JFD6QDYWXTF2SXBQEW1VKM95', tag: 'CC0', label: 'Creative Commons Zero (CC0 1.0)'},
+  {
+    id: '01JFD6R28H3XMX2DRQZ7CEC200',
+    tag: 'CC-BY-SA 4.0',
+    label: 'Attribution-ShareAlike 4.0 International (CC-BY-SA 4.0)'
+  },
+  {
+    id: '01JFD6R7BBJQ7C1BDYQE2NADR6',
+    tag: 'CC-BY-NC 4.0',
+    label: 'Attribution-NonCommercial 4.0 International (CC-BY-NC)'
+  },
+  {
+    id: '01JFD6RC1JQHYWX4F4ZB1EBN0T',
+    tag: 'CC-BY-NC-SA 4.0',
+    label: 'Attribution-NonCommercial-ShareAlike 4.0 International (CC-BY-NC-SA)'
+  }
 ] //await fetchLicenses()
 
 /* ----- Dropzone ----- */
@@ -439,94 +462,114 @@ function checkDirection(): 'horizontal' | 'vertical' {
             </Select>
           </div>
 
-          <div v-else class="gap-y-4">
+          <div v-else-if="infoSelection" class="gap-y-4">
             <h2 class="text-2xl">{{ infoSelection?.title || 'Title not available' }}</h2>
-            <Separator class="bg-aruna-text/50 my-6"/>
-            <dl class="flex flex-col gap-y-4">
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Id:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.id || ''
-                  }}
-                </dd>
+            <Separator class="bg-aruna-text/50 mt-6"/>
+            <!--<span class="text-sm font-medium leading-6 text-aruna-text-accent">Labels:</span>-->
+            <ScrollArea>
+              <div class="flex p-4 ps-0 space-x-4 w-max whitespace-nowrap truncate">
+                <div v-for="label in infoSelection?.labels"
+                     class="flex flex-row my-1 last:me-0">
+                  <span :class="{'rounded-md': label.value === '' || label.value === undefined,
+                                 'rounded-l-md': label.value && label.value.length > 0}"
+                        class="text-xs font-medium truncate max-w-60 whitespace-nowrap items-center gap-x-1.5 py-1 px-2 rounded-l-md text-aruna-highlight border border-aruna-highlight">
+                    {{ label.key }}
+                  </span>
+                  <span v-if="label.value"
+                        class="truncate max-w-60 whitespace-nowrap items-center gap-x-1.5 py-1 px-2 rounded-r-lg text-xs font-medium border border-l-0 border-aruna-highlight text-aruna-bg bg-aruna-highlight">
+                    {{ label.value }}
+                  </span>
+                </div>
               </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Name:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.name || ''
-                  }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Description:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.description || ''
-                  }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Size:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+
+            <Table class="table-auto">
+              <TableBody class="">
+              <TableRow>
+                <TableCell class="w-fit text-sm font-medium leading-6 text-aruna-text-accent">Id:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.id || '' }}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Name:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.name || '' }}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="align-text-top text-sm font-medium leading-6 text-aruna-text-accent">Description:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.description || '' }}
+                </TableCell>
+              </TableRow>
+              <TableRow v-if="infoSelection?.variant === ResourceVariant.Object">
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Size:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ formatBytes(infoSelection?.content_len || 0) }}
-                </dd>
-              </div>
-              <div v-if="infoSelection?.variant !== ResourceVariant.Object"
-                   class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Children:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.count || 0
-                  }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Created At:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                </TableCell>
+              </TableRow>
+              <TableRow v-else>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Children:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.count || 0 }}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Created At:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ formatDate(infoSelection?.created_at || '') }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Last Modified:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Last Modified:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ formatDate(infoSelection?.last_modified || '') }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">License:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.license_tag || ''
-                  }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Locations:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">[...]</dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Locked:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">License:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.license_id || '' }}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm align-text-top font-medium leading-6 text-aruna-text-accent">Locations:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  <ul class="list-disc">
+                    <li class="flex gap-x-2" v-for="loc in infoSelection?.location">
+                      <component :is="StatusMap[loc.status as keyof typeof StatusMap]"
+                                 :class="{'text-aruna-text-accent animate-spin': loc.status === SyncingStatus.Pending,
+                                          'text-aruna-text-accent': loc.status === SyncingStatus.Running,
+                                          'text-green-600': loc.status === SyncingStatus.Finished,
+                                          'text-destructive': loc.status === SyncingStatus.Error}"/>
+                      {{ loc.endpoint_id }}
+                    </li>
+                  </ul>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Locked:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ infoSelection?.locked || 'N/A' }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Visibility:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Visibility:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ infoSelection?.visibility || '' }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Deleted:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Deleted:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ infoSelection?.deleted }}
-                </dd>
-              </div>
-
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Labels:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">[...]</dd>
-              </div>
-            </dl>
+                </TableCell>
+              </TableRow>
+              </TableBody>
+            </Table>
           </div>
-
 
           <div class="flex gap-x-4">
             <Button v-if="fileUpload"
@@ -538,14 +581,14 @@ function checkDirection(): 'horizontal' | 'vertical' {
             </Button>
             <Button variant="outline"
                     @click="closeInfo"
-                    class="inline-flex w-fit bg-transparent text-aruna-highlight border border-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
+                    class="inline-flex w-fit bg-transparent text-aruna-text border border-aruna-text hover:bg-aruna-h hover:text-aruna-text-accent hover:border-aruna-text-accent">
               Close
             </Button>
 
             <Button v-if="infoSelection"
                     variant="outline"
                     @click="deleteResource(infoSelection)"
-                    class="inline-flex w-fit bg-transparent text-destructive border border-destructive hover:bg-destructive/25">
+                    class="inline-flex w-fit bg-transparent text-destructive border border-destructive hover:bg-destructive/25 hover:text-destructive">
               Delete
             </Button>
           </div>
