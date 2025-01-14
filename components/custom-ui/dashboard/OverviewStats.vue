@@ -113,7 +113,7 @@ function emitTabSwitch(tabId: string) {
 
     <div class="flex items-center justify-center gap-y-6 gap-x-1">
       Wanna create or join a group? Take a look at your
-      <span class="font-bold text-aruna-highlight hover:text-aruna-highlight/80"
+      <span class="font-bold text-aruna-highlight hover:text-aruna-highlight/80 hover:cursor-pointer"
             @click="emitTabSwitch('Profile')">
         profile
       </span>.
