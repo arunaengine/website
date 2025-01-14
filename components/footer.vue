@@ -3,7 +3,7 @@ import {IconBrandGithub} from "@tabler/icons-vue";
 </script>
 <template>
   <div class="w-[100vw] bg-aruna-bg/90">
-    <footer class="w-full max-w-[85rem] p-4 sm:px-6 lg:px-8 mx-auto">
+    <footer class="w-full p-4 sm:px-6 lg:px-8 mx-auto">
       <!-- Grid -->
       <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-5 text-center">
         <div>

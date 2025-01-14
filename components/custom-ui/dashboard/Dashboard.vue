@@ -2,7 +2,6 @@
 import {
   IconAffiliate,
   IconBell,
-  IconDeviceDesktopAnalytics,
   IconHome,
   IconChartLine,
   IconFingerprint,
@@ -49,7 +48,12 @@ import {useProjects} from "~/composables/Projects";
 import {useTokens} from "~/composables/Tokens";
 import {useEvents} from "~/composables/Events";
 
+// ----- Route Magic ----------
+const route = useRoute()
+const tab = route.query.tab
+// ----- End Route Magic ----------
 
+// ----- PROPERTIES ----------
 const props = defineProps<{
   user: User | undefined
 }>()
@@ -58,11 +62,7 @@ const user_id = toRef(() => user.value?.id)
 
 watch(user, () => console.log('[Dashboard Component]', `User got updated: ${user.value ? user.value.id : 'Undefined'}`))
 watch(user_id, () => console.log('[Dashboard Component]', `User Id updated: ${user_id.value}`))
-
-const route = useRoute()
-const tab = route.query.tab
-
-const endpoints = ref([]) //await fetchEndpoints() TODO
+// ----- END PROPERTIES ----------
 
 const {events, refreshEvents} = await useEvents([user], user_id)
 const {realms, refreshRealms} = await useRealms()
@@ -108,6 +108,11 @@ const componentProps = computed(() => {
       return {
         resources: projects.value
       }
+    case 'Realms':
+      return {
+        realms: realms.value,
+        selectedRealm: selectedRealm.value
+      }
     case 'ResourceCreation':
       return {
         realms: realms.value,
@@ -141,6 +146,8 @@ EventBus.on('setTab', (tabId: string) => setTab(tabId))
 /* ----- END EXTERNAL TAB SWITCH ----- */
 
 /* ----- REALM SWITCH ----- */
+const selectedRealm = ref<Realm | undefined>(realms.value ? realms.value[0] : undefined)
+watch(selectedRealm, () => console.info('[Dashboard Component] Bidirectional Realm Switch:', selectedRealm.value))
 function addRealm(realm: Realm) {
   if (realms.value)
     realms.value.push(realm)
@@ -315,6 +322,7 @@ EventBus.on('spinStop', () => spinBaby.value = false)
           <ClientOnly fallbackTag="span">
             <RealmSwitcher class="flex"
                            :realms="realms"
+                           v-model:realm-selection="selectedRealm"
                            @add-realm="addRealm" />
             <template #fallback>
               <Skeleton class="h-auto w-[300px]"/>

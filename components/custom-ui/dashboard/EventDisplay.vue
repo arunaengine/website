@@ -205,31 +205,10 @@ const today = new Date()
       </div>
 
       <Separator/>
+
       <div class="flex-1 whitespace-pre-wrap p-4 text-sm">
         <pre class="break-words text-wrap">{{ JSON.stringify(eventData, null, 2).trim() }}</pre>
         <!-- TODO: Human readable event summary -->
-      </div>
-
-      <Separator class="mt-auto"/>
-      <div class="p-4">
-        <form>
-          <div class="grid gap-4">
-            <Textarea class="p-4"
-                      :placeholder="`Reply ${eventData.type}...`"/>
-            <div class="flex items-center">
-              <Label html-for="mute"
-                     class="flex items-center gap-2 text-xs font-normal">
-                <Switch id="mute" aria-label="Mute thread"/>
-                Mute this thread
-              </Label>
-              <Button type="button"
-                      size="sm"
-                      class="ml-auto">
-                Send
-              </Button>
-            </div>
-          </div>
-        </form>
       </div>
 
     </div>
