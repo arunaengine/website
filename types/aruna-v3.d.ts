@@ -966,6 +966,8 @@ export type components = {
     GetRelationsResponse: {
       offset?: number | null;
       relations: components["schemas"]["Relation"][];
+      /** Format: int32 */
+      total_hits: number;
     };
     GetResourcesResponse: {
       resources: components["schemas"]["Resource"][];
