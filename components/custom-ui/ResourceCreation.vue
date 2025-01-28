@@ -173,7 +173,7 @@ const onSubmit = handleSubmit(async (values) => {
     visibility: values.visibility,
     identifiers: values.identifiers,
     license_tag: values.license_tag,
-    authors: values.authors,
+    authors: Array.from(authors.value.values()),
     labels: Array.from(keyValues.value.values()),
   }
 
@@ -214,10 +214,8 @@ const onSubmit = handleSubmit(async (values) => {
 /* ----- End Form Schema ----- */
 
 /* ----- Resource Authors ----- */
-const authors: Ref<Map<string, v2Author>> = ref(new Map())
-const authorDialogOpen = ref(false);
-
-function addAuthor(author: v2Author) {
+const authors: Ref<Map<string, Author>> = ref(new Map())
+function addAuthor(author: Author) {
   authors.value.set(getUniqueId(), author)
 }
 
@@ -229,11 +227,8 @@ function removeAuthor(key: string) {
 
 /* ----- Resource key-values ----- */
 const keyValues: Ref<Map<string, KeyValue>> = ref(new Map())
-const keyValueDialogOpen = ref(false);
-//const ontologyDialogOpen = ref(false);
-
-function addKeyValue(key: string, val: string, locked: boolean) {
-  keyValues.value.set(key, {key: key, value: val, locked: locked} as KeyValue)
+function addKeyValue(keyValue: KeyValue) {
+  keyValues.value.set(keyValue.key, keyValue)
 }
 
 function removeKeyValue(key: string) {
@@ -256,10 +251,10 @@ function updateProgress(current: number, total: number | undefined) {
 
 // ----- Helper functions -----
 let id = 0
-
 function getUniqueId(): string {
   return id++ + '';
 }
+// ----- End Helper functions -----
 
 /*
 function textAreaAutoHeight(domElement: HTMLTextAreaElement | null, offset = 0) {
@@ -788,15 +783,13 @@ async function waitForSync(s3client: S3Client, bucket: string, key: string): Pro
                       :collapsible="true">
         <div class="flex flex-col basis-1/2 h-full p-4">
           <div class="flex px-4 grow flex-row md:flex-col overflow-x-auto">
-            <div class="flex flex-row mb-2 justify-start items-center">
-              <label for="key-values-input"
-                     class="block text-lg font-medium text-aruna-text-accent">Authors</label>
-              <button
-                  type="button"
-                  @click="authorDialogOpen = true"
-                  class="ms-4 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-aruna-text-accent rounded-md text-aruna-text-accent hover:text-aruna-highlight hover:border-aruna-highlight focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
-                <IconPlus class="flex-shrink-0 size-4"/>
-              </button>
+            <div class="flex flex-row mb-2 justify-start items-center gap-x-4">
+              <span class="block text-lg font-medium text-aruna-text-accent">Authors</span>
+              <AuthorDialog :initial-open="false"
+                            :with-button="true"
+                            button-css="h-auto p-0.5 px-1 rounded-md font-normal text-aruna-highlight border-aruna-highlight hover:border-aruna-highlight/80 hover:bg-transparent hover:text-aruna-highlight/80"
+                            button-label="Add"
+                            @add-author="(author: Author) => addAuthor(author)"/>
             </div>
 
             <div class="-m-1.5 overflow-x-auto">
@@ -812,7 +805,7 @@ async function waitForSync(s3client: S3Client, bucket: string, key: string): Pro
                         Email
                       </th>
                       <th scope="col" class="px-6 py-3 text-start text-sm font-bold text-aruna-text-accent uppercase">
-                        Orcid
+                        External Identifier
                       </th>
                       <th scope="col" class="px-6 py-3 text-center text-sm font-bold text-aruna-text-accent uppercase">
                         Actions
@@ -820,15 +813,15 @@ async function waitForSync(s3client: S3Client, bucket: string, key: string): Pro
                     </tr>
                     </thead>
                     <tbody class="divide-y divide-aruna-text/50">
-                    <tr v-for="[key, value] in authors">
+                    <tr v-for="[key, author] in authors">
                       <td class="px-6 py-2 whitespace-nowrap text-sm text-aruna-text">
-                        {{ value.firstName }} {{ value.lastName }}
+                        {{ author.first_name }} {{ author.last_name }}
                       </td>
                       <td class="px-6 py-2 whitespace-nowrap text-sm text-aruna-text">
-                        {{ value.email }}
+                        {{ author.email }}
                       </td>
                       <td class="px-6 py-2 whitespace-nowrap text-sm text-aruna-text">
-                        {{ value.orcid }}
+                        {{ author.identifier }}
                       </td>
                       <td class="px-6 py-2 whitespace-nowrap text-sm font-medium text-center">
                         <button type="button"
@@ -845,17 +838,18 @@ async function waitForSync(s3client: S3Client, bucket: string, key: string): Pro
             </div>
 
             <div class="flex flex-row mb-2 mt-6 justify-start items-center gap-x-4">
-              <label for="key-values-input"
-                     class="block text-lg font-medium text-aruna-text-accent">Key-Values</label>
-              <button type="button"
-                      @click="keyValueDialogOpen = true"
-                      class="px-1 inline-flex items-center gap-x-2 m-0.5 p-0.5 border border-aruna-text-accent rounded-md text-aruna-text-accent text-sm hover:text-aruna-highlight hover:border-aruna-highlight focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
-                <IconPlus class="flex-shrink-0 size-4"/>
-              </button>
+              <span class="block text-lg font-medium text-aruna-text-accent">Key-Values</span>
+
+              <KeyValueDialog :initial-open="false"
+                              :with-button="true"
+                              button-css="h-auto p-0.5 px-1 rounded-md font-normal text-aruna-highlight border-aruna-highlight hover:border-aruna-highlight/80 hover:bg-transparent hover:text-aruna-highlight/80"
+                              button-label="Add"
+                              @add-key-value="(keyValue: KeyValue) => addKeyValue(keyValue)"/>
+
               <OntologyDialog :initial-open="false"
                               :with-button="true"
-                              button-css="h-auto p-0.5 px-1 rounded-md font-normal text-aruna-text-accent border-aruna-text-accent hover:border-aruna-highlight hover:bg-transparent hover:text-aruna-highlight"
-                              @add-key-value="addKeyValue"/>
+                              button-css="h-auto p-0.5 px-1 rounded-md font-normal text-aruna-highlight border-aruna-highlight hover:border-aruna-highlight/80 hover:bg-transparent hover:text-aruna-highlight/80"
+                              @add-key-value="(keyValue: KeyValue) => addKeyValue(keyValue)"/>
             </div>
 
             <div class="-m-1.5 overflow-x-auto">
@@ -916,23 +910,7 @@ async function waitForSync(s3client: S3Client, bucket: string, key: string): Pro
   </div>
   <!-- End Resource Creation Form -->
 
-  <AuthorDialog :initial-open="authorDialogOpen"
-                :with-button="false"
-                @update:open="authorDialogOpen = false"
-                @add-author="(author) => {
-                  addAuthor(author);
-                  authorDialogOpen = false;
-                }"/>
-
-  <KeyValueDialog :initial-open="keyValueDialogOpen"
-                  :with-button="false"
-                  @update:open="keyValueDialogOpen = false"
-                  @add-key-value="({ key, value, locked }) => {
-                    addKeyValue(key, value, locked);
-                    keyValueDialogOpen = false;
-                  }"/>
-
-  <!-- TODO -->
+  <!-- TODO: Refactor (?) -->
   <ModalObjectDisplay modalId="object-display"
                       :object="createdResource"
                       :progress="uploadProgress"
