@@ -26,7 +26,7 @@ watch(externalTrigger, () => (open.value = externalTrigger.value))
 
 /* ----- EMITS ----- */
 const emit = defineEmits<{
-  'add-key-value': [key: string, value: string, locked: boolean]
+  'add-key-value': [keyValue: KeyValue]
 }>()
 /* ----- END EMITS ----- */
 
@@ -85,9 +85,11 @@ function createMetadataLink(id: string) {
 
 function submit() {
   if (currentSelection.value) {
-    emit('add-key-value',
-        'http://purl.org/dc/terms/conformsTo',
-        `{"@type": "CreativeWork", "@id": "${currentSelection.value.iri}", "url": "${createMetadataLink(currentSelection.value.id)}"}`, true)
+    emit('add-key-value', {
+      key: 'http://purl.org/dc/terms/conformsTo',
+      value: `{"@type": "CreativeWork", "@id": "${currentSelection.value.iri}", "url": "${createMetadataLink(currentSelection.value.id)}"}`,
+      locked: true
+    })
     clear()
     open.value = false
   }
