@@ -44,8 +44,8 @@ onMounted(() => forceRefresh.value += 1);
           </NuxtLink>
 
           <NuxtLink v-if="user_state"
-              class="font-medium text-aruna-text-accent focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
-              to="/user/dashboard">
+                    class="font-medium text-aruna-text-accent focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
+                    to="/user/dashboard">
             Dashboard
           </NuxtLink>
 
@@ -56,32 +56,35 @@ onMounted(() => forceRefresh.value += 1);
           </NuxtLink>
 
           <!-- Dropdown Start -->
-          <div class="hs-dropdown [--strategy:static] sm:[--strategy:fixed] [--adaptive:none]">
-            <button id="hs-mega-menu-basic-dr" type="button"
-                    class="flex items-center w-full text-aruna-text-accent font-medium">
+          <DropdownMenu>
+            <DropdownMenuTrigger class="flex items-center gap-x-2 font-medium text-aruna-text-accent focus:outline-none focus:ring-1 focus:ring-aruna-highlight">
               Docs
-              <IconChevronDown class="ms-1 flex-shrink-0 w-5 h-auto"/>
-            </button>
-
-            <div
-                class="hs-dropdown-menu transition-[opacity,margin] duration-[0.1ms] sm:duration-[150ms] hs-dropdown-open:opacity-100 opacity-0 sm:w-48 z-10 sm:shadow-md rounded-md p-2 bg-aruna-bg/90 border-aruna-text/50 divide-aruna-text/50 before:absolute top-full sm:border before:-top-5 before:start-0 before:w-full before:h-5 hidden">
-              <NuxtLink href="https://github.com/arunaengine/api"
-                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-aruna-fg focus:ring-1 focus:ring-aruna-highlight"
-                        target="_blank">
-                API
-              </NuxtLink>
-              <NuxtLink href="https://docs.aruna-engine.org/latest/get_started/basic_usage/00_index/"
-                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-aruna-fg focus:ring-1 focus:ring-aruna-highlight"
-                        target="_blank">
-                Getting Started
-              </NuxtLink>
-              <NuxtLink href="https://docs.aruna-engine.org/latest/internal_data_structure/internal_data_structure/"
-                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-aruna-fg focus:ring-1 focus:ring-aruna-highlight"
-                        target="_blank">
-                Data Structure
-              </NuxtLink>
-            </div>
-          </div>
+              <IconChevronDown class="size-4"/>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem class="flex hover:bg-aruna-fg focus:bg-aruna-fg">
+                <NuxtLink href="https://github.com/arunaengine/api"
+                          target="_blank"
+                          class="w-full">
+                  API
+                </NuxtLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem class="flex hover:bg-aruna-fg focus:bg-aruna-fg">
+                <NuxtLink href="https://docs.aruna-engine.org/latest/get_started/basic_usage/00_index/"
+                          target="_blank"
+                          class="w-full">
+                  Getting Started
+                </NuxtLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem class="flex hover:bg-aruna-fg focus:bg-aruna-fg">
+                <NuxtLink href="https://docs.aruna-engine.org/latest/internal_data_structure/internal_data_structure/"
+                          target="_blank"
+                          class="w-full">
+                  Data Structure
+                </NuxtLink>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <!-- Dropdown End -->
 
           <NuxtLink href="https://github.com/arunaengine"
