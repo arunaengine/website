@@ -47,7 +47,6 @@ const formSchema = toTypedSchema(z.object({
   lastName: z.string({required_error: "Last name is required."}).min(2).max(128),
   email: z.string().email('Invalid email format.').optional(),
   identifier: z.string().optional(), //z.string().regex(ORCID_REGEX, 'Not a valid ORCID').optional(),
-  userId: z.string().regex(ULID_REGEX, 'Not a valid ULID').optional(),
 }))
 
 const form = useForm({
@@ -57,7 +56,7 @@ const form = useForm({
 const onSubmit = form.handleSubmit(async (values) => {
   console.info('[AuthorDialog] Submit values:', values)
   emit('add-author', {
-    id: values.userId || '',
+    id: '', //TODO: Will be added with search
     first_name: values.firstName,
     last_name: values.lastName,
     email: values.email || '',
@@ -84,6 +83,8 @@ const onSubmit = form.handleSubmit(async (values) => {
           Add an additional author to the resource.
         </DialogDescription>
       </DialogHeader>
+
+      <!-- TODO: Search field for users to auto-fill fields -->
 
       <form id="authorForm" @submit="onSubmit" class="space-y-4">
         <div class="flex flex-col space-y-2 sm:flex-row sm:space-x-4 sm:space-y-0">
@@ -131,7 +132,7 @@ const onSubmit = form.handleSubmit(async (values) => {
           </FormItem>
         </FormField>
 
-        <FormField v-slot="{ componentField }" name="orcid">
+        <FormField v-slot="{ componentField }" name="identifier">
           <FormItem>
             <FormLabel class="flex items-center justify-between">
               <span>Identifier</span>
@@ -146,26 +147,6 @@ const onSubmit = form.handleSubmit(async (values) => {
             </FormLabel>
             <FormControl>
               <Input type="text" placeholder="Other identifiers of the Author, e.g. ORCID" v-bind="componentField"/>
-            </FormControl>
-            <FormMessage/>
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ componentField }" name="userId">
-          <FormItem>
-            <FormLabel class="flex items-center justify-between">
-              <span>User Id</span>
-              <Popover>
-                <PopoverTrigger>
-                  <IconHelp class="size-4 text-aruna-highlight font-bold"/>
-                </PopoverTrigger>
-                <PopoverContent class="text-sm rounded-sm">
-                  If available, you can enter the author's Aruna user id here to automagically fill the fields.
-                </PopoverContent>
-              </Popover>
-            </FormLabel>
-            <FormControl>
-              <Input type="text" placeholder="Author's user id in Aruna" v-bind="componentField"/>
             </FormControl>
             <FormMessage/>
           </FormItem>
