@@ -8,7 +8,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 
-console.log(window.location.hostname)
+//console.log(window.location.hostname)
 const local = computed(() => window.location.hostname.includes('localhost'))
 </script>
 

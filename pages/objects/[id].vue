@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  IconArrowLeft,
   IconArrowsSplit,
   IconBucket,
   IconChevronDown,
@@ -20,11 +19,11 @@ import {
 import {
   modelsv2Status,
   v2DataClass,
-  v2EndpointHostVariant,
-  v2PermissionLevel,
-  v2ResourceVariant,
+  v2EndpointHostVariant, type v2InternalRelation,
   v2InternalRelationVariant,
+  v2PermissionLevel,
   v2RelationDirection,
+  v2ResourceVariant,
 } from "~/composables/aruna_api_json";
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
@@ -54,6 +53,13 @@ const {resource, jsonLd}: ResourceInfoResponse = await $fetch<ResourceInfoRespon
   loading.value = false
   return response
 })
+const incomingRelations = computed(() => resource.relations.filter(rel => rel.internal &&
+    rel.internal.definedVariant !== v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_DELETED &&
+    rel.internal.direction === v2RelationDirection.RELATION_DIRECTION_INBOUND).map(rel => rel.internal))
+const outgoingRelations = computed(() => resource.relations.filter(rel => rel.internal &&
+    rel.internal.definedVariant !== v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_DELETED &&
+    rel.internal.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND).map(rel => rel.internal))
+const externalRelations = computed(() => resource.relations.filter(rel => rel.external).map(rel => rel.external))
 
 function isDownloadable(): boolean {
   if (resource) {
@@ -329,28 +335,35 @@ useHead({
           <IconExternalLink class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">External Relations</span>
         </div>
-        <CardRelations :relations="resource?.relations" :external="true"/>
+        <CardExternalRelations :relations="externalRelations"/>
       </div>
 
-      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
-        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-          <IconArrowsSplit class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
-          <span class="">Internal Relations</span>
-        </div>
-        <CardRelations :relations="resource?.relations" :external="false"/>
-      </div>
-    </div>
-    <!-- End Relations Row -->
-
-    <!-- Locations -->
-    <div v-if="resource.variant == v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
-         class="flex flex-wrap justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
       <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
         <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
           <IconCloudDown class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Locations</span>
         </div>
-        <CardDownloads :endpoints="resource?.endpoints" @download="downloadResource"/>
+        <CardDownloads :endpoints="resource?.endpoints" :resource-type="resource.variant" @download="downloadResource"/>
+      </div>
+    </div>
+    <!-- End Relations Row -->
+
+    <!-- Locations -->
+    <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
+        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+          <IconArrowsSplit class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
+          <span class="">Incoming Relations</span>
+        </div>
+        <CardInternalRelations :relations="incomingRelations"/>
+      </div>
+
+      <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
+        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
+          <IconArrowsSplit class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
+          <span class="">Outgoing Relations</span>
+        </div>
+        <CardInternalRelations :relations="outgoingRelations"/>
       </div>
     </div>
     <!-- End Locations -->
