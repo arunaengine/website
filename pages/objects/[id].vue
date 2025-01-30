@@ -343,7 +343,7 @@ useHead({
           <IconCloudDown class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
           <span class="">Locations</span>
         </div>
-        <CardDownloads :endpoints="resource?.endpoints" @download="downloadResource"/>
+        <CardDownloads :endpoints="resource?.endpoints" :resource-type="resource.variant" @download="downloadResource"/>
       </div>
     </div>
     <!-- End Relations Row -->
