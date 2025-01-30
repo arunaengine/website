@@ -125,9 +125,11 @@ async function loadResourcesPage(): Promise<[ObjectInfo, v2InternalRelation][]> 
             <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-aruna-text-accent uppercase">
               Name
             </th>
+            <!--
             <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-aruna-text-accent uppercase">
               ID
             </th>
+            -->
             <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-aruna-text-accent uppercase">
               Resource
             </th>
@@ -142,7 +144,7 @@ async function loadResourcesPage(): Promise<[ObjectInfo, v2InternalRelation][]> 
               <NuxtLink :to="`/objects/${resource.id}`"
                         exact=true
                         class="text-aruna-highlight hover:text-aruna-highlight/80">
-                <div>
+                <div class="max-w-[500px] truncate overflow-ellipsis">
                   <!--<IconArrowBigRightLines class="flex-shrink-0 size-6 inline-block"/>-->
                   <IconFolders v-if="resource.variant === v2ResourceVariant.RESOURCE_VARIANT_COLLECTION"
                                class="flex-shrink-0 size-6 inline-block me-2"/>
@@ -156,9 +158,11 @@ async function loadResourcesPage(): Promise<[ObjectInfo, v2InternalRelation][]> 
                 </div>
               </NuxtLink>
             </td>
+            <!--
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-aruna-text">
               {{ resource.id }}
             </td>
+            -->
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-aruna-text">
               {{ toResourceTypeStr(resource.variant) }}
             </td>
