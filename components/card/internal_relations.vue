@@ -151,7 +151,8 @@ async function loadResourcesPage(): Promise<[ObjectInfo, v2InternalRelation][]> 
                                     class="flex-shrink-0 size-6 inline-block me-2"/>
                         <IconFile v-else-if="resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
                                   class="flex-shrink-0 size-6 inline-block me-2"/>
-                        {{ resource.title ? resource.title : resource.name }}
+                        <span v-if="resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT">{{ resource.name }}</span>
+                        <span v-else>{{ resource.title ? resource.title : resource.name }}</span>
                       </div>
                     </NuxtLink>
                   </TooltipTrigger>
