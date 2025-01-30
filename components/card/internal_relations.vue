@@ -126,11 +126,6 @@ async function loadResourcesPage(): Promise<[ObjectInfo, v2InternalRelation][]> 
             <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-aruna-text-accent uppercase">
               Name
             </th>
-            <!--
-            <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-aruna-text-accent uppercase">
-              ID
-            </th>
-            -->
             <th scope="col" class="px-6 py-3 text-start text-sm font-medium text-aruna-text-accent uppercase">
               Resource
             </th>
@@ -167,11 +162,6 @@ async function loadResourcesPage(): Promise<[ObjectInfo, v2InternalRelation][]> 
                 </Tooltip>
               </TooltipProvider>
             </td>
-            <!--
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-aruna-text">
-              {{ resource.id }}
-            </td>
-            -->
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-aruna-text">
               {{ toResourceTypeStr(resource.variant) }}
             </td>
