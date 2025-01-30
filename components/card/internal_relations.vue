@@ -66,6 +66,7 @@ async function loadResourcesPage(): Promise<[ObjectInfo, v2InternalRelation][]> 
   }
   return []
 }
+
 // ----- End Relation Pagination ----------
 </script>
 
@@ -141,22 +142,30 @@ async function loadResourcesPage(): Promise<[ObjectInfo, v2InternalRelation][]> 
           <tbody class="divide-y divide-aruna-text/50">
           <tr v-for="[resource, relInfo] in displayedResources" :key="resource.id">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-aruna-text">
-              <NuxtLink :to="`/objects/${resource.id}`"
-                        exact=true
-                        class="text-aruna-highlight hover:text-aruna-highlight/80">
-                <div class="max-w-[500px] truncate overflow-ellipsis">
-                  <!--<IconArrowBigRightLines class="flex-shrink-0 size-6 inline-block"/>-->
-                  <IconFolders v-if="resource.variant === v2ResourceVariant.RESOURCE_VARIANT_COLLECTION"
-                               class="flex-shrink-0 size-6 inline-block me-2"/>
-                  <IconFolder v-else-if="resource.variant === v2ResourceVariant.RESOURCE_VARIANT_DATASET"
-                              class="flex-shrink-0 size-6 inline-block me-2"/>
-                  <IconFile v-else-if="resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
-                            class="flex-shrink-0 size-6 inline-block me-2"/>
-
-                  <!--{{ child.title ? child.title : child.name }}-->
-                  {{ resource.name }}
-                </div>
-              </NuxtLink>
+              <TooltipProvider :delay-duration="250">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <NuxtLink :to="`/objects/${resource.id}`"
+                              exact=true
+                              class="text-aruna-highlight hover:text-aruna-highlight/80">
+                      <div class="max-w-[500px] truncate overflow-ellipsis">
+                        <!--<IconArrowBigRightLines class="flex-shrink-0 size-6 inline-block"/>-->
+                        <IconFolders v-if="resource.variant === v2ResourceVariant.RESOURCE_VARIANT_COLLECTION"
+                                     class="flex-shrink-0 size-6 inline-block me-2"/>
+                        <IconFolder v-else-if="resource.variant === v2ResourceVariant.RESOURCE_VARIANT_DATASET"
+                                    class="flex-shrink-0 size-6 inline-block me-2"/>
+                        <IconFile v-else-if="resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
+                                  class="flex-shrink-0 size-6 inline-block me-2"/>
+                        <!--{{ child.title ? child.title : child.name }}-->
+                        {{ resource.name }}
+                      </div>
+                    </NuxtLink>
+                  </TooltipTrigger>
+                  <TooltipContent class="rounded-none text-aruna-accent bg-aruna-muted border border-aruna-highlight">
+                    <p>ID: {{ resource.id }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </td>
             <!--
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-aruna-text">
