@@ -75,7 +75,7 @@ function onExpand() {
         <Tabs default-value="all" class="h-full">
           <div class="flex items-center px-4 py-2">
             <h1 class="text-xl font-bold">
-              Inbox
+              Personal Events
             </h1>
             <TabsList class="ml-auto">
               <TabsTrigger value="all" class="text-zinc-600 dark:text-zinc-200">

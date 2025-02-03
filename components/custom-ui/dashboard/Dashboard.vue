@@ -2,6 +2,7 @@
 import {
   IconAffiliate,
   IconBell,
+  IconCreativeCommons,
   IconHome,
   IconChartLine,
   IconFingerprint,
@@ -38,6 +39,7 @@ import Profile from "~/components/custom-ui/user/Profile.vue";
 import Tokens from "~/components/custom-ui/user/Tokens.vue";
 import Proxies from "~/components/custom-ui/user/Proxies.vue";
 import SearchBar from "~/components/custom-ui/SearchBar.vue";
+import Licences from "~/components/custom-ui/dashboard/licenses/Licenses.vue";
 
 import type {User} from '~/composables/api_wrapper'
 import {toast} from "~/components/ui/toast";
@@ -47,6 +49,7 @@ import {useGroups} from "~/composables/Groups";
 import {useProjects} from "~/composables/Projects";
 import {useTokens} from "~/composables/Tokens";
 import {useEvents} from "~/composables/Events";
+import {useLicenses} from "~/composables/Licenses";
 
 // ----- Route Magic ----------
 const route = useRoute()
@@ -70,10 +73,13 @@ const {groups, refreshGroups} = await useGroups()
 const {tokens, refreshTokens} = await useTokens()
 const {projects, refreshProjects} = await useProjects()
 const {stats, refreshStats} = await useStats([]) //await useStats([realms, groups, projects])
+const {licenses, refreshLicenses} = await useLicenses([])
 
 watch(realms, () => console.log('[Dashboard] Realms updated to value:', realms.value))
 watch(groups, () => console.log('[Dashboard] Groups updated to value:', groups.value))
 watch(events, () => console.log('[Dashboard] Events updated to value:', events.value))
+watch(licenses, () => console.log('[Dashboard] Licenses updated to value:', licenses.value))
+
 
 EventBus.on('updateStats', async () => await refreshStats())
 EventBus.on('updateRealms', async () => await refreshRealms())
@@ -94,6 +100,7 @@ const contentComponents = {
   'Profile': {component: Profile},
   'Tokens': {component: Tokens,},
   'Proxies': {component: Proxies},
+  'Licenses': {component: Licences},
 }
 const componentProps = computed(() => {
   switch (currentContent.value) {
@@ -107,6 +114,10 @@ const componentProps = computed(() => {
     case 'FileExplorer':
       return {
         resources: projects.value
+      }
+    case 'Licenses':
+      return {
+        licenses: licenses.value
       }
     case 'Realms':
       return {
@@ -221,6 +232,7 @@ EventBus.on('spinStop', () => spinBaby.value = false)
               Realms
             </button>
 
+            <!--
             <button key="DummyStats"
                     :class="{'bg-aruna-fg text-aruna-text-accent': currentContent === 'DummyStats'}"
                     class="flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-aruna-text hover:text-aruna-text-accent"
@@ -236,6 +248,7 @@ EventBus.on('spinStop', () => spinBaby.value = false)
               <IconChartLine class="h-4 w-4"/>
               Analytics
             </button>
+            -->
 
             <button key="FileExplorer"
                     :class="{'bg-aruna-fg text-aruna-text-accent': currentContent === 'FileExplorer'}"
@@ -269,6 +282,14 @@ EventBus.on('spinStop', () => spinBaby.value = false)
                     @click="currentContent = 'Proxies'">
               <IconPolygon class="h-4 w-4"/>
               Data Proxies
+            </button>
+
+            <button key="Licenses"
+                    :class="{'bg-aruna-fg text-aruna-text-accent': currentContent === 'Licenses'}"
+                    class="flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-aruna-text hover:text-aruna-text-accent"
+                    @click="currentContent = 'Licenses'">
+              <IconCreativeCommons class="h-4 w-4"/>
+              Licenses
             </button>
           </nav>
         </div>

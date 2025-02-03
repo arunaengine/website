@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/form'
 import {Input} from '@/components/ui/input'
 import {Popover, PopoverTrigger, PopoverContent} from '@/components/ui/popover'
-import type {v2Author} from "~/composables/aruna_api_json";
 import {useForm} from "vee-validate";
 import {toTypedSchema} from '@vee-validate/zod'
 import * as z from 'zod'
@@ -28,6 +27,7 @@ import * as z from 'zod'
 const props = defineProps<{
   initialOpen: boolean,
   withButton: boolean,
+  buttonLabel?: string
   buttonCss?: string
 }>()
 const externalTrigger = toRef(props, 'initialOpen')
@@ -37,7 +37,7 @@ watch(externalTrigger, () => open.value = externalTrigger.value)
 
 /* ----- EVENT EMITS ----- */
 const emit = defineEmits<{
-  'add-author': [relation: v2Author]
+  'add-author': [relation: Author]
 }>()
 /* ----- END EVENT EMITS ----- */
 
@@ -46,8 +46,7 @@ const formSchema = toTypedSchema(z.object({
   firstName: z.string({required_error: "First name is required."}).min(2).max(128),
   lastName: z.string({required_error: "Last name is required."}).min(2).max(128),
   email: z.string().email('Invalid email format.').optional(),
-  orcid: z.string().regex(ORCID_REGEX, 'Not a valid ORCID').optional(),
-  userId: z.string().regex(ULID_REGEX, 'Not a valid ULID').optional(),
+  identifier: z.string().optional(), //z.string().regex(ORCID_REGEX, 'Not a valid ORCID').optional(),
 }))
 
 const form = useForm({
@@ -55,13 +54,16 @@ const form = useForm({
 })
 
 const onSubmit = form.handleSubmit(async (values) => {
+  console.info('[AuthorDialog] Submit values:', values)
   emit('add-author', {
-    firstName: values.firstName,
-    lastName: values.lastName,
+    id: '', //TODO: Will be added with search
+    first_name: values.firstName,
+    last_name: values.lastName,
     email: values.email || '',
-    orcid: values.orcid || '',
-    id: values.userId || ''
-  })})
+    identifier: values.identifier || ''
+  })
+  open.value = false
+})
 /* ----- END FORM SCHEMA ----- */
 </script>
 
@@ -70,19 +72,21 @@ const onSubmit = form.handleSubmit(async (values) => {
     <DialogTrigger v-if="withButton" as-child>
       <Button variant="outline"
               :class="cn('rounded-sm text-aruna-highlight border border-aruna-highlight bg-transparent hover:bg-aruna-highlight hover:text-aruna-text-accent', props.buttonCss)">
-      Add Author
+        {{ buttonLabel || 'Add Author' }}
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-[425px] sm:rounded-md"
                    @pointer-down-outside="(event) => event.preventDefault()">
       <DialogHeader>
-        <DialogTitle class="mb-2 text-center text-aruna-800 font-bold">Add Author</DialogTitle>
-        <DialogDescription class="text-center">
+        <DialogTitle class="mb-2 text-center text-aruna-highlight font-bold">Add Author</DialogTitle>
+        <DialogDescription class="text-aruna-text text-center">
           Add an additional author to the resource.
         </DialogDescription>
       </DialogHeader>
 
-      <form id="dialogForm" @submit="onSubmit" class="space-y-4">
+      <!-- TODO: Search field for users to auto-fill fields -->
+
+      <form id="authorForm" @submit="onSubmit" class="space-y-4">
         <div class="flex flex-col space-y-2 sm:flex-row sm:space-x-4 sm:space-y-0">
           <div class="flex grow flex-col">
             <FormField v-slot="{ componentField }" name="firstName">
@@ -114,7 +118,7 @@ const onSubmit = form.handleSubmit(async (values) => {
               <FormLabel>Email</FormLabel>
               <Popover>
                 <PopoverTrigger>
-                  <IconHelp class="size-4 text-aruna-800 font-bold"/>
+                  <IconHelp class="size-4 text-aruna-highlight font-bold"/>
                 </PopoverTrigger>
                 <PopoverContent class="text-sm rounded-sm">
                   A valid email address that can be used to contact the author.
@@ -128,41 +132,21 @@ const onSubmit = form.handleSubmit(async (values) => {
           </FormItem>
         </FormField>
 
-        <FormField v-slot="{ componentField }" name="orcid">
+        <FormField v-slot="{ componentField }" name="identifier">
           <FormItem>
             <FormLabel class="flex items-center justify-between">
-              <span>ORCID</span>
+              <span>Identifier</span>
               <Popover>
                 <PopoverTrigger>
-                  <IconHelp class="size-4 text-aruna-800 font-bold"/>
+                  <IconHelp class="size-4 text-aruna-highlight font-bold"/>
                 </PopoverTrigger>
                 <PopoverContent class="text-sm rounded-sm">
-                  If available, you can enter the ORCID of the author here.
+                  If available, you can enter an external identifier of the author here.
                 </PopoverContent>
               </Popover>
             </FormLabel>
             <FormControl>
-              <Input type="text" placeholder="Author's ORCID" v-bind="componentField"/>
-            </FormControl>
-            <FormMessage/>
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ componentField }" name="userId">
-          <FormItem>
-            <FormLabel class="flex items-center justify-between">
-              <span>User Id</span>
-              <Popover>
-                <PopoverTrigger>
-                  <IconHelp class="size-4 text-aruna-800 font-bold"/>
-                </PopoverTrigger>
-                <PopoverContent class="text-sm rounded-sm">
-                  If available, you can enter the Aruna user id of the author here.
-                </PopoverContent>
-              </Popover>
-            </FormLabel>
-            <FormControl>
-              <Input type="text" placeholder="Author's user id in Aruna" v-bind="componentField"/>
+              <Input type="text" placeholder="Other identifiers of the Author, e.g. ORCID" v-bind="componentField"/>
             </FormControl>
             <FormMessage/>
           </FormItem>
@@ -170,7 +154,9 @@ const onSubmit = form.handleSubmit(async (values) => {
       </form>
 
       <DialogFooter>
-        <Button type="submit" form="dialogForm" class="bg-aruna-800 hover:bg-aruna-700">
+        <Button type="submit"
+                form="authorForm"
+                class="w-fit bg-transparent border border-aruna-highlight text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
           Add Author
         </Button>
       </DialogFooter>

@@ -1,51 +1,93 @@
 <script lang="ts" setup>
 import {
+  IconCheck,
+  IconEdit,
+  IconExclamationCircle,
   IconFile,
   IconFolder,
   IconFolderPlus,
   IconFolderSymlink,
   IconInfoCircle,
+  IconLoader3,
   IconLock,
+  IconLockOpen2,
   IconPlus,
+  IconTreadmill,
   IconUpload,
   IconWorld,
+  IconX
 } from '@tabler/icons-vue'
 import {Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator,} from '@/components/ui/breadcrumb'
 
-import type {GetRelationsResponse, ResourceElement} from "~/composables/api_wrapper"
+import type {
+  CreateResourceRequest,
+  GetRelationsResponse,
+  ResourceElement,
+  SimpleCredentials
+} from "~/composables/api_wrapper"
 import {fetchChildren} from "~/composables/api_wrapper";
-import {ResourceVariant} from "~/types/aruna-v3-enums"
+import {ResourceVariant, SyncingStatus, VisibilityClass} from "~/types/aruna-v3-enums"
 import {toast} from "~/components/ui/toast";
 import {h} from "vue";
 
+const StatusMap = {
+  [SyncingStatus.Pending]: IconLoader3,
+  [SyncingStatus.Running]: IconTreadmill,
+  [SyncingStatus.Finished]: IconCheck,
+  [SyncingStatus.Error]: IconExclamationCircle,
+}
+
 const licenses = [
-  {tag: 'CC0', label: 'Creative Commons Zero (CC0 1.0)'},
-  {tag: 'CC-BY-SA 4.0', label: 'Attribution-ShareAlike 4.0 International (CC-BY-SA 4.0)'},
-  {tag: 'CC-BY-NC 4.0', label: 'Attribution-NonCommercial 4.0 International (CC-BY-NC)'},
-  {tag: 'CC-BY-NC-SA 4.0', label: 'Attribution-NonCommercial-ShareAlike 4.0 International (CC-BY-NC-SA)'}
+  {id: '01JFD6QDYWXTF2SXBQEW1VKM95', tag: 'CC0', label: 'Creative Commons Zero (CC0 1.0)'},
+  {
+    id: '01JFD6R28H3XMX2DRQZ7CEC200',
+    tag: 'CC-BY-SA 4.0',
+    label: 'Attribution-ShareAlike 4.0 International (CC-BY-SA 4.0)'
+  },
+  {
+    id: '01JFD6R7BBJQ7C1BDYQE2NADR6',
+    tag: 'CC-BY-NC 4.0',
+    label: 'Attribution-NonCommercial 4.0 International (CC-BY-NC)'
+  },
+  {
+    id: '01JFD6RC1JQHYWX4F4ZB1EBN0T',
+    tag: 'CC-BY-NC-SA 4.0',
+    label: 'Attribution-NonCommercial-ShareAlike 4.0 International (CC-BY-NC-SA)'
+  }
 ] //await fetchLicenses()
 
 /* ----- Dropzone ----- */
 import {useDropZone} from "@vueuse/core"
 import KeyValueDialog from "~/components/custom-ui/dialog/KeyValueDialog.vue";
 import AuthorDialog from "~/components/custom-ui/dialog/AuthorDialog.vue";
+import {Upload} from "@aws-sdk/lib-storage";
+import {S3Client} from "@aws-sdk/client-s3";
+import type {S3ClientConfig} from "@aws-sdk/client-s3/dist-types/S3Client";
+import {PaginationFirst, PaginationPrev} from "~/components/ui/pagination";
 
 const dropZoneRef = ref<HTMLDivElement>()
 
-// Object meta
+// File upload meta
 const fileUpload = ref<File | null>(null)
 const fileName = ref<string | null>(null)
 const fileTitle = ref<string | null>(null)
+const fileDescription = ref<string | null>(null)
+const fileLicense = ref<string | null>(null)
+const fileAuthors = ref<Map<string, Author>>(new Map())
+const fileLabels = ref<Map<string, KeyValue>>(new Map())
 const parent = ref<ResourceElement | null>(null)
+const fileUploadProgress = ref<number>(0)
+watch(fileUploadProgress, (v) => console.info('[FileExplorer] Upload progress:', v))
 
 function onDrop(files: File[] | null) {
-  // called when files are dropped on zone
-  console.log('[FileExplorer] Dropped files:', files)
-
   if (files && files.length > 0) {
+    //Clear meta info context
+    infoSelection.value = undefined
+
+    // Set file upload context and open sidebar
     fileUpload.value = files[0]
     fileName.value = fileUpload.value.name
-    parent.value = currentHierarchy.value[currentHierarchy.value.length - 1]
+    parent.value = currentHierarchy.value[currentHierarchy.value.length - 1]  // Last element of current hierarchy
 
     infoOpen.value = true
   }
@@ -53,11 +95,19 @@ function onDrop(files: File[] | null) {
 
 const {isOverDropZone} = useDropZone(dropZoneRef, {
   onDrop,
-  // control multi-file drop
+  // Control multi-file drop
   multiple: false,
-  // whether to prevent default behavior for unhandled events
+  // Whether to prevent default behavior for unhandled events
   preventDefaultForUnhandled: false,
 })
+
+function updateProgress(current: number, total: number | undefined) {
+  if (!total)
+    return 0
+  const floatProgress = current / total * 100
+  fileUploadProgress.value = +floatProgress.toFixed(2)
+}
+
 /* ----- End Dropzone ----- */
 
 
@@ -94,7 +144,7 @@ watchEffect(async () => {
     //}
 
     // Fetch children
-    const children: ResourceElement[] = await fetchChildren(currentResource.id)
+    const children: ResourceElement[] = await fetchChildren(currentResource.id, offset.value, pageSize.value)
 
     // Add to loaded resources
     addChildren(loadedResources.value, currentResource.id, children)
@@ -112,8 +162,22 @@ function openInfo(resource: ResourceElement) {
 }
 
 function closeInfo() {
-  fileUpload.value = null
+  // Clear meta info context
   infoOpen.value = false
+  infoSelection.value = undefined
+
+  // Clear file upload context
+  clearFileMeta()
+}
+
+function clearFileMeta() {
+  fileUpload.value = null
+  fileName.value = null
+  fileTitle.value = null
+  fileDescription.value = null
+  fileLicense.value = null
+  fileLabels.value.clear()
+  fileAuthors.value.clear()
 }
 
 async function deleteResource(resource: ResourceElement) {
@@ -126,9 +190,12 @@ async function deleteResource(resource: ResourceElement) {
 }
 
 function navigateBack(resourceId: string) {
-  // Clear met info field:
+  // Clear meta info context
   infoOpen.value = false
   infoSelection.value = undefined
+
+  // Clear file upload context
+  clearFileMeta()
 
   // Navigate
   if (resourceId === 'root') {
@@ -140,7 +207,6 @@ function navigateBack(resourceId: string) {
 }
 
 async function navigateForward(element: ResourceElement) {
-
   // Check if is locked
   if (element.variant === ResourceVariant.Object || element.locked)
     return
@@ -151,15 +217,18 @@ async function navigateForward(element: ResourceElement) {
     query: {
       node: element.id,
       direction: 'Outgoing',
-      offset: 0,
-      page_size: Number.MAX_SAFE_INTEGER
+      offset: offset.value, //0,
+      page_size: pageSize.value //Number.MAX_SAFE_INTEGER
     }
   }).then(response => {
     console.info('[Navigate Forward] Fetched relations:', response.relations)
-    //return response.relations.filter(rel => rel.relation_type === 'HasPart').map(rel => rel.to_id)
+
+    element.count = response.total_hits
+    totalHits.value = response.total_hits
     currentHierarchy.value.push(element)
     infoOpen.value = false
     infoSelection.value = undefined
+    clearFileMeta()
   }).catch(error => {
     console.dir(error.data)
     if (error.data.statusCode === 403) {
@@ -181,15 +250,6 @@ async function navigateForward(element: ResourceElement) {
       })
     }
   })
-
-
-  /*
-  if (element.variant != ResourceVariant.Object) {
-    currentHierarchy.value.push(element)
-    infoOpen.value = false
-    infoSelection.value = undefined
-  }
-  */
 }
 
 function addChildren(array: ResourceElement[], id: string, children: ResourceElement[]): ResourceElement | undefined {
@@ -206,12 +266,6 @@ function addChildren(array: ResourceElement[], id: string, children: ResourceEle
   }
 }
 
-const actions = [
-  //{name: 'Upload', icon: IconUpload},
-  {name: 'Create', icon: IconPlus},
-  //{name: 'Download', icon: IconDownload},
-]
-
 function emitTabSwitch(tabId: string) {
   EventBus.emit('setTab', tabId);
 }
@@ -224,6 +278,118 @@ function checkDirection(): 'horizontal' | 'vertical' {
     return 'vertical'
   }
 }
+
+async function submitUpload() {
+  await $fetch<GetS3CredentialsFromUserResponse>('/api/v3/credentials')
+      .then(async response => {
+
+        //TODO: Finish GetS3Credentials when it also returns secret
+        return {
+          access_key: '01JGXX8S57F7MDKGKBNM5MJSVK.3',
+          secret_key: '9f829eef9778c246d8f1b549dd9ee8525df6cc65f9bc0763559eaccb15ada1521af0be7f6c0d6d70b58efc24eb8340541bf98b630bbee818b9b56334bee48859',
+        }
+
+        // Check if S3 credentials for data proxy exist
+        for (const token of response.tokens) {
+          if (token.token_info.component_id === '<Component-Id>')
+            return {
+              access_key: token.access_key,
+              secret_key: '<Secret-Key>'
+            }
+        }
+        // No credentials found
+        throw new Error(`No S3 credentials available for component: <Component-Id>`)
+
+      }).then(async credentials => {
+        console.info('[FileUpload] Credentials:', credentials)
+        const request = {
+          variant: ResourceVariant.Object,
+          parent_id: parent.value?.id,
+          name: fileName.value,
+          title: fileTitle.value,
+          description: fileDescription.value,
+          license_id: fileLicense.value,
+          labels: [], //TODO: Map to Array
+          authors: [], //TODO: Map to Array
+          visibility: VisibilityClass.Public,
+          identifiers: []
+        } as CreateResourceRequest
+
+        //TODO: Finish create Object resource when the Aruna Data service is able to process events
+        /*
+        await $fetch<CreateResourceResponse>('/api/v3/resource', {
+          method: 'POST',
+          body: request
+        })
+        */
+
+        return [credentials, 'http://localhost:1337']
+
+      }).then(async ([credentials, endpoint_url]) => {
+        //TODO: Upload data via S3
+        // Create S3 client for staging object
+        const s3client = new S3Client({
+          endpoint: endpoint_url,
+          region: 'region-one',
+          credentials: {
+            accessKeyId: (credentials as SimpleCredentials).access_key,
+            secretAccessKey: (credentials as SimpleCredentials).secret_key,
+          }
+        } as S3ClientConfig)
+
+        const bucket = currentHierarchy.value[0].name
+        const pathParts = currentHierarchy.value.slice(1)
+        const key = pathParts.length > 0 ? `${pathParts.join('/')}/${fileUpload.value?.name}` : fileUpload.value?.name
+
+        console.info('[FileExplorer] Bucket and key:', bucket, currentHierarchy.value.slice(1), key, `${endpoint_url}/${bucket}/${key}`)
+
+        if (fileUpload.value) {
+          const upload = new Upload({
+            client: s3client as S3Client,
+            queueSize: 4, // 4 uploads concurrently
+            partSize: fileUpload.value.size > 5 * 1024 * 1024 * 1024 ? 50 * 1024 * 1024 : 5 * 1024 * 1024, // 5MiB parts up to 5GiB; then 50MiB parts
+            leavePartsOnError: false, // Remove uploaded parts on error
+            params: {
+              Bucket: bucket,
+              Key: key as string,
+              Body: fileUpload.value
+            },
+          })
+
+          // Update progress bar value
+          upload.on("httpUploadProgress", progress =>
+              updateProgress(progress.loaded ? progress.loaded : 0, progress.total))
+
+          // Do something after upload succeeded
+          return await upload.done() //.then(() => console.log('Upload succeeded'))
+        }
+
+        throw new Error('No file selected... that is very late...')
+
+      }).then(response => {
+        console.log(`Upload completed with status code: ${response.$metadata.httpStatusCode}`)
+      }).catch(error => {
+        console.error('[FileExplorer Client] Upload error:', error.data)
+        toast({
+          title: 'Error',
+          description: h('pre', {class: 'mt-2 w-[500px] rounded-md bg-slate-950 p-4'},
+              h('code', {class: 'text-white'}, JSON.stringify(error.message, null, 2))),
+          duration: -1
+        })
+      })
+}
+
+
+// ----- Pagination ---------- //
+const currentPage = ref<number>(1)
+const pageSize = ref<number>(3)
+const totalHits = ref<number>(6)
+const offset = computed(() => (currentPage.value-1) * pageSize.value)// currentPage.value * pageSize.value) //
+watch(offset, () => {
+  console.info(`[FileExplorer] Current page: ${currentPage.value}, Current page size: ${pageSize.value}, Current offset: ${offset.value}`)
+  console.info('[FileExplorer] Current resource children:', currentHierarchy.value[currentHierarchy.value.length - 1].children.length)
+})
+// ----- End Pagination ---------- //
 </script>
 <template>
   <div class="flex flex-col h-full w-full py-6 ps-6">
@@ -233,18 +399,19 @@ function checkDirection(): 'horizontal' | 'vertical' {
         <Breadcrumb>
           <BreadcrumbList class="text-aruna-text-accent">
             <BreadcrumbItem @click="navigateBack('root')"
-                            class="hover:cursor-pointer">Your Projects
+                            class="hover:cursor-pointer">
+              Your Projects
             </BreadcrumbItem>
-            <div v-for="ele in currentHierarchy"
+            <div v-for="resource in currentHierarchy"
                  class="flex items-center justify-center gap-2.5">
               <BreadcrumbSeparator/>
-              <BreadcrumbItem v-if="ele.variant !== ResourceVariant.Object"
-                              @click="navigateBack(ele.id)"
+              <BreadcrumbItem v-if="resource.variant !== ResourceVariant.Object"
+                              @click="navigateBack(resource.id)"
                               class="hover:cursor-pointer">
-                {{ !ele.deleted ? ele.name : 'DELETED' }}
+                {{ !resource.deleted ? resource.name : 'DELETED' }}
               </BreadcrumbItem>
               <BreadcrumbItem v-else>
-                {{ !ele.deleted ? ele.name : 'DELETED' }}
+                {{ !resource.deleted ? resource.name : 'DELETED' }}
               </BreadcrumbItem>
             </div>
           </BreadcrumbList>
@@ -253,18 +420,64 @@ function checkDirection(): 'horizontal' | 'vertical' {
 
       <!-- Action Buttons -->
       <div class="flex items-center gap-4">
-        <button v-for="action in actions"
-                :key="action.name"
+        <!--<Select v-model:model-value="pageSize">-->
+        <Select @update:modelValue="(v) => pageSize = parseInt(v)" :default-value="3">
+          <SelectTrigger class="w-[180px]">
+            <SelectValue>Page size: {{ pageSize }}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Page Size</SelectLabel>
+              <SelectItem v-for="size in ['3','5','10','15','25','50','100']" :value="size">{{ size }}</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+
+        <Button key="create"
                 @click="emitTabSwitch('ResourceCreation')"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3">
-          <component :is="action.icon"
-                     class="h-4 w-4 mr-2"/>
-          {{ action.name }}
-        </button>
+                class="inline-flex w-fit bg-transparent text-aruna-highlight border border-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
+          <IconPlus class="h-4 w-4 mr-2"/>
+          Create
+        </Button>
       </div>
       <!-- End Action Buttons -->
     </div>
     <!-- End Header -->
+
+    <!-- Pagination -->
+    <div class="my-2 flex">
+      <Pagination v-if="currentHierarchy.length > 1 && totalHits > pageSize"
+                  v-slot="{ page }"
+                  :total="totalHits"
+                  :items-per-page="pageSize"
+                  :sibling-count="1"
+                  :default-page="1"
+                  show-edges>
+        <PaginationList v-slot="{ items }" class="flex items-center gap-1">
+          <PaginationFirst class="w-8 h-8 p-0 rounded-sm border-aruna-text bg-aruna-bg"/>
+          <PaginationPrev class="w-8 h-8 p-0 rounded-sm border-aruna-text bg-aruna-bg"/>
+
+          <template v-for="(item, index) in items">
+            <PaginationListItem v-if="item.type === 'page'"
+                                :key="index"
+                                :value="item.value"
+                                class="rounded-sm"
+                                as-child>
+              <Button class="w-9 h-9 p-0"
+                      :variant="item.value === page ? 'default' : 'outline'"
+                      @click="currentPage = item.value">
+                {{ item.value }}
+              </Button>
+            </PaginationListItem>
+            <PaginationEllipsis v-else :key="item.type" :index="index" />
+          </template>
+
+          <PaginationNext />
+          <PaginationLast />
+        </PaginationList>
+      </Pagination>
+    </div>
+    <!-- End Pagination -->
 
     <ResizablePanelGroup id="file-explorer-list"
                          :direction="checkDirection()"
@@ -283,11 +496,11 @@ function checkDirection(): 'horizontal' | 'vertical' {
         <!-- Flexbox Resource Display -->
         <div class="flex flex-row flex-wrap content-start items-start justify-start gap-x-6 gap-y-6 my-4">
           <Card v-for="resource in displayedResources"
-                class="rounded-sm border-aruna-text/50 flex flex-col items-center justify-center min-w-[200px] max-w-[300px] h-fit"
-                @dblclick="navigateForward(resource)">
+                class="rounded-sm border-aruna-text/50 flex flex-col items-center justify-center min-w-[200px] max-w-[300px] h-fit">
             <CardContent class="p-0 flex flex-col items-center w-full">
               <div class="w-full flex gap-x-2">
-                <div class="group flex flex-col grow py-4 ps-4 items-center justify-center">
+                <div class="group flex flex-col grow py-4 ps-4 items-center justify-center"
+                     @dblclick="navigateForward(resource)">
                   <div class="flex h-fit w-full items-center justify-center">
                     <IconWorld v-if="resource.variant === ResourceVariant.Project"
                                :class="{'text-destructive group-hover:text-destructive': resource.deleted}"
@@ -327,7 +540,7 @@ function checkDirection(): 'horizontal' | 'vertical' {
                 class="min-w-[200px] py-4 px-2 h-fit flex items-center justify-center rounded-sm border border-dashed border-aruna-highlight transition-all ease-in-out delay-50 duration-250"
                 :class="{'bg-aruna-highlight/25': isOverDropZone}"
                 ref="dropZoneRef">
-            <CardContent>
+            <CardContent class="py-0">
               <div class="flex flex-col gap-y-6 items-center justify-center text-aruna-highlight">
                 <IconUpload class="h-12 w-12"/>
                 Drop your file here
@@ -358,7 +571,10 @@ function checkDirection(): 'horizontal' | 'vertical' {
         <!-- End no resources display -->
       </ResizablePanel>
       <ResizableHandle v-if="infoOpen" id="file-explorer-handle" class="mt-2" with-handle/>
-      <ResizablePanel v-if="infoOpen" id="file-explorer-info" :default-size="25" :min-size="25" :max-size="50">
+      <ResizablePanel v-if="infoOpen" id="file-explorer-sidebar"
+                      :default-size="25"
+                      :min-size="25"
+                      :max-size="50">
         <!-- Flexbox file meta display -->
         <div style="transition-behavior: allow-discrete;"
              :class="{'visible flex translate-x-0 ' : infoOpen, 'invisible hidden translate-x-full' : !infoOpen}"
@@ -385,23 +601,6 @@ function checkDirection(): 'horizontal' | 'vertical' {
               </TableBody>
             </Table>
 
-            <!--
-            <dl class="flex flex-col">
-              <div class="flex gap-x-4">
-                <dt class="text-aruna-text-accent">Name:</dt>
-                <dd class="text-aruna-text truncate overflow-ellipsis">{{ fileUpload.name }}</dd>
-              </div>
-              <div class="flex gap-x-4">
-                <dt class="text-aruna-text-accent">Size:</dt>
-                <dd class="text-aruna-text">{{ formatBytes(fileUpload.size) }}</dd>
-              </div>
-              <div class="flex gap-x-4">
-                <dt class="text-aruna-text-accent">Type:</dt>
-                <dd class="text-aruna-text truncate overflow-ellipsis">{{ fileUpload.type || 'N/A' }}</dd>
-              </div>
-            </dl>
-            -->
-
             <Separator class="bg-aruna-text/50 my-4"/>
 
             <Label for="description">Description</Label>
@@ -413,24 +612,60 @@ function checkDirection(): 'horizontal' | 'vertical' {
                                    focus-visible:border-aruna-highlight focus-visible:ring-aruna-highlight focus-visible:outline-none
                                    disabled:opacity-50 disabled:pointer-events-none"/>
 
-            <div class="flex sm:flex-col w-fit gap-y-4">
-              <Label for="labels">Labels</Label>
-              <KeyValueDialog :initial-open="false" :with-button="true"/>
+            <div class="flex sm:flex-col w-full gap-y-1">
+              <KeyValueDialog :initial-open="false"
+                              :with-button="true"
+                              button-css="w-fit"
+                              button-label="Add Label"
+                              @add-key-value="(v: KeyValue) => fileLabels.set(v.key, v)"/>
+
+              <div class="p-1 gap-2 flex flex-wrap items-center">
+                <div v-for="[key, label] in fileLabels" class="h-fit flex justify-center">
+                  <span class="flex justify-center items-center rounded-s-sm border border-aruna-highlight">
+                    <IconLock v-if="label.locked" class="m-0.5 flex-shrink-0 size-5"/>
+                    <IconLockOpen2 v-else class="m-0.5 flex-shrink-0 size-5"/>
+                  </span>
+                  <span class="flex justify-center px-1 items-center border border-aruna-highlight text-sm text-aruna-highlight">
+                        {{ key }}
+                      </span>
+                  <span v-if="label.value"
+                        class="flex justify-center px-1 items-center max-w-48 text-sm truncate overflow-ellipsis border border-aruna-highlight bg-aruna-highlight text-aruna-text-accent">
+                    {{ label.value }}
+                  </span>
+                  <span class="group flex justify-center items-center rounded-e-sm border border-aruna-highlight hover:cursor-pointer">
+                    <Button variant="ghost"
+                            class="h-fit px-2 py-0 hover:bg-transparent"
+                            @click="fileLabels.delete(label.key)">
+                  <IconX class="flex-shrink-0 size-4 text-aruna-text group-hover:text-destructive"/>
+                </Button>
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div class="flex sm:flex-col w-fit gap-y-4">
               <Label for="authors">Authors</Label>
-              <AuthorDialog :initial-open="false" :with-button="true"/>
+              <AuthorDialog :initial-open="false"
+                            :with-button="true"
+                            button-css="w-fit"
+                            @add-author="(v: Author) => fileAuthors.set(`${v.email}`, v)"/>
+
+              <ul v-if="fileAuthors.size > 0" class="ps-6 list-disc">
+                <li v-for="[key, author] in fileAuthors" class="text-aruna-text">
+                  {{ author.first_name }} {{ author.last_name }} | {{ author.email }}
+                </li>
+              </ul>
             </div>
 
             <Label for="license">License</Label>
-            <Select>
+            <Select :default-value="licenses[0].id"
+                    @update:model-value="(v) => fileLicense = v">
               <SelectTrigger class="bg-aruna-muted w-full max-w-[450px]">
                 <SelectValue placeholder="Select a license for your resource"/>
               </SelectTrigger>
               <SelectContent class="bg-aruna-bg/90 truncate overflow-ellipsis">
                 <SelectGroup>
-                  <SelectItem v-for="license in licenses" :value="license.tag"
+                  <SelectItem v-for="license in licenses" :value="license.id"
                               class="hover:bg-aruna-fg">
                     {{ license.label }}
                   </SelectItem>
@@ -439,113 +674,132 @@ function checkDirection(): 'horizontal' | 'vertical' {
             </Select>
           </div>
 
-          <div v-else class="gap-y-4">
+          <div v-else-if="infoSelection" class="gap-y-4">
             <h2 class="text-2xl">{{ infoSelection?.title || 'Title not available' }}</h2>
-            <Separator class="bg-aruna-text/50 my-6"/>
-            <dl class="flex flex-col gap-y-4">
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Id:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.id || ''
-                  }}
-                </dd>
+            <Separator class="bg-aruna-text/50 mt-6"/>
+            <!--<span class="text-sm font-medium leading-6 text-aruna-text-accent">Labels:</span>-->
+            <ScrollArea>
+              <div class="flex p-4 ps-0 space-x-4 w-max whitespace-nowrap truncate">
+                <div v-for="label in infoSelection?.labels"
+                     class="flex flex-row my-1 last:me-0">
+                  <span :class="{'rounded-md': label.value === '' || label.value === undefined,
+                                 'rounded-l-md': label.value && label.value.length > 0}"
+                        class="text-xs font-medium truncate max-w-60 whitespace-nowrap items-center gap-x-1.5 py-1 px-2 rounded-l-md text-aruna-highlight border border-aruna-highlight">
+                    {{ label.key }}
+                  </span>
+                  <span v-if="label.value"
+                        class="truncate max-w-60 whitespace-nowrap items-center gap-x-1.5 py-1 px-2 rounded-r-lg text-xs font-medium border border-l-0 border-aruna-highlight text-aruna-bg bg-aruna-highlight">
+                    {{ label.value }}
+                  </span>
+                </div>
               </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Name:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.name || ''
-                  }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Description:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.description || ''
-                  }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Size:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+
+            <Table class="table-auto">
+              <TableBody class="">
+              <TableRow>
+                <TableCell class="w-fit text-sm font-medium leading-6 text-aruna-text-accent">Id:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.id || '' }}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Name:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.name || '' }}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="align-text-top text-sm font-medium leading-6 text-aruna-text-accent">Description:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.description || '' }}
+                </TableCell>
+              </TableRow>
+              <TableRow v-if="infoSelection?.variant === ResourceVariant.Object">
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Size:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ formatBytes(infoSelection?.content_len || 0) }}
-                </dd>
-              </div>
-              <div v-if="infoSelection?.variant !== ResourceVariant.Object"
-                   class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Children:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.count || 0
-                  }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Created At:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                </TableCell>
+              </TableRow>
+              <TableRow v-else>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Children:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.count || 0 }}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Created At:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ formatDate(infoSelection?.created_at || '') }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Last Modified:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Last Modified:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ formatDate(infoSelection?.last_modified || '') }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">License:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">{{
-                    infoSelection?.license_tag || ''
-                  }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Locations:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">[...]</dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Locked:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ infoSelection?.locked || 'N/A' }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Visibility:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">License:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.license_id || '' }}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm align-text-top font-medium leading-6 text-aruna-text-accent">Locations:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  <ul class="list-disc">
+                    <li class="flex gap-x-2" v-for="loc in infoSelection?.location">
+                      <component :is="StatusMap[loc.status as keyof typeof StatusMap]"
+                                 :class="{'text-aruna-text-accent animate-spin': loc.status === SyncingStatus.Pending,
+                                          'text-aruna-text-accent': loc.status === SyncingStatus.Running,
+                                          'text-green-600': loc.status === SyncingStatus.Finished,
+                                          'text-destructive': loc.status === SyncingStatus.Error}"/>
+                      {{ loc.endpoint_id }}
+                    </li>
+                  </ul>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Locked:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                  {{ infoSelection?.locked }}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Visibility:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ infoSelection?.visibility || '' }}
-                </dd>
-              </div>
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Deleted:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Deleted:</TableCell>
+                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
                   {{ infoSelection?.deleted }}
-                </dd>
-              </div>
-
-              <div class="px-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                <dt class="text-sm font-medium leading-6 text-aruna-text-accent">Labels:</dt>
-                <dd class="mt-1 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">[...]</dd>
-              </div>
-            </dl>
+                </TableCell>
+              </TableRow>
+              </TableBody>
+            </Table>
           </div>
-
 
           <div class="flex gap-x-4">
             <Button v-if="fileUpload"
                     variant="outline"
-                    @click="console.log('Create resource and upload file')"
-                    disabled
+                    @click="submitUpload"
                     class="inline-flex w-fit bg-transparent text-aruna-highlight border border-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
               Upload
             </Button>
             <Button variant="outline"
                     @click="closeInfo"
-                    class="inline-flex w-fit bg-transparent text-aruna-highlight border border-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
+                    class="inline-flex w-fit bg-transparent text-aruna-text border border-aruna-text hover:bg-aruna-h hover:text-aruna-text-accent hover:border-aruna-text-accent">
               Close
             </Button>
 
             <Button v-if="infoSelection"
                     variant="outline"
                     @click="deleteResource(infoSelection)"
-                    class="inline-flex w-fit bg-transparent text-destructive border border-destructive hover:bg-destructive/25">
+                    class="inline-flex w-fit bg-transparent text-destructive border border-destructive hover:bg-destructive/25 hover:text-destructive">
               Delete
             </Button>
           </div>
@@ -554,7 +808,5 @@ function checkDirection(): 'horizontal' | 'vertical' {
         <!-- End Flexbox file meta display -->
       </ResizablePanel>
     </ResizablePanelGroup>
-
-
   </div>
 </template>

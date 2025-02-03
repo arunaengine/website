@@ -1,30 +1,24 @@
 <template>
   <NavigationTop />
 
-  <div class="container mx-auto mt-4 p-4 border-2 border-aruna-text/50 rounded-md bg-[#080d1f]">
-    <div class="border-b border-gray-700 px-4">
-      <nav class="flex space-x-2" aria-label="Tabs" role="tablist">
-        <button type="button"
-                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-highlight hs-tab-active:text-aruna-highlight py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none :focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight active"
-                id="basic-tabs-item-1"
-                data-hs-tab="#basic-tabs-1"
-                aria-controls="basic-tabs-1"
-                role="tab">
-          Nutzungsbedingungen
-        </button>
-        <button type="button"
-                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-highlight hs-tab-active:text-aruna-highlight py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none :focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight"
-                id="basic-tabs-item-2"
-                data-hs-tab="#basic-tabs-2"
-                aria-controls="basic-tabs-2"
-                role="tab">
-          Terms of Service
-        </button>
-      </nav>
-    </div>
+  <div class="container mx-auto mt-4 p-4 border-2 border-aruna-text/50 rounded-md bg-aruna-bg/90">
 
-    <div class="mt-3 p-4">
-      <div id="basic-tabs-1" role="tabpanel" aria-labelledby="basic-tabs-item-1">
+    <Tabs default-value="agb"
+          class="w-full">
+      <TabsList class="rounded-sm border border-aruna-text/50">
+        <TabsTrigger value="agb"
+                     class="rounded-sm text-aruna-text data-[state=active]:bg-aruna-bg/90 data-[state=active]:text-aruna-text-accent">
+          Nutzungsbedingungen
+        </TabsTrigger>
+        <TabsTrigger value="tos"
+                     class="rounded-sm text-aruna-text data-[state=active]:bg-aruna-bg/90 data-[state=active]:text-aruna-text-accent">
+          Terms of Service
+        </TabsTrigger>
+      </TabsList>
+
+      <Separator class="bg-aruna-text/50 my-4"/>
+
+      <TabsContent value="agb">
         <h1 class="text-3xl font-bold text-aruna-text-accent uppercase">
           Nutzungsbedingungen
         </h1>
@@ -124,9 +118,8 @@
           informieren, indem wir die überarbeiteten Bedingungen auf unserer Website veröffentlichen. Die fortgesetzte
           Nutzung des Webservices nach solchen Änderungen gilt als Zustimmung zu den aktualisierten Nutzungsbedingungen.
         </p>
-      </div>
-
-      <div id="basic-tabs-2" class="hidden" role="tabpanel" aria-labelledby="basic-tabs-item-2">
+      </TabsContent>
+      <TabsContent value="tos">
         <h1 class="text-3xl font-bold text-aruna-text-accent">
           Terms of service
         </h1>
@@ -234,8 +227,8 @@
           posting the revised terms on our website. Your continued use of the Web Service following such changes will
           constitute your acceptance of the updated Terms of Service.
         </p>
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   </div>
 
   <Footer />

@@ -9,7 +9,10 @@ export default defineNuxtConfig({
   experimental: {
     clientNodeCompat: true
   },
-  modules: ['@nuxtjs/tailwindcss', "shadcn-nuxt"],
+  modules: ['@nuxtjs/tailwindcss', "shadcn-nuxt", 'nuxt-monaco-editor', "@nuxtjs/color-mode"],
+  colorMode: {
+    classSuffix: "",
+  },
   css: [
     '~/assets/styles/main.css',
   ],
