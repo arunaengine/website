@@ -61,7 +61,6 @@ const props = defineProps<{
 }>()
 const user = toRef(() => props.user)
 const user_id = toRef(() => user.value?.id)
-
 watch(user, () => console.log('[Dashboard Component]', `User got updated: ${user.value ? user.value.id : 'Undefined'}`))
 watch(user_id, () => console.log('[Dashboard Component]', `User Id updated: ${user_id.value}`))
 // ----- END PROPERTIES ----------
@@ -112,7 +111,8 @@ const componentProps = computed(() => {
       }
     case 'FileExplorer':
       return {
-        resources: projects.value
+        resources: projects.value,
+        licenses: licenses.value
       }
     case 'Licenses':
       return {
@@ -126,7 +126,8 @@ const componentProps = computed(() => {
     case 'ResourceCreation':
       return {
         realms: realms.value,
-        groups: groups.value
+        groups: groups.value,
+        licenses: licenses.value
       }
     case 'Profile':
       return {
