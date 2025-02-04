@@ -3,7 +3,18 @@
 import {IconLoader2, IconSearch} from "@tabler/icons-vue";
 import {GenericNodeType, ResourceVariant} from "~/types/aruna-v3-enums";
 
-const DEFAULT_LIMIT = 4;
+const DEFAULT_LIMIT = useRuntimeConfig().public.searchDialogLimit || 10;
+
+/* ----- Properties ----- */
+interface SearchDialogProps {
+  limitResults?: number,
+  filter?: string
+}
+
+const props = defineProps<SearchDialogProps>()
+const limitResults = props.limitResults || DEFAULT_LIMIT
+const filter = props.filter
+/* ----- End Properties ----- */
 
 const router = useRouter()
 
@@ -11,11 +22,23 @@ const queryInput = ref('')
 const fetching = ref(false)
 const response: Ref<SearchResponse | undefined | void> = ref(undefined)
 const dialogOpen = ref(false)
-// mit computed berechnen
-const resources: Ref<SplitResources | undefined> = ref(undefined)
+
+const resources: ComputedRef<SplitResources | undefined> = computed(() => splitResources(response.value?.resources));
+
+type SplitResources = {
+  projects: Resource[],
+  folders: Resource[],
+  objects: Resource[],
+  other: any[],
+}
 
 function handleDialogOpenChange() {
   dialogOpen.value = !dialogOpen.value
+}
+
+function openDialog(): void {
+  queryInput.value = ''; // reset the query when the dialog is opened again
+  dialogOpen.value = true;
 }
 
 // Debounce input to decrease number of requests
@@ -33,11 +56,6 @@ watch(queryInput, () => {
 
 const debouncedInput = debounce(async () => await searchResources(queryInput.value), 250)
 
-function openDialog(): void {
-  queryInput.value = '';
-  dialogOpen.value = true;
-}
-
 async function searchResources(query: string): Promise<void> {
   // No need to search with empty input
   if (!query) {
@@ -48,7 +66,8 @@ async function searchResources(query: string): Promise<void> {
   response.value = await $fetch<SearchResponse>('/api/v3/search', {
     query: {
       query: query,
-      limit: DEFAULT_LIMIT
+      limit: limitResults,
+      filter: filter
     }
   }).catch(error => {
     console.log(error)
@@ -56,17 +75,6 @@ async function searchResources(query: string): Promise<void> {
   })
   fetching.value = false
   dialogOpen.value = true
-}
-
-watch(response, () => {
-  resources.value = splitResources(response.value?.resources)
-})
-
-type SplitResources = {
-  projects: Resource[],
-  folders: Resource[],
-  objects: Resource[],
-  other: any[],
 }
 
 function splitResources(resources: (Resource & { [type: string]: GenericNodeType })[]): SplitResources {
@@ -146,7 +154,7 @@ function splitResources(resources: (Resource & { [type: string]: GenericNodeType
           </CommandItem>
         </CommandGroup>
       </CommandList>
-      <Button v-if="response?.expected_hits > DEFAULT_LIMIT">
+      <Button v-if="response?.expected_hits > limitResults">
         Show all results
       </Button>
     </CommandDialog>
