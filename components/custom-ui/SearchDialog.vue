@@ -11,6 +11,7 @@ const queryInput = ref('')
 const fetching = ref(false)
 const response: Ref<SearchResponse | undefined | void> = ref(undefined)
 const dialogOpen = ref(false)
+// mit computed berechnen
 const resources: Ref<SplitResources | undefined> = ref(undefined)
 
 function handleDialogOpenChange() {
@@ -31,6 +32,11 @@ watch(queryInput, () => {
 })
 
 const debouncedInput = debounce(async () => await searchResources(queryInput.value), 250)
+
+function openDialog(): void {
+  queryInput.value = '';
+  dialogOpen.value = true;
+}
 
 async function searchResources(query: string): Promise<void> {
   // No need to search with empty input
@@ -70,33 +76,32 @@ function splitResources(resources: (Resource & { [type: string]: GenericNodeType
     objects: [],
     other: []
   }
-  console.log(resources);
-  console.log(response.value?.expected_hits);
-  for (const resource of resources) {
-    if (resource.type === GenericNodeType.Resource) {
-      switch (resource.variant) {
-        case ResourceVariant.Project:
-          result.projects.push(resource)
-          break;
-        case ResourceVariant.Folder:
-          result.folders.push(resource)
-          break;
-        case ResourceVariant.Object:
-          result.objects.push(resource)
-          break;
+  if (resources) {
+    for (const resource of resources) {
+      if (resource.type === GenericNodeType.Resource) {
+        switch (resource.variant) {
+          case ResourceVariant.Project:
+            result.projects.push(resource)
+            break;
+          case ResourceVariant.Folder:
+            result.folders.push(resource)
+            break;
+          case ResourceVariant.Object:
+            result.objects.push(resource)
+            break;
+        }
+      } else {
+        result.other.push(resource)
       }
-    } else {
-      result.other.push(resource)
     }
   }
   return result
 }
-
 </script>
 
 <template>
   <div class="relative flex">
-    <Button @click="dialogOpen=true">
+    <Button @click="openDialog()">
       <IconSearch class="mr-1 h-4 w-4 text-muted-foreground"/>
       Search
     </Button>
@@ -140,9 +145,6 @@ function splitResources(resources: (Resource & { [type: string]: GenericNodeType
             {{ resource.type + ": " + resource.name }}
           </CommandItem>
         </CommandGroup>
-        <!-- <CommandItem disabled v-if="response?.expected_hits > DEFAULT_LIMIT" :value="'load more'">...</CommandItem>
-
-        </CommandItem> -->
       </CommandList>
       <Button v-if="response?.expected_hits > DEFAULT_LIMIT">
         Show all results
