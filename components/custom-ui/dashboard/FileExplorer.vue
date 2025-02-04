@@ -685,7 +685,23 @@ watch(offset, () => {
           </div>
 
           <div v-else-if="infoSelection" class="gap-y-4">
-            <h2 class="text-2xl">{{ infoSelection?.title || 'Title not available' }}</h2>
+            <div class="flex items-center">
+
+              <TooltipProvider :delay-duration="500">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <IconLock v-if="infoSelection?.locked" class="text-destructive"/>
+                    <IconLockOpen2 v-else class="text-aruna-highlight"/>
+                  </TooltipTrigger>
+                  <TooltipContent class="rounded-none text-aruna-highlight bg-aruna-muted border border-aruna-text/50">
+                    <span v-if="infoSelection?.locked">This resource is locked and cannot be edited.</span>
+                    <span v-else>This resource is still editable.</span>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <h2 class="ms-4 text-2xl">{{ infoSelection?.title || 'Title not available' }}</h2>
+            </div>
             <Separator class="bg-aruna-text/50 mt-6"/>
             <!--<span class="text-sm font-medium leading-6 text-aruna-text-accent">Labels:</span>-->
             <ScrollArea>
@@ -703,92 +719,101 @@ watch(offset, () => {
                   </span>
                 </div>
               </div>
-              <ScrollBar orientation="horizontal" />
+              <ScrollBar orientation="horizontal"/>
             </ScrollArea>
 
             <Table class="table-auto">
               <TableBody class="">
-              <TableRow>
-                <TableCell class="w-fit text-sm font-medium leading-6 text-aruna-text-accent">Id:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ infoSelection?.id || '' }}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Name:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ infoSelection?.name || '' }}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell class="align-text-top text-sm font-medium leading-6 text-aruna-text-accent">Description:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ infoSelection?.description || '' }}
-                </TableCell>
-              </TableRow>
-              <TableRow v-if="infoSelection?.variant === ResourceVariant.Object">
-                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Size:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ formatBytes(infoSelection?.content_len || 0) }}
-                </TableCell>
-              </TableRow>
-              <TableRow v-else>
-                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Children:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ infoSelection?.count || 0 }}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Created At:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ formatDate(infoSelection?.created_at || '') }}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Last Modified:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ formatDate(infoSelection?.last_modified || '') }}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">License:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ infoSelection?.license_id || '' }}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell class="text-sm align-text-top font-medium leading-6 text-aruna-text-accent">Locations:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  <ul class="list-disc">
-                    <li class="flex gap-x-2" v-for="loc in infoSelection?.location">
-                      <component :is="StatusMap[loc.status as keyof typeof StatusMap]"
-                                 :class="{'text-aruna-text-accent animate-spin': loc.status === SyncingStatus.Pending,
+                <TableRow>
+                  <TableCell class="w-fit min-w-[125px] text-sm font-medium leading-6 text-aruna-text-accent">
+                    Id:
+                  </TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    {{ infoSelection?.id || '' }}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Name:</TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    {{ infoSelection?.name || '' }}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell class="align-text-top text-sm font-medium leading-6 text-aruna-text-accent">
+                    Description:
+                  </TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    {{ infoSelection?.description || '' }}
+                  </TableCell>
+                </TableRow>
+                <TableRow v-if="infoSelection?.variant === ResourceVariant.Object">
+                  <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Size:</TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    {{ formatBytes(infoSelection?.content_len || 0) }}
+                  </TableCell>
+                </TableRow>
+                <TableRow v-else>
+                  <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">
+                    Children:
+                  </TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    {{ infoSelection?.count || 0 }}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">
+                    Created At:
+                  </TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    {{ formatDate(infoSelection?.created_at || 'N/A') }}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">
+                    Last Modified:
+                  </TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    {{ formatDate(infoSelection?.last_modified || 'N/A') }}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">
+                    License:
+                  </TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    {{ licenseMap.get(infoSelection?.license_id) || 'N/A' }}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell class="text-sm align-text-top font-medium leading-6 text-aruna-text-accent">
+                    Locations:
+                  </TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    <ul v-if="infoSelection?.location.length > 0" class="list-disc">
+                      <li class="flex gap-x-2" v-for="loc in infoSelection?.location">
+                        <component :is="StatusMap[loc.status as keyof typeof StatusMap]"
+                                   :class="{'text-aruna-text-accent animate-spin': loc.status === SyncingStatus.Pending,
                                           'text-aruna-text-accent': loc.status === SyncingStatus.Running,
                                           'text-green-600': loc.status === SyncingStatus.Finished,
                                           'text-destructive': loc.status === SyncingStatus.Error}"/>
-                      {{ loc.endpoint_id }}
-                    </li>
-                  </ul>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Locked:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ infoSelection?.locked }}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Visibility:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ infoSelection?.visibility || '' }}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Deleted:</TableCell>
-                <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                  {{ infoSelection?.deleted }}
-                </TableCell>
-              </TableRow>
+                        {{ loc.endpoint_id }}
+                      </li>
+                    </ul>
+                    <span v-else>N/A</span>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Visibility:</TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    {{ infoSelection?.visibility || '' }}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Deleted:</TableCell>
+                  <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
+                    {{ infoSelection?.deleted }}
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>
