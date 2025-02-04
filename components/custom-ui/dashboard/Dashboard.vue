@@ -38,7 +38,7 @@ import Events from "~/components/custom-ui/dashboard/Events.vue";
 import Profile from "~/components/custom-ui/user/Profile.vue";
 import Tokens from "~/components/custom-ui/user/Tokens.vue";
 import Proxies from "~/components/custom-ui/user/Proxies.vue";
-import SearchBar from "~/components/custom-ui/SearchBar.vue";
+import SearchDialog from "~/components/custom-ui/SearchDialog.vue";
 import Licences from "~/components/custom-ui/dashboard/licenses/Licenses.vue";
 
 import type {User} from '~/composables/api_wrapper'
@@ -349,7 +349,7 @@ EventBus.on('spinStop', () => spinBaby.value = false)
               <Skeleton class="h-auto w-[300px]"/>
             </template>
           </ClientOnly>
-          <SearchBar />
+          <SearchDialog />
         </div>
         <DropdownMenu>
           <ClientOnly fallbackTag="span">

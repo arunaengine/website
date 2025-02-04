@@ -60,7 +60,7 @@ export type CreateGroupResponse = paths["/api/v3/groups"]["post"]["responses"][2
 // Info
 export type GetEventsResponse = paths["/api/v3/info/events"]["get"]["responses"][200]["content"]["application/json"];
 export type GetStatsResponse = paths["/api/v3/info/stats"]["get"]["responses"][200]["content"]["application/json"];
-export type SearchResponse = paths["/api/v3/info/search"]["get"]["responses"][200]["content"]["application/json"];
+export type SearchResponse = paths["/api/v3/info/search"]["get"]["responses"][200]["content"]["applicatiown/json"];
 
 // Realms
 export type CreateRealmResponse = paths["/api/v3/realms"]["post"]["responses"][200]["content"]["application/json"];
