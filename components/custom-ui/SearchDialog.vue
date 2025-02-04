@@ -141,11 +141,12 @@ function splitResources(resources: (Resource & { [type: string]: GenericNodeType
           </CommandItem>
         </CommandGroup>
         <!-- <CommandItem disabled v-if="response?.expected_hits > DEFAULT_LIMIT" :value="'load more'">...</CommandItem>
-        < !-- <Button v-if="response?.expected_hits > DEFAULT_LIMIT">
-          Show all results
-        </Button> -- >
+
         </CommandItem> -->
       </CommandList>
+      <Button v-if="response?.expected_hits > DEFAULT_LIMIT">
+        Show all results
+      </Button>
     </CommandDialog>
     <!-- END COMMAND DIALOG-->
   </div>
