@@ -580,11 +580,11 @@ async function submit() {
         </FormField>
         <!-- End Description Input -->
 
-        <div class="flex flex-col lg:flex-row gap-x-4">
+        <div class="flex flex-col xl:flex-row gap-4">
           <!-- Parent Id Input -->
           <FormField v-slot="{componentField}"
                      name="parent_id">
-            <FormItem v-if="values.variant !== ResourceVariant.Project">
+            <FormItem v-if="values.variant !== ResourceVariant.Project" class="w-full lg:basis-1/2">
               <FormLabel>Parent Id</FormLabel>
               <FormControl>
                 <div class="flex rounded-sm">
@@ -592,7 +592,7 @@ async function submit() {
                       Unspecified
                     </span>
                   <Input type="text"
-                         placeholder="Id of the new resources direct parent"
+                         placeholder="Id of the new resource's direct parent."
                          v-bind="componentField"
                          class="py-2 px-3 h-auto w-full border-s-0 border-aruna-text/50 rounded-s-none rounded-e-sm bg-aruna-muted text-aruna-text-accent text-sm
                                 placeholder:text-aruna-text
@@ -613,7 +613,7 @@ async function submit() {
               <FormLabel>Realm Selection</FormLabel>
               <Select v-bind="componentField">
                 <FormControl>
-                  <SelectTrigger class="bg-aruna-muted">
+                  <SelectTrigger class="bg-aruna-muted border-aruna-text/50">
                     <SelectValue placeholder="Select a realm for your project"/>
                   </SelectTrigger>
                 </FormControl>
@@ -638,7 +638,7 @@ async function submit() {
               <FormLabel>Group Selection</FormLabel>
               <Select v-bind="componentField">
                 <FormControl>
-                  <SelectTrigger class="bg-aruna-muted">
+                  <SelectTrigger class="bg-aruna-muted border-aruna-text/50">
                     <SelectValue placeholder="Select an administration group for your project"/>
                   </SelectTrigger>
                 </FormControl>
