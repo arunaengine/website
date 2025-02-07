@@ -34,15 +34,17 @@ export function toResourceTypeStr(variant: v2ResourceVariant | undefined): strin
 }
 
 export function fromResourceTypeStr(
-        variant: string | undefined, 
+        variant: string | undefined,
         default_value: v2ResourceVariant | undefined = v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED): v2ResourceVariant {
-    switch (variant.toLowerCase()) {
+    if (variant) {
+      switch (variant.toLowerCase()) {
         case "project": return v2ResourceVariant.RESOURCE_VARIANT_PROJECT
         case "collection": return v2ResourceVariant.RESOURCE_VARIANT_COLLECTION
         case "dataset": return v2ResourceVariant.RESOURCE_VARIANT_DATASET
         case "object": return v2ResourceVariant.RESOURCE_VARIANT_OBJECT
-        default: return default_value
+      }
     }
+    return default_value
 }
 
 export function getChildResourceType(variant: v2ResourceVariant | undefined): v2ResourceVariant {
@@ -107,13 +109,14 @@ export function toDataClassStr(variant: v2DataClass | undefined): string {
 }
 
 export function fromDataClassStr(string: string | undefined): v2DataClass {
-    switch (string.toLowerCase()) {
+    if (string)
+      switch (string.toLowerCase()) {
         case "public" : return v2DataClass.DATA_CLASS_PUBLIC
         case "private" : return v2DataClass.DATA_CLASS_PRIVATE
         case "workspace" : return v2DataClass.DATA_CLASS_WORKSPACE
         case "confidential" : return v2DataClass.DATA_CLASS_CONFIDENTIAL
-        default: return v2DataClass.DATA_CLASS_UNSPECIFIED
-    }
+      }
+    return v2DataClass.DATA_CLASS_UNSPECIFIED
 }
 
 export function toKeyValueVariantStr(variant: v2KeyValueVariant | undefined): string {
