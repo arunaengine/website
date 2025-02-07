@@ -1,4 +1,4 @@
-ARG NODE_IMAGE=oven/bun:1.1-alpine
+ARG NODE_IMAGE=oven/bun:1-alpine
 
 FROM --platform=linux/amd64 $NODE_IMAGE AS base
 WORKDIR /usr/src/app
