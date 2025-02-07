@@ -2,9 +2,11 @@
 import {
   IconArrowsSplit,
   IconBucket,
+  IconCheck,
   IconChevronDown,
   IconCloudDown,
   IconCloudLock,
+  IconEdit,
   IconExternalLink,
   IconFileInfo,
   IconFileSignal,
@@ -19,11 +21,12 @@ import {
 import {
   modelsv2Status,
   v2DataClass,
-  v2EndpointHostVariant, type v2InternalRelation,
+  v2EndpointHostVariant,
   v2InternalRelationVariant,
   v2PermissionLevel,
   v2RelationDirection,
   v2ResourceVariant,
+  type v2UpdateProjectDescriptionResponse,
 } from "~/composables/aruna_api_json";
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
@@ -36,6 +39,10 @@ import {
   toResourceTypeStr
 } from "~/composables/enum_conversions";
 import {ResourceInfo} from "~/composables/ResourceInfo";
+import {useToast} from '~/components/ui/toast/use-toast'
+
+const {toast} = useToast()
+
 
 interface ResourceInfoResponse extends Response {
   resource: ResourceInfo
@@ -60,6 +67,60 @@ const outgoingRelations = computed(() => resource.relations.filter(rel => rel.in
     rel.internal.definedVariant !== v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_DELETED &&
     rel.internal.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND).map(rel => rel.internal))
 const externalRelations = computed(() => resource.relations.filter(rel => rel.external).map(rel => rel.external))
+
+// ----- Editable Fields ---------------
+const editDescription = ref<boolean>(false)
+const descriptionBackup = ref(resource.description)
+
+function isEditable(): boolean {
+  if (resource) {
+    return [v2PermissionLevel.PERMISSION_LEVEL_ADMIN,
+      v2PermissionLevel.PERMISSION_LEVEL_WRITE].includes(resource.permission)
+  }
+  return false
+}
+
+async function updateDescription(description: string) {
+  console.info('[LandingPage] Updated description:', description)
+  if (resource) {
+    const apiEndpoint = `/api/${toResourceTypeStr(resource.variant).toLowerCase()}/${resource.id}/description`
+    console.info('[LandingPage] Call API endpoint:', apiEndpoint)
+    await $fetch<v2UpdateProjectDescriptionResponse>(apiEndpoint, {
+      method: 'PATCH',
+      body: {
+        description: description,
+      }
+    }).then(response => {
+      toast({
+        description: h('div',
+            {class: 'flex space-x-2 items-center justify-center text-aruna-text-accent'},
+            [
+              h(IconCheck, {class: 'flex-shrink-0 size-6 text-aruna-highlight'}),
+              h('span',
+                  {class: 'text-fuchsia-50'},
+                  ['Successfully updated the description.'])
+            ]),
+        duration: 5000
+      })
+      descriptionBackup.value = description
+      editDescription.value = false
+    }).catch(error => {
+      console.error(error)
+      toast({
+        title: 'Error',
+        //description: 'Something went wrong. If this problem persists please contact an administrator.',
+        description: `Failed to update description: ${error.data.message}`,
+        variant: 'destructive',
+        duration: 10000,
+      })
+    })
+  }
+}
+
+function cancelDescriptionEdit() {
+  resource.description = descriptionBackup.value
+  editDescription.value = false
+}
 
 function isDownloadable(): boolean {
   if (resource) {
@@ -289,12 +350,33 @@ useHead({
     <!-- Description / Authors Row -->
     <div class="flex flex-col xl:flex-row justify-center gap-x-4 gap-y-2 max-w-screen-2xl mx-auto mb-6">
       <div class="flex flex-col grow p-2 bg-aruna-bg/90 border border-aruna-text/50 text-aruna-text-accent">
-        <div class="flex flex-row justify-start items-center p-4 font-bold text-xl">
-          <IconFileInfo class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
-          <span class="">Description</span>
+        <div class="flex flex-row justify-between items-center p-4 font-bold text-xl">
+          <div class="flex flex-row w-fit">
+            <IconFileInfo class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
+            <span class="">Description</span>
+          </div>
+          <IconEdit v-if="isEditable()" @click="editDescription = true"/>
         </div>
-        <div class="flex grow p-4 bg-aruna-bg/90 text-aruna-text text-lg border-t border-aruna-text/50">
-          {{ resource?.description }}
+        <div v-if="editDescription" class="flex flex-col gap-2">
+          <Textarea v-model="resource.description"
+                    :rows="5"
+                    class="py-3 px-4 w-full border-aruna-text/50 rounded-md bg-aruna-muted text-aruna-text-accent text-sm
+                                   focus:border-aruna-highlight focus:ring-aruna-highlight focus:outline-none
+                                   focus-visible:border-aruna-highlight focus-visible:ring-aruna-highlight focus-visible:outline-none
+                                   disabled:opacity-50 disabled:pointer-events-none placeholder:text-aruna-text"/>
+          <div class="flex gap-4">
+            <Button @click="updateDescription(resource.description)"
+                    variant="outline"
+                    class="w-fit bg-transparent border-aruna-highlight text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
+              Save
+            </Button>
+            <Button @click="cancelDescriptionEdit()" variant="outline" class="w-fit border-aruna-text text-aruna-text">
+              Cancel
+            </Button>
+          </div>
+        </div>
+        <div v-else class="flex grow p-4 bg-aruna-bg/90 text-aruna-text text-lg border-t border-aruna-text/50">
+          <pre class="w-full">{{ resource?.description }}</pre>
         </div>
       </div>
       <div v-if="resource.authors"
