@@ -17,8 +17,12 @@ import LoginDialog from "~/components/custom-ui/dialog/LoginDialog.vue";
 // Fetch user from global state
 const user_state: Ref<v2User | undefined> = inject('userRef', ref(undefined))
 const forceRefresh = ref(0)
+const devInstance = ref<boolean>(false)
 
-onMounted(() => forceRefresh.value += 1);
+onMounted(() => {
+  forceRefresh.value += 1
+  devInstance.value = window.location.hostname.includes('dev.')
+});
 </script>
 
 <template>
@@ -59,7 +63,7 @@ onMounted(() => forceRefresh.value += 1);
 
             <div
                 class="hs-dropdown-menu transition-[opacity,margin] duration-[0.1ms] sm:duration-[150ms] hs-dropdown-open:opacity-100 opacity-0 sm:w-48 z-10 sm:shadow-md rounded-md p-2 bg-aruna-bg/90 border-aruna-text/50 divide-aruna-text/50 before:absolute top-full sm:border before:-top-5 before:start-0 before:w-full before:h-5 hidden">
-              <NuxtLink href="https://github.com/arunaengine/api"
+              <NuxtLink :to="devInstance ? 'https://api.dev.aruna-engine.org' : 'https://api.aruna-engine.org'"
                         class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-aruna-fg focus:ring-1 focus:ring-aruna-highlight"
                         target="_blank">
                 API
@@ -146,7 +150,7 @@ onMounted(() => forceRefresh.value += 1);
                   <DropdownMenuPortal>
                     <DropdownMenuSubContent class="bg-aruna-muted">
                       <DropdownMenuLabel class="sm:hidden flex hover:bg-aruna-fg focus:bg-aruna-fg">
-                        <NuxtLink to="https://github.com/arunaengine/api"
+                        <NuxtLink :to="devInstance ? 'https://api.dev.aruna-engine.org' : 'https://api.aruna-engine.org'"
                                   target="_blank"
                                   class="flex items-center gap-x-2">
                           API
