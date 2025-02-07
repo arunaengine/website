@@ -43,7 +43,7 @@ function dataClassCss(dataClass: v2DataClass): string {
       <!-- Name and ID display with links -->
       <NuxtLink :to="`/objects/${entry.id}`"
                 class="text-aruna-highlight font-bold">
-        <h3>{{ entry.name }}</h3>
+        <h3>{{ entry.title || entry.name }}</h3>
       </NuxtLink>
 
       <NuxtLink :to="`/objects/${entry.id}`"
