@@ -111,7 +111,7 @@ async function updateDescription(description: string) {
 
     //const apiEndpoint = `/api/${toResourceTypeStr(resource.variant).toLowerCase()}/${resource.id}/description`
     console.info('[LandingPage] Call API endpoint:', apiEndpoint)
-    await $fetch<v2UpdateProjectDescriptionResponse>(apiEndpoint, {
+    await $fetch(apiEndpoint, {
       method: 'PATCH',
       body: {
         description: description,
@@ -146,6 +146,71 @@ async function updateDescription(description: string) {
 function cancelDescriptionEdit() {
   resource.description = descriptionBackup.value
   editDescription.value = false
+}
+
+// ----- Editable Title ---------------
+const titleEditMode = ref<boolean>(false)
+
+async function updateTitle(newTitle: string | undefined) {
+  console.info('[LandingPage] Updated title:', newTitle)
+  if (resource) {
+    let apiEndpoint = undefined
+    switch (resource.variant) {
+      case v2ResourceVariant.RESOURCE_VARIANT_PROJECT:
+        apiEndpoint = `/api/project/${resource.id}/title`
+        break
+      case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION:
+        apiEndpoint = `/api/collection/${resource.id}/title`
+        break
+      case v2ResourceVariant.RESOURCE_VARIANT_DATASET:
+        apiEndpoint = `/api/dataset/${resource.id}/title`
+        break
+    }
+
+    // Show error if somehow this gets called for an Object
+    if (!apiEndpoint) {
+      toast({
+        title: 'Error',
+        //description: 'Something went wrong. If this problem persists please contact an administrator.',
+        description: `Title editing for the current resource is not yet implemented.`,
+        variant: 'destructive',
+        duration: 10000,
+      })
+      return
+    }
+
+    console.info('[LandingPage] Call API endpoint:', apiEndpoint)
+    await $fetch(apiEndpoint, {
+      method: 'POST',
+      body: {
+        title: newTitle ? newTitle : '',
+      }
+    }).then(response => {
+      toast({
+        description: h('div',
+            {class: 'flex space-x-2 items-center justify-center text-aruna-text-accent'},
+            [
+              h(IconCheck, {class: 'flex-shrink-0 size-6 text-aruna-highlight'}),
+              h('span',
+                  {class: 'text-fuchsia-50'},
+                  ['Successfully updated the title.'])
+            ]),
+        duration: 5000
+      })
+
+      resource.title = newTitle ? newTitle : ''
+      titleEditMode.value = false
+    }).catch(error => {
+      console.error(error)
+      toast({
+        title: 'Error',
+        //description: 'Something went wrong. If this problem persists please contact an administrator.',
+        description: `Failed to update description: ${error.data.message}`,
+        variant: 'destructive',
+        duration: 10000,
+      })
+    })
+  }
 }
 
 function isDownloadable(): boolean {
@@ -368,7 +433,11 @@ useHead({
     <!-- General Info Row -->
     <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 max-w-screen-2xl mx-auto mb-6">
       <CardSmallInfo :icon_id='"ID"' :text="resource.id"/>
-      <CardName :name="resource.name" :title="resource.title"/>
+      <CardName v-model:edit-mode="titleEditMode"
+                :name="resource.name"
+                :title="resource.title"
+                :editable="isEditable()"
+                @update-title="updateTitle"/>
       <CardStats :stats="resource.stats"/>
     </div>
     <!-- End General Info Row -->
@@ -381,7 +450,7 @@ useHead({
             <IconFileInfo class="flex-shrink-0 size-6 me-4 text-aruna-highlight"/>
             <span class="">Description</span>
           </div>
-          <IconEdit v-if="isEditable()" @click="editDescription = true"/>
+          <IconEdit v-if="isEditable()" @click="editDescription = true" class="hover:cursor-pointer"/>
         </div>
         <div v-if="editDescription" class="flex flex-col gap-2">
           <Textarea v-model="resource.description"
