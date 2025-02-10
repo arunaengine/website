@@ -68,14 +68,15 @@ const outgoingRelations = computed(() => resource.relations.filter(rel => rel.in
     rel.internal.direction === v2RelationDirection.RELATION_DIRECTION_OUTBOUND).map(rel => rel.internal))
 const externalRelations = computed(() => resource.relations.filter(rel => rel.external).map(rel => rel.external))
 
-// ----- Editable Fields ---------------
+// ----- Editable Description ---------------
 const editDescription = ref<boolean>(false)
 const descriptionBackup = ref(resource.description)
 
 function isEditable(): boolean {
   if (resource) {
     return [v2PermissionLevel.PERMISSION_LEVEL_ADMIN,
-      v2PermissionLevel.PERMISSION_LEVEL_WRITE].includes(resource.permission)
+          v2PermissionLevel.PERMISSION_LEVEL_WRITE].includes(resource.permission) &&
+        resource.variant !== v2ResourceVariant.RESOURCE_VARIANT_OBJECT
   }
   return false
 }
@@ -83,7 +84,32 @@ function isEditable(): boolean {
 async function updateDescription(description: string) {
   console.info('[LandingPage] Updated description:', description)
   if (resource) {
-    const apiEndpoint = `/api/${toResourceTypeStr(resource.variant).toLowerCase()}/${resource.id}/description`
+    let apiEndpoint = undefined
+    switch (resource.variant) {
+      case v2ResourceVariant.RESOURCE_VARIANT_PROJECT:
+        apiEndpoint = `/api/project/${resource.id}/description`
+        break
+      case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION:
+        apiEndpoint = `/api/collection/${resource.id}/description`
+        break
+      case v2ResourceVariant.RESOURCE_VARIANT_DATASET:
+        apiEndpoint = `/api/dataset/${resource.id}/description`
+        break
+    }
+
+    // Show error if somehow this gets called for an Object
+    if (!apiEndpoint) {
+      toast({
+        title: 'Error',
+        //description: 'Something went wrong. If this problem persists please contact an administrator.',
+        description: `Title editing for the current resource is not yet implemented.`,
+        variant: 'destructive',
+        duration: 10000,
+      })
+      return
+    }
+
+    //const apiEndpoint = `/api/${toResourceTypeStr(resource.variant).toLowerCase()}/${resource.id}/description`
     console.info('[LandingPage] Call API endpoint:', apiEndpoint)
     await $fetch<v2UpdateProjectDescriptionResponse>(apiEndpoint, {
       method: 'PATCH',
