@@ -41,7 +41,7 @@ export default defineNuxtConfig({
       local: {
         clientId: "test",
         clientSecret: "QgBl9I2CD3eVhL7LFvkHrYUK7oKL3LE2",
-        issuer: "http://localhost:1998",
+        issuer: "http://localhost:1998/realms/test",
         redirectUrl: "http://localhost:3000/callback",
         authUrl: 'http://localhost:1998/realms/test/protocol/openid-connect/auth',
         tokenUrl: 'http://localhost:1998/realms/test/protocol/openid-connect/token',
