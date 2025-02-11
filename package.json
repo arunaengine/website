@@ -10,9 +10,9 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.735.0",
-    "@aws-sdk/lib-storage": "^3.735.0",
-    "@aws-sdk/s3-request-presigner": "^3.735.0",
+    "@aws-sdk/client-s3": "^3.738.0",
+    "@aws-sdk/lib-storage": "^3.738.0",
+    "@aws-sdk/s3-request-presigner": "^3.738.0",
     "@bynect/markdown-it-class": "^1.0.2",
     "@nuxtjs/tailwindcss": "^6.13.1",
     "@nuxtjs/color-mode": "^3.5.2",
