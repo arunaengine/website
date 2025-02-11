@@ -74,15 +74,12 @@ const descriptionBackup = ref(resource.description)
 
 function isEditable(): boolean {
   if (resource) {
-    return [v2PermissionLevel.PERMISSION_LEVEL_ADMIN,
-          v2PermissionLevel.PERMISSION_LEVEL_WRITE].includes(resource.permission)
-        //&& resource.variant !== v2ResourceVariant.RESOURCE_VARIANT_OBJECT
+    return [v2PermissionLevel.PERMISSION_LEVEL_ADMIN, v2PermissionLevel.PERMISSION_LEVEL_WRITE].includes(resource.permission)
   }
   return false
 }
 
 async function updateDescription(description: string) {
-  console.info('[LandingPage] Updated description:', description)
   if (resource) {
     let apiEndpoint = undefined
     switch (resource.variant) {
@@ -100,7 +97,6 @@ async function updateDescription(description: string) {
         break
     }
 
-    const anyParent = incomingRelations.value.find(rel => rel?.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO)
     const request = resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT ? {
       name: undefined,
       description: description,
@@ -118,14 +114,11 @@ async function updateDescription(description: string) {
       description: description,
     }
 
-    console.info('[LandingPage] Update description request:', request)
-
-    // Show error if somehow this gets called for an Object
+    // Show error if somehow this gets called for an unspecified resource
     if (!apiEndpoint) {
       toast({
         title: 'Error',
-        //description: 'Something went wrong. If this problem persists please contact an administrator.',
-        description: `Title editing for the current resource is not yet implemented.`,
+        description: `Title editing for the current resource should not be possible.`,
         variant: 'destructive',
         duration: 10000,
       })
@@ -171,7 +164,6 @@ function cancelDescriptionEdit() {
 const titleEditMode = ref<boolean>(false)
 
 async function updateTitle(newTitle: string | undefined) {
-  console.info('[LandingPage] Updated title:', newTitle)
   if (resource) {
     let apiEndpoint = undefined
     switch (resource.variant) {
@@ -189,19 +181,17 @@ async function updateTitle(newTitle: string | undefined) {
         break
     }
 
-    // Show error if somehow this gets called for an Object
+    // Show error if somehow this gets called for an unspecified resource
     if (!apiEndpoint) {
       toast({
         title: 'Error',
-        //description: 'Something went wrong. If this problem persists please contact an administrator.',
-        description: `Title editing for the current resource is not yet implemented.`,
+        description: `Title editing for the current resource should not be possible.`,
         variant: 'destructive',
         duration: 10000,
       })
       return
     }
 
-    console.info('[LandingPage] Call API endpoint:', apiEndpoint)
     await $fetch(apiEndpoint, {
       method: 'POST',
       body: {

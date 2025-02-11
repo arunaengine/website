@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {IconEdit, IconIdBadge2} from "@tabler/icons-vue";
-import type {v2Author, v2Stats} from "~/composables/aruna_api_json";
 
 // v-model
 const editMode = defineModel<boolean>('editMode')
