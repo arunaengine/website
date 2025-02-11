@@ -12,7 +12,7 @@ const props = defineProps<{
   editable: boolean
 }>()
 const editable = ref<boolean>(props.editable)
-const editedTitle = ref<string | undefined>(props.title)
+const editedTitle = ref<string>(props.title || '')
 
 // Events
 const emit = defineEmits<{
@@ -39,7 +39,7 @@ const emit = defineEmits<{
         <div class="flex w-full justify-between items-center space-x-2 border-aruna-text/50">
           <div class="flex gap-2 w-full items-center">
             <span class="text-lg text-aruna-text">Title:</span>
-            <div v-if="props.title && editMode" class="flex flex-col gap-2 w-full">
+            <div v-if="editMode" class="flex flex-col gap-2 w-full">
               <Input type="text"
                      v-model="editedTitle"
                      placeholder="Title of the resource"
@@ -58,10 +58,8 @@ const emit = defineEmits<{
                 </Button>
               </div>
             </div>
-            <span v-else-if="props.title  && !editMode" class="font-bold text-xl text-aruna-text-accent">{{
-                props.title
-              }}</span>
-            <span v-else class="font-bold text-xl text-aruna-text-accent">N/A</span>
+            <span v-else class="font-bold text-xl text-aruna-text-accent">
+              {{ props.title || 'N/A' }}</span>
           </div>
           <IconEdit v-if="!editMode && editable"
                     @click="editMode = true"
