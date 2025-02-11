@@ -22,11 +22,11 @@ import {
   modelsv2Status,
   v2DataClass,
   v2EndpointHostVariant,
+  type v2Hash,
   v2InternalRelationVariant,
   v2PermissionLevel,
   v2RelationDirection,
   v2ResourceVariant,
-  type v2UpdateProjectDescriptionResponse,
 } from "~/composables/aruna_api_json";
 import {GetObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {getSignedUrl,} from "@aws-sdk/s3-request-presigner";
@@ -75,8 +75,8 @@ const descriptionBackup = ref(resource.description)
 function isEditable(): boolean {
   if (resource) {
     return [v2PermissionLevel.PERMISSION_LEVEL_ADMIN,
-          v2PermissionLevel.PERMISSION_LEVEL_WRITE].includes(resource.permission) &&
-        resource.variant !== v2ResourceVariant.RESOURCE_VARIANT_OBJECT
+          v2PermissionLevel.PERMISSION_LEVEL_WRITE].includes(resource.permission)
+        //&& resource.variant !== v2ResourceVariant.RESOURCE_VARIANT_OBJECT
   }
   return false
 }
@@ -95,7 +95,30 @@ async function updateDescription(description: string) {
       case v2ResourceVariant.RESOURCE_VARIANT_DATASET:
         apiEndpoint = `/api/dataset/${resource.id}/description`
         break
+      case v2ResourceVariant.RESOURCE_VARIANT_OBJECT:
+        apiEndpoint = `/api/object/${resource.id}/update`
+        break
     }
+
+    const anyParent = incomingRelations.value.find(rel => rel?.definedVariant === v2InternalRelationVariant.INTERNAL_RELATION_VARIANT_BELONGS_TO)
+    const request = resource.variant === v2ResourceVariant.RESOURCE_VARIANT_OBJECT ? {
+      name: undefined,
+      description: description,
+      addKeyValues: [],
+      removeKeyValues: [],
+      dataClass: resource.dataClass,
+      projectId: undefined, //anyParent?.resourceVariant === v2ResourceVariant.RESOURCE_VARIANT_PROJECT ? anyParent.resourceId : undefined,
+      collectionId: undefined, //anyParent?.resourceVariant === v2ResourceVariant.RESOURCE_VARIANT_COLLECTION ? anyParent.resourceId : undefined,
+      datasetId: undefined, //anyParent?.resourceVariant === v2ResourceVariant.RESOURCE_VARIANT_DATASET ? anyParent.resourceId : undefined,
+      hashes: [],
+      forceRevision: false,
+      metadataLicenseTag: undefined,
+      dataLicenseTag: undefined,
+    } : {
+      description: description,
+    }
+
+    console.info('[LandingPage] Update description request:', request)
 
     // Show error if somehow this gets called for an Object
     if (!apiEndpoint) {
@@ -109,13 +132,9 @@ async function updateDescription(description: string) {
       return
     }
 
-    //const apiEndpoint = `/api/${toResourceTypeStr(resource.variant).toLowerCase()}/${resource.id}/description`
-    console.info('[LandingPage] Call API endpoint:', apiEndpoint)
     await $fetch(apiEndpoint, {
       method: 'PATCH',
-      body: {
-        description: description,
-      }
+      body: request
     }).then(response => {
       toast({
         description: h('div',
@@ -164,6 +183,9 @@ async function updateTitle(newTitle: string | undefined) {
         break
       case v2ResourceVariant.RESOURCE_VARIANT_DATASET:
         apiEndpoint = `/api/dataset/${resource.id}/title`
+        break
+      case v2ResourceVariant.RESOURCE_VARIANT_OBJECT:
+        apiEndpoint = `/api/object/${resource.id}/title`
         break
     }
 
