@@ -5,7 +5,7 @@ export default defineEventHandler(async event => {
   const request = await readBody(event)
 
   const baseUrl = useRuntimeConfig().serverHostUrl
-  const fetchUrl = `${baseUrl}/v2/datasets/${objectId}/update`
+  const fetchUrl = `${baseUrl}/v2/objects/${objectId}`
   return await $fetch<v2UpdateObjectResponse>(fetchUrl, {
     method: 'POST',
     headers: {
