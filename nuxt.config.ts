@@ -99,7 +99,8 @@ export default defineNuxtConfig({
         customImg: '', // URL to external or internal image
         validFrom: '', // Some valid date string
         validTo: '', // Some valid date string
-      }
+      },
+      filterTestResources: false
     }
   },
 
