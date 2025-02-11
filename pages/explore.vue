@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import {v2ResourceVariant, type v2GenericResource} from "~/composables/aruna_api_json";
+import {v2ResourceVariant, type v2GenericResource, type v2SearchResourcesResponse} from "~/composables/aruna_api_json";
 import {
   IconFile,
   IconFiles,
@@ -27,6 +27,17 @@ const limit: Ref<number> = ref(20);
 const hits: Ref<v2GenericResource[]> = ref([]);
 const estimatedTotal = ref(0);
 
+// Evaluate if experimental features of search index are activated
+const experimentalEnabled = await $fetch<v2SearchResourcesResponse>('api/search', {
+  method: 'POST',
+  body: {
+    query: "",
+    filter: "name NOT CONTAINS test",
+    limit: 1,
+    offset: 0,
+  }
+}).then(() => true).catch(() => false)
+
 /* Query */
 const query = ref("");
 watch(query, async () => {
@@ -34,7 +45,7 @@ watch(query, async () => {
 });
 
 /* Filter */
-const filter = ref("object_type = PROJECT");
+const filter = ref(experimentalEnabled && useRuntimeConfig().public.filterTestResources ? "name NOT CONTAINS test AND object_type = PROJECT" : "object_type = PROJECT");
 const typeFilter = ref(v2ResourceVariant.RESOURCE_VARIANT_PROJECT);
 const customFilter = ref("");
 const customFilterValid = ref(true);
@@ -76,6 +87,17 @@ function generateFilter() {
       filter.value = customFilter.value;
     }
   }
+
+  // Filter all resources which contain 'test' in its name
+  if (experimentalEnabled && useRuntimeConfig().public.filterTestResources) {
+    if (filter.value.length > 0) {
+      filter.value += 'AND name NOT CONTAINS test';
+    } else {
+      filter.value = 'name NOT CONTAINS test';
+    }
+  }
+  console.info('[Explore]', filter.value)
+
 }
 
 /* Update search results list */
