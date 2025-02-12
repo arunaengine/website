@@ -403,12 +403,12 @@ watch(offset, () => {
 // ----- End Pagination ---------- //
 </script>
 <template>
-  <div class="flex flex-col h-full w-full py-6 ps-6">
+  <div class="flex flex-col h-full w-full">
     <!-- Header -->
-    <div class="flex h-14 items-center justify-between border-b px-6 border-gray-800 bg-gray-900">
+    <div class="flex p-4 h-14 items-center justify-between px-6 bg-transparent border-b border-aruna-text/50">
       <nav aria-label="breadcrumb">
         <Breadcrumb>
-          <BreadcrumbList class="text-aruna-text-accent">
+          <BreadcrumbList class="font-bold text-aruna-text-accent">
             <BreadcrumbItem @click="navigateBack('root')"
                             class="hover:cursor-pointer">
               Your Projects
@@ -494,18 +494,8 @@ watch(offset, () => {
                          :direction="checkDirection()"
                          class="h-full">
       <ResizablePanel>
-        <!--
-        <div :class="{'opacity-50': isOverDropZone}"
-            class="absolute flex w-full h-full items-center justify-center opacity-0 transition-all ease-in-out delay-50 duration-500">
-          <div class="flex flex-col bg-aruna-highlight items-center justify-center gap-y-6 p-32 border-2 border-dashed border-aruna-text-accent rounded-sm">
-            Drop your file here
-            <IconPlus class="flex-shrink-0 size-8 text-aruna-text-accent border rounded-full border-aruna-text-accent"/>
-          </div>
-        </div>
-        -->
-
         <!-- Flexbox Resource Display -->
-        <div class="flex flex-row flex-wrap content-start items-start justify-start gap-6 my-4">
+        <div class="flex flex-row flex-wrap content-start items-start justify-start gap-6 ms-4 my-4">
           <Card v-for="resource in displayedResources"
                 class="rounded-sm border-aruna-text/50 flex flex-col items-center justify-center min-w-[200px] max-w-[300px] h-fit">
             <CardContent class="p-0 flex flex-col items-center w-full">
