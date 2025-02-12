@@ -35,7 +35,7 @@ watch(externalTrigger, () => (open.value = externalTrigger.value))
 
 /* ----- EVENT EMITS ----- */
 const emit = defineEmits<{
-  'add-component': [component: v3Component]
+  'add-component': [component: v3Component, realmId: string]
 }>()
 /* ----- END EVENT EMITS ----- */
 
@@ -120,7 +120,7 @@ const onSubmit = handleSubmit(async (values) => {
       title: 'Success',
       description: h('pre', {class: 'mt-2 w-[500px] rounded-md bg-slate-950 p-4'}, h('code', {class: 'text-white'}, JSON.stringify(response, null, 2))),
     })
-    emit('add-component', response.component)
+    emit('add-component', response.component, values.realm_id)
     open.value = false
 
   }).catch(error => {
@@ -152,7 +152,6 @@ const onSubmit = handleSubmit(async (values) => {
         </DialogTitle>
         <DialogDescription class="flex flex-col gap-y-4 justify-start">
           Add a new component to your realm.
-          <pre>{{ JSON.stringify(values, null, 2) }}</pre>
         </DialogDescription>
       </DialogHeader>
 
