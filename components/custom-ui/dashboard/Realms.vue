@@ -278,7 +278,7 @@ function openComponentCreation(realmId: string) {
   componentDialogOpen.value = true
 }
 
-function addComponent(component: v3Component) {
+function addComponent(component: v3Component, realmId: string) {
   toast({
     title: 'Event Received',
     description: `Received "AddComponent" event: ${component.id}`
@@ -411,7 +411,7 @@ const expandedDescription = ref<Set<string>>(new Set())
   <RealmComponentDialog :initial-open="componentDialogOpen"
                         :with-button="false"
                         :realm-id="currentRealm"
-                        @add-component=""
+                        @add-component="addComponent"
                         @update:open="componentDialogOpen = false"/>
 
   <div class="mx-4 mt-4 h-full flex flex-col">
