@@ -117,26 +117,12 @@ export type SimpleCredentials = {
 export enum EventTypes {
   RegisterUser = 'RegisterUserRequestTx',
   CreateToken = 'CreateTokenRequestTx',
+  CreateS3Credentials = 'CreateS3CredentialsRequestTx',
   CreateRealm = 'CreateRealmRequestTx',
   CreateGroup = 'CreateGroupRequestTx',
   CreateComponent = 'CreateComponentRequestTx',
   CreateResource = 'CreateResourceRequestTx',
   TODO = 'Complete this enum'
-}
-
-export type Oidc = {
-  oidc_realm: string
-  oidc_subject: string
-}
-
-export type TxUser = {
-  user_id: string
-  auth_method: {
-    oidc?: Oidc
-  } | {
-    Aruna: number
-  }
-  impersonated_by: TxUser | null
 }
 
 export type BaseTx = {
@@ -149,48 +135,46 @@ export type BaseTx = {
   }
 }
 
+export type TxUser = {
+  user_id: string
+  auth_method: AuthType
+  impersonated_by: TxUser | null
+}
+
+export type AuthType = {
+  Oidc?: Oidc
+  Aruna?: number
+}
+
+export type Oidc = {
+  oidc_realm: string
+  oidc_subject: string
+}
+
+// Specific Events
 export type RegisterUserTx = BaseTx & {
-  req: {
-    first_name: string,
-    last_name: string,
-    email: string,
-    identifier: string
-  }
+  req: RegisterUserRequest
 }
 
 export type CreateTokenTx = BaseTx & {
-  req: {
-    name: string,
-    scope: 'Personal' | 'Resource',
-    expires_at: Date,
-    group_id: string | null,
-    realm_id: string | null
-  }
+  req: CreateTokenRequest
+}
+
+export type CreateS3CredentialsRequestTx = BaseTx & {
+  req: CreateS3CredentialsRequest
+}
+
+export type CreateComponentRequestTx = BaseTx & {
+  req: CreateComponentRequest
 }
 
 export type CreateGroupTx = BaseTx & {
-  req: {
-    name: string,
-    description: string,
-  }
-  generated_group: {
-    id: string
-    name: string
-    description: string
-  }
+  req: CreateGroupRequest
 }
 
 export type CreateRealmTx = BaseTx & {
-  req: {
-    tag: string,
-    name: string,
-    description: string,
-  }
-  generated_group: {
-    id: string
-    name: string
-    description: string
-  }
+  req: CreateRealmRequest
+  generated_group: Group
 }
 
 
