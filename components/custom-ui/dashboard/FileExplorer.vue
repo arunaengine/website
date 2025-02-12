@@ -3,6 +3,7 @@ import {
   IconCheck,
   IconEdit,
   IconExclamationCircle,
+  IconExternalLink,
   IconFile,
   IconFolder,
   IconFolderPlus,
@@ -685,22 +686,31 @@ watch(offset, () => {
           </div>
 
           <div v-else-if="infoSelection" class="gap-y-4">
-            <div class="flex items-center">
-
-              <TooltipProvider :delay-duration="500">
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <IconLock v-if="infoSelection?.locked" class="text-destructive"/>
-                    <IconLockOpen2 v-else class="text-aruna-highlight"/>
-                  </TooltipTrigger>
-                  <TooltipContent class="rounded-none text-aruna-highlight bg-aruna-muted border border-aruna-text/50">
-                    <span v-if="infoSelection?.locked">This resource is locked and cannot be edited.</span>
-                    <span v-else>This resource is still editable.</span>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <h2 class="ms-4 text-2xl">{{ infoSelection?.title || 'Title not available' }}</h2>
+            <div class="flex justify-between">
+              <div class="flex items-center">
+                <!-- Locked / Unlocked -->
+                <TooltipProvider :delay-duration="500">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <IconLock v-if="infoSelection?.locked" class="text-destructive"/>
+                      <IconLockOpen2 v-else class="text-aruna-highlight"/>
+                    </TooltipTrigger>
+                    <TooltipContent class="rounded-none text-aruna-highlight bg-aruna-muted border border-aruna-text/50">
+                      <span v-if="infoSelection?.locked">This resource is locked and cannot be edited.</span>
+                      <span v-else>This resource is still editable.</span>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <!-- End Locked / Unlocked -->
+                <!-- Name / Title -->
+                <h2 class="ms-4 text-2xl">{{ infoSelection?.title || 'Title not available' }}</h2>
+                <!-- End Name / Title -->
+              </div>
+              <!-- Link to resource landing page -->
+              <NuxtLink :to="`/objects/${infoSelection?.id}`" target="_blank">
+                <IconExternalLink class="flex-shrink-0 text-aruna-text-accent hover:text-aruna-highlight"/>
+              </NuxtLink>
+              <!-- End Link to resource landing page -->
             </div>
             <Separator class="bg-aruna-text/50 mt-6"/>
             <!--<span class="text-sm font-medium leading-6 text-aruna-text-accent">Labels:</span>-->
