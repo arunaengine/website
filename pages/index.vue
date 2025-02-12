@@ -8,7 +8,7 @@ import Hero from "~/components/custom-ui/frontpage/Hero.vue";
 </script>
 <template>
   <div class="flex flex-col flex-grow">
-    <div class="bg-[url('/public/imgs/global-bg.webp')] bg-cover bg-fixed bg-center bg-no-repeat">
+    <div class="bg-[url('/imgs/global-bg.webp')] bg-cover bg-fixed bg-center bg-no-repeat">
       <!-- Header + Navigation -->
       <NavigationTop/>
       <!-- END Header + Navigation -->
