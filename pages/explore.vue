@@ -1,14 +1,11 @@
 <script lang="ts" setup>
-import {v2ResourceVariant, type v2GenericResource} from "~/composables/aruna_api_json";
 import {
   IconFile,
-  IconFiles,
   IconFolder,
   IconFolders,
   IconSearch,
   IconWorldSearch,
 } from "@tabler/icons-vue";
-import {Button} from '@/components/ui/button'
 import {
   Pagination,
   PaginationEllipsis,
@@ -19,23 +16,30 @@ import {
   PaginationNext,
   PaginationPrev,
 } from '@/components/ui/pagination'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import {ResourceVariant} from "~/types/aruna-v3-enums";
 
 import {searchResources} from "~/composables/api_wrapper";
 
 const currentPage: Ref<number> = ref(1);
 const limit: Ref<number> = ref(20);
-const hits: Ref<v2GenericResource[]> = ref([]);
+const hits: Ref<Resource[]> = ref([]);
 const estimatedTotal = ref(0);
+const fetching = ref(false);
+
+const debouncedInput = debounce(async () => await queryResources(true), 250)
 
 /* Query */
 const query = ref("");
 watch(query, async () => {
-  await queryResources(true)
+  fetching.value = true;
+  await debouncedInput()
 });
 
 /* Filter */
-const filter = ref("object_type = PROJECT");
-const typeFilter = ref(v2ResourceVariant.RESOURCE_VARIANT_PROJECT);
+const filter = ref("variant=0");
+const typeFilter = ref(ResourceVariant.Project);
 const customFilter = ref("");
 const customFilterValid = ref(true);
 
@@ -48,24 +52,21 @@ watch(typeFilter, async () => {
 
 function generateFilter() {
   switch (typeFilter.value) {
-    case v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED: {
+    case null: {
       filter.value = "";
       break;
     }
-    case v2ResourceVariant.RESOURCE_VARIANT_PROJECT: {
-      filter.value = "object_type = PROJECT";
+    case ResourceVariant.Project: {
+      filter.value = "variant=0";
       break;
     }
-    case v2ResourceVariant.RESOURCE_VARIANT_COLLECTION: {
-      filter.value = "object_type = COLLECTION";
+    case ResourceVariant.Folder: {
+      filter.value = "variant=1";
       break;
     }
-    case v2ResourceVariant.RESOURCE_VARIANT_DATASET: {
-      filter.value = "object_type = DATASET";
+    case ResourceVariant.Object: {
+      filter.value = "variant=2";
       break;
-    }
-    case v2ResourceVariant.RESOURCE_VARIANT_OBJECT: {
-      filter.value = "object_type = OBJECT";
     }
   }
 
@@ -93,13 +94,26 @@ async function queryResources(pageReset: boolean) {
   })
 
   try {
-    const response = await searchResources(body)
+    //const response = await searchResources(body)
+    const response = await $fetch<SearchResponse>('/api/v3/search', {
+      query: {
+        query: query.value,
+        limit: limit.value,
+        filter: filter.value,
+        offset: offset,
+      }
+    }).catch(error => {
+      console.error(error)
+      throw new Error("Resource search failed.")
+    })
 
     customFilterValid.value = true;
     hits.value = response.resources ? response.resources : [];
-    estimatedTotal.value = response.estimatedTotal
-        ? Number(response.estimatedTotal)
+    console.log(hits.value);
+    estimatedTotal.value = response.expected_hits
+        ? Number(response.expected_hits)
         : 0;
+    fetching.value = false;
   } catch (error) {
     console.warn(error);
     customFilterValid.value = false;
@@ -133,13 +147,22 @@ onMounted(async () => await queryResources(true));
         <div>
           <label class="sr-only" for="search-query-input-with-icon">Search query input</label>
           <div class="flex rounded-md shadow-sm">
+            <!-- <Input type="text"
+                   id="search-query-input-with-icon"
+                   v-model="query"
+                   name="search-query-input-with-icon"
+                   placeholder="Search Aruna Resources"
+            />
+            <Button type="button">
+              <IconSearch class="flex-shrink-0 size-6"/>
+            </Button> -->
             <input type="text"
                    v-model="query"
                    id="search-query-input-with-icon"
                    name="search-query-input-with-icon"
                    class="py-3 px-4 pe-11 block w-full border-e-0 border-aruna-text/50 rounded-s-md text-sm focus:z-10 focus:ring-1 focus:ring-aruna-highlight focus:border-aruna-highlight disabled:opacity-50 disabled:pointer-events-none bg-aruna-bg/90 text-aruna-text"
                    placeholder="Search Aruna Resources"/>
-            <button type="button"
+                 <button type="button"
                     class="w-[2.875rem] h-[2.875rem] flex-shrink-0 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-e-md border border-aruna-highlight bg-aruna-bg/90 text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-aruna-highlight">
               <IconSearch class="flex-shrink-0 size-6"/>
             </button>
@@ -162,7 +185,7 @@ onMounted(async () => await queryResources(true));
                  class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-bg/90 border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
             <input type="radio"
                    v-model="typeFilter"
-                   :value="v2ResourceVariant.RESOURCE_VARIANT_UNSPECIFIED"
+                   :value="null"
                    id="resource-type-all"
                    name="resource-type-select"
                    class="shrink-0 mt-0.5 border-aruna-text/50 rounded-full text-aruna-highlight focus:ring-0 disabled:opacity-50 disabled:pointer-events-none bg-aruna-muted checked:bg-aruna-highlight checked:border-aruna-muted focus:ring-offset-0"/>
@@ -175,7 +198,7 @@ onMounted(async () => await queryResources(true));
             <input type="radio"
                    checked
                    v-model="typeFilter"
-                   :value="v2ResourceVariant.RESOURCE_VARIANT_PROJECT"
+                   :value="ResourceVariant.Project"
                    id="resource-type-projects"
                    name="resource-type-select"
                    class="shrink-0 mt-0.5 border-aruna-text/50 rounded-full text-aruna-highlight focus:ring-0 disabled:opacity-50 disabled:pointer-events-none bg-aruna-muted checked:bg-aruna-highlight checked:border-aruna-muted focus:ring-offset-0"/>
@@ -187,31 +210,19 @@ onMounted(async () => await queryResources(true));
                  class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-bg/90 border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
             <input type="radio"
                    v-model="typeFilter"
-                   :value="v2ResourceVariant.RESOURCE_VARIANT_COLLECTION"
+                   :value="ResourceVariant.Folder"
                    id="resource-type-collections"
                    name="resource-type-select"
                    class="shrink-0 mt-0.5 border-aruna-text/50 rounded-full text-aruna-highlight focus:ring-0 disabled:opacity-50 disabled:pointer-events-none bg-aruna-muted checked:bg-aruna-highlight checked:border-aruna-muted focus:ring-offset-0"/>
             <IconFolder class="flex-shrink-0 size-5 mx-2 text-aruna-text ms-5"/>
-            <span class="text-sm text-aruna-text">Collections</span>
-          </label>
-
-          <label for="resource-type-datasets"
-                 class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-bg/90 border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
-            <input type="radio"
-                   v-model="typeFilter"
-                   :value="v2ResourceVariant.RESOURCE_VARIANT_DATASET"
-                   id="resource-type-datasets"
-                   name="resource-type-select"
-                   class="shrink-0 mt-0.5 border-aruna-text/50 rounded-full text-aruna-highlight focus:ring-0 disabled:opacity-50 disabled:pointer-events-none bg-aruna-muted checked:bg-aruna-highlight checked:border-aruna-muted focus:ring-offset-0"/>
-            <IconFiles class="flex-shrink-0 size-5 mx-2 text-aruna-text ms-5"/>
-            <span class="text-sm text-aruna-text">Datasets</span>
+            <span class="text-sm text-aruna-text">Folder</span>
           </label>
 
           <label for="resource-type-objects"
                  class="cursor-pointer max-w-xs flex p-3 w-full bg-aruna-bg/90 border border-aruna-text/50 rounded-md text-sm focus:border-aruna-text/50 focus:ring-aruna-highlight text-aruna-text">
             <input type="radio"
                    v-model="typeFilter"
-                   :value="v2ResourceVariant.RESOURCE_VARIANT_OBJECT"
+                   :value="ResourceVariant.Object"
                    id="resource-type-objects"
                    name="resource-type-select"
                    class="shrink-0 mt-0.5 border-aruna-text/50 rounded-full text-aruna-highlight focus:ring-0 disabled:opacity-50 disabled:pointer-events-none bg-aruna-muted checked:bg-aruna-highlight checked:border-aruna-muted focus:ring-offset-0"/>
@@ -295,7 +306,7 @@ onMounted(async () => await queryResources(true));
         </Pagination>
 
         <!-- Start Display Search Results -->
-        <SearchResults :key="hits" :resources="hits"/>
+        <SearchResults :resources="hits" :fetching="fetching"/>
         <!-- End Display Search Results -->
 
         <Pagination v-if="estimatedTotal > limit"
