@@ -186,10 +186,10 @@ EventBus.on('spinStop', () => spinBaby.value = false)
 
 <template>
   <!--<div class="grid h-full min-h-[calc(100vh-64px)] w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">-->
-  <div class="grid h-full min-h-[calc(100vh-64px)] w-full md:grid-cols-[220px_1fr]">
-    <div class="hidden border-r bg-aruna-bg/90 md:block">
+  <div class="grid h-full min-h-[calc(100vh-64px)] w-full lg:grid-cols-[220px_1fr]">
+    <div class="hidden border-r border-aruna-text/50 bg-aruna-bg/90 md:block">
       <div class="flex h-full max-h-screen flex-col gap-2">
-        <div class="flex items-center justify-between border-b px-4 lg:h-[60px] lg:px-6">
+        <div class="flex items-center justify-between border-b border-aruna-text/50 px-4 lg:h-[60px] lg:px-6">
           <div class="flex space-x-2">
             <img alt="Aruna logo"
                  class="inline w-24 h-auto align-middle hover:cursor-pointer"
@@ -300,7 +300,7 @@ EventBus.on('spinStop', () => spinBaby.value = false)
 
     <!-- Sidebar for mobile devices -->
     <div class="flex flex-col">
-      <header class="flex items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
+      <header class="flex items-center gap-4 border-b border-aruna-text/50 bg-muted/40 px-4 lg:h-[60px] lg:px-6">
         <Sheet>
           <SheetTrigger as-child>
             <Button class="shrink-0 md:hidden"

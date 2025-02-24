@@ -19,7 +19,7 @@ function emitTabSwitch(tabId: string) {
 
 <template>
   <!--<div class="flex flex-1 items-center justify-center rounded-md border border-dashed border-slate-500 shadow-sm">-->
-  <div class="mx-4 mt-4 flex flex-1 flex-col rounded-md border border-dashed border-slate-500 shadow-sm">
+  <div class="mx-4 mt-4 flex flex-1 flex-col">
     <div class="flex flex-col my-6">
       <div class="grid gap-4 p-4 md:grid-cols-2 md:gap-8 lg:grid-cols-5">
         <Card>
