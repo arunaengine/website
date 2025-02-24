@@ -3,6 +3,7 @@ import {
   IconCheck,
   IconEdit,
   IconExclamationCircle,
+  IconExternalLink,
   IconFile,
   IconFolder,
   IconFolderPlus,
@@ -72,6 +73,7 @@ import {Upload} from "@aws-sdk/lib-storage";
 import {S3Client} from "@aws-sdk/client-s3";
 import type {S3ClientConfig} from "@aws-sdk/client-s3/dist-types/S3Client";
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "~/components/ui/tooltip";
+import EditableLabel from "~/components/custom-ui/EditableLabel.vue";
 
 const dropZoneRef = ref<HTMLDivElement>()
 
@@ -116,10 +118,10 @@ function updateProgress(current: number, total: number | undefined) {
   fileUploadProgress.value = +floatProgress.toFixed(2)
 }
 
-/* ----- End Dropzone ----- */
+// ----- End Dropzone ---------- //
 
 
-/* ----- PROPERTIES ----- */
+// ----- PROPERTIES ---------- //
 interface FileExplorerProps {
   resources: ResourceElement[]
   licenses: License[]
@@ -140,6 +142,10 @@ const displayedResources: Ref<ResourceElement[]> = ref(loadedResources.value)
 const infoSelection: Ref<ResourceElement | undefined> = ref(undefined)
 watch(infoSelection, () => console.log('[FileExplorer] Current selection:', infoSelection.value))
 const infoOpen: Ref<boolean> = ref(false)
+
+const nameEditMode = ref(false)
+const titleEditMode = ref(false)
+const descriptionEditMode = ref(false)
 
 watchEffect(async () => {
   console.log('[FileExplorer] Current Hierarchy:', currentHierarchy.value.map(ele => ele.id).join(', '))
@@ -394,20 +400,118 @@ async function submitUpload() {
 const currentPage = ref<number>(1)
 const pageSize = ref<number>(3)
 const totalHits = ref<number>(6)
-const offset = computed(() => (currentPage.value - 1) * pageSize.value)// currentPage.value * pageSize.value) //
+const offset = computed(() => (currentPage.value - 1) * pageSize.value)
 watch(offset, () => {
   console.info(`[FileExplorer] Current page: ${currentPage.value}, Current page size: ${pageSize.value}, Current offset: ${offset.value}`)
   console.info('[FileExplorer] Current resource children:', currentHierarchy.value[currentHierarchy.value.length - 1].children.length)
 })
+
 // ----- End Pagination ---------- //
+
+// ----- Update Functions --------------------
+async function updateName(resourceId: string, name: string) {
+  await $fetch('/api/v3/resources/name', {
+    method: 'POST',
+    body: {
+      id: resourceId,
+      name: name
+    }
+  }).then(() => {
+    infoSelection.value.name = name
+    nameEditMode.value = false
+    toast({
+      description: h('div',
+          {class: 'flex space-x-2 items-center justify-center text-aruna-text-accent'},
+          [
+            h(IconCheck, {class: 'flex-shrink-0 size-6 text-aruna-highlight'}),
+            h('span',
+                {class: 'text-fuchsia-50'},
+                ['Name successfully updated.'])
+          ]),
+      duration: 5000
+    })
+  }).catch(error => {
+    toast({
+      title: 'Error',
+      //description: 'Something went wrong. If this problem persists please contact an administrator.',
+      description: `Failed to update name: ${error.data.message}`,
+      variant: 'destructive',
+      duration: 10000,
+    })
+  })
+}
+
+async function updateTitle(resourceId: string, title: string) {
+  await $fetch('/api/v3/resources/title', {
+    method: 'POST',
+    body: {
+      id: resourceId,
+      title: title
+    }
+  }).then(() => {
+    infoSelection.value.title = title
+    titleEditMode.value = false
+    toast({
+      description: h('div',
+          {class: 'flex space-x-2 items-center justify-center text-aruna-text-accent'},
+          [
+            h(IconCheck, {class: 'flex-shrink-0 size-6 text-aruna-highlight'}),
+            h('span',
+                {class: 'text-fuchsia-50'},
+                ['Title successfully updated.'])
+          ]),
+      duration: 5000
+    })
+  }).catch(error => {
+    toast({
+      title: 'Error',
+      //description: 'Something went wrong. If this problem persists please contact an administrator.',
+      description: `Failed to update title: ${error.data.message}`,
+      variant: 'destructive',
+      duration: 10000,
+    })
+  })
+}
+
+async function updateDescription(resourceId: string, description: string) {
+  await $fetch('/api/v3/resources/description', {
+    method: 'POST',
+    body: {
+      id: resourceId,
+      description: description
+    }
+  }).then(() => {
+    infoSelection.value.description = description
+    descriptionEditMode.value = false
+    toast({
+      description: h('div',
+          {class: 'flex space-x-2 items-center justify-center text-aruna-text-accent'},
+          [
+            h(IconCheck, {class: 'flex-shrink-0 size-6 text-aruna-highlight'}),
+            h('span',
+                {class: 'text-fuchsia-50'},
+                ['Description successfully updated.'])
+          ]),
+      duration: 5000
+    })
+  }).catch(error => {
+    toast({
+      title: 'Error',
+      //description: 'Something went wrong. If this problem persists please contact an administrator.',
+      description: `Failed to update description: ${error.data.message}`,
+      variant: 'destructive',
+      duration: 10000,
+    })
+  })
+}
 </script>
 <template>
-  <div class="flex flex-col h-full w-full py-6 ps-6">
+  <div class="flex flex-col h-full w-full">
     <!-- Header -->
-    <div class="flex h-14 items-center justify-between border-b px-6 border-gray-800 bg-gray-900">
+    <div class="flex p-4 h-14 items-center justify-between px-6 bg-transparent border-b border-aruna-text/50">
       <nav aria-label="breadcrumb">
         <Breadcrumb>
-          <BreadcrumbList class="text-aruna-text-accent">
+          <BreadcrumbList class="font-bold text-aruna-text-accent">
             <BreadcrumbItem @click="navigateBack('root')"
                             class="hover:cursor-pointer">
               Your Projects
@@ -493,18 +597,8 @@ watch(offset, () => {
                          :direction="checkDirection()"
                          class="h-full">
       <ResizablePanel>
-        <!--
-        <div :class="{'opacity-50': isOverDropZone}"
-            class="absolute flex w-full h-full items-center justify-center opacity-0 transition-all ease-in-out delay-50 duration-500">
-          <div class="flex flex-col bg-aruna-highlight items-center justify-center gap-y-6 p-32 border-2 border-dashed border-aruna-text-accent rounded-sm">
-            Drop your file here
-            <IconPlus class="flex-shrink-0 size-8 text-aruna-text-accent border rounded-full border-aruna-text-accent"/>
-          </div>
-        </div>
-        -->
-
         <!-- Flexbox Resource Display -->
-        <div class="flex flex-row flex-wrap content-start items-start justify-start gap-6 my-4">
+        <div class="flex flex-row flex-wrap content-start items-start justify-start gap-6 ms-4 my-4">
           <Card v-for="resource in displayedResources"
                 class="rounded-sm border-aruna-text/50 flex flex-col items-center justify-center min-w-[200px] max-w-[300px] h-fit">
             <CardContent class="p-0 flex flex-col items-center w-full">
@@ -668,16 +762,16 @@ watch(offset, () => {
             </div>
 
             <Label for="license">License</Label>
-            <Select :default-value="licenses[0].id"
+            <Select :default-value="props.licenses[0].id"
                     @update:model-value="(v) => fileLicense = v">
               <SelectTrigger class="bg-aruna-muted w-full max-w-[450px]">
                 <SelectValue placeholder="Select a license for your resource"/>
               </SelectTrigger>
               <SelectContent class="bg-aruna-bg/90 truncate overflow-ellipsis">
                 <SelectGroup>
-                  <SelectItem v-for="license in licenses" :value="license.id"
+                  <SelectItem v-for="license in props.licenses" :value="license.id"
                               class="hover:bg-aruna-fg">
-                    {{ license.label }}
+                    {{ license.name }}
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -685,22 +779,38 @@ watch(offset, () => {
           </div>
 
           <div v-else-if="infoSelection" class="gap-y-4">
-            <div class="flex items-center">
-
-              <TooltipProvider :delay-duration="500">
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <IconLock v-if="infoSelection?.locked" class="text-destructive"/>
-                    <IconLockOpen2 v-else class="text-aruna-highlight"/>
-                  </TooltipTrigger>
-                  <TooltipContent class="rounded-none text-aruna-highlight bg-aruna-muted border border-aruna-text/50">
-                    <span v-if="infoSelection?.locked">This resource is locked and cannot be edited.</span>
-                    <span v-else>This resource is still editable.</span>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <h2 class="ms-4 text-2xl">{{ infoSelection?.title || 'Title not available' }}</h2>
+            <div class="flex items-center justify-between">
+              <div class="flex w-full items-center">
+                <!-- Locked / Unlocked -->
+                <TooltipProvider :delay-duration="500">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <IconLock v-if="infoSelection?.locked" class="me-4 text-destructive"/>
+                      <IconLockOpen2 v-else class="me-4 text-aruna-highlight"/>
+                    </TooltipTrigger>
+                    <TooltipContent class="rounded-none text-aruna-highlight bg-aruna-muted border border-aruna-text/50">
+                      <span v-if="infoSelection?.locked">This resource is locked and cannot be edited.</span>
+                      <span v-else>This resource is still editable.</span>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <!-- End Locked / Unlocked -->
+                <!-- Name / Title -->
+                <EditableLabel v-model:edit-mode="titleEditMode"
+                               @dblclick="titleEditMode = true"
+                               @updated-value="updateTitle"
+                               :resourceId="infoSelection?.id"
+                               :text="infoSelection?.title || 'Title not available'"
+                               text-css="text-2xl text-aruna-text-accent"
+                               :multiline="false"/>
+                <!--<h2 class="ms-4 text-2xl">{{ infoSelection?.title || 'Title not available' }}</h2>-->
+                <!-- End Name / Title -->
+              </div>
+              <!-- Link to resource landing page -->
+              <NuxtLink :to="`/objects/${infoSelection?.id}`" target="_blank">
+                <IconExternalLink class="ms-4 flex-shrink-0 text-aruna-text-accent hover:text-aruna-highlight"/>
+              </NuxtLink>
+              <!-- End Link to resource landing page -->
             </div>
             <Separator class="bg-aruna-text/50 mt-6"/>
             <!--<span class="text-sm font-medium leading-6 text-aruna-text-accent">Labels:</span>-->
@@ -725,7 +835,7 @@ watch(offset, () => {
             <Table class="table-auto">
               <TableBody class="">
                 <TableRow>
-                  <TableCell class="w-fit min-w-[125px] text-sm font-medium leading-6 text-aruna-text-accent">
+                  <TableCell class="w-[125px] text-sm font-medium leading-6 text-aruna-text-accent">
                     Id:
                   </TableCell>
                   <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
@@ -735,7 +845,12 @@ watch(offset, () => {
                 <TableRow>
                   <TableCell class="text-sm font-medium leading-6 text-aruna-text-accent">Name:</TableCell>
                   <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                    {{ infoSelection?.name || '' }}
+                    <EditableLabel v-model:edit-mode="nameEditMode"
+                                   @dblclick="nameEditMode = true"
+                                   @updated-value="updateName"
+                                   :resourceId="infoSelection?.id"
+                                   :text="infoSelection?.name"
+                                   :multiline="false"/>
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -743,7 +858,12 @@ watch(offset, () => {
                     Description:
                   </TableCell>
                   <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                    {{ infoSelection?.description || '' }}
+                    <EditableLabel v-model:edit-mode="descriptionEditMode"
+                                   @dblclick="descriptionEditMode = true"
+                                   @updated-value="updateDescription"
+                                   :resourceId="infoSelection?.id"
+                                   :text="infoSelection?.description"
+                                   :multiline="true"/>
                   </TableCell>
                 </TableRow>
                 <TableRow v-if="infoSelection?.variant === ResourceVariant.Object">
@@ -781,7 +901,7 @@ watch(offset, () => {
                     License:
                   </TableCell>
                   <TableCell class="mt-1 ps-4 text-sm leading-6 text-aruna-text sm:col-span-2 sm:mt-0">
-                    {{ licenseMap.get(infoSelection?.license_id) || 'N/A' }}
+                    {{ licenseMap.get(infoSelection?.license_id)?.name || 'N/A' }}
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -818,19 +938,20 @@ watch(offset, () => {
             </Table>
           </div>
 
-          <div class="flex gap-x-4">
-            <Button v-if="fileUpload"
-                    variant="outline"
-                    @click="submitUpload"
-                    class="inline-flex w-fit bg-transparent text-aruna-highlight border border-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
-              Upload
-            </Button>
-            <Button variant="outline"
-                    @click="closeInfo"
-                    class="inline-flex w-fit bg-transparent text-aruna-text border border-aruna-text hover:bg-aruna-h hover:text-aruna-text-accent hover:border-aruna-text-accent">
-              Close
-            </Button>
-
+          <div class="flex justify-between">
+            <div class="flex gap-x-2">
+              <Button v-if="fileUpload"
+                      variant="outline"
+                      @click="submitUpload"
+                      class="inline-flex w-fit bg-transparent text-aruna-highlight border border-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent">
+                Upload
+              </Button>
+              <Button variant="outline"
+                      @click="closeInfo"
+                      class="inline-flex w-fit bg-transparent text-aruna-text border border-aruna-text hover:bg-aruna-h hover:text-aruna-text-accent hover:border-aruna-text-accent">
+                Close
+              </Button>
+            </div>
             <Button v-if="infoSelection"
                     variant="outline"
                     @click="deleteResource(infoSelection)"

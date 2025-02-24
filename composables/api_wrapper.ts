@@ -48,7 +48,7 @@ export type CreateRealmRequest = paths["/api/v3/realms"]["post"]["requestBody"][
 export type CreateTokenRequest = paths["/api/v3/users/tokens"]["post"]["requestBody"]["content"]["application/json"];
 export type CreateResourceRequest = paths["/api/v3/resources"]["post"]["requestBody"]["content"]["application/json"];
 export type CreateS3CredentialsRequest = paths["/api/v3/users/s3credentials"]["post"]["requestBody"]["content"]["application/json"];
-
+export type UpdateResourceDescriptionRequest = paths["/api/v3/resources/description"]["post"]["requestBody"]["content"]["application/json"];
 
 // ----- Responses -----
 // Global
@@ -62,6 +62,10 @@ export type GetEventsResponse = paths["/api/v3/info/events"]["get"]["responses"]
 export type GetStatsResponse = paths["/api/v3/info/stats"]["get"]["responses"][200]["content"]["application/json"];
 export type SearchResponse = paths["/api/v3/info/search"]["get"]["responses"][200]["content"]["applicatiown/json"];
 
+// License
+export type CreateLicensesResponse = paths["/api/v3/license"]["post"]["responses"][200]["content"]["application/json"];
+export type GetLicensesResponse = paths["/api/v3/license"]["get"]["responses"][200]["content"]["application/json"];
+
 // Realms
 export type CreateRealmResponse = paths["/api/v3/realms"]["post"]["responses"][200]["content"]["application/json"];
 export type GetRealmComponentsResponse = paths["/api/v3/realms/{id}/components"]["get"]["responses"][200]["content"]["application/json"];
@@ -73,6 +77,9 @@ export type CreateResourceResponse = paths["/api/v3/resources"]["post"]["respons
 export type GetResourcesResponse = paths["/api/v3/resources"]["get"]["responses"][200]["content"]["application/json"];
 export type GetRelationsResponse = paths["/api/v3/resources/{id}/relations"]["get"]["responses"][200]["content"]["application/json"];
 export type DeleteResourcesResponse = paths["/api/v3/resources/{id}"]["delete"]["responses"][200]["content"]["application/json"];
+export type UpdateResourceNameResponse = paths["/api/v3/resources/name"]["post"]["responses"][200]["content"]["application/json"];
+export type UpdateResourceTitleResponse = paths["/api/v3/resources/title"]["post"]["responses"][200]["content"]["application/json"];
+export type UpdateResourceDescriptionResponse = paths["/api/v3/resources/description"]["post"]["responses"][200]["content"]["application/json"];
 
 // Users
 export type RegisterUserResponse = paths["/api/v3/users"]["post"]["responses"][200]["content"]["application/json"];
@@ -113,30 +120,21 @@ export type SimpleCredentials = {
   secret_key: string
 }
 
+export type RealmContext = {
+  realm: Realm,
+  group: Group
+}
+
 // ----- Events -----
 export enum EventTypes {
   RegisterUser = 'RegisterUserRequestTx',
   CreateToken = 'CreateTokenRequestTx',
+  CreateS3Credentials = 'CreateS3CredentialsRequestTx',
   CreateRealm = 'CreateRealmRequestTx',
   CreateGroup = 'CreateGroupRequestTx',
   CreateComponent = 'CreateComponentRequestTx',
   CreateResource = 'CreateResourceRequestTx',
   TODO = 'Complete this enum'
-}
-
-export type Oidc = {
-  oidc_realm: string
-  oidc_subject: string
-}
-
-export type TxUser = {
-  user_id: string
-  auth_method: {
-    oidc?: Oidc
-  } | {
-    Aruna: number
-  }
-  impersonated_by: TxUser | null
 }
 
 export type BaseTx = {
@@ -149,48 +147,46 @@ export type BaseTx = {
   }
 }
 
+export type TxUser = {
+  user_id: string
+  auth_method: AuthType
+  impersonated_by: TxUser | null
+}
+
+export type AuthType = {
+  Oidc?: Oidc
+  Aruna?: number
+}
+
+export type Oidc = {
+  oidc_realm: string
+  oidc_subject: string
+}
+
+// Specific Events
 export type RegisterUserTx = BaseTx & {
-  req: {
-    first_name: string,
-    last_name: string,
-    email: string,
-    identifier: string
-  }
+  req: RegisterUserRequest
 }
 
 export type CreateTokenTx = BaseTx & {
-  req: {
-    name: string,
-    scope: 'Personal' | 'Resource',
-    expires_at: Date,
-    group_id: string | null,
-    realm_id: string | null
-  }
+  req: CreateTokenRequest
+}
+
+export type CreateS3CredentialsRequestTx = BaseTx & {
+  req: CreateS3CredentialsRequest
+}
+
+export type CreateComponentRequestTx = BaseTx & {
+  req: CreateComponentRequest
 }
 
 export type CreateGroupTx = BaseTx & {
-  req: {
-    name: string,
-    description: string,
-  }
-  generated_group: {
-    id: string
-    name: string
-    description: string
-  }
+  req: CreateGroupRequest
 }
 
 export type CreateRealmTx = BaseTx & {
-  req: {
-    tag: string,
-    name: string,
-    description: string,
-  }
-  generated_group: {
-    id: string
-    name: string
-    description: string
-  }
+  req: CreateRealmRequest
+  generated_group: Group
 }
 
 
