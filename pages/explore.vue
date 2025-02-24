@@ -53,7 +53,8 @@ watch(typeFilter, async () => {
 function generateFilter() {
   switch (typeFilter.value) {
     case null: {
-      filter.value = "";
+      filter.value = "variant IN [0,1,2]";
+      // limit search to projects, folders and objects
       break;
     }
     case ResourceVariant.Project: {
@@ -94,7 +95,7 @@ async function queryResources(pageReset: boolean) {
   })
 
   try {
-    //const response = await searchResources(body)
+    //const response = await searchResources(body) // TODO remove dead code
     const response = await $fetch<SearchResponse>('/api/v3/search', {
       query: {
         query: query.value,
@@ -147,6 +148,7 @@ onMounted(async () => await queryResources(true));
         <div>
           <label class="sr-only" for="search-query-input-with-icon">Search query input</label>
           <div class="flex rounded-md shadow-sm">
+            <!-- TODO change to shadcn components -->
             <!-- <Input type="text"
                    id="search-query-input-with-icon"
                    v-model="query"
