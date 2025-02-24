@@ -16,6 +16,5 @@ const {resources} = defineProps<SearchResultListProps>()
     <h2 class="text-aruna-text-accent font-bold text-center">No results found</h2>
   </div>
 
-
   <CardResource v-for="hit in resources" :resource="hit" />
 </template>
