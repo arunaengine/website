@@ -155,7 +155,7 @@ function splitResources(resources: (Resource & { [type: string]: GenericNodeType
         </CommandGroup>
       </CommandList>
       <Button v-if="response?.expected_hits > limitResults">
-        Show all results
+        <NuxtLink :href="'/explore?q=' + queryInput">Show all results</NuxtLink>
       </Button>
     </CommandDialog>
     <!-- END COMMAND DIALOG-->

@@ -350,7 +350,7 @@ EventBus.on('spinStop', () => spinBaby.value = false)
               <Skeleton class="h-auto w-[300px]"/>
             </template>
           </ClientOnly>
-          <SearchDialog />
+          <SearchDialog filter="variant IN [0,1,2]"/>
         </div>
         <DropdownMenu>
           <ClientOnly fallbackTag="span">
