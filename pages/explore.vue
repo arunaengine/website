@@ -22,16 +22,17 @@ import {ResourceVariant} from "~/types/aruna-v3-enums";
 
 import {searchResources} from "~/composables/api_wrapper";
 
+const route = useRoute()
 const currentPage: Ref<number> = ref(1);
 const limit: Ref<number> = ref(20);
 const hits: Ref<Resource[]> = ref([]);
 const estimatedTotal = ref(0);
-const fetching = ref(false);
+const fetching = ref(true);
 
 const debouncedInput = debounce(async () => await queryResources(true), 250)
 
 /* Query */
-const query = ref("");
+const query = ref(route.query.q ? route.query.q : '')
 watch(query, async () => {
   fetching.value = true;
   await debouncedInput()
