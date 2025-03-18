@@ -96,7 +96,6 @@ async function queryResources(pageReset: boolean) {
   })
 
   try {
-    //const response = await searchResources(body) // TODO remove dead code
     const response = await $fetch<SearchResponse>('/api/v3/search', {
       query: {
         query: query.value,
@@ -149,16 +148,6 @@ onMounted(async () => await queryResources(true));
         <div>
           <label class="sr-only" for="search-query-input-with-icon">Search query input</label>
           <div class="flex rounded-md shadow-sm">
-            <!-- TODO change to shadcn components -->
-            <!-- <Input type="text"
-                   id="search-query-input-with-icon"
-                   v-model="query"
-                   name="search-query-input-with-icon"
-                   placeholder="Search Aruna Resources"
-            />
-            <Button type="button">
-              <IconSearch class="flex-shrink-0 size-6"/>
-            </Button> -->
             <input type="text"
                    v-model="query"
                    id="search-query-input-with-icon"
