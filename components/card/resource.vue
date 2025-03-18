@@ -19,28 +19,38 @@ function displayDescription(description: string): string {
   }
   return description
 }
+
 function displayVisbility(visibility: VisibilityClass): string {
   switch (visibility) {
-    case VisibilityClass.Public: return 'Public';
-    case VisibilityClass.PublicMetadata: return 'Public Metadata';
-    case VisibilityClass.Private: return 'Private';
-    default: return 'Unspecified'
+    case VisibilityClass.Public:
+      return 'Public';
+    case VisibilityClass.PublicMetadata:
+      return 'Public Metadata';
+    case VisibilityClass.Private:
+      return 'Private';
+    default:
+      return 'Unspecified'
   }
 }
+
 function visibilityCss(visibility: VisibilityClass): string {
   switch (visibility) {
-    case VisibilityClass.Public: return 'border-green-600 text-green-600';
-    case VisibilityClass.PublicMetadata: return 'border-white text-white';
-    case VisibilityClass.Private: return 'border-red-600/80 text-red-600/80';
-    default: return 'border-aruna-text/50 text-aruna-text/50'
+    case VisibilityClass.Public:
+      return 'border-green-600 text-green-600';
+    case VisibilityClass.PublicMetadata:
+      return 'border-white text-white';
+    case VisibilityClass.Private:
+      return 'border-red-600/80 text-red-600/80';
+    default:
+      return 'border-aruna-text/50 text-aruna-text/50'
   }
 }
 </script>
 
 <template>
   <div
-       class="flex flex-auto my-3 p-4 gap-x-4 bg-aruna-bg/90 border border-l-4 border-l-aruna-highlight shadow-sm rounded-md border-aruna-text/50"
-       :class="{'border-l-destructive': resource.deleted}">
+      class="flex flex-auto my-3 p-4 gap-x-4 bg-aruna-bg/90 border border-l-4 border-l-aruna-highlight shadow-sm rounded-md border-aruna-text/50"
+      :class="{'border-l-destructive': resource.deleted}">
     <div class="flex flex-col basis-1/3 gap-y-3 border-aruna-text/50">
       <!-- Name and ID display -->
       <TooltipProvider>
@@ -73,7 +83,7 @@ function visibilityCss(visibility: VisibilityClass): string {
           Children: {{ resource.count }}
         </Badge>
         <Badge v-if="resource.variant === ResourceVariant.Object"
-              class="px-2 py-1 bg-transparent hover:bg-transparent border border-aruna-text text-aruna-text">
+               class="px-2 py-1 bg-transparent hover:bg-transparent border border-aruna-text text-aruna-text">
           {{ resource.content_len ? formatBytes(+resource.content_len) : "N/A Bytes" }}
         </Badge>
         <!-- END Stats Badge -->

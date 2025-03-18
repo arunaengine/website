@@ -109,8 +109,9 @@ function splitResources(resources: (Resource & { [type: string]: GenericNodeType
 
 <template>
   <div class="relative flex">
-    <Button @click="openDialog()">
-      <IconSearch class="mr-1 h-4 w-4 text-muted-foreground"/>
+    <Button @click="openDialog()"
+            class="py-2 px-3 inline-flex justify-center items-center bg-transparent border border-aruna-highlight rounded-sm text-aruna-highlight hover:text-aruna-text-accent hover:bg-aruna-highlight disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-aruna-highlight cursor-pointer">
+      <IconSearch class="mr-1 h-4 w-4"/>
       Search
     </Button>
 
@@ -137,13 +138,15 @@ function splitResources(resources: (Resource & { [type: string]: GenericNodeType
         </CommandGroup>
         <CommandGroup heading="Folders">
           <CommandItem v-for="resource in resources?.folders"
-                       :value="resource">
+                       :value="resource"
+                       @select="router.push('/objects/' + resource.id)">
             {{ resource.name }}
           </CommandItem>
         </CommandGroup>
         <CommandGroup heading="Objects">
           <CommandItem v-for="resource in resources?.objects"
-                       :value="resource">
+                       :value="resource"
+                       @select="router.push('/objects/' + resource.id)">
             {{ resource.name }}
           </CommandItem>
         </CommandGroup>
