@@ -100,7 +100,8 @@ export default defineNuxtConfig({
         hidePeriod: 60 * 60 * 24, // Hide banner per default for one day
         validFrom: '', // Some valid date string
         validTo: '', // Some valid date string
-      }
+      },
+      searchDialogLimit: 10
     }
   },
 

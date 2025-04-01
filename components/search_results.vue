@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import type {v2GenericResource} from '@/composables/aruna_api_json';
 
 interface SearchResultListProps {
-  resources: v2GenericResource[]
+  resources: Resource[],
+  fetching: boolean,
 }
 const {resources} = defineProps<SearchResultListProps>()
 </script>
 
 <template>
-  <div v-if="resources.length == 0">
+  <div v-if="fetching">
+    <h2 class="text-aruna-text-accent font-bold text-center">Fetching Results</h2>
+  </div>
+
+  <div v-if="resources.length == 0 && !fetching">
     <h2 class="text-aruna-text-accent font-bold text-center">No results found</h2>
   </div>
 

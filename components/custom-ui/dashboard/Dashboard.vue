@@ -38,6 +38,7 @@ import Events from "~/components/custom-ui/dashboard/Events.vue";
 import Profile from "~/components/custom-ui/user/Profile.vue";
 import Tokens from "~/components/custom-ui/user/Tokens.vue";
 import Proxies from "~/components/custom-ui/user/Proxies.vue";
+import SearchDialog from "~/components/custom-ui/SearchDialog.vue";
 import Licences from "~/components/custom-ui/dashboard/licenses/Licenses.vue";
 
 import type {User} from '~/composables/api_wrapper'
@@ -349,12 +350,7 @@ EventBus.on('spinStop', () => spinBaby.value = false)
               <Skeleton class="h-auto w-[300px]"/>
             </template>
           </ClientOnly>
-          <div class="relative flex">
-            <IconSearch class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"/>
-            <Input type="search"
-                   placeholder="Search Resources"
-                   class="w-[400px] appearance-none bg-background pl-8 shadow-none "/>
-          </div>
+          <SearchDialog filter="variant IN [0,1,2]"/>
         </div>
         <DropdownMenu>
           <ClientOnly fallbackTag="span">
