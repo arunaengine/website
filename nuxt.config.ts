@@ -71,7 +71,18 @@ export default defineNuxtConfig({
         tokenUrl: '',
         revokeUrl: '',
         scope: [''],
-        code_challenge: false
+        code_challenge: false,
+        post_auth: false
+      },
+      iam4nfdi: {
+        clientId: '',
+        clientSecret: '',
+        issuer: '',
+        redirectUrl: '',
+        authUrl: '',
+        tokenUrl: '',
+        revokeUrl: '',
+        scope: [''],
         code_challenge: false,
         post_auth: false
       }
