@@ -47,7 +47,8 @@ export default defineNuxtConfig({
         tokenUrl: 'http://localhost:1998/realms/test/protocol/openid-connect/token',
         revokeUrl: 'http://localhost:1998/realms/test/protocol/openid-connect/revoke',
         scope: ["openid"],
-        code_challenge: false
+        code_challenge: false,
+        post_auth: false
       },
       gfbio: {
         clientId: '',
@@ -58,7 +59,8 @@ export default defineNuxtConfig({
         tokenUrl: '',
         revokeUrl: '',
         scope: [''],
-        code_challenge: false
+        code_challenge: false,
+        post_auth: false
       },
       lifescience: {
         clientId: '',
@@ -70,6 +72,8 @@ export default defineNuxtConfig({
         revokeUrl: '',
         scope: [''],
         code_challenge: false
+        code_challenge: false,
+        post_auth: false
       }
     },
     markdownCss: {

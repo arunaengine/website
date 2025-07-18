@@ -1,5 +1,29 @@
 import type {v2AddOidcProviderResponse} from "~/composables/aruna_api_json";
 
+type AuthCodeRequest = {
+  grant_type: 'authorization_code',
+  redirect_uri: string,
+  code: string,
+  code_verifier?: string, // Only with PKCE
+  client_id?: string,     // Only with client_secret_post (config.post_auth: true)
+  client_secret?: string, // Only with client_secret_post (config.post_auth: true)
+}
+
+type AuthCodeResponse = {
+  access_token: string,
+  refresh_token: string,
+  expires_in: number | undefined,
+  refresh_expires_in: number | undefined,
+}
+
+function errorToPOJO(error: any) {
+  const ret: any = {};
+  for (const propertyName of Object.getOwnPropertyNames(error)) {
+    ret[propertyName] = error[propertyName];
+  }
+  return ret;
+};
+
 export default defineEventHandler(async event => {
   const query = getQuery(event)
   const {code, state} = query
@@ -26,43 +50,41 @@ export default defineEventHandler(async event => {
     throw new Error(`Unknown/Unsupported identity provider: ${provider}`)
   }
 
-  // Fetch access/refresh tokens from provider
-  let tokens: any = undefined
+  // Build request and fetch access/refresh token from provider
+  let request: AuthCodeRequest = {
+    grant_type: 'authorization_code',
+    redirect_uri: config.redirectUrl,
+    code: code as string,
+  }
   if (code_verifier) {
-    // Fetch access and refresh token
-    tokens = await $fetch(config.tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        grant_type: 'authorization_code',
-        redirect_uri: config.redirectUrl,
-        code: code as string,
-        code_verifier: code_verifier,
-      }).toString(),
-    }).catch((error) => {
-      return {error}
-    })
-  } else {
-    // Fetch access and refresh token
-    tokens = await $fetch(config.tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        grant_type: 'authorization_code',
-        redirect_uri: config.redirectUrl,
-        code: code as string,
-      }).toString(),
-    }).catch((error) => {
-      return {error}
-    })
+    request.code_verifier = code_verifier
+  }
+  if (config.post_auth) {
+    request.client_id = config.clientId
+    request.client_secret = config.clientSecret
+  }
+  let headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+  }
+  if (!config.post_auth) {
+    headers['Authorization'] = 'Basic ' + btoa(config.clientId+":"+config.clientSecret)
+  }
+
+  let tokens = await $fetch<AuthCodeResponse>(config.tokenUrl, {
+    method: 'POST',
+    headers: headers,
+    body: new URLSearchParams(request).toString(),
+  })
+  .catch(error => {
+    console.debug(errorToPOJO(error))
+    return [error.code, error.data.error_description]
+  })
+
+  if (Array.isArray(tokens)) {
+    return createError({
+      statusCode: tokens[0],
+      message: `Login failed: '${tokens[1]}'. Please try again later or contact the website administrator`,
+    });
   }
 
   if (add_idp) {
