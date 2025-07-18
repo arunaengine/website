@@ -23,7 +23,7 @@ export default defineEventHandler(async event => {
   if (config?.code_challenge) {
     //const state = crypto.randomUUID() // Optional
     const code_verifier = crypto.randomUUID()
-    const code_challenge = crypto.createHash('sha256').update(code_verifier).digest().toString('base64')
+    const code_challenge = crypto.createHash('sha256').update(code_verifier).digest().toString('base64url')
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=+$/, '')
