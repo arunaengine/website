@@ -1,4 +1,5 @@
 import type {v2AddOidcProviderResponse} from "~/composables/aruna_api_json";
+import {errorToPOJO, fetchCachedOidcMetadata} from "~/server/utils/oidc";
 
 type AuthCodeRequest = {
   grant_type: 'authorization_code',
@@ -16,14 +17,6 @@ type AuthCodeResponse = {
   refresh_expires_in: number | undefined,
 }
 
-function errorToPOJO(error: any) {
-  const ret: any = {};
-  for (const propertyName of Object.getOwnPropertyNames(error)) {
-    ret[propertyName] = error[propertyName];
-  }
-  return ret;
-};
-
 export default defineEventHandler(async event => {
   const query = getQuery(event)
   const {code, state} = query
@@ -40,7 +33,7 @@ export default defineEventHandler(async event => {
   deleteCookie(event, 'login_meta')
 
   if (!login_meta)
-      throw new Error('Missing login meta information')
+    throw new Error('Missing login meta information')
   const {provider, code_verifier, add_idp} = JSON.parse(login_meta)
 
   // Fetch provider specific config
@@ -48,6 +41,15 @@ export default defineEventHandler(async event => {
   const config = providers[provider as keyof typeof providers]
   if (!config) {
     throw new Error(`Unknown/Unsupported identity provider: ${provider}`)
+  }
+
+  const response = await fetchCachedOidcMetadata(config.wellKnownUrl)
+  if (Array.isArray(response)) {
+    return createError({
+      statusCode: response[0],
+      message: `Failed to fetch openid configuration of identity provider: '${response[1]}'. 
+      Please try again later or contact the website administrator`,
+    });
   }
 
   // Build request and fetch access/refresh token from provider
@@ -67,15 +69,14 @@ export default defineEventHandler(async event => {
     'Content-Type': 'application/x-www-form-urlencoded',
   }
   if (!config.post_auth) {
-    headers['Authorization'] = 'Basic ' + btoa(config.clientId+":"+config.clientSecret)
+    headers['Authorization'] = 'Basic ' + btoa(config.clientId + ":" + config.clientSecret)
   }
 
-  let tokens = await $fetch<AuthCodeResponse>(config.tokenUrl, {
+  let tokens = await $fetch<AuthCodeResponse>(response.token_endpoint, {
     method: 'POST',
     headers: headers,
     body: new URLSearchParams(request).toString(),
-  })
-  .catch(error => {
+  }).catch(error => {
     console.debug(errorToPOJO(error))
     return [error.code, error.data.error_description]
   })
