@@ -11,8 +11,10 @@ export default defineEventHandler(async event => {
       'Authorization': `Bearer ${event.context.access_token}`
     }
   }).then(response => {
+    console.log(response)
     return response.user ? response.user : new ArunaError(15, 'Returned user is undefined')
   }).catch(error => {
+    console.error(error)
     return new ArunaError(error.data.code, error.data.message)
   })
 })

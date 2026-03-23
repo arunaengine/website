@@ -10,6 +10,7 @@ dist
 node_modules
 
 # bun
+bun.lock
 bun.lockb
 
 # Logs
@@ -22,6 +23,8 @@ logs
 .idea
 .vscode
 target
+.opencode
+AGENTS.md
 
 # Local env files
 .env

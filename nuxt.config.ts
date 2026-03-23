@@ -6,6 +6,7 @@ export default defineNuxtConfig({
     }
   },
   devtools: { enabled: true },
+  ssr: false,
   experimental: {
     clientNodeCompat: true
   },
@@ -39,7 +40,7 @@ export default defineNuxtConfig({
     },
     provider: {
       local: {
-        wellKnownUrl: "http://localhost:1998/realms/test/.well-known/openid-configuration",
+        wellKnownUrl: 'http://localhost:1998/realms/test/.well-known/openid-configuration',
         clientId: "test",
         clientSecret: "QgBl9I2CD3eVhL7LFvkHrYUK7oKL3LE2",
         redirectUrl: "http://localhost:3000/callback",
@@ -48,7 +49,7 @@ export default defineNuxtConfig({
         post_auth: false
       },
       gfbio: {
-        wellKnownUrl: "",
+        wellKnownUrl: '',
         clientId: '',
         clientSecret: '',
         redirectUrl: '',
@@ -57,7 +58,7 @@ export default defineNuxtConfig({
         post_auth: false
       },
       lifescience: {
-        wellKnownUrl: "",
+        wellKnownUrl: '',
         clientId: '',
         clientSecret: '',
         redirectUrl: '',
@@ -66,7 +67,7 @@ export default defineNuxtConfig({
         post_auth: false
       },
       iam4nfdi: {
-        wellKnownUrl: "",
+        wellKnownUrl: '',
         clientId: '',
         clientSecret: '',
         redirectUrl: '',

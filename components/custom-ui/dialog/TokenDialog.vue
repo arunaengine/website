@@ -20,6 +20,7 @@ import {
 import {Input} from '@/components/ui/input'
 import {Popover, PopoverTrigger, PopoverContent} from '@/components/ui/popover'
 import {type v2Permission, v2PermissionLevel,} from "~/composables/aruna_api_json";
+import { useClipboard} from '@vueuse/core'
 import {useForm} from "vee-validate";
 import {toTypedSchema} from '@vee-validate/zod'
 import * as z from 'zod'

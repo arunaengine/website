@@ -21,6 +21,7 @@ import TokenDialog from "~/components/custom-ui/dialog/TokenDialog.vue";
 import {DateFormatter} from "@internationalized/date";
 import {Button} from "~/components/ui/button";
 import {h} from "vue";
+import type {IdpMeta} from "~/server/api/user/idps";
 
 // Toast for notifications
 const {toast} = useToast()
@@ -33,6 +34,7 @@ const df = new DateFormatter((navigator && navigator.language) || "de-DE", {
 // Constants
 const arunaUser: Ref<v2User | undefined> = inject('userRef', ref(undefined))
 const endpoints: v2Endpoint[] | undefined = await fetchEndpoints()
+const idps: IdpMeta[] = await $fetch<IdpMeta[]>('/api/user/idps')
 
 watch(arunaUser, () => {
   console.log("User got updated")
@@ -86,6 +88,53 @@ function hasEndpoint(endpointId: string | undefined): boolean {
       }
     }
     return found
+  }
+}
+
+function idpConnected(issuer: string): boolean {
+  if (arunaUser.value === undefined || typeof arunaUser.value === "string") {
+    return false
+  } else {
+
+    const urls: string[] | undefined = arunaUser.value?.attributes?.externalIds ?
+        arunaUser.value?.attributes?.externalIds.map(extId => extId.oidcUrl).filter(id => id !== undefined) :
+        undefined
+    console.log(`[Account Client] Comparison ${issuer} : ${urls}`)
+
+    if (arunaUser.value?.attributes?.externalIds) {
+      for (const externalId of arunaUser.value.attributes.externalIds) {
+        if (externalId.oidcUrl === issuer) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+}
+
+function mapIdpTag(tag: string): string {
+  switch (tag) {
+    case "lifescience":
+      return "LifeScience RI"
+    case "gfbio":
+      return "GFBio SSO"
+    case "iam4nfdi":
+      return "NFDI AAI"
+    default:
+      return tag
+  }
+}
+
+function mapIdpTagToIcon(tag: string): string {
+  switch (tag) {
+    case 'lifescience':
+      return '/imgs/ls-ri.webp'
+    case 'gfbio':
+      return '/imgs/gfbio.webp'
+    case 'iam4nfdi':
+      return '/imgs/iam4nfdi.webp'
+    default:
+      return '/imgs/keycloak.webp'
   }
 }
 
@@ -351,23 +400,34 @@ if (add_response === 'success') {
 
           <Separator class="my-8 bg-aruna-text"/>
 
-          <Card class="max-w-md mx-auto bg-aruna-muted border-aruna-text/50">
-            <CardHeader class="text-center">
-              <CardTitle class="text-xl text-aruna-text-accent">Connect AAI</CardTitle>
-              <CardDescription class="flex flex-col">
-                <p>Connect your LifeScience RI accounts to the Aruna account you're currently logged in with.</p>
-                <Button variant="outline"
-                        class="inline-flex shrink mx-auto mt-4 px-4 border-aruna-text/50 text-lg hover:bg-aruna-fg">
-                  <a href="/auth/login?provider=lifescience&add_idp=true" class="flex">
-                    <img src="/imgs/ls-ri.webp"
-                         alt="LifeScience Login"
-                         class="h-6 mr-2"/>
-                    Connect LifeScience RI
-                  </a>
-                </Button>
-              </CardDescription>
-            </CardHeader>
-          </Card>
+          <div class="flex flex-col gap-y-4 justify-start">
+            <span class="text-aruna-highlight text-lg font-bold">Connect supported AAI with your account</span>
+            <div class="flex flex-col lg:flex-row gap-y-4 justify-start">
+              <Card v-for="idp in idps" class="max-w-md mx-4 bg-aruna-muted border-aruna-text/50">
+                <CardHeader class="text-center">
+                  <CardDescription class="flex flex-col">
+                    <p>Connect your {{ mapIdpTag(idp.tag) }} accounts to the Aruna account you're currently logged in
+                      with.</p>
+
+                    <div class="flex flex-row my-2 gap-x-4 justify-center items-center">
+                      <IconDiscountCheck class="flex-shrink-0 size-8 text-green-700"
+                                         v-if="idpConnected(idp.issuer)"/>
+                      <Button variant="outline"
+                              :disabled=idpConnected(idp.issuer)
+                              class="inline-flex shrink px-4 border-aruna-text/50 text-lg hover:bg-aruna-fg">
+                        <a :href="`/auth/login?provider=${idp.tag}&add_idp=true`" class="flex items-center">
+                          <img :src=mapIdpTagToIcon(idp.tag)
+                               :alt="`${mapIdpTag(idp.tag)} Login`"
+                               class="h-6 mr-2"/>
+                          Connect {{ mapIdpTag(idp.tag) }}
+                        </a>
+                      </Button>
+                    </div>
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
 
 
         </div>
