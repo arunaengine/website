@@ -552,7 +552,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
 
     <Separator class="my-10 bg-aruna-text"/>
 
-    <div class="flex flex-col md:flex-row">
+    <div class="flex flex-col md:flex-row" data-testid="resource-creation-form">
       <div class="flex flex-row md:flex-col px-4 grow">
         <!-- Resource Name Input -->
         <label for="hs-validation-name-error"
@@ -562,6 +562,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
                  v-model="resourceName"
                  id="hs-validation-name-error"
                  name="hs-validation-name-error"
+                 data-testid="resource-name-input"
                  :class="[{'border-destructive focus:border-destructive': !validationStates.get('resourceName')}]"
                  class="py-3 px-4 block w-full border-aruna-text/50 rounded-md bg-aruna-muted text-aruna-text text-sm focus:border-aruna-highlight focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none"
                  :disabled="dataUpload !== null"
@@ -579,22 +580,24 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
         <!-- Resource Title Input -->
         <label for="display-name-input"
                class="block mt-6 text-lg font-medium mb-2 text-aruna-text-accent">Title</label>
-        <input type="text"
-               v-model="resourceTitle"
-               id="display-name-input"
-               class="py-3 px-4 block w-full border-aruna-text/50 rounded-md bg-aruna-muted text-aruna-text text-sm focus:border-aruna-highlight focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none"
-               placeholder="Display name for the resource">
+         <input type="text"
+                v-model="resourceTitle"
+                id="display-name-input"
+                data-testid="resource-title-input"
+                class="py-3 px-4 block w-full border-aruna-text/50 rounded-md bg-aruna-muted text-aruna-text text-sm focus:border-aruna-highlight focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none"
+                placeholder="Display name for the resource">
         <!-- End Resource Title Input -->
         <!-- Resource Description Input -->
         <div class="relative">
           <label for="hs-textarea-ex-1"
                  class="block mt-6 text-lg font-medium mb-2 text-aruna-text-accent">Description</label>
-          <textarea id="hs-textarea-ex-1"
-                    v-model="resourceDescription"
-                    ref="textAreaElement"
-                    @input="textAreaAutoHeight(textAreaElement, 3)"
-                    :class="[{'border-destructive focus:border-destructive focus:ring-destructive': !validationStates.get('resourceDescription')}]"
-                    class="p-4 pb-12 block w-full border-aruna-text/50 rounded-md bg-aruna-muted text-aruna-text text-sm focus:border-aruna-highlight focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none"
+           <textarea id="hs-textarea-ex-1"
+                     v-model="resourceDescription"
+                     ref="textAreaElement"
+                     data-testid="resource-description-input"
+                     @input="textAreaAutoHeight(textAreaElement, 3)"
+                     :class="[{'border-destructive focus:border-destructive focus:ring-destructive': !validationStates.get('resourceDescription')}]"
+                     class="p-4 pb-12 block w-full border-aruna-text/50 rounded-md bg-aruna-muted text-aruna-text text-sm focus:border-aruna-highlight focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none"
                     placeholder="A concise description of the resource"></textarea>
           <!-- Toolbar -->
           <div class="absolute bottom-px inset-x-px p-2 rounded-b-md bg-aruna-muted">
@@ -917,6 +920,7 @@ const sleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, de
       <Button type="button"
               v-bind:disabled="!validState"
               @click="submit"
+              data-testid="resource-create-button"
               variant="outline"
               class="px-4 py-6 inline-flex text-md rounded-md border border-aruna-highlight bg-transparent text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-aruna-highlight">
         Create Resource

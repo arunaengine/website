@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto'
+
 export function createProjectTestData() {
-  const uniqueId = Date.now().toString()
+  const uniqueId = `${Date.now().toString(36)}-${randomUUID().split('-')[0]}`
 
   return {
     name: `pw-e2e-${uniqueId}`,

@@ -16,6 +16,10 @@ const errorMsg = toRef(props, 'errorMsg')
 
 <template>
   <div :id="props.modalId"
+       role="dialog"
+       aria-modal="true"
+       aria-label="Created resource details"
+       data-testid="created-resource-dialog"
        class="hs-overlay hidden size-full fixed top-0 start-0 z-[80] overflow-x-hidden overflow-y-auto [--overlay-backdrop:static]"
        data-hs-overlay-keyboard="false">
     <div
@@ -55,9 +59,9 @@ const errorMsg = toRef(props, 'errorMsg')
               <div class="p-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
                 <dt class="text-sm font-medium leading-6 text-gray-400">Link</dt>
                 <dd class="mt-1 text-sm leading-6 text-gray-300 sm:col-span-2 sm:mt-0">
-                  <a :href="`/objects/${object.id}`">
-                    <IconExternalLink/>
-                  </a>
+                  <a :href="`/objects/${object.id}`" data-testid="created-resource-link">
+                     <IconExternalLink/>
+                   </a>
                 </dd>
               </div>
             </dl>
