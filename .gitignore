@@ -19,6 +19,9 @@ bun.lockb
 logs
 *.log
 
+# Tests
+playwright/
+
 # Misc
 .DS_Store
 .fleet
