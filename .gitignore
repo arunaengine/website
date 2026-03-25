@@ -2,9 +2,11 @@
 .output
 .data
 .nuxt
+.nuxtrc
 .nitro
 .cache
 dist
+test-results
 
 # Node dependencies
 node_modules
