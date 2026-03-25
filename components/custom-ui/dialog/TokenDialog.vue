@@ -163,7 +163,8 @@ function clear(visibility: boolean) {
         Create Token
       </Button>
     </DialogTrigger>
-    <DialogContent class="sm:max-w-xl sm:rounded-md border-aruna-text/50"
+    <DialogContent data-testid="create-token-dialog"
+                   class="sm:max-w-xl sm:rounded-md border-aruna-text/50"
                    @pointer-down-outside="(event) => event.preventDefault()">
       <DialogHeader>
         <DialogTitle class="mb-2 text-center text-aruna-highlight font-bold">Create Token</DialogTitle>
@@ -177,8 +178,8 @@ function clear(visibility: boolean) {
           <FormItem>
             <FormLabel>Token Name</FormLabel>
             <FormControl>
-              <Input type="text" placeholder="Some speaking name for the token" v-bind="componentField"
-                     class="mt-0"/>
+               <Input type="text" placeholder="Some speaking name for the token" data-testid="token-name-input" v-bind="componentField"
+                      class="mt-0"/>
             </FormControl>
             <FormMessage/>
           </FormItem>
@@ -288,8 +289,9 @@ function clear(visibility: boolean) {
 
         <!-- Token Secret -->
 
-        <div v-if="tokenSecret"
-             class="flex flex-col text-center bg-neutral-900 border border-gray-700 shadow-sm rounded-sm p-4 md:p-5">
+         <div v-if="tokenSecret"
+              data-testid="token-secret-panel"
+              class="flex flex-col text-center bg-neutral-900 border border-gray-700 shadow-sm rounded-sm p-4 md:p-5">
           <h3 class="text-lg font-bold text-gray-200">
             Token Secret
           </h3>
@@ -300,7 +302,7 @@ function clear(visibility: boolean) {
             Store it in a secure location before you close this window.
           </p>
           <hr class="my-4"/>
-          <p class="mt-2 text-wrap break-all text-neutral-400">
+          <p id="token-secret" class="mt-2 text-wrap break-all text-neutral-400">
             {{ tokenSecret }}
           </p>
         </div>
@@ -310,6 +312,7 @@ function clear(visibility: boolean) {
 
       <DialogFooter>
         <Button type="submit"
+                data-testid="create-token-submit"
                 form="dialogForm"
                 variant="outline"
                 class="border border-aruna-highlight bg-transparent text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent rounded-sm"

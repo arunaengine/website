@@ -9,3 +9,11 @@ export function createProjectTestData() {
     description: `Created by the Playwright resource creation flow ${uniqueId}.`,
   }
 }
+
+export function createTokenTestData() {
+  const uniqueId = `${Date.now().toString(36)}-${randomUUID().split('-')[0]}`
+
+  return {
+    name: `pw-token-${uniqueId}`,
+  }
+}

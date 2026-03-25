@@ -26,7 +26,8 @@ export default defineEventHandler(async event => {
   const token_claims = parseJwt(event.context.access_token)
   let idpMeta: IdpMeta[] = []
   for (const [key, value] of Object.entries(useRuntimeConfig().provider)) {
-    if (key === 'local')
+    console.log(key, value)
+    if (!value.wellKnownUrl)
       continue
 
     const response = await fetchCachedOidcMetadata((value as IdpConfig).wellKnownUrl)

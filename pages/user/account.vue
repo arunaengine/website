@@ -323,6 +323,7 @@ if (add_response === 'success') {
       <div class="border-b border-aruna-text/50">
         <nav class="flex space-x-6" aria-label="Tabs" role="tablist">
           <button type="button"
+                  data-testid="account-profile-tab"
                   class="hs-tab-active:font-semibold hs-tab-active:border-aruna-highlight hs-tab-active:text-aruna-highlight py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none :focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight active"
                   id="tabs-with-icons-item-1"
                   data-hs-tab="#tabs-with-icons-1"
@@ -332,6 +333,7 @@ if (add_response === 'success') {
             Profile
           </button>
           <button type="button"
+                  data-testid="account-tokens-tab"
                   class="hs-tab-active:font-semibold hs-tab-active:border-aruna-highlight hs-tab-active:text-aruna-highlight py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none :focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight"
                   id="tabs-with-icons-item-2"
                   data-hs-tab="#tabs-with-icons-2"
@@ -341,6 +343,7 @@ if (add_response === 'success') {
             Tokens
           </button>
           <button type="button"
+                  data-testid="account-data-proxies-tab"
                   class="hs-tab-active:font-semibold hs-tab-active:border-aruna-highlight hs-tab-active:text-aruna-highlight py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none :focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight"
                   id="tabs-with-icons-item-3"
                   data-hs-tab="#tabs-with-icons-3"
@@ -432,12 +435,12 @@ if (add_response === 'success') {
 
         </div>
 
-        <div id="tabs-with-icons-2" class="hidden" role="tabpanel" aria-labelledby="tabs-with-icons-item-2">
+        <div id="tabs-with-icons-2" data-testid="account-tokens-panel" class="hidden" role="tabpanel" aria-labelledby="tabs-with-icons-item-2">
           <div class="flex flex-col">
             <div class="-m-1.5 overflow-x-auto">
               <div class="p-1.5 min-w-full inline-block align-middle">
                 <div class="overflow-hidden">
-                  <table class="min-w-full divide-y divide-aruna-text/50">
+                  <table data-testid="account-tokens-table" class="min-w-full divide-y divide-aruna-text/50">
                     <thead>
                     <tr>
                       <th scope="col" class="px-6 py-3 text-start text-md font-medium text-aruna-text-accent uppercase">
@@ -498,6 +501,7 @@ if (add_response === 'success') {
           </div>
           <div class="flex flex-row justify-end">
             <Button @click="setVisibility(Dialogs.TokenDialog, true)"
+                    data-testid="account-create-token-button"
                     variant="outline"
                     class="mt-2 text-aruna-highlight border-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent text-md rounded-sm">
               Create Token
