@@ -4,9 +4,15 @@ import {
   ApiError,
   apiRequest,
   defaultApiBaseUrl,
+  type AddGroupMemberRequest,
   type ApiGroup,
+  type ApiRole,
+  type CreateGroupRoleRequest,
   type CreateMetadataRequest,
   type CreateMetadataResponse,
+  type GroupDetailResponse,
+  type GroupMembersResponse,
+  type GroupRolesResponse,
   type InfoResponse,
   type ListGroupsResponse,
   type ListMetadataResponse,
@@ -18,6 +24,7 @@ import {
   type S3CredentialSummary,
   type SparqlResponse,
   type UserInfoResponse,
+  type UserSearchResponse,
 } from '@/lib/api'
 
 const TOKEN_KEY = 'aruna.authToken'
@@ -179,6 +186,95 @@ async function updateUserProfile(input: {
   }
 }
 
+// Throws ApiError with status 409 and the server's verbatim message when the
+// caller is over the owned-group cap.
+async function createGroup(name: string): Promise<GroupDetailResponse> {
+  saving.value = true
+  try {
+    const created = await request<GroupDetailResponse>('/groups', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    })
+    await loadAuthenticated().catch(() => undefined)
+    return created
+  } finally {
+    saving.value = false
+  }
+}
+
+async function getGroup(groupId: string): Promise<GroupDetailResponse> {
+  return request<GroupDetailResponse>(`/groups/${groupId}`)
+}
+
+async function listGroupMembers(groupId: string): Promise<GroupMembersResponse> {
+  return request<GroupMembersResponse>(`/groups/${groupId}/members`)
+}
+
+async function addGroupMember(groupId: string, input: AddGroupMemberRequest): Promise<GroupRolesResponse> {
+  saving.value = true
+  try {
+    const response = await request<GroupRolesResponse>(`/groups/${groupId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+    await loadAuthenticated().catch(() => undefined)
+    return response
+  } finally {
+    saving.value = false
+  }
+}
+
+async function removeGroupMember(groupId: string, userId: string, roleId?: string): Promise<void> {
+  saving.value = true
+  try {
+    await request<void>(`/groups/${groupId}/members/${userId}`, {
+      method: 'DELETE',
+      query: { role_id: roleId },
+    })
+    await loadAuthenticated().catch(() => undefined)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function leaveGroup(groupId: string): Promise<void> {
+  saving.value = true
+  try {
+    await request<void>(`/groups/${groupId}/leave`, { method: 'POST' })
+    await loadAuthenticated().catch(() => undefined)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function createGroupRole(groupId: string, input: CreateGroupRoleRequest): Promise<ApiRole> {
+  saving.value = true
+  try {
+    const role = await request<ApiRole>(`/groups/${groupId}/roles`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+    await loadAuthenticated().catch(() => undefined)
+    return role
+  } finally {
+    saving.value = false
+  }
+}
+
+async function deleteGroupRole(groupId: string, roleId: string): Promise<void> {
+  saving.value = true
+  try {
+    await request<void>(`/groups/${groupId}/roles/${roleId}`, { method: 'DELETE' })
+    await loadAuthenticated().catch(() => undefined)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function searchUsers(q: string, limit = 20): Promise<UserSearchResponse> {
+  return request<UserSearchResponse>('/users/search', { query: { q, limit } })
+}
+
 async function runSparql(query: string): Promise<SparqlResult> {
   const started = performance.now()
   const result = await request<SparqlResponse>('/metadata/sparql/query', {
@@ -276,18 +372,39 @@ const nodes = computed<Node[]>(() => {
   }))
 })
 
-const groups = computed<Group[]>(() => {
-  const byId = new Map<string, ApiGroup>()
-  for (const group of apiGroups.value) byId.set(group.group_id, group)
-  for (const group of userInfo.value?.groups ?? []) {
-    byId.set(group.group_id, {
+// Distinct member ids per group, from /groups?include=roles. Only counted
+// when the caller can see assigned_users (i.e. is a member of the group).
+const groupMemberCounts = computed<Map<string, number>>(() => {
+  const counts = new Map<string, number>()
+  for (const group of apiGroups.value) {
+    const count = memberCount(group.roles)
+    if (count !== undefined) counts.set(group.group_id, count)
+  }
+  return counts
+})
+
+// "My groups" come from /users/info; their roles are the caller's own roles.
+const myGroups = computed<Group[]>(() =>
+  (userInfo.value?.groups ?? []).map((group) =>
+    mapGroup({
       group_id: group.group_id,
       display_name: group.display_name,
       realm_id: realm.value.id,
       roles: group.roles,
-    })
-  }
-  return Array.from(byId.values()).map((group) => ({
+    }),
+  ),
+)
+
+// Realm groups the caller is not a member of, from the open GET /groups.
+const discoverableGroups = computed<Group[]>(() => {
+  const mine = new Set((userInfo.value?.groups ?? []).map((group) => group.group_id))
+  return apiGroups.value.filter((group) => !mine.has(group.group_id)).map(mapGroup)
+})
+
+const groups = myGroups
+
+function mapGroup(group: ApiGroup): Group {
+  return {
     id: group.group_id,
     realmId: group.realm_id,
     name: group.display_name,
@@ -298,8 +415,16 @@ const groups = computed<Group[]>(() => {
     usedBytes: 0,
     ownerId: '',
     tags: (group.roles ?? []).map((role) => role.name),
-  }))
-})
+    memberCount: groupMemberCounts.value.get(group.group_id),
+  }
+}
+
+function memberCount(roles?: ApiRole[]): number | undefined {
+  if (!roles?.some((role) => role.assigned_users)) return undefined
+  const users = new Set<string>()
+  for (const role of roles) for (const user of role.assigned_users ?? []) users.add(user)
+  return users.size
+}
 
 const profiles = computed<MetadataProfile[]>(() => profileItems.value.map(mapProfile))
 const metadata = computed<MetadataDoc[]>(() => metadataItems.value.map(mapMetadataDoc))
@@ -499,6 +624,8 @@ export function useAruna() {
     currentUser,
     nodes,
     groups,
+    myGroups,
+    discoverableGroups,
     metadata,
     profiles,
     metadataItems,
@@ -508,6 +635,15 @@ export function useAruna() {
     loadRoCrate,
     createMetadata,
     updateUserProfile,
+    createGroup,
+    getGroup,
+    listGroupMembers,
+    addGroupMember,
+    removeGroupMember,
+    leaveGroup,
+    createGroupRole,
+    deleteGroupRole,
+    searchUsers,
     runSparql,
     searchMetadata,
     setAuthToken,
