@@ -52,7 +52,7 @@ const pageTitle = computed(() =>
 )
 const pageDescription = computed(() =>
   currentUser.value
-    ? 'Live data from the local Aruna API. No demo records are shown.'
+    ? 'Live data from the local Aruna API.'
     : 'You are browsing public data as a guest. Sign in to create datasets and manage your groups.',
 )
 </script>
