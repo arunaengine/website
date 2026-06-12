@@ -10,6 +10,8 @@ import {
   type CreateGroupRoleRequest,
   type CreateMetadataRequest,
   type CreateMetadataResponse,
+  type CreateS3CredentialsRequest,
+  type CreateS3CredentialsResponse,
   type GroupDetailResponse,
   type GroupMembersResponse,
   type GroupRolesResponse,
@@ -238,6 +240,30 @@ async function createGroup(name: string): Promise<GroupDetailResponse> {
 
 async function getGroup(groupId: string): Promise<GroupDetailResponse> {
   return request<GroupDetailResponse>(`/groups/${groupId}`)
+}
+
+async function createS3Credentials(input: CreateS3CredentialsRequest): Promise<CreateS3CredentialsResponse> {
+  saving.value = true
+  try {
+    const created = await request<CreateS3CredentialsResponse>('/users/credentials', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+    await loadAuthenticated().catch(() => undefined)
+    return created
+  } finally {
+    saving.value = false
+  }
+}
+
+async function revokeS3Credential(accessKeyId: string): Promise<void> {
+  saving.value = true
+  try {
+    await request<void>(`/users/credentials/${encodeURIComponent(accessKeyId)}`, { method: 'DELETE' })
+    await loadAuthenticated().catch(() => undefined)
+  } finally {
+    saving.value = false
+  }
 }
 
 async function listGroupMembers(groupId: string): Promise<GroupMembersResponse> {
@@ -679,6 +705,8 @@ export function useAruna() {
     updateUserProfile,
     createGroup,
     getGroup,
+    createS3Credentials,
+    revokeS3Credential,
     listGroupMembers,
     addGroupMember,
     removeGroupMember,

@@ -8,6 +8,7 @@ import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Separator from '@/components/ui/Separator.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
+import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import GroupDetail from '@/components/groups/GroupDetail.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
@@ -33,6 +34,7 @@ const {
   setAuthToken,
   setApiBaseUrl,
   updateUserProfile,
+  revokeS3Credential,
 } = useAruna()
 const { signIn, signOut, isAuthenticated, stage, stageError } = useAuth()
 
@@ -91,7 +93,18 @@ const themeOptions: Array<{ id: ThemeMode; title: string; icon: unknown; preview
 const { mode: appearance, setTheme } = useTheme()
 
 const createGroupOpen = ref(false)
+const createCredentialOpen = ref(false)
+const revokeError = ref<string | null>(null)
 const selectedGroupId = ref('')
+
+async function revoke(accessKeyId: string) {
+  revokeError.value = null
+  try {
+    await revokeS3Credential(accessKeyId)
+  } catch (err) {
+    revokeError.value = err instanceof Error ? err.message : String(err)
+  }
+}
 
 function toggleGroup(groupId: string) {
   selectedGroupId.value = selectedGroupId.value === groupId ? '' : groupId
@@ -258,14 +271,19 @@ function toggleGroup(groupId: string) {
         </section>
 
         <section id="credentials" class="surface overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-4"><div class="flex items-center gap-2"><KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 credentials</h3><Badge variant="outline">{{ credentials.length }}</Badge></div></header>
+          <header class="flex items-center justify-between border-b border-border px-5 py-4">
+            <div class="flex items-center gap-2"><KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 credentials</h3><Badge variant="outline">{{ credentials.length }}</Badge></div>
+            <Button size="sm" @click="createCredentialOpen = true"><Plus class="h-4 w-4" /> Create</Button>
+          </header>
           <table class="w-full text-sm">
-            <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th></tr></thead>
+            <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th><th class="px-5 py-2"></th></tr></thead>
             <tbody>
-              <tr v-for="credential in credentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground">{{ credential.group_id }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px] text-muted-foreground">{{ relativeTime(credential.expires_at) }}</td></tr>
-              <tr v-if="!credentials.length"><td colspan="4" class="px-5 py-6 text-center text-xs text-muted-foreground">No S3 credentials for the authenticated user.</td></tr>
+              <tr v-for="credential in credentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground">{{ credential.group_id }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px] text-muted-foreground">{{ relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
+              <tr v-if="!credentials.length"><td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">No S3 credentials for the authenticated user.</td></tr>
             </tbody>
           </table>
+          <p v-if="revokeError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ revokeError }}</p>
+          <CreateCredentialDialog v-model:open="createCredentialOpen" />
         </section>
 
         <section id="appearance" class="surface">

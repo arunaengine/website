@@ -274,6 +274,17 @@ export interface ListS3CredentialsResponse {
   credentials: S3CredentialSummary[]
 }
 
+export interface CreateS3CredentialsRequest {
+  group_id: string
+  expires_in_seconds?: number
+  path_restrictions?: Array<{ pattern: string; permission: string }>
+}
+
+export interface CreateS3CredentialsResponse {
+  access_key_id: string
+  access_secret: string
+}
+
 // The backend deserializes CreateMetadataRequest as an untagged enum with
 // deny_unknown_fields, so a request must match exactly one variant shape.
 export interface CreateMetadataScaffoldRequest {
