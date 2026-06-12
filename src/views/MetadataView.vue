@@ -2,22 +2,16 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import Pagination from '@/components/ui/Pagination.vue'
-import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { useRoute, RouterLink } from 'vue-router'
 import { CrateNotReadyError, useAruna } from '@/composables/useAruna'
 import { relativeTime } from '@/lib/utils'
-import { Search, ArrowLeft, ListChecks, Plus, Code2, Star, FileJson2, ExternalLink } from 'lucide-vue-next'
+import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink } from 'lucide-vue-next'
 
 const route = useRoute()
-const router = useRouter()
-const { metadata, profiles, currentUser, loadRoCrate, fullCrates, cratePending } = useAruna()
+const { metadata, profiles, loading, loadRoCrate, fullCrates, cratePending } = useAruna()
 
-const q = ref('')
-const profileFilter = ref<string | null>(null)
 const showCrate = ref(false)
-const showNewDataset = ref(false)
 const loadingCrate = ref(false)
 const crateNotReady = ref(false)
 const crateError = ref<string | null>(null)
@@ -25,23 +19,6 @@ const crateError = ref<string | null>(null)
 const detailId = computed(() => (route.params.id as string) || '')
 const current = computed(() => metadata.value.find((doc) => doc.ulid === detailId.value))
 const currentProfile = computed(() => profiles.value.find((profile) => profile.id === current.value?.profileId))
-const favouriteIds = computed(() => currentUser.value?.favouriteMetadataIds ?? [])
-
-const filtered = computed(() => {
-  const needle = q.value.trim().toLowerCase()
-  return metadata.value.filter((doc) => {
-    if (profileFilter.value && doc.profileId !== profileFilter.value) return false
-    if (!needle) return true
-    return `${doc.title} ${doc.description} ${doc.keywords.join(' ')} ${doc.author}`.toLowerCase().includes(needle)
-  })
-})
-
-const PAGE_SIZE = 12
-const page = ref(1)
-watch([q, profileFilter], () => {
-  page.value = 1
-})
-const paged = computed(() => filtered.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
 
 let crateFetchToken = 0
 
@@ -90,73 +67,23 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
     })
     .filter((file) => file.id)
 })
-
-function open(id: string) {
-  router.push({ name: 'metadata-detail', params: { id } })
-}
-
-function isFavourite(id: string) {
-  return favouriteIds.value.includes(id)
-}
 </script>
 
 <template>
   <div>
     <PageHeader
       :title="current ? current.title : 'Metadata'"
-      :description="current ? `${currentProfile?.name ?? 'No profile'} · ${current.ulid}` : 'Live RO-Crate metadata documents visible through the Aruna API.'"
+      :description="current ? `${currentProfile?.name ?? 'No profile'} · ${current.ulid}` : 'Live RO-Crate metadata document.'"
     >
       <template #actions>
-        <RouterLink v-if="current" :to="{ name: 'metadata' }">
-          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Catalog</Button>
+        <RouterLink :to="{ name: 'search' }">
+          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Discover</Button>
         </RouterLink>
-        <Button v-else @click="showNewDataset = true" :disabled="!currentUser"><Plus class="h-4 w-4" /> New metadata</Button>
       </template>
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <template v-if="!current">
-        <div class="surface flex flex-col gap-3 p-4 md:flex-row md:items-center">
-          <div class="relative flex-1">
-            <Search class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input v-model="q" placeholder="Search title, keywords, description, author…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
-          <span class="text-muted-foreground">Profile:</span>
-          <button class="chip transition-colors" :class="profileFilter === null ? 'border-primary/40 text-primary' : ''" @click="profileFilter = null">any</button>
-          <button v-for="profile in profiles" :key="profile.id" class="chip transition-colors" :class="profileFilter === profile.id ? 'border-primary/40 text-primary' : ''" @click="profileFilter = profileFilter === profile.id ? null : profile.id">
-            {{ profile.shortName }}
-          </button>
-        </div>
-
-        <div v-if="filtered.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <article v-for="doc in paged" :key="doc.ulid" class="surface group relative flex h-full cursor-pointer flex-col gap-3 p-4 transition-shadow hover:shadow-md" @click="open(doc.ulid)">
-            <Star v-if="isFavourite(doc.ulid)" class="absolute right-3 top-3 h-4 w-4 text-amber-500" fill="currentColor" />
-            <div class="pr-6">
-              <h3 class="font-display text-sm font-semibold text-aruna-navy">{{ doc.title }}</h3>
-              <p class="mt-1 line-clamp-2 text-xs text-muted-foreground">{{ doc.description || doc.ulid }}</p>
-            </div>
-            <div class="flex flex-wrap gap-1">
-              <span v-for="keyword in doc.keywords.slice(0, 4)" :key="keyword" class="rounded-full border border-border bg-muted/30 px-1.5 py-0.5 text-[10px] text-foreground/70">#{{ keyword }}</span>
-            </div>
-            <div class="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-              <span class="truncate">{{ doc.author || doc.ulid }}</span>
-              <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                <ListChecks class="h-3 w-3" /> {{ profiles.find((profile) => profile.id === doc.profileId)?.shortName ?? 'No profile' }}
-              </span>
-            </div>
-          </article>
-        </div>
-        <div v-else class="surface p-12 text-center text-sm text-muted-foreground">No visible metadata documents match the filter.</div>
-
-        <div v-if="filtered.length > PAGE_SIZE" class="surface overflow-hidden">
-          <Pagination v-model:page="page" :page-size="PAGE_SIZE" :total="filtered.length" label="metadata documents" />
-        </div>
-      </template>
-
-      <template v-else>
+      <template v-if="current">
         <article class="surface p-6">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
@@ -222,8 +149,10 @@ function isFavourite(id: string) {
           <p v-else class="mt-2">This document does not reference any data files yet.</p>
         </section>
       </template>
-    </div>
 
-    <NewDatasetDialog v-model:open="showNewDataset" @created="(doc) => router.push({ name: 'metadata-detail', params: { id: doc.ulid } })" />
+      <div v-else class="surface p-12 text-center text-sm text-muted-foreground">
+        {{ loading ? 'Loading metadata…' : 'This metadata document is not visible or does not exist.' }}
+      </div>
+    </div>
   </div>
 </template>
