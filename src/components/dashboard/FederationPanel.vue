@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import type { Node } from '@/data/types'
 
 const props = defineProps<{
@@ -104,6 +105,9 @@ const statusLabel: Record<Node['status'], string> = {
         <span class="flex items-center gap-1.5">
           <span class="h-2 w-2 rounded-full bg-muted-foreground/50" /> Offline
         </span>
+        <RouterLink to="/app/status" class="text-xs font-medium text-primary hover:underline">
+          Node status
+        </RouterLink>
       </div>
     </div>
 
