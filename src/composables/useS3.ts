@@ -5,6 +5,7 @@ import {
   GetObjectCommand,
   ListBucketsCommand,
   ListObjectsV2Command,
+  PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
@@ -186,6 +187,13 @@ function uploadObject(
   }
 }
 
+// S3 folder convention: a zero-byte object whose key ends in '/'.
+async function createFolder(bucket: string, prefix: string, name: string): Promise<void> {
+  await client().send(
+    new PutObjectCommand({ Bucket: bucket, Key: `${prefix}${name}/`, Body: new Uint8Array(0) }),
+  )
+}
+
 async function deleteObject(bucket: string, key: string): Promise<void> {
   await client().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
 }
@@ -215,6 +223,7 @@ export function useS3() {
     listBuckets,
     createBucket,
     listObjects,
+    createFolder,
     uploadObject,
     deleteObject,
     downloadUrl,

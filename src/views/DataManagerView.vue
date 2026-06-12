@@ -79,6 +79,15 @@ const deleteTarget = ref<ObjectEntry | null>(null)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 
+const newFolderOpen = ref(false)
+const newFolderName = ref('')
+const newFolderBusy = ref(false)
+const newFolderError = ref<string | null>(null)
+const newFolderInvalid = computed(() => {
+  const name = newFolderName.value.trim()
+  return !name || name.includes('/')
+})
+
 async function refreshBuckets() {
   if (!s3.hasActiveKey.value) return
   bucketsLoading.value = true
@@ -176,6 +185,27 @@ async function createBucket() {
     createBucketError.value = s3ErrorMessage(err)
   } finally {
     creatingBucket.value = false
+  }
+}
+
+function openNewFolder() {
+  newFolderName.value = ''
+  newFolderError.value = null
+  newFolderOpen.value = true
+}
+
+async function createFolder() {
+  if (newFolderInvalid.value || newFolderBusy.value) return
+  newFolderBusy.value = true
+  newFolderError.value = null
+  try {
+    await s3.createFolder(bucket.value, s3Prefix.value, newFolderName.value.trim())
+    newFolderOpen.value = false
+    await loadObjects()
+  } catch (err) {
+    newFolderError.value = s3ErrorMessage(err)
+  } finally {
+    newFolderBusy.value = false
   }
 }
 
@@ -372,6 +402,7 @@ const isEmpty = computed(
               </div>
               <div class="flex items-center gap-2">
                 <input ref="fileInput" type="file" multiple class="hidden" @change="onFileInput" />
+                <Button variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
                 <Button size="sm" @click="pickFiles"><Upload class="h-4 w-4" /> Upload</Button>
               </div>
             </div>
@@ -455,6 +486,27 @@ const isEmpty = computed(
     </div>
 
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />
+
+    <Dialog :open="newFolderOpen" @update:open="(v: boolean) => (newFolderOpen = v)">
+      <DialogContent class="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>New folder</DialogTitle>
+          <DialogDescription>
+            Creates <span class="font-mono text-xs">{{ s3Prefix }}{{ newFolderName.trim() || 'name' }}/</span> in
+            <span class="font-mono text-xs">{{ bucket }}</span>.
+          </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-2">
+          <Input v-model="newFolderName" placeholder="folder-name" class="font-mono text-xs" @keyup.enter="createFolder" />
+          <p v-if="newFolderName.trim().includes('/')" class="text-xs text-destructive">The folder name cannot contain '/'.</p>
+          <p v-if="newFolderError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ newFolderError }}</p>
+        </div>
+        <DialogFooter>
+          <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+          <Button :disabled="newFolderInvalid || newFolderBusy" @click="createFolder">{{ newFolderBusy ? 'Creating…' : 'Create' }}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <Dialog :open="deleteTarget !== null" @update:open="(v: boolean) => { if (!v) deleteTarget = null }">
       <DialogContent class="max-w-md">
