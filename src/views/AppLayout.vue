@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Sidebar from '@/components/dashboard/Sidebar.vue'
+import SideNav from '@/components/layout/SideNav.vue'
 import TopBar from '@/components/dashboard/TopBar.vue'
 import MobileNav from '@/components/dashboard/MobileNav.vue'
 import { RouterView } from 'vue-router'
@@ -7,10 +7,10 @@ import { RouterView } from 'vue-router'
 
 <template>
   <div class="app-shell flex min-h-full bg-background">
-    <Sidebar />
+    <SideNav />
     <div class="flex min-w-0 flex-1 flex-col">
       <TopBar />
-      <main class="flex-1 overflow-y-auto pb-20 md:pb-0">
+      <main class="flex-1 overflow-x-hidden pb-20 md:pb-0">
         <RouterView />
       </main>
     </div>
