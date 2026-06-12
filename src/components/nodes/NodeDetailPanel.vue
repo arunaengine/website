@@ -3,12 +3,15 @@ import Badge from '@/components/ui/Badge.vue'
 import CopyButton from './CopyButton.vue'
 import LocalNodeDetails from './LocalNodeDetails.vue'
 import { connectionLabel, connectionVariant, kindVariant, statusVariant } from './node-display'
-import type { InfoResponse, RealmNodeInfo } from '@/lib/api'
+import type { NodeProbe } from './node-probe'
+import type { RealmNodeInfo } from '@/lib/api'
+import { formatBytes, formatNumber } from '@/lib/utils'
+import { TriangleAlert } from 'lucide-vue-next'
 
 defineProps<{
   node: RealmNodeInfo
   isLocal?: boolean
-  info?: InfoResponse | null
+  probe?: NodeProbe | null
 }>()
 </script>
 
@@ -41,13 +44,43 @@ defineProps<{
       </div>
     </div>
 
-    <template v-if="isLocal && info">
+    <div
+      v-if="probe?.state === 'unreachable'"
+      class="flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/5 px-2.5 py-1.5 text-xs text-red-700 dark:text-red-300"
+    >
+      <TriangleAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span class="min-w-0 break-words">REST endpoint unreachable{{ probe.error ? `: ${probe.error}` : '' }}</span>
+    </div>
+
+    <div v-if="probe?.usage" class="border-t border-border/70 pt-3">
+      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Storage usage</div>
+      <dl class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+        <div>
+          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Objects</dt>
+          <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatNumber(probe.usage.objects) }}</dd>
+        </div>
+        <div>
+          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stored</dt>
+          <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatBytes(probe.usage.stored_bytes) }}</dd>
+        </div>
+        <div>
+          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Blobs</dt>
+          <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatNumber(probe.usage.stored_blobs) }}</dd>
+        </div>
+        <div>
+          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Buckets</dt>
+          <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatNumber(probe.usage.buckets) }}</dd>
+        </div>
+      </dl>
+    </div>
+
+    <template v-if="probe?.info">
       <div class="border-t border-border/70 pt-3">
         <div class="mb-2 flex items-center gap-2">
-          <span class="text-[10px] font-semibold uppercase tracking-wider text-primary">This node</span>
-          <Badge :variant="statusVariant(info.node.status)" class="text-[10px] uppercase">{{ info.node.status || 'unknown' }}</Badge>
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-primary">{{ isLocal ? 'This node' : 'Node details' }}</span>
+          <Badge :variant="statusVariant(probe.info.node.status)" class="text-[10px] uppercase">{{ probe.info.node.status || 'unknown' }}</Badge>
         </div>
-        <LocalNodeDetails :info="info" />
+        <LocalNodeDetails :info="probe.info" />
       </div>
     </template>
   </div>

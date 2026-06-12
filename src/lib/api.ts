@@ -127,6 +127,8 @@ export interface RealmNodeInfo {
   configured: boolean
   present: boolean
   connection_status: 'connected' | 'configured'
+  // Advertised by newer backends; absent until nodes publish their REST endpoint.
+  rest_url?: string | null
 }
 
 export interface UserInfoResponse {

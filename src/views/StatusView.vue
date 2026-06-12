@@ -1,19 +1,22 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
-import { connectionLabel, connectionVariant, kindVariant, statusVariant } from '@/components/nodes/node-display'
+import { connectionLabel, connectionVariant, isDegradedStatus, kindVariant, statusVariant, type BadgeVariant } from '@/components/nodes/node-display'
+import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
-import { truncateMiddle } from '@/lib/utils'
+import { formatBytes, formatNumber, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
 import { ApiError } from '@/lib/api'
 import { Boxes, ChevronRight, Globe2, HardDrive, RefreshCw } from 'lucide-vue-next'
 
-const { realm, realmInfo, nodeInfo, loadInfo } = useAruna()
+const route = useRoute()
+const { realm, realmInfo, nodeInfo, usageInfo, loadInfo } = useAruna()
 
 const REFRESH_INTERVAL_MS = 10_000
 
@@ -21,6 +24,7 @@ const expandedId = ref('')
 const statusError = ref<string | null>(null)
 const lastUpdated = ref<Date | null>(null)
 const refreshing = ref(false)
+const probes = ref<Record<string, NodeProbe>>({})
 let timer: number | undefined
 
 async function refreshStatus() {
@@ -30,11 +34,23 @@ async function refreshStatus() {
     await loadInfo()
     statusError.value = null
     lastUpdated.value = new Date()
+    await probeRealmNodes()
   } catch (err) {
     statusError.value = err instanceof ApiError || err instanceof Error ? err.message : String(err)
   } finally {
     refreshing.value = false
   }
+}
+
+async function probeRealmNodes() {
+  const targets = (realmInfo.value?.nodes ?? [])
+    .filter((node) => !isLocal(node))
+    .map((node) => ({ id: node.node_id, base: nodeApiBase(node) }))
+    .filter((target): target is { id: string; base: string } => !!target.base)
+  const results = await Promise.all(
+    targets.map(async ({ id, base }) => [id, await probeNode(base)] as const),
+  )
+  probes.value = Object.fromEntries(results)
 }
 
 onMounted(() => {
@@ -49,6 +65,34 @@ function isLocal(node: RealmNodeInfo): boolean {
   return node.kind === 'local' || (!!localPeerId.value && node.node_id === localPeerId.value)
 }
 
+// The local node is reported through the already-loaded /info data instead of
+// a second probe against the same endpoint.
+function probeFor(node: RealmNodeInfo): NodeProbe | undefined {
+  if (isLocal(node)) {
+    return nodeInfo.value
+      ? { state: 'ok', info: nodeInfo.value, usage: usageInfo.value }
+      : undefined
+  }
+  return probes.value[node.node_id]
+}
+
+function restBadge(node: RealmNodeInfo): { label: string; variant: BadgeVariant } | null {
+  const probe = probeFor(node)
+  if (probe?.state === 'unreachable') return { label: 'unreachable', variant: 'destructive' }
+  if (probe?.info) {
+    const status = probe.info.services.interfaces.rest.status
+    return { label: `rest ${status || 'unknown'}`, variant: statusVariant(status) }
+  }
+  if (!isLocal(node) && nodeApiBase(node)) return { label: 'checking…', variant: 'outline' }
+  return null
+}
+
+function usageSummary(node: RealmNodeInfo): string | null {
+  const usage = probeFor(node)?.usage
+  if (!usage) return null
+  return `${formatNumber(usage.objects)} obj · ${formatBytes(usage.stored_bytes)}`
+}
+
 const kindOrder: Record<RealmNodeInfo['kind'], number> = { local: 0, management: 1, server: 2, user: 3 }
 
 const sortedNodes = computed(() =>
@@ -61,6 +105,27 @@ const connectedCount = computed(
   () => sortedNodes.value.filter((node) => node.connection_status === 'connected').length,
 )
 
+const unreachableNodes = computed(() =>
+  sortedNodes.value.filter(
+    (node) =>
+      probeFor(node)?.state === 'unreachable' ||
+      (node.configured && node.connection_status !== 'connected'),
+  ),
+)
+
+const degradedNodes = computed(() =>
+  sortedNodes.value.filter((node) => {
+    const probe = probeFor(node)
+    if (probe?.state !== 'ok' || !probe.info) return false
+    const interfaces = probe.info.services.interfaces
+    return isDegradedStatus(interfaces.rest.status) || isDegradedStatus(interfaces.s3.status)
+  }),
+)
+
+function nodeIdList(nodes: RealmNodeInfo[]): string {
+  return nodes.map((node) => truncateMiddle(node.node_id, 10, 6)).join(', ')
+}
+
 const lastUpdatedLabel = computed(() =>
   lastUpdated.value
     ? lastUpdated.value.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -70,6 +135,25 @@ const lastUpdatedLabel = computed(() =>
 function toggleNode(nodeId: string) {
   expandedId.value = expandedId.value === nodeId ? '' : nodeId
 }
+
+const targetNodeId = computed(() => (typeof route.query.node === 'string' ? route.query.node : ''))
+let highlightedTarget = ''
+
+watch(
+  [targetNodeId, sortedNodes] as const,
+  async ([id, nodes]) => {
+    if (!id || id === highlightedTarget) return
+    if (!nodes.some((node) => node.node_id === id)) return
+    highlightedTarget = id
+    expandedId.value = id
+    await nextTick()
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    document
+      .getElementById(`status-node-${id}`)
+      ?.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' })
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -89,6 +173,22 @@ function toggleNode(nodeId: string) {
         class="surface border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-800 dark:text-amber-300"
       >
         Status refresh failed: {{ statusError }}
+      </div>
+
+      <div
+        v-if="unreachableNodes.length"
+        class="surface border-red-500/30 bg-red-500/5 p-4 text-sm text-red-800 dark:text-red-300"
+      >
+        {{ unreachableNodes.length === 1 ? '1 configured node is' : `${unreachableNodes.length} configured nodes are` }}
+        unreachable: <span class="font-mono text-xs">{{ nodeIdList(unreachableNodes) }}</span>
+      </div>
+
+      <div
+        v-if="degradedNodes.length"
+        class="surface border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-800 dark:text-amber-300"
+      >
+        Degraded interfaces on {{ degradedNodes.length === 1 ? 'node' : 'nodes' }}:
+        <span class="font-mono text-xs">{{ nodeIdList(degradedNodes) }}</span>
       </div>
 
       <section class="surface p-5">
@@ -136,10 +236,13 @@ function toggleNode(nodeId: string) {
           <Badge variant="outline" class="tabular-nums">{{ sortedNodes.length }}</Badge>
         </header>
         <ul class="divide-y divide-border">
-          <li v-for="node in sortedNodes" :key="node.node_id">
+          <li v-for="node in sortedNodes" :id="`status-node-${node.node_id}`" :key="node.node_id">
             <div
               class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40"
-              :class="expandedId === node.node_id ? 'bg-muted/30' : ''"
+              :class="[
+                expandedId === node.node_id && 'bg-muted/30',
+                targetNodeId === node.node_id && 'ring-1 ring-inset ring-primary/40',
+              ]"
             >
               <button
                 type="button"
@@ -164,6 +267,19 @@ function toggleNode(nodeId: string) {
                 </span>
               </button>
               <CopyButton :value="node.node_id" label="Copy node id" />
+              <span
+                v-if="usageSummary(node)"
+                class="hidden shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline"
+              >
+                {{ usageSummary(node) }}
+              </span>
+              <Badge
+                v-if="restBadge(node)"
+                :variant="restBadge(node)!.variant"
+                class="shrink-0 text-[10px] uppercase"
+              >
+                {{ restBadge(node)!.label }}
+              </Badge>
               <Badge :variant="connectionVariant(node)" class="shrink-0 gap-1.5 text-[10px] uppercase">
                 <span
                   :class="['h-1.5 w-1.5 rounded-full', node.connection_status === 'connected' ? 'bg-emerald-500' : 'bg-amber-500']"
@@ -172,7 +288,7 @@ function toggleNode(nodeId: string) {
               </Badge>
             </div>
             <div v-if="expandedId === node.node_id" class="border-t border-border bg-muted/10 px-5 py-4">
-              <NodeDetailPanel :node="node" :is-local="isLocal(node)" :info="isLocal(node) ? nodeInfo : null" />
+              <NodeDetailPanel :node="node" :is-local="isLocal(node)" :probe="probeFor(node)" />
             </div>
           </li>
           <li v-if="!sortedNodes.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
