@@ -44,10 +44,31 @@ const routes: RouteRecordRaw[] = [
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
+function hashTargetExists(hash: string): boolean {
+  try {
+    return Boolean(document.querySelector(hash))
+  } catch {
+    return false
+  }
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior() {
+  scrollBehavior(to, _from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.hash) {
+      // Wait a tick so freshly mounted views can render the target element.
+      return new Promise((resolve) => {
+        window.setTimeout(() => {
+          if (hashTargetExists(to.hash)) {
+            resolve({ el: to.hash, top: 72, behavior: 'smooth' })
+          } else {
+            resolve({ top: 0 })
+          }
+        }, 0)
+      })
+    }
     return { top: 0 }
   },
 })

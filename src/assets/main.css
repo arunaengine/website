@@ -88,6 +88,10 @@
     font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
     color-scheme: light;
   }
+  /* Keep anchor targets clear of the sticky top bar. */
+  [id] {
+    scroll-margin-top: 4.5rem;
+  }
   .dark body {
     color-scheme: dark;
   }
