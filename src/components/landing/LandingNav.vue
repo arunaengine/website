@@ -49,11 +49,11 @@ function onSignIn() {
           <Sun v-if="isDark" class="h-4 w-4" />
           <Moon v-else class="h-4 w-4" />
         </Button>
-        <Button v-if="!isAuthenticated" variant="outline" size="sm" @click="onSignIn">
+        <Button v-if="!isAuthenticated" size="sm" @click="onSignIn">
           <LogIn class="h-3.5 w-3.5" />
           Sign in
         </Button>
-        <RouterLink to="/app">
+        <RouterLink v-else to="/app">
           <Button size="sm">
             Open portal
             <ArrowRight class="h-3.5 w-3.5" />

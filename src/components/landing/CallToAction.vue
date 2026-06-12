@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
-import { ArrowRight, BookOpen } from 'lucide-vue-next'
+import { ArrowRight } from 'lucide-vue-next'
 import { RouterLink } from 'vue-router'
 </script>
 
@@ -31,18 +31,15 @@ import { RouterLink } from 'vue-router'
           </div>
           <div class="flex flex-wrap gap-3 lg:justify-end">
             <RouterLink to="/app">
-              <Button size="lg" variant="solid">
+              <Button
+                variant="outline"
+                size="lg"
+                class="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              >
                 Open the portal
                 <ArrowRight class="h-4 w-4" />
               </Button>
             </RouterLink>
-            <Button
-              variant="outline"
-              size="lg"
-              class="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
-            >
-              <BookOpen class="h-4 w-4" /> Read the spec
-            </Button>
           </div>
         </div>
       </div>

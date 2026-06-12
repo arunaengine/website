@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import { ArrowRight, BookOpen } from 'lucide-vue-next'
-import { RouterLink } from 'vue-router'
 import { computed } from 'vue'
 import { useTheme } from '@/composables/useTheme'
 
@@ -55,15 +54,15 @@ const wordmark = computed(() =>
       </p>
 
       <div class="mt-9 flex flex-wrap justify-center gap-3">
-        <RouterLink to="/app">
-          <Button size="lg">
-            Open the portal
-            <ArrowRight class="h-4 w-4" />
-          </Button>
-        </RouterLink>
-        <Button variant="outline" size="lg" as-child>
+        <Button size="lg" as-child>
           <a href="#capabilities">
-            <BookOpen class="h-4 w-4" /> What's inside
+            See what's inside
+            <ArrowRight class="h-4 w-4" />
+          </a>
+        </Button>
+        <Button variant="outline" size="lg" as-child>
+          <a href="#architecture">
+            <BookOpen class="h-4 w-4" /> How it works
           </a>
         </Button>
       </div>
