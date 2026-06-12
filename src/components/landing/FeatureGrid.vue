@@ -9,25 +9,25 @@ import {
 const features = [
   {
     title: 'Object storage',
-    desc: 'Every node exposes an S3-compatible API, so existing clients, scripts and workflow tools keep working. Buckets can hold local objects and references to data on other nodes.',
+    desc: 'An S3-compatible API on every node. Your clients, scripts and pipelines keep working, unchanged.',
     icon: Boxes,
     tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
   },
   {
     title: 'Metadata',
-    desc: 'Datasets are described as RO-Crate JSON-LD documents covering files, people, licenses and processes. The same metadata is projected into a graph you can query with SPARQL.',
+    desc: 'Every dataset is an RO-Crate: files, people, licenses, processes. Query the whole realm with SPARQL.',
     icon: FileJson2,
     tone: 'bg-aruna-sky/15 text-aruna-sky',
   },
   {
     title: 'Replication',
-    desc: 'Nodes in a realm exchange metadata documents peer to peer and converge again after a network partition. Data stays on the nodes of the organization that owns it.',
+    desc: 'Metadata syncs peer to peer and converges after partitions. Data stays with the organization that owns it.',
     icon: Share2,
     tone: 'bg-aruna-aqua/15 text-aruna-aqua',
   },
   {
     title: 'Access control',
-    desc: 'You sign in through your institution\'s OIDC provider. Groups hold roles, and roles grant permissions scoped to paths, so access to every bucket and dataset is explicit.',
+    desc: 'Sign in through your institution\'s OIDC provider. Roles grant permissions on paths, so every grant is explicit.',
     icon: KeyRound,
     tone: 'bg-aruna-tagline/15 text-aruna-tagline',
   },
@@ -42,11 +42,11 @@ const features = [
           What's inside
         </div>
         <h2 class="mt-3 font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
-          What every node provides.
+          One binary, the whole node.
         </h2>
         <p class="mt-3 text-sm text-muted-foreground">
-          A node is a single binary that serves the S3 API, the REST API and
-          this portal. These are the four parts you work with day to day.
+          Every node serves the S3 API, the REST API and this portal. These
+          four parts do the daily work.
         </p>
       </div>
 
