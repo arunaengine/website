@@ -25,6 +25,7 @@ import {
   type RealmInfoResponse,
   type S3CredentialSummary,
   type SparqlResponse,
+  type UsageResponse,
   type UserInfoResponse,
   type UserSearchResponse,
 } from '@/lib/api'
@@ -41,6 +42,7 @@ const authError = ref<string | null>(null)
 
 const nodeInfo = ref<InfoResponse | null>(null)
 const realmInfo = ref<RealmInfoResponse | null>(null)
+const usageInfo = ref<UsageResponse | null>(null)
 const userInfo = ref<UserInfoResponse | null>(null)
 const apiGroups = ref<ApiGroup[]>([])
 const metadataItems = ref<MetadataDocumentListItem[]>([])
@@ -96,12 +98,15 @@ async function refresh() {
 }
 
 async function loadInfo() {
-  const [info, realm] = await Promise.all([
+  // /info/usage is not deployed everywhere yet; hide the stats on failure.
+  const [info, realm, usage] = await Promise.all([
     request<InfoResponse>('/info'),
     request<RealmInfoResponse>('/info/realm'),
+    request<UsageResponse>('/info/usage').catch(() => null),
   ])
   nodeInfo.value = info
   realmInfo.value = realm
+  usageInfo.value = usage
 }
 
 // Right after a create, the RO-Crate graph projection can lag behind the
@@ -684,6 +689,7 @@ export function useAruna() {
     bootstrapped,
     nodeInfo,
     realmInfo,
+    usageInfo,
     userInfo,
     credentials,
     realm,
