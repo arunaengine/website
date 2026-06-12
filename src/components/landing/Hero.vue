@@ -23,17 +23,17 @@ const wordmark = computed(() =>
     <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
 
     <div class="container relative max-w-3xl pb-24 pt-20 text-center sm:pt-24">
-      <!-- Brand lockup: wave mark + ARUNA wordmark (image — never typed) -->
+      <!-- Brand lockup: wave mark + ARUNA wordmark (always the image assets, never typed) -->
       <img
         src="/brand/icon-mark.png"
         alt=""
-        class="mx-auto h-16 w-16 select-none sm:h-20 sm:w-20"
+        class="mx-auto h-20 w-20 select-none sm:h-24 sm:w-24"
         draggable="false"
       />
       <img
         :src="wordmark"
         alt="ARUNA"
-        class="mx-auto mt-6 h-8 w-auto select-none sm:h-10"
+        class="mx-auto mt-3 h-8 w-auto select-none sm:h-10"
         draggable="false"
       />
       <p class="tagline mt-3.5 text-xs sm:text-[13px]">
