@@ -3,21 +3,15 @@ import Button from '@/components/ui/Button.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
-import { ArrowRight, Boxes, FileJson2, ListChecks, LogIn, Plus, Activity, Users } from 'lucide-vue-next'
+import { ArrowRight, Boxes, FileJson2, ListChecks, Plus, Activity, Users } from 'lucide-vue-next'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
-import { useAuth } from '@/composables/useAuth'
 import { relativeTime } from '@/lib/utils'
 
 const router = useRouter()
 const { currentUser, metadata, profiles, nodes, groups, realm, nodeInfo, loading, error, authError, refresh } = useAruna()
-const { signIn } = useAuth()
 const showNewDataset = ref(false)
-
-function onSignIn() {
-  void signIn({ redirectTo: '/app' })
-}
 
 const onlineNodes = computed(() => nodes.value.filter((node) => node.status === 'healthy').length)
 
@@ -73,7 +67,6 @@ const pageDescription = computed(() =>
         <Button v-if="currentUser" variant="outline" @click="showNewDataset = true">
           <Plus class="h-4 w-4" /> New dataset
         </Button>
-        <Button v-else @click="onSignIn"><LogIn class="h-4 w-4" /> Sign in</Button>
         <RouterLink to="/app/metadata">
           <Button :variant="currentUser ? 'default' : 'outline'">
             Open catalog <ArrowRight class="h-4 w-4" />
@@ -85,10 +78,7 @@ const pageDescription = computed(() =>
     <div class="container max-w-[1100px] space-y-6 py-8">
       <div v-if="error || authError" class="surface border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-800 dark:text-amber-300">
         <div v-if="error">API error: {{ error }}</div>
-        <div v-if="authError" class="flex flex-wrap items-center justify-between gap-2">
-          <span>Your session is no longer valid: {{ authError }}</span>
-          <Button size="sm" variant="outline" @click="onSignIn"><LogIn class="h-3.5 w-3.5" /> Sign in again</Button>
-        </div>
+        <div v-if="authError">Your session is no longer valid: {{ authError }}. Use the sign-in button in the top bar to start a new session.</div>
       </div>
 
       <section class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
