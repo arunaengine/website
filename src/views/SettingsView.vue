@@ -17,12 +17,13 @@ import { useAuth } from '@/composables/useAuth'
 import { RouterLink } from 'vue-router'
 import { relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
-import { ChevronRight, KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from 'lucide-vue-next'
+import { ChevronRight, ExternalLink, KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from 'lucide-vue-next'
 
 const {
   apiBaseUrl,
   authToken,
   currentUser,
+  nodeInfo,
   userInfo,
   myGroups,
   discoverableGroups,
@@ -64,6 +65,20 @@ watch(currentUser, (user) => {
 }, { immediate: true })
 
 const preferredProfile = computed(() => profiles.value.find((profile) => profile.id === preferredProfileId.value))
+
+// Swagger UI is served from the node's root, not under /api/v1.
+const swaggerUrl = computed(() => {
+  let origin = window.location.origin
+  const restUrl = nodeInfo.value?.services.interfaces.rest.url
+  if (restUrl) {
+    try {
+      origin = new URL(restUrl).origin
+    } catch {
+      // keep the window origin
+    }
+  }
+  return `${origin}/swagger-ui`
+})
 
 function saveConnection() {
   setApiBaseUrl(apiBaseDraft.value)
@@ -189,6 +204,9 @@ function toggleGroup(groupId: string) {
               <label class="text-xs font-medium text-foreground">API base URL</label>
               <Input v-model="apiBaseDraft" class="mt-1" placeholder="/api/v1" />
               <p class="mt-1 text-[11px] text-muted-foreground">Vite proxies /api to the local Aruna node during development.</p>
+              <a :href="swaggerUrl" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                <ExternalLink class="h-3 w-3" /> API reference (Swagger UI)
+              </a>
             </div>
             <div v-if="isAuthenticated">
               <label class="text-xs font-medium text-foreground">Bearer token (advanced)</label>
