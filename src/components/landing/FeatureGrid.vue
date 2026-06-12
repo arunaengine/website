@@ -2,33 +2,33 @@
 import {
   Boxes,
   FileJson2,
-  Search,
-  ListChecks,
+  KeyRound,
+  Share2,
 } from 'lucide-vue-next'
 
 const features = [
   {
-    title: 'Buckets',
-    desc: 'A flat list of buckets — your files, organised the way you want them. Reference data from other endpoints when you need to.',
+    title: 'Object storage',
+    desc: 'Every node exposes an S3-compatible API, so existing clients, scripts and workflow tools keep working. Buckets can hold local objects and references to data on other nodes.',
     icon: Boxes,
     tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
   },
   {
     title: 'Metadata',
-    desc: 'RO-Crate descriptions for every dataset, with authors, license and rich context. Linked across the catalog.',
+    desc: 'Datasets are described as RO-Crate JSON-LD documents covering files, people, licenses and processes. The same metadata is projected into a graph you can query with SPARQL.',
     icon: FileJson2,
     tone: 'bg-aruna-sky/15 text-aruna-sky',
   },
   {
-    title: 'Profiles',
-    desc: 'Schemas that describe what a "good" dataset looks like in your field. Pick a profile, fill in the form, you\'re done.',
-    icon: ListChecks,
+    title: 'Replication',
+    desc: 'Nodes in a realm exchange metadata documents peer to peer and converge again after a network partition. Data stays on the nodes of the organization that owns it.',
+    icon: Share2,
     tone: 'bg-aruna-aqua/15 text-aruna-aqua',
   },
   {
-    title: 'Search',
-    desc: 'A friendly search that returns datasets, buckets and files. Switch on expert mode for full SPARQL when you need it.',
-    icon: Search,
+    title: 'Access control',
+    desc: 'You sign in through your institution\'s OIDC provider. Groups hold roles, and roles grant permissions scoped to paths, so access to every bucket and dataset is explicit.',
+    icon: KeyRound,
     tone: 'bg-aruna-tagline/15 text-aruna-tagline',
   },
 ]
@@ -42,11 +42,11 @@ const features = [
           What's inside
         </div>
         <h2 class="mt-3 font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
-          Four things, well done.
+          What every node provides.
         </h2>
         <p class="mt-3 text-sm text-muted-foreground">
-          Researchers shouldn't need to think about replication, gossip
-          protocols or content hashes. Aruna keeps that out of the way.
+          A node is a single binary that serves the S3 API, the REST API and
+          this portal. These are the four parts you work with day to day.
         </p>
       </div>
 

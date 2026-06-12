@@ -21,12 +21,12 @@ import { RouterLink } from 'vue-router'
             <h2
               class="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl"
             >
-              Bring your nodes. Keep your data. Share what you choose.
+              Run a node. Join a realm. Keep your data where it is.
             </h2>
             <p class="mt-4 max-w-xl text-sm text-white/75 md:text-base">
-              Spin up an Aruna node, join or create a realm, and every dataset
-              you publish gets a stable identifier, a verifiable hash and
-              replicas exactly where your policy requires them.
+              An Aruna node is a single binary plus your own OIDC provider. It
+              serves the S3 API, the REST API and this portal, and it
+              replicates metadata with the other nodes in its realm.
             </p>
           </div>
           <div class="flex flex-wrap gap-3 lg:justify-end">

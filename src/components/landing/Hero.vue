@@ -43,15 +43,15 @@ const wordmark = computed(() =>
       <h1
         class="mt-12 font-display text-3xl font-semibold leading-[1.12] tracking-tight text-aruna-navy sm:text-4xl md:text-[42px]"
       >
-        One place for your
+        Federated storage for
         <span class="text-gradient">research data</span>
         and the metadata that describes it.
       </h1>
 
       <p class="mx-auto mt-5 max-w-xl text-base text-muted-foreground">
-        Buckets for files. Profiles for metadata. A search that finds both. No
-        node management, no replication knobs — Aruna takes care of the
-        plumbing.
+        Each organization runs its own Aruna node with an S3-compatible API.
+        Datasets carry RO-Crate metadata you can query with SPARQL, and nodes
+        in a realm replicate that metadata between each other.
       </p>
 
       <div class="mt-9 flex flex-wrap justify-center gap-3">
@@ -72,7 +72,7 @@ const wordmark = computed(() =>
         class="mt-12 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground"
       >
         <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        Federated research data, made simple
+        Open source under the Apache 2.0 and MIT licenses
       </div>
     </div>
   </section>
