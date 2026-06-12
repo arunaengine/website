@@ -71,7 +71,7 @@ async function runQuery() {
       </template>
     </PageHeader>
 
-    <div class="container max-w-[1200px] space-y-6 py-8">
+    <div class="container space-y-6 py-8">
       <template v-if="!expertMode">
         <div class="surface p-4">
           <div class="relative">

@@ -114,7 +114,7 @@ function isFavourite(id: string) {
       </template>
     </PageHeader>
 
-    <div class="container max-w-[1200px] space-y-6 py-8">
+    <div class="container space-y-6 py-8">
       <template v-if="!current">
         <div class="surface flex flex-col gap-3 p-4 md:flex-row md:items-center">
           <div class="relative flex-1">
