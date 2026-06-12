@@ -67,6 +67,8 @@ export interface Group {
   usedBytes: number
   ownerId: string
   tags: string[]
+  // Undefined when the member list is hidden from the caller.
+  memberCount?: number
 }
 
 export interface GroupMembership {

@@ -134,7 +134,8 @@ export interface ApiRole {
   role_id: string
   name: string
   permissions: Record<string, string>
-  assigned_users: string[]
+  // Only present when the caller is a member of the group; missing means hidden.
+  assigned_users?: string[]
 }
 
 export interface ApiUserGroup {
@@ -152,6 +153,59 @@ export interface ApiGroup {
 
 export interface ListGroupsResponse {
   groups: ApiGroup[]
+}
+
+export interface CreateGroupRequest {
+  name: string
+}
+
+export interface GroupDetailResponse {
+  display_name: string
+  group_id: string
+  realm_id: string
+  roles: ApiRole[]
+}
+
+export interface GroupMemberRole {
+  role_id: string
+  name: string
+}
+
+export interface GroupMember {
+  user_id: string
+  name?: string
+  roles: GroupMemberRole[]
+}
+
+export interface GroupMembersResponse {
+  members: GroupMember[]
+}
+
+export interface AddGroupMemberRequest {
+  user_id: string
+  role_ids?: string[]
+}
+
+export interface GroupRolesResponse {
+  roles: ApiRole[]
+}
+
+export type GroupPermissionLevel = 'read' | 'write' | 'deny'
+
+export interface CreateGroupRoleRequest {
+  name: string
+  permissions: Record<string, GroupPermissionLevel>
+  assigned_users?: string[]
+}
+
+export interface UserSearchHit {
+  user_id: string
+  name: string
+}
+
+export interface UserSearchResponse {
+  users: UserSearchHit[]
+  next_start_after?: string | null
 }
 
 export interface MetadataDocumentListItem {
