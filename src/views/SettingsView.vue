@@ -9,13 +9,14 @@ import Switch from '@/components/ui/Switch.vue'
 import Separator from '@/components/ui/Separator.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import GroupDetail from '@/components/groups/GroupDetail.vue'
+import CopyButton from '@/components/nodes/CopyButton.vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { RouterLink } from 'vue-router'
 import { relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
-import { KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from 'lucide-vue-next'
+import { ChevronRight, KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from 'lucide-vue-next'
 
 const {
   apiBaseUrl,
@@ -44,6 +45,7 @@ const signingIn = computed(() => stage.value === 'redirecting')
 function startSignIn() {
   void signIn({ onboardingSecret: onboardingSecret.value, redirectTo: '/app/settings' })
 }
+const identityOpen = ref(false)
 const name = ref('')
 const email = ref('')
 const affiliation = ref('')
@@ -129,6 +131,24 @@ function toggleGroup(groupId: string) {
             <Button v-if="isAuthenticated" variant="outline" size="sm" @click="signOut"><LogOut class="h-3.5 w-3.5" /> Sign out</Button>
             <Button v-else size="sm" :disabled="signingIn" @click="startSignIn"><LogIn class="h-3.5 w-3.5" /> Sign in</Button>
           </div>
+          <div v-if="isAuthenticated && userInfo" class="border-b border-border px-5 py-3">
+            <button
+              type="button"
+              class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              :aria-expanded="identityOpen"
+              @click="identityOpen = !identityOpen"
+            >
+              <ChevronRight :class="['h-3.5 w-3.5 transition-transform', identityOpen && 'rotate-90']" />
+              Identity details
+            </button>
+            <div v-if="identityOpen" class="mt-2 flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
+              <div class="min-w-0 flex-1">
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Full user identity</div>
+                <code class="mt-0.5 block break-all font-mono text-[11px] leading-relaxed text-foreground/80">{{ userInfo.user.user_id }}</code>
+              </div>
+              <CopyButton :value="userInfo.user.user_id" label="Copy user identity" />
+            </div>
+          </div>
           <div v-if="!isAuthenticated" class="grid gap-5 border-b border-border p-5 md:grid-cols-2">
             <div>
               <label class="text-xs font-medium text-foreground">Onboarding secret (first admin, optional)</label>
@@ -170,7 +190,7 @@ function toggleGroup(groupId: string) {
             <Avatar :user="currentUser" size="lg" />
             <div>
               <div class="font-medium text-foreground">{{ currentUser.name }}</div>
-              <div class="text-[11px] text-muted-foreground">{{ userInfo?.user.user_id }}</div>
+              <div v-if="currentUser.email" class="text-[11px] text-muted-foreground">{{ currentUser.email }}</div>
             </div>
           </div>
           <div v-else class="border-b border-border px-5 py-5 text-sm text-muted-foreground">No authenticated user loaded.</div>
