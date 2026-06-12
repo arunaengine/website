@@ -88,6 +88,10 @@
     font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
     color-scheme: light;
   }
+  /* Keep anchor targets clear of the sticky top bar. */
+  [id] {
+    scroll-margin-top: 4.5rem;
+  }
   .dark body {
     color-scheme: dark;
   }
@@ -128,6 +132,12 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+
+  /* One left-aligned content container shared by the app shell: the top
+     bar, page headers and every view body align to the same edges. */
+  .app-shell .container {
+    @apply mx-0 w-full max-w-[1400px] px-6;
   }
 
   /* Consistent surfaces across the app. Elevation = border + bg shift. */
