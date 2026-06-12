@@ -27,6 +27,8 @@ const routes: RouteRecordRaw[] = [
       // Profiles for RO-Crate metadata schemas
       { path: 'profiles', name: 'profiles', component: () => import('@/views/ProfilesView.vue') },
       { path: 'profiles/:profileId', name: 'profile-detail', component: () => import('@/views/ProfilesView.vue') },
+      // Groups — dedicated management page
+      { path: 'groups/:id?', name: 'groups', component: () => import('@/views/GroupsView.vue') },
       // Settings (consolidates account preferences, members, tokens)
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
       // Compatibility redirects from prior IA
@@ -34,8 +36,6 @@ const routes: RouteRecordRaw[] = [
       { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },
       { path: 'query', redirect: { name: 'search' } },
       { path: 'nodes', redirect: { name: 'settings' } },
-      { path: 'groups', redirect: { name: 'settings' } },
-      { path: 'groups/:id', redirect: { name: 'settings' } },
       { path: 'realm', redirect: { name: 'settings' } },
     ],
   },

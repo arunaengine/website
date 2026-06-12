@@ -60,8 +60,8 @@ const results = computed(() => {
         badge: 'group',
         title: group.name,
         subtitle: group.description || group.id,
-        routeName: 'settings',
-        routeParams: {},
+        routeName: 'groups',
+        routeParams: { id: group.id },
       })),
   ].slice(0, 8)
 })
