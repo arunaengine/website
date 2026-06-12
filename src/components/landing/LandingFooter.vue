@@ -9,9 +9,9 @@ import { Github, BookOpen, Link as LinkIcon } from 'lucide-vue-next'
       <div class="md:col-span-2">
         <AppLogo :size="24" subtitle="the data orchestration engine" />
         <p class="mt-4 max-w-sm text-sm text-muted-foreground">
-          Aruna is a federated data management system. Each organization runs
-          its own node, keeps authority over its data and joins a realm to
-          share metadata and data with partners.
+          Federated data management for research. Each organization runs its
+          own node, keeps authority over its data and shares through the
+          realm.
         </p>
       </div>
       <div>

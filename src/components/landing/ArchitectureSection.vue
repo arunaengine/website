@@ -10,7 +10,7 @@ import { Hash, FileJson2, Database, Share2, Layers } from 'lucide-vue-next'
       <SectionHeader
         eyebrow="Architecture"
         title="How a realm is put together."
-        description="A realm is a set of nodes run by cooperating organizations. Each node stores objects, serves metadata and replicates documents to its peers, so the catalog stays available without a central server."
+        description="Cooperating organizations each run a node. Nodes replicate metadata to their peers, so the catalog needs no central server."
       />
 
       <div class="grid gap-10 lg:grid-cols-[1fr_1.1fr]">

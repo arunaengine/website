@@ -24,9 +24,8 @@ import { RouterLink } from 'vue-router'
               Run a node. Join a realm. Keep your data where it is.
             </h2>
             <p class="mt-4 max-w-xl text-sm text-white/75 md:text-base">
-              An Aruna node is a single binary plus your own OIDC provider. It
-              serves the S3 API, the REST API and this portal, and it
-              replicates metadata with the other nodes in its realm.
+              A single binary plus your own OIDC provider. That is the whole
+              deployment.
             </p>
           </div>
           <div class="flex flex-wrap gap-3 lg:justify-end">
