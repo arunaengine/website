@@ -13,7 +13,7 @@ const style = computed(() => {
   switch (props.access) {
     case 'admin':
     case 'realm-admin':
-      return 'bg-aruna-navy text-white border-aruna-navy dark:bg-white dark:text-aruna-navy dark:border-white'
+      return 'bg-aruna-navy/10 text-aruna-navy border-aruna-navy/25 dark:bg-aruna-aqua/10 dark:text-aruna-aqua dark:border-aruna-aqua/30'
     case 'realm-operator':
       return 'bg-aruna-royal/10 text-aruna-royal border-aruna-royal/30'
     case 'user':

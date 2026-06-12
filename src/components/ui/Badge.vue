@@ -24,7 +24,7 @@ const badgeVariants = cva(
           'border-transparent bg-aruna-aqua/15 text-aruna-navy ring-1 ring-inset ring-aruna-aqua/40 dark:text-aruna-aqua dark:ring-aruna-aqua/25',
         royal:
           'border-transparent bg-aruna-royal/10 text-aruna-royal ring-1 ring-inset ring-aruna-royal/25 dark:bg-aruna-royal/20 dark:text-aruna-aqua dark:ring-aruna-royal/35',
-        sky: 'border-transparent bg-aruna-sky/10 text-aruna-sky ring-1 ring-inset ring-aruna-sky/25 dark:bg-aruna-sky/15 dark:text-aruna-aqua dark:ring-aruna-sky/25',
+        sky: 'border-transparent bg-aruna-sky/10 text-sky-700 ring-1 ring-inset ring-aruna-sky/25 dark:bg-aruna-sky/15 dark:text-aruna-aqua dark:ring-aruna-sky/25',
       },
     },
     defaultVariants: { variant: 'default' },
