@@ -68,7 +68,10 @@ export interface InfoResponse {
     peer_id: string
     capabilities: string
   }
+  api_version?: string
+  portal?: PortalStatus | null
   my_addresses: string[]
+  connections?: unknown
   services: {
     interfaces: InterfaceServicesStatus
     database?: { status: string }
@@ -76,6 +79,12 @@ export interface InfoResponse {
     blob?: { status: string }
   }
   warnings: string[]
+}
+
+export interface PortalStatus {
+  installed: boolean
+  version?: string | null
+  source?: string | null
 }
 
 export interface InterfaceServicesStatus {
@@ -106,7 +115,7 @@ export interface RealmInfoResponse {
 
 export interface RealmNodeInfo {
   node_id: string
-  kind: 'management' | 'server' | 'local'
+  kind: 'management' | 'server' | 'local' | 'user'
   configured: boolean
   present: boolean
   connection_status: 'connected' | 'configured'
