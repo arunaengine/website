@@ -169,13 +169,6 @@
     @apply font-mono text-[11px] tracking-tight text-muted-foreground;
   }
 
-  .dark .text-aruna-navy {
-    color: hsl(var(--foreground));
-  }
-  .dark .text-aruna-royal {
-    color: hsl(var(--primary));
-  }
-
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--input)) transparent;
@@ -230,4 +223,14 @@
       linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
   }
+}
+
+/* Remap brand text onto dark surfaces. Kept outside the Tailwind layers and
+   at zero extra specificity so an explicit dark:text-* utility always wins —
+   the old in-layer rule hijacked dark:text-aruna-navy into white-on-white. */
+.dark :where(.text-aruna-navy) {
+  color: hsl(var(--foreground));
+}
+.dark :where(.text-aruna-royal) {
+  color: hsl(var(--primary));
 }

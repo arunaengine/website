@@ -19,10 +19,10 @@ const routes: RouteRecordRaw[] = [
       // Buckets — primary research surface (formerly "Data manager")
       { path: 'buckets', name: 'buckets', component: () => import('@/views/DataManagerView.vue') },
       { path: 'buckets/:bucketId', name: 'bucket', component: () => import('@/views/DataManagerView.vue') },
-      // Search — card-based by default, SPARQL in expert mode
+      // Discover — the metadata catalog plus search, SPARQL in expert mode
       { path: 'search', name: 'search', component: () => import('@/views/SearchView.vue') },
-      // Metadata catalog
-      { path: 'metadata', name: 'metadata', component: () => import('@/views/MetadataView.vue') },
+      // The old catalog listing merged into Discover; detail pages stay here
+      { path: 'metadata', name: 'metadata', redirect: { name: 'search' } },
       { path: 'metadata/:id', name: 'metadata-detail', component: () => import('@/views/MetadataView.vue') },
       // Profiles for RO-Crate metadata schemas
       { path: 'profiles', name: 'profiles', component: () => import('@/views/ProfilesView.vue') },
