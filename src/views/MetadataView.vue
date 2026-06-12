@@ -6,19 +6,20 @@ import Pagination from '@/components/ui/Pagination.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { useAruna } from '@/composables/useAruna'
+import { CrateNotReadyError, useAruna } from '@/composables/useAruna'
 import { relativeTime } from '@/lib/utils'
 import { Search, ArrowLeft, ListChecks, Plus, Code2, Star, FileJson2, ExternalLink } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
-const { metadata, profiles, currentUser, loadRoCrate, fullCrates } = useAruna()
+const { metadata, profiles, currentUser, loadRoCrate, fullCrates, cratePending } = useAruna()
 
 const q = ref('')
 const profileFilter = ref<string | null>(null)
 const showCrate = ref(false)
 const showNewDataset = ref(false)
 const loadingCrate = ref(false)
+const crateNotReady = ref(false)
 const crateError = ref<string | null>(null)
 
 const detailId = computed(() => (route.params.id as string) || '')
@@ -42,23 +43,53 @@ watch([q, profileFilter], () => {
 })
 const paged = computed(() => filtered.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
 
+let crateFetchToken = 0
+
+async function fetchCrate(id: string) {
+  const token = ++crateFetchToken
+  crateError.value = null
+  crateNotReady.value = false
+  loadingCrate.value = true
+  try {
+    await loadRoCrate(id)
+  } catch (err) {
+    if (token !== crateFetchToken) return
+    if (err instanceof CrateNotReadyError) crateNotReady.value = true
+    else crateError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    if (token === crateFetchToken) loadingCrate.value = false
+  }
+}
+
 watch(
   detailId,
   async (id) => {
     showCrate.value = false
     crateError.value = null
+    crateNotReady.value = false
     if (!id) return
-    loadingCrate.value = true
-    try {
-      await loadRoCrate(id)
-    } catch (err) {
-      crateError.value = err instanceof Error ? err.message : String(err)
-    } finally {
-      loadingCrate.value = false
-    }
+    await fetchCrate(id)
   },
   { immediate: true },
 )
+
+const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
+  const crate = fullCrates.value[detailId.value] ?? current.value?.roCrate
+  if (!crate || typeof crate !== 'object') return []
+  const graphValue = (crate as Record<string, unknown>)['@graph']
+  if (!Array.isArray(graphValue)) return []
+  return graphValue
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === 'object' && !Array.isArray(entry)))
+    .filter((entry) => {
+      const type = entry['@type']
+      return type === 'File' || (Array.isArray(type) && type.includes('File'))
+    })
+    .map((entry) => {
+      const id = typeof entry['@id'] === 'string' ? entry['@id'] : ''
+      return { id, name: typeof entry.name === 'string' && entry.name ? entry.name : id }
+    })
+    .filter((file) => file.id)
+})
 
 function open(id: string) {
   router.push({ name: 'metadata-detail', params: { id } })
@@ -169,14 +200,26 @@ function isFavourite(id: string) {
             <span class="inline-flex items-center gap-2"><Code2 class="h-3.5 w-3.5 text-muted-foreground" /> RO-Crate JSON-LD</span>
             <span class="text-xs text-muted-foreground">{{ showCrate ? 'hide' : 'show' }}</span>
           </button>
-          <div v-if="loadingCrate" class="mt-3 text-xs text-muted-foreground">Loading full RO-Crate…</div>
+          <div v-if="loadingCrate && cratePending[current.ulid]" class="mt-3 text-xs text-muted-foreground">Preparing the crate…</div>
+          <div v-else-if="loadingCrate" class="mt-3 text-xs text-muted-foreground">Loading full RO-Crate…</div>
+          <div v-if="crateNotReady" class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+            <span>The crate is still being prepared.</span>
+            <Button variant="outline" size="sm" @click="fetchCrate(current.ulid)">Retry</Button>
+          </div>
           <div v-if="crateError" class="mt-3 text-xs text-destructive">{{ crateError }}</div>
           <pre v-if="showCrate" class="mt-3 max-h-[560px] overflow-auto whitespace-pre-wrap rounded-md bg-muted/30 p-4 font-mono text-[11.5px] leading-relaxed text-foreground/85 scrollbar-thin"><code>{{ JSON.stringify(fullCrates[current.ulid] ?? current.roCrate, null, 2) }}</code></pre>
         </section>
 
         <section class="surface p-5 text-xs text-muted-foreground">
           <div class="flex items-center gap-2 font-medium text-foreground"><FileJson2 class="h-4 w-4 text-primary" /> Referenced data</div>
-          <p class="mt-2">Object listing is not shown here because S3 ListObjectsV2 and browser CORS are not implemented yet. No placeholder files are displayed.</p>
+          <ul v-if="referencedFiles.length" class="mt-3 space-y-2">
+            <li v-for="file in referencedFiles" :key="file.id" class="flex flex-wrap items-baseline gap-x-2">
+              <span class="font-medium text-foreground">{{ file.name }}</span>
+              <a v-if="file.id.startsWith('http')" :href="file.id" target="_blank" rel="noopener" class="inline-flex items-center gap-1 break-all font-mono text-[11px] text-primary hover:underline">{{ file.id }} <ExternalLink class="h-3 w-3 shrink-0" /></a>
+              <span v-else class="break-all font-mono text-[11px]">{{ file.id }}</span>
+            </li>
+          </ul>
+          <p v-else class="mt-2">This document does not reference any data files yet.</p>
         </section>
       </template>
     </div>

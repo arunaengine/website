@@ -265,16 +265,26 @@ export interface ListS3CredentialsResponse {
   credentials: S3CredentialSummary[]
 }
 
-export interface CreateMetadataRequest {
+// The backend deserializes CreateMetadataRequest as an untagged enum with
+// deny_unknown_fields, so a request must match exactly one variant shape.
+export interface CreateMetadataScaffoldRequest {
+  group_id: string
+  path: string
+  name: string
+  description: string
+  date_published: string
+  license: string
+  public?: boolean
+}
+
+export interface CreateMetadataRoCrateRequest {
   group_id: string
   path: string
   public?: boolean
-  name?: string
-  description?: string
-  date_published?: string
-  license?: string
-  rocrate?: unknown
+  rocrate: unknown
 }
+
+export type CreateMetadataRequest = CreateMetadataScaffoldRequest | CreateMetadataRoCrateRequest
 
 // The API flattens the summary fields onto the response body
 // (CreateMetadataResponse uses #[serde(flatten)]).
