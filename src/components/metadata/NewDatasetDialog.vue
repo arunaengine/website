@@ -12,8 +12,9 @@ import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Badge from '@/components/ui/Badge.vue'
+import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import { computed, ref, watch } from 'vue'
-import { FileJson2 } from 'lucide-vue-next'
+import { FileJson2, Plus } from 'lucide-vue-next'
 import { useAruna } from '@/composables/useAruna'
 import type { MetadataDoc } from '@/data/types'
 
@@ -38,6 +39,7 @@ const datePublished = ref(new Date().toISOString().slice(0, 10))
 const license = ref('https://creativecommons.org/licenses/by/4.0/')
 const isPublic = ref(false)
 const submitError = ref<string | null>(null)
+const createGroupOpen = ref(false)
 
 const groupOptions = computed(() => groups.value.map((group) => ({ value: group.id, label: group.name })))
 const profileOptions = computed(() => [
@@ -158,8 +160,11 @@ async function submit() {
         <div v-if="!currentUser" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
           Sign in before creating metadata.
         </div>
-        <div v-else-if="!groups.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          You are not a member of any group yet — ask a realm admin to add you to one.
+        <div v-else-if="!groups.length" class="flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          <span>You are not a member of any group yet — datasets belong to a group.</span>
+          <Button variant="outline" size="sm" class="shrink-0" @click="createGroupOpen = true">
+            <Plus class="h-3.5 w-3.5" /> Create a group
+          </Button>
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
@@ -215,6 +220,8 @@ async function submit() {
           {{ saving ? 'Creating…' : 'Create metadata' }}
         </Button>
       </DialogFooter>
+
+      <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (groupId = group.group_id)" />
     </DialogContent>
   </Dialog>
 </template>
