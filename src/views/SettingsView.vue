@@ -7,20 +7,23 @@ import Avatar from '@/components/ui/Avatar.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Separator from '@/components/ui/Separator.vue'
+import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
+import GroupDetail from '@/components/groups/GroupDetail.vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { RouterLink } from 'vue-router'
 import { relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
-import { KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, RefreshCw, Save } from 'lucide-vue-next'
+import { KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from 'lucide-vue-next'
 
 const {
   apiBaseUrl,
   authToken,
   currentUser,
   userInfo,
-  groups,
+  myGroups,
+  discoverableGroups,
   profiles,
   credentials,
   authError,
@@ -84,6 +87,13 @@ const themeOptions: Array<{ id: ThemeMode; title: string; icon: unknown; preview
   { id: 'system', title: 'System', icon: Monitor, preview: 'linear-gradient(90deg, #ffffff 0 50%, #0B0B0E 50% 100%)' },
 ]
 const { mode: appearance, setTheme } = useTheme()
+
+const createGroupOpen = ref(false)
+const selectedGroupId = ref('')
+
+function toggleGroup(groupId: string) {
+  selectedGroupId.value = selectedGroupId.value === groupId ? '' : groupId
+}
 </script>
 
 <template>
@@ -189,15 +199,42 @@ const { mode: appearance, setTheme } = useTheme()
         </section>
 
         <section id="groups" class="surface overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-4"><h3 class="font-display text-sm font-semibold text-aruna-navy">Groups &amp; roles</h3><Badge variant="outline">{{ groups.length }} groups</Badge></header>
+          <header class="flex items-center justify-between border-b border-border px-5 py-4">
+            <div class="flex items-center gap-2"><h3 class="font-display text-sm font-semibold text-aruna-navy">Groups &amp; roles</h3><Badge variant="outline" class="tabular-nums">{{ myGroups.length }} groups</Badge></div>
+            <Button size="sm" :disabled="!currentUser" @click="createGroupOpen = true"><Plus class="h-3.5 w-3.5" /> Create group</Button>
+          </header>
           <ul class="divide-y divide-border">
-            <li v-for="group in groups" :key="group.id" class="flex items-center gap-3 px-5 py-3">
-              <span class="h-2 w-2 rounded-full bg-primary" />
-              <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div><div class="truncate text-[11px] text-muted-foreground">{{ group.id }}</div></div>
-              <div class="flex flex-wrap justify-end gap-1"><AccessBadge v-for="role in group.tags" :key="role" :access="role" /></div>
+            <li v-for="group in myGroups" :key="group.id">
+              <button type="button" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40" :class="selectedGroupId === group.id ? 'bg-muted/30' : ''" @click="toggleGroup(group.id)">
+                <span class="h-2 w-2 shrink-0 rounded-full bg-primary" />
+                <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div><div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div></div>
+                <Badge v-if="group.memberCount !== undefined" variant="outline" class="shrink-0 tabular-nums">{{ group.memberCount }} {{ group.memberCount === 1 ? 'member' : 'members' }}</Badge>
+                <div class="flex flex-wrap justify-end gap-1"><AccessBadge v-for="role in group.tags" :key="role" :access="role" /></div>
+              </button>
+              <div v-if="selectedGroupId === group.id" class="border-t border-border bg-muted/10 p-4">
+                <GroupDetail :group-id="group.id" @left="selectedGroupId = ''" />
+              </div>
             </li>
-            <li v-if="!groups.length" class="px-5 py-6 text-center text-xs text-muted-foreground">No authenticated group memberships loaded.</li>
+            <li v-if="!myGroups.length" class="px-5 py-6 text-center text-xs text-muted-foreground">
+              You are not a member of any group yet — create one to get started.
+            </li>
           </ul>
+          <div v-if="discoverableGroups.length" class="border-t border-border">
+            <div class="px-5 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Other groups in this realm</div>
+            <ul class="divide-y divide-border">
+              <li v-for="group in discoverableGroups" :key="group.id">
+                <button type="button" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40" :class="selectedGroupId === group.id ? 'bg-muted/30' : ''" @click="toggleGroup(group.id)">
+                  <span class="h-2 w-2 shrink-0 rounded-full bg-border" />
+                  <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div><div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div></div>
+                  <span class="shrink-0 text-[11px] text-muted-foreground">Membership is managed by the group's admins.</span>
+                </button>
+                <div v-if="selectedGroupId === group.id" class="border-t border-border bg-muted/10 p-4">
+                  <GroupDetail :group-id="group.id" />
+                </div>
+              </li>
+            </ul>
+          </div>
+          <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (selectedGroupId = group.group_id)" />
         </section>
 
         <section id="credentials" class="surface overflow-hidden">
