@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tsbuildinfo
+aruna-portal-dist-*.tar.gz
+.env
+.claude/settings.local.json

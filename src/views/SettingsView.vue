@@ -1,0 +1,225 @@
+<script setup lang="ts">
+import PageHeader from '@/components/dashboard/PageHeader.vue'
+import Button from '@/components/ui/Button.vue'
+import Badge from '@/components/ui/Badge.vue'
+import Input from '@/components/ui/Input.vue'
+import Avatar from '@/components/ui/Avatar.vue'
+import AccessBadge from '@/components/ui/AccessBadge.vue'
+import Switch from '@/components/ui/Switch.vue'
+import Separator from '@/components/ui/Separator.vue'
+import { useTheme, type ThemeMode } from '@/composables/useTheme'
+import { useAruna } from '@/composables/useAruna'
+import { useAuth } from '@/composables/useAuth'
+import { RouterLink } from 'vue-router'
+import { relativeTime } from '@/lib/utils'
+import { computed, ref, watch } from 'vue'
+import { KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, RefreshCw, Save } from 'lucide-vue-next'
+
+const {
+  apiBaseUrl,
+  authToken,
+  currentUser,
+  userInfo,
+  groups,
+  profiles,
+  credentials,
+  authError,
+  saving,
+  refresh,
+  setAuthToken,
+  setApiBaseUrl,
+  updateUserProfile,
+} = useAruna()
+const { signIn, signOut, isAuthenticated, stage, stageError } = useAuth()
+
+const apiBaseDraft = ref(apiBaseUrl.value)
+const tokenDraft = ref(authToken.value)
+watch(authToken, (token) => (tokenDraft.value = token))
+const onboardingSecret = ref('')
+const signingIn = computed(() => stage.value === 'redirecting')
+
+function startSignIn() {
+  void signIn({ onboardingSecret: onboardingSecret.value, redirectTo: '/app/settings' })
+}
+const name = ref('')
+const email = ref('')
+const affiliation = ref('')
+const orcid = ref('')
+const preferredProfileId = ref('')
+const profileMessage = ref<string | null>(null)
+
+watch(currentUser, (user) => {
+  name.value = user?.name ?? ''
+  email.value = user?.email ?? ''
+  affiliation.value = user?.affiliation ?? ''
+  orcid.value = user?.orcid ?? ''
+  preferredProfileId.value = user?.preferredProfileId ?? ''
+}, { immediate: true })
+
+const preferredProfile = computed(() => profiles.value.find((profile) => profile.id === preferredProfileId.value))
+
+function saveConnection() {
+  setApiBaseUrl(apiBaseDraft.value)
+  setAuthToken(tokenDraft.value)
+  void refresh()
+}
+
+async function saveProfile() {
+  profileMessage.value = null
+  await updateUserProfile({
+    name: name.value,
+    set_attributes: {
+      email: email.value,
+      affiliation: affiliation.value,
+      orcid: orcid.value,
+      ...(preferredProfileId.value ? { 'ui.preferred_profile_path': `profiles/${preferredProfileId.value}` } : {}),
+    },
+  })
+  profileMessage.value = 'Saved to /users/info.'
+}
+
+const themeOptions: Array<{ id: ThemeMode; title: string; icon: unknown; preview: string }> = [
+  { id: 'light', title: 'Light', icon: Sun, preview: 'linear-gradient(135deg, #ffffff 0%, #edf6ff 100%)' },
+  { id: 'dark', title: 'Dark', icon: Moon, preview: 'linear-gradient(135deg, #0B0B0E 0%, #16161A 55%, #335DC6 130%)' },
+  { id: 'system', title: 'System', icon: Monitor, preview: 'linear-gradient(90deg, #ffffff 0 50%, #0B0B0E 50% 100%)' },
+]
+const { mode: appearance, setTheme } = useTheme()
+</script>
+
+<template>
+  <div>
+    <PageHeader title="Settings" description="API connection, current user, profiles, groups and credentials from the local Aruna API.">
+      <template #actions>
+        <Button variant="outline" @click="refresh"><RefreshCw class="h-4 w-4" /> Refresh</Button>
+        <Button :disabled="!currentUser || saving" @click="saveProfile"><Save class="h-4 w-4" /> Save profile</Button>
+      </template>
+    </PageHeader>
+
+    <div class="container grid max-w-[1400px] gap-6 py-8 lg:grid-cols-[260px_1fr]">
+      <nav class="flex flex-col gap-1 text-sm">
+        <a href="#connection" class="rounded-md px-3 py-2 font-medium text-primary bg-primary/5">API connection</a>
+        <a href="#profile" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Profile</a>
+        <a href="#default-profile" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Default profile</a>
+        <a href="#groups" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Groups &amp; roles</a>
+        <a href="#credentials" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">S3 credentials</a>
+        <a href="#appearance" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Appearance</a>
+      </nav>
+
+      <div class="space-y-6">
+        <section id="connection" class="surface">
+          <header class="border-b border-border px-5 py-4">
+            <h3 class="font-display text-sm font-semibold text-aruna-navy">Session &amp; API connection</h3>
+            <p class="text-xs text-muted-foreground">Sign-in is handled by the realm's identity provider; the issued Aruna token authenticates this browser.</p>
+          </header>
+          <div class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+            <div class="text-sm">
+              <div class="font-medium text-foreground">{{ isAuthenticated ? `Signed in as ${currentUser?.name}` : 'Not signed in' }}</div>
+              <div class="text-xs text-muted-foreground">{{ isAuthenticated ? 'Authenticated endpoints are available.' : 'Public endpoints only — sign in to manage data.' }}</div>
+            </div>
+            <Button v-if="isAuthenticated" variant="outline" size="sm" @click="signOut"><LogOut class="h-3.5 w-3.5" /> Sign out</Button>
+            <Button v-else size="sm" :disabled="signingIn" @click="startSignIn"><LogIn class="h-3.5 w-3.5" /> Sign in</Button>
+          </div>
+          <div v-if="!isAuthenticated" class="grid gap-5 border-b border-border p-5 md:grid-cols-2">
+            <div>
+              <label class="text-xs font-medium text-foreground">Onboarding secret (first admin, optional)</label>
+              <Input v-model="onboardingSecret" class="mt-1" type="password" placeholder="Paste onboarding secret" />
+              <p class="mt-1 text-[11px] text-muted-foreground">Only for the first user on a fresh node — claims the realm admin role. Applied on the next sign-in.</p>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Existing API token (advanced)</label>
+              <Input v-model="tokenDraft" class="mt-1" type="password" placeholder="Paste Aruna token" />
+              <p class="mt-1 text-[11px] text-muted-foreground">Skip single sign-on and authenticate with a previously issued token, then Apply connection.</p>
+            </div>
+          </div>
+          <div class="grid gap-5 p-5 md:grid-cols-2">
+            <div>
+              <label class="text-xs font-medium text-foreground">API base URL</label>
+              <Input v-model="apiBaseDraft" class="mt-1" placeholder="/api/v1" />
+              <p class="mt-1 text-[11px] text-muted-foreground">Vite proxies /api to the local Aruna node during development.</p>
+            </div>
+            <div v-if="isAuthenticated">
+              <label class="text-xs font-medium text-foreground">Bearer token (advanced)</label>
+              <Input v-model="tokenDraft" class="mt-1" type="password" placeholder="Paste Aruna token" />
+              <p class="mt-1 text-[11px] text-muted-foreground">Filled automatically by sign-in; paste a token here to authenticate manually.</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+            <div class="text-xs" :class="authError || stageError ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'">
+              {{ stageError || authError || '' }}
+            </div>
+            <Button size="sm" variant="outline" @click="saveConnection">Apply connection</Button>
+          </div>
+        </section>
+
+        <section id="profile" class="surface">
+          <header class="border-b border-border px-5 py-4">
+            <h3 class="font-display text-sm font-semibold text-aruna-navy">Profile</h3>
+            <p class="text-xs text-muted-foreground">Loaded from /users/info and saved with PATCH /users/info.</p>
+          </header>
+          <div v-if="currentUser" class="flex items-center gap-4 border-b border-border px-5 py-5">
+            <Avatar :user="currentUser" size="lg" />
+            <div>
+              <div class="font-medium text-foreground">{{ currentUser.name }}</div>
+              <div class="text-[11px] text-muted-foreground">{{ userInfo?.user.user_id }}</div>
+            </div>
+          </div>
+          <div v-else class="border-b border-border px-5 py-5 text-sm text-muted-foreground">No authenticated user loaded.</div>
+          <div class="grid gap-5 p-5 md:grid-cols-2">
+            <div><label class="text-xs font-medium text-foreground">Full name</label><Input v-model="name" class="mt-1" /></div>
+            <div><label class="text-xs font-medium text-foreground">Email</label><Input v-model="email" class="mt-1" /></div>
+            <div><label class="text-xs font-medium text-foreground">Affiliation</label><Input v-model="affiliation" class="mt-1" /></div>
+            <div><label class="text-xs font-medium text-foreground">ORCID</label><Input v-model="orcid" placeholder="0000-0000-0000-0000" class="mt-1" /></div>
+          </div>
+          <div v-if="profileMessage" class="border-t border-border px-5 py-3 text-xs text-emerald-700 dark:text-emerald-300">{{ profileMessage }}</div>
+        </section>
+
+        <section id="default-profile" class="surface">
+          <header class="flex items-center justify-between border-b border-border px-5 py-4">
+            <div class="flex items-center gap-2"><ListChecks class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Default metadata profile</h3></div>
+            <RouterLink :to="{ name: 'profiles' }"><Button variant="outline" size="sm">Browse profiles <ArrowRight class="h-3.5 w-3.5" /></Button></RouterLink>
+          </header>
+          <div class="grid gap-2 p-5 sm:grid-cols-2">
+            <button v-for="profile in profiles" :key="profile.id" type="button" class="flex items-start gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/40" :class="preferredProfileId === profile.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="preferredProfileId = profile.id">
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" :style="{ backgroundColor: profile.iconColor }"><ListChecks class="h-4 w-4" /></span>
+              <div class="min-w-0 flex-1"><div class="flex items-center gap-2"><span class="text-sm font-medium text-foreground">{{ profile.name }}</span><Badge v-if="preferredProfileId === profile.id" variant="accent" class="text-[10px] uppercase">default</Badge></div><p class="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{{ profile.description }}</p></div>
+            </button>
+            <div v-if="!profiles.length" class="text-sm text-muted-foreground">No visible profile documents.</div>
+          </div>
+          <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span></div>
+        </section>
+
+        <section id="groups" class="surface overflow-hidden">
+          <header class="flex items-center justify-between border-b border-border px-5 py-4"><h3 class="font-display text-sm font-semibold text-aruna-navy">Groups &amp; roles</h3><Badge variant="outline">{{ groups.length }} groups</Badge></header>
+          <ul class="divide-y divide-border">
+            <li v-for="group in groups" :key="group.id" class="flex items-center gap-3 px-5 py-3">
+              <span class="h-2 w-2 rounded-full bg-primary" />
+              <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div><div class="truncate text-[11px] text-muted-foreground">{{ group.id }}</div></div>
+              <div class="flex flex-wrap justify-end gap-1"><AccessBadge v-for="role in group.tags" :key="role" :access="role" /></div>
+            </li>
+            <li v-if="!groups.length" class="px-5 py-6 text-center text-xs text-muted-foreground">No authenticated group memberships loaded.</li>
+          </ul>
+        </section>
+
+        <section id="credentials" class="surface overflow-hidden">
+          <header class="flex items-center justify-between border-b border-border px-5 py-4"><div class="flex items-center gap-2"><KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 credentials</h3><Badge variant="outline">{{ credentials.length }}</Badge></div></header>
+          <table class="w-full text-sm">
+            <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th></tr></thead>
+            <tbody>
+              <tr v-for="credential in credentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground">{{ credential.group_id }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px] text-muted-foreground">{{ relativeTime(credential.expires_at) }}</td></tr>
+              <tr v-if="!credentials.length"><td colspan="4" class="px-5 py-6 text-center text-xs text-muted-foreground">No S3 credentials for the authenticated user.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="appearance" class="surface">
+          <header class="flex items-center justify-between border-b border-border px-5 py-4"><div class="flex items-center gap-2"><Palette class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Appearance</h3></div></header>
+          <div class="grid gap-3 p-5 md:grid-cols-3">
+            <button v-for="option in themeOptions" :key="option.id" class="flex items-center gap-3 rounded-lg border border-border bg-background/70 p-3 text-left transition-colors hover:border-primary/40" :class="appearance === option.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="setTheme(option.id)"><span class="grid h-12 w-16 shrink-0 place-items-center rounded-md border border-border shadow-inner" :style="{ background: option.preview }"><component :is="option.icon" class="h-4 w-4 text-primary" /></span><div><div class="text-sm font-medium text-foreground">{{ option.title }}</div></div></button>
+          </div>
+          <Separator />
+          <div class="flex items-center justify-between gap-3 p-5"><div class="flex items-center gap-2"><ShieldCheck class="h-4 w-4 text-primary" /><div><div class="text-sm font-medium text-foreground">Hide sensitive hashes by default</div><div class="text-xs text-muted-foreground">Hash display controls are local UI-only preferences.</div></div></div><Switch :checked="true" /></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</template>
