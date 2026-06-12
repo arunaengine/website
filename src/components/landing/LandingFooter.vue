@@ -9,9 +9,9 @@ import { Github, BookOpen, Link as LinkIcon } from 'lucide-vue-next'
       <div class="md:col-span-2">
         <AppLogo :size="24" subtitle="the data orchestration engine" />
         <p class="mt-4 max-w-sm text-sm text-muted-foreground">
-          Aruna federated data portal — a coherent workspace for scientific data
-          across federated storage nodes. Built on the Aruna data orchestration
-          engine.
+          Aruna is a federated data management system. Each organization runs
+          its own node, keeps authority over its data and joins a realm to
+          share metadata and data with partners.
         </p>
       </div>
       <div>
@@ -40,9 +40,8 @@ import { Github, BookOpen, Link as LinkIcon } from 'lucide-vue-next'
               <Github class="h-3 w-3" /> Aruna engine (Rust)
             </a>
           </li>
-          <li><a href="#" class="hover:text-foreground">RO-Crate profile</a></li>
+          <li><a href="#" class="hover:text-foreground">RO-Crate profiles</a></li>
           <li><a href="#" class="hover:text-foreground">API reference</a></li>
-          <li><a href="#" class="hover:text-foreground">Status page</a></li>
         </ul>
       </div>
     </div>
@@ -51,8 +50,7 @@ import { Github, BookOpen, Link as LinkIcon } from 'lucide-vue-next'
         class="container flex flex-col items-start justify-between gap-3 py-5 text-xs text-muted-foreground md:flex-row md:items-center"
       >
         <div>
-          © 2026 Aruna Federation · the federated data portal, powered by the
-          Aruna data orchestration engine
+          © 2026 the Aruna project · Apache 2.0 and MIT licensed
         </div>
         <div class="flex items-center gap-3">
           <a href="#" class="hover:text-foreground"><Github class="h-4 w-4" /></a>

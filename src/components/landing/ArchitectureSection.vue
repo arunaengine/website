@@ -9,8 +9,8 @@ import { Hash, FileJson2, Database, Share2, Layers } from 'lucide-vue-next'
     <div class="container max-w-6xl">
       <SectionHeader
         eyebrow="Architecture"
-        title="Three primitives. One addressable fabric."
-        description="The portal composes objects, metadata and buckets into a content-addressed graph. The federation speaks manifests, not pathnames — so every node can mount any slice of it."
+        title="How a realm is put together."
+        description="A realm is a set of nodes run by cooperating organizations. Each node stores objects, serves metadata and replicates documents to its peers, so the catalog stays available without a central server."
       />
 
       <div class="grid gap-10 lg:grid-cols-[1fr_1.1fr]">
@@ -21,12 +21,12 @@ import { Hash, FileJson2, Database, Share2, Layers } from 'lucide-vue-next'
             </div>
             <div>
               <dt class="font-display text-base font-semibold text-aruna-navy">
-                blake3 objects
+                Content-addressed objects
               </dt>
               <dd class="mt-1 text-sm text-muted-foreground">
-                Every byte stored in Aruna gets a blake3 fingerprint. Duplicates
-                collapse; moves never invalidate a reference. Objects are
-                verifiable end-to-end.
+                Files are stored as immutable blobs identified by their BLAKE3
+                hash. Identical content is stored once, and transfers between
+                nodes are verified against the hash as they stream.
               </dd>
             </div>
           </div>
@@ -36,12 +36,12 @@ import { Hash, FileJson2, Database, Share2, Layers } from 'lucide-vue-next'
             </div>
             <div>
               <dt class="font-display text-base font-semibold text-aruna-navy">
-                RO-Crate metadata, version-vector history
+                RO-Crate metadata with history
               </dt>
               <dd class="mt-1 text-sm text-muted-foreground">
-                Every dataset is a Meta Resource with a stable document ULID,
-                a current serialized version vector and an append-only history
-                log.
+                Each dataset has a metadata document identified by a stable
+                ULID. Changes are recorded as ordered events, which gives every
+                document an append-only audit log.
               </dd>
             </div>
           </div>
@@ -51,12 +51,12 @@ import { Hash, FileJson2, Database, Share2, Layers } from 'lucide-vue-next'
             </div>
             <div>
               <dt class="font-display text-base font-semibold text-aruna-navy">
-                Buckets: local, virtual, staged, replica
+                Buckets as virtual collections
               </dt>
               <dd class="mt-1 text-sm text-muted-foreground">
-                Local buckets hold the truth. Staging buckets protect drafts.
-                Virtual buckets compose slices from across the realm. Replica
-                buckets power hot and warm tiers.
+                A bucket can mix local objects, replicated copies and
+                references to objects on other nodes. Through the S3 API it
+                looks like one ordinary bucket.
               </dd>
             </div>
           </div>
@@ -69,9 +69,9 @@ import { Hash, FileJson2, Database, Share2, Layers } from 'lucide-vue-next'
                 Realms and groups on top
               </dt>
               <dd class="mt-1 text-sm text-muted-foreground">
-                The portal wraps the storage graph with governance: realms
-                bundle nodes and shared quotas, groups bundle users and
-                permissions, and every bucket carries an explicit ACL.
+                A realm is the trust boundary that nodes join. Within it,
+                groups hold users and roles, and roles grant permissions on
+                paths. Trust between organizations never implies access.
               </dd>
             </div>
           </div>
@@ -92,25 +92,34 @@ import { Hash, FileJson2, Database, Share2, Layers } from 'lucide-vue-next'
   "@context": "https://w3id.org/ro/crate/1.2/context",
   "@graph": [
     {
-      "@id": "aruna:01HK9TXJ5Q9WAH…ZPQ",
+      "@id": "ro-crate-metadata.json",
+      "@type": "CreativeWork",
+      "conformsTo": { "@id": "https://w3id.org/ro/crate/1.2" },
+      "about": { "@id": "./" }
+    },
+    {
+      "@id": "./",
       "@type": "Dataset",
-      "name": "Alpine Basin Reanalysis 1979–2024",
-      "publisher": { "@id": "org:eth-zürich" },
+      "name": "Alpine Basin Reanalysis",
+      "description": "Daily temperature and precipitation fields for the alpine basin study area, 1979 to 2024.",
+      "datePublished": "2026-04-02",
       "license": { "@id": "https://creativecommons.org/licenses/by/4.0/" },
-      "identifier": "document_id:01HK9TXJ5Q9WAH…ZPQ",
-      "aruna:version_vector": "vv:05:d34f8a12b0c9",
-      "keywords": ["climate", "reanalysis", "alps"],
       "hasPart": [
-        { "@id": "blake3:d34f8a12…b0c9" },
-        { "@id": "blake3:a812fb02…e41d" }
+        { "@id": "data/temperature.nc" },
+        { "@id": "data/precipitation.nc" }
       ]
     },
     {
-      "@id": "blake3:d34f8a12…b0c9",
+      "@id": "data/temperature.nc",
       "@type": "File",
-      "contentHash": "blake3:d34f8a12…b0c9",
-      "encodingFormat": "application/x-netcdf",
-      "storedOn": ["node-eth-zurich", "node-dublin-cloud"]
+      "name": "Daily mean temperature",
+      "encodingFormat": "application/x-netcdf"
+    },
+    {
+      "@id": "data/precipitation.nc",
+      "@type": "File",
+      "name": "Daily precipitation totals",
+      "encodingFormat": "application/x-netcdf"
     }
   ]
 }</code></pre>
@@ -122,7 +131,7 @@ import { Hash, FileJson2, Database, Share2, Layers } from 'lucide-vue-next'
               </div>
               <div class="flex items-center gap-2 px-5 py-3">
                 <Layers class="h-3.5 w-3.5 text-primary" />
-                <span class="text-foreground/80">mounted by 2 virtual buckets</span>
+                <span class="text-foreground/80">referenced in 2 buckets</span>
               </div>
             </div>
           </Card>

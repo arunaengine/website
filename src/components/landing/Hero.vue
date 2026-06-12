@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import { ArrowRight, BookOpen } from 'lucide-vue-next'
-import { RouterLink } from 'vue-router'
 import { computed } from 'vue'
 import { useTheme } from '@/composables/useTheme'
 
@@ -23,17 +22,17 @@ const wordmark = computed(() =>
     <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
 
     <div class="container relative max-w-3xl pb-24 pt-20 text-center sm:pt-24">
-      <!-- Brand lockup: wave mark + ARUNA wordmark (image — never typed) -->
+      <!-- Brand lockup: wave mark + ARUNA wordmark (always the image assets, never typed) -->
       <img
         src="/brand/icon-mark.png"
         alt=""
-        class="mx-auto h-16 w-16 select-none sm:h-20 sm:w-20"
+        class="mx-auto h-20 w-20 select-none sm:h-24 sm:w-24"
         draggable="false"
       />
       <img
         :src="wordmark"
         alt="ARUNA"
-        class="mx-auto mt-6 h-8 w-auto select-none sm:h-10"
+        class="mx-auto mt-3 h-8 w-auto select-none sm:h-10"
         draggable="false"
       />
       <p class="tagline mt-3.5 text-xs sm:text-[13px]">
@@ -43,27 +42,27 @@ const wordmark = computed(() =>
       <h1
         class="mt-12 font-display text-3xl font-semibold leading-[1.12] tracking-tight text-aruna-navy sm:text-4xl md:text-[42px]"
       >
-        One place for your
+        Federated storage for
         <span class="text-gradient">research data</span>
         and the metadata that describes it.
       </h1>
 
       <p class="mx-auto mt-5 max-w-xl text-base text-muted-foreground">
-        Buckets for files. Profiles for metadata. A search that finds both. No
-        node management, no replication knobs — Aruna takes care of the
-        plumbing.
+        Each organization runs its own Aruna node with an S3-compatible API.
+        Datasets carry RO-Crate metadata you can query with SPARQL, and nodes
+        in a realm replicate that metadata between each other.
       </p>
 
       <div class="mt-9 flex flex-wrap justify-center gap-3">
-        <RouterLink to="/app">
-          <Button size="lg">
-            Open the portal
-            <ArrowRight class="h-4 w-4" />
-          </Button>
-        </RouterLink>
-        <Button variant="outline" size="lg" as-child>
+        <Button size="lg" as-child>
           <a href="#capabilities">
-            <BookOpen class="h-4 w-4" /> What's inside
+            See what's inside
+            <ArrowRight class="h-4 w-4" />
+          </a>
+        </Button>
+        <Button variant="outline" size="lg" as-child>
+          <a href="#architecture">
+            <BookOpen class="h-4 w-4" /> How it works
           </a>
         </Button>
       </div>
@@ -72,7 +71,7 @@ const wordmark = computed(() =>
         class="mt-12 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground"
       >
         <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        Federated research data, made simple
+        Open source under the Apache 2.0 and MIT licenses
       </div>
     </div>
   </section>

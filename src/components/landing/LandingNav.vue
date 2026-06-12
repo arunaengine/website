@@ -19,8 +19,8 @@ function onSignIn() {
     class="sticky top-0 z-40 w-full border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70"
   >
     <div class="container flex h-14 items-center justify-between gap-6">
-      <RouterLink to="/" class="flex items-center gap-2.5 hover:opacity-90">
-        <AppLogo :size="22" />
+      <RouterLink to="/" class="flex items-center hover:opacity-90">
+        <AppLogo :size="26" />
       </RouterLink>
 
       <nav
@@ -49,11 +49,11 @@ function onSignIn() {
           <Sun v-if="isDark" class="h-4 w-4" />
           <Moon v-else class="h-4 w-4" />
         </Button>
-        <Button v-if="!isAuthenticated" variant="outline" size="sm" @click="onSignIn">
+        <Button v-if="!isAuthenticated" size="sm" @click="onSignIn">
           <LogIn class="h-3.5 w-3.5" />
           Sign in
         </Button>
-        <RouterLink to="/app">
+        <RouterLink v-else to="/app">
           <Button size="sm">
             Open portal
             <ArrowRight class="h-3.5 w-3.5" />
