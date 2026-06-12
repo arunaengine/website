@@ -92,25 +92,34 @@ import { Hash, FileJson2, Database, Share2, Layers } from 'lucide-vue-next'
   "@context": "https://w3id.org/ro/crate/1.2/context",
   "@graph": [
     {
-      "@id": "aruna:01HK9TXJ5Q9WAH…ZPQ",
+      "@id": "ro-crate-metadata.json",
+      "@type": "CreativeWork",
+      "conformsTo": { "@id": "https://w3id.org/ro/crate/1.2" },
+      "about": { "@id": "./" }
+    },
+    {
+      "@id": "./",
       "@type": "Dataset",
-      "name": "Alpine Basin Reanalysis 1979–2024",
-      "publisher": { "@id": "org:eth-zürich" },
+      "name": "Alpine Basin Reanalysis",
+      "description": "Daily temperature and precipitation fields for the alpine basin study area, 1979 to 2024.",
+      "datePublished": "2026-04-02",
       "license": { "@id": "https://creativecommons.org/licenses/by/4.0/" },
-      "identifier": "document_id:01HK9TXJ5Q9WAH…ZPQ",
-      "aruna:version_vector": "vv:05:d34f8a12b0c9",
-      "keywords": ["climate", "reanalysis", "alps"],
       "hasPart": [
-        { "@id": "blake3:d34f8a12…b0c9" },
-        { "@id": "blake3:a812fb02…e41d" }
+        { "@id": "data/temperature.nc" },
+        { "@id": "data/precipitation.nc" }
       ]
     },
     {
-      "@id": "blake3:d34f8a12…b0c9",
+      "@id": "data/temperature.nc",
       "@type": "File",
-      "contentHash": "blake3:d34f8a12…b0c9",
-      "encodingFormat": "application/x-netcdf",
-      "storedOn": ["node-eth-zurich", "node-dublin-cloud"]
+      "name": "Daily mean temperature",
+      "encodingFormat": "application/x-netcdf"
+    },
+    {
+      "@id": "data/precipitation.nc",
+      "@type": "File",
+      "name": "Daily precipitation totals",
+      "encodingFormat": "application/x-netcdf"
     }
   ]
 }</code></pre>
