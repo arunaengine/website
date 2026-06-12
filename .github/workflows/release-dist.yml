@@ -1,0 +1,30 @@
+# Publishes the portal dist tarball the aruna node consumes (pinned via the
+# aruna repo's portal.lock). Triggered by version tags.
+name: release-dist
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: bash scripts/build-dist-tarball.sh
+      - name: Compute artifact checksum
+        run: sha256sum aruna-portal-dist-*.tar.gz | tee dist-sha256.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            aruna-portal-dist-*.tar.gz
+            dist-sha256.txt
+          generate_release_notes: true
