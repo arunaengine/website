@@ -8,10 +8,9 @@ import {
   Boxes,
   ChevronsLeft,
   ChevronsRight,
-  FileJson2,
+  Compass,
   LayoutDashboard,
   ListChecks,
-  Search,
   Settings,
   Users,
 } from 'lucide-vue-next'
@@ -21,13 +20,13 @@ interface NavItem {
   icon: unknown
   label: string
   exact?: boolean
+  match?: string[]
 }
 
 const nav: NavItem[] = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/app/metadata', icon: FileJson2, label: 'Catalog' },
+  { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
   { to: '/app/buckets', icon: Boxes, label: 'Data' },
-  { to: '/app/search', icon: Search, label: 'Search' },
   { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
   { to: '/app/groups', icon: Users, label: 'Groups' },
   { to: '/app/status', icon: Activity, label: 'Status' },
@@ -37,7 +36,8 @@ const nav: NavItem[] = [
 const route = useRoute()
 
 function isActive(item: NavItem): boolean {
-  return item.exact ? route.path === item.to : route.path.startsWith(item.to)
+  if (item.exact) return route.path === item.to
+  return (item.match ?? [item.to]).some((prefix) => route.path.startsWith(prefix))
 }
 
 const COLLAPSE_KEY = 'aruna.sidebarCollapsed'
