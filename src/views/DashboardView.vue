@@ -3,14 +3,15 @@ import Button from '@/components/ui/Button.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
-import { ArrowRight, Boxes, FileJson2, ListChecks, Plus, Activity, Users } from 'lucide-vue-next'
+import StatCard from '@/components/ui/StatCard.vue'
+import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, Plus, Activity, Users } from 'lucide-vue-next'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
-import { relativeTime } from '@/lib/utils'
+import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, nodes, groups, realm, nodeInfo, loading, error, authError, refresh } = useAruna()
+const { currentUser, metadata, profiles, nodes, groups, realm, nodeInfo, usageInfo, loading, error, authError, refresh } = useAruna()
 const showNewDataset = ref(false)
 
 const onlineNodes = computed(() => nodes.value.filter((node) => node.status === 'healthy').length)
@@ -51,7 +52,7 @@ const pageTitle = computed(() =>
 )
 const pageDescription = computed(() =>
   currentUser.value
-    ? 'Live data from the local Aruna API. No demo records are shown.'
+    ? 'Live data from the local Aruna API.'
     : 'You are browsing public data as a guest. Sign in to create datasets and manage your groups.',
 )
 </script>
@@ -91,6 +92,26 @@ const pageDescription = computed(() =>
             <div class="mt-0.5 truncate text-[11px] text-muted-foreground">{{ stat.label }}</div>
           </div>
         </div>
+      </section>
+
+      <section v-if="usageInfo" class="grid gap-3.5 sm:grid-cols-3">
+        <StatCard
+          label="Objects"
+          :value="formatNumber(usageInfo.objects)"
+          :icon="Files"
+          :hint="`${formatNumber(usageInfo.stored_blobs)} stored blobs`"
+        />
+        <StatCard
+          label="Stored data"
+          :value="formatBytes(usageInfo.stored_bytes)"
+          :icon="Database"
+          hint="Aggregate blob storage on this node"
+        />
+        <StatCard
+          label="Buckets"
+          :value="formatNumber(usageInfo.buckets)"
+          :icon="FolderOpen"
+        />
       </section>
 
       <section class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">

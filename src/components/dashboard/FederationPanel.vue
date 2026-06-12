@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import type { Node } from '@/data/types'
 
 const props = defineProps<{
@@ -8,6 +8,12 @@ const props = defineProps<{
   /** peer id of the node this portal is connected to */
   primaryId?: string
 }>()
+
+const router = useRouter()
+
+function openNode(id: string) {
+  void router.push({ name: 'status', query: { node: id } })
+}
 
 /* SVG viewport — everything below lives in this coordinate system. */
 const VW = 600
@@ -38,41 +44,29 @@ const placed = computed<PlacedNode[]>(() =>
   })),
 )
 
-/* All pairwise connections, trimmed so lines terminate at the node rings. */
+/* Only connections the realm actually reports: local node to present peers,
+   trimmed so lines terminate at the node rings. */
 const edges = computed(() => {
   const list = placed.value
-  const out: Array<{
-    x1: number
-    y1: number
-    x2: number
-    y2: number
-    active: boolean
-    syncing: boolean
-  }> = []
-  for (let i = 0; i < list.length; i++) {
-    for (let j = i + 1; j < list.length; j++) {
-      const a = list[i]
-      const b = list[j]
-      const dx = b.cx - a.cx
-      const dy = b.cy - a.cy
+  const local = list.find((node) => node.primary)
+  if (!local) return []
+  return list
+    .filter((node) => node.id !== local.id && node.status !== 'offline')
+    .map((node) => {
+      const dx = node.cx - local.cx
+      const dy = node.cy - local.cy
       const len = Math.hypot(dx, dy) || 1
       const ux = dx / len
       const uy = dy / len
-      out.push({
-        x1: a.cx + ux * TRIM,
-        y1: a.cy + uy * TRIM,
-        x2: b.cx - ux * TRIM,
-        y2: b.cy - uy * TRIM,
-        active: a.status !== 'offline' && b.status !== 'offline',
-        syncing:
-          a.status === 'syncing' ||
-          b.status === 'syncing' ||
-          a.status === 'degraded' ||
-          b.status === 'degraded',
-      })
-    }
-  }
-  return out
+      return {
+        id: node.id,
+        x1: local.cx + ux * TRIM,
+        y1: local.cy + uy * TRIM,
+        x2: node.cx - ux * TRIM,
+        y2: node.cy - uy * TRIM,
+        syncing: node.status === 'syncing' || node.status === 'degraded',
+      }
+    })
 })
 
 function statusColor(status: Node['status']): string {
@@ -164,33 +158,42 @@ const statusLabel: Record<Node['status'], string> = {
             />
 
             <!-- Edges first so nodes sit on top -->
-            <g v-for="(e, i) in edges" :key="i">
+            <g v-for="e in edges" :key="e.id">
               <line
                 :x1="e.x1"
                 :y1="e.y1"
                 :x2="e.x2"
                 :y2="e.y2"
                 :stroke="e.syncing ? '#fbbf24' : '#4E86D7'"
-                :stroke-opacity="e.active ? 0.45 : 0.18"
+                stroke-opacity="0.45"
                 stroke-width="1.5"
                 stroke-linecap="round"
               />
               <line
-                v-if="e.active"
+                class="fed-flow"
                 :x1="e.x1"
                 :y1="e.y1"
                 :x2="e.x2"
                 :y2="e.y2"
                 :stroke="e.syncing ? '#fbbf24' : '#4E86D7'"
                 stroke-width="2"
-                stroke-dasharray="2 14"
                 stroke-linecap="round"
                 stroke-opacity="0.5"
               />
             </g>
 
             <!-- Nodes -->
-            <g v-for="n in placed" :key="n.id">
+            <g
+              v-for="n in placed"
+              :key="n.id"
+              class="cursor-pointer focus:outline-none"
+              role="link"
+              tabindex="0"
+              :aria-label="`View ${n.slug} on the status page`"
+              @click="openNode(n.id)"
+              @keydown.enter="openNode(n.id)"
+            >
+              <title>View {{ n.slug }} on the status page</title>
               <circle
                 v-if="n.primary"
                 :cx="n.cx"
@@ -245,11 +248,16 @@ const statusLabel: Record<Node['status'], string> = {
           <div
             v-for="(n, i) in placed"
             :key="n.id"
+            role="link"
+            tabindex="0"
+            :aria-label="`View ${n.slug} on the status page`"
             :class="[
-              'flex flex-col gap-3 px-5 py-4',
+              'flex cursor-pointer flex-col gap-3 px-5 py-4 transition-colors hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/40',
               i % 3 !== 0 && 'border-l border-border/60',
               i >= 3 && 'border-t border-border/60',
             ]"
+            @click="openNode(n.id)"
+            @keydown.enter="openNode(n.id)"
           >
             <div>
               <div class="mb-1 flex items-center gap-1.5">
@@ -312,3 +320,22 @@ const statusLabel: Record<Node['status'], string> = {
     </div>
   </section>
 </template>
+
+<style scoped>
+.fed-flow {
+  stroke-dasharray: 2 14;
+  animation: fed-dash 1.4s linear infinite;
+}
+
+@keyframes fed-dash {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fed-flow {
+    animation: none;
+  }
+}
+</style>

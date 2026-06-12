@@ -26,14 +26,21 @@ export function connectionLabel(node: RealmNodeInfo): string {
   return node.connection_status === 'connected' ? 'connected' : 'configured'
 }
 
-const healthyStatuses = new Set(['ok', 'running', 'healthy', 'ready', 'up', 'enabled', 'online', 'connected', 'serving', 'active'])
+const healthyStatuses = new Set(['ok', 'running', 'healthy', 'ready', 'up', 'enabled', 'online', 'connected', 'serving', 'active', 'available'])
+const degradedStatuses = new Set(['degraded', 'syncing', 'partial', 'known'])
 const idleStatuses = new Set(['disabled', 'off', 'stopped', 'inactive', 'not_configured'])
-const failedStatuses = new Set(['error', 'failed', 'unhealthy', 'down', 'offline'])
+const failedStatuses = new Set(['error', 'failed', 'unhealthy', 'down', 'offline', 'unavailable', 'unreachable'])
 
 export function statusVariant(status?: string | null): BadgeVariant {
   const value = (status ?? '').toLowerCase()
   if (healthyStatuses.has(value)) return 'success'
+  if (degradedStatuses.has(value)) return 'warn'
   if (idleStatuses.has(value)) return 'secondary'
   if (failedStatuses.has(value)) return 'destructive'
   return 'outline'
+}
+
+export function isDegradedStatus(status?: string | null): boolean {
+  const variant = statusVariant(status)
+  return variant === 'warn' || variant === 'destructive'
 }

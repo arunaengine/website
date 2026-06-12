@@ -98,6 +98,14 @@ export interface InterfaceStatus {
   url?: string | null
 }
 
+// GET /info/usage; may grow extra fields, unknown ones are ignored.
+export interface UsageResponse {
+  buckets: number
+  objects: number
+  stored_blobs: number
+  stored_bytes: number
+}
+
 export interface RealmInfoResponse {
   realm_id: string
   description?: string | null
@@ -119,6 +127,8 @@ export interface RealmNodeInfo {
   configured: boolean
   present: boolean
   connection_status: 'connected' | 'configured'
+  // Advertised by newer backends; absent until nodes publish their REST endpoint.
+  rest_url?: string | null
 }
 
 export interface UserInfoResponse {
