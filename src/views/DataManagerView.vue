@@ -60,6 +60,8 @@ const credentialDialogOpen = ref(false)
 const manualKeyId = ref('')
 const manualSecret = ref('')
 
+const keyTail = computed(() => s3.activeKey.value?.accessKeyId.slice(-4) ?? '')
+
 interface UploadItem {
   id: number
   name: string
@@ -127,13 +129,6 @@ function activateManualKey() {
   s3.setActiveKey({ accessKeyId: manualKeyId.value.trim(), secretAccessKey: manualSecret.value.trim() })
   manualKeyId.value = ''
   manualSecret.value = ''
-}
-
-function forgetKey() {
-  s3.clearActiveKey()
-  buckets.value = []
-  folders.value = []
-  objects.value = []
 }
 
 function openBucket(name: string) {
@@ -264,8 +259,12 @@ const isEmpty = computed(
     >
       <template #actions>
         <template v-if="s3.hasActiveKey.value">
-          <Badge variant="outline" class="gap-1 font-mono text-[10px]"><KeyRound class="h-3 w-3" /> {{ s3.activeKey.value?.accessKeyId }}</Badge>
-          <Button variant="outline" size="sm" @click="forgetKey">Forget key</Button>
+          <span
+            class="flex items-center gap-1 font-mono text-[11px] text-muted-foreground"
+            :title="`Signing with key ${s3.activeKey.value?.accessKeyId} — manage keys in Settings`"
+          >
+            <KeyRound class="h-3 w-3" /> …{{ keyTail }}
+          </span>
           <Button variant="outline" size="sm" @click="refreshBuckets(); bucket && loadObjects(true)"><RefreshCw class="h-4 w-4" /> Refresh</Button>
         </template>
       </template>
