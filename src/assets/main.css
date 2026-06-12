@@ -130,6 +130,12 @@
     color: transparent;
   }
 
+  /* One left-aligned content container shared by the app shell: the top
+     bar, page headers and every view body align to the same edges. */
+  .app-shell .container {
+    @apply mx-0 w-full max-w-[1400px] px-6;
+  }
+
   /* Consistent surfaces across the app. Elevation = border + bg shift. */
   .surface {
     @apply rounded-lg border border-border bg-card shadow-[0_1px_2px_rgba(8,33,108,0.04),0_2px_8px_rgba(8,33,108,0.05)];

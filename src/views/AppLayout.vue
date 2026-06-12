@@ -6,7 +6,7 @@ import { RouterView } from 'vue-router'
 </script>
 
 <template>
-  <div class="flex min-h-full bg-background">
+  <div class="app-shell flex min-h-full bg-background">
     <Sidebar />
     <div class="flex min-w-0 flex-1 flex-col">
       <TopBar />
