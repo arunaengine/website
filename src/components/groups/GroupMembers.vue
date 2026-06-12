@@ -65,6 +65,7 @@ const runSearch = useDebounceFn(async (term: string) => {
 }, 250)
 
 watch(query, (term) => {
+  if (selectedUser.value && term.trim() === selectedUser.value.name) return
   selectedUser.value = null
   void runSearch(term.trim())
 })
