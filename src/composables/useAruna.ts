@@ -45,6 +45,7 @@ const metadataItems = ref<MetadataDocumentListItem[]>([])
 const profileItems = ref<MetadataDocumentListItem[]>([])
 const credentials = ref<S3CredentialSummary[]>([])
 const fullCrates = ref<Record<string, unknown>>({})
+const cratePending = ref<Record<string, boolean>>({})
 const bootstrapped = ref(false)
 
 function readStored(key: string): string {
@@ -146,11 +147,44 @@ async function loadAuthenticated() {
   credentials.value = credentialList.credentials
 }
 
+// Thrown when the RO-Crate graph projection is still materializing after the
+// polling window. This is a transient state, not a failure.
+export class CrateNotReadyError extends Error {
+  constructor(public documentId: string) {
+    super('The RO-Crate is still being prepared. Try again in a moment.')
+    this.name = 'CrateNotReadyError'
+  }
+}
+
+// Backoff while the graph projection materializes right after a create.
+const CRATE_POLL_DELAYS_MS = [1000, 2000, 3000, 3000, 3000, 3000, 3000]
+
+function setCratePending(documentId: string, pending: boolean) {
+  cratePending.value = { ...cratePending.value, [documentId]: pending }
+}
+
+// A 503 from the rocrate export means the graph projection is still
+// materializing (expected right after create), so poll with backoff instead
+// of surfacing an error, and give up with CrateNotReadyError after ~20s.
 async function loadRoCrate(documentId: string): Promise<unknown> {
   if (fullCrates.value[documentId]) return fullCrates.value[documentId]
-  const response = await request<MetadataRoCrateResponse>(`/metadata/${documentId}/rocrate`)
-  fullCrates.value = { ...fullCrates.value, [documentId]: response.rocrate }
-  return response.rocrate
+  try {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const response = await request<MetadataRoCrateResponse>(`/metadata/${documentId}/rocrate`)
+        fullCrates.value = { ...fullCrates.value, [documentId]: response.rocrate }
+        return response.rocrate
+      } catch (err) {
+        const materializing = err instanceof ApiError && err.status === 503
+        if (!materializing) throw err
+        if (attempt >= CRATE_POLL_DELAYS_MS.length) throw new CrateNotReadyError(documentId)
+        setCratePending(documentId, true)
+        await new Promise((resolve) => setTimeout(resolve, CRATE_POLL_DELAYS_MS[attempt]))
+      }
+    }
+  } finally {
+    setCratePending(documentId, false)
+  }
 }
 
 async function createMetadata(input: CreateMetadataRequest) {
@@ -631,6 +665,7 @@ export function useAruna() {
     metadataItems,
     profileItems,
     fullCrates,
+    cratePending,
     refresh,
     loadRoCrate,
     createMetadata,
