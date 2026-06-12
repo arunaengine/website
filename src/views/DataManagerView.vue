@@ -60,6 +60,8 @@ const credentialDialogOpen = ref(false)
 const manualKeyId = ref('')
 const manualSecret = ref('')
 
+const keyTail = computed(() => s3.activeKey.value?.accessKeyId.slice(-4) ?? '')
+
 interface UploadItem {
   id: number
   name: string
@@ -77,6 +79,15 @@ const deleteTarget = ref<ObjectEntry | null>(null)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 
+const newFolderOpen = ref(false)
+const newFolderName = ref('')
+const newFolderBusy = ref(false)
+const newFolderError = ref<string | null>(null)
+const newFolderInvalid = computed(() => {
+  const name = newFolderName.value.trim()
+  return !name || name.includes('/')
+})
+
 async function refreshBuckets() {
   if (!s3.hasActiveKey.value) return
   bucketsLoading.value = true
@@ -91,49 +102,57 @@ async function refreshBuckets() {
   }
 }
 
-async function loadObjects(reset: boolean) {
+// Listings refresh in the background: rendered rows stay in place until the
+// new page arrives, and stale responses are dropped via a request id.
+let listRequestId = 0
+
+async function loadObjects(more = false) {
   if (!s3.hasActiveKey.value || !bucket.value) return
+  const requestId = ++listRequestId
   listLoading.value = true
   listError.value = null
-  if (reset) {
-    folders.value = []
-    objects.value = []
-    nextToken.value = undefined
-  }
   try {
-    const page = await s3.listObjects(bucket.value, s3Prefix.value, nextToken.value)
-    folders.value = reset ? page.folders : [...folders.value, ...page.folders]
-    objects.value = reset ? page.objects : [...objects.value, ...page.objects]
+    const page = await s3.listObjects(bucket.value, s3Prefix.value, more ? nextToken.value : undefined)
+    if (requestId !== listRequestId) return
+    folders.value = more ? [...folders.value, ...page.folders] : page.folders
+    objects.value = more ? [...objects.value, ...page.objects] : page.objects
     nextToken.value = page.nextToken
   } catch (err) {
-    listError.value = s3ErrorMessage(err)
+    if (requestId === listRequestId) listError.value = s3ErrorMessage(err)
   } finally {
-    listLoading.value = false
+    if (requestId === listRequestId) listLoading.value = false
   }
 }
 
+function refreshAll() {
+  void refreshBuckets()
+  if (bucket.value) void loadObjects()
+}
+
 watch(
-  [() => s3.hasActiveKey.value, bucket, prefix],
-  ([hasKey]) => {
-    if (!hasKey) return
-    void refreshBuckets()
-    if (bucket.value) void loadObjects(true)
+  () => s3.activeKey.value,
+  (key) => {
+    if (!key) {
+      buckets.value = []
+      folders.value = []
+      objects.value = []
+      nextToken.value = undefined
+      return
+    }
+    refreshAll()
   },
   { immediate: true },
 )
+
+watch([bucket, prefix], () => {
+  if (bucket.value) void loadObjects()
+})
 
 function activateManualKey() {
   if (!manualKeyId.value.trim() || !manualSecret.value.trim()) return
   s3.setActiveKey({ accessKeyId: manualKeyId.value.trim(), secretAccessKey: manualSecret.value.trim() })
   manualKeyId.value = ''
   manualSecret.value = ''
-}
-
-function forgetKey() {
-  s3.clearActiveKey()
-  buckets.value = []
-  folders.value = []
-  objects.value = []
 }
 
 function openBucket(name: string) {
@@ -166,6 +185,27 @@ async function createBucket() {
     createBucketError.value = s3ErrorMessage(err)
   } finally {
     creatingBucket.value = false
+  }
+}
+
+function openNewFolder() {
+  newFolderName.value = ''
+  newFolderError.value = null
+  newFolderOpen.value = true
+}
+
+async function createFolder() {
+  if (newFolderInvalid.value || newFolderBusy.value) return
+  newFolderBusy.value = true
+  newFolderError.value = null
+  try {
+    await s3.createFolder(bucket.value, s3Prefix.value, newFolderName.value.trim())
+    newFolderOpen.value = false
+    await loadObjects()
+  } catch (err) {
+    newFolderError.value = s3ErrorMessage(err)
+  } finally {
+    newFolderBusy.value = false
   }
 }
 
@@ -208,7 +248,7 @@ async function uploadFiles(files: File[]) {
     }
     uploads.value = [...uploads.value]
   }
-  await loadObjects(true)
+  await loadObjects()
 }
 
 async function cancelUpload(item: UploadItem) {
@@ -243,7 +283,7 @@ async function confirmDelete() {
   try {
     await s3.deleteObject(bucket.value, deleteTarget.value.key)
     deleteTarget.value = null
-    await loadObjects(true)
+    await loadObjects()
   } catch (err) {
     deleteError.value = s3ErrorMessage(err)
   } finally {
@@ -264,9 +304,13 @@ const isEmpty = computed(
     >
       <template #actions>
         <template v-if="s3.hasActiveKey.value">
-          <Badge variant="outline" class="gap-1 font-mono text-[10px]"><KeyRound class="h-3 w-3" /> {{ s3.activeKey.value?.accessKeyId }}</Badge>
-          <Button variant="outline" size="sm" @click="forgetKey">Forget key</Button>
-          <Button variant="outline" size="sm" @click="refreshBuckets(); bucket && loadObjects(true)"><RefreshCw class="h-4 w-4" /> Refresh</Button>
+          <span
+            class="flex items-center gap-1 font-mono text-[11px] text-muted-foreground"
+            :title="`Signing with key ${s3.activeKey.value?.accessKeyId} — manage keys in Settings`"
+          >
+            <KeyRound class="h-3 w-3" /> …{{ keyTail }}
+          </span>
+          <Button variant="outline" size="sm" @click="refreshAll"><RefreshCw class="h-4 w-4" /> Refresh</Button>
         </template>
       </template>
     </PageHeader>
@@ -299,7 +343,7 @@ const isEmpty = computed(
             <h2 class="font-display text-base font-semibold text-aruna-navy">Use an existing key</h2>
           </div>
           <p class="mt-2 text-sm text-muted-foreground">
-            Keys stay in this tab's memory and are dropped on reload.
+            The key is kept in this browser so the session survives reloads. Revoke keys under Settings.
           </p>
           <div class="mt-4 space-y-2">
             <Input v-model="manualKeyId" placeholder="Access key ID" class="font-mono text-xs" />
@@ -352,9 +396,13 @@ const isEmpty = computed(
 
           <template v-else>
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <Breadcrumbs :bucket="bucket" :path="prefix" @navigate="navigateTo" />
+              <div class="flex min-w-0 items-center gap-2">
+                <Breadcrumbs :bucket="bucket" :path="prefix" @navigate="navigateTo" />
+                <Loader2 v-if="listLoading" class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+              </div>
               <div class="flex items-center gap-2">
                 <input ref="fileInput" type="file" multiple class="hidden" @change="onFileInput" />
+                <Button variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
                 <Button size="sm" @click="pickFiles"><Upload class="h-4 w-4" /> Upload</Button>
               </div>
             </div>
@@ -428,11 +476,8 @@ const isEmpty = computed(
                   </tr>
                 </tbody>
               </table>
-              <div v-if="listLoading" class="flex items-center gap-2 border-t border-border px-4 py-3 text-xs text-muted-foreground">
-                <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading objects…
-              </div>
-              <div v-else-if="nextToken" class="border-t border-border px-4 py-2">
-                <Button variant="ghost" size="sm" @click="loadObjects(false)">Load more</Button>
+              <div v-if="nextToken" class="border-t border-border px-4 py-2">
+                <Button variant="ghost" size="sm" :disabled="listLoading" @click="loadObjects(true)">Load more</Button>
               </div>
             </div>
           </template>
@@ -441,6 +486,27 @@ const isEmpty = computed(
     </div>
 
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />
+
+    <Dialog :open="newFolderOpen" @update:open="(v: boolean) => (newFolderOpen = v)">
+      <DialogContent class="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>New folder</DialogTitle>
+          <DialogDescription>
+            Creates <span class="font-mono text-xs">{{ s3Prefix }}{{ newFolderName.trim() || 'name' }}/</span> in
+            <span class="font-mono text-xs">{{ bucket }}</span>.
+          </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-2">
+          <Input v-model="newFolderName" placeholder="folder-name" class="font-mono text-xs" @keyup.enter="createFolder" />
+          <p v-if="newFolderName.trim().includes('/')" class="text-xs text-destructive">The folder name cannot contain '/'.</p>
+          <p v-if="newFolderError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ newFolderError }}</p>
+        </div>
+        <DialogFooter>
+          <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+          <Button :disabled="newFolderInvalid || newFolderBusy" @click="createFolder">{{ newFolderBusy ? 'Creating…' : 'Create' }}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <Dialog :open="deleteTarget !== null" @update:open="(v: boolean) => { if (!v) deleteTarget = null }">
       <DialogContent class="max-w-md">

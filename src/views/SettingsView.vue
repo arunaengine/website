@@ -17,12 +17,13 @@ import { useAuth } from '@/composables/useAuth'
 import { RouterLink } from 'vue-router'
 import { relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
-import { ChevronRight, KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from 'lucide-vue-next'
+import { ChevronRight, ExternalLink, KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from 'lucide-vue-next'
 
 const {
   apiBaseUrl,
   authToken,
   currentUser,
+  nodeInfo,
   userInfo,
   myGroups,
   discoverableGroups,
@@ -65,6 +66,20 @@ watch(currentUser, (user) => {
 
 const preferredProfile = computed(() => profiles.value.find((profile) => profile.id === preferredProfileId.value))
 
+// Swagger UI is served from the node's root, not under /api/v1.
+const swaggerUrl = computed(() => {
+  let origin = window.location.origin
+  const restUrl = nodeInfo.value?.services.interfaces.rest.url
+  if (restUrl) {
+    try {
+      origin = new URL(restUrl).origin
+    } catch {
+      // keep the window origin
+    }
+  }
+  return `${origin}/swagger-ui`
+})
+
 function saveConnection() {
   setApiBaseUrl(apiBaseDraft.value)
   setAuthToken(tokenDraft.value)
@@ -96,6 +111,16 @@ const createGroupOpen = ref(false)
 const createCredentialOpen = ref(false)
 const revokeError = ref<string | null>(null)
 const selectedGroupId = ref('')
+
+const groupNames = computed(() => {
+  const names = new Map<string, string>()
+  for (const group of [...myGroups.value, ...discoverableGroups.value]) names.set(group.id, group.name)
+  return names
+})
+
+function groupLabel(groupId: string) {
+  return groupNames.value.get(groupId) ?? groupId.slice(0, 8)
+}
 
 async function revoke(accessKeyId: string) {
   revokeError.value = null
@@ -179,6 +204,9 @@ function toggleGroup(groupId: string) {
               <label class="text-xs font-medium text-foreground">API base URL</label>
               <Input v-model="apiBaseDraft" class="mt-1" placeholder="/api/v1" />
               <p class="mt-1 text-[11px] text-muted-foreground">Vite proxies /api to the local Aruna node during development.</p>
+              <a :href="swaggerUrl" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                <ExternalLink class="h-3 w-3" /> API reference (Swagger UI)
+              </a>
             </div>
             <div v-if="isAuthenticated">
               <label class="text-xs font-medium text-foreground">Bearer token (advanced)</label>
@@ -278,7 +306,7 @@ function toggleGroup(groupId: string) {
           <table class="w-full text-sm">
             <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th><th class="px-5 py-2"></th></tr></thead>
             <tbody>
-              <tr v-for="credential in credentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground">{{ credential.group_id }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px] text-muted-foreground">{{ relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
+              <tr v-for="credential in credentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px] text-muted-foreground">{{ relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
               <tr v-if="!credentials.length"><td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">No S3 credentials for the authenticated user.</td></tr>
             </tbody>
           </table>

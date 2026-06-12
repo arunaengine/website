@@ -123,20 +123,20 @@ function activate() {
           <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
             <div class="min-w-0">
               <div class="text-[10px] uppercase tracking-wider text-muted-foreground">Access key ID</div>
-              <div class="truncate font-mono text-xs">{{ created.access_key_id }}</div>
+              <div class="break-all font-mono text-xs">{{ created.access_key_id }}</div>
             </div>
             <CopyButton :value="created.access_key_id" label="Copy access key ID" />
           </div>
           <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
             <div class="min-w-0">
               <div class="text-[10px] uppercase tracking-wider text-muted-foreground">Secret access key</div>
-              <div class="truncate font-mono text-xs">{{ created.access_secret }}</div>
+              <div class="break-all font-mono text-xs">{{ created.access_secret }}</div>
             </div>
             <CopyButton :value="created.access_secret" label="Copy secret access key" />
           </div>
           <div class="relative rounded-md border border-border bg-muted/40 px-3 py-2">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground">CLI usage</div>
-            <pre class="mt-1 overflow-x-auto whitespace-pre font-mono text-[11px] leading-5">{{ cliSnippet }}</pre>
+            <pre class="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] leading-5">{{ cliSnippet }}</pre>
             <div class="absolute right-2 top-2"><CopyButton :value="cliSnippet" label="Copy CLI snippet" /></div>
           </div>
         </div>
