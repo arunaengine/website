@@ -93,36 +93,51 @@ async function refreshBuckets() {
   }
 }
 
-async function loadObjects(reset: boolean) {
+// Listings refresh in the background: rendered rows stay in place until the
+// new page arrives, and stale responses are dropped via a request id.
+let listRequestId = 0
+
+async function loadObjects(more = false) {
   if (!s3.hasActiveKey.value || !bucket.value) return
+  const requestId = ++listRequestId
   listLoading.value = true
   listError.value = null
-  if (reset) {
-    folders.value = []
-    objects.value = []
-    nextToken.value = undefined
-  }
   try {
-    const page = await s3.listObjects(bucket.value, s3Prefix.value, nextToken.value)
-    folders.value = reset ? page.folders : [...folders.value, ...page.folders]
-    objects.value = reset ? page.objects : [...objects.value, ...page.objects]
+    const page = await s3.listObjects(bucket.value, s3Prefix.value, more ? nextToken.value : undefined)
+    if (requestId !== listRequestId) return
+    folders.value = more ? [...folders.value, ...page.folders] : page.folders
+    objects.value = more ? [...objects.value, ...page.objects] : page.objects
     nextToken.value = page.nextToken
   } catch (err) {
-    listError.value = s3ErrorMessage(err)
+    if (requestId === listRequestId) listError.value = s3ErrorMessage(err)
   } finally {
-    listLoading.value = false
+    if (requestId === listRequestId) listLoading.value = false
   }
 }
 
+function refreshAll() {
+  void refreshBuckets()
+  if (bucket.value) void loadObjects()
+}
+
 watch(
-  [() => s3.hasActiveKey.value, bucket, prefix],
-  ([hasKey]) => {
-    if (!hasKey) return
-    void refreshBuckets()
-    if (bucket.value) void loadObjects(true)
+  () => s3.activeKey.value,
+  (key) => {
+    if (!key) {
+      buckets.value = []
+      folders.value = []
+      objects.value = []
+      nextToken.value = undefined
+      return
+    }
+    refreshAll()
   },
   { immediate: true },
 )
+
+watch([bucket, prefix], () => {
+  if (bucket.value) void loadObjects()
+})
 
 function activateManualKey() {
   if (!manualKeyId.value.trim() || !manualSecret.value.trim()) return
@@ -203,7 +218,7 @@ async function uploadFiles(files: File[]) {
     }
     uploads.value = [...uploads.value]
   }
-  await loadObjects(true)
+  await loadObjects()
 }
 
 async function cancelUpload(item: UploadItem) {
@@ -238,7 +253,7 @@ async function confirmDelete() {
   try {
     await s3.deleteObject(bucket.value, deleteTarget.value.key)
     deleteTarget.value = null
-    await loadObjects(true)
+    await loadObjects()
   } catch (err) {
     deleteError.value = s3ErrorMessage(err)
   } finally {
@@ -265,7 +280,7 @@ const isEmpty = computed(
           >
             <KeyRound class="h-3 w-3" /> …{{ keyTail }}
           </span>
-          <Button variant="outline" size="sm" @click="refreshBuckets(); bucket && loadObjects(true)"><RefreshCw class="h-4 w-4" /> Refresh</Button>
+          <Button variant="outline" size="sm" @click="refreshAll"><RefreshCw class="h-4 w-4" /> Refresh</Button>
         </template>
       </template>
     </PageHeader>
@@ -351,7 +366,10 @@ const isEmpty = computed(
 
           <template v-else>
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <Breadcrumbs :bucket="bucket" :path="prefix" @navigate="navigateTo" />
+              <div class="flex min-w-0 items-center gap-2">
+                <Breadcrumbs :bucket="bucket" :path="prefix" @navigate="navigateTo" />
+                <Loader2 v-if="listLoading" class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+              </div>
               <div class="flex items-center gap-2">
                 <input ref="fileInput" type="file" multiple class="hidden" @change="onFileInput" />
                 <Button size="sm" @click="pickFiles"><Upload class="h-4 w-4" /> Upload</Button>
@@ -427,11 +445,8 @@ const isEmpty = computed(
                   </tr>
                 </tbody>
               </table>
-              <div v-if="listLoading" class="flex items-center gap-2 border-t border-border px-4 py-3 text-xs text-muted-foreground">
-                <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading objects…
-              </div>
-              <div v-else-if="nextToken" class="border-t border-border px-4 py-2">
-                <Button variant="ghost" size="sm" @click="loadObjects(false)">Load more</Button>
+              <div v-if="nextToken" class="border-t border-border px-4 py-2">
+                <Button variant="ghost" size="sm" :disabled="listLoading" @click="loadObjects(true)">Load more</Button>
               </div>
             </div>
           </template>
