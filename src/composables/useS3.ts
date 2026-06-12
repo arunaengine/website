@@ -42,9 +42,23 @@ export interface ObjectPage {
 
 const { nodeInfo, realmInfo } = useAruna()
 
-// Credentials stay in memory only; a reload requires re-entering or minting
-// a fresh key so secrets never touch persistent storage.
-const activeKey = ref<S3Key | null>(null)
+const STORAGE_KEY = 'aruna.s3Key'
+
+function loadStoredKey(): S3Key | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<S3Key>
+    if (typeof parsed.accessKeyId === 'string' && typeof parsed.secretAccessKey === 'string') {
+      return { accessKeyId: parsed.accessKeyId, secretAccessKey: parsed.secretAccessKey }
+    }
+  } catch {
+    // fall through to no key
+  }
+  return null
+}
+
+const activeKey = ref<S3Key | null>(loadStoredKey())
 
 const endpoint = computed(
   () =>
@@ -81,11 +95,13 @@ function client(): S3Client {
 
 function setActiveKey(key: S3Key) {
   activeKey.value = key
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(key))
 }
 
 function clearActiveKey() {
   activeKey.value = null
   cached = null
+  localStorage.removeItem(STORAGE_KEY)
 }
 
 async function listBuckets(): Promise<BucketEntry[]> {

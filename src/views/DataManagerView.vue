@@ -299,7 +299,7 @@ const isEmpty = computed(
             <h2 class="font-display text-base font-semibold text-aruna-navy">Use an existing key</h2>
           </div>
           <p class="mt-2 text-sm text-muted-foreground">
-            Keys stay in this tab's memory and are dropped on reload.
+            The key is kept in this browser so the session survives reloads. Revoke keys under Settings.
           </p>
           <div class="mt-4 space-y-2">
             <Input v-model="manualKeyId" placeholder="Access key ID" class="font-mono text-xs" />
