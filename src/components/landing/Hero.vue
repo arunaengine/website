@@ -23,12 +23,15 @@ const wordmark = computed(() =>
 
     <div class="container relative max-w-3xl pb-24 pt-20 text-center sm:pt-24">
       <!-- Brand lockup: wave mark + ARUNA wordmark (always the image assets, never typed) -->
-      <img
-        src="/brand/icon-mark.png"
-        alt=""
-        class="mx-auto h-20 w-20 select-none sm:h-24 sm:w-24"
-        draggable="false"
-      />
+      <!-- icon-mark.png pads the wave; clip to its alpha bbox (183,333 to 1118,870 of 1254 sq) -->
+      <div class="relative mx-auto aspect-[935/537] h-16 overflow-hidden sm:h-20">
+        <img
+          src="/brand/icon-mark.png"
+          alt=""
+          class="absolute left-[-19.6%] top-[-62%] w-[134.1%] max-w-none select-none"
+          draggable="false"
+        />
+      </div>
       <img
         :src="wordmark"
         alt="ARUNA"
