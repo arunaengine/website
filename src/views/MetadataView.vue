@@ -6,19 +6,20 @@ import Pagination from '@/components/ui/Pagination.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { useAruna } from '@/composables/useAruna'
+import { CrateNotReadyError, useAruna } from '@/composables/useAruna'
 import { relativeTime } from '@/lib/utils'
 import { Search, ArrowLeft, ListChecks, Plus, Code2, Star, FileJson2, ExternalLink } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
-const { metadata, profiles, currentUser, loadRoCrate, fullCrates } = useAruna()
+const { metadata, profiles, currentUser, loadRoCrate, fullCrates, cratePending } = useAruna()
 
 const q = ref('')
 const profileFilter = ref<string | null>(null)
 const showCrate = ref(false)
 const showNewDataset = ref(false)
 const loadingCrate = ref(false)
+const crateNotReady = ref(false)
 const crateError = ref<string | null>(null)
 
 const detailId = computed(() => (route.params.id as string) || '')
@@ -42,20 +43,32 @@ watch([q, profileFilter], () => {
 })
 const paged = computed(() => filtered.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
 
+let crateFetchToken = 0
+
+async function fetchCrate(id: string) {
+  const token = ++crateFetchToken
+  crateError.value = null
+  crateNotReady.value = false
+  loadingCrate.value = true
+  try {
+    await loadRoCrate(id)
+  } catch (err) {
+    if (token !== crateFetchToken) return
+    if (err instanceof CrateNotReadyError) crateNotReady.value = true
+    else crateError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    if (token === crateFetchToken) loadingCrate.value = false
+  }
+}
+
 watch(
   detailId,
   async (id) => {
     showCrate.value = false
     crateError.value = null
+    crateNotReady.value = false
     if (!id) return
-    loadingCrate.value = true
-    try {
-      await loadRoCrate(id)
-    } catch (err) {
-      crateError.value = err instanceof Error ? err.message : String(err)
-    } finally {
-      loadingCrate.value = false
-    }
+    await fetchCrate(id)
   },
   { immediate: true },
 )
@@ -169,7 +182,12 @@ function isFavourite(id: string) {
             <span class="inline-flex items-center gap-2"><Code2 class="h-3.5 w-3.5 text-muted-foreground" /> RO-Crate JSON-LD</span>
             <span class="text-xs text-muted-foreground">{{ showCrate ? 'hide' : 'show' }}</span>
           </button>
-          <div v-if="loadingCrate" class="mt-3 text-xs text-muted-foreground">Loading full RO-Crate…</div>
+          <div v-if="loadingCrate && cratePending[current.ulid]" class="mt-3 text-xs text-muted-foreground">Preparing the crate…</div>
+          <div v-else-if="loadingCrate" class="mt-3 text-xs text-muted-foreground">Loading full RO-Crate…</div>
+          <div v-if="crateNotReady" class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+            <span>The crate is still being prepared.</span>
+            <Button variant="outline" size="sm" @click="fetchCrate(current.ulid)">Retry</Button>
+          </div>
           <div v-if="crateError" class="mt-3 text-xs text-destructive">{{ crateError }}</div>
           <pre v-if="showCrate" class="mt-3 max-h-[560px] overflow-auto whitespace-pre-wrap rounded-md bg-muted/30 p-4 font-mono text-[11.5px] leading-relaxed text-foreground/85 scrollbar-thin"><code>{{ JSON.stringify(fullCrates[current.ulid] ?? current.roCrate, null, 2) }}</code></pre>
         </section>
