@@ -5,9 +5,9 @@ import {
   GetObjectCommand,
   ListBucketsCommand,
   ListObjectsV2Command,
-  PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
+import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { useAruna } from './useAruna'
 
@@ -131,15 +131,43 @@ async function listObjects(bucket: string, prefix: string, token?: string): Prom
   }
 }
 
-async function uploadObject(bucket: string, key: string, file: File): Promise<void> {
-  await client().send(
-    new PutObjectCommand({
+export interface UploadHandle {
+  promise: Promise<void>
+  abort: () => Promise<void>
+}
+
+// Files larger than one part are uploaded via S3 multipart with parallel
+// parts; abort() tells the node to drop the parts already written.
+const UPLOAD_PART_SIZE = 16 * 1024 * 1024
+const UPLOAD_CONCURRENCY = 3
+
+function uploadObject(
+  bucket: string,
+  key: string,
+  file: File,
+  onProgress?: (loaded: number, total: number) => void,
+): UploadHandle {
+  const upload = new Upload({
+    client: client(),
+    params: {
       Bucket: bucket,
       Key: key,
       Body: file,
       ContentType: file.type || 'application/octet-stream',
-    }),
-  )
+    },
+    partSize: UPLOAD_PART_SIZE,
+    queueSize: UPLOAD_CONCURRENCY,
+    leavePartsOnError: false,
+  })
+  if (onProgress) {
+    upload.on('httpUploadProgress', (progress) => {
+      onProgress(progress.loaded ?? 0, progress.total ?? file.size)
+    })
+  }
+  return {
+    promise: upload.done().then(() => undefined),
+    abort: () => upload.abort(),
+  }
 }
 
 async function deleteObject(bucket: string, key: string): Promise<void> {

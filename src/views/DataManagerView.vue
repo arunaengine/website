@@ -13,8 +13,9 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
+import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useS3, s3ErrorMessage, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
+import { useS3, s3ErrorMessage, type BucketEntry, type FolderEntry, type ObjectEntry, type UploadHandle } from '@/composables/useS3'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -62,10 +63,12 @@ const manualSecret = ref('')
 interface UploadItem {
   id: number
   name: string
-  state: 'uploading' | 'done' | 'error'
+  state: 'uploading' | 'done' | 'error' | 'canceled'
+  progress: number
   error?: string
 }
 const uploads = ref<UploadItem[]>([])
+const uploadHandles = new Map<number, UploadHandle>()
 let uploadCounter = 0
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragActive = ref(false)
@@ -184,18 +187,36 @@ function onDrop(event: DragEvent) {
 
 async function uploadFiles(files: File[]) {
   for (const file of files) {
-    const item: UploadItem = { id: ++uploadCounter, name: file.name, state: 'uploading' }
+    const item: UploadItem = { id: ++uploadCounter, name: file.name, state: 'uploading', progress: 0 }
     uploads.value = [...uploads.value, item]
+    const handle = s3.uploadObject(bucket.value, `${s3Prefix.value}${file.name}`, file, (loaded, total) => {
+      item.progress = total ? Math.round((loaded / total) * 100) : 0
+      uploads.value = [...uploads.value]
+    })
+    uploadHandles.set(item.id, handle)
     try {
-      await s3.uploadObject(bucket.value, `${s3Prefix.value}${file.name}`, file)
+      await handle.promise
       item.state = 'done'
+      item.progress = 100
     } catch (err) {
-      item.state = 'error'
-      item.error = s3ErrorMessage(err)
+      if (item.state !== 'canceled') {
+        item.state = 'error'
+        item.error = s3ErrorMessage(err)
+      }
+    } finally {
+      uploadHandles.delete(item.id)
     }
     uploads.value = [...uploads.value]
   }
   await loadObjects(true)
+}
+
+async function cancelUpload(item: UploadItem) {
+  const handle = uploadHandles.get(item.id)
+  if (!handle) return
+  item.state = 'canceled'
+  uploads.value = [...uploads.value]
+  await handle.abort().catch(() => undefined)
 }
 
 function clearFinishedUploads() {
@@ -344,9 +365,14 @@ const isEmpty = computed(
                 <Button variant="ghost" size="sm" @click="clearFinishedUploads">Clear finished</Button>
               </div>
               <div v-for="item in uploads" :key="item.id" class="flex items-center gap-2 text-xs">
-                <Loader2 v-if="item.state === 'uploading'" class="h-3 w-3 animate-spin text-primary" />
-                <Badge v-else :variant="item.state === 'done' ? 'accent' : 'destructive'" class="text-[10px] uppercase">{{ item.state }}</Badge>
-                <span class="truncate font-mono">{{ item.name }}</span>
+                <Loader2 v-if="item.state === 'uploading'" class="h-3 w-3 shrink-0 animate-spin text-primary" />
+                <Badge v-else :variant="item.state === 'done' ? 'accent' : item.state === 'canceled' ? 'secondary' : 'destructive'" class="text-[10px] uppercase">{{ item.state }}</Badge>
+                <span class="min-w-0 flex-none truncate font-mono" :class="item.state === 'uploading' ? 'max-w-[40%]' : ''">{{ item.name }}</span>
+                <template v-if="item.state === 'uploading'">
+                  <Progress :value="item.progress" :warn="101" :critical="101" class="h-1.5 flex-1" />
+                  <span class="w-9 shrink-0 text-right font-mono text-muted-foreground">{{ item.progress }}%</span>
+                  <Button variant="ghost" size="sm" class="h-6 shrink-0 px-2" @click="cancelUpload(item)">Cancel</Button>
+                </template>
                 <span v-if="item.error" class="truncate text-destructive">{{ item.error }}</span>
               </div>
             </div>
