@@ -73,6 +73,24 @@ watch(
   { immediate: true },
 )
 
+const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
+  const crate = fullCrates.value[detailId.value] ?? current.value?.roCrate
+  if (!crate || typeof crate !== 'object') return []
+  const graphValue = (crate as Record<string, unknown>)['@graph']
+  if (!Array.isArray(graphValue)) return []
+  return graphValue
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === 'object' && !Array.isArray(entry)))
+    .filter((entry) => {
+      const type = entry['@type']
+      return type === 'File' || (Array.isArray(type) && type.includes('File'))
+    })
+    .map((entry) => {
+      const id = typeof entry['@id'] === 'string' ? entry['@id'] : ''
+      return { id, name: typeof entry.name === 'string' && entry.name ? entry.name : id }
+    })
+    .filter((file) => file.id)
+})
+
 function open(id: string) {
   router.push({ name: 'metadata-detail', params: { id } })
 }
@@ -194,7 +212,14 @@ function isFavourite(id: string) {
 
         <section class="surface p-5 text-xs text-muted-foreground">
           <div class="flex items-center gap-2 font-medium text-foreground"><FileJson2 class="h-4 w-4 text-primary" /> Referenced data</div>
-          <p class="mt-2">Object listing is not shown here because S3 ListObjectsV2 and browser CORS are not implemented yet. No placeholder files are displayed.</p>
+          <ul v-if="referencedFiles.length" class="mt-3 space-y-2">
+            <li v-for="file in referencedFiles" :key="file.id" class="flex flex-wrap items-baseline gap-x-2">
+              <span class="font-medium text-foreground">{{ file.name }}</span>
+              <a v-if="file.id.startsWith('http')" :href="file.id" target="_blank" rel="noopener" class="inline-flex items-center gap-1 break-all font-mono text-[11px] text-primary hover:underline">{{ file.id }} <ExternalLink class="h-3 w-3 shrink-0" /></a>
+              <span v-else class="break-all font-mono text-[11px]">{{ file.id }}</span>
+            </li>
+          </ul>
+          <p v-else class="mt-2">This document does not reference any data files yet.</p>
         </section>
       </template>
     </div>
