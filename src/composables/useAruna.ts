@@ -317,11 +317,13 @@ function setApiBaseUrl(url: string) {
 
 const realm = computed<Realm>(() => {
   const id = realmInfo.value?.realm_id ?? nodeInfo.value?.node.realm_id ?? 'unknown'
-  const description = realmInfo.value?.description || 'Aruna realm'
+  const description = realmInfo.value?.description?.trim() ?? ''
+  // Derived from the realm description until the backend exposes a short_name.
+  const displayName = description || shortId(id)
   return {
     id,
-    name: description,
-    shortName: shortId(id),
+    name: displayName,
+    shortName: truncateLabel(displayName),
     color: colorFor(id),
     description,
     established: '',
@@ -589,6 +591,10 @@ function shortId(id: string): string {
   return id.length > 12 ? id.slice(0, 8) : id
 }
 
+function truncateLabel(value: string, max = 24): string {
+  return value.length > max ? `${value.slice(0, max).trimEnd()}…` : value
+}
+
 function slugify(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
@@ -632,6 +638,7 @@ export function useAruna() {
     profileItems,
     fullCrates,
     refresh,
+    loadInfo,
     loadRoCrate,
     createMetadata,
     updateUserProfile,

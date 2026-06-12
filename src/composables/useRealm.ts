@@ -5,6 +5,10 @@ import type { Bucket, Invitation, ActivityEvent, User } from '@/data/types'
 export function useRealm() {
   const aruna = useAruna()
   const activeRealmId = computed(() => aruna.realm.value.id)
+  // Display name comes from the realm description (id prefix as fallback);
+  // the raw realm id is exposed separately for tooltips and copy affordances.
+  const realmDisplayName = computed(() => aruna.realm.value.name)
+  const realmId = computed(() => aruna.realm.value.id)
   const accessibleRealms = computed(() => [aruna.realm.value])
   const myMemberships = computed(() => {
     const user = aruna.userInfo.value
@@ -16,6 +20,8 @@ export function useRealm() {
   return {
     activeRealmId,
     realm: aruna.realm,
+    realmDisplayName,
+    realmId,
     realms: computed(() => [aruna.realm.value]),
     role,
     accessibleRealms,
