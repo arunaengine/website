@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core'
 
-const BASE = 'http://localhost:5173'
+const BASE = process.env.ARUNA_PORTAL_BASE || 'http://localhost:5173'
 const results = []
 function step(name, ok, detail = '') {
   results.push({ name, ok, detail })

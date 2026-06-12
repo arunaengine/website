@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core'
 
-const BASE = 'http://localhost:5173'
+const BASE = process.env.ARUNA_PORTAL_BASE || 'http://localhost:5173'
 const out = process.env.SHOT_DIR || '/tmp/portal-shots'
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome-stable', headless: true })
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
