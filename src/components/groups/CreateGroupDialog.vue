@@ -9,7 +9,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import { ref, watch } from 'vue'
-import { Users } from 'lucide-vue-next'
+import { Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type GroupDetailResponse } from '@/lib/api'
 

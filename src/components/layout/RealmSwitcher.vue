@@ -8,7 +8,7 @@ import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import { useRealm } from '@/composables/useRealm'
 import { truncateMiddle } from '@/lib/utils'
-import { Check, ChevronsUpDown, Globe2 } from 'lucide-vue-next'
+import { Check, ChevronsUpDown, Globe2 } from '@lucide/vue'
 
 const { realm, realmDisplayName, realmId, activeRealmId, accessibleRealms, myMemberships, setRealm } = useRealm()
 

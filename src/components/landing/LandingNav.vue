@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
-import { Github, BookOpen, ArrowRight, LogIn, Moon, Sun } from 'lucide-vue-next'
+import GithubIcon from '@/components/icons/GithubIcon.vue'
+import { BookOpen, ArrowRight, LogIn, Moon, Sun } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
@@ -37,7 +38,7 @@ function onSignIn() {
             target="_blank"
             rel="noopener"
           >
-            <Github class="h-4 w-4" />
+            <GithubIcon class="h-4 w-4" />
             GitHub
           </a>
         </Button>

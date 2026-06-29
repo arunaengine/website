@@ -12,7 +12,7 @@ import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { computed, ref, watch } from 'vue'
-import { ListChecks, Plus, Trash2 } from 'lucide-vue-next'
+import { ListChecks, Plus, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import type { MetadataProfile, ProfileField, ProfileFieldKind } from '@/data/types'
 

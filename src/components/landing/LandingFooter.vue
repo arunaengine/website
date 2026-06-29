@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppLogo from '@/components/layout/AppLogo.vue'
-import { Github, BookOpen, Link as LinkIcon } from 'lucide-vue-next'
+import GithubIcon from '@/components/icons/GithubIcon.vue'
+import { BookOpen, Link as LinkIcon } from '@lucide/vue'
 </script>
 
 <template>
@@ -37,7 +38,7 @@ import { Github, BookOpen, Link as LinkIcon } from 'lucide-vue-next'
         <ul class="mt-3 space-y-2 text-sm text-foreground/80">
           <li>
             <a href="https://github.com/ArunaStorage" class="inline-flex items-center gap-1 hover:text-foreground" target="_blank" rel="noopener">
-              <Github class="h-3 w-3" /> Aruna engine (Rust)
+              <GithubIcon class="h-3 w-3" /> Aruna engine (Rust)
             </a>
           </li>
           <li><a href="#" class="hover:text-foreground">RO-Crate profiles</a></li>
@@ -53,7 +54,7 @@ import { Github, BookOpen, Link as LinkIcon } from 'lucide-vue-next'
           © 2026 the Aruna project · Apache 2.0 and MIT licensed
         </div>
         <div class="flex items-center gap-3">
-          <a href="#" class="hover:text-foreground"><Github class="h-4 w-4" /></a>
+          <a href="#" class="hover:text-foreground"><GithubIcon class="h-4 w-4" /></a>
           <a href="#" class="hover:text-foreground"><BookOpen class="h-4 w-4" /></a>
           <a href="#" class="hover:text-foreground"><LinkIcon class="h-4 w-4" /></a>
         </div>

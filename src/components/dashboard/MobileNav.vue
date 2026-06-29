@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from 'vue-router'
-import { Home, Boxes, Compass, Users, Settings } from 'lucide-vue-next'
+import { Home, Boxes, Compass, Users, Settings } from '@lucide/vue'
 
 const route = useRoute()
 

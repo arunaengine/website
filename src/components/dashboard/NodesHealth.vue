@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import QuotaBar from '@/components/ui/QuotaBar.vue'
-import { CircleCheck, CircleAlert, CircleOff, Loader2 } from 'lucide-vue-next'
+import { CircleCheck, CircleAlert, CircleOff, Loader2 } from '@lucide/vue'
 import { computed } from 'vue'
 import type { Node } from '@/data/types'
 

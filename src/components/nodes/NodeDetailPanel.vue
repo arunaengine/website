@@ -6,7 +6,7 @@ import { connectionLabel, connectionVariant, kindVariant, statusVariant } from '
 import type { NodeProbe } from './node-probe'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatBytes, formatNumber } from '@/lib/utils'
-import { TriangleAlert } from 'lucide-vue-next'
+import { TriangleAlert } from '@lucide/vue'
 
 defineProps<{
   node: RealmNodeInfo

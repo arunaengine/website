@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
-import { ArrowRight, BookOpen } from 'lucide-vue-next'
+import { ArrowRight, BookOpen } from '@lucide/vue'
 import { computed } from 'vue'
 import { useTheme } from '@/composables/useTheme'
 

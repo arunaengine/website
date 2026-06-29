@@ -17,7 +17,7 @@ import { useAuth } from '@/composables/useAuth'
 import { RouterLink } from 'vue-router'
 import { relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
-import { ChevronRight, ExternalLink, KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from 'lucide-vue-next'
+import { ChevronRight, ExternalLink, KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from '@lucide/vue'
 
 const {
   apiBaseUrl,

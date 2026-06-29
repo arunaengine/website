@@ -13,7 +13,7 @@ import {
   ArrowLeft,
   ChevronsLeft,
   ChevronsRight,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 
 const nav = [
   { to: '/app', icon: Home, label: 'Home', exact: true },

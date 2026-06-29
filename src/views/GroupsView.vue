@@ -8,7 +8,7 @@ import GroupDetail from '@/components/groups/GroupDetail.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRoute } from 'vue-router'
 import { computed, ref, watch } from 'vue'
-import { Plus, RefreshCw, Users } from 'lucide-vue-next'
+import { Plus, RefreshCw, Users } from '@lucide/vue'
 
 const { currentUser, myGroups, discoverableGroups, loading, refresh } = useAruna()
 const route = useRoute()

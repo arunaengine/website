@@ -4,7 +4,7 @@ import Badge from '@/components/ui/Badge.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import { computed, ref, watch } from 'vue'
-import { LogOut, ShieldCheck, Users } from 'lucide-vue-next'
+import { LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type GroupDetailResponse, type GroupMember } from '@/lib/api'
 

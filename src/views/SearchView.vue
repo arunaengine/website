@@ -8,7 +8,7 @@ import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
-import { Search, FileJson2, ListChecks, Code2, Play, Plus, Star } from 'lucide-vue-next'
+import { Search, FileJson2, ListChecks, Code2, Play, Plus, Star } from '@lucide/vue'
 import type { SparqlResult } from '@/data/types'
 
 const route = useRoute()

@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import { statusVariant } from './node-display'
 import type { InfoResponse } from '@/lib/api'
-import { TriangleAlert } from 'lucide-vue-next'
+import { TriangleAlert } from '@lucide/vue'
 
 const props = defineProps<{ info: InfoResponse }>()
 

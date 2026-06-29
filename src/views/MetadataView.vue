@@ -6,7 +6,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { CrateNotReadyError, useAruna } from '@/composables/useAruna'
 import { relativeTime } from '@/lib/utils'
-import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink } from 'lucide-vue-next'
+import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink } from '@lucide/vue'
 
 const route = useRoute()
 const { metadata, profiles, loading, loadRoCrate, fullCrates, cratePending } = useAruna()

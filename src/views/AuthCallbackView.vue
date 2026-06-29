@@ -4,7 +4,7 @@ import Button from '@/components/ui/Button.vue'
 import { useAuth } from '@/composables/useAuth'
 import { onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
-import { Loader2 } from 'lucide-vue-next'
+import { Loader2 } from '@lucide/vue'
 
 const router = useRouter()
 const { completeSignIn, signIn, stage, stageError } = useAuth()

@@ -13,7 +13,7 @@ import {
   type SelectRootProps,
   useForwardPropsEmits,
 } from 'radix-vue'
-import { Check, ChevronDown } from 'lucide-vue-next'
+import { Check, ChevronDown } from '@lucide/vue'
 import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 

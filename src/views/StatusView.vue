@@ -13,7 +13,7 @@ import { useAruna } from '@/composables/useAruna'
 import { formatBytes, formatNumber, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
 import { ApiError } from '@/lib/api'
-import { Boxes, ChevronRight, Globe2, HardDrive, RefreshCw } from 'lucide-vue-next'
+import { Boxes, ChevronRight, Globe2, HardDrive, RefreshCw } from '@lucide/vue'
 
 const route = useRoute()
 const { realm, realmInfo, nodeInfo, usageInfo, loadInfo } = useAruna()

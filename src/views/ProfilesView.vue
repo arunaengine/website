@@ -7,7 +7,7 @@ import NewProfileDialog from '@/components/metadata/NewProfileDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
-import { ListChecks, Plus, Star, Lock, CheckCircle2, Circle } from 'lucide-vue-next'
+import { ListChecks, Plus, Star, Lock, CheckCircle2, Circle } from '@lucide/vue'
 import type { ProfileFieldKind } from '@/data/types'
 
 const route = useRoute()

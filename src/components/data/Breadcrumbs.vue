@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ChevronRight, FolderOpenDot, Home } from 'lucide-vue-next'
+import { ChevronRight, FolderOpenDot, Home } from '@lucide/vue'
 
 const props = defineProps<{ path: string; bucket: string }>()
 const emit = defineEmits<{

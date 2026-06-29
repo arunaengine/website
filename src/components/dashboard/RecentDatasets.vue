@@ -3,7 +3,7 @@ import { useRealm } from '@/composables/useRealm'
 import Badge from '@/components/ui/Badge.vue'
 import { RouterLink } from 'vue-router'
 import { relativeTime } from '@/lib/utils'
-import { ArrowRight, FileJson2 } from 'lucide-vue-next'
+import { ArrowRight, FileJson2 } from '@lucide/vue'
 import { computed } from 'vue'
 
 const { metadata } = useRealm()

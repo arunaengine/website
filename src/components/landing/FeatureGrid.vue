@@ -4,7 +4,7 @@ import {
   FileJson2,
   KeyRound,
   Share2,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 
 const features = [
   {

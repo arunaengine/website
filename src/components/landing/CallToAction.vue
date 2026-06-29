@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
-import { ArrowRight } from 'lucide-vue-next'
+import { ArrowRight } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 </script>
 

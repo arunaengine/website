@@ -14,7 +14,7 @@ import Switch from '@/components/ui/Switch.vue'
 import Badge from '@/components/ui/Badge.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import { computed, ref, watch } from 'vue'
-import { FileJson2, Plus, X } from 'lucide-vue-next'
+import { FileJson2, Plus, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import type { MetadataDoc } from '@/data/types'
 

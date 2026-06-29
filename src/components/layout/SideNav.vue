@@ -13,7 +13,7 @@ import {
   ListChecks,
   Settings,
   Users,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 
 interface NavItem {
   to: string

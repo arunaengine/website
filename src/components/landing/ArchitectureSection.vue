@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Card from '@/components/ui/Card.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
-import { Hash, FileJson2, Database, Share2, Layers } from 'lucide-vue-next'
+import { Hash, FileJson2, Database, Share2, Layers } from '@lucide/vue'
 </script>
 
 <template>

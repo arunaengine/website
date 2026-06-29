@@ -8,7 +8,7 @@ import {
   useForwardPropsEmits,
 } from 'radix-vue'
 import { computed } from 'vue'
-import { X } from 'lucide-vue-next'
+import { X } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<DialogContentProps & { class?: string; hideClose?: boolean }>()

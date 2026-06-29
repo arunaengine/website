@@ -4,7 +4,7 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { computed, ref } from 'vue'
-import { Lock, Plus, Trash2 } from 'lucide-vue-next'
+import { Lock, Plus, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import type { ApiRole, GroupDetailResponse, GroupPermissionLevel } from '@/lib/api'
 
