@@ -32,7 +32,7 @@ fi
 GIT_COMMIT="${GITHUB_SHA:-$(git rev-parse HEAD)}"
 GIT_REF="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-SOURCE="${PORTAL_SOURCE:-ArunaStorage/website@${GIT_REF}}"
+SOURCE="${PORTAL_SOURCE:-arunaengine/website@${GIT_REF}}"
 
 json_escape() {
     local value="$1"
@@ -42,20 +42,33 @@ json_escape() {
     printf '%s' "$value"
 }
 
-{
-    printf '{\n'
-    printf '  "name": "aruna-portal",\n'
-    printf '  "version": "%s",\n' "$(json_escape "$VERSION")"
-    printf '  "git_commit": "%s",\n' "$(json_escape "$GIT_COMMIT")"
-    printf '  "git_ref": "%s",\n' "$(json_escape "$GIT_REF")"
-    printf '  "built_at": "%s",\n' "$(json_escape "$BUILT_AT")"
-    printf '  "source": "%s"\n' "$(json_escape "$SOURCE")"
-    printf '}\n'
-} > "$MANIFEST"
+write_manifest() {
+    local artifact_sha256="${1:-}"
+    {
+        printf '{\n'
+        printf '  "name": "aruna-portal",\n'
+        printf '  "version": "%s",\n' "$(json_escape "$VERSION")"
+        printf '  "git_commit": "%s",\n' "$(json_escape "$GIT_COMMIT")"
+        printf '  "git_ref": "%s",\n' "$(json_escape "$GIT_REF")"
+        printf '  "built_at": "%s",\n' "$(json_escape "$BUILT_AT")"
+        printf '  "source": "%s"' "$(json_escape "$SOURCE")"
+        if [ -n "$artifact_sha256" ]; then
+            printf ',\n'
+            printf '  "artifact_sha256": "%s"\n' "$(json_escape "$artifact_sha256")"
+        else
+            printf '\n'
+        fi
+        printf '}\n'
+    } > "$MANIFEST"
+}
+
+write_manifest
 cp "$MANIFEST" "dist/$MANIFEST"
 
 tar -C dist -czf "$TARBALL" .
-sha256sum "$TARBALL" > "$SHA_FILE"
+ARTIFACT_SHA256="$(sha256sum "$TARBALL" | cut -d' ' -f1)"
+printf '%s  %s\n' "$ARTIFACT_SHA256" "$TARBALL" > "$SHA_FILE"
+write_manifest "$ARTIFACT_SHA256"
 
 echo "artifact=$ROOT/$TARBALL"
 echo "checksum=$ROOT/$SHA_FILE"
