@@ -203,7 +203,7 @@ function toggleGroup(groupId: string) {
             <div>
               <label class="text-xs font-medium text-foreground">API base URL</label>
               <Input v-model="apiBaseDraft" class="mt-1" placeholder="/api/v1" />
-              <p class="mt-1 text-[11px] text-muted-foreground">Vite proxies /api to the local Aruna node during development.</p>
+              <p class="mt-1 text-[11px] text-muted-foreground">Release builds can pin this with VITE_ARUNA_API_BASE_URL; the /api proxy is development-only.</p>
               <a :href="swaggerUrl" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline">
                 <ExternalLink class="h-3 w-3" /> API reference (Swagger UI)
               </a>

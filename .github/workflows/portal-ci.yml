@@ -1,0 +1,21 @@
+name: portal-ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feat/v3-portal
+      - feat/v3-portal-release-assets
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun run build

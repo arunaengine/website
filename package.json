@@ -6,12 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "release:assets": "bash scripts/build-dist-tarball.sh"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1075.0",
-    "@aws-sdk/lib-storage": "^3.1075.0",
-    "@aws-sdk/s3-request-presigner": "^3.1075.0",
+    "@aws-sdk/client-s3": "^3.1077.0",
+    "@aws-sdk/lib-storage": "^3.1077.0",
+    "@aws-sdk/s3-request-presigner": "^3.1077.0",
     "@lucide/vue": "^1.22.0",
     "@vueuse/core": "^14.3.0",
     "class-variance-authority": "^0.7.1",
@@ -22,16 +23,16 @@
     "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.1",
-    "@types/node": "^26.0.1",
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/node": "^26.1.0",
     "@vitejs/plugin-vue": "^6.0.7",
     "autoprefixer": "^10.5.2",
     "playwright-core": "^1.61.1",
     "postcss": "^8.5.16",
-    "tailwindcss": "^4.3.1",
+    "tailwindcss": "^4.3.2",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^6.0.3",
-    "vite": "^8.1.0",
-    "vue-tsc": "^3.3.5"
+    "vite": "^8.1.2",
+    "vue-tsc": "^3.3.6"
   }
 }
