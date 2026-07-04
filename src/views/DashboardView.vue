@@ -155,9 +155,9 @@ const pageDescription = computed(() =>
               <h2 class="font-display text-sm font-semibold text-aruna-navy">Buckets</h2>
             </div>
             <p class="mt-2 text-xs text-muted-foreground">
-              Bucket/object browsing is disabled until the S3 ListObjectsV2 and browser CORS work is available. This UI does not invent bucket records.
+              Browse buckets, upload objects and mint credentials in the data manager. The same buckets are served by the node's S3 API, so any S3 client works too.
             </p>
-            <RouterLink to="/app/buckets" class="mt-3 inline-flex text-xs font-medium text-primary hover:underline">Open S3 status</RouterLink>
+            <RouterLink to="/app/buckets" class="mt-3 inline-flex text-xs font-medium text-primary hover:underline">Open data manager</RouterLink>
           </section>
         </div>
       </section>

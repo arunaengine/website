@@ -9,7 +9,7 @@ import {
 const features = [
   {
     title: 'Object storage',
-    desc: 'An S3-compatible API on every node. Your clients, scripts and pipelines keep working, unchanged.',
+    desc: 'An S3-compatible API on every node, with browsing and uploads built into this portal. Your clients, scripts and pipelines keep working, unchanged.',
     icon: Boxes,
     tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
   },

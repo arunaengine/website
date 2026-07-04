@@ -46,12 +46,13 @@ const wordmark = computed(() =>
         class="mt-12 font-display text-3xl font-semibold leading-[1.12] tracking-tight text-aruna-navy sm:text-4xl md:text-[42px]"
       >
         <span class="text-gradient">Your data</span> moves.
-        Your control doesn't.
+        Your portal doesn't.
       </h1>
 
       <p class="mx-auto mt-5 max-w-xl text-base text-muted-foreground">
         Aruna ships data and its metadata as one, across laptops, lab PCs and
-        repositories. Your nodes keep the data. The realm shares the catalog.
+        repositories. Wherever the data travels, you keep working in one
+        place: the portal your own node serves.
       </p>
 
       <div class="mt-9 flex flex-wrap justify-center gap-3">
