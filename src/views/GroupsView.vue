@@ -80,13 +80,18 @@ const description = computed(() =>
             </div>
           </li>
           <li v-if="!myGroups.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
-            {{
-              loading
-                ? 'Loading groups…'
-                : currentUser
-                  ? 'You are not a member of any group yet — create one to get started.'
-                  : 'Sign in to see the groups you belong to.'
-            }}
+            <p>
+              {{
+                loading
+                  ? 'Loading groups…'
+                  : currentUser
+                    ? 'You are not a member of any group yet — create one to get started.'
+                    : 'Sign in to see the groups you belong to.'
+              }}
+            </p>
+            <Button v-if="currentUser && !loading" variant="outline" size="sm" class="mt-3" @click="createGroupOpen = true">
+              <Plus class="h-3.5 w-3.5" /> Create group
+            </Button>
           </li>
         </ul>
       </section>

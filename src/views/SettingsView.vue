@@ -277,7 +277,10 @@ function toggleGroup(groupId: string) {
               </div>
             </li>
             <li v-if="!myGroups.length" class="px-5 py-6 text-center text-xs text-muted-foreground">
-              You are not a member of any group yet — create one to get started.
+              <p>You are not a member of any group yet — create one to get started.</p>
+              <Button v-if="currentUser" variant="outline" size="sm" class="mt-3" @click="createGroupOpen = true">
+                <Plus class="h-3.5 w-3.5" /> Create group
+              </Button>
             </li>
           </ul>
           <div v-if="discoverableGroups.length" class="border-t border-border">
