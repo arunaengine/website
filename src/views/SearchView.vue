@@ -5,10 +5,11 @@ import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
+import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
-import { Search, FileJson2, ListChecks, Code2, Play, Plus, Star } from '@lucide/vue'
+import { Search, FileJson2, Code2, Play, Plus, Star } from '@lucide/vue'
 import type { SparqlResult } from '@/data/types'
 
 const route = useRoute()
@@ -115,9 +116,7 @@ async function runQuery() {
               </div>
               <div class="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                 <span class="truncate">{{ doc.author || doc.ulid }}</span>
-                <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                  <ListChecks class="h-3 w-3" /> {{ profiles.find((profile) => profile.id === doc.profileId)?.shortName ?? 'No profile' }}
-                </span>
+                <ProfileChip :doc="doc" />
               </div>
             </RouterLink>
           </div>

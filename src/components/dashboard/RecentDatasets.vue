@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRealm } from '@/composables/useRealm'
 import Badge from '@/components/ui/Badge.vue'
+import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import { RouterLink } from 'vue-router'
 import { relativeTime } from '@/lib/utils'
 import { ArrowRight, FileJson2 } from '@lucide/vue'
@@ -50,6 +51,7 @@ const recent = computed(() =>
               <Badge variant="outline" class="border-primary/30 text-primary">
                 v{{ m.currentVersion }}
               </Badge>
+              <ProfileChip :doc="m" />
             </div>
             <div class="mt-0.5 truncate text-[11px] text-muted-foreground">
               {{ m.author }} · {{ m.organization }} ·

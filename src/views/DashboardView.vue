@@ -3,6 +3,7 @@ import Button from '@/components/ui/Button.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
+import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
@@ -131,6 +132,9 @@ const pageDescription = computed(() =>
                   <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(doc.updatedAt) }}</span>
                 </div>
                 <p class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{{ doc.description || doc.ulid }}</p>
+                <div class="mt-1.5">
+                  <ProfileChip :doc="doc" />
+                </div>
               </RouterLink>
             </li>
             <li v-if="!recentMetadata.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
