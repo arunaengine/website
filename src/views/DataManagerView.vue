@@ -17,7 +17,7 @@ import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3, s3ErrorMessage, type BucketEntry, type FolderEntry, type ObjectEntry, type UploadHandle } from '@/composables/useS3'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Boxes,
@@ -35,7 +35,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { currentUser } = useAruna()
+const { currentUser, bootstrapped } = useAruna()
 const s3 = useS3()
 
 const bucket = computed(() => (route.params.bucketId as string | undefined) ?? '')
@@ -89,7 +89,7 @@ const newFolderInvalid = computed(() => {
 })
 
 async function refreshBuckets() {
-  if (!s3.hasActiveKey.value) return
+  if (!s3.hasActiveKey.value || !s3.endpoint.value) return
   bucketsLoading.value = true
   bucketsError.value = null
   try {
@@ -107,7 +107,7 @@ async function refreshBuckets() {
 let listRequestId = 0
 
 async function loadObjects(more = false) {
-  if (!s3.hasActiveKey.value || !bucket.value) return
+  if (!s3.hasActiveKey.value || !s3.endpoint.value || !bucket.value) return
   const requestId = ++listRequestId
   listLoading.value = true
   listError.value = null
@@ -129,9 +129,12 @@ function refreshAll() {
   if (bucket.value) void loadObjects()
 }
 
+// On a fresh page load the S3 endpoint arrives asynchronously (from the
+// /info bootstrap), so loading must wait for both the key and the endpoint
+// and re-fire once the endpoint resolves.
 watch(
-  () => s3.activeKey.value,
-  (key) => {
+  [() => s3.activeKey.value, () => s3.endpoint.value],
+  ([key, endpoint]) => {
     if (!key) {
       buckets.value = []
       folders.value = []
@@ -139,6 +142,7 @@ watch(
       nextToken.value = undefined
       return
     }
+    if (!endpoint) return
     refreshAll()
   },
   { immediate: true },
@@ -263,6 +267,15 @@ function clearFinishedUploads() {
   uploads.value = uploads.value.filter((item) => item.state === 'uploading')
 }
 
+// A reload mid-upload silently discards the multipart upload, so ask the
+// browser to confirm while one is running.
+function onBeforeUnload(event: BeforeUnloadEvent) {
+  if (!uploads.value.some((item) => item.state === 'uploading')) return
+  event.preventDefault()
+}
+window.addEventListener('beforeunload', onBeforeUnload)
+onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload))
+
 async function download(object: ObjectEntry) {
   try {
     const url = await s3.downloadUrl(bucket.value, object.key)
@@ -316,7 +329,11 @@ const isEmpty = computed(
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <section v-if="!s3.endpoint.value" class="surface border-amber-500/30 bg-amber-500/5 p-5 text-sm text-amber-900 dark:text-amber-200">
+      <section v-if="!s3.endpoint.value && !bootstrapped" class="surface flex items-center gap-2 p-5 text-sm text-muted-foreground">
+        <Loader2 class="h-4 w-4 animate-spin" /> Connecting to the node…
+      </section>
+
+      <section v-else-if="!s3.endpoint.value" class="surface border-amber-500/30 bg-amber-500/5 p-5 text-sm text-amber-900 dark:text-amber-200">
         <div class="flex items-start gap-3">
           <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />
           <p>This node does not advertise an S3 endpoint, so the data manager cannot connect.</p>

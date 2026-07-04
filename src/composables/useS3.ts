@@ -63,8 +63,8 @@ const activeKey = ref<S3Key | null>(loadStoredKey())
 
 const endpoint = computed(
   () =>
-    nodeInfo.value?.services.interfaces.s3.url ??
-    realmInfo.value?.interfaces.s3.url ??
+    nodeInfo.value?.services?.interfaces?.s3?.url ??
+    realmInfo.value?.interfaces?.s3?.url ??
     null,
 )
 
