@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import Button from '@/components/ui/Button.vue'
-import { ArrowRight, BookOpen } from '@lucide/vue'
-import { computed } from 'vue'
-import { useTheme } from '@/composables/useTheme'
+import Button from "@/components/ui/Button.vue";
+import { ArrowRight, BookOpen } from "@lucide/vue";
+import { computed } from "vue";
+import { useTheme } from "@/composables/useTheme";
 
-const { isDark } = useTheme()
+const { isDark } = useTheme();
 const wordmark = computed(() =>
-  isDark.value ? '/brand/wordmark-white.png' : '/brand/wordmark.png',
-)
+  isDark.value ? "/brand/wordmark-white.png" : "/brand/wordmark.png",
+);
 </script>
 
 <template>
@@ -19,7 +19,10 @@ const wordmark = computed(() =>
       aria-hidden="true"
       class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_0%,black_30%,transparent_75%)]"
     />
-    <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
+    <div
+      aria-hidden="true"
+      class="wash-primary pointer-events-none absolute inset-0"
+    />
 
     <div class="container relative max-w-3xl pb-24 pt-20 text-center sm:pt-24">
       <!-- Brand lockup: wave mark + ARUNA wordmark (always the image assets, never typed) -->
@@ -45,14 +48,14 @@ const wordmark = computed(() =>
       <h1
         class="mt-12 font-display text-3xl font-semibold leading-[1.12] tracking-tight text-aruna-navy sm:text-4xl md:text-[42px]"
       >
-        <span class="text-gradient">Your data</span> moves.
-        Your portal doesn't.
+        <span class="text-gradient">Your data</span> moves. Your control
+        doesn't.
       </h1>
 
       <p class="mx-auto mt-5 max-w-xl text-base text-muted-foreground">
         Aruna ships data and its metadata as one, across laptops, lab PCs and
-        repositories. Wherever the data travels, you keep working in one
-        place: the portal your own node serves.
+        repositories. Wherever the data travels, you keep working in one place:
+        the portal your own node serves.
       </p>
 
       <div class="mt-9 flex flex-wrap justify-center gap-3">
