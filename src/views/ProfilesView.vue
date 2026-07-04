@@ -2,19 +2,28 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import Pagination from '@/components/ui/Pagination.vue'
 import NewProfileDialog from '@/components/metadata/NewProfileDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
-import { ListChecks, Plus, Star, Lock, CheckCircle2, Circle } from '@lucide/vue'
-import { PROFILE_VALUE_KIND_LABELS, PROFILE_OBLIGATION_LABELS } from '@/lib/profiles/labels'
+import { ListChecks, Plus, Star, Lock, Download } from '@lucide/vue'
+import {
+  OBLIGATION_ACCENT,
+  OBLIGATION_ORDER,
+  PROFILE_OBLIGATION_LABELS,
+  PROFILE_VALUE_KIND_LABELS,
+  obligationBadgeVariant,
+} from '@/lib/profiles/labels'
+import { deriveEntityObligation, entityRulesToMode } from '@/lib/profiles/mode'
+import { buildProfileCrate } from '@/lib/profiles/rocrate'
+import { isRecord } from '@/lib/profiles/uri'
+import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import type { MetadataProfile } from '@/data/types'
-import type { ProfileObligation, ProfilePropertyRule } from '@/lib/profiles/types'
+import type { ProfilePropertyRule } from '@/lib/profiles/types'
 
 const route = useRoute()
 const router = useRouter()
-const { profiles, currentUser, updateUserProfile, saving, loadRoCrate } = useAruna()
+const { profiles, currentUser, updateUserProfile, saving, loadRoCrate, fullCrates } = useAruna()
 const showNewProfile = ref(false)
 
 const selectedId = computed(() => (route.params.profileId as string) || profiles.value[0]?.id || '')
@@ -28,14 +37,6 @@ function select(id: string) {
 async function setPreferred(id: string) {
   await updateUserProfile({ set_attributes: { 'ui.preferred_profile_path': `profiles/${id}` } })
 }
-
-// Obligation → Badge variant and the order rules are grouped in.
-const OBLIGATION_BADGE: Record<ProfileObligation, 'royal' | 'warn' | 'secondary'> = {
-  MUST: 'royal',
-  SHOULD: 'warn',
-  MAY: 'secondary',
-}
-const OBLIGATION_ORDER: ProfileObligation[] = ['MUST', 'SHOULD', 'MAY']
 
 // Profile list summaries can omit the structured rule entities. When the selected
 // profile lacks entity rules but has a backing document, fetch the full crate once
@@ -63,12 +64,6 @@ const selectedLoadingFull = computed(() => {
   return Boolean(docId && loadingCrateIds.value[docId] && !selected.value?.entityRules.length)
 })
 
-// Short human type name from a schema.org / URI type ("http://schema.org/Dataset" → "Dataset").
-function shortType(type: string): string {
-  if (!type) return 'entity'
-  return type.split(/[#/]/).filter(Boolean).pop() ?? type
-}
-
 function propertyCount(profile: MetadataProfile): number {
   return profile.entityRules.length
     ? profile.entityRules.reduce((sum, rule) => sum + rule.propertyRules.length, 0)
@@ -84,6 +79,72 @@ const allPropertyRules = computed<ProfilePropertyRule[]>(() => {
     : profile.propertyRules
 })
 const requiredPropertyCount = computed(() => allPropertyRules.value.filter((rule) => rule.obligation === 'MUST').length)
+
+// Entity-level obligation is derived (not stored): an entity type is required /
+// recommended iff a MUST / SHOULD property references it via its entityTypes.
+// `via` names the strongest referencing property so the header can explain it.
+const entityRulesWithObligation = computed(() => {
+  const entities = selected.value?.entityRules ?? []
+  return entities.map((rule) => ({ rule, ...deriveEntityObligation(rule.type, entities) }))
+})
+
+function downloadJson(data: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
+// Full-fidelity export (D1): the profile's stored crate carries mode + schema
+// losslessly. Prefer the already-loaded crate; when it is not loaded yet, fetch it
+// on demand (L9) rather than rebuilding with fabricated basics. Only if the fetch
+// fails do we rebuild from the record's fields — and then omit datePublished /
+// license (buildProfileCrate drops empty ones) instead of inventing them.
+const downloadingCrate = ref(false)
+async function downloadProfileCrate(profile: MetadataProfile) {
+  let crate = profile.documentId ? fullCrates.value[profile.documentId] : undefined
+  if (!(isRecord(crate) && Array.isArray(crate['@graph'])) && profile.documentId) {
+    downloadingCrate.value = true
+    try {
+      crate = await loadRoCrate(profile.documentId)
+    } catch {
+      crate = undefined
+    } finally {
+      downloadingCrate.value = false
+    }
+  }
+  const finalCrate =
+    isRecord(crate) && Array.isArray(crate['@graph'])
+      ? crate
+      : buildProfileCrate({
+          slug: profile.id,
+          name: profile.name,
+          description: profile.description,
+          version: profile.version,
+          datePublished: '',
+          license: '',
+          entityRules: profile.entityRules,
+          importedMode: profile.mode ?? undefined,
+        })
+  downloadJson(finalCrate, `${profile.id}.crate.json`)
+}
+
+// Secondary export: the Describo/Crate-O mode file — form structure only. The
+// verbatim imported mode when present, else generated from the entity rules.
+function downloadModeFile(profile: MetadataProfile) {
+  const mode =
+    profile.mode ??
+    entityRulesToMode(
+      { name: profile.name, description: profile.description, version: profile.version ?? '' },
+      profile.entityRules,
+    )
+  downloadJson(mode, `${profile.id}.mode.json`)
+}
 
 function groupByObligation(rules: ProfilePropertyRule[]) {
   return OBLIGATION_ORDER
@@ -103,15 +164,6 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
   if (rule.multipleValues) parts.push('multiple values')
   return parts
 }
-
-// Pagination is kept only for the flat fallback list (legacy/external profiles).
-const PROPERTY_PAGE_SIZE = 8
-const propertyPage = ref(1)
-watch(selectedId, () => { propertyPage.value = 1 })
-const fallbackRules = computed(() => selected.value?.propertyRules ?? [])
-const fallbackPaged = computed(() =>
-  fallbackRules.value.slice((propertyPage.value - 1) * PROPERTY_PAGE_SIZE, propertyPage.value * PROPERTY_PAGE_SIZE),
-)
 </script>
 
 <template>
@@ -174,6 +226,23 @@ const fallbackPaged = computed(() =>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                :disabled="downloadingCrate"
+                @click="downloadProfileCrate(selected)"
+                title="Full-fidelity RO-Crate profile — validation rules and form structure travel together"
+              >
+                <Download class="h-3.5 w-3.5" /> {{ downloadingCrate ? 'Preparing…' : 'Download profile crate' }}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                @click="downloadModeFile(selected)"
+                title="Mode file (Describo/Crate-O) — structure only; validation rules travel in the profile crate"
+              >
+                <Download class="h-3.5 w-3.5" /> Mode file (Describo/Crate-O)
+              </Button>
               <Button v-if="currentUser && preferredId !== selected.id" variant="outline" size="sm" :disabled="saving" @click="setPreferred(selected.id)">
                 <Star class="h-3.5 w-3.5" /> Set as my default
               </Button>
@@ -212,23 +281,25 @@ const fallbackPaged = computed(() =>
 
         <!-- Grouped entity-rule sections: what entities this profile expects and how they must be described. -->
         <template v-if="selected.entityRules.length">
-          <div v-for="entityRule in selected.entityRules" :key="entityRule.id" class="surface overflow-hidden">
+          <div v-for="entry in entityRulesWithObligation" :key="entry.rule.id" class="surface overflow-hidden">
             <header class="border-b border-border px-5 py-4">
               <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-foreground">
                 <span>This profile</span>
-                <Badge :variant="OBLIGATION_BADGE[entityRule.obligation]" class="text-[10px] font-semibold uppercase tracking-wide">{{ entityRule.obligation }}</Badge>
+                <Badge :variant="obligationBadgeVariant(entry.obligation)" class="text-[10px] font-semibold uppercase tracking-wide">{{ entry.obligation }}</Badge>
                 <span>include an entity of type</span>
-                <b class="font-semibold text-aruna-navy">{{ shortType(entityRule.type) }}</b>
-                <span v-if="entityRule.label && entityRule.label.toLowerCase() !== shortType(entityRule.type).toLowerCase()" class="text-muted-foreground">— {{ entityRule.label }}</span>
+                <b class="font-semibold text-aruna-navy">{{ entityTypeLabel(entry.rule.type) }}</b>
+                <span v-if="entry.rule.label && entry.rule.label.toLowerCase() !== entityTypeLabel(entry.rule.type).toLowerCase()" class="text-muted-foreground">— {{ entry.rule.label }}</span>
+                <!-- Derived obligation is explained by the property that references this type. -->
+                <span v-if="entry.via" class="text-[11px] text-muted-foreground">via <code class="hash rounded bg-muted px-1 py-0.5 text-foreground/70">{{ entry.via.valueName }}</code></span>
               </div>
-              <p v-if="entityRule.description" class="mt-1.5 text-xs text-muted-foreground">{{ entityRule.description }}</p>
-              <p class="mt-1 text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[entityRule.obligation].help }}</p>
+              <p v-if="entry.rule.description" class="mt-1.5 text-xs text-muted-foreground">{{ entry.rule.description }}</p>
+              <p class="mt-1 text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[entry.obligation].help }}</p>
             </header>
 
-            <div v-if="entityRule.propertyRules.length">
-              <div v-for="group in groupByObligation(entityRule.propertyRules)" :key="group.obligation">
+            <div v-if="entry.rule.propertyRules.length">
+              <div v-for="group in groupByObligation(entry.rule.propertyRules)" :key="group.obligation" class="border-l-2" :class="OBLIGATION_ACCENT[group.obligation]">
                 <div class="flex flex-wrap items-center gap-2 bg-muted/20 px-5 py-2">
-                  <Badge :variant="OBLIGATION_BADGE[group.obligation]" class="text-[10px] font-semibold uppercase tracking-wide">{{ group.obligation }}</Badge>
+                  <Badge :variant="obligationBadgeVariant(group.obligation)" class="text-[10px] font-semibold uppercase tracking-wide">{{ group.obligation }}</Badge>
                   <span class="text-xs font-semibold text-foreground">{{ PROFILE_OBLIGATION_LABELS[group.obligation].label }}</span>
                   <span class="text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[group.obligation].help }}</span>
                 </div>
@@ -238,8 +309,14 @@ const fallbackPaged = computed(() =>
                       <span class="text-sm font-medium text-foreground">{{ rule.label }}</span>
                       <code class="hash rounded bg-muted px-1.5 py-0.5 text-foreground/70">{{ rule.valueName }}</code>
                       <span class="text-[10px] uppercase tracking-wide text-muted-foreground">{{ PROFILE_VALUE_KIND_LABELS[rule.kind] }}</span>
+                      <!-- Absolute property term URI (mode input `id`), truncated. -->
+                      <code v-if="rule.propertyUri" class="inline-block max-w-[240px] truncate align-middle font-mono text-[10px] text-muted-foreground/70" :title="rule.propertyUri">{{ rule.propertyUri }}</code>
                     </div>
                     <p v-if="rule.description" class="mt-0.5 text-[12px] text-muted-foreground">{{ rule.description }}</p>
+                    <!-- Entity-reference targets: the entity types this property points at. -->
+                    <div v-if="rule.kind === 'entity' && rule.entityTypes?.length" class="mt-1 flex flex-wrap items-center gap-1">
+                      <span v-for="type in rule.entityTypes" :key="type" class="rounded-full bg-card px-2 py-0.5 text-[10px] text-foreground/70 ring-1 ring-inset ring-border">references {{ entityTypeLabel(type) }}</span>
+                    </div>
                     <div v-if="rule.example" class="mt-1 font-mono text-[11px] text-foreground/60">e.g. {{ rule.example }}</div>
                     <div v-if="rule.enumOptions?.length" class="mt-1 flex flex-wrap items-center gap-1">
                       <span class="text-[10px] text-muted-foreground">one of:</span>
@@ -258,39 +335,9 @@ const fallbackPaged = computed(() =>
           </div>
         </template>
 
-        <!-- Fallback: legacy/external profiles with no structured entity rules render the flat property list. -->
-        <div v-else class="surface overflow-hidden">
-          <header class="border-b border-border px-5 py-3">
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Property rules</h3>
-            <p class="text-xs text-muted-foreground">This profile has no structured entity rules; showing the flat property rules parsed from its JSON Schema validator.</p>
-          </header>
-          <ul class="divide-y divide-border">
-            <li v-for="rule in fallbackPaged" :key="rule.id" class="flex items-start gap-3 px-5 py-3">
-              <CheckCircle2 v-if="rule.obligation === 'MUST'" class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <Circle v-else class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/60" />
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-sm font-medium text-foreground">{{ rule.label }}</span>
-                  <code class="hash rounded bg-muted px-1.5 py-0.5 text-foreground/70">{{ rule.valueName }}</code>
-                  <Badge :variant="OBLIGATION_BADGE[rule.obligation]" class="text-[10px] font-semibold uppercase tracking-wide">{{ rule.obligation }}</Badge>
-                  <span class="text-[10px] text-muted-foreground">· {{ PROFILE_VALUE_KIND_LABELS[rule.kind] }}</span>
-                </div>
-                <p v-if="rule.description" class="mt-0.5 text-[12px] text-muted-foreground">{{ rule.description }}</p>
-                <div v-if="rule.example" class="mt-1 font-mono text-[11px] text-foreground/60">e.g. {{ rule.example }}</div>
-                <div v-if="rule.enumOptions?.length" class="mt-1 flex flex-wrap items-center gap-1">
-                  <span class="text-[10px] text-muted-foreground">one of:</span>
-                  <span v-for="option in rule.enumOptions" :key="option" class="rounded-full bg-card px-2 py-0.5 text-[10px] text-foreground/70 ring-1 ring-inset ring-border">{{ option }}</span>
-                </div>
-                <div v-if="constraintSummary(rule).length" class="mt-1 flex flex-wrap gap-1.5">
-                  <span v-for="part in constraintSummary(rule)" :key="part" class="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{{ part }}</span>
-                </div>
-              </div>
-            </li>
-            <li v-if="!fallbackRules.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
-              This profile has no parseable property rules.
-            </li>
-          </ul>
-          <Pagination v-if="fallbackRules.length > PROPERTY_PAGE_SIZE" v-model:page="propertyPage" :page-size="PROPERTY_PAGE_SIZE" :total="fallbackRules.length" label="properties" />
+        <!-- Profiles without a mode.json artifact surface with no machine-readable rules. -->
+        <div v-else class="surface px-5 py-10 text-center text-sm text-muted-foreground">
+          This profile has no machine-readable rules.
         </div>
       </section>
 
