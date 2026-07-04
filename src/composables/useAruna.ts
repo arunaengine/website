@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { Group, MetadataDoc, MetadataProfile, Node, ProfileField, ProfileFieldKind, Realm, SparqlResult, User } from '@/data/types'
+import type { Group, MetadataDoc, MetadataProfile, Node, Realm, SparqlResult, User } from '@/data/types'
 import {
   ApiError,
   apiRequest,
@@ -29,6 +29,8 @@ import {
   type UserInfoResponse,
   type UserSearchResponse,
 } from '@/lib/api'
+import { propertyRulesFromSchema } from '@/lib/profiles/schema'
+import { parseProfileCrate } from '@/lib/profiles/rocrate'
 
 const TOKEN_KEY = 'aruna.authToken'
 const API_BASE_KEY = 'aruna.apiBaseUrl'
@@ -503,7 +505,8 @@ function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
   const keywords = arrayText(entity?.keywords ?? entity?.keyword)
   const license = idValue(entity?.license) || textValue(entity?.license) || ''
   const contributors = people(entity?.author ?? entity?.creator ?? entity?.contributor)
-  const profileId = profileIdFromConformsTo(entity?.conformsTo) ?? ''
+  const profileIds = profileIdsFromConformsTo(entity?.conformsTo)
+  const profileId = profileIds[0] ?? ''
   return {
     ulid: item.document_id,
     title,
@@ -531,6 +534,7 @@ function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
     organization: contributors[0]?.affiliation ?? '',
     nodeId: '',
     profileId,
+    profileIds,
     contributors,
     doi: idValue(entity?.identifier) || textValue(entity?.identifier),
     temporalCoverage: textValue(entity?.temporalCoverage),
@@ -541,50 +545,31 @@ function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
 }
 
 function mapProfile(item: MetadataDocumentListItem): MetadataProfile {
-  const entity = primaryEntity(item.rocrate_summary)
+  const rocrate = fullCrates.value[item.document_id] ?? item.rocrate_summary
+  const parsed = parseProfileCrate(rocrate)
   const pathId = profileIdFromPath(item.document_path) || item.document_id
-  const name = textValue(entity?.name) || pathId
+  const entity = primaryEntity(rocrate)
+  const name = parsed.name || textValue(entity?.name) || pathId
+  const propertyRules = parsed.datasetPropertyRules.length ? parsed.datasetPropertyRules : propertyRulesFromSchema(parsed.schema)
   return {
     id: pathId,
+    documentId: item.document_id,
+    documentPath: item.document_path,
+    graphIri: item.graph_iri,
+    profileUri: item.graph_iri,
     name,
     shortName: name.split(/\s+/)[0] || pathId,
-    description: textValue(entity?.description) || '',
-    domain: textValue(entity?.domain) || 'RO-Crate',
+    description: parsed.description || textValue(entity?.description) || '',
+    domain: typeList(entity).includes('http://www.w3.org/ns/dx/prof#Profile') ? 'RO-Crate Profile' : textValue(entity?.domain) || 'RO-Crate',
+    version: parsed.version,
     iconColor: colorFor(pathId),
-    fields: fieldsFromValidator(item.rocrate_summary),
+    entityRules: parsed.entityRules,
+    propertyRules,
+    schema: parsed.schema,
     suggestedKeywords: arrayText(entity?.keywords ?? entity?.keyword),
     managed: item.public,
-    usedCount: metadataItems.value.filter((doc) => mapMetadataDoc(doc).profileId === pathId).length,
+    usedCount: metadataItems.value.filter((doc) => mapMetadataDoc(doc).profileIds?.includes(pathId)).length,
   }
-}
-
-function fieldsFromValidator(rocrate: unknown): ProfileField[] {
-  const validator = graph(rocrate).find((entry) => {
-    const encoding = textValue(entry.encodingFormat)
-    return encoding.includes('schema+json') || entry['@id'] === '#validator'
-  })
-  const schema = typeof validator?.text === 'object' && validator.text ? validator.text as Record<string, unknown> : undefined
-  const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined
-  if (!properties) return []
-  const required = new Set(arrayText(schema?.required))
-  return Object.entries(properties).map(([id, property]) => ({
-    id,
-    label: textValue(property.title) || id,
-    description: textValue(property.description) || '',
-    kind: fieldKind(property),
-    required: required.has(id),
-    example: textValue(property.examples),
-    enumOptions: arrayText(property.enum).length ? arrayText(property.enum) : undefined,
-  }))
-}
-
-function fieldKind(property: Record<string, unknown>): ProfileFieldKind {
-  if (Array.isArray(property.enum)) return 'enum'
-  if (property.format === 'uri') return 'url'
-  if (property.format === 'date') return 'date'
-  if (property.type === 'array') return 'keyword-list'
-  if (property.type === 'string' && property.maxLength === undefined) return 'longtext'
-  return 'text'
 }
 
 function graph(value: unknown): Array<Record<string, unknown>> {
@@ -621,19 +606,41 @@ function arrayText(value: unknown): string[] {
   return single ? [single] : []
 }
 
+function typeList(entity?: Record<string, unknown>): string[] {
+  return arrayText(entity?.['@type'])
+}
+
 function people(value: unknown) {
   return arrayText(value).map((name) => ({ name, role: 'Contributor', affiliation: undefined }))
 }
 
-function profileIdFromConformsTo(value: unknown): string | undefined {
-  const id = idValue(value)
-  if (!id) return undefined
-  return profileIdFromPath(id.split('/').pop() ?? id)
+function profileIdsFromConformsTo(value: unknown): string[] {
+  const resolved = new Set<string>()
+  for (const id of idValues(value)) {
+    const local = profileIdFromConformanceId(id)
+    if (local) resolved.add(local)
+  }
+  return [...resolved]
+}
+
+function profileIdFromConformanceId(id: string): string | undefined {
+  const byGraph = profileItems.value.find((profile) => profile.graph_iri === id)
+  if (byGraph) return profileIdFromPath(byGraph.document_path) || byGraph.document_id
+  if (id.startsWith('aruna:profile/')) return profileIdFromPath(id)
+  if (id.includes('/profiles/')) return profileIdFromPath(id.split('/profiles/').pop())
+  return undefined
 }
 
 function profileIdFromPath(value?: string | null): string | undefined {
   if (!value) return undefined
   return value.replace(/^profiles\//, '').replace(/^aruna:profile\//, '')
+}
+
+function idValues(value: unknown): string[] {
+  if (typeof value === 'string') return [value]
+  if (Array.isArray(value)) return value.flatMap(idValues)
+  if (isRecord(value)) return idValues(value['@id'] ?? value.id)
+  return []
 }
 
 function colorFor(value: string): string {

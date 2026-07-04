@@ -1,3 +1,5 @@
+import type { JsonSchema, ProfileEntityRule, ProfilePropertyRule } from '@/lib/profiles/types'
+
 // -----------------------------------------------------------------------------
 // Realms, nodes, and federation primitives
 // -----------------------------------------------------------------------------
@@ -180,34 +182,23 @@ export interface MetadataVersion {
   hash: string
 }
 
-export type ProfileFieldKind =
-  | 'text'
-  | 'longtext'
-  | 'url'
-  | 'date'
-  | 'keyword-list'
-  | 'person-list'
-  | 'license'
-  | 'enum'
-
-export interface ProfileField {
-  id: string
-  label: string
-  description: string
-  kind: ProfileFieldKind
-  required: boolean
-  example?: string
-  enumOptions?: string[]
-}
-
 export interface MetadataProfile {
   id: string
+  documentId?: string
+  documentPath?: string
+  graphIri?: string
+  profileUri?: string
   name: string
   shortName: string
   description: string
   domain: string
+  version?: string
   iconColor: string
-  fields: ProfileField[]
+  // Structured RO-Crate entity rules parsed from the profile crate.
+  entityRules: ProfileEntityRule[]
+  // Property rules on the root Dataset entity, kept for quick display/fallback.
+  propertyRules: ProfilePropertyRule[]
+  schema?: JsonSchema
   // Suggested keywords / vocabularies that are pre-populated when this profile is used
   suggestedKeywords: string[]
   // Whether this profile is editable by the current user (some are realm-managed templates)
@@ -241,6 +232,7 @@ export interface MetadataDoc {
   organization: string
   nodeId: string
   profileId: string
+  profileIds?: string[]
   contributors: MetadataContributor[]
   // Optional richer fields commonly present in research RO-Crates
   doi?: string
