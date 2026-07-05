@@ -359,7 +359,7 @@ async function save() {
               <div>
                 <label class="text-xs font-medium text-foreground">Max devices per user</label>
                 <Input v-model="draft.maxDevices" type="number" min="0" placeholder="Unlimited" class="mt-1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Empty means unlimited.</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">Stored in the policy; not enforced yet — device enrollment is still in development.</p>
               </div>
             </div>
           </div>
