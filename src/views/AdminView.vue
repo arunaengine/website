@@ -36,6 +36,7 @@ const UNITS = [
   { value: 'B', factor: 1 },
 ]
 const unitOptions = UNITS.map((u) => ({ value: u.value, label: u.value }))
+const U32_MAX = 4294967295
 
 // type="number" inputs emit numbers; normalize before any string handling.
 function text(v: unknown): string {
@@ -77,7 +78,8 @@ function amountToBytes(value: string | number, unit: string): number | null {
   const n = Number(s)
   if (s === '' || !Number.isFinite(n) || n < 0) return null
   const factor = UNITS.find((u) => u.value === unit)?.factor ?? 1024 ** 3
-  return Math.round(n * factor)
+  const bytes = Math.round(n * factor)
+  return Number.isSafeInteger(bytes) ? bytes : null
 }
 function fieldBytes(f: QuotaField): number | null {
   return f.unlimited ? null : amountToBytes(f.value, f.unit)
@@ -151,22 +153,22 @@ function intOrEmptyValid(v: string | number): boolean {
   const s = text(v).trim()
   if (s === '') return true
   const n = Number(s)
-  return Number.isInteger(n) && n >= 0
+  return Number.isInteger(n) && n >= 0 && n <= U32_MAX
 }
-const graceInvalid = computed(() => { const g = Number(draft.value.grace); return !Number.isInteger(g) || g < 100 })
+const graceInvalid = computed(() => { const g = Number(draft.value.grace); return !Number.isInteger(g) || g < 100 || g > U32_MAX })
 const warnInvalid = computed(() => { const w = Number(draft.value.warn); return !Number.isInteger(w) || w < 1 || w > 100 })
 
 const clientErrors = computed(() => {
   const errs: string[] = []
   if (graceInvalid.value) errs.push('Grace factor must be a whole number of at least 100%.')
   if (warnInvalid.value) errs.push('Warn threshold must be a whole number between 1 and 100%.')
-  if (!quotaFieldValid(draft.value.defaultQuota)) errs.push('Default group quota must be a non-negative number.')
+  if (!quotaFieldValid(draft.value.defaultQuota)) errs.push('Default group quota must be a non-negative number below ~8 PiB.')
   if (!intOrEmptyValid(draft.value.maxGroups)) errs.push('Max groups per user must be a non-negative whole number.')
   if (!intOrEmptyValid(draft.value.maxDevices)) errs.push('Max devices per user must be a non-negative whole number.')
   draft.value.overrides.forEach((o, i) => {
     if (!o.group_id) errs.push(`Group override ${i + 1} needs a group.`)
-    if (!quotaFieldValid(o.quota)) errs.push(`Group override ${i + 1} quota must be a non-negative number.`)
-    if (text(o.grace).trim() !== '') { const g = Number(o.grace); if (!Number.isInteger(g) || g < 100) errs.push(`Group override ${i + 1} grace factor must be at least 100%.`) }
+    if (!quotaFieldValid(o.quota)) errs.push(`Group override ${i + 1} quota must be a non-negative number below ~8 PiB.`)
+    if (text(o.grace).trim() !== '') { const g = Number(o.grace); if (!Number.isInteger(g) || g < 100 || g > U32_MAX) errs.push(`Group override ${i + 1} grace factor must be at least 100%.`) }
   })
   if (duplicateGroupIds.value.size) errs.push('Each group may appear in at most one override.')
   draft.value.userCaps.forEach((u, i) => { if (!intOrEmptyValid(u.max_groups)) errs.push(`User cap ${i + 1} max groups must be a non-negative whole number.`) })
