@@ -66,7 +66,7 @@ export interface InfoResponse {
     status: string
     realm_id: string
     peer_id: string
-    capabilities: string
+    capabilities: 'management' | 'server' | 'local'
   }
   api_version?: string
   portal?: PortalStatus | null

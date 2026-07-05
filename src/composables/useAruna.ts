@@ -451,6 +451,9 @@ const isRealmAdmin = computed<boolean>(() => {
   )
 })
 
+// Quota edits are only accepted by a management node; server/local nodes 403.
+const isManagementNode = computed<boolean>(() => nodeInfo.value?.node.capabilities === 'management')
+
 const nodes = computed<Node[]>(() => {
   const id = realm.value.id
   return (realmInfo.value?.nodes ?? []).map((node) => ({
@@ -754,6 +757,7 @@ export function useAruna() {
     realm,
     currentUser,
     isRealmAdmin,
+    isManagementNode,
     nodes,
     groups,
     myGroups,

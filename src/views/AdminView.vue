@@ -13,8 +13,10 @@ import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { Database, HardDrive, Layers, Boxes, RefreshCw, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
 
-const { realmInfo, usageInfo, isRealmAdmin, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
+const { realmInfo, usageInfo, isRealmAdmin, isManagementNode, nodeInfo, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
 const { isAuthenticated } = useAuth()
+
+const nodeCapability = computed(() => nodeInfo.value?.node.capabilities ?? 'server')
 
 // Mirrors aruna's `impl Default for QuotaConfig` — the effective policy when a
 // backend serves no quota block. null = unlimited.
@@ -254,7 +256,7 @@ function reset() {
   saveMessage.value = null
 }
 async function save() {
-  if (!dirty.value || saving.value || invalid.value) return
+  if (!dirty.value || saving.value || invalid.value || !isManagementNode.value) return
   saveError.value = null
   saveMessage.value = null
   try {
@@ -307,6 +309,10 @@ async function save() {
           </div>
           <p v-else class="px-5 py-4 text-sm text-muted-foreground">Realm-wide totals need an authenticated session on a quota-aware backend.</p>
         </section>
+
+        <p v-if="!isManagementNode" class="surface px-5 py-3 text-xs text-muted-foreground">
+          This node is a {{ nodeCapability }} node — the quota policy can only be edited through a management node.
+        </p>
 
         <section id="policy" class="surface">
           <header class="flex items-center gap-2 border-b border-border px-5 py-4">
@@ -430,7 +436,7 @@ async function save() {
           </div>
           <div class="flex items-center gap-2">
             <Button variant="outline" size="sm" :disabled="!dirty || saving" @click="reset">Reset</Button>
-            <Button size="sm" :disabled="!dirty || saving || invalid" @click="save"><Save class="h-3.5 w-3.5" /> Save policy</Button>
+            <Button size="sm" :disabled="!dirty || saving || invalid || !isManagementNode" @click="save"><Save class="h-3.5 w-3.5" /> Save policy</Button>
           </div>
         </div>
       </div>
