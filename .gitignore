@@ -6,5 +6,5 @@ aruna-portal-dist.tar.gz
 aruna-portal-dist.tar.gz.sha256
 portal-manifest.json
 .env
-.claude/settings.local.json
+.claude
 node_modules
