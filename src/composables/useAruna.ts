@@ -435,12 +435,19 @@ const currentUser = computed<User | null>(() => {
   }
 })
 
+// The backend authorizes quota edits with WRITE on exactly /{realm_id}/admin/config.
 const isRealmAdmin = computed<boolean>(() => {
   const info = userInfo.value
   if (!info) return false
-  const prefix = `/${info.realm.realm_id}/admin`
+  const target = `/${info.realm.realm_id}/admin/config`
   return info.realm.roles.some((role) =>
-    Object.entries(role.permissions).some(([key, value]) => value === 'Write' && key.startsWith(prefix)),
+    Object.entries(role.permissions).some(([key, value]) => {
+      if (value !== 'Write') return false
+      if (key === target) return true
+      if (!key.endsWith('/**')) return false
+      const base = key.slice(0, -3)
+      return target === base || target.startsWith(`${base}/`)
+    }),
   )
 })
 
