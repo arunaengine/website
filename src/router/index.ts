@@ -32,6 +32,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'status', name: 'status', component: () => import('@/views/StatusView.vue') },
       // Settings (consolidates account preferences, members, tokens)
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
+      // Realm admin — quota policy and realm-wide usage
+      { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
       // Compatibility redirects from prior IA
       { path: 'data', redirect: { name: 'buckets' } },
       { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },

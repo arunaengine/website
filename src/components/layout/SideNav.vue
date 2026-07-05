@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import AppLogo from '@/components/layout/AppLogo.vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useAruna } from '@/composables/useAruna'
 import {
   Activity,
   ArrowLeft,
@@ -12,6 +13,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Settings,
+  ShieldCheck,
   Users,
 } from '@lucide/vue'
 
@@ -23,7 +25,9 @@ interface NavItem {
   match?: string[]
 }
 
-const nav: NavItem[] = [
+const { isRealmAdmin } = useAruna()
+
+const nav = computed<NavItem[]>(() => [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
   { to: '/app/buckets', icon: Boxes, label: 'Data' },
@@ -31,7 +35,8 @@ const nav: NavItem[] = [
   { to: '/app/groups', icon: Users, label: 'Groups' },
   { to: '/app/status', icon: Activity, label: 'Status' },
   { to: '/app/settings', icon: Settings, label: 'Settings' },
-]
+  ...(isRealmAdmin.value ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin' }] : []),
+])
 
 const route = useRoute()
 
