@@ -1,43 +1,82 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import Input from '@/components/ui/Input.vue'
-import Textarea from '@/components/ui/Textarea.vue'
-import Select from '@/components/ui/Select.vue'
-import Switch from '@/components/ui/Switch.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
-import { CheckCircle2, AlertTriangle } from '@lucide/vue'
-import { controlsFromSchema, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
+import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
+import { CheckCircle2, AlertTriangle, Lightbulb } from '@lucide/vue'
+import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
+import { entityRulesToMode } from '@/lib/profiles/mode'
 import { validateProfileData } from '@/lib/profiles/validate'
-import { PROFILE_OBLIGATION_LABELS } from '@/lib/profiles/labels'
+import { obligationBadgeVariant, PROFILE_OBLIGATION_LABELS, PROFILE_REFERENCE_MODE_LABELS } from '@/lib/profiles/labels'
+import { entityTypeLabel } from '@/lib/profiles/entityTypes'
+import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import type { ProfileBuilder } from './useProfileBuilder'
 
 const props = defineProps<{ builder: ProfileBuilder }>()
 const builder = props.builder
 
-// The preview compiles the generated schema through the same controls pipeline
-// dataset creation uses, so authors see exactly what people filling the profile
-// will see and how validation reacts.
-const controls = computed(() => controlsFromSchema(builder.generatedSchema))
+// Plain-English lines for every constraint the schema/mode preview cannot show at
+// a glance: allowed URL sets, list cardinality, reference mode, required contents.
+// Only rules that carry at least one such constraint appear, so a plain profile
+// shows an empty summary (hidden).
+function constraintLines(rule: ProfilePropertyRule): string[] {
+  const lines: string[] = []
+  if (rule.kind === 'select-url' && rule.valueOptions?.length) {
+    lines.push(`Value must be one of ${rule.valueOptions.length} allowed URLs: ${(rule.valueOptions as string[]).join(', ')}.`)
+  }
+  if (rule.minItems !== undefined && rule.maxItems !== undefined) {
+    lines.push(`Must have between ${rule.minItems} and ${rule.maxItems} entries.`)
+  } else if (rule.minItems !== undefined) {
+    lines.push(`Must have at least ${rule.minItems} ${rule.minItems === 1 ? 'entry' : 'entries'}.`)
+  } else if (rule.maxItems !== undefined) {
+    lines.push(`Must have at most ${rule.maxItems} ${rule.maxItems === 1 ? 'entry' : 'entries'}.`)
+  }
+  if (rule.referenceMode) {
+    lines.push(`Referenced as: ${PROFILE_REFERENCE_MODE_LABELS[rule.referenceMode].label}.`)
+  }
+  for (const instance of rule.requiredInstances ?? []) {
+    const match = instance.id !== undefined ? `@id ${instance.id}` : `name ${instance.name}`
+    lines.push(`Must contain an entry matching ${match}${instance.hint ? ` — ${instance.hint}` : ''}.`)
+  }
+  return lines
+}
+
+const constraintSummary = computed(() =>
+  builder.normalizedEntities
+    .map((entity) => ({
+      label: entity.label,
+      rules: entity.propertyRules
+        .map((rule) => ({ label: rule.label || rule.valueName, obligation: rule.obligation, lines: constraintLines(rule) }))
+        .filter((rule) => rule.lines.length),
+    }))
+    .filter((entity) => entity.rules.length),
+)
+
+// The preview compiles the Dataset entity's rules through the same controls
+// pipeline dataset creation uses, so authors see exactly what people filling the
+// profile will see and how validation reacts. Entity-reference rules resolve
+// their sub-form against every entity rule.
+const controls = computed(() =>
+  controlsFromRules(builder.datasetEntity?.propertyRules ?? [], builder.normalizedEntities),
+)
 const values = ref<Record<string, unknown>>({})
 watch(controls, (list) => { values.value = defaultControlValues(list) }, { immediate: true })
 
+// Pretty-printed Describo/Crate-O mode file — the canonical machine-readable rule
+// serialization, including any verbatim-preserved keys from an imported mode.
+const modeText = computed(() =>
+  JSON.stringify(
+    entityRulesToMode(builder.profileBasics(), builder.normalizedEntities, builder.importedMode ?? undefined),
+    null,
+    2,
+  ),
+)
+
 const normalizedValues = computed(() => normalizeProfileValues(values.value, controls.value))
 const violations = computed(() => validateProfileData(builder.generatedSchema, normalizedValues.value))
-
-function fieldString(property: string): string {
-  const value = values.value[property]
-  if (Array.isArray(value)) return value.join(', ')
-  if (value === undefined || value === null) return ''
-  return String(value)
-}
-
-function setValue(property: string, value: unknown) {
-  values.value = { ...values.value, [property]: value }
-}
 
 function violationsFor(property: string) {
   return violations.value.filter((violation) => violation.fieldId === property)
@@ -59,80 +98,116 @@ function violationsFor(property: string) {
       <CheckCircle2 class="h-4 w-4" /> This profile is ready to create.
     </div>
 
+    <!-- Non-blocking authoring suggestions (e.g. prefer a schema.org term). -->
+    <div v-if="builder.rulesHints.length" class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+      <div class="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300">
+        <Lightbulb class="h-4 w-4" /> Suggestions
+      </div>
+      <ul class="mt-2 space-y-1 text-xs text-amber-800 dark:text-amber-300">
+        <li v-for="hint in builder.rulesHints" :key="hint">{{ hint }}</li>
+      </ul>
+    </div>
+
+    <!-- Human summary of the constraints the raw artifacts express tersely:
+         allowed URL sets, list cardinality, reference mode, required contents. -->
+    <div v-if="constraintSummary.length" class="rounded-lg border border-border p-3">
+      <div class="text-sm font-medium text-foreground">Constraints</div>
+      <div v-for="entity in constraintSummary" :key="entity.label" class="mt-2">
+        <div class="text-xs font-medium text-muted-foreground">{{ entity.label }}</div>
+        <ul class="mt-1 space-y-1">
+          <li v-for="rule in entity.rules" :key="rule.label" class="text-[11px] text-foreground">
+            <span class="inline-flex items-center gap-1.5">
+              <Badge :variant="obligationBadgeVariant(rule.obligation)" class="text-[10px]">{{ PROFILE_OBLIGATION_LABELS[rule.obligation].label }}</Badge>
+              <span class="font-medium">{{ rule.label }}</span>
+            </span>
+            <ul class="ml-4 list-disc space-y-0.5 text-muted-foreground">
+              <li v-for="line in rule.lines" :key="line">{{ line }}</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- What each generated artifact is for (D6). The entity and property rules
+         are the source of truth; these three files are derived from them. -->
     <p class="text-xs text-muted-foreground">
-      The JSON Schema and Profile Crate below are derived artifacts — the entity and property rules are the source of truth.
+      Your rules generate three files:
+      <b class="text-foreground">profile.html</b> is the human-readable specification,
+      <b class="text-foreground">mode.json</b> is the editor form structure (Describo/Crate-O-compatible), and
+      <b class="text-foreground">schema.json</b> holds the validation rules. They all travel together in the Profile Crate.
+      Editors read the mode file; validation reads the validation rules — mode files have no vocabulary for constraints or recommended levels.
     </p>
 
     <Tabs default-value="preview">
       <TabsList>
         <TabsTrigger value="preview">Form preview</TabsTrigger>
-        <TabsTrigger value="schema">JSON Schema</TabsTrigger>
+        <TabsTrigger value="schema">Validation rules</TabsTrigger>
+        <TabsTrigger value="mode">Mode file</TabsTrigger>
         <TabsTrigger value="crate">Profile Crate</TabsTrigger>
       </TabsList>
 
       <TabsContent value="preview">
         <div class="rounded-lg border border-border p-4">
           <p class="text-xs text-muted-foreground">
-            This is the form people see when they create a Dataset with this profile. Try it out —
-            required (MUST) values that are empty show an error, recommended (SHOULD) values show an amber warning.
+            A read-only preview of the form people see when they create a Dataset with this profile.
+            Required (MUST) values that are empty show an error, recommended (SHOULD) values show an amber warning.
           </p>
           <div v-if="!controls.length" class="mt-3 text-xs text-muted-foreground">
             The Dataset entity has no property rules yet, so no inputs are generated.
           </div>
           <div v-else class="mt-3 grid gap-3 sm:grid-cols-2">
-            <div v-for="control in controls" :key="control.property" :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''">
+            <!-- Entity references are filled with a sub-form in the dataset dialog;
+                 the review preview just names the referenced types. -->
+            <div
+              v-for="control in controls.filter((c) => c.control === 'entity')"
+              :key="control.property"
+              class="sm:col-span-2"
+            >
               <label class="flex items-center gap-2 text-xs font-medium text-foreground">
                 {{ control.label }}
-                <Badge v-if="control.obligation" :variant="control.obligation === 'MUST' ? 'royal' : control.obligation === 'SHOULD' ? 'warn' : 'secondary'" class="text-[10px]">
-                  {{ control.obligation ? PROFILE_OBLIGATION_LABELS[control.obligation].label : '' }}
+                <Badge v-if="control.obligation" :variant="obligationBadgeVariant(control.obligation)" class="text-[10px]">
+                  {{ PROFILE_OBLIGATION_LABELS[control.obligation].label }}
                 </Badge>
               </label>
-              <Textarea
-                v-if="control.control === 'textarea'"
-                :model-value="fieldString(control.property)"
-                class="mt-1"
-                rows="3"
-                @update:model-value="(value: string) => setValue(control.property, value)"
-              />
-              <Select
-                v-else-if="control.control === 'select'"
-                :model-value="fieldString(control.property)"
-                :options="(control.enumOptions ?? []).map((option) => ({ value: option, label: option }))"
-                class="mt-1"
-                placeholder="Choose an option"
-                @update:model-value="(value: string) => setValue(control.property, value)"
-              />
-              <label v-else-if="control.control === 'checkbox'" class="mt-1 flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-sm">
-                <span>{{ control.description || 'Enabled' }}</span>
-                <Switch :checked="Boolean(values[control.property])" @update:checked="(value: boolean) => setValue(control.property, value)" />
-              </label>
-              <Input
-                v-else
-                :model-value="fieldString(control.property)"
-                :type="control.control === 'integer' || control.control === 'number' ? 'number' : control.control === 'datetime-local' ? 'datetime-local' : control.control === 'tags' ? 'text' : control.control"
-                class="mt-1"
-                :placeholder="control.control === 'tags' ? 'Comma-separated values' : undefined"
-                @update:model-value="(value: string | number) => setValue(control.property, value)"
-              />
-              <p v-if="control.description && control.control !== 'checkbox'" class="mt-1 text-[11px] text-muted-foreground">{{ control.description }}</p>
+              <div class="mt-1 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+                References
+                <span class="font-medium text-foreground">{{ control.entityRule ? entityTypeLabel(control.entityRule.type) : entityTypeLabel(control.entityTypes?.[0] ?? '') || 'an entity' }}</span>
+                — added as {{ control.multiple ? 'one or more sub-forms' : 'a sub-form' }} when creating a dataset.
+              </div>
               <p
                 v-for="violation in violationsFor(control.property)"
                 :key="violation.ruleId + violation.pointer"
                 class="mt-1 text-[11px]"
-                :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-600 dark:text-amber-400'"
+                :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
               >
                 {{ violation.message }}
               </p>
             </div>
+            <ProfileControlField
+              v-for="control in controls.filter((c) => c.control !== 'entity')"
+              :key="control.property"
+              :control="control"
+              :model-value="values[control.property]"
+              :violations="violationsFor(control.property)"
+              disabled
+              :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
+            />
           </div>
         </div>
       </TabsContent>
 
       <TabsContent value="schema">
+        <p class="mb-2 text-[11px] text-muted-foreground">Validation rules — value constraints plus which properties are required (MUST) and recommended (SHOULD).</p>
         <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedSchemaText }}</pre>
       </TabsContent>
 
+      <TabsContent value="mode">
+        <p class="mb-2 text-[11px] text-muted-foreground">Describo/Crate-O-compatible mode file — form structure only, usable directly in those editors. Constraints and recommended levels stay in the validation rules.</p>
+        <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ modeText }}</pre>
+      </TabsContent>
+
       <TabsContent value="crate">
+        <p class="mb-2 text-[11px] text-muted-foreground">The complete profile document that is saved — all three files travel inside it.</p>
         <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedCrateText }}</pre>
       </TabsContent>
     </Tabs>
