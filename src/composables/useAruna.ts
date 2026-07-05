@@ -23,6 +23,7 @@ import {
   type MetadataRoCrateResponse,
   type MetadataSearchResponse,
   type RealmInfoResponse,
+  type RealmQuotaConfig,
   type S3CredentialSummary,
   type SparqlResponse,
   type UsageResponse,
@@ -233,6 +234,20 @@ async function updateUserProfile(input: {
   }
 }
 
+async function setRealmQuota(config: RealmQuotaConfig): Promise<RealmQuotaConfig> {
+  saving.value = true
+  try {
+    const stored = await request<RealmQuotaConfig>('/info/realm/quota', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    })
+    if (realmInfo.value) realmInfo.value = { ...realmInfo.value, quota: stored }
+    return stored
+  } finally {
+    saving.value = false
+  }
+}
+
 // Throws ApiError with status 409 and the server's verbatim message when the
 // caller is over the owned-group cap.
 async function createGroup(name: string): Promise<GroupDetailResponse> {
@@ -418,6 +433,15 @@ const currentUser = computed<User | null>(() => {
     preferredProfileId: profileIdFromPath(userInfo.value?.preferences.preferred_profile_path ?? undefined),
     favouriteMetadataIds: userInfo.value?.preferences.favourite_metadata_ids ?? [],
   }
+})
+
+const isRealmAdmin = computed<boolean>(() => {
+  const info = userInfo.value
+  if (!info) return false
+  const prefix = `/${info.realm.realm_id}/admin`
+  return info.realm.roles.some((role) =>
+    Object.entries(role.permissions).some(([key, value]) => value === 'Write' && key.startsWith(prefix)),
+  )
 })
 
 const nodes = computed<Node[]>(() => {
@@ -722,6 +746,7 @@ export function useAruna() {
     credentials,
     realm,
     currentUser,
+    isRealmAdmin,
     nodes,
     groups,
     myGroups,
@@ -737,6 +762,7 @@ export function useAruna() {
     loadRoCrate,
     createMetadata,
     updateUserProfile,
+    setRealmQuota,
     createGroup,
     getGroup,
     createS3Credentials,
