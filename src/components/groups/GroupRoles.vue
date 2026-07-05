@@ -142,7 +142,10 @@ async function removeRole(role: ApiRole) {
         </thead>
         <tbody>
           <tr v-for="role in sortedRoles" :key="role.role_id" class="border-t border-border">
-            <td class="px-5 py-2.5 font-medium text-foreground">{{ role.name }}</td>
+            <td class="px-5 py-2.5 font-medium text-foreground">
+              {{ role.name }}
+              <Badge v-if="role.public" variant="secondary" class="ml-1 text-[10px] uppercase" title="Applies to everyone, including anonymous requests">public</Badge>
+            </td>
             <td v-for="scope in scopes" :key="scope.label" class="px-3 py-2.5">
               <Badge v-if="cellLevel(role, scope.paths)" :variant="levelVariant(cellLevel(role, scope.paths)!)" class="text-[10px] uppercase">
                 {{ cellLevel(role, scope.paths) }}

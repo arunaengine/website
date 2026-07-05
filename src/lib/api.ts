@@ -155,6 +155,8 @@ export interface ApiRole {
   permissions: Record<string, string>
   // Only present when the caller is a member of the group; missing means hidden.
   assigned_users?: string[]
+  // Applies to every principal, including anonymous requests.
+  public?: boolean
 }
 
 export interface ApiUserGroup {
@@ -215,6 +217,8 @@ export interface CreateGroupRoleRequest {
   name: string
   permissions: Record<string, GroupPermissionLevel>
   assigned_users?: string[]
+  // Public roles apply to every principal — including anonymous requests.
+  public?: boolean
 }
 
 export interface UserSearchHit {
