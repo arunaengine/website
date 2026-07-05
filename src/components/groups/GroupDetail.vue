@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import QuotaBar from '@/components/ui/QuotaBar.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import { computed, ref, watch } from 'vue'
-import { LogOut, ShieldCheck, Users } from '@lucide/vue'
+import { HardDrive, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
-import { ApiError, type GroupDetailResponse, type GroupMember } from '@/lib/api'
+import { formatBytes } from '@/lib/utils'
+import { ApiError, type GroupDetailResponse, type GroupMember, type UsageResponse } from '@/lib/api'
 
 const props = defineProps<{ groupId: string }>()
 const emit = defineEmits<{ (e: 'left'): void }>()
 
-const { getGroup, listGroupMembers, leaveGroup, saving, currentUser } = useAruna()
+const { getGroup, getGroupUsage, listGroupMembers, leaveGroup, saving, currentUser } = useAruna()
 
 const group = ref<GroupDetailResponse | null>(null)
 const members = ref<GroupMember[]>([])
@@ -19,6 +21,15 @@ const membersHidden = ref(false)
 const loadError = ref<string | null>(null)
 const leaveError = ref<string | null>(null)
 const loadingDetail = ref(false)
+const usage = ref<UsageResponse | null>(null)
+
+const usageTotals = computed(() => usage.value?.realm ?? null)
+const quotaStatus = computed(() => usage.value?.quota ?? null)
+// Finite quota (a number, not null) means a bar; null means unlimited.
+const quotaBytes = computed<number | null>(() => {
+  const q = quotaStatus.value
+  return q && q.quota_bytes != null ? q.quota_bytes : null
+})
 
 const isMember = computed(() =>
   Boolean(group.value?.roles.some((role) => role.assigned_users?.includes(currentUser.value?.id ?? ''))),
@@ -34,8 +45,11 @@ const canManage = computed(() =>
 async function reload() {
   loadingDetail.value = true
   loadError.value = null
+  usage.value = null
   try {
     group.value = await getGroup(props.groupId)
+    // Old backends have no per-group usage endpoint; a 404 just hides the block.
+    usage.value = await getGroupUsage(props.groupId).catch(() => null)
     try {
       members.value = (await listGroupMembers(props.groupId)).members
       membersHidden.value = false
@@ -87,6 +101,24 @@ async function leave() {
         </Button>
       </header>
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
+
+      <div v-if="usageTotals" class="border-b border-border">
+        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
+          <HardDrive class="h-3.5 w-3.5 text-primary" />
+          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Storage</span>
+          <Badge v-if="quotaStatus?.warning" variant="warn" class="text-[10px] uppercase">near quota</Badge>
+        </div>
+        <div class="px-5 py-3">
+          <QuotaBar v-if="quotaBytes != null" :used="usageTotals.logical_bytes" :quota="quotaBytes" label="Group storage" />
+          <div v-else class="flex items-center justify-between text-[11px]">
+            <span class="font-medium text-muted-foreground">Group storage</span>
+            <span class="tabular-nums text-foreground/80">{{ formatBytes(usageTotals.logical_bytes) }} <span class="text-muted-foreground">· unlimited</span></span>
+          </div>
+          <p v-if="quotaBytes != null && quotaStatus?.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
+            Hard cap {{ formatBytes(quotaStatus.ceiling_bytes) }}.
+          </p>
+        </div>
+      </div>
 
       <div class="border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">

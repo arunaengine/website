@@ -268,6 +268,10 @@ async function getGroup(groupId: string): Promise<GroupDetailResponse> {
   return request<GroupDetailResponse>(`/groups/${groupId}`)
 }
 
+async function getGroupUsage(groupId: string): Promise<UsageResponse> {
+  return request<UsageResponse>(`/groups/${groupId}/usage`)
+}
+
 async function createS3Credentials(input: CreateS3CredentialsRequest): Promise<CreateS3CredentialsResponse> {
   saving.value = true
   try {
@@ -776,6 +780,7 @@ export function useAruna() {
     setRealmQuota,
     createGroup,
     getGroup,
+    getGroupUsage,
     createS3Credentials,
     revokeS3Credential,
     listGroupMembers,

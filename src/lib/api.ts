@@ -107,6 +107,18 @@ export interface UsageResponse {
   // Newer backends add logical bytes and, for authenticated callers, realm-wide totals.
   logical_bytes?: number
   realm?: UsageTotals
+  // Present on GET /groups/{id}/usage from quota-aware backends.
+  quota?: GroupQuotaStatus
+}
+
+export interface GroupQuotaStatus {
+  // Effective group quota (override else default); null means unlimited.
+  quota_bytes: number | null
+  // Quota × grace — the enforced hard cap; null means unlimited.
+  ceiling_bytes: number | null
+  warn_threshold_percent: number
+  // True when group usage has reached the warn threshold; false when unlimited.
+  warning: boolean
 }
 
 export interface UsageTotals {

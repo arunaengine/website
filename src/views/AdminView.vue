@@ -349,7 +349,7 @@ async function save() {
               <div>
                 <label class="text-xs font-medium text-foreground">Warn threshold (%)</label>
                 <Input v-model="draft.warn" type="number" min="1" max="100" class="mt-1" :invalid="warnInvalid ? 'error' : undefined" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Members are warned at this share of the quota. 1–100.</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">Groups are flagged on their detail page at this share of the quota. 1–100.</p>
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">Max groups per user</label>
