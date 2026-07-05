@@ -104,6 +104,17 @@ export interface UsageResponse {
   objects: number
   stored_blobs: number
   stored_bytes: number
+  // Newer backends add logical bytes and, for authenticated callers, realm-wide totals.
+  logical_bytes?: number
+  realm?: UsageTotals
+}
+
+export interface UsageTotals {
+  buckets: number
+  objects: number
+  stored_blobs: number
+  stored_bytes: number
+  logical_bytes: number
 }
 
 export interface RealmInfoResponse {
@@ -118,7 +129,30 @@ export interface RealmInfoResponse {
   }>
   discovery: unknown
   nodes: RealmNodeInfo[]
+  // Present on newer backends; older deployments omit the quota policy.
+  quota?: RealmQuotaConfig
   interfaces: InterfaceServicesStatus
+}
+
+export interface RealmQuotaConfig {
+  default_group_quota_bytes: number | null
+  grace_factor_percent: number
+  warn_threshold_percent: number
+  group_overrides: RealmGroupQuotaOverride[]
+  max_groups_per_user: number | null
+  user_group_cap_overrides: RealmUserGroupCapOverride[]
+  max_devices_per_user: number | null
+}
+
+export interface RealmGroupQuotaOverride {
+  group_id: string
+  quota_bytes: number | null
+  grace_factor_percent: number | null
+}
+
+export interface RealmUserGroupCapOverride {
+  user_id: string
+  max_groups: number | null
 }
 
 export interface RealmNodeInfo {
