@@ -29,8 +29,7 @@ import {
   type UserInfoResponse,
   type UserSearchResponse,
 } from '@/lib/api'
-import { propertyRulesFromSchema } from '@/lib/profiles/schema'
-import { parseProfileCrate } from '@/lib/profiles/rocrate'
+import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
 
 const TOKEN_KEY = 'aruna.authToken'
 const API_BASE_KEY = 'aruna.apiBaseUrl'
@@ -181,8 +180,13 @@ async function loadRoCrate(documentId: string): Promise<unknown> {
     for (let attempt = 0; ; attempt++) {
       try {
         const response = await request<MetadataRoCrateResponse>(`/metadata/${documentId}/rocrate`)
-        fullCrates.value = { ...fullCrates.value, [documentId]: response.rocrate }
-        return response.rocrate
+        // Public profile crates reference their artifacts on S3 instead of
+        // embedding text; fetch that content once here so the synchronous
+        // consumers (mapProfile, the dataset dialog) keep reading `text`.
+        // Crates without external artifacts pass through untouched.
+        const resolved = await resolveProfileArtifacts(response.rocrate)
+        fullCrates.value = { ...fullCrates.value, [documentId]: resolved }
+        return resolved
       } catch (err) {
         const materializing = err instanceof ApiError && err.status === 503
         if (!materializing) throw err
@@ -507,6 +511,9 @@ function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
   const contributors = people(entity?.author ?? entity?.creator ?? entity?.contributor)
   const profileIds = profileIdsFromConformsTo(entity?.conformsTo)
   const profileId = profileIds[0] ?? ''
+  // Keep the raw conformance ids so the UI can show an external profile IRI even when it
+  // resolves to no local profile. Drop the RO-Crate spec conformance URI, which is not a profile.
+  const conformsToIds = idValues(entity?.conformsTo).filter((id) => !id.startsWith('https://w3id.org/ro/crate'))
   return {
     ulid: item.document_id,
     title,
@@ -535,6 +542,7 @@ function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
     nodeId: '',
     profileId,
     profileIds,
+    conformsToIds,
     contributors,
     doi: idValue(entity?.identifier) || textValue(entity?.identifier),
     temporalCoverage: textValue(entity?.temporalCoverage),
@@ -546,11 +554,17 @@ function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
 
 function mapProfile(item: MetadataDocumentListItem): MetadataProfile {
   const rocrate = fullCrates.value[item.document_id] ?? item.rocrate_summary
-  const parsed = parseProfileCrate(rocrate)
+  let parsed: ReturnType<typeof parseProfileCrate>
+  try {
+    parsed = parseProfileCrate(rocrate)
+  } catch {
+    // A malformed stored profile crate must never throw the whole `profiles`
+    // computed; surface it with no machine-readable rules instead.
+    parsed = { name: '', description: '', entityRules: [], datasetPropertyRules: [] }
+  }
   const pathId = profileIdFromPath(item.document_path) || item.document_id
   const entity = primaryEntity(rocrate)
   const name = parsed.name || textValue(entity?.name) || pathId
-  const propertyRules = parsed.datasetPropertyRules.length ? parsed.datasetPropertyRules : propertyRulesFromSchema(parsed.schema)
   return {
     id: pathId,
     documentId: item.document_id,
@@ -564,8 +578,10 @@ function mapProfile(item: MetadataDocumentListItem): MetadataProfile {
     version: parsed.version,
     iconColor: colorFor(pathId),
     entityRules: parsed.entityRules,
-    propertyRules,
+    propertyRules: parsed.datasetPropertyRules,
     schema: parsed.schema,
+    mode: parsed.mode,
+    contextTerms: parsed.contextTerms,
     suggestedKeywords: arrayText(entity?.keywords ?? entity?.keyword),
     managed: item.public,
     usedCount: metadataItems.value.filter((doc) => mapMetadataDoc(doc).profileIds?.includes(pathId)).length,
@@ -626,14 +642,12 @@ function profileIdsFromConformsTo(value: unknown): string[] {
 function profileIdFromConformanceId(id: string): string | undefined {
   const byGraph = profileItems.value.find((profile) => profile.graph_iri === id)
   if (byGraph) return profileIdFromPath(byGraph.document_path) || byGraph.document_id
-  if (id.startsWith('aruna:profile/')) return profileIdFromPath(id)
-  if (id.includes('/profiles/')) return profileIdFromPath(id.split('/profiles/').pop())
   return undefined
 }
 
 function profileIdFromPath(value?: string | null): string | undefined {
   if (!value) return undefined
-  return value.replace(/^profiles\//, '').replace(/^aruna:profile\//, '')
+  return value.replace(/^profiles\//, '')
 }
 
 function idValues(value: unknown): string[] {
@@ -641,6 +655,13 @@ function idValues(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(idValues)
   if (isRecord(value)) return idValues(value['@id'] ?? value.id)
   return []
+}
+
+// Human-readable tail of an IRI (last path/fragment segment) for chips that surface an
+// external profile conformsTo id which does not resolve to a local profile.
+export function readableIri(iri: string): string {
+  const withoutQuery = iri.split('?')[0].replace(/\/+$/, '')
+  return withoutQuery.split(/[/#]/).filter(Boolean).pop() || iri
 }
 
 function colorFor(value: string): string {

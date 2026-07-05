@@ -1,4 +1,5 @@
 import type { JsonSchema, ProfileEntityRule, ProfilePropertyRule } from '@/lib/profiles/types'
+import type { ModeFile } from '@/lib/profiles/mode'
 
 // -----------------------------------------------------------------------------
 // Realms, nodes, and federation primitives
@@ -199,6 +200,10 @@ export interface MetadataProfile {
   // Property rules on the root Dataset entity, kept for quick display/fallback.
   propertyRules: ProfilePropertyRule[]
   schema?: JsonSchema
+  // Raw Describo/Crate-O mode file, for verbatim re-export and re-open.
+  mode?: ModeFile
+  // Non-schema.org term → URI mappings recovered from the profile crate context.
+  contextTerms?: Record<string, string>
   // Suggested keywords / vocabularies that are pre-populated when this profile is used
   suggestedKeywords: string[]
   // Whether this profile is editable by the current user (some are realm-managed templates)
@@ -233,6 +238,10 @@ export interface MetadataDoc {
   nodeId: string
   profileId: string
   profileIds?: string[]
+  // Raw conformsTo conformance ids (RO-Crate spec URIs filtered out), retained so the UI
+  // can surface an external profile IRI even when it does not resolve to a local profile.
+  // Always populated by mapMetadataDoc; optional so ad-hoc doc literals may omit it.
+  conformsToIds?: string[]
   contributors: MetadataContributor[]
   // Optional richer fields commonly present in research RO-Crates
   doi?: string

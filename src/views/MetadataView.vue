@@ -4,7 +4,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
-import { CrateNotReadyError, useAruna } from '@/composables/useAruna'
+import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
 import { relativeTime } from '@/lib/utils'
 import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink } from '@lucide/vue'
 
@@ -19,6 +19,11 @@ const crateError = ref<string | null>(null)
 const detailId = computed(() => (route.params.id as string) || '')
 const current = computed(() => metadata.value.find((doc) => doc.ulid === detailId.value))
 const currentProfile = computed(() => profiles.value.find((profile) => profile.id === current.value?.profileId))
+// When no local profile resolves, fall back to the first raw conformsTo IRI so an external
+// profile association stays visible instead of reading "No profile".
+const conformsIri = computed(() => (currentProfile.value ? '' : current.value?.conformsToIds?.[0] ?? ''))
+const profileName = computed(() => currentProfile.value?.name ?? (conformsIri.value ? readableIri(conformsIri.value) : 'No profile'))
+const profileShortName = computed(() => currentProfile.value?.shortName ?? (conformsIri.value ? readableIri(conformsIri.value) : 'No profile'))
 
 let crateFetchToken = 0
 
@@ -73,7 +78,7 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
   <div>
     <PageHeader
       :title="current ? current.title : 'Metadata'"
-      :description="current ? `${currentProfile?.name ?? 'No profile'} · ${current.ulid}` : 'Live RO-Crate metadata document.'"
+      :description="current ? `${profileName} · ${current.ulid}` : 'Live RO-Crate metadata document.'"
     >
       <template #actions>
         <RouterLink :to="{ name: 'search' }">
@@ -90,6 +95,9 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
               <RouterLink v-if="currentProfile" :to="{ name: 'profile-detail', params: { profileId: currentProfile.id } }" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:opacity-80">
                 <ListChecks class="h-3 w-3" /> {{ currentProfile.name }}
               </RouterLink>
+              <span v-else-if="conformsIri" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary" :title="conformsIri">
+                <ListChecks class="h-3 w-3" /> {{ profileName }}
+              </span>
               <h1 class="mt-3 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ current.title }}</h1>
               <p class="mt-3 max-w-3xl text-sm leading-relaxed text-foreground/85">{{ current.description || 'No description in RO-Crate summary.' }}</p>
               <div class="mt-4 flex flex-wrap gap-1.5">
@@ -106,7 +114,7 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
             </div>
             <div class="surface-muted p-3">
               <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Profile</dt>
-              <dd class="mt-1 text-sm font-medium text-foreground">{{ currentProfile?.shortName ?? 'No profile' }}</dd>
+              <dd class="mt-1 break-all text-sm font-medium text-foreground" :title="conformsIri || undefined">{{ profileShortName }}</dd>
             </div>
             <div class="surface-muted p-3">
               <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">License</dt>
