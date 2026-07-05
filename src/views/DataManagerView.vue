@@ -15,7 +15,7 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useS3, s3ErrorMessage, type BucketEntry, type FolderEntry, type ObjectEntry, type UploadHandle } from '@/composables/useS3'
+import { useS3, s3ErrorMessage, isS3AuthError, type BucketEntry, type FolderEntry, type ObjectEntry, type UploadHandle } from '@/composables/useS3'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -45,12 +45,14 @@ const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
 const buckets = ref<BucketEntry[]>([])
 const bucketsLoading = ref(false)
 const bucketsError = ref<string | null>(null)
+const bucketsAuthError = ref(false)
 
 const folders = ref<FolderEntry[]>([])
 const objects = ref<ObjectEntry[]>([])
 const nextToken = ref<string | undefined>(undefined)
 const listLoading = ref(false)
 const listError = ref<string | null>(null)
+const listAuthError = ref(false)
 
 const newBucketName = ref('')
 const creatingBucket = ref(false)
@@ -92,10 +94,12 @@ async function refreshBuckets() {
   if (!s3.hasActiveKey.value || !s3.endpoint.value) return
   bucketsLoading.value = true
   bucketsError.value = null
+  bucketsAuthError.value = false
   try {
     buckets.value = await s3.listBuckets()
   } catch (err) {
     bucketsError.value = s3ErrorMessage(err)
+    bucketsAuthError.value = isS3AuthError(err)
     buckets.value = []
   } finally {
     bucketsLoading.value = false
@@ -111,6 +115,7 @@ async function loadObjects(more = false) {
   const requestId = ++listRequestId
   listLoading.value = true
   listError.value = null
+  listAuthError.value = false
   try {
     const page = await s3.listObjects(bucket.value, s3Prefix.value, more ? nextToken.value : undefined)
     if (requestId !== listRequestId) return
@@ -118,7 +123,10 @@ async function loadObjects(more = false) {
     objects.value = more ? [...objects.value, ...page.objects] : page.objects
     nextToken.value = page.nextToken
   } catch (err) {
-    if (requestId === listRequestId) listError.value = s3ErrorMessage(err)
+    if (requestId === listRequestId) {
+      listError.value = s3ErrorMessage(err)
+      listAuthError.value = isS3AuthError(err)
+    }
   } finally {
     if (requestId === listRequestId) listLoading.value = false
   }
@@ -286,6 +294,7 @@ async function download(object: ObjectEntry) {
     anchor.click()
   } catch (err) {
     listError.value = s3ErrorMessage(err)
+    listAuthError.value = isS3AuthError(err)
   }
 }
 
@@ -380,6 +389,14 @@ const isEmpty = computed(
             <div v-if="bucketsLoading" class="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
               <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading buckets…
             </div>
+            <div v-else-if="bucketsError && bucketsAuthError" class="m-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+              <p>Your S3 credentials were rejected — the key may be invalid, expired, or revoked.</p>
+              <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ bucketsError }}</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="h-3.5 w-3.5" /> Create new credentials</Button>
+                <Button variant="outline" size="sm" @click="s3.clearActiveKey()"><KeyRound class="h-3.5 w-3.5" /> Clear active key</Button>
+              </div>
+            </div>
             <p v-else-if="bucketsError" class="px-4 py-3 text-xs text-destructive">{{ bucketsError }}</p>
             <ul v-else-if="buckets.length" class="max-h-[420px] overflow-y-auto py-1">
               <li v-for="entry in buckets" :key="entry.name">
@@ -449,7 +466,15 @@ const isEmpty = computed(
               @dragleave="dragActive = false"
               @drop.prevent="onDrop"
             >
-              <p v-if="listError" class="border-b border-border px-4 py-3 text-xs text-destructive">{{ listError }}</p>
+              <div v-if="listError && listAuthError" class="border-b border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
+                <p>Your S3 credentials were rejected — the key may be invalid, expired, or revoked.</p>
+                <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ listError }}</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="h-3.5 w-3.5" /> Create new credentials</Button>
+                  <Button variant="outline" size="sm" @click="s3.clearActiveKey()"><KeyRound class="h-3.5 w-3.5" /> Clear active key</Button>
+                </div>
+              </div>
+              <p v-else-if="listError" class="border-b border-border px-4 py-3 text-xs text-destructive">{{ listError }}</p>
               <table class="w-full text-sm">
                 <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
                   <tr>
@@ -481,8 +506,8 @@ const isEmpty = computed(
                     <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '—' }}</td>
                     <td class="px-4 py-2.5">
                       <div class="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon-sm" aria-label="Download" @click="download(object)"><Download /></Button>
-                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click="deleteTarget = object; deleteError = null"><Trash2 /></Button>
+                        <Button variant="ghost" size="icon-sm" aria-label="Download" @click="download(object)"><Download class="size-3.5" /></Button>
+                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click="deleteTarget = object; deleteError = null"><Trash2 class="size-3.5" /></Button>
                       </div>
                     </td>
                   </tr>

@@ -5,6 +5,7 @@ import {
   GetObjectCommand,
   ListBucketsCommand,
   ListObjectsV2Command,
+  PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
@@ -116,6 +117,39 @@ async function createBucket(name: string): Promise<void> {
   await client().send(new CreateBucketCommand({ Bucket: name }))
 }
 
+// Read-only CORS for publicly served artifacts: browsers (other portals,
+// Crate-O, …) must be able to fetch objects from this bucket cross-origin.
+async function allowPublicReadCors(bucket: string): Promise<void> {
+  await client().send(
+    new PutBucketCorsCommand({
+      Bucket: bucket,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            AllowedMethods: ['GET', 'HEAD'],
+            AllowedOrigins: ['*'],
+            AllowedHeaders: ['*'],
+            MaxAgeSeconds: 3600,
+          },
+        ],
+      },
+    }),
+  )
+}
+
+// Small generated artifacts (profile mode/schema/html) — a single PutObject,
+// no multipart machinery.
+async function putTextObject(bucket: string, key: string, text: string, contentType: string): Promise<void> {
+  await client().send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: new TextEncoder().encode(text),
+      ContentType: contentType,
+    }),
+  )
+}
+
 async function listObjects(bucket: string, prefix: string, token?: string): Promise<ObjectPage> {
   const response = await client().send(
     new ListObjectsV2Command({
@@ -213,6 +247,28 @@ export function s3ErrorMessage(err: unknown): string {
   return String(err)
 }
 
+const S3_AUTH_ERROR_NAMES = new Set([
+  'InvalidAccessKeyId',
+  'SignatureDoesNotMatch',
+  'ExpiredToken',
+  'TokenRefreshRequired',
+  'InvalidToken',
+  'AccessDenied',
+])
+
+// A rejected, expired or revoked key surfaces as one of these SDK error names
+// or as a 401/403 from the node — distinct from a transient network or server
+// fault, so the UI can offer to mint a fresh key instead of just showing text.
+export function isS3AuthError(err: unknown): boolean {
+  if (err && typeof err === 'object') {
+    const error = err as { name?: string; $metadata?: { httpStatusCode?: number } }
+    if (error.name && S3_AUTH_ERROR_NAMES.has(error.name)) return true
+    const status = error.$metadata?.httpStatusCode
+    if (status === 401 || status === 403) return true
+  }
+  return false
+}
+
 export function useS3() {
   return {
     activeKey,
@@ -222,6 +278,8 @@ export function useS3() {
     clearActiveKey,
     listBuckets,
     createBucket,
+    allowPublicReadCors,
+    putTextObject,
     listObjects,
     createFolder,
     uploadObject,
