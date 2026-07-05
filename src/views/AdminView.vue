@@ -32,43 +32,50 @@ const UNITS = [
   { value: 'TiB', factor: 1024 ** 4 },
   { value: 'GiB', factor: 1024 ** 3 },
   { value: 'MiB', factor: 1024 ** 2 },
+  { value: 'KiB', factor: 1024 },
+  { value: 'B', factor: 1 },
 ]
 const unitOptions = UNITS.map((u) => ({ value: u.value, label: u.value }))
 
+// type="number" inputs emit numbers; normalize before any string handling.
+function text(v: unknown): string {
+  return v == null ? '' : String(v)
+}
+
 interface QuotaField {
   unlimited: boolean
-  value: string
+  value: string | number
   unit: string
 }
 interface OverrideRow {
   group_id: string
   quota: QuotaField
-  grace: string
+  grace: string | number
 }
 interface UserCapRow {
   user_id: string
   name: string
-  max_groups: string
+  max_groups: string | number
 }
 interface Draft {
   defaultQuota: QuotaField
-  grace: string
-  warn: string
-  maxGroups: string
-  maxDevices: string
+  grace: string | number
+  warn: string | number
+  maxGroups: string | number
+  maxDevices: string | number
   overrides: OverrideRow[]
   userCaps: UserCapRow[]
 }
 
+// B always divides cleanly, so the seed is exact and round-trips byte-identical.
 function bytesToAmount(bytes: number): { value: string; unit: string } {
-  for (const u of UNITS) {
-    if (bytes % u.factor === 0) return { value: String(bytes / u.factor), unit: u.value }
-  }
-  return { value: String(parseFloat((bytes / 1024 ** 3).toFixed(2))), unit: 'GiB' }
+  const unit = UNITS.find((u) => bytes % u.factor === 0) ?? { value: 'B', factor: 1 }
+  return { value: String(bytes / unit.factor), unit: unit.value }
 }
-function amountToBytes(value: string, unit: string): number | null {
-  const n = Number(value)
-  if (value.trim() === '' || !Number.isFinite(n) || n < 0) return null
+function amountToBytes(value: string | number, unit: string): number | null {
+  const s = text(value).trim()
+  const n = Number(s)
+  if (s === '' || !Number.isFinite(n) || n < 0) return null
   const factor = UNITS.find((u) => u.value === unit)?.factor ?? 1024 ** 3
   return Math.round(n * factor)
 }
@@ -81,7 +88,7 @@ function seedField(bytes: number | null): QuotaField {
   return { unlimited: false, value, unit }
 }
 
-function seedDraft(quota: RealmQuotaConfig | undefined): Draft {
+function seedDraft(quota: RealmQuotaConfig | undefined, names: Map<string, string> = new Map()): Draft {
   const q = quota ?? DEFAULT_QUOTA
   return {
     defaultQuota: seedField(q.default_group_quota_bytes),
@@ -94,7 +101,11 @@ function seedDraft(quota: RealmQuotaConfig | undefined): Draft {
       quota: seedField(o.quota_bytes),
       grace: o.grace_factor_percent == null ? '' : String(o.grace_factor_percent),
     })),
-    userCaps: q.user_group_cap_overrides.map((u) => ({ user_id: u.user_id, name: '', max_groups: u.max_groups == null ? '' : String(u.max_groups) })),
+    userCaps: q.user_group_cap_overrides.map((u) => ({
+      user_id: u.user_id,
+      name: names.get(u.user_id) ?? '',
+      max_groups: u.max_groups == null ? '' : String(u.max_groups),
+    })),
   }
 }
 
@@ -105,11 +116,13 @@ const saveError = ref<string | null>(null)
 const saveMessage = ref<string | null>(null)
 
 function reseed() {
-  draft.value = seedDraft(realmInfo.value?.quota)
+  const names = new Map(draft.value.userCaps.filter((u) => u.name).map((u) => [u.user_id, u.name]))
+  draft.value = seedDraft(realmInfo.value?.quota, names)
   baseline.value = JSON.stringify(draft.value)
 }
 // Re-seed from a refreshed realm config only while the admin has no edits open.
 watch(() => realmInfo.value?.quota, () => { if (!dirty.value) reseed() })
+watch(dirty, (d) => { if (d) { saveError.value = null; saveMessage.value = null } })
 
 const groupOptions = computed(() => {
   const seen = new Map<string, string>()
@@ -134,8 +147,9 @@ const duplicateUserIds = computed(() => duplicates(draft.value.userCaps, (u) => 
 function quotaFieldValid(f: QuotaField): boolean {
   return f.unlimited || amountToBytes(f.value, f.unit) != null
 }
-function intOrEmptyValid(s: string): boolean {
-  if (s.trim() === '') return true
+function intOrEmptyValid(v: string | number): boolean {
+  const s = text(v).trim()
+  if (s === '') return true
   const n = Number(s)
   return Number.isInteger(n) && n >= 0
 }
@@ -152,7 +166,7 @@ const clientErrors = computed(() => {
   draft.value.overrides.forEach((o, i) => {
     if (!o.group_id) errs.push(`Group override ${i + 1} needs a group.`)
     if (!quotaFieldValid(o.quota)) errs.push(`Group override ${i + 1} quota must be a non-negative number.`)
-    if (o.grace.trim() !== '') { const g = Number(o.grace); if (!Number.isInteger(g) || g < 100) errs.push(`Group override ${i + 1} grace factor must be at least 100%.`) }
+    if (text(o.grace).trim() !== '') { const g = Number(o.grace); if (!Number.isInteger(g) || g < 100) errs.push(`Group override ${i + 1} grace factor must be at least 100%.`) }
   })
   if (duplicateGroupIds.value.size) errs.push('Each group may appear in at most one override.')
   draft.value.userCaps.forEach((u, i) => { if (!intOrEmptyValid(u.max_groups)) errs.push(`User cap ${i + 1} max groups must be a non-negative whole number.`) })
@@ -179,20 +193,34 @@ const visibleUsers = computed(() => {
   const taken = new Set(draft.value.userCaps.map((u) => u.user_id))
   return userResults.value.filter((hit) => !taken.has(hit.user_id))
 })
+let userSearchSeq = 0
 const runUserSearch = useDebounceFn(async (term: string) => {
-  if (term.length < 2) { userResults.value = []; return }
+  const seq = ++userSearchSeq
   userSearching.value = true
   userSearchError.value = null
   try {
-    userResults.value = (await searchUsers(term)).users
+    const response = await searchUsers(term)
+    if (seq === userSearchSeq) userResults.value = response.users
   } catch (err) {
-    userSearchError.value = err instanceof Error ? err.message : String(err)
-    userResults.value = []
+    if (seq === userSearchSeq) {
+      userSearchError.value = err instanceof Error ? err.message : String(err)
+      userResults.value = []
+    }
   } finally {
-    userSearching.value = false
+    if (seq === userSearchSeq) userSearching.value = false
   }
 }, 250)
-watch(userQuery, (term) => void runUserSearch(term.trim()))
+watch(userQuery, (term) => {
+  const trimmed = term.trim()
+  if (trimmed.length < 2) {
+    userSearchSeq++
+    userResults.value = []
+    userSearching.value = false
+    userSearchError.value = null
+    return
+  }
+  void runUserSearch(trimmed)
+})
 function addUserCap(hit: UserSearchHit) {
   draft.value.userCaps.push({ user_id: hit.user_id, name: hit.name, max_groups: '' })
   userQuery.value = ''
@@ -207,14 +235,14 @@ function buildConfig(): RealmQuotaConfig {
     group_overrides: draft.value.overrides.map((o) => ({
       group_id: o.group_id,
       quota_bytes: fieldBytes(o.quota),
-      grace_factor_percent: o.grace.trim() === '' ? null : Number(o.grace),
+      grace_factor_percent: text(o.grace).trim() === '' ? null : Number(o.grace),
     })),
-    max_groups_per_user: draft.value.maxGroups.trim() === '' ? null : Number(draft.value.maxGroups),
+    max_groups_per_user: text(draft.value.maxGroups).trim() === '' ? null : Number(draft.value.maxGroups),
     user_group_cap_overrides: draft.value.userCaps.map((u) => ({
       user_id: u.user_id,
-      max_groups: u.max_groups.trim() === '' ? null : Number(u.max_groups),
+      max_groups: text(u.max_groups).trim() === '' ? null : Number(u.max_groups),
     })),
-    max_devices_per_user: draft.value.maxDevices.trim() === '' ? null : Number(draft.value.maxDevices),
+    max_devices_per_user: text(draft.value.maxDevices).trim() === '' ? null : Number(draft.value.maxDevices),
   }
 }
 
@@ -345,7 +373,7 @@ async function save() {
               <div class="mt-1.5 text-[11px] text-muted-foreground">
                 <span v-if="o.quota.unlimited">Unlimited quota</span>
                 <span v-else-if="quotaFieldValid(o.quota)">Quota {{ formatBytes(fieldBytes(o.quota) ?? 0) }}</span>
-                · Grace {{ o.grace.trim() === '' ? 'inherits the global factor' : `${o.grace}%` }}
+                · Grace {{ text(o.grace).trim() === '' ? 'inherits the global factor' : `${o.grace}%` }}
               </div>
             </div>
             <p v-if="!draft.overrides.length" class="text-xs text-muted-foreground">No per-group overrides. Every group uses the default quota.</p>
