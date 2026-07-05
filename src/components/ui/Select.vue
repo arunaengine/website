@@ -27,13 +27,16 @@ const props = defineProps<
     options: Option[]
     placeholder?: string
     class?: string
+    invalid?: 'error' | 'warning'
   }
 >()
 const emits = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 const forwarded = useForwardPropsEmits(props, emits)
 const triggerClasses = computed(() =>
   cn(
-    'flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-field px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring',
+    'flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-field px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring',
+    props.invalid === 'error' && 'border-destructive focus:border-destructive focus:ring-destructive',
+    props.invalid === 'warning' && 'border-amber-500/70 focus:border-amber-500 focus:ring-amber-500',
     props.class,
   ),
 )

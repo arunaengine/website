@@ -3,13 +3,17 @@ import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 import { useVModel } from '@vueuse/core'
 
-const props = defineProps<{ class?: string; modelValue?: string }>()
+const props = defineProps<{ class?: string; modelValue?: string; invalid?: 'error' | 'warning' }>()
 const emits = defineEmits<{ (e: 'update:modelValue', value: string): void }>()
 const modelValue = useVModel(props, 'modelValue', emits, { passive: true })
 
 const classes = computed(() =>
   cn(
-    'flex w-full rounded-md border border-input bg-field px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-mono leading-relaxed',
+    'flex w-full rounded-md border border-input bg-field px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-mono leading-relaxed',
+    props.invalid === 'error' &&
+      'border-destructive focus-visible:border-destructive focus-visible:ring-destructive',
+    props.invalid === 'warning' &&
+      'border-amber-500/70 focus-visible:border-amber-500 focus-visible:ring-amber-500',
     props.class,
   ),
 )

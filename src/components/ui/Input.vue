@@ -7,6 +7,7 @@ const props = defineProps<{
   class?: string
   modelValue?: string | number
   defaultValue?: string | number
+  invalid?: 'error' | 'warning'
 }>()
 const emits = defineEmits<{ (e: 'update:modelValue', value: string | number): void }>()
 const modelValue = useVModel(props, 'modelValue', emits, {
@@ -16,7 +17,11 @@ const modelValue = useVModel(props, 'modelValue', emits, {
 
 const classes = computed(() =>
   cn(
-    'flex h-9 w-full rounded-md border border-input bg-field px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+    'flex h-9 w-full rounded-md border border-input bg-field px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+    props.invalid === 'error' &&
+      'border-destructive focus-visible:border-destructive focus-visible:ring-destructive',
+    props.invalid === 'warning' &&
+      'border-amber-500/70 focus-visible:border-amber-500 focus-visible:ring-amber-500',
     props.class,
   ),
 )
