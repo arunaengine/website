@@ -1,0 +1,190 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import Input from '@/components/ui/Input.vue'
+import Button from '@/components/ui/Button.vue'
+import Badge from '@/components/ui/Badge.vue'
+import { Upload, Globe, FileJson, CheckCircle2, AlertTriangle, Loader2 } from '@lucide/vue'
+import { isModeFile, MODELED_MODE_KEYS, modeBasics, modeToEntityRules } from '@/lib/profiles/mode'
+import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
+import { isRecord } from '@/lib/profiles/uri'
+import type { ProfileBasics } from '@/lib/profiles/types'
+import type { ProfileBuilder, ProfileImportResult } from './useProfileBuilder'
+
+const props = defineProps<{ builder: ProfileBuilder }>()
+const emit = defineEmits<{ (e: 'imported'): void }>()
+
+const fileInput = ref<HTMLInputElement | null>(null)
+const url = ref('')
+const busy = ref(false)
+const error = ref('')
+// A parsed import held back because the builder already has edits; applied only
+// after the author confirms the replacement.
+const pendingImport = ref<ProfileImportResult | null>(null)
+
+// Detect a Describo/Crate-O mode file or an RO-Crate profile crate, map it into
+// the builder, and remember the raw mode for verbatim re-export. The success
+// summary lives on the builder (importSummary) so it survives tab navigation.
+// Async because a public profile crate may reference its artifacts on S3
+// (resolveProfileArtifacts fetches them before parsing).
+async function ingest(json: unknown) {
+  let result: ProfileImportResult
+  if (isModeFile(json)) {
+    result = {
+      basics: modeBasics(json),
+      entityRules: modeToEntityRules(json),
+      mode: json,
+      kind: 'mode',
+      preservedKeys: preservedKeys(json),
+    }
+  } else if (isRecord(json) && Array.isArray(json['@graph'])) {
+    const parsed = parseProfileCrate(await resolveProfileArtifacts(json))
+    const basics: Partial<ProfileBasics> = {
+      name: parsed.name,
+      description: parsed.description,
+      version: parsed.version,
+      datePublished: parsed.datePublished,
+      license: parsed.license,
+    }
+    result = {
+      basics,
+      entityRules: parsed.entityRules,
+      mode: parsed.mode ?? null,
+      kind: 'crate',
+      preservedKeys: preservedKeys(parsed.mode),
+    }
+  } else {
+    throw new Error('Unrecognized file — expected a Describo/Crate-O mode file or an RO-Crate profile crate (with @graph).')
+  }
+  if (props.builder.hasEdits) {
+    pendingImport.value = result
+    error.value = ''
+    return
+  }
+  apply(result)
+}
+
+function preservedKeys(mode: unknown): string[] {
+  return isRecord(mode) ? Object.keys(mode).filter((key) => !MODELED_MODE_KEYS.has(key)) : []
+}
+
+function apply(result: ProfileImportResult) {
+  props.builder.applyImport(result)
+  pendingImport.value = null
+  error.value = ''
+  emit('imported')
+}
+
+function fail(err: unknown) {
+  error.value = err instanceof Error ? err.message : String(err)
+  pendingImport.value = null
+}
+
+function onFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  error.value = ''
+  const reader = new FileReader()
+  reader.onload = () => {
+    void (async () => {
+      try {
+        await ingest(JSON.parse(String(reader.result)))
+      } catch (err) {
+        fail(err)
+      }
+    })()
+  }
+  reader.onerror = () => { error.value = 'Could not read that file.' }
+  reader.readAsText(file)
+  // Reset so re-selecting the same file fires change again.
+  input.value = ''
+}
+
+async function fromUrl() {
+  const target = url.value.trim()
+  if (!target) return
+  busy.value = true
+  error.value = ''
+  try {
+    const response = await fetch(target)
+    if (!response.ok) throw new Error(`Fetch failed (${response.status} ${response.statusText}).`)
+    await ingest(await response.json())
+  } catch (err) {
+    // Cross-origin / network failures surface as an opaque TypeError.
+    if (err instanceof TypeError) {
+      error.value = 'Could not fetch that URL — it may block cross-origin requests (CORS) or be unreachable. Download the file and upload it instead.'
+      pendingImport.value = null
+    } else {
+      fail(err)
+    }
+  } finally {
+    busy.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+    <div>
+      <h4 class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+        <FileJson class="h-4 w-4 text-primary" /> Import an existing profile
+        <Badge variant="secondary">Describo/Crate-O-compatible</Badge>
+      </h4>
+      <p class="mt-1 text-xs text-muted-foreground">
+        Start from a Describo/Crate-O mode file or an RO-Crate profile crate. Rules we recognize become editable here; everything else in the file is kept unchanged and written back on export.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <input ref="fileInput" type="file" accept="application/json,.json" class="hidden" @change="onFile" />
+      <Button type="button" variant="outline" size="sm" @click="fileInput?.click()">
+        <Upload class="size-3.5" /> Upload JSON
+      </Button>
+      <span class="text-[11px] text-muted-foreground">or</span>
+      <div class="flex min-w-[220px] flex-1 items-center gap-2">
+        <Input v-model="url" placeholder="https://…/mode.json" @keydown.enter="fromUrl" />
+        <Button type="button" variant="outline" size="sm" :disabled="busy || !url.trim()" @click="fromUrl">
+          <Loader2 v-if="busy" class="size-3.5 animate-spin" />
+          <Globe v-else class="size-3.5" /> Fetch
+        </Button>
+      </div>
+    </div>
+
+    <div v-if="error" class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+      <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>{{ error }}</span>
+    </div>
+
+    <div v-if="pendingImport" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+      <div class="flex items-center gap-2 font-medium">
+        <AlertTriangle class="h-3.5 w-3.5 shrink-0" />
+        Importing replaces your current draft — the basics and every rule you have edited.
+      </div>
+      <div class="mt-2 flex items-center gap-2">
+        <Button type="button" variant="outline" size="sm" @click="apply(pendingImport)">Replace draft</Button>
+        <Button type="button" variant="ghost" size="sm" @click="pendingImport = null">Keep editing</Button>
+      </div>
+    </div>
+
+    <div v-if="builder.importSummary" class="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+      <div class="flex items-center gap-2 font-medium">
+        <CheckCircle2 class="h-3.5 w-3.5" />
+        Imported {{ builder.importSummary.kind === 'mode' ? 'mode file' : 'profile crate' }}<template v-if="builder.importSummary.name">: {{ builder.importSummary.name }}</template>
+      </div>
+      <p class="mt-1">
+        {{ builder.importSummary.entityCount }} entity {{ builder.importSummary.entityCount === 1 ? 'rule' : 'rules' }},
+        {{ builder.importSummary.propertyCount }} property {{ builder.importSummary.propertyCount === 1 ? 'rule' : 'rules' }} recognized.
+      </p>
+      <p v-if="builder.importSummary.preservedKeys.length" class="mt-1">
+        Preserved but not editable: <code class="rounded bg-muted px-1">{{ builder.importSummary.preservedKeys.join(', ') }}</code>.
+      </p>
+    </div>
+
+    <!-- A bare mode file has no vocabulary for constraints or recommended levels;
+         those only come with a full profile crate (D1). -->
+    <div v-if="builder.importSummary?.kind === 'mode'" class="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+      <FileJson class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>Mode files carry form structure only — value constraints and recommended levels import when you upload a <b class="text-foreground">profile crate</b> instead.</span>
+    </div>
+  </div>
+</template>
