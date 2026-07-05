@@ -170,7 +170,7 @@ const clientErrors = computed(() => {
   draft.value.overrides.forEach((o, i) => {
     if (!o.group_id) errs.push(`Group override ${i + 1} needs a group.`)
     if (!quotaFieldValid(o.quota)) errs.push(`Group override ${i + 1} quota must be a non-negative number below ~8 PiB.`)
-    if (text(o.grace).trim() !== '') { const g = Number(o.grace); if (!Number.isInteger(g) || g < 100 || g > U32_MAX) errs.push(`Group override ${i + 1} grace factor must be at least 100%.`) }
+    if (!o.quota.unlimited && text(o.grace).trim() !== '') { const g = Number(o.grace); if (!Number.isInteger(g) || g < 100 || g > U32_MAX) errs.push(`Group override ${i + 1} grace factor must be at least 100%.`) }
   })
   if (duplicateGroupIds.value.size) errs.push('Each group may appear in at most one override.')
   draft.value.userCaps.forEach((u, i) => { if (!intOrEmptyValid(u.max_groups)) errs.push(`User cap ${i + 1} max groups must be a non-negative whole number.`) })
@@ -180,7 +180,13 @@ const clientErrors = computed(() => {
 const invalid = computed(() => clientErrors.value.length > 0)
 
 function addOverride() {
-  draft.value.overrides.push({ group_id: '', quota: { unlimited: true, value: '', unit: 'GiB' }, grace: '' })
+  draft.value.overrides.push({ group_id: '', quota: { unlimited: false, value: '', unit: 'GiB' }, grace: '' })
+}
+// Unlimited now exempts a group entirely; grace on an unlimited row is incoherent
+// and rejected by the backend, so drop any stale grace when the toggle turns on.
+function setOverrideUnlimited(o: OverrideRow, unlimited: boolean) {
+  o.quota.unlimited = unlimited
+  if (unlimited) o.grace = ''
 }
 function removeOverride(index: number) {
   draft.value.overrides.splice(index, 1)
@@ -239,7 +245,7 @@ function buildConfig(): RealmQuotaConfig {
     group_overrides: draft.value.overrides.map((o) => ({
       group_id: o.group_id,
       quota_bytes: fieldBytes(o.quota),
-      grace_factor_percent: text(o.grace).trim() === '' ? null : Number(o.grace),
+      grace_factor_percent: o.quota.unlimited || text(o.grace).trim() === '' ? null : Number(o.grace),
     })),
     max_groups_per_user: text(draft.value.maxGroups).trim() === '' ? null : Number(draft.value.maxGroups),
     user_group_cap_overrides: draft.value.userCaps.map((u) => ({
@@ -369,19 +375,21 @@ async function save() {
               <div class="flex flex-wrap items-center gap-2">
                 <Select v-model="o.group_id" :options="groupOptions" placeholder="Select group" class="w-56" :invalid="duplicateGroupIds.has(o.group_id) ? 'error' : undefined" />
                 <label class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Switch v-model:checked="o.quota.unlimited" /> Unlimited
+                  <Switch :checked="o.quota.unlimited" @update:checked="setOverrideUnlimited(o, $event)" /> Unlimited
                 </label>
                 <template v-if="!o.quota.unlimited">
                   <Input v-model="o.quota.value" type="number" min="0" placeholder="0" class="w-28" />
                   <Select v-model="o.quota.unit" :options="unitOptions" class="w-24" />
                 </template>
-                <Input v-model="o.grace" type="number" min="100" placeholder="grace %" class="w-28" />
+                <Input v-model="o.grace" type="number" min="100" placeholder="grace %" class="w-28" :disabled="o.quota.unlimited" />
                 <Button variant="ghost" size="sm" class="ml-auto text-destructive hover:text-destructive" @click="removeOverride(i)"><Trash2 class="h-3.5 w-3.5" /></Button>
               </div>
               <div class="mt-1.5 text-[11px] text-muted-foreground">
-                <span v-if="o.quota.unlimited">Unlimited quota</span>
-                <span v-else-if="quotaFieldValid(o.quota)">Quota {{ formatBytes(fieldBytes(o.quota) ?? 0) }}</span>
-                · Grace {{ text(o.grace).trim() === '' ? 'inherits the global factor' : `${o.grace}%` }}
+                <template v-if="o.quota.unlimited">Unlimited — exempts this group from byte quotas entirely.</template>
+                <template v-else>
+                  <span v-if="quotaFieldValid(o.quota)">Quota {{ formatBytes(fieldBytes(o.quota) ?? 0) }}</span>
+                  · Grace {{ text(o.grace).trim() === '' ? 'inherits the global factor' : `${o.grace}%` }}
+                </template>
               </div>
             </div>
             <p v-if="!draft.overrides.length" class="text-xs text-muted-foreground">No per-group overrides. Every group uses the default quota.</p>
