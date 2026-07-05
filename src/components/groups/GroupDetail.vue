@@ -25,7 +25,7 @@ const usage = ref<UsageResponse | null>(null)
 
 const usageTotals = computed(() => usage.value?.realm ?? null)
 const quotaStatus = computed(() => usage.value?.quota ?? null)
-// Finite quota (a number, not null) means a bar; null means unlimited.
+// Finite quota (a number, not null) means a bar; null means unlimited or no quota block.
 const quotaBytes = computed<number | null>(() => {
   const q = quotaStatus.value
   return q && q.quota_bytes != null ? q.quota_bytes : null
@@ -112,7 +112,7 @@ async function leave() {
           <QuotaBar v-if="quotaBytes != null" :used="usageTotals.logical_bytes" :quota="quotaBytes" label="Group storage" />
           <div v-else class="flex items-center justify-between text-[11px]">
             <span class="font-medium text-muted-foreground">Group storage</span>
-            <span class="tabular-nums text-foreground/80">{{ formatBytes(usageTotals.logical_bytes) }} <span class="text-muted-foreground">· unlimited</span></span>
+            <span class="tabular-nums text-foreground/80">{{ formatBytes(usageTotals.logical_bytes) }} <span v-if="quotaStatus" class="text-muted-foreground">· unlimited</span></span>
           </div>
           <p v-if="quotaBytes != null && quotaStatus?.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
             Hard cap {{ formatBytes(quotaStatus.ceiling_bytes) }}.
