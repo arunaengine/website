@@ -150,7 +150,10 @@ async function fetchList({ more = false, silent = false } = {}) {
       listError.value = errorMessage(err)
     }
   } finally {
-    if (requestId === listRequestId && !silent) refreshing.value = false
+    // Only non-silent calls ever set `refreshing`, so clear it unconditionally
+    // for them — a silent poll that superseded this request id must not leave
+    // the spinner stuck on (a later poll never touches `refreshing`).
+    if (!silent) refreshing.value = false
   }
 }
 
@@ -178,18 +181,29 @@ async function init() {
 
 let pollTimer: number | undefined
 onMounted(() => {
-  if (!tesEnabled.value || !currentUser.value) return
-  void init()
+  if (!tesEnabled.value) return
+  // currentUser bootstraps after mount on a hard load/deep link; init once it
+  // is present, otherwise the watch below picks up the late sign-in.
+  if (currentUser.value) void init()
   // View-owned auto-refresh: only re-fetch page one (a multi-page view must not
-  // silently truncate) and only while some listed task is still active.
+  // silently truncate) and only while some listed task is still active. The
+  // interval is always registered (guarding on currentUser/refreshing per tick)
+  // so a post-mount sign-in does not need to re-create it.
   pollTimer = window.setInterval(() => {
     if (document.hidden) return
+    if (!currentUser.value) return
+    if (refreshing.value) return
     if (pagesLoaded.value !== 1) return
     if (!tasks.value.some((t) => isActiveTesState(t.state))) return
     void fetchList({ silent: true })
   }, 10_000)
 })
 onUnmounted(() => window.clearInterval(pollTimer))
+
+// A post-mount sign-in must initialize the view (mirrors GroupsView).
+watch(currentUser, (u, prev) => {
+  if (u && !prev && tesEnabled.value && listState.value === 'idle') void init()
+})
 </script>
 
 <template>
