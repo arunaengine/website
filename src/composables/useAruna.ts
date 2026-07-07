@@ -20,8 +20,10 @@ import {
   type ListMetadataResponse,
   type ListS3CredentialsResponse,
   type MetadataDocumentListItem,
+  type MetadataDocumentSummary,
   type MetadataRoCrateResponse,
   type MetadataSearchResponse,
+  type ReplaceMetadataRoCrateRequest,
   type RealmInfoResponse,
   type RealmQuotaConfig,
   type S3CredentialSummary,
@@ -215,6 +217,60 @@ async function createMetadata(input: CreateMetadataRequest) {
   } finally {
     saving.value = false
   }
+}
+
+async function getMetadataDocument(documentId: string): Promise<MetadataDocumentSummary> {
+  return request<MetadataDocumentSummary>(`/metadata/${encodeURIComponent(documentId)}`)
+}
+
+// Uncached, unresolved crate for editing (loadRoCrate caches and resolves
+// profile artifacts, which must never be written back).
+async function fetchRoCrateRaw(documentId: string): Promise<unknown> {
+  const response = await request<MetadataRoCrateResponse>(`/metadata/${encodeURIComponent(documentId)}/rocrate`)
+  return response.rocrate
+}
+
+function invalidateCrate(documentId: string) {
+  const { [documentId]: _removed, ...rest } = fullCrates.value
+  fullCrates.value = rest
+}
+
+async function replaceMetadataRoCrate(
+  documentId: string,
+  input: ReplaceMetadataRoCrateRequest,
+): Promise<MetadataDocumentSummary> {
+  saving.value = true
+  try {
+    const summary = await request<MetadataDocumentSummary>(`/metadata/${encodeURIComponent(documentId)}/rocrate`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    })
+    invalidateCrate(documentId)
+    // The update is accepted; a failing catalog refresh (projection race) must
+    // not surface as a save failure.
+    await loadMetadata().catch(() => undefined)
+    return summary
+  } finally {
+    saving.value = false
+  }
+}
+
+async function deleteMetadataDocument(documentId: string): Promise<void> {
+  saving.value = true
+  try {
+    await request<void>(`/metadata/${encodeURIComponent(documentId)}`, { method: 'DELETE' })
+    invalidateCrate(documentId)
+    metadataItems.value = metadataItems.value.filter((item) => item.document_id !== documentId)
+    await loadMetadata().catch(() => undefined)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function listGroupMetadata(groupId: string): Promise<ListMetadataResponse> {
+  return request<ListMetadataResponse>('/metadata', {
+    query: { group_id: groupId, include: 'summary', limit: 1000 },
+  })
 }
 
 async function updateUserProfile(input: {
@@ -776,6 +832,12 @@ export function useAruna() {
     loadInfo,
     loadRoCrate,
     createMetadata,
+    getMetadataDocument,
+    fetchRoCrateRaw,
+    invalidateCrate,
+    replaceMetadataRoCrate,
+    deleteMetadataDocument,
+    listGroupMetadata,
     updateUserProfile,
     setRealmQuota,
     createGroup,

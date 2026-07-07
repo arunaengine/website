@@ -308,6 +308,16 @@ export interface MetadataRoCrateResponse {
   next_cursor?: string | null
 }
 
+// GET /metadata/{id} and the response body of PUT /metadata/{id}/rocrate,
+// POST /metadata (flattened) — the registry summary without rocrate_summary.
+export type MetadataDocumentSummary = Omit<MetadataDocumentListItem, 'rocrate_summary'>
+
+export interface ReplaceMetadataRoCrateRequest {
+  rocrate: unknown
+  // Omitted keeps the document's current visibility.
+  public?: boolean
+}
+
 export interface MetadataSearchResponse {
   hits: Array<{
     document_id: string
