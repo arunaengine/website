@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Group, MetadataDoc, MetadataProfile, Node, Realm, User } from '@/data/types'
 import {
   ApiError,
@@ -608,6 +608,27 @@ const currentUser = computed<User | null>(() => {
     favouriteMetadataIds: userInfo.value?.preferences.favourite_metadata_ids ?? [],
   }
 })
+
+// A direct A→B account switch (SettingsView.saveConnection swaps the token and
+// refreshes without a sign-out) leaves user A's persisted catalog cache in
+// place. If B then reloads while the serving node is unreachable, refresh()'s
+// catch path hydrates and renders A's cached non-public titles into B's
+// session. Clear the snapshot on identity change so it cannot leak across
+// accounts. The `prev && id` guard is load-bearing: an unguarded clear would
+// also fire on the boot transition undefined→A and race loadMetadata's save
+// inside the same refresh() (loadMetadata can save before loadAuthenticated
+// resolves userinfo), wiping every online boot's snapshot and breaking the
+// offline-reload feature. Same-user token re-paste keeps the same id, so the
+// cache survives it (which is why this keys on user id, not the token).
+watch(
+  () => currentUser.value?.id,
+  (id, prev) => {
+    if (prev && id && id !== prev) {
+      clearCatalogCache()
+      catalogFromCacheAt.value = null
+    }
+  },
+)
 
 // True when the current user holds a WRITE role permission that covers `target`,
 // either as an exact key or via a trailing `/**` wildcard (the seeded

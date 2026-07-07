@@ -1180,7 +1180,7 @@ async function submit() {
 
       <DialogFooter>
         <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
-        <Button :disabled="!canSubmit || saving || writesDisabled" @click="submit">
+        <Button :disabled="!canSubmit || saving || writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="submit">
           {{ saving ? 'Creating…' : 'Create metadata' }}
         </Button>
       </DialogFooter>
