@@ -64,15 +64,15 @@ try {
   await page.waitForTimeout(2000)
   step('admin quota policy editor still renders', (await page.textContent('body')).includes('Quota policy'))
 
-  // Buckets page renders (Upload action or the credential prompt). The upload
-  // precheck itself is not assertable here without a configured finite quota
-  // and an active S3 key that would actually breach it.
+  // Buckets page renders (the Add data action or the credential prompt). The
+  // upload precheck itself is not assertable here without a configured finite
+  // quota and an active S3 key that would actually breach it.
   await page.goto(BASE + '/app/buckets')
   await page.waitForTimeout(2000)
   const bucketsBody = await page.textContent('body')
   step(
     'buckets page renders',
-    bucketsBody.includes('Upload') || bucketsBody.includes('credentials') || bucketsBody.includes('S3'),
+    /Add data|Upload|credentials|S3/.test(bucketsBody),
   )
 
   // The only tolerated console error is the known API projection-race 500 on
