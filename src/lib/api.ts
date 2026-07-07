@@ -452,6 +452,52 @@ export interface CreateS3CredentialsResponse {
   access_secret: string
 }
 
+// Source connectors (GET/POST /groups/{group_id}/connectors — verified against
+// aruna api/src/routes/connectors.rs). Real, served contract — no gating.
+export type SourceConnectorKind = 'http' | 's3' | 'webdav' | 'ftp' | 'aruna_native'
+
+export interface SourceConnectorSummary {
+  connector_id: string
+  group_id: string
+  name: string
+  kind: SourceConnectorKind
+  public_config: Record<string, string>
+  created_at: string
+  updated_at: string
+  created_by: string
+  has_secret_config: boolean
+}
+
+export interface ListSourceConnectorsResponse {
+  connectors: SourceConnectorSummary[]
+}
+
+// Blob staging (POST /staging/ — verified against aruna api/src/routes/staging.rs).
+// Internally tagged: the `strategy` discriminant sits beside the flattened
+// target fields. Synchronous one-shot materialization (201 on success);
+// 'sync' exists in the API enum but returns 501 on today's backends.
+export type StagingStrategy = 'snapshot' | 'reference' | 'sync'
+
+export interface StageBlobSubmission {
+  strategy: StagingStrategy
+  group_id: string
+  connector_id: string
+  source_path: string
+  bucket: string
+  key: string
+}
+
+export interface StageBlobResponse {
+  strategy: StagingStrategy
+  bucket: string
+  key: string
+  version_id: string
+  size: number
+  content_type?: string | null
+  etag?: string | null
+  last_modified?: string | null
+}
+
 // The backend deserializes CreateMetadataRequest as an untagged enum with
 // deny_unknown_fields, so a request must match exactly one variant shape.
 export interface CreateMetadataScaffoldRequest {

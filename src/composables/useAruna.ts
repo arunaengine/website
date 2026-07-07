@@ -19,6 +19,9 @@ import {
   type ListGroupsResponse,
   type ListMetadataResponse,
   type ListS3CredentialsResponse,
+  type ListSourceConnectorsResponse,
+  type StageBlobResponse,
+  type StageBlobSubmission,
   type MetadataDocumentListItem,
   type MetadataDocumentSummary,
   type MetadataRoCrateResponse,
@@ -385,6 +388,18 @@ async function createS3Credentials(input: CreateS3CredentialsRequest): Promise<C
   } finally {
     saving.value = false
   }
+}
+
+// Source connectors registered on a group (GET /groups/{group_id}/connectors).
+async function listGroupConnectors(groupId: string): Promise<ListSourceConnectorsResponse> {
+  return request<ListSourceConnectorsResponse>(`/groups/${groupId}/connectors`)
+}
+
+// Synchronous one-shot staging: the node pulls source_path from the connector
+// and materializes it as bucket/key (201 on success). Slow for big blobs —
+// callers must show a running state. The axum route is literally "/staging/".
+async function stageBlob(input: StageBlobSubmission): Promise<StageBlobResponse> {
+  return request<StageBlobResponse>('/staging/', { method: 'POST', body: JSON.stringify(input) })
 }
 
 async function revokeS3Credential(accessKeyId: string): Promise<void> {
@@ -897,6 +912,8 @@ export function useAruna() {
     getGroupUsage,
     getGroupUsageHistory,
     createS3Credentials,
+    listGroupConnectors,
+    stageBlob,
     revokeS3Credential,
     listGroupMembers,
     addGroupMember,
