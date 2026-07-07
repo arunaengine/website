@@ -22,6 +22,7 @@ import {
   type MetadataDocumentListItem,
   type MetadataDocumentSummary,
   type MetadataRoCrateResponse,
+  type MetadataSearchOptions,
   type MetadataSearchResponse,
   type ReplaceMetadataRoCrateRequest,
   type RealmInfoResponse,
@@ -487,9 +488,23 @@ async function runSparql(query: string): Promise<SparqlResult> {
   }
 }
 
-async function searchMetadata(query: string) {
+async function searchMetadata(
+  query: string,
+  options: MetadataSearchOptions = {},
+): Promise<MetadataSearchResponse> {
   return request<MetadataSearchResponse>('/metadata/search', {
-    query: { q: query, limit: 100 },
+    query: {
+      q: query,
+      // Backend clamps to 1..=250 (default 25); the portal additionally
+      // respects the aruna#258 page cap of 100 hits per page.
+      limit: Math.min(Math.max(options.limit ?? 25, 1), 100),
+      // Forward-compatible aruna#258 param. Only callers gated behind
+      // featureEnabled('searchCursor') pass it; today's backend has no such
+      // parameter (axum Query ignores unknown params, but we never send it
+      // unless the flag is on).
+      cursor: options.cursor,
+    },
+    signal: options.signal,
   })
 }
 

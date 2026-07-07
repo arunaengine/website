@@ -364,15 +364,42 @@ export interface ReplaceMetadataRoCrateRequest {
   public?: boolean
 }
 
+// GET /metadata/search — verified against aruna api/src/routes/metadata.rs.
+// The backend accepts only q, limit (default 25, clamped 1..=250) and
+// mode=local|distributed; hits are deduplicated per document and ordered by
+// descending score; nodes_failed > 0 marks a partial result.
+// `title`, `snippet`, `partial`, `failed_nodes` and `next_cursor` are NOT
+// served yet — they are the forward-compatible fields proposed in aruna#258
+// (opaque cursor bound to the query, score ordering, page cap 100) and stay
+// optional so today's responses type-check unchanged.
+export interface MetadataSearchHit {
+  document_id: string
+  group_id: string
+  document_path: string
+  graph_iri: string
+  subject_iri: string
+  score: number
+  // aruna#258 server-side enrichment (not served yet)
+  title?: string | null
+  snippet?: string | null
+}
+
 export interface MetadataSearchResponse {
-  hits: Array<{
-    document_id: string
-    group_id: string
-    document_path: string
-    graph_iri: string
-    subject_iri: string
-    score: number
-  }>
+  hits: MetadataSearchHit[]
+  /** Node partitions queried; served today. */
+  nodes_queried: number
+  /** Node partitions that failed or timed out; > 0 ⇒ partial. Served today. */
+  nodes_failed: number
+  // aruna#258 forward-compatible fields (not served yet)
+  partial?: boolean
+  failed_nodes?: string[]
+  next_cursor?: string | null
+}
+
+export interface MetadataSearchOptions {
+  limit?: number
+  cursor?: string
+  signal?: AbortSignal
 }
 
 export interface SparqlResponse {
