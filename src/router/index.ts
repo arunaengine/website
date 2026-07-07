@@ -37,6 +37,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
       // Realm admin — quota policy and realm-wide usage
       { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
+      // Realm admin — node onboarding wizard and outstanding secrets
+      { path: 'admin/onboarding', name: 'admin-onboarding', component: () => import('@/views/AdminOnboardingView.vue') },
       // Compatibility redirects from prior IA
       { path: 'data', redirect: { name: 'buckets' } },
       { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },

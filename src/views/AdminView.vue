@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
+import { RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { formatBytes, formatNumber } from '@/lib/utils'
@@ -299,6 +300,7 @@ async function save() {
         <a href="#policy" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Quota policy</a>
         <a href="#group-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Group overrides</a>
         <a href="#user-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">User caps</a>
+        <RouterLink :to="{ name: 'admin-onboarding' }" class="mt-1 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Node onboarding →</RouterLink>
       </nav>
 
       <div class="space-y-6">

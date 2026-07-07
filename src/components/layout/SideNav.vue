@@ -12,6 +12,7 @@ import {
   Compass,
   LayoutDashboard,
   ListChecks,
+  ServerCog,
   Settings,
   ShieldCheck,
   SquareTerminal,
@@ -37,7 +38,12 @@ const nav = computed<NavItem[]>(() => [
   { to: '/app/groups', icon: Users, label: 'Groups' },
   { to: '/app/status', icon: Activity, label: 'Status' },
   { to: '/app/settings', icon: Settings, label: 'Settings' },
-  ...(isRealmAdmin.value ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin' }] : []),
+  ...(isRealmAdmin.value
+    ? [
+        { to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true },
+        { to: '/app/admin/onboarding', icon: ServerCog, label: 'Onboarding' },
+      ]
+    : []),
 ])
 
 const route = useRoute()
