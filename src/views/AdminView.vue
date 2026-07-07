@@ -8,6 +8,7 @@ import Switch from '@/components/ui/Switch.vue'
 import { RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { featureEnabled } from '@/lib/config'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { ApiError, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
@@ -18,6 +19,9 @@ const { realmInfo, usageInfo, isRealmAdmin, isManagementNode, nodeInfo, setRealm
 const { isAuthenticated } = useAuth()
 
 const nodeCapability = computed(() => nodeInfo.value?.node.capabilities ?? 'server')
+
+// Placement admin lives on its own route (aruna#269), config-gated (default off).
+const placementAdminEnabled = featureEnabled('placementAdmin')
 
 // Mirrors aruna's `impl Default for QuotaConfig` — the effective policy when a
 // backend serves no quota block. null = unlimited.
@@ -301,6 +305,13 @@ async function save() {
         <a href="#group-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Group overrides</a>
         <a href="#user-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">User caps</a>
         <RouterLink :to="{ name: 'admin-onboarding' }" class="mt-1 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Node onboarding →</RouterLink>
+        <RouterLink
+          v-if="placementAdminEnabled"
+          :to="{ name: 'admin-placement' }"
+          class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          Placement →
+        </RouterLink>
       </nav>
 
       <div class="space-y-6">

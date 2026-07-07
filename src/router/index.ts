@@ -44,6 +44,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
       // Realm admin — node onboarding wizard and outstanding secrets
       { path: 'admin/onboarding', name: 'admin-onboarding', component: () => import('@/views/AdminOnboardingView.vue') },
+      // Realm admin — placement defaults and transitions (feature-gated in-view)
+      { path: 'admin/placement', name: 'admin-placement', component: () => import('@/views/AdminPlacementView.vue') },
       // Compatibility redirects from prior IA
       { path: 'data', redirect: { name: 'buckets' } },
       { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },

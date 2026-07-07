@@ -3,6 +3,7 @@ import AppLogo from '@/components/layout/AppLogo.vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { featureEnabled } from '@/lib/config'
 import {
   Activity,
   ArrowLeft,
@@ -12,6 +13,7 @@ import {
   Compass,
   LayoutDashboard,
   ListChecks,
+  MapPinned,
   ServerCog,
   Settings,
   ShieldCheck,
@@ -29,6 +31,11 @@ interface NavItem {
 
 const { isRealmAdmin } = useAruna()
 
+// Placement admin is config-gated (aruna#269, default off); the nav entry only
+// appears for a realm admin on a portal with the flag on. Config resolves
+// pre-mount (#275), so a static read is safe.
+const placementAdminEnabled = featureEnabled('placementAdmin')
+
 const nav = computed<NavItem[]>(() => [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
@@ -43,6 +50,9 @@ const nav = computed<NavItem[]>(() => [
         { to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true },
         { to: '/app/admin/onboarding', icon: ServerCog, label: 'Onboarding' },
       ]
+    : []),
+  ...(isRealmAdmin.value && placementAdminEnabled
+    ? [{ to: '/app/admin/placement', icon: MapPinned, label: 'Placement' }]
     : []),
 ])
 
