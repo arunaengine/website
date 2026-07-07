@@ -178,10 +178,16 @@ type ResolvedLink =
 function resolveUrl(url: string): ResolvedLink {
   const parsed = parseS3Url(url, s3.endpoint.value)
   if (parsed) {
-    const prefix = parsed.key.includes('/') ? parsed.key.slice(0, parsed.key.lastIndexOf('/') + 1) : ''
+    // Slash-less parent prefix, matching DataManagerView.navigateTo (which
+    // appends its own trailing '/'); a trailing slash here would list the
+    // bucket at "prefix//" — an always-empty folder view.
+    const prefix = parsed.key.includes('/') ? parsed.key.slice(0, parsed.key.lastIndexOf('/')) : ''
     return { kind: 's3', bucketId: parsed.bucket, prefix }
   }
-  if (isDrsReference(url)) {
+  // Only node-resolvable id forms (w3id URL / content-hash ARN) get a DRS href;
+  // `drs://` URIs are accepted for TES input but the node's DRS route rejects
+  // them (parse_requested_object_id), so they fall through to plain rendering.
+  if (isDrsReference(url) && !/^drs:\/\//i.test(url)) {
     return { kind: 'drs', object: drsObjectHref(apiBaseUrl.value, url), download: drsDownloadHref(apiBaseUrl.value, url) }
   }
   return { kind: 'plain' }
@@ -346,7 +352,7 @@ const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.
             <div v-for="(row, i) in declaredOutputs" :key="'d' + i" class="flex flex-wrap items-center gap-2 text-[11px]">
               <span class="font-mono text-muted-foreground">{{ row.path }}</span>
               <span class="text-muted-foreground">→</span>
-              <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: { prefix: row.link.prefix } }">{{ row.url }}</RouterLink>
+              <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
               <template v-else-if="row.link.kind === 'drs'">
                 <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLink class="h-3 w-3" /></a>
                 <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener" aria-label="Download"><Download class="h-3.5 w-3.5" /></a>
@@ -361,7 +367,7 @@ const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.
               <span class="font-mono text-muted-foreground">{{ row.path }}</span>
               <span v-if="row.size !== undefined && !Number.isNaN(row.size)" class="text-muted-foreground">{{ formatBytes(row.size) }}</span>
               <span class="text-muted-foreground">→</span>
-              <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: { prefix: row.link.prefix } }">{{ row.url }}</RouterLink>
+              <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
               <template v-else-if="row.link.kind === 'drs'">
                 <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLink class="h-3 w-3" /></a>
                 <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener" aria-label="Download"><Download class="h-3.5 w-3.5" /></a>
