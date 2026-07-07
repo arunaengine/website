@@ -174,13 +174,25 @@ function goToWatch() {
   currentStep.value = 3
 }
 
+// A registration claim is a Local secret redeemed once at sign-up: its
+// claimed_node_id is a user id ("{ulid}@{realm}", always containing '@'),
+// which no iroh node id ever does. This discriminates it from the node-boot
+// window, where claimedIsNode is also transiently false while the joining
+// node has not yet appeared in realmInfo.nodes.
+const isRegistrationClaim = computed(
+  () =>
+    !!watchState.value.claimedBy &&
+    minted.value?.mode === 'Local' &&
+    watchState.value.claimedBy.includes('@'),
+)
+
 // connected → real node; expired → timed out; registration → a Local secret
 // redeemed at sign-up (claimedBy is a user id, never a node).
 const watchTerminal = computed<'connected' | 'expired' | 'registration' | null>(() => {
   const w = watchState.value
   if (w.phase === 'connected') return 'connected'
   if (w.phase === 'expired') return 'expired'
-  if (w.phase === 'waiting-presence' && w.claimedBy && !w.claimedIsNode) return 'registration'
+  if (w.phase === 'waiting-presence' && isRegistrationClaim.value) return 'registration'
   return null
 })
 
@@ -201,7 +213,7 @@ const watchStages = computed<WatchStage[]>(() => {
   }
 
   if (w.claimedBy) {
-    const registration = w.phase === 'waiting-presence' && !w.claimedIsNode
+    const registration = isRegistrationClaim.value
     stages.push({
       key: 'claim',
       label: 'Claimed by a node',

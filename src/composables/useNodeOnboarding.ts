@@ -148,16 +148,20 @@ export function useNodeOnboarding() {
 
   async function revoke(id: string): Promise<void> {
     markRevoking(id, true)
+    let failure: string | null = null
     try {
       await request<void>(`/admin/onboarding/secrets/${encodeURIComponent(id)}`, { method: 'DELETE' })
     } catch (err) {
       // A 404 means the secret was already pruned or claimed-and-expired — the
       // row is gone either way, so treat it as a successful revoke.
       if (!(err instanceof ApiError && err.status === 404)) {
-        listError.value = errorMessage(err)
+        failure = errorMessage(err)
       }
     } finally {
+      // Refresh first (it clears listError on success), THEN surface the revoke
+      // failure — otherwise a still-working list endpoint erases the message.
       await refreshSecrets().catch(() => undefined)
+      if (failure) listError.value = failure
       markRevoking(id, false)
     }
   }
@@ -184,6 +188,10 @@ export function useNodeOnboarding() {
     try {
       if (watch.value.phase === 'waiting-claim') {
         await refreshSecrets()
+        // refreshSecrets swallows its own errors into listError; mirror it so a
+        // network hiccup during claim-watch reaches the inline strip (and clears
+        // itself on the next successful tick).
+        patchWatch({ lastError: listError.value })
         const row = secrets.value.find((s) => s.enrollment_id === watch.value.enrollmentId)
         if (row?.claimed_node_id) {
           // claimedIsNode is confirmed against realmInfo.nodes in waiting-presence.
@@ -205,9 +213,12 @@ export function useNodeOnboarding() {
           patchWatch({ claimedIsNode: true, phase: connected ? 'connected' : 'waiting-presence' })
           if (connected) stopWatch()
         } else {
-          // claimedBy matches no realm node: a Local secret redeemed at
-          // registration (admin claim) — it never appears as a node.
+          // claimedBy matches no realm node — either the joining node has not
+          // booted yet (keep polling) or it is a Local secret redeemed at
+          // registration (admin claim), whose user id "{ulid}@{realm}" carries
+          // an '@' that no iroh node id has and never appears as a node: stop.
           patchWatch({ claimedIsNode: false })
+          if (watch.value.claimedBy?.includes('@')) stopWatch()
         }
       }
     } catch (err) {
