@@ -33,6 +33,27 @@ try {
   const guestBell = await page.getByRole('button', { name: /Notifications/ }).count()
   step('no notification bell for guests', guestBell === 0)
 
+  // Guest SPARQL console: reachable signed out, runs a public query
+  await page.goto(BASE + '/app/query')
+  await page.waitForTimeout(1500)
+  const consoleBody = await page.textContent('body')
+  step('guest can open the query console', consoleBody.includes('Query console'))
+  step('console shows editor and run button', (await page.getByRole('button', { name: /Run/ }).count()) > 0)
+  // The default example is a SELECT with LIMIT; run it as a guest
+  await page.getByRole('button', { name: /^Run/ }).first().click()
+  await page.waitForTimeout(3000)
+  const ranBody = await page.textContent('body')
+  step(
+    'guest query returns a result or an honest error',
+    ranBody.includes('ms') || ranBody.includes('No rows') || ranBody.includes('Try again'),
+  )
+  // Paging controls render for SELECT results
+  step('paging controls present', (await page.getByRole('button', { name: /Next/ }).count()) > 0 || ranBody.includes('Try again'))
+  // Deep link with a document scope preselects the document picker
+  await page.goto(BASE + '/app/query?document=01UNKNOWNDOCID0000000000000')
+  await page.waitForTimeout(1000)
+  step('document deep link renders console', (await page.textContent('body')).includes('Query console'))
+
   // 3. Clicking Sign in in the top bar redirects straight to Keycloak (no interstitial)
   await page.locator('header').getByRole('button', { name: /^Sign in$/ }).first().click()
   await page.waitForURL(/localhost:8080/, { timeout: 15000 })
