@@ -13,7 +13,15 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
   features: {},
 }
 
-let current: PortalRuntimeConfig = { ...DEFAULT_PORTAL_CONFIG, features: {} }
+// Per-flag default states, layered UNDER any served `features` map: an explicit
+// served value (including `false`) always wins, and any flag absent here stays
+// off. The backend has served cursor paging since aruna 9ae6bd68, so
+// `searchCursor` defaults on; it stays a version-skew / deployment toggle — an
+// older node that never returns `next_cursor` simply ends pagination, so the UI
+// degrades gracefully, and a deployment can still force it off via config.
+const DEFAULT_FEATURES: Record<string, boolean> = { searchCursor: true }
+
+let current: PortalRuntimeConfig = { ...DEFAULT_PORTAL_CONFIG, features: { ...DEFAULT_FEATURES } }
 
 export function portalConfig(): PortalRuntimeConfig {
   return current
@@ -38,7 +46,7 @@ export async function loadPortalConfig(): Promise<PortalRuntimeConfig> {
 }
 
 function mergeConfig(raw: Record<string, unknown>): PortalRuntimeConfig {
-  const merged: PortalRuntimeConfig = { ...DEFAULT_PORTAL_CONFIG, features: {} }
+  const merged: PortalRuntimeConfig = { ...DEFAULT_PORTAL_CONFIG, features: { ...DEFAULT_FEATURES } }
   if (typeof raw.apiBaseUrl === 'string' && raw.apiBaseUrl.trim()) merged.apiBaseUrl = raw.apiBaseUrl.trim()
   if (raw.features && typeof raw.features === 'object' && !Array.isArray(raw.features)) {
     for (const [key, value] of Object.entries(raw.features as Record<string, unknown>)) {
