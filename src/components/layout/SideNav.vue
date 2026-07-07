@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   SquareTerminal,
   Users,
+  Workflow,
 } from '@lucide/vue'
 
 interface NavItem {
@@ -36,11 +37,15 @@ const { isRealmAdmin } = useAruna()
 // pre-mount (#275), so a static read is safe.
 const placementAdminEnabled = featureEnabled('placementAdmin')
 
+// Config resolves before the app mounts, so a plain read is safe here.
+const tesEnabled = featureEnabled('tes')
+
 const nav = computed<NavItem[]>(() => [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
   { to: '/app/query', icon: SquareTerminal, label: 'Query' },
   { to: '/app/buckets', icon: Boxes, label: 'Data' },
+  ...(tesEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
   { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
   { to: '/app/groups', icon: Users, label: 'Groups' },
   { to: '/app/status', icon: Activity, label: 'Status' },
