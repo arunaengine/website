@@ -19,8 +19,11 @@ const routes: RouteRecordRaw[] = [
       // Buckets — primary research surface (formerly "Data manager")
       { path: 'buckets', name: 'buckets', component: () => import('@/views/DataManagerView.vue') },
       { path: 'buckets/:bucketId', name: 'bucket', component: () => import('@/views/DataManagerView.vue') },
-      // Discover — the metadata catalog plus search, SPARQL in expert mode
+      // Discover — the metadata catalog plus full-text search
       { path: 'search', name: 'search', component: () => import('@/views/SearchView.vue') },
+      // SPARQL console — intentionally NOT auth-gated: guests query public graphs,
+      // the backend applies visibility filtering.
+      { path: 'query', name: 'query', component: () => import('@/views/QueryConsoleView.vue') },
       // The old catalog listing merged into Discover; detail pages stay here
       { path: 'metadata', name: 'metadata', redirect: { name: 'search' } },
       { path: 'metadata/:id', name: 'metadata-detail', component: () => import('@/views/MetadataView.vue') },
@@ -37,7 +40,6 @@ const routes: RouteRecordRaw[] = [
       // Compatibility redirects from prior IA
       { path: 'data', redirect: { name: 'buckets' } },
       { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },
-      { path: 'query', redirect: { name: 'search' } },
       { path: 'nodes', redirect: { name: 'settings' } },
       { path: 'realm', redirect: { name: 'settings' } },
       // Unknown /app URLs keep the shell and show a 404 instead of redirecting away.
