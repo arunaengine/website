@@ -82,16 +82,21 @@ function pump(): void {
 
 async function run(item: UploadQueueItem): Promise<void> {
   const file = files.get(item.id)
-  if (!file) return
+  if (!file) {
+    item.state = 'error'
+    item.error = 'File no longer available for upload.'
+    touch()
+    return
+  }
   item.state = 'uploading'
   item.progress = 0
   touch()
-  const handle = s3.uploadObject(item.bucket, item.key, file, (loaded, total) => {
-    item.progress = total ? Math.round((loaded / total) * 100) : 0
-    touch()
-  })
-  handles.set(item.id, handle)
   try {
+    const handle = s3.uploadObject(item.bucket, item.key, file, (loaded, total) => {
+      item.progress = total ? Math.round((loaded / total) * 100) : 0
+      touch()
+    })
+    handles.set(item.id, handle)
     await handle.promise
     if (item.state === 'uploading') {
       item.state = 'done'
