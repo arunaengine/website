@@ -8,9 +8,9 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
-import ProfileChip from '@/components/metadata/ProfileChip.vue'
+import CatalogCard from '@/components/metadata/CatalogCard.vue'
 import { computed, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { Search, FileJson2, Code2, Play, Plus, Star } from '@lucide/vue'
 import type { SparqlResult } from '@/data/types'
@@ -144,30 +144,15 @@ async function runQuery() {
             <span class="text-xs text-muted-foreground">{{ hits.length }}</span>
           </div>
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <RouterLink v-for="doc in paged" :key="doc.ulid" :to="{ name: 'metadata-detail', params: { id: doc.ulid } }" class="surface group relative flex h-full flex-col gap-3 p-4 transition-shadow hover:shadow-md">
-              <button
-                v-if="currentUser"
-                type="button"
-                class="absolute right-2.5 top-2.5 rounded-md p-1 transition-colors hover:bg-muted disabled:opacity-50"
-                :class="isFavourite(doc.ulid) ? 'text-amber-500' : 'text-muted-foreground'"
-                :disabled="favBusy.has(doc.ulid)"
-                :aria-label="isFavourite(doc.ulid) ? 'Remove from favourites' : 'Add to favourites'"
-                @click.prevent.stop="toggleFav(doc.ulid)"
-              >
-                <Star class="h-4 w-4" :fill="isFavourite(doc.ulid) ? 'currentColor' : 'none'" />
-              </button>
-              <div class="pr-6">
-                <h3 class="font-display text-sm font-semibold text-aruna-navy">{{ doc.title }}</h3>
-                <p class="mt-1 line-clamp-2 text-xs text-muted-foreground">{{ doc.description || doc.ulid }}</p>
-              </div>
-              <div class="flex flex-wrap gap-1">
-                <span v-for="keyword in doc.keywords.slice(0, 4)" :key="keyword" class="rounded-full border border-border bg-muted/30 px-1.5 py-0.5 text-[10px] text-foreground/70">#{{ keyword }}</span>
-              </div>
-              <div class="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                <span class="truncate">{{ doc.author || doc.ulid }}</span>
-                <ProfileChip :doc="doc" />
-              </div>
-            </RouterLink>
+            <CatalogCard
+              v-for="doc in paged"
+              :key="doc.ulid"
+              :doc="doc"
+              :favourite="isFavourite(doc.ulid)"
+              :can-favourite="Boolean(currentUser)"
+              :favourite-busy="favBusy.has(doc.ulid)"
+              @toggle-favourite="toggleFav"
+            />
           </div>
           <div v-if="hits.length > PAGE_SIZE" class="surface mt-4 overflow-hidden">
             <Pagination v-model:page="page" :page-size="PAGE_SIZE" :total="hits.length" label="metadata documents" />
