@@ -43,6 +43,7 @@ import {
 } from '@/lib/api'
 import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
 import { useConnectivity } from '@/lib/connectivity'
+import { clearCatalogCache, loadCatalogCache, saveCatalogCache } from '@/lib/catalog-cache'
 
 const TOKEN_KEY = 'aruna.authToken'
 const API_BASE_KEY = 'aruna.apiBaseUrl'
@@ -68,6 +69,10 @@ const credentials = ref<S3CredentialSummary[]>([])
 const fullCrates = ref<Record<string, unknown>>({})
 const cratePending = ref<Record<string, boolean>>({})
 const bootstrapped = ref(false)
+// unix-ms timestamp of the cached catalog when the current list came from
+// localStorage (offline reload); null when the list is live. Surfaced as a
+// staleness note in the offline banner.
+const catalogFromCacheAt = ref<number | null>(null)
 
 function readStored(key: string): string {
   if (typeof window === 'undefined') return ''
@@ -108,6 +113,16 @@ async function refresh() {
     }
   } catch (err) {
     error.value = errorMessage(err)
+    // Offline reload: hydrate the last cached catalog so browsing still shows
+    // something; staleness is surfaced via catalogFromCacheAt in the banner.
+    if (!metadataItems.value.length) {
+      const cached = loadCatalogCache()
+      if (cached) {
+        metadataItems.value = cached.metadataItems
+        profileItems.value = cached.profileItems
+        catalogFromCacheAt.value = cached.savedAt
+      }
+    }
   } finally {
     loading.value = false
     bootstrapped.value = true
@@ -158,6 +173,14 @@ async function loadMetadata() {
   ])
   metadataItems.value = metadata.documents.filter((doc) => !doc.document_path.startsWith('profiles/'))
   profileItems.value = profiles.documents
+  // A live load supersedes any cached snapshot; persist it so a later reload
+  // while the serving node is unreachable can still render a browsable catalog.
+  catalogFromCacheAt.value = null
+  saveCatalogCache({
+    savedAt: Date.now(),
+    metadataItems: metadataItems.value,
+    profileItems: profileItems.value,
+  })
 }
 
 async function loadAuthenticated() {
@@ -539,6 +562,12 @@ async function searchMetadata(
 function setAuthToken(token: string) {
   authToken.value = token.trim()
   storeValue(TOKEN_KEY, authToken.value)
+  // The cached catalog list can contain documents visible only to the
+  // signed-in user, so drop it on sign-out to avoid leaking non-public titles.
+  if (!authToken.value) {
+    clearCatalogCache()
+    catalogFromCacheAt.value = null
+  }
 }
 
 function setApiBaseUrl(url: string) {
@@ -927,6 +956,7 @@ export function useAruna() {
     profiles,
     metadataItems,
     profileItems,
+    catalogFromCacheAt,
     fullCrates,
     cratePending,
     refresh,

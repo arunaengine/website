@@ -7,9 +7,10 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useGlobalErrors } from '@/composables/useGlobalErrors'
 import { useConnectivity } from '@/lib/connectivity'
+import { relativeTime } from '@/lib/utils'
 
 const route = useRoute()
-const { error, authError, refresh } = useAruna()
+const { error, authError, refresh, catalogFromCacheAt } = useAruna()
 const { signIn } = useAuth()
 const { errors, dismissGlobalError } = useGlobalErrors()
 const { offline, nodeReachable } = useConnectivity()
@@ -37,10 +38,12 @@ function onSignIn() {
         <span v-if="nodeReachable">
           You appear to be offline. Browsing, search and SPARQL keep working over this node's local data, but
           content from other nodes may be stale — and writes need connectivity.
+          <span v-if="catalogFromCacheAt"> Showing the catalog as cached {{ relativeTime(new Date(catalogFromCacheAt).toISOString()) }}.</span>
         </span>
         <span v-else>
           This portal cannot reach its node — showing the last loaded data. Reads may be stale and writes need
           connectivity.
+          <span v-if="catalogFromCacheAt"> Showing the catalog as cached {{ relativeTime(new Date(catalogFromCacheAt).toISOString()) }}.</span>
         </span>
       </span>
       <Button variant="outline" size="sm" class="shrink-0" @click="refresh">Retry</Button>
