@@ -405,3 +405,48 @@ export type CreateMetadataRequest = CreateMetadataScaffoldRequest | CreateMetada
 // The API flattens the summary fields onto the response body
 // (CreateMetadataResponse uses #[serde(flatten)]).
 export type CreateMetadataResponse = MetadataDocumentListItem
+
+// --- Notifications (GET /notifications, /notifications/unread, POST /notifications/read) ---
+
+// Backend NotificationResponse. Kind-specific fields are omitted (not null)
+// when absent; new kinds appear over time, so `kind`/`category` stay open strings.
+export interface ApiNotification {
+  id: string
+  category: string
+  kind: string
+  class: 'direct' | 'transient'
+  created_at_ms: number
+  read: boolean
+  group_id?: string
+  member_user_id?: string
+  actor_user_id?: string
+  node_id?: string
+  realm_id?: string
+  path?: string
+  document_id?: string
+  bucket?: string
+  key?: string
+  size_bytes?: number
+}
+
+export interface NotificationListResponse {
+  notifications: ApiNotification[]
+  // Opaque base64url cursor; omitted on the last page. Pass back verbatim.
+  next_cursor?: string
+}
+
+// Bounded lower-bound count: the backend stops counting at 100 and sets capped.
+export interface UnreadCountResponse {
+  count: number
+  capped: boolean
+}
+
+export interface MarkReadRequest {
+  ids: string[]
+  // Inclusive created_at_ms sweep; ids: [] + up_to_ms marks everything up to it.
+  up_to_ms?: number
+}
+
+export interface MarkReadResponse {
+  marked: number
+}
