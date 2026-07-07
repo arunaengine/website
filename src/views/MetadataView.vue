@@ -3,6 +3,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -16,7 +17,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
-import { relativeTime } from '@/lib/utils'
+import { formatBytes, relativeTime } from '@/lib/utils'
 import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
@@ -174,23 +175,97 @@ watch(
   { immediate: true },
 )
 
-const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
-  const crate = fullCrates.value[detailId.value] ?? current.value?.roCrate
+interface DataEntityRow {
+  id: string
+  name: string
+  types: string[]
+  encodingFormat?: string
+  contentSize?: string
+  contentUrl?: string
+}
+
+function crateGraph(crate: unknown): Array<Record<string, unknown>> {
   if (!crate || typeof crate !== 'object') return []
-  const graphValue = (crate as Record<string, unknown>)['@graph']
-  if (!Array.isArray(graphValue)) return []
-  return graphValue
-    .filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === 'object' && !Array.isArray(entry)))
-    .filter((entry) => {
-      const type = entry['@type']
-      return type === 'File' || (Array.isArray(type) && type.includes('File'))
+  const g = (crate as Record<string, unknown>)['@graph']
+  return Array.isArray(g)
+    ? g.filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object' && !Array.isArray(e)))
+    : []
+}
+
+// Same about-based root heuristic as the edit dialog.
+function crateRootId(crate: unknown): string | undefined {
+  const g = crateGraph(crate)
+  const descriptor = g.find((e) => e['@id'] === 'ro-crate-metadata.json')
+  const about = descriptor?.about
+  if (about && typeof about === 'object' && !Array.isArray(about)) {
+    const id = (about as Record<string, unknown>)['@id']
+    if (typeof id === 'string') return id
+  }
+  return g.find((e) => e['@id'] !== 'ro-crate-metadata.json')?.['@id'] as string | undefined
+}
+
+function typesOf(entity: Record<string, unknown>): string[] {
+  const t = entity['@type']
+  if (typeof t === 'string') return [t]
+  if (Array.isArray(t)) return t.filter((x): x is string => typeof x === 'string')
+  return []
+}
+
+function stringProp(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) return stringProp(value[0])
+  if (value && typeof value === 'object') {
+    const id = (value as Record<string, unknown>)['@id']
+    return typeof id === 'string' ? id : undefined
+  }
+  return undefined
+}
+
+// The union of entities referenced from the root's hasPart and every File/Dataset
+// entity (excluding the root and the metadata descriptor).
+const dataEntities = computed<DataEntityRow[]>(() => {
+  const crate = fullCrates.value[detailId.value] ?? current.value?.roCrate
+  const g = crateGraph(crate)
+  if (!g.length) return []
+  const rootId = crateRootId(crate)
+  const root = rootId ? g.find((e) => e['@id'] === rootId) : undefined
+  const hasPartIds = new Set<string>()
+  const hasPart = root?.hasPart
+  for (const ref of Array.isArray(hasPart) ? hasPart : hasPart ? [hasPart] : []) {
+    const id = stringProp(ref)
+    if (id) hasPartIds.add(id)
+  }
+  const rows: DataEntityRow[] = []
+  const seen = new Set<string>()
+  for (const entity of g) {
+    const id = typeof entity['@id'] === 'string' ? entity['@id'] : ''
+    if (!id || id === 'ro-crate-metadata.json' || id === rootId || seen.has(id)) continue
+    const types = typesOf(entity)
+    if (!hasPartIds.has(id) && !types.includes('File') && !types.includes('Dataset')) continue
+    seen.add(id)
+    rows.push({
+      id,
+      name: stringProp(entity.name) || id,
+      types,
+      encodingFormat: stringProp(entity.encodingFormat),
+      contentSize: stringProp(entity.contentSize),
+      contentUrl: stringProp(entity.contentUrl),
     })
-    .map((entry) => {
-      const id = typeof entry['@id'] === 'string' ? entry['@id'] : ''
-      return { id, name: typeof entry.name === 'string' && entry.name ? entry.name : id }
-    })
-    .filter((file) => file.id)
+  }
+  return rows
 })
+
+function entityLink(row: DataEntityRow): string | undefined {
+  const target = row.contentUrl ?? row.id
+  return target.startsWith('http') ? target : undefined
+}
+
+function entitySize(row: DataEntityRow): string {
+  if (!row.contentSize) return '—'
+  const n = Number(row.contentSize)
+  return row.contentSize.trim() !== '' && Number.isFinite(n) ? formatBytes(n) : row.contentSize
+}
 </script>
 
 <template>
@@ -308,16 +383,54 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
           <pre v-if="showCrate" class="mt-3 max-h-[560px] overflow-auto whitespace-pre-wrap rounded-md bg-muted/30 p-4 font-mono text-[11.5px] leading-relaxed text-foreground/85 scrollbar-thin"><code>{{ JSON.stringify(currentCrate, null, 2) }}</code></pre>
         </section>
 
-        <section class="surface p-5 text-xs text-muted-foreground">
-          <div class="flex items-center gap-2 font-medium text-foreground"><FileJson2 class="h-4 w-4 text-primary" /> Referenced data</div>
-          <ul v-if="referencedFiles.length" class="mt-3 space-y-2">
-            <li v-for="file in referencedFiles" :key="file.id" class="flex flex-wrap items-baseline gap-x-2">
-              <span class="font-medium text-foreground">{{ file.name }}</span>
-              <a v-if="file.id.startsWith('http')" :href="file.id" target="_blank" rel="noopener" class="inline-flex items-center gap-1 break-all font-mono text-[11px] text-primary hover:underline">{{ file.id }} <ExternalLink class="h-3 w-3 shrink-0" /></a>
-              <span v-else class="break-all font-mono text-[11px]">{{ file.id }}</span>
-            </li>
-          </ul>
-          <p v-else class="mt-2">This document does not reference any data files yet.</p>
+        <section class="surface overflow-hidden">
+          <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
+            <FileJson2 class="h-4 w-4 text-primary" /> Referenced data
+            <span v-if="dataEntities.length" class="text-xs font-normal text-muted-foreground">{{ dataEntities.length }}</span>
+          </div>
+
+          <table v-if="loadingCrate || dataEntities.length" class="w-full text-sm">
+            <thead class="bg-muted/30 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th class="px-5 py-2 text-left font-semibold">Name</th>
+                <th class="px-5 py-2 text-left font-semibold">Type</th>
+                <th class="px-5 py-2 text-left font-semibold">Format</th>
+                <th class="px-5 py-2 text-right font-semibold">Size</th>
+                <th class="px-5 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-if="loadingCrate && !dataEntities.length">
+                <tr v-for="n in 3" :key="n" class="border-t border-border">
+                  <td class="px-5 py-2.5"><Skeleton class="h-4 w-40" /></td>
+                  <td class="px-5 py-2.5"><Skeleton class="h-4 w-16" /></td>
+                  <td class="px-5 py-2.5"><Skeleton class="h-4 w-20" /></td>
+                  <td class="px-5 py-2.5"><Skeleton class="ml-auto h-4 w-12" /></td>
+                  <td class="px-5 py-2.5"></td>
+                </tr>
+              </template>
+              <tr v-for="row in dataEntities" v-else :key="row.id" class="border-t border-border">
+                <td class="px-5 py-2.5 font-medium text-foreground" :title="row.id">{{ row.name }}</td>
+                <td class="px-5 py-2.5 text-muted-foreground">{{ row.types.join(', ') || '—' }}</td>
+                <td class="px-5 py-2.5 text-muted-foreground">{{ row.encodingFormat || '—' }}</td>
+                <td class="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ entitySize(row) }}</td>
+                <td class="px-5 py-2.5 text-right">
+                  <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open ${row.name} in a new tab`">
+                    <ExternalLink class="h-3.5 w-3.5" />
+                  </a>
+                  <span v-else class="text-muted-foreground">—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div v-if="crateNotReady" class="flex items-center gap-3 px-5 py-4 text-xs text-muted-foreground">
+            <span>The crate is still being prepared.</span>
+            <Button variant="outline" size="sm" @click="fetchCrate(detailId)">Retry</Button>
+          </div>
+          <p v-else-if="!loadingCrate && !dataEntities.length" class="px-5 py-6 text-xs text-muted-foreground">
+            This document does not reference any data files. Files can be attached by editing the crate.
+          </p>
         </section>
       </template>
 
