@@ -40,6 +40,10 @@ const routes: RouteRecordRaw[] = [
       // before the runtime config loads (gating cannot live here). The component is
       // lazy, so the flag is read at navigation time, after config load.
       { path: 'settings/devices', name: 'settings-devices', component: () => import('@/views/DevicesView.vue') },
+      // Subscriptions / offline leases (aruna#273) — the view self-gates on
+      // featureEnabled('subscriptions') and renders NotFoundView when the flag
+      // is off (routes register before the runtime config loads; #271 pattern).
+      { path: 'settings/subscriptions', name: 'settings-subscriptions', component: () => import('@/views/SubscriptionsView.vue') },
       // Realm admin — quota policy and realm-wide usage
       { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
       // Realm admin — node onboarding wizard and outstanding secrets

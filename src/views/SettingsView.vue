@@ -14,8 +14,8 @@ import CopyButton from '@/components/nodes/CopyButton.vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
-import { RouterLink } from 'vue-router'
 import { featureEnabled } from '@/lib/config'
+import { RouterLink } from 'vue-router'
 import { relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { ChevronRight, ExternalLink, KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from '@lucide/vue'
@@ -40,6 +40,7 @@ const {
 } = useAruna()
 const { signIn, signOut, isAuthenticated, stage, stageError } = useAuth()
 
+const subscriptionsEnabled = featureEnabled('subscriptions')
 const apiBaseDraft = ref(apiBaseUrl.value)
 const tokenDraft = ref(authToken.value)
 watch(authToken, (token) => (tokenDraft.value = token))
@@ -163,6 +164,7 @@ const deviceEnrollmentEnabled = featureEnabled('deviceEnrollment')
           :to="{ name: 'settings-devices' }"
           class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
         >My devices &rarr;</RouterLink>
+        <RouterLink v-if="subscriptionsEnabled" :to="{ name: 'settings-subscriptions' }" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Subscriptions &rarr;</RouterLink>
       </nav>
 
       <div class="space-y-6">
