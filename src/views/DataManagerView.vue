@@ -19,6 +19,7 @@ import { useS3, s3ErrorMessage, isS3AuthError, type BucketEntry, type FolderEntr
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { UsageResponse } from '@/lib/api'
+import { buildCrateReferenceIndex, type CrateObjectReference } from '@/lib/crateReferences'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -27,6 +28,7 @@ import {
   Download,
   FolderPlus,
   KeyRound,
+  Link2,
   Loader2,
   LogIn,
   Plus,
@@ -38,7 +40,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { currentUser, bootstrapped, credentials, getGroupUsage } = useAruna()
+const { currentUser, bootstrapped, credentials, getGroupUsage, fullCrates, metadataItems } = useAruna()
 const s3 = useS3()
 
 const bucket = computed(() => (route.params.bucketId as string | undefined) ?? '')
@@ -335,6 +337,14 @@ async function confirmDelete() {
 const isEmpty = computed(
   () => !listLoading.value && !listError.value && !folders.value.length && !objects.value.length,
 )
+
+// Cache-only cross-reference: which loaded crates point at each object. Rebuilds
+// from the client-side crate caches, so it never issues a request and only knows
+// about metadata fetched this session (the badge tooltip says as much).
+const crateRefs = computed(() => buildCrateReferenceIndex(fullCrates.value, metadataItems.value, s3.endpoint.value))
+function objectRefs(object: ObjectEntry): CrateObjectReference[] {
+  return crateRefs.value.get(`${bucket.value}/${object.key}`) ?? []
+}
 </script>
 
 <template>
@@ -548,7 +558,18 @@ const isEmpty = computed(
                   </tr>
                   <tr v-for="object in objects" :key="object.key" class="border-t border-border hover:bg-muted/30">
                     <td class="px-4 py-2.5">
-                      <span class="flex items-center gap-2"><ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span></span>
+                      <span class="flex items-center gap-2">
+                        <ObjectIcon :name="object.name" class="h-4 w-4" />
+                        <span class="truncate">{{ object.name }}</span>
+                        <RouterLink
+                          v-if="objectRefs(object).length"
+                          :to="{ name: 'metadata-detail', params: { id: objectRefs(object)[0].documentId } }"
+                          class="shrink-0"
+                          :title="`Referenced by ${objectRefs(object).map((r) => r.title).join(', ')} — from metadata loaded in this session`"
+                        >
+                          <Badge variant="royal" class="gap-1 text-[10px]"><Link2 class="h-3 w-3" /> referenced</Badge>
+                        </RouterLink>
+                      </span>
                     </td>
                     <td class="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '—' }}</td>
                     <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '—' }}</td>
