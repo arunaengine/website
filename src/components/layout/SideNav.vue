@@ -14,6 +14,7 @@ import {
   ListChecks,
   Settings,
   ShieldCheck,
+  SquareTerminal,
   Users,
 } from '@lucide/vue'
 
@@ -30,6 +31,7 @@ const { isRealmAdmin } = useAruna()
 const nav = computed<NavItem[]>(() => [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
+  { to: '/app/query', icon: SquareTerminal, label: 'Query' },
   { to: '/app/buckets', icon: Boxes, label: 'Data' },
   { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
   { to: '/app/groups', icon: Users, label: 'Groups' },
