@@ -166,7 +166,7 @@ const isEmpty = computed(
                   @click="openFolder(folder)"
                 >
                   <td class="px-3 py-2">
-                    <span class="flex items-center gap-2 text-xs"><ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/</span>
+                    <button type="button" class="flex w-full items-center gap-2 text-left text-xs" @click.stop="openFolder(folder)"><ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/</button>
                   </td>
                   <td class="px-3 py-2 text-right text-xs text-muted-foreground">—</td>
                   <td class="px-3 py-2 text-xs text-muted-foreground">—</td>
@@ -178,7 +178,7 @@ const isEmpty = computed(
                   @click="pick(object)"
                 >
                   <td class="px-3 py-2">
-                    <span class="flex items-center gap-2 text-xs"><ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span></span>
+                    <button type="button" class="flex w-full items-center gap-2 text-left text-xs" @click.stop="pick(object)"><ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span></button>
                   </td>
                   <td class="px-3 py-2 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '—' }}</td>
                   <td class="px-3 py-2 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '—' }}</td>
