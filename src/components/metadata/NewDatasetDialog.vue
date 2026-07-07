@@ -27,6 +27,7 @@ import { buildProfileContext, isSchemaOrgUri } from '@/lib/profiles/propertyCata
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { isAbsoluteUri, isInvalidReferenceUri, REFERENCE_URI_MESSAGE } from '@/lib/profiles/uri'
 import { validateProfileData, validateRequiredInstances } from '@/lib/profiles/validate'
+import { entityClassKey, scopeViolations, scopedViolation, type ViolationScope } from '@/lib/profiles/evaluate'
 import {
   DX_PROFILE,
   RO_CRATE_PROFILE,
@@ -180,7 +181,10 @@ const hasPartEntries = computed(() => dataRefList.value.map((entry) => ({ id: en
 // Blocking (MUST) / warning (SHOULD) violations for each required instance a
 // hasPart rule does not find among the data references.
 const hasPartRequiredViolations = computed<ProfileViolation[]>(() =>
-  hasPartRules.value.flatMap((rule) => validateRequiredInstances(rule, hasPartEntries.value)),
+  scopeViolations(
+    { profileSlug: profileId.value, entity: 'Dataset' },
+    hasPartRules.value.flatMap((rule) => validateRequiredInstances(rule, hasPartEntries.value)),
+  ),
 )
 // The profile's required contents, shown as a checklist beside the Data references
 // section with a satisfied flag and severity (unsatisfied → error/warning).
@@ -282,7 +286,9 @@ const normalizedGeneratedValues = computed(() => {
 const generatedCreateValues = computed(() => normalizeProfileValues(generatedValues.value, generatedScalarControls.value, { omitEmpty: true }))
 // Warnings inside come from SHOULD/recommended rules; they never block
 // submission (see canSubmit) and surface inline at their inputs.
-const profileViolations = computed(() => validateProfileData(profileSchema.value, normalizedGeneratedValues.value))
+const profileViolations = computed(() =>
+  scopeViolations({ profileSlug: profileId.value, entity: 'Dataset' }, validateProfileData(profileSchema.value, normalizedGeneratedValues.value)),
+)
 const profileCollisionKeys = computed(() => profileControls.value.map((control) => control.property).filter((property) => reservedDatasetKeys.has(property)))
 
 // Per-instance scalar violations for every entity control, keyed by control
@@ -293,10 +299,13 @@ const entityInstanceViolations = computed<Record<string, ProfileViolation[][]>>(
     const subControls = entitySubControls.value[control.property] ?? []
     const schema = entitySchemas.value[control.property]
     const instances = entityInstances.value[control.property] ?? []
-    map[control.property] = instances.map((instance) => [
-      ...validateProfileData(schema, instanceValidationValues(instance, subControls)),
-      ...referenceUriViolations(instance, subControls),
-    ])
+    map[control.property] = instances.map((instance, index) => {
+      const scope: ViolationScope = { profileSlug: profileId.value, entity: entityClassKey(control.entityRule, control.entityTypes), instance: index }
+      return [
+        ...scopeViolations(scope, validateProfileData(schema, instanceValidationValues(instance, subControls))),
+        ...referenceUriViolations(scope, instance, subControls),
+      ]
+    })
   }
   return map
 })
@@ -305,7 +314,7 @@ const entityInstanceViolations = computed<Record<string, ProfileViolation[][]>>(
 // is not an absolute URI is a blocking field error (it would emit a broken
 // `{"@id"}` reference). Surfaced inline via entityInstanceViolations and counted
 // in entityInstanceErrorCount so it gates submit.
-function referenceUriViolations(instance: Record<string, unknown>, subControls: ProfileControl[]): ProfileViolation[] {
+function referenceUriViolations(scope: ViolationScope, instance: Record<string, unknown>, subControls: ProfileControl[]): ProfileViolation[] {
   const violations: ProfileViolation[] = []
   for (const control of subControls) {
     if (control.control !== 'entity') continue
@@ -314,13 +323,16 @@ function referenceUriViolations(instance: Record<string, unknown>, subControls: 
     const entries = control.multiple ? (Array.isArray(raw) ? raw : []) : [raw]
     entries.forEach((entry, entryIndex) => {
       if (typeof entry === 'string' && isInvalidReferenceUri(entry)) {
-        violations.push({
-          constraint: 'format.uri',
-          pointer: control.multiple ? `/${control.property}/${entryIndex}` : `/${control.property}`,
-          fieldId: control.property,
-          message: REFERENCE_URI_MESSAGE,
-          severity: 'error',
-        })
+        violations.push(
+          scopedViolation(
+            scope,
+            'format.uri',
+            control.property,
+            REFERENCE_URI_MESSAGE,
+            'error',
+            control.multiple ? `/${control.property}/${entryIndex}` : `/${control.property}`,
+          ),
+        )
       }
     })
   }
@@ -347,13 +359,16 @@ const entityReferenceFormatViolations = computed<ProfileViolation[]>(() => {
     const entries = control.multiple ? (Array.isArray(raw) ? raw : []) : [raw]
     entries.forEach((entry, index) => {
       if (typeof entry === 'string' && isInvalidReferenceUri(entry)) {
-        out.push({
-          constraint: 'format.uri',
-          pointer: control.multiple ? `/${control.property}/${index}` : `/${control.property}`,
-          fieldId: control.property,
-          message: REFERENCE_URI_MESSAGE,
-          severity: 'error',
-        })
+        out.push(
+          scopedViolation(
+            { profileSlug: profileId.value, entity: 'Dataset' },
+            'format.uri',
+            control.property,
+            REFERENCE_URI_MESSAGE,
+            'error',
+            control.multiple ? `/${control.property}/${index}` : `/${control.property}`,
+          ),
+        )
       }
     })
   }
@@ -403,7 +418,7 @@ const licenseControl = computed(() =>
 const licenseControlViolations = computed<ProfileViolation[]>(() => {
   const out = [...(builtInViolations.value.license ?? [])]
   if (scaffoldFieldErrors.value.license) {
-    out.unshift({ constraint: 'required', pointer: '/license', fieldId: 'license', message: scaffoldFieldErrors.value.license, severity: 'error' })
+    out.unshift(scopedViolation({ profileSlug: profileId.value, entity: 'Dataset' }, 'required', 'license', scaffoldFieldErrors.value.license))
   }
   return out
 })
@@ -970,7 +985,7 @@ async function submit() {
           <p v-if="scaffoldFieldErrors.title" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.title }}</p>
           <template v-if="!scaffoldFieldErrors.title">
             <template v-for="violation in builtInViolations.name ?? []" :key="violation.constraint + violation.pointer">
-              <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">{{ violation.message }}</p>
+              <p class="mt-1 text-[11px]" :title="violation.ruleId" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">{{ violation.message }}</p>
               <p v-if="violation.hint" class="text-[11px] text-muted-foreground">{{ violation.hint }}</p>
             </template>
           </template>
@@ -987,7 +1002,7 @@ async function submit() {
           <p v-if="scaffoldFieldErrors.description" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.description }}</p>
           <template v-if="!scaffoldFieldErrors.description">
             <template v-for="violation in builtInViolations.description ?? []" :key="violation.constraint + violation.pointer">
-              <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">{{ violation.message }}</p>
+              <p class="mt-1 text-[11px]" :title="violation.ruleId" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">{{ violation.message }}</p>
               <p v-if="violation.hint" class="text-[11px] text-muted-foreground">{{ violation.hint }}</p>
             </template>
           </template>
@@ -1002,6 +1017,7 @@ async function submit() {
                 v-for="violation in builtInViolations.datePublished ?? []"
                 :key="violation.constraint + violation.pointer"
                 class="mt-1 text-[11px]"
+                :title="violation.ruleId"
                 :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
               >{{ violation.message }}</p>
             </template>
@@ -1026,6 +1042,7 @@ async function submit() {
                 v-for="violation in builtInViolations.license ?? []"
                 :key="violation.constraint + violation.pointer"
                 class="mt-1 text-[11px]"
+                :title="violation.ruleId"
                 :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
               >{{ violation.message }}</p>
             </template>
@@ -1123,6 +1140,7 @@ async function submit() {
             v-for="violation in hasPartSchemaViolations"
             :key="violation.constraint + violation.pointer"
             class="mt-1 text-[11px]"
+            :title="violation.ruleId"
             :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
           >
             {{ violation.message }}

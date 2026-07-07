@@ -10,6 +10,7 @@ import { CheckCircle2, AlertTriangle, Lightbulb } from '@lucide/vue'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
 import { entityRulesToMode } from '@/lib/profiles/mode'
 import { validateProfileData } from '@/lib/profiles/validate'
+import { scopeViolations } from '@/lib/profiles/evaluate'
 import { obligationBadgeVariant, PROFILE_OBLIGATION_LABELS, PROFILE_REFERENCE_MODE_LABELS } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
@@ -76,7 +77,14 @@ const modeText = computed(() =>
 )
 
 const normalizedValues = computed(() => normalizeProfileValues(values.value, controls.value))
-const violations = computed(() => validateProfileData(builder.generatedSchema, normalizedValues.value))
+// Scope the preview violations with the draft slug so authors see the exact rule
+// ids CEL will emit (fall back to 'draft' before a slug is chosen).
+const violations = computed(() =>
+  scopeViolations(
+    { profileSlug: builder.profileBasics().slug || 'draft', entity: 'Dataset' },
+    validateProfileData(builder.generatedSchema, normalizedValues.value),
+  ),
+)
 
 function violationsFor(property: string) {
   return violations.value.filter((violation) => violation.fieldId === property)
@@ -178,6 +186,7 @@ function violationsFor(property: string) {
                 v-for="violation in violationsFor(control.property)"
                 :key="violation.constraint + violation.pointer"
                 class="mt-1 text-[11px]"
+                :title="violation.ruleId"
                 :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
               >
                 {{ violation.message }}

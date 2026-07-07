@@ -301,7 +301,7 @@ function update(value: unknown) {
     />
     <p v-if="showDescription" class="mt-1 text-[11px] text-muted-foreground">{{ control.description }}</p>
     <template v-for="violation in violations ?? []" :key="violation.constraint + violation.pointer">
-      <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
+      <p class="mt-1 text-[11px]" :title="violation.ruleId" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
         {{ violation.message }}
       </p>
       <p v-if="violation.hint" class="text-[11px] text-muted-foreground">{{ violation.hint }}</p>
