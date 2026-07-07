@@ -42,9 +42,13 @@ import {
   type UserSearchResponse,
 } from '@/lib/api'
 import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
+import { useConnectivity } from '@/lib/connectivity'
 
 const TOKEN_KEY = 'aruna.authToken'
 const API_BASE_KEY = 'aruna.apiBaseUrl'
+
+// Module singletons both — no cycle (connectivity imports only vue).
+const { offline } = useConnectivity()
 
 const apiBaseUrl = ref(readStored(API_BASE_KEY) || defaultApiBaseUrl())
 const authToken = ref(readStored(TOKEN_KEY) || import.meta.env.VITE_ARUNA_TOKEN || '')
@@ -519,6 +523,14 @@ async function searchMetadata(
       // InvalidCursor. Only callers gated behind featureEnabled('searchCursor')
       // pass it; apiRequest drops undefined, so it is absent otherwise.
       cursor: options.cursor,
+      // While offline, distributed fan-out would wait out timeouts on
+      // unreachable peers. mode=local (verified backend param,
+      // MetadataSearchParams) answers from this node's own projection — which
+      // on a subscribed device includes all leased metadata (aruna#273). Back
+      // online, the server default (distributed) resumes; the #258
+      // partial-results banner keeps covering degraded fan-out either way.
+      // apiRequest drops undefined, so the online wire format is unchanged.
+      mode: offline.value ? 'local' : undefined,
     },
     signal: options.signal,
   })
