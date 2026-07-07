@@ -174,6 +174,21 @@ try {
     !groupsBody.includes('Request to join') && !groupsBody.includes('Your join requests'),
   )
 
+  // Device enrollment (aruna#271) is config-gated OFF by default: with no
+  // features.deviceEnrollment flag, Settings shows no "My devices" link and the
+  // /app/settings/devices route renders the 404 view (no wizard, no HTTP).
+  await page.goto(BASE + '/app/settings')
+  await page.waitForTimeout(800)
+  const devicesSettingsBody = await page.textContent('body')
+  step('device enrollment hidden while feature flag is off', !devicesSettingsBody.includes('My devices'))
+  await page.goto(BASE + '/app/settings/devices')
+  await page.waitForTimeout(800)
+  const devicesRouteBody = await page.textContent('body')
+  step(
+    'devices route is a 404 while feature flag is off',
+    devicesRouteBody.includes('404') && !devicesRouteBody.includes('Enroll'),
+  )
+
   // The only tolerated console error is the known API projection-race 500 on
   // GET /metadata, which the portal retries and recovers from.
   const unexpected = consoleErrors.filter(
