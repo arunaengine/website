@@ -18,12 +18,14 @@ import { useRealm } from '@/composables/useRealm'
 import { useTheme } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 
 const q = ref('')
 const showResults = ref(false)
 const showNewDataset = ref(false)
 const { realm, role } = useRealm()
 const { currentUser, metadata, groups, authError, loading } = useAruna()
+const { writesDisabled } = useConnectivity()
 const { hasSession, signIn, signOut, stage } = useAuth()
 const { isDark, toggleTheme } = useTheme()
 const route = useRoute()
@@ -139,6 +141,8 @@ function scheduleHide() {
         variant="outline"
         size="sm"
         class="hidden h-9 md:inline-flex"
+        :disabled="writesDisabled"
+        :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
         @click="showNewDataset = true"
       >
         <Plus class="h-4 w-4" /> New dataset

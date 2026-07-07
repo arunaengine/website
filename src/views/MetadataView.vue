@@ -20,6 +20,7 @@ import { useProfileConformance } from '@/composables/useProfileConformance'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { formatBytes, relativeTime } from '@/lib/utils'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil, SquareTerminal, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
@@ -40,6 +41,7 @@ const {
   fullCrates,
   cratePending,
 } = useAruna()
+const { writesDisabled } = useConnectivity()
 
 const isFav = computed(() => Boolean(currentUser.value?.favouriteMetadataIds?.includes(detailId.value)))
 const favBusy = ref(false)
@@ -303,7 +305,8 @@ function entitySize(row: DataEntityRow): string {
           v-if="current && currentUser"
           variant="outline"
           size="icon"
-          :disabled="favBusy"
+          :disabled="favBusy || writesDisabled"
+          :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
           :aria-label="isFav ? 'Remove from favourites' : 'Add to favourites'"
           @click="toggleFav"
         >
@@ -312,8 +315,8 @@ function entitySize(row: DataEntityRow): string {
         <RouterLink v-if="detailId" :to="{ name: 'query', query: { document: detailId } }">
           <Button variant="outline"><SquareTerminal class="h-4 w-4" /> Query</Button>
         </RouterLink>
-        <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
-        <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
+        <Button v-if="current && canWrite" variant="outline" :disabled="writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
+        <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" :disabled="writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
         <RouterLink :to="{ name: 'search' }">
           <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Discover</Button>
         </RouterLink>
@@ -548,7 +551,7 @@ function entitySize(row: DataEntityRow): string {
         <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
         <DialogFooter>
           <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
-          <Button variant="destructive" :disabled="saving" @click="confirmDelete">{{ saving ? 'Deleting…' : 'Delete' }}</Button>
+          <Button variant="destructive" :disabled="saving || writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="confirmDelete">{{ saving ? 'Deleting…' : 'Delete' }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

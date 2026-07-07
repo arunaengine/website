@@ -18,6 +18,7 @@ import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
 import { computed, ref, watch } from 'vue'
 import { Check, FileJson2, Plus, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import type { MetadataDoc } from '@/data/types'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
 import { buildEntityInstance, emitEntityReference, emitSelectObject, isHasPartUri, slugify, uniqueId } from '@/lib/profiles/emit'
@@ -66,6 +67,7 @@ const emit = defineEmits<{
 }>()
 
 const { groups, profiles, metadata, createMetadata, loadRoCrate, saving, currentUser } = useAruna()
+const { writesDisabled } = useConnectivity()
 
 const groupId = ref('')
 const profileId = ref('')
@@ -1172,9 +1174,13 @@ async function submit() {
         {{ submitBlockerSummary.join(' ') }}
       </div>
 
+      <div v-if="writesDisabled" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+        You're offline — creating metadata needs connectivity.
+      </div>
+
       <DialogFooter>
         <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
-        <Button :disabled="!canSubmit || saving" @click="submit">
+        <Button :disabled="!canSubmit || saving || writesDisabled" @click="submit">
           {{ saving ? 'Creating…' : 'Create metadata' }}
         </Button>
       </DialogFooter>

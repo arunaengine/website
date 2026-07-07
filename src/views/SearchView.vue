@@ -12,6 +12,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { truncateMiddle } from '@/lib/utils'
 import { Search, FileJson2, SquareTerminal, Plus, Star, AlertTriangle } from '@lucide/vue'
 
@@ -19,6 +20,7 @@ const route = useRoute()
 const router = useRouter()
 const { realm, metadata, profiles, currentUser, loading, error, bootstrapped, refresh, toggleFavourite, myGroups, discoverableGroups } =
   useAruna()
+const { writesDisabled } = useConnectivity()
 
 // Continuity: the old ?expert=1 SPARQL workbench moved to the standalone console.
 if (route.query.expert === '1') void router.replace({ name: 'query' })
@@ -150,7 +152,7 @@ function clearFilters() {
       description="Browse the live RO-Crate metadata catalog, filter and search it, or open the SPARQL console for graph queries."
     >
       <template #actions>
-        <Button :disabled="!currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
+        <Button :disabled="!currentUser || writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
         <RouterLink :to="{ name: 'query' }">
           <Button variant="outline"><SquareTerminal class="h-4 w-4" /> SPARQL console</Button>
         </RouterLink>
@@ -223,7 +225,7 @@ function clearFilters() {
                   :doc="line.doc"
                   :score="line.hit.score"
                   :favourite="isFavourite(line.doc.ulid)"
-                  :can-favourite="Boolean(currentUser)"
+                  :can-favourite="Boolean(currentUser) && !writesDisabled"
                   :favourite-busy="favBusy.has(line.doc.ulid)"
                   @toggle-favourite="toggleFav"
                 />
@@ -304,7 +306,7 @@ function clearFilters() {
                 :key="doc.ulid"
                 :doc="doc"
                 :favourite="isFavourite(doc.ulid)"
-                :can-favourite="Boolean(currentUser)"
+                :can-favourite="Boolean(currentUser) && !writesDisabled"
                 :favourite-busy="favBusy.has(doc.ulid)"
                 @toggle-favourite="toggleFav"
               />
@@ -327,7 +329,7 @@ function clearFilters() {
             :title="`No visible metadata in ${realm.shortName}`"
             description="No RO-Crate metadata documents are visible here yet."
           >
-            <Button v-if="currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
+            <Button v-if="currentUser" :disabled="writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
           </EmptyState>
         </template>
     </div>

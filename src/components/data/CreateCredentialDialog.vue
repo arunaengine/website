@@ -15,6 +15,7 @@ import { computed, ref, watch } from 'vue'
 import { ChevronRight, KeyRound, Plus, ShieldAlert, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import type { CreateS3CredentialsResponse } from '@/lib/api'
 
 const props = defineProps<{ open: boolean }>()
@@ -24,6 +25,7 @@ const emit = defineEmits<{
 }>()
 
 const { myGroups, saving, createS3Credentials } = useAruna()
+const { writesDisabled } = useConnectivity()
 const { endpoint, setActiveKey } = useS3()
 
 const EXPIRY_OPTIONS = [
@@ -200,10 +202,14 @@ function activate() {
         </div>
       </div>
 
+      <div v-if="writesDisabled && !created" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+        You're offline — creating credentials needs connectivity.
+      </div>
+
       <DialogFooter>
         <template v-if="!created">
           <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
-          <Button :disabled="saving || !groupId" @click="submit">{{ saving ? 'Creating…' : 'Create' }}</Button>
+          <Button :disabled="saving || !groupId || writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="submit">{{ saving ? 'Creating…' : 'Create' }}</Button>
         </template>
         <template v-else>
           <DialogClose><Button variant="outline">Close</Button></DialogClose>

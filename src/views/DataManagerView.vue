@@ -25,6 +25,7 @@ import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quot
 import type { UsageResponse } from '@/lib/api'
 import { buildCrateReferenceIndex, type CrateObjectReference } from '@/lib/crateReferences'
 import { formatBytes, relativeTime } from '@/lib/utils'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
@@ -44,6 +45,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const { currentUser, bootstrapped, credentials, getGroupUsage, fullCrates, metadataItems } = useAruna()
+const { writesDisabled } = useConnectivity()
 const s3 = useS3()
 
 const bucket = computed(() => (route.params.bucketId as string | undefined) ?? '')
@@ -239,6 +241,8 @@ async function createFolder() {
 
 function onDrop(event: DragEvent) {
   dragActive.value = false
+  // Dropped files while offline must not enqueue doomed uploads (aruna#273).
+  if (writesDisabled.value) return
   if (!bucket.value || !event.dataTransfer?.files.length) return
   void requestUpload(Array.from(event.dataTransfer.files))
 }
@@ -468,7 +472,7 @@ function objectRefs(object: ObjectEntry): CrateObjectReference[] {
                   Staging
                   <Badge v-if="staging.runningCount.value" variant="secondary" class="ml-1">{{ staging.runningCount.value }}</Badge>
                 </Button>
-                <Button size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
+                <Button size="sm" :disabled="writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>
             </div>
 

@@ -17,6 +17,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useStaging, stagingErrorMessage } from '@/composables/useStaging'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import type { SourceConnectorSummary, StageBlobResponse } from '@/lib/api'
+import { useConnectivity } from '@/lib/connectivity'
 import { computed, ref, watch } from 'vue'
 import { CloudDownload, Loader2, Upload, UploadCloud } from '@lucide/vue'
 
@@ -29,6 +30,7 @@ const emit = defineEmits<{
 
 const { myGroups, listGroupConnectors } = useAruna()
 const staging = useStaging()
+const { writesDisabled } = useConnectivity()
 
 const tab = ref('upload')
 
@@ -51,6 +53,8 @@ function onBrowse(event: Event) {
 
 function onDrop(event: DragEvent) {
   dragActive.value = false
+  // Dropped files while offline must not enqueue doomed uploads (aruna#273).
+  if (writesDisabled.value) return
   const files = event.dataTransfer?.files
   if (files?.length) emitUpload(Array.from(files))
 }

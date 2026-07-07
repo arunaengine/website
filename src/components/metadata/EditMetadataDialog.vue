@@ -18,6 +18,7 @@ import { Pencil } from '@lucide/vue'
 import { ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { licenseEntity } from '@/lib/profiles/rocrate'
 
 const props = defineProps<{ open: boolean; documentId: string }>()
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 }>()
 
 const { saving, fetchRoCrateRaw, getMetadataDocument, replaceMetadataRoCrate } = useAruna()
+const { writesDisabled } = useConnectivity()
 
 const loading = ref(false)
 const loadError = ref<string | null>(null)
@@ -257,11 +259,17 @@ async function save() {
         </div>
 
         <p v-if="saveError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ saveError }}</p>
+
+        <!-- An editing session can go offline mid-edit; the disabled save plus
+             this note is honest without discarding the unsaved draft. -->
+        <p v-if="writesDisabled" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          You're offline — saving changes needs connectivity. Your edits are kept until you reconnect.
+        </p>
       </template>
 
       <DialogFooter>
         <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
-        <Button :disabled="loading || Boolean(loadError) || saving" @click="save">{{ saving ? 'Saving…' : 'Save changes' }}</Button>
+        <Button :disabled="loading || Boolean(loadError) || saving || writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="save">{{ saving ? 'Saving…' : 'Save changes' }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
