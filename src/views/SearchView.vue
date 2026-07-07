@@ -265,6 +265,24 @@ async function runQuery() {
             <p v-if="hiddenByProfile > 0" class="mt-3 text-[11px] text-muted-foreground">
               {{ hiddenByProfile }} result(s) without catalog details are hidden by the profile filter.
             </p>
+
+            <!-- Cursor paging (aruna#258) behind featureEnabled('searchCursor').
+                 Flag off ⇒ no sentinel, no cursor param: one ≤100-hit page. -->
+            <template v-if="cursorEnabled">
+              <div v-if="loadingMore" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Skeleton v-for="n in 3" :key="n" class="h-36" />
+              </div>
+              <div v-if="moreError" class="mt-3 flex items-center gap-2 text-xs text-destructive">
+                {{ moreError }}
+                <Button variant="outline" size="sm" @click="loadMore">Try again</Button>
+              </div>
+              <!-- IntersectionObserver sentinel (observed by useMetadataSearch). -->
+              <div v-if="nextCursor" ref="sentinel" class="h-1" aria-hidden="true" />
+              <p v-else class="py-2 text-center text-[11px] text-muted-foreground">End of results.</p>
+            </template>
+            <p v-else-if="capped" class="py-2 text-center text-[11px] text-muted-foreground">
+              Showing the first 100 matches by relevance — refine the query to narrow results.
+            </p>
           </section>
 
           <EmptyState
