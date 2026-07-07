@@ -176,7 +176,7 @@ function violationsFor(property: string) {
               </div>
               <p
                 v-for="violation in violationsFor(control.property)"
-                :key="violation.ruleId + violation.pointer"
+                :key="violation.constraint + violation.pointer"
                 class="mt-1 text-[11px]"
                 :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
               >

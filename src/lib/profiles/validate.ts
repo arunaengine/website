@@ -43,11 +43,15 @@ export function validateRequiredInstances(
 ): ProfileViolation[] {
   const severity: ProfileViolation['severity'] = rule.obligation === 'MUST' ? 'error' : 'warning'
   const violations: ProfileViolation[] = []
-  for (const instance of rule.requiredInstances ?? []) {
-    if (!instance.name && !instance.id) continue
-    if (entries.some((entry) => instanceMatches(instance, entry))) continue
-    violations.push(violation('requiredInstance', rule.valueName, requiredInstanceMessage(instance), severity, instance.hint))
-  }
+  // Index against the list filtered to nameable instances — the same order in
+  // which schema.ts emits `contains`/`allOf`, so `requiredInstance.<n>` is the
+  // stable rule-id segment the backend CEL programs will mirror.
+  ;(rule.requiredInstances ?? [])
+    .filter((instance) => instance.name || instance.id)
+    .forEach((instance, index) => {
+      if (entries.some((entry) => instanceMatches(instance, entry))) return
+      violations.push(violation(`requiredInstance.${index}`, rule.valueName, requiredInstanceMessage(instance), severity, instance.hint))
+    })
   return violations
 }
 
@@ -122,14 +126,14 @@ function validateScalar(
 }
 
 function violation(
-  ruleId: string,
+  constraint: string,
   fieldId: string,
   message: string,
   severity: ProfileViolation['severity'] = 'error',
   hint?: string,
 ): ProfileViolation {
   return {
-    ruleId,
+    constraint,
     pointer: `/${fieldId.replace(/~/g, '~0').replace(/\//g, '~1')}`,
     fieldId,
     message,

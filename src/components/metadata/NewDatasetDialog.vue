@@ -315,7 +315,7 @@ function referenceUriViolations(instance: Record<string, unknown>, subControls: 
     entries.forEach((entry, entryIndex) => {
       if (typeof entry === 'string' && isInvalidReferenceUri(entry)) {
         violations.push({
-          ruleId: 'format.uri',
+          constraint: 'format.uri',
           pointer: control.multiple ? `/${control.property}/${entryIndex}` : `/${control.property}`,
           fieldId: control.property,
           message: REFERENCE_URI_MESSAGE,
@@ -348,7 +348,7 @@ const entityReferenceFormatViolations = computed<ProfileViolation[]>(() => {
     entries.forEach((entry, index) => {
       if (typeof entry === 'string' && isInvalidReferenceUri(entry)) {
         out.push({
-          ruleId: 'format.uri',
+          constraint: 'format.uri',
           pointer: control.multiple ? `/${control.property}/${index}` : `/${control.property}`,
           fieldId: control.property,
           message: REFERENCE_URI_MESSAGE,
@@ -403,7 +403,7 @@ const licenseControl = computed(() =>
 const licenseControlViolations = computed<ProfileViolation[]>(() => {
   const out = [...(builtInViolations.value.license ?? [])]
   if (scaffoldFieldErrors.value.license) {
-    out.unshift({ ruleId: 'required', pointer: '/license', fieldId: 'license', message: scaffoldFieldErrors.value.license, severity: 'error' })
+    out.unshift({ constraint: 'required', pointer: '/license', fieldId: 'license', message: scaffoldFieldErrors.value.license, severity: 'error' })
   }
   return out
 })
@@ -969,7 +969,7 @@ async function submit() {
           <Input v-model="title" class="mt-1" placeholder="Dataset title" :invalid="scaffoldInvalid('title', 'name')" @blur="fillPath" />
           <p v-if="scaffoldFieldErrors.title" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.title }}</p>
           <template v-if="!scaffoldFieldErrors.title">
-            <template v-for="violation in builtInViolations.name ?? []" :key="violation.ruleId + violation.pointer">
+            <template v-for="violation in builtInViolations.name ?? []" :key="violation.constraint + violation.pointer">
               <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">{{ violation.message }}</p>
               <p v-if="violation.hint" class="text-[11px] text-muted-foreground">{{ violation.hint }}</p>
             </template>
@@ -986,7 +986,7 @@ async function submit() {
           <Textarea v-model="description" class="mt-1" rows="3" :invalid="scaffoldInvalid('description')" />
           <p v-if="scaffoldFieldErrors.description" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.description }}</p>
           <template v-if="!scaffoldFieldErrors.description">
-            <template v-for="violation in builtInViolations.description ?? []" :key="violation.ruleId + violation.pointer">
+            <template v-for="violation in builtInViolations.description ?? []" :key="violation.constraint + violation.pointer">
               <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">{{ violation.message }}</p>
               <p v-if="violation.hint" class="text-[11px] text-muted-foreground">{{ violation.hint }}</p>
             </template>
@@ -1000,7 +1000,7 @@ async function submit() {
             <template v-if="!scaffoldFieldErrors.datePublished">
               <p
                 v-for="violation in builtInViolations.datePublished ?? []"
-                :key="violation.ruleId + violation.pointer"
+                :key="violation.constraint + violation.pointer"
                 class="mt-1 text-[11px]"
                 :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
               >{{ violation.message }}</p>
@@ -1024,7 +1024,7 @@ async function submit() {
             <template v-if="!scaffoldFieldErrors.license">
               <p
                 v-for="violation in builtInViolations.license ?? []"
-                :key="violation.ruleId + violation.pointer"
+                :key="violation.constraint + violation.pointer"
                 class="mt-1 text-[11px]"
                 :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
               >{{ violation.message }}</p>
@@ -1121,7 +1121,7 @@ async function submit() {
           </div>
           <p
             v-for="violation in hasPartSchemaViolations"
-            :key="violation.ruleId + violation.pointer"
+            :key="violation.constraint + violation.pointer"
             class="mt-1 text-[11px]"
             :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
           >

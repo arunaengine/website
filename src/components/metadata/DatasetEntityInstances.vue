@@ -123,7 +123,7 @@ function emptyStateText(): string {
     <template v-if="instances.length">
       <p
         v-for="violation in presenceViolations"
-        :key="violation.ruleId + violation.pointer"
+        :key="violation.constraint + violation.pointer"
         class="mt-1 text-[11px]"
         :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
       >
@@ -162,8 +162,8 @@ function emptyStateText(): string {
             </div>
             <p v-if="field.description" class="text-[11px] text-muted-foreground">{{ field.description }}</p>
             <!-- Presence (required/recommended) violations for the whole list. Per-row
-                 URI errors (ruleId 'format.uri') are shown inline under each input. -->
-            <template v-for="violation in violationsFor(index, field.property).filter((item) => item.ruleId !== 'format.uri')" :key="violation.ruleId + violation.pointer">
+                 URI errors (constraint 'format.uri') are shown inline under each input. -->
+            <template v-for="violation in violationsFor(index, field.property).filter((item) => item.constraint !== 'format.uri')" :key="violation.constraint + violation.pointer">
               <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
                 {{ violation.message }}
               </p>

@@ -300,7 +300,7 @@ function update(value: unknown) {
       @update:model-value="(value: string | number) => update(value)"
     />
     <p v-if="showDescription" class="mt-1 text-[11px] text-muted-foreground">{{ control.description }}</p>
-    <template v-for="violation in violations ?? []" :key="violation.ruleId + violation.pointer">
+    <template v-for="violation in violations ?? []" :key="violation.constraint + violation.pointer">
       <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
         {{ violation.message }}
       </p>

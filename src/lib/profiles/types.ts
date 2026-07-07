@@ -231,7 +231,13 @@ export interface ProfileControl {
 }
 
 export interface ProfileViolation {
-  ruleId: string
+  // Constraint kind — closed vocabulary, see evaluate.ts contract doc.
+  constraint: string
+  // Stable scoped id `<profileSlug>/<entity>/<property>/<constraint>` stamped by
+  // scopeViolations (evaluate.ts); absent only between raw validation and scoping.
+  ruleId?: string
+  entity?: string
+  instance?: number
   pointer: string
   fieldId?: string
   message: string
