@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SideNav from '@/components/layout/SideNav.vue'
 import TopBar from '@/components/dashboard/TopBar.vue'
+import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import MobileNav from '@/components/dashboard/MobileNav.vue'
 import { RouterView } from 'vue-router'
 </script>
@@ -10,6 +11,7 @@ import { RouterView } from 'vue-router'
     <SideNav />
     <div class="flex min-w-0 flex-1 flex-col">
       <TopBar />
+      <GlobalErrorBanner />
       <main class="flex-1 overflow-x-hidden pb-20 md:pb-0">
         <RouterView />
       </main>

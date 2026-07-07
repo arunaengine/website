@@ -15,6 +15,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
+import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { relativeTime } from '@/lib/utils'
 import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil, Trash2, Star } from '@lucide/vue'
 
@@ -44,8 +45,8 @@ async function toggleFav() {
   favBusy.value = true
   try {
     await toggleFavourite(detailId.value)
-  } catch {
-    // A favourite toggle failure is non-critical; surfaced globally in a later step.
+  } catch (err) {
+    reportGlobalError(err instanceof Error ? err.message : String(err))
   } finally {
     favBusy.value = false
   }

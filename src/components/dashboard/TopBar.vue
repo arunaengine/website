@@ -10,7 +10,7 @@ import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import RealmSwitcher from '@/components/layout/RealmSwitcher.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
-import { Bell, ChevronDown, Plus, Search, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
+import { ChevronDown, Plus, Search, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRealm } from '@/composables/useRealm'
@@ -141,11 +141,6 @@ function scheduleHide() {
         @click="showNewDataset = true"
       >
         <Plus class="h-4 w-4" /> New dataset
-      </Button>
-
-      <Button variant="ghost" size="icon" class="relative" :title="authError || 'API connected'">
-        <Bell class="h-4 w-4" />
-        <span class="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full" :class="authError ? 'bg-amber-500' : 'bg-emerald-500'" />
       </Button>
 
       <Button variant="ghost" size="icon" :aria-label="isDark ? 'Use light mode' : 'Use dark mode'" @click="toggleTheme">

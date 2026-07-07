@@ -13,7 +13,7 @@ import { useAruna } from '@/composables/useAruna'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, nodes, groups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, error, authError, refresh } = useAruna()
+const { currentUser, metadata, profiles, nodes, groups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh } = useAruna()
 const showNewDataset = ref(false)
 
 const onlineNodes = computed(() => nodes.value.filter((node) => node.status === 'healthy').length)
@@ -79,11 +79,6 @@ const pageDescription = computed(() =>
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <div v-if="error || authError" class="surface border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-800 dark:text-amber-300">
-        <div v-if="error">API error: {{ error }}</div>
-        <div v-if="authError">Your session is no longer valid: {{ authError }}. Use the sign-in button in the top bar to start a new session.</div>
-      </div>
-
       <section class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <template v-if="!bootstrapped">
           <Skeleton v-for="n in 4" :key="n" class="h-16" />
