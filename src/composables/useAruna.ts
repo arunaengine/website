@@ -28,6 +28,8 @@ import {
   type RealmQuotaConfig,
   type S3CredentialSummary,
   type SparqlResponse,
+  type UsageHistoryResolution,
+  type UsageHistoryResponse,
   type UsageResponse,
   type UserInfoResponse,
   type UserSearchResponse,
@@ -356,6 +358,16 @@ async function getGroup(groupId: string): Promise<GroupDetailResponse> {
 
 async function getGroupUsage(groupId: string): Promise<UsageResponse> {
   return request<UsageResponse>(`/groups/${groupId}/usage`)
+}
+
+// STUB against the assumed #250 history endpoint (see api.ts). On today's
+// backends this 404s; callers gate on featureEnabled('usageHistory') and
+// treat 404/405 as "backend does not serve history yet".
+async function getGroupUsageHistory(
+  groupId: string,
+  opts: { from?: string; to?: string; resolution?: UsageHistoryResolution } = {},
+): Promise<UsageHistoryResponse> {
+  return request<UsageHistoryResponse>(`/groups/${groupId}/usage/history`, { query: { ...opts } })
 }
 
 async function createS3Credentials(input: CreateS3CredentialsRequest): Promise<CreateS3CredentialsResponse> {
@@ -875,6 +887,7 @@ export function useAruna() {
     createGroup,
     getGroup,
     getGroupUsage,
+    getGroupUsageHistory,
     createS3Credentials,
     revokeS3Credential,
     listGroupMembers,
