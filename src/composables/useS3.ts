@@ -256,10 +256,19 @@ const S3_AUTH_ERROR_NAMES = new Set([
   'AccessDenied',
 ])
 
+// The node rejects writes above the group's grace ceiling with the custom
+// S3 code "QuotaExceeded" and HTTP 403 (aruna api/src/s3/error.rs). The SDK
+// exposes the code as the error name.
+export function isS3QuotaError(err: unknown): boolean {
+  return Boolean(err && typeof err === 'object' && (err as { name?: string }).name === 'QuotaExceeded')
+}
+
 // A rejected, expired or revoked key surfaces as one of these SDK error names
 // or as a 401/403 from the node — distinct from a transient network or server
 // fault, so the UI can offer to mint a fresh key instead of just showing text.
 export function isS3AuthError(err: unknown): boolean {
+  // A full group is a 403 too; never misreport it as "credentials rejected".
+  if (isS3QuotaError(err)) return false
   if (err && typeof err === 'object') {
     const error = err as { name?: string; $metadata?: { httpStatusCode?: number } }
     if (error.name && S3_AUTH_ERROR_NAMES.has(error.name)) return true

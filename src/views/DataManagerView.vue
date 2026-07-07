@@ -15,12 +15,12 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useS3, s3ErrorMessage, isS3AuthError, type BucketEntry, type FolderEntry, type ObjectEntry, type UploadHandle } from '@/composables/useS3'
+import { useS3, s3ErrorMessage, isS3AuthError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type UploadHandle } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { UsageResponse } from '@/lib/api'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   Boxes,
   Download,
@@ -72,6 +72,7 @@ interface UploadItem {
   state: 'uploading' | 'done' | 'error' | 'canceled'
   progress: number
   error?: string
+  quotaExceeded?: boolean
 }
 const uploads = ref<UploadItem[]>([])
 const uploadHandles = new Map<number, UploadHandle>()
@@ -310,7 +311,12 @@ async function uploadFiles(files: File[]) {
     } catch (err) {
       if (item.state !== 'canceled') {
         item.state = 'error'
-        item.error = s3ErrorMessage(err)
+        if (isS3QuotaError(err)) {
+          item.quotaExceeded = true
+          item.error = 'The group’s storage quota is exhausted — the node rejected this upload (QuotaExceeded).'
+        } else {
+          item.error = s3ErrorMessage(err)
+        }
       }
     } finally {
       uploadHandles.delete(item.id)
@@ -513,6 +519,13 @@ const isEmpty = computed(
                   <Button variant="ghost" size="sm" class="h-6 shrink-0 px-2" @click="cancelUpload(item)">Cancel</Button>
                 </template>
                 <span v-if="item.error" class="truncate text-destructive">{{ item.error }}</span>
+                <RouterLink
+                  v-if="item.quotaExceeded"
+                  :to="activeGroupId ? { name: 'groups', params: { id: activeGroupId }, hash: '#storage' } : { name: 'groups' }"
+                  class="shrink-0 text-xs font-medium text-primary hover:underline"
+                >
+                  View group quota
+                </RouterLink>
               </div>
             </div>
 
