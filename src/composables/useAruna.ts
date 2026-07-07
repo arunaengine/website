@@ -28,6 +28,8 @@ import {
   type RealmInfoResponse,
   type RealmQuotaConfig,
   type S3CredentialSummary,
+  type SparqlQueryMode,
+  type SparqlQueryRequest,
   type SparqlResponse,
   type UsageHistoryResolution,
   type UsageHistoryResponse,
@@ -488,6 +490,21 @@ async function runSparql(query: string): Promise<SparqlResult> {
   }
 }
 
+// Raw, typed SPARQL execution. scope.documentId switches to the
+// document-scoped endpoint; visibility filtering is server-side, so this
+// works signed out (public graphs only). No `saving` guard: read-only.
+async function runSparqlQuery(
+  query: string,
+  scope: { documentId?: string; mode?: SparqlQueryMode } = {},
+): Promise<SparqlResponse> {
+  const path = scope.documentId
+    ? `/metadata/${encodeURIComponent(scope.documentId)}/sparql/query`
+    : '/metadata/sparql/query'
+  const body: SparqlQueryRequest = { query }
+  if (scope.mode) body.mode = scope.mode
+  return request<SparqlResponse>(path, { method: 'POST', body: JSON.stringify(body) })
+}
+
 async function searchMetadata(
   query: string,
   options: MetadataSearchOptions = {},
@@ -913,6 +930,7 @@ export function useAruna() {
     deleteGroupRole,
     searchUsers,
     runSparql,
+    runSparqlQuery,
     searchMetadata,
     setAuthToken,
     setApiBaseUrl,

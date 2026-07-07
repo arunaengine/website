@@ -408,10 +408,24 @@ export interface MetadataSearchOptions {
   signal?: AbortSignal
 }
 
-export interface SparqlResponse {
-  kind: 'Solutions' | 'Boolean'
-  value: Array<Record<string, string>> | boolean
+// --- SPARQL (POST /metadata/sparql/query, POST /metadata/{id}/sparql/query) ---
+
+export type SparqlQueryMode = 'local' | 'distributed'
+
+// Omitted mode defaults to 'distributed' on the backend. Only SELECT and ASK
+// query forms are accepted; the form check parses the raw text, so queries
+// must declare their own PREFIXes.
+export interface SparqlQueryRequest {
+  query: string
+  mode?: SparqlQueryMode
 }
+
+// Solution cells are N-Triples-encoded terms: '<iri>', '"literal"',
+// '"literal"@lang', '"3"^^<datatype>', '_:blank'. Unbound variables are
+// absent from the row. nodes_failed > 0 means the merged result is partial.
+export type SparqlResponse =
+  | { kind: 'Solutions'; value: Array<Record<string, string>>; nodes_queried: number; nodes_failed: number }
+  | { kind: 'Boolean'; value: boolean; nodes_queried: number; nodes_failed: number }
 
 export interface S3CredentialSummary {
   access_key_id: string
