@@ -5,10 +5,12 @@ import QuotaBar from '@/components/ui/QuotaBar.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
+import JoinRequestsInbox from '@/components/groups/JoinRequestsInbox.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { FileJson2, HardDrive, LogOut, ShieldCheck, Users } from '@lucide/vue'
+import { FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
+import { useJoinRequests } from '@/composables/useJoinRequests'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import {
   ApiError,
@@ -22,8 +24,10 @@ const props = defineProps<{ groupId: string }>()
 const emit = defineEmits<{ (e: 'left'): void }>()
 
 const { getGroup, getGroupUsage, listGroupMembers, listGroupMetadata, leaveGroup, saving, currentUser } = useAruna()
+const { joinRequestsEnabled } = useJoinRequests()
 
 const DOC_LIMIT = 8
+const joinRequestCount = ref(0)
 
 const group = ref<GroupDetailResponse | null>(null)
 const members = ref<GroupMember[]>([])
@@ -190,6 +194,21 @@ async function leave() {
           :roles="group.roles"
           :can-manage="canManage"
           @changed="reload"
+        />
+      </div>
+
+      <div v-if="canManage && joinRequestsEnabled" class="border-b border-border">
+        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
+          <Inbox class="h-3.5 w-3.5 text-primary" />
+          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Join requests</span>
+          <Badge v-if="joinRequestCount > 0" variant="warn" class="tabular-nums">{{ joinRequestCount }}</Badge>
+          <Badge v-else variant="outline" class="tabular-nums">0</Badge>
+        </div>
+        <JoinRequestsInbox
+          :group-id="group.group_id"
+          :roles="group.roles"
+          @changed="reload"
+          @count="joinRequestCount = $event"
         />
       </div>
 
