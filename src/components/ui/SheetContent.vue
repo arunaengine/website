@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  DialogClose,
   DialogContent,
   DialogOverlay,
   DialogPortal,
@@ -47,12 +48,12 @@ const classes = computed(() => cn(sheetVariants({ side: props.side || 'right' })
     />
     <DialogContent v-bind="forwarded" :class="classes">
       <slot />
-      <button
+      <DialogClose
         class="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
         aria-label="Close"
       >
         <X class="h-4 w-4" />
-      </button>
+      </DialogClose>
     </DialogContent>
   </DialogPortal>
 </template>
