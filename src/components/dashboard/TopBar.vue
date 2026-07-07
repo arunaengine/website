@@ -10,6 +10,7 @@ import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import RealmSwitcher from '@/components/layout/RealmSwitcher.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
+import NotificationBell from '@/components/dashboard/NotificationBell.vue'
 import { ChevronDown, Plus, Search, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -142,6 +143,8 @@ function scheduleHide() {
       >
         <Plus class="h-4 w-4" /> New dataset
       </Button>
+
+      <NotificationBell />
 
       <Button variant="ghost" size="icon" :aria-label="isDark ? 'Use light mode' : 'Use dark mode'" @click="toggleTheme">
         <Sun v-if="isDark" class="h-4 w-4" />
