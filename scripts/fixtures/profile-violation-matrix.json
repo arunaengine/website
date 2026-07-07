@@ -1,0 +1,341 @@
+{
+  "$comment": "Shared conformance fixture. The aruna#253/#255 CEL tests consume this verbatim; see src/lib/profiles/evaluate.ts for the rule-id contract. valueCases exercise validateProfileData per constraint keyword; crateCases exercise evaluateCrate end to end.",
+  "valueCases": [
+    {
+      "name": "required MUST → error",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "required": ["title"], "properties": { "title": { "type": "string" } } },
+      "values": {},
+      "expect": [{ "ruleId": "matrix/Dataset/title/required", "severity": "error", "pointer": "/title" }]
+    },
+    {
+      "name": "recommended SHOULD → warning",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "recommended": ["notes"], "properties": { "notes": { "type": "string" } } },
+      "values": {},
+      "expect": [{ "ruleId": "matrix/Dataset/notes/recommended", "severity": "warning", "pointer": "/notes" }]
+    },
+    {
+      "name": "enum mismatch",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "status": { "type": "string", "enum": ["draft", "final"] } } },
+      "values": { "status": "other" },
+      "expect": [{ "ruleId": "matrix/Dataset/status/enum", "severity": "error", "pointer": "/status" }]
+    },
+    {
+      "name": "pattern mismatch",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "code": { "type": "string", "pattern": "^[0-9]+$" } } },
+      "values": { "code": "abc" },
+      "expect": [{ "ruleId": "matrix/Dataset/code/pattern", "severity": "error", "pointer": "/code" }]
+    },
+    {
+      "name": "minLength",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "short": { "type": "string", "minLength": 5 } } },
+      "values": { "short": "ab" },
+      "expect": [{ "ruleId": "matrix/Dataset/short/minLength", "severity": "error", "pointer": "/short" }]
+    },
+    {
+      "name": "maxLength",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "bio": { "type": "string", "maxLength": 3 } } },
+      "values": { "bio": "abcdef" },
+      "expect": [{ "ruleId": "matrix/Dataset/bio/maxLength", "severity": "error", "pointer": "/bio" }]
+    },
+    {
+      "name": "minimum",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "count": { "type": "number", "minimum": 10 } } },
+      "values": { "count": 5 },
+      "expect": [{ "ruleId": "matrix/Dataset/count/minimum", "severity": "error", "pointer": "/count" }]
+    },
+    {
+      "name": "maximum",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "score": { "type": "number", "maximum": 10 } } },
+      "values": { "score": 20 },
+      "expect": [{ "ruleId": "matrix/Dataset/score/maximum", "severity": "error", "pointer": "/score" }]
+    },
+    {
+      "name": "multipleOf",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "step": { "type": "number", "multipleOf": 5 } } },
+      "values": { "step": 7 },
+      "expect": [{ "ruleId": "matrix/Dataset/step/multipleOf", "severity": "error", "pointer": "/step" }]
+    },
+    {
+      "name": "minItems",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "tags": { "type": "array", "minItems": 2, "items": { "type": "string" } } } },
+      "values": { "tags": ["only-one"] },
+      "expect": [{ "ruleId": "matrix/Dataset/tags/minItems", "severity": "error", "pointer": "/tags" }]
+    },
+    {
+      "name": "maxItems",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "tags": { "type": "array", "maxItems": 1, "items": { "type": "string" } } } },
+      "values": { "tags": ["a", "b"] },
+      "expect": [{ "ruleId": "matrix/Dataset/tags/maxItems", "severity": "error", "pointer": "/tags" }]
+    },
+    {
+      "name": "type.array",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "list": { "type": "array", "items": { "type": "string" } } } },
+      "values": { "list": "not-a-list" },
+      "expect": [{ "ruleId": "matrix/Dataset/list/type.array", "severity": "error", "pointer": "/list" }]
+    },
+    {
+      "name": "type.string",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "name": { "type": "string" } } },
+      "values": { "name": 42 },
+      "expect": [{ "ruleId": "matrix/Dataset/name/type.string", "severity": "error", "pointer": "/name" }]
+    },
+    {
+      "name": "type.integer",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "n": { "type": "integer" } } },
+      "values": { "n": 1.5 },
+      "expect": [{ "ruleId": "matrix/Dataset/n/type.integer", "severity": "error", "pointer": "/n" }]
+    },
+    {
+      "name": "type.number",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "x": { "type": "number" } } },
+      "values": { "x": "text" },
+      "expect": [{ "ruleId": "matrix/Dataset/x/type.number", "severity": "error", "pointer": "/x" }]
+    },
+    {
+      "name": "type.boolean",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "flag": { "type": "boolean" } } },
+      "values": { "flag": "yes" },
+      "expect": [{ "ruleId": "matrix/Dataset/flag/type.boolean", "severity": "error", "pointer": "/flag" }]
+    },
+    {
+      "name": "format.date",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "when": { "type": "string", "format": "date" } } },
+      "values": { "when": "2020/01/01" },
+      "expect": [{ "ruleId": "matrix/Dataset/when/format.date", "severity": "error", "pointer": "/when" }]
+    },
+    {
+      "name": "format.date-time",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "ts": { "type": "string", "format": "date-time" } } },
+      "values": { "ts": "not-a-date-time" },
+      "expect": [{ "ruleId": "matrix/Dataset/ts/format.date-time", "severity": "error", "pointer": "/ts" }]
+    },
+    {
+      "name": "format.email",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "email": { "type": "string", "format": "email" } } },
+      "values": { "email": "not-an-email" },
+      "expect": [{ "ruleId": "matrix/Dataset/email/format.email", "severity": "error", "pointer": "/email" }]
+    },
+    {
+      "name": "format.uri",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "properties": { "homepage": { "type": "string", "format": "uri" } } },
+      "values": { "homepage": "not a uri" },
+      "expect": [{ "ruleId": "matrix/Dataset/homepage/format.uri", "severity": "error", "pointer": "/homepage" }]
+    },
+    {
+      "name": "fully valid → no violations",
+      "profileSlug": "matrix",
+      "entity": "Dataset",
+      "schema": { "type": "object", "required": ["title"], "properties": { "title": { "type": "string", "minLength": 2 } } },
+      "values": { "title": "ok" },
+      "expect": []
+    }
+  ],
+  "crateCases": [
+    {
+      "name": "conformant dialog-shaped crate (explicit schema)",
+      "profile": {
+        "slug": "matrix",
+        "schema": { "type": "object", "required": ["title"], "properties": { "title": { "type": "string" } } },
+        "entityRules": [],
+        "datasetPropertyRules": [
+          { "id": "r1", "label": "Title", "description": "", "kind": "text", "propertyUri": "http://schema.org/name", "valueName": "title", "obligation": "MUST" }
+        ]
+      },
+      "crate": {
+        "@graph": [
+          { "@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": { "@id": "./" } },
+          { "@id": "./", "@type": "Dataset", "title": "Something" }
+        ]
+      },
+      "expect": []
+    },
+    {
+      "name": "missing MUST property → error",
+      "profile": {
+        "slug": "matrix",
+        "entityRules": [],
+        "datasetPropertyRules": [
+          { "id": "r1", "label": "Title", "description": "", "kind": "text", "propertyUri": "http://schema.org/name", "valueName": "title", "obligation": "MUST" }
+        ]
+      },
+      "crate": {
+        "@graph": [
+          { "@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": { "@id": "./" } },
+          { "@id": "./", "@type": "Dataset" }
+        ]
+      },
+      "expect": [{ "ruleId": "matrix/Dataset/title/required", "severity": "error", "pointer": "/title" }]
+    },
+    {
+      "name": "SHOULD empty → warning",
+      "profile": {
+        "slug": "matrix",
+        "entityRules": [],
+        "datasetPropertyRules": [
+          { "id": "r1", "label": "Notes", "description": "", "kind": "text", "propertyUri": "http://schema.org/description", "valueName": "notes", "obligation": "SHOULD" }
+        ]
+      },
+      "crate": {
+        "@graph": [
+          { "@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": { "@id": "./" } },
+          { "@id": "./", "@type": "Dataset" }
+        ]
+      },
+      "expect": [{ "ruleId": "matrix/Dataset/notes/recommended", "severity": "warning", "pointer": "/notes" }]
+    },
+    {
+      "name": "inline entity instance violating a sub-field → scoped to class + instance",
+      "profile": {
+        "slug": "matrix",
+        "entityRules": [
+          {
+            "id": "ePerson", "label": "Person", "description": "", "type": "http://schema.org/Person", "className": "Person",
+            "propertyRules": [
+              { "id": "pName", "label": "Name", "description": "", "kind": "text", "propertyUri": "http://schema.org/name", "valueName": "name", "obligation": "MUST" }
+            ]
+          }
+        ],
+        "datasetPropertyRules": [
+          { "id": "rAuthor", "label": "Author", "description": "", "kind": "entity", "propertyUri": "http://schema.org/author", "valueName": "author", "obligation": "MUST", "multipleValues": true, "entityTypes": ["http://schema.org/Person"] }
+        ]
+      },
+      "crate": {
+        "@graph": [
+          { "@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": { "@id": "./" } },
+          { "@id": "./", "@type": "Dataset", "author": [{ "@id": "#person-1" }] },
+          { "@id": "#person-1", "@type": "Person" }
+        ]
+      },
+      "expect": [{ "ruleId": "matrix/Person/name/required", "severity": "error", "pointer": "/name", "instance": 0 }]
+    },
+    {
+      "name": "external reference with non-URI @id → format.uri",
+      "profile": {
+        "slug": "matrix",
+        "entityRules": [],
+        "datasetPropertyRules": [
+          { "id": "rRel", "label": "Related", "description": "", "kind": "entity", "propertyUri": "http://schema.org/relatedLink", "valueName": "related", "obligation": "MAY", "referenceMode": "external", "entityTypes": ["http://schema.org/CreativeWork"] }
+        ]
+      },
+      "crate": {
+        "@graph": [
+          { "@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": { "@id": "./" } },
+          { "@id": "./", "@type": "Dataset", "related": { "@id": "not a uri" } }
+        ]
+      },
+      "expect": [{ "ruleId": "matrix/Dataset/related/format.uri", "severity": "error", "pointer": "/related" }]
+    },
+    {
+      "name": "hasPart requiredInstance missing → error",
+      "profile": {
+        "slug": "matrix",
+        "entityRules": [],
+        "datasetPropertyRules": [
+          { "id": "rHP", "label": "Has part", "description": "", "kind": "entity", "propertyUri": "http://schema.org/hasPart", "valueName": "hasPart", "obligation": "MUST", "multipleValues": true, "requiredInstances": [{ "name": "README.md" }] }
+        ]
+      },
+      "crate": {
+        "@graph": [
+          { "@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": { "@id": "./" } },
+          { "@id": "./", "@type": "Dataset", "hasPart": [{ "@id": "data.csv" }] },
+          { "@id": "data.csv", "@type": "File", "name": "data.csv" }
+        ]
+      },
+      "expect": [{ "ruleId": "matrix/Dataset/hasPart/requiredInstance.0", "severity": "error", "pointer": "/hasPart" }]
+    },
+    {
+      "name": "hasPart requiredInstance present (matched by name) → clean",
+      "profile": {
+        "slug": "matrix",
+        "entityRules": [],
+        "datasetPropertyRules": [
+          { "id": "rHP", "label": "Has part", "description": "", "kind": "entity", "propertyUri": "http://schema.org/hasPart", "valueName": "hasPart", "obligation": "MUST", "multipleValues": true, "requiredInstances": [{ "name": "README.md" }] }
+        ]
+      },
+      "crate": {
+        "@graph": [
+          { "@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": { "@id": "./" } },
+          { "@id": "./", "@type": "Dataset", "hasPart": [{ "@id": "readme" }] },
+          { "@id": "readme", "@type": "File", "name": "README.md" }
+        ]
+      },
+      "expect": []
+    },
+    {
+      "name": "hasPart requiredInstance present (matched by id) → clean",
+      "profile": {
+        "slug": "matrix",
+        "entityRules": [],
+        "datasetPropertyRules": [
+          { "id": "rHP", "label": "Has part", "description": "", "kind": "entity", "propertyUri": "http://schema.org/hasPart", "valueName": "hasPart", "obligation": "MUST", "multipleValues": true, "requiredInstances": [{ "id": "data/main.csv" }] }
+        ]
+      },
+      "crate": {
+        "@graph": [
+          { "@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": { "@id": "./" } },
+          { "@id": "./", "@type": "Dataset", "hasPart": [{ "@id": "data/main.csv" }] },
+          { "@id": "data/main.csv", "@type": "File", "name": "Main table" }
+        ]
+      },
+      "expect": []
+    },
+    {
+      "name": "multi-instance hasPart → filtered requiredInstance index",
+      "profile": {
+        "slug": "matrix",
+        "entityRules": [],
+        "datasetPropertyRules": [
+          { "id": "rHP", "label": "Has part", "description": "", "kind": "entity", "propertyUri": "http://schema.org/hasPart", "valueName": "hasPart", "obligation": "MUST", "multipleValues": true, "requiredInstances": [{ "name": "A" }, { "name": "" }, { "name": "B" }] }
+        ]
+      },
+      "crate": {
+        "@graph": [
+          { "@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": { "@id": "./" } },
+          { "@id": "./", "@type": "Dataset", "hasPart": [{ "@id": "a" }] },
+          { "@id": "a", "@type": "File", "name": "A" }
+        ]
+      },
+      "expect": [{ "ruleId": "matrix/Dataset/hasPart/requiredInstance.1", "severity": "error", "pointer": "/hasPart" }]
+    }
+  ]
+}
