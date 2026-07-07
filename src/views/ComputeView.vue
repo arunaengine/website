@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -20,11 +21,16 @@ import {
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { Cpu, LogIn, RefreshCw } from '@lucide/vue'
+import { Cpu, ListPlus, LogIn, RefreshCw } from '@lucide/vue'
 
+const router = useRouter()
 const { tesEnabled, getTesServiceInfo, listTasks } = useTes()
 const { currentUser, myGroups } = useAruna()
 const { signIn, stage } = useAuth()
+
+function goNew() {
+  void router.push({ name: 'compute-new' })
+}
 
 const signingIn = computed(() => stage.value === 'redirecting')
 function startSignIn() {
@@ -176,7 +182,11 @@ onUnmounted(() => window.clearInterval(pollTimer))
 
 <template>
   <div>
-    <PageHeader title="Compute" description="Submit and monitor GA4GH TES tasks executed on this node." />
+    <PageHeader title="Compute" description="Submit and monitor GA4GH TES tasks executed on this node.">
+      <template v-if="tesEnabled && currentUser" #actions>
+        <Button size="sm" @click="goNew"><ListPlus class="h-4 w-4" /> New task</Button>
+      </template>
+    </PageHeader>
 
     <!-- Gate 1: feature disabled — no API call is ever issued in this state. -->
     <div v-if="!tesEnabled" class="container max-w-[1100px] py-8">
@@ -250,7 +260,9 @@ onUnmounted(() => window.clearInterval(pollTimer))
         v-else-if="listState === 'ready' && !tasks.length"
         title="No compute tasks"
         description="Tasks submitted to this node appear here."
-      />
+      >
+        <Button size="sm" @click="goNew"><ListPlus class="h-4 w-4" /> New task</Button>
+      </EmptyState>
 
       <div v-else-if="tasks.length" class="surface overflow-hidden">
         <table class="w-full text-sm">

@@ -52,6 +52,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'admin/placement', name: 'admin-placement', component: () => import('@/views/AdminPlacementView.vue') },
       // Compute — GA4GH TES tasks (feature-gated in-view, aruna#290)
       { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
+      { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue') },
       // Compatibility redirects from prior IA
       { path: 'data', redirect: { name: 'buckets' } },
       { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },
