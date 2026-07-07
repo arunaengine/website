@@ -10,14 +10,13 @@ const props = withDefaults(
     barClass?: string
     warn?: number
     critical?: number
+    label?: string
   }>(),
   { value: 0, max: 100, warn: 75, critical: 90 },
 )
 
-const pct = computed(() => {
-  const v = Math.max(0, Math.min(props.max, props.value ?? 0))
-  return (v / props.max) * 100
-})
+const clamped = computed(() => Math.max(0, Math.min(props.max, props.value ?? 0)))
+const pct = computed(() => (clamped.value / props.max) * 100)
 const tone = computed(() => {
   if (pct.value >= props.critical) return 'bg-rose-500'
   if (pct.value >= props.warn) return 'bg-amber-500'
@@ -27,6 +26,11 @@ const tone = computed(() => {
 
 <template>
   <div
+    role="progressbar"
+    :aria-valuemin="0"
+    :aria-valuemax="max"
+    :aria-valuenow="clamped"
+    :aria-label="label"
     :class="cn('relative h-2 w-full overflow-hidden rounded-full bg-muted', props.class)"
   >
     <div

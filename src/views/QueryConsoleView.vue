@@ -413,13 +413,13 @@ function firstLine(query: string): string {
               <p class="text-lg font-semibold text-foreground">{{ booleanValue ? 'true' : 'false' }}</p>
               <p class="text-xs text-muted-foreground">ASK result</p>
             </div>
-            <div v-else class="max-h-[480px] overflow-auto scrollbar-thin">
+            <div v-else tabindex="0" role="region" aria-label="Query results" class="max-h-[480px] overflow-auto scrollbar-thin">
               <table class="w-full text-left">
                 <thead
                   class="sticky top-0 z-10 bg-background text-[11px] uppercase tracking-wider text-muted-foreground"
                 >
                   <tr>
-                    <th v-for="column in columns" :key="column" class="px-3 py-2 font-semibold">{{ column }}</th>
+                    <th v-for="column in columns" :key="column" scope="col" class="px-3 py-2 font-semibold">{{ column }}</th>
                   </tr>
                 </thead>
                 <tbody>

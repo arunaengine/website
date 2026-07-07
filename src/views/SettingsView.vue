@@ -335,7 +335,7 @@ const deviceEnrollmentEnabled = featureEnabled('deviceEnrollment')
             <button v-for="option in themeOptions" :key="option.id" class="flex items-center gap-3 rounded-lg border border-border bg-background/70 p-3 text-left transition-colors hover:border-primary/40" :class="appearance === option.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="setTheme(option.id)"><span class="grid h-12 w-16 shrink-0 place-items-center rounded-md border border-border shadow-inner" :style="{ background: option.preview }"><component :is="option.icon" class="h-4 w-4 text-primary" /></span><div><div class="text-sm font-medium text-foreground">{{ option.title }}</div></div></button>
           </div>
           <Separator />
-          <div class="flex items-center justify-between gap-3 p-5"><div class="flex items-center gap-2"><ShieldCheck class="h-4 w-4 text-primary" /><div><div class="text-sm font-medium text-foreground">Hide sensitive hashes by default</div><div class="text-xs text-muted-foreground">Hash display controls are local UI-only preferences.</div></div></div><Switch :checked="true" /></div>
+          <div class="flex items-center justify-between gap-3 p-5"><div class="flex items-center gap-2"><ShieldCheck class="h-4 w-4 text-primary" /><div><div class="text-sm font-medium text-foreground">Hide sensitive hashes by default</div><div class="text-xs text-muted-foreground">Hash display controls are local UI-only preferences.</div></div></div><Switch aria-label="Hide sensitive hashes by default" :checked="true" /></div>
         </section>
       </div>
     </div>

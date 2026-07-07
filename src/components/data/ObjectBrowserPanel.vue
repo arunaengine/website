@@ -149,13 +149,13 @@ const isEmpty = computed(
         </div>
         <div class="overflow-hidden rounded-md border border-border">
           <p v-if="listError" class="border-b border-border px-3 py-2 text-xs text-destructive">{{ listError }}</p>
-          <div class="max-h-[260px] overflow-y-auto">
+          <div tabindex="0" role="region" aria-label="Objects" class="max-h-[260px] overflow-y-auto">
             <table class="w-full text-sm">
               <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th class="px-3 py-1.5 text-left font-semibold">Name</th>
-                  <th class="px-3 py-1.5 text-right font-semibold">Size</th>
-                  <th class="px-3 py-1.5 text-left font-semibold">Modified</th>
+                  <th scope="col" class="px-3 py-1.5 text-left font-semibold">Name</th>
+                  <th scope="col" class="px-3 py-1.5 text-right font-semibold">Size</th>
+                  <th scope="col" class="px-3 py-1.5 text-left font-semibold">Modified</th>
                 </tr>
               </thead>
               <tbody>

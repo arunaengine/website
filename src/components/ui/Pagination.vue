@@ -25,8 +25,9 @@ function go(delta: number) {
 </script>
 
 <template>
-  <div
+  <nav
     v-if="total > pageSize"
+    :aria-label="label ? `${label} pagination` : 'Pagination'"
     class="flex items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-2 text-[11px] text-muted-foreground"
   >
     <span>
@@ -55,5 +56,5 @@ function go(delta: number) {
         <ChevronRight class="h-3.5 w-3.5" />
       </button>
     </div>
-  </div>
+  </nav>
 </template>
