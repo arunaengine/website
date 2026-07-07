@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -9,6 +9,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
+import TaskDetailPanel from '@/components/compute/TaskDetailPanel.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
@@ -21,15 +22,26 @@ import {
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { Cpu, ListPlus, LogIn, RefreshCw } from '@lucide/vue'
+import { ChevronRight, Cpu, ListPlus, LogIn, RefreshCw } from '@lucide/vue'
 
 const router = useRouter()
+const route = useRoute()
 const { tesEnabled, getTesServiceInfo, listTasks } = useTes()
 const { currentUser, myGroups } = useAruna()
 const { signIn, stage } = useAuth()
 
 function goNew() {
   void router.push({ name: 'compute-new' })
+}
+
+// Deep-linkable task drawer driven by the :taskId route param (the back button
+// closes it, DataManagerView's bucket-param precedent).
+const openTaskId = computed(() => (route.params.taskId ? String(route.params.taskId) : ''))
+function openTask(task: TesTask) {
+  if (task.id) void router.push({ name: 'compute-task', params: { taskId: task.id } })
+}
+function closeTask() {
+  void router.push({ name: 'compute' })
 }
 
 const signingIn = computed(() => stage.value === 'redirecting')
@@ -272,10 +284,17 @@ onUnmounted(() => window.clearInterval(pollTimer))
               <th class="px-5 py-2 text-left font-semibold">State</th>
               <th class="px-5 py-2 text-left font-semibold">Group</th>
               <th class="px-5 py-2 text-left font-semibold">Created</th>
+              <th class="px-5 py-2"></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="task in tasks" :key="task.id || task.name" class="border-t border-border">
+            <tr
+              v-for="task in tasks"
+              :key="task.id || task.name"
+              class="border-t border-border"
+              :class="task.id ? 'cursor-pointer hover:bg-muted/40' : ''"
+              @click="openTask(task)"
+            >
               <td class="px-5 py-2.5">
                 <div class="font-medium text-foreground" :class="!task.name ? 'font-mono text-[11px]' : ''">
                   {{ task.name || truncateMiddle(task.id || '') }}
@@ -290,6 +309,7 @@ onUnmounted(() => window.clearInterval(pollTimer))
               <td class="px-5 py-2.5 text-[11px] text-muted-foreground">
                 {{ task.creation_time ? relativeTime(task.creation_time) : '—' }}
               </td>
+              <td class="px-5 py-2.5 text-right"><ChevronRight v-if="task.id" class="ml-auto h-4 w-4 text-muted-foreground" /></td>
             </tr>
           </tbody>
         </table>
@@ -297,6 +317,14 @@ onUnmounted(() => window.clearInterval(pollTimer))
           <Button variant="ghost" size="sm" :disabled="refreshing" @click="fetchList({ more: true })">Load more</Button>
         </div>
       </div>
+
+      <TaskDetailPanel
+        v-if="openTaskId"
+        :task-id="openTaskId"
+        :open="!!openTaskId"
+        @update:open="(v) => !v && closeTask()"
+        @canceled="reload"
+      />
     </div>
   </div>
 </template>

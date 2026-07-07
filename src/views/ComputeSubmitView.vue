@@ -142,9 +142,8 @@ const submitError = ref<string | null>(null)
 async function submit() {
   submitError.value = null
   try {
-    await createTask(task.value)
-    // The task-detail route lands in a later commit; redirect to the list for now.
-    void router.push({ name: 'compute' })
+    const { id } = await createTask(task.value)
+    void router.push({ name: 'compute-task', params: { taskId: id } })
   } catch (err) {
     submitError.value = isTesUnsupported(err)
       ? `This backend does not serve a TES endpoint yet (aruna#290). ${errorMessage(err)}`

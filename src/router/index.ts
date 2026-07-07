@@ -53,6 +53,7 @@ const routes: RouteRecordRaw[] = [
       // Compute — GA4GH TES tasks (feature-gated in-view, aruna#290)
       { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
       { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue') },
+      { path: 'compute/:taskId', name: 'compute-task', component: () => import('@/views/ComputeView.vue') },
       // Compatibility redirects from prior IA
       { path: 'data', redirect: { name: 'buckets' } },
       { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },
