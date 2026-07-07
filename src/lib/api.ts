@@ -1,4 +1,5 @@
 import { portalConfig } from './config'
+import { noteFetchFailure, noteFetchSuccess } from './connectivity'
 
 const DEFAULT_API_BASE_URL = '/api/v1'
 
@@ -49,7 +50,18 @@ export async function apiRequest<T>(
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await fetch(url, { ...options, headers })
+  let response: Response
+  try {
+    response = await fetch(url, { ...options, headers })
+  } catch (err) {
+    // Network-level failure (or a deliberate abort) — the request never
+    // reached a server. Report it to the connectivity model (which ignores
+    // AbortError) and rethrow the original rejection verbatim.
+    noteFetchFailure(err)
+    throw err
+  }
+  // Any HTTP response — even an error status — proves the node is reachable.
+  noteFetchSuccess()
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`
     try {
