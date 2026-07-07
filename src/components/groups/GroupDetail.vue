@@ -10,8 +10,8 @@ import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
 import JoinRequestsInbox from '@/components/groups/JoinRequestsInbox.vue'
 import UsageHistoryChart from '@/components/groups/UsageHistoryChart.vue'
-import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, nextTick, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { ChartArea, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
@@ -32,6 +32,12 @@ const emit = defineEmits<{ (e: 'left'): void }>()
 
 const { getGroup, getGroupUsage, getGroupUsageHistory, listGroupMembers, listGroupMetadata, leaveGroup, saving, currentUser } = useAruna()
 const { joinRequestsEnabled } = useJoinRequests()
+const route = useRoute()
+
+// One-shot deep-link scroll to the storage section. Set per navigation (in the
+// groupId watch) and consumed after the first successful reload, so @changed
+// reloads from member/role edits don't yank the viewport.
+let storageAnchorPending = false
 
 const DOC_LIMIT = 8
 const joinRequestCount = ref(0)
@@ -62,9 +68,13 @@ const historyPoints = ref<UsageHistoryPoint[] | null>(null)
 const historyLoading = ref(false)
 const historyError = ref<string | null>(null)
 const historyUnsupported = ref(false)
+// Guards against out-of-order responses when the range switches or the group
+// changes while a fetch is in flight: only the latest request writes state.
+let historySeq = 0
 
 async function loadHistory() {
   if (!usageHistoryEnabled) return
+  const seq = ++historySeq
   historyLoading.value = true
   historyError.value = null
   historyUnsupported.value = false
@@ -77,13 +87,15 @@ async function loadHistory() {
       to: to.toISOString(),
       resolution: days === 7 ? 'hour' : 'day',
     })
+    if (seq !== historySeq) return
     historyPoints.value = response.points
   } catch (err) {
+    if (seq !== historySeq) return
     historyPoints.value = null
     if (err instanceof ApiError && (err.status === 404 || err.status === 405)) historyUnsupported.value = true
     else historyError.value = err instanceof Error ? err.message : String(err)
   } finally {
-    historyLoading.value = false
+    if (seq === historySeq) historyLoading.value = false
   }
 }
 
@@ -136,9 +148,25 @@ async function reload() {
   }
   // Independent endpoint (aruna#250), gated; no-op when the flag is off.
   void loadHistory()
+  // The storage section renders only after getGroup + getGroupUsage resolve, so
+  // the router's one-shot hash retry misses it (aruna#248 review F4). Scroll here
+  // once per navigation; @changed reloads keep the flag consumed.
+  if (storageAnchorPending && route.hash === '#storage' && usage.value) {
+    storageAnchorPending = false
+    await nextTick()
+    document.getElementById('storage')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 
-watch(() => props.groupId, () => { leaveError.value = null; void reload() }, { immediate: true })
+watch(
+  () => props.groupId,
+  () => {
+    leaveError.value = null
+    storageAnchorPending = true
+    void reload()
+  },
+  { immediate: true },
+)
 watch(historyRange, () => void loadHistory())
 
 async function leave() {
