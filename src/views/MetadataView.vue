@@ -2,22 +2,42 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
+import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
 import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink } from '@lucide/vue'
 
 const route = useRoute()
-const { metadata, profiles, loading, loadRoCrate, fullCrates, cratePending } = useAruna()
+const {
+  metadata,
+  profiles,
+  currentUser,
+  bootstrapped,
+  loadRoCrate,
+  loadMetadata,
+  getMetadataDocument,
+  fullCrates,
+  cratePending,
+} = useAruna()
 
 const showCrate = ref(false)
 const loadingCrate = ref(false)
 const crateNotReady = ref(false)
 const crateError = ref<string | null>(null)
 
+// Honest per-document resolution: the catalog list is not authoritative (it can
+// be stale after a create, and a missing id there is indistinguishable from a
+// private/deleted document), so we fall back to GET /metadata/{id}.
+const docState = ref<'loading' | 'found' | 'not-found' | 'forbidden' | 'error'>('loading')
+const docError = ref<string | null>(null)
+const fetchedSummary = ref<MetadataDocumentSummary | null>(null)
+
 const detailId = computed(() => (route.params.id as string) || '')
 const current = computed(() => metadata.value.find((doc) => doc.ulid === detailId.value))
+const currentCrate = computed(() => fullCrates.value[detailId.value] ?? current.value?.roCrate ?? {})
 const currentProfile = computed(() => profiles.value.find((profile) => profile.id === current.value?.profileId))
 // When no local profile resolves, fall back to the first raw conformsTo IRI so an external
 // profile association stays visible instead of reading "No profile".
@@ -43,14 +63,56 @@ async function fetchCrate(id: string) {
   }
 }
 
+let resolveToken = 0
+
+async function resolveDoc(id: string) {
+  const token = ++resolveToken
+  docError.value = null
+  fetchedSummary.value = null
+  docState.value = 'loading'
+  if (!id) return
+  // Already in the catalog: render the rich article and fetch its crate.
+  if (metadata.value.some((doc) => doc.ulid === id)) {
+    docState.value = 'found'
+    await fetchCrate(id)
+    return
+  }
+  // Otherwise ask the backend directly so we can tell missing/private/error
+  // apart from a merely stale catalog list.
+  try {
+    const summary = await getMetadataDocument(id)
+    if (token !== resolveToken) return
+    fetchedSummary.value = summary
+    // The list may be stale right after a create; refresh so the rich article
+    // can appear. A failing refresh must not flip us out of 'found'.
+    await loadMetadata().catch(() => undefined)
+    if (token !== resolveToken) return
+    docState.value = 'found'
+    await fetchCrate(id)
+  } catch (err) {
+    if (token !== resolveToken) return
+    if (err instanceof ApiError && (err.status === 404 || err.status === 400)) docState.value = 'not-found'
+    else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) docState.value = 'forbidden'
+    else {
+      docState.value = 'error'
+      docError.value = err instanceof Error ? err.message : String(err)
+    }
+  }
+}
+
 watch(
-  detailId,
-  async (id) => {
+  // Wait for the initial bootstrap before deciding — the catalog list is empty
+  // during the very first load, so an unknown id must not read as not-found.
+  [detailId, bootstrapped],
+  async ([id, ready]) => {
     showCrate.value = false
     crateError.value = null
     crateNotReady.value = false
-    if (!id) return
-    await fetchCrate(id)
+    if (!id || !ready) {
+      docState.value = 'loading'
+      return
+    }
+    await resolveDoc(id)
   },
   { immediate: true },
 )
@@ -77,8 +139,8 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
 <template>
   <div>
     <PageHeader
-      :title="current ? current.title : 'Metadata'"
-      :description="current ? `${profileName} · ${current.ulid}` : 'Live RO-Crate metadata document.'"
+      :title="current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Metadata'"
+      :description="current ? `${profileName} · ${current.ulid}` : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate metadata document.'"
     >
       <template #actions>
         <RouterLink :to="{ name: 'search' }">
@@ -129,20 +191,52 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
             </div>
           </dl>
         </article>
+      </template>
 
+      <!-- Resolved directly but not (yet) in the catalog listing: registry summary. -->
+      <article v-else-if="docState === 'found' && fetchedSummary" class="surface p-6">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0 flex-1">
+            <h1 class="break-all font-display text-xl font-semibold tracking-tight text-aruna-navy">{{ fetchedSummary.document_path }}</h1>
+            <p class="mt-2 text-sm text-muted-foreground">Showing this document's registry summary; it is not in the catalog listing yet.</p>
+          </div>
+          <Badge :variant="fetchedSummary.public ? 'success' : 'secondary'" class="text-[10px] uppercase">{{ fetchedSummary.public ? 'public' : 'private' }}</Badge>
+        </div>
+        <dl class="mt-6 grid gap-3 sm:grid-cols-4">
+          <div class="surface-muted p-3">
+            <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Document ID</dt>
+            <dd class="mt-1 break-all font-mono text-[11px] text-foreground">{{ fetchedSummary.document_id }}</dd>
+          </div>
+          <div class="surface-muted p-3">
+            <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Group</dt>
+            <dd class="mt-1 break-all font-mono text-[11px] text-foreground">{{ fetchedSummary.group_id }}</dd>
+          </div>
+          <div class="surface-muted p-3">
+            <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Created</dt>
+            <dd class="mt-1 text-sm font-medium text-foreground">{{ relativeTime(fetchedSummary.created_at) }}</dd>
+          </div>
+          <div class="surface-muted p-3">
+            <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Updated</dt>
+            <dd class="mt-1 text-sm font-medium text-foreground">{{ relativeTime(fetchedSummary.updated_at) }}</dd>
+          </div>
+        </dl>
+      </article>
+
+      <!-- Crate + referenced data for any resolved document (keyed on detailId). -->
+      <template v-if="docState === 'found'">
         <section class="surface p-4">
           <button type="button" class="flex w-full items-center justify-between text-sm font-medium text-foreground/80 hover:text-foreground" @click="showCrate = !showCrate">
             <span class="inline-flex items-center gap-2"><Code2 class="h-3.5 w-3.5 text-muted-foreground" /> RO-Crate JSON-LD</span>
             <span class="text-xs text-muted-foreground">{{ showCrate ? 'hide' : 'show' }}</span>
           </button>
-          <div v-if="loadingCrate && cratePending[current.ulid]" class="mt-3 text-xs text-muted-foreground">Preparing the crate…</div>
+          <div v-if="loadingCrate && cratePending[detailId]" class="mt-3 text-xs text-muted-foreground">Preparing the crate…</div>
           <div v-else-if="loadingCrate" class="mt-3 text-xs text-muted-foreground">Loading full RO-Crate…</div>
           <div v-if="crateNotReady" class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
             <span>The crate is still being prepared.</span>
-            <Button variant="outline" size="sm" @click="fetchCrate(current.ulid)">Retry</Button>
+            <Button variant="outline" size="sm" @click="fetchCrate(detailId)">Retry</Button>
           </div>
           <div v-if="crateError" class="mt-3 text-xs text-destructive">{{ crateError }}</div>
-          <pre v-if="showCrate" class="mt-3 max-h-[560px] overflow-auto whitespace-pre-wrap rounded-md bg-muted/30 p-4 font-mono text-[11.5px] leading-relaxed text-foreground/85 scrollbar-thin"><code>{{ JSON.stringify(fullCrates[current.ulid] ?? current.roCrate, null, 2) }}</code></pre>
+          <pre v-if="showCrate" class="mt-3 max-h-[560px] overflow-auto whitespace-pre-wrap rounded-md bg-muted/30 p-4 font-mono text-[11.5px] leading-relaxed text-foreground/85 scrollbar-thin"><code>{{ JSON.stringify(currentCrate, null, 2) }}</code></pre>
         </section>
 
         <section class="surface p-5 text-xs text-muted-foreground">
@@ -158,9 +252,33 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
         </section>
       </template>
 
-      <div v-else class="surface p-12 text-center text-sm text-muted-foreground">
-        {{ loading ? 'Loading metadata…' : 'This metadata document is not visible or does not exist.' }}
+      <div v-else-if="docState === 'loading'" class="surface p-12 text-center text-sm text-muted-foreground">
+        Loading metadata…
       </div>
+
+      <div v-else-if="docState === 'not-found'" class="surface px-5 py-12 text-center">
+        <p class="text-sm font-medium text-foreground">This metadata document does not exist (or has been deleted).</p>
+        <p class="mx-auto mt-2 max-w-md break-all font-mono text-xs text-muted-foreground">{{ detailId }}</p>
+        <RouterLink :to="{ name: 'search' }" class="mt-5 inline-flex">
+          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Discover</Button>
+        </RouterLink>
+      </div>
+
+      <div v-else-if="docState === 'forbidden'" class="surface px-5 py-12 text-center">
+        <p class="text-sm font-medium text-foreground">This document is not public.</p>
+        <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          {{ currentUser ? 'Sign in with an account that can see it.' : 'Sign in with an account that can see it, using the button in the top bar.' }}
+        </p>
+        <RouterLink :to="{ name: 'search' }" class="mt-5 inline-flex">
+          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Discover</Button>
+        </RouterLink>
+      </div>
+
+      <ErrorPanel
+        v-else-if="docState === 'error'"
+        :message="docError ?? 'Failed to load this document.'"
+        @retry="resolveDoc(detailId)"
+      />
     </div>
   </div>
 </template>

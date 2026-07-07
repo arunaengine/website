@@ -830,6 +830,7 @@ export function useAruna() {
     cratePending,
     refresh,
     loadInfo,
+    loadMetadata,
     loadRoCrate,
     createMetadata,
     getMetadataDocument,

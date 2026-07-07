@@ -40,9 +40,11 @@ const routes: RouteRecordRaw[] = [
       { path: 'query', redirect: { name: 'search' } },
       { path: 'nodes', redirect: { name: 'settings' } },
       { path: 'realm', redirect: { name: 'settings' } },
+      // Unknown /app URLs keep the shell and show a 404 instead of redirecting away.
+      { path: ':pathMatch(.*)*', name: 'app-not-found', component: () => import('@/views/NotFoundView.vue') },
     ],
   },
-  { path: '/:pathMatch(.*)*', redirect: '/' },
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/views/NotFoundView.vue') },
 ]
 
 function hashTargetExists(hash: string): boolean {
