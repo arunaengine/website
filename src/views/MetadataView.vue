@@ -3,18 +3,20 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
-import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink } from '@lucide/vue'
+import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil } from '@lucide/vue'
 
 const route = useRoute()
 const {
   metadata,
   profiles,
   currentUser,
+  userInfo,
   bootstrapped,
   loadRoCrate,
   loadMetadata,
@@ -22,6 +24,16 @@ const {
   fullCrates,
   cratePending,
 } = useAruna()
+
+const showEdit = ref(false)
+// The owning group_id is the document's realmId (see mapMetadataDoc). Membership
+// is a UI heuristic; the backend still enforces write permission (a 403 surfaces
+// inside the edit dialog).
+const canWrite = computed(() => Boolean(userInfo.value?.groups.some((g) => g.group_id === current.value?.realmId)))
+
+async function onSaved() {
+  await fetchCrate(detailId.value)
+}
 
 const showCrate = ref(false)
 const loadingCrate = ref(false)
@@ -143,6 +155,7 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
       :description="current ? `${profileName} · ${current.ulid}` : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate metadata document.'"
     >
       <template #actions>
+        <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
         <RouterLink :to="{ name: 'search' }">
           <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Discover</Button>
         </RouterLink>
@@ -280,5 +293,7 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
         @retry="resolveDoc(detailId)"
       />
     </div>
+
+    <EditMetadataDialog v-if="current" v-model:open="showEdit" :document-id="current.ulid" @saved="onSaved" />
   </div>
 </template>
