@@ -45,6 +45,22 @@ try {
   const detailBody = await page.textContent('body')
   step('dataset created and detail page opened', detailBody.includes('Coral genome assembly'), page.url())
 
+  // Edit the dataset title via the Edit dialog (PUT /metadata/{id}/rocrate)
+  await page.getByRole('button', { name: /^Edit$/ }).first().click()
+  await page.waitForSelector('text=Edit metadata')
+  const editDialog = page.locator('[role="dialog"]')
+  await editDialog.getByPlaceholder('Dataset title').fill('Coral genome assembly v2')
+  await editDialog.getByRole('button', { name: /Save changes/ }).click()
+  await page.waitForTimeout(2500)
+  step('dataset title edited via ro-crate replace', (await page.textContent('body')).includes('Coral genome assembly v2'))
+
+  // Toggle the favourite star; it should read as filled on Discover
+  await page.getByRole('button', { name: 'Add to favourites' }).first().click()
+  await page.waitForTimeout(1500)
+  await page.goto(BASE + '/app/search')
+  await page.waitForTimeout(1500)
+  step('favourite star toggles on', (await page.getByRole('button', { name: 'Remove from favourites' }).count()) > 0)
+
   // Catalog lists it
   await page.goto(BASE + '/app/metadata')
   await page.waitForTimeout(1500)
@@ -90,6 +106,38 @@ try {
   // Groups and credentials sections render real data
   const settingsBody = await page.textContent('body')
   step('groups section shows Genomics lab', settingsBody.includes('Genomics lab'))
+
+  // Deep-link to a nonexistent document → honest not-found panel (not a redirect)
+  await page.goto(BASE + '/app/metadata/01UNKNOWNDOCID0000000000000')
+  await page.waitForTimeout(1500)
+  step('unknown document shows not-found panel', (await page.textContent('body')).includes('does not exist'))
+
+  // Unknown app URL → 404 view instead of a silent redirect to '/'
+  await page.goto(BASE + '/app/nope')
+  await page.waitForTimeout(1000)
+  step('unknown app url shows 404 view', (await page.textContent('body')).includes('404'))
+
+  // Credential dialog exposes the optional path-restriction section
+  await page.goto(BASE + '/app/settings')
+  await page.waitForTimeout(1500)
+  await page.locator('#credentials').getByRole('button', { name: /Create/ }).first().click()
+  await page.waitForSelector('text=Create S3 credentials')
+  await page.getByRole('button', { name: /Path restrictions/ }).click()
+  step('credential dialog shows path restrictions', (await page.textContent('body')).includes('Add restriction'))
+  await page.keyboard.press('Escape')
+
+  // Delete the dataset via the confirm dialog; Discover no longer lists it
+  await page.goto(BASE + '/app/search?q=coral')
+  await page.waitForTimeout(1500)
+  await page.getByRole('link', { name: /Coral genome assembly/ }).first().click()
+  await page.waitForURL(/\/app\/metadata\//)
+  await page.waitForTimeout(1500)
+  await page.getByRole('button', { name: /^Delete$/ }).first().click()
+  await page.waitForSelector('text=Delete metadata document')
+  await page.locator('[role="dialog"]').getByRole('button', { name: /^Delete$/ }).click()
+  await page.waitForURL(/\/app\/search/, { timeout: 15000 })
+  await page.waitForTimeout(2000)
+  step('dataset deleted and removed from Discover', !(await page.textContent('body')).includes('Coral genome assembly'))
 
   // The only tolerated console error is the known API projection-race 500 on
   // GET /metadata, which the portal retries and recovers from.

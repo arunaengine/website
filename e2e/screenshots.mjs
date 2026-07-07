@@ -32,5 +32,15 @@ await page.goto(BASE + '/app/settings')
 await page.waitForTimeout(1500)
 await shot('04-settings-session')
 
+// Honest not-found view for an unknown app URL
+await page.goto(BASE + '/app/nope')
+await page.waitForTimeout(1000)
+await shot('05-not-found')
+
+// Discover catalog (loading skeleton / results)
+await page.goto(BASE + '/app/search')
+await page.waitForTimeout(1500)
+await shot('06-discover')
+
 await browser.close()
 console.log('done')
