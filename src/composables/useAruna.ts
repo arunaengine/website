@@ -273,6 +273,23 @@ async function listGroupMetadata(groupId: string): Promise<ListMetadataResponse>
   })
 }
 
+// Favourites live in the user attribute ui.favourite_metadata_ids as a
+// comma-separated id list (see backend user_preferences_from_attributes).
+async function toggleFavourite(documentId: string): Promise<void> {
+  const current = userInfo.value?.preferences.favourite_metadata_ids ?? []
+  const next = current.includes(documentId)
+    ? current.filter((id) => id !== documentId)
+    : [...current, documentId]
+  const body = next.length
+    ? { set_attributes: { 'ui.favourite_metadata_ids': next.join(',') } }
+    : { remove_attributes: ['ui.favourite_metadata_ids'] }
+  const updated = await request<UserInfoResponse>('/users/info', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+  userInfo.value = updated // PATCH returns the full GetUserInfoResponse
+}
+
 async function updateUserProfile(input: {
   name?: string
   set_attributes?: Record<string, string>
@@ -839,6 +856,7 @@ export function useAruna() {
     replaceMetadataRoCrate,
     deleteMetadataDocument,
     listGroupMetadata,
+    toggleFavourite,
     updateUserProfile,
     setRealmQuota,
     createGroup,

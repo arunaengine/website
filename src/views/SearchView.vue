@@ -17,11 +17,14 @@ import type { SparqlResult } from '@/data/types'
 
 const route = useRoute()
 const router = useRouter()
-const { realm, metadata, profiles, currentUser, loading, error, bootstrapped, refresh, runSparql } = useAruna()
+const { realm, metadata, profiles, currentUser, loading, error, bootstrapped, refresh, runSparql, toggleFavourite } = useAruna()
 
 const q = ref<string>((route.query.q as string) ?? '')
 const profileFilter = ref<string | null>((route.query.profile as string) ?? null)
+const favouritesOnly = ref(false)
 const expertMode = ref<boolean>(route.query.expert === '1')
+const favBusy = ref<Set<string>>(new Set())
+const favError = ref<string | null>(null)
 const showNewDataset = ref(false)
 const sparql = ref(`SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 25`)
 const sparqlResult = ref<SparqlResult | null>(null)
@@ -34,17 +37,18 @@ watch(expertMode, (next) => router.replace({ query: { ...route.query, expert: ne
 
 const PAGE_SIZE = 12
 const page = ref(1)
-watch([q, profileFilter], () => {
+watch([q, profileFilter, favouritesOnly], () => {
   page.value = 1
 })
 
-const filtering = computed(() => Boolean(q.value.trim() || profileFilter.value))
+const filtering = computed(() => Boolean(q.value.trim() || profileFilter.value || favouritesOnly.value))
 const favouriteIds = computed(() => currentUser.value?.favouriteMetadataIds ?? [])
 
 const hits = computed(() => {
   const needle = q.value.trim().toLowerCase()
   return metadata.value.filter((doc) => {
     if (profileFilter.value && doc.profileId !== profileFilter.value) return false
+    if (favouritesOnly.value && !favouriteIds.value.includes(doc.ulid)) return false
     if (!needle) return true
     return `${doc.title} ${doc.description} ${doc.keywords.join(' ')} ${doc.author}`.toLowerCase().includes(needle)
   })
@@ -55,9 +59,25 @@ function isFavourite(id: string) {
   return favouriteIds.value.includes(id)
 }
 
+async function toggleFav(id: string) {
+  if (favBusy.value.has(id)) return
+  favError.value = null
+  favBusy.value = new Set(favBusy.value).add(id)
+  try {
+    await toggleFavourite(id)
+  } catch (err) {
+    favError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    const next = new Set(favBusy.value)
+    next.delete(id)
+    favBusy.value = next
+  }
+}
+
 function clearFilters() {
   q.value = ''
   profileFilter.value = null
+  favouritesOnly.value = false
 }
 
 async function runQuery() {
@@ -103,8 +123,13 @@ async function runQuery() {
             <button v-for="profile in profiles" :key="profile.id" class="chip transition-colors" :class="profileFilter === profile.id ? 'border-primary/40 text-primary' : ''" @click="profileFilter = profileFilter === profile.id ? null : profile.id">
               {{ profile.shortName }}
             </button>
+            <button v-if="currentUser" class="chip inline-flex items-center gap-1 transition-colors" :class="favouritesOnly ? 'border-amber-400/60 text-amber-600 dark:text-amber-400' : ''" @click="favouritesOnly = !favouritesOnly">
+              <Star class="h-3 w-3" :fill="favouritesOnly ? 'currentColor' : 'none'" /> Favourites
+            </button>
           </div>
         </div>
+
+        <p v-if="favError" class="text-xs text-destructive">{{ favError }}</p>
 
         <section v-if="!bootstrapped || (loading && !metadata.length)" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Skeleton v-for="n in 6" :key="n" class="h-36" />
@@ -120,7 +145,17 @@ async function runQuery() {
           </div>
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <RouterLink v-for="doc in paged" :key="doc.ulid" :to="{ name: 'metadata-detail', params: { id: doc.ulid } }" class="surface group relative flex h-full flex-col gap-3 p-4 transition-shadow hover:shadow-md">
-              <Star v-if="isFavourite(doc.ulid)" class="absolute right-3 top-3 h-4 w-4 text-amber-500" fill="currentColor" />
+              <button
+                v-if="currentUser"
+                type="button"
+                class="absolute right-2.5 top-2.5 rounded-md p-1 transition-colors hover:bg-muted disabled:opacity-50"
+                :class="isFavourite(doc.ulid) ? 'text-amber-500' : 'text-muted-foreground'"
+                :disabled="favBusy.has(doc.ulid)"
+                :aria-label="isFavourite(doc.ulid) ? 'Remove from favourites' : 'Add to favourites'"
+                @click.prevent.stop="toggleFav(doc.ulid)"
+              >
+                <Star class="h-4 w-4" :fill="isFavourite(doc.ulid) ? 'currentColor' : 'none'" />
+              </button>
               <div class="pr-6">
                 <h3 class="font-display text-sm font-semibold text-aruna-navy">{{ doc.title }}</h3>
                 <p class="mt-1 line-clamp-2 text-xs text-muted-foreground">{{ doc.description || doc.ulid }}</p>

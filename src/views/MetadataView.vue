@@ -16,7 +16,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
-import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil, Trash2 } from '@lucide/vue'
+import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,9 +32,24 @@ const {
   loadMetadata,
   getMetadataDocument,
   deleteMetadataDocument,
+  toggleFavourite,
   fullCrates,
   cratePending,
 } = useAruna()
+
+const isFav = computed(() => Boolean(currentUser.value?.favouriteMetadataIds?.includes(detailId.value)))
+const favBusy = ref(false)
+async function toggleFav() {
+  if (favBusy.value) return
+  favBusy.value = true
+  try {
+    await toggleFavourite(detailId.value)
+  } catch {
+    // A favourite toggle failure is non-critical; surfaced globally in a later step.
+  } finally {
+    favBusy.value = false
+  }
+}
 
 const showEdit = ref(false)
 const showDelete = ref(false)
@@ -184,6 +199,16 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
       :description="current ? `${profileName} · ${current.ulid}` : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate metadata document.'"
     >
       <template #actions>
+        <Button
+          v-if="current && currentUser"
+          variant="outline"
+          size="icon"
+          :disabled="favBusy"
+          :aria-label="isFav ? 'Remove from favourites' : 'Add to favourites'"
+          @click="toggleFav"
+        >
+          <Star class="h-4 w-4" :class="isFav ? 'text-amber-500' : ''" :fill="isFav ? 'currentColor' : 'none'" />
+        </Button>
         <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
         <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
         <RouterLink :to="{ name: 'search' }">
