@@ -99,6 +99,8 @@ watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1
           <RouterLink
             :to="item.to"
             :title="collapsed ? item.label : undefined"
+            :aria-current="isActive(item) ? 'page' : undefined"
+            :aria-label="collapsed ? item.label : undefined"
             :class="[
               'flex items-center gap-2.5 rounded-md py-2 text-[13px] font-medium transition-colors',
               collapsed ? 'justify-center px-0' : 'px-2.5',
@@ -118,6 +120,7 @@ watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1
       <button
         type="button"
         :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         :class="[
           'flex w-full items-center gap-2.5 rounded-md py-2 text-[12px] font-medium text-muted-foreground/80 transition-colors hover:bg-foreground/[0.04] hover:text-foreground',
           collapsed ? 'justify-center px-0' : 'px-2.5',
@@ -131,6 +134,7 @@ watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1
       <RouterLink
         to="/"
         :title="collapsed ? 'Back to landing' : undefined"
+        :aria-label="collapsed ? 'Back to landing' : undefined"
         :class="[
           'flex items-center gap-2.5 rounded-md py-2 text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground',
           collapsed ? 'justify-center px-0' : 'px-2.5',

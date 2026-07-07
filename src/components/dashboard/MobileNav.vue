@@ -29,6 +29,7 @@ function isActive(item: (typeof nav)[number]): boolean {
         v-for="item in nav"
         :key="item.to"
         :to="item.to"
+        :aria-current="isActive(item) ? 'page' : undefined"
         class="flex flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-medium transition-colors hover:bg-muted hover:text-foreground"
         :class="isActive(item) ? 'bg-primary/10 text-primary' : 'text-muted-foreground'"
       >

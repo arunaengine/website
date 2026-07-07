@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Sheet from '@/components/ui/Sheet.vue'
 import SheetContent from '@/components/ui/SheetContent.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -240,6 +241,7 @@ const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.
 <template>
   <Sheet :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
     <SheetContent side="right" class="w-full p-6 sm:max-w-2xl">
+      <DialogTitle class="sr-only">Task details</DialogTitle>
       <div v-if="loadState === 'loading'" class="space-y-4">
         <Skeleton class="h-8 w-2/3" />
         <Skeleton class="h-40 w-full" />

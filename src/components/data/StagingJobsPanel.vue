@@ -6,6 +6,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useStaging } from '@/composables/useStaging'
 import { featureEnabled } from '@/lib/config'
@@ -65,6 +66,7 @@ function jobBadge(state: StagingJobState): 'secondary' | 'success' | 'destructiv
 <template>
   <Sheet :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
     <SheetContent side="right" class="w-full p-6 sm:max-w-md">
+      <DialogTitle class="sr-only">Staging jobs</DialogTitle>
       <div class="flex items-center justify-between pr-8">
         <h2 class="flex items-center gap-2 text-base font-semibold text-foreground">
           <HardDriveDownload class="h-4 w-4 text-primary" /> Staging jobs
