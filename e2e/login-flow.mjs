@@ -29,6 +29,10 @@ try {
   const guestBody = await page.textContent('body')
   step('guest dashboard shows guest copy', guestBody.includes('Aruna data portal') && guestBody.includes('guest'))
 
+  // Signed out: no notification bell
+  const guestBell = await page.getByRole('button', { name: /Notifications/ }).count()
+  step('no notification bell for guests', guestBell === 0)
+
   // 3. Clicking Sign in in the top bar redirects straight to Keycloak (no interstitial)
   await page.locator('header').getByRole('button', { name: /^Sign in$/ }).first().click()
   await page.waitForURL(/localhost:8080/, { timeout: 15000 })

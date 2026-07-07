@@ -31,6 +31,31 @@ try {
   await page.waitForTimeout(2000)
   step('admin signed in', (await page.textContent('body')).includes('Aruna Admin'))
 
+  // Notification bell renders for the signed-in admin and opens its dropdown.
+  // (Real cross-user delivery — admin adds a member, the member's bell
+  // increments — needs two sessions and is out of scope for this single-session
+  // script.)
+  const bell = page.getByRole('button', { name: /Notifications/ })
+  step('notification bell visible when signed in', (await bell.count()) === 1)
+  await bell.first().click()
+  await page.waitForTimeout(800)
+  const bellBody = await page.textContent('body')
+  step(
+    'notification dropdown opens with list or empty state',
+    bellBody.includes('Mark all read') && (bellBody.includes('caught up') || bellBody.includes('ago')),
+  )
+  // Mark all read leaves no unread badge on the bell button
+  const badgeText = await bell.first().textContent()
+  if (badgeText && badgeText.trim() !== '') {
+    await page.getByRole('button', { name: 'Mark all read' }).click()
+    await page.waitForTimeout(800)
+    step('mark all read clears the badge', ((await bell.first().textContent()) || '').trim() === '')
+  } else {
+    step('mark all read clears the badge', true, 'inbox already empty — skipped')
+  }
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
   // Create a dataset through the New dataset dialog
   await page.getByRole('button', { name: 'New dataset' }).first().click()
   await page.waitForSelector('text=New metadata document')
