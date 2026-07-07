@@ -64,8 +64,8 @@ watch(
 )
 
 function refreshAll() {
-  void loadDevices()
-  void loadInfo()
+  if (currentUser.value) void loadDevices()
+  void loadInfo().catch(() => undefined)
 }
 
 // --- Enrollment wizard ------------------------------------------------------
@@ -214,7 +214,7 @@ function pollTick() {
   }
   const row = enrolledRow.value
   if (!row || !row.node_id) void loadDevices()
-  else void loadInfo()
+  else void loadInfo().catch(() => undefined)
 }
 function startWatch() {
   stopWatch()
@@ -510,6 +510,7 @@ function startSignIn() {
             :busy-ids="evictingIds"
             :can-revoke="true"
             revoke-label="Evict"
+            busy-label="Evicting…"
             empty-text="No devices enrolled yet — enroll one above."
             @revoke="onEvict"
           />

@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import {
+  ApiError,
   apiRequest,
   type EnrollUserDeviceRequest,
   type EnrollUserDeviceResponse,
@@ -128,13 +129,13 @@ async function evictDevice(enrollmentId: string): Promise<void> {
       await request<void>(`/users/devices/${encodeURIComponent(enrollmentId)}`, { method: 'DELETE' })
     } catch (err) {
       // Already evicted — treat as success so the row disappears cleanly.
-      if (!(err instanceof Error && /\b404\b/.test(err.message))) throw err
+      if (!(err instanceof ApiError && err.status === 404)) throw err
     }
     devices.value = devices.value.filter((d) => d.enrollment_id !== enrollmentId)
     void loadDevices().catch(() => undefined)
     // Eviction propagates realm-wide — the user node must drop out of
     // realmInfo.nodes, so refresh the shared realm info.
-    void useAruna().loadInfo()
+    void useAruna().loadInfo().catch(() => undefined)
   } finally {
     evictingIds.value = evictingIds.value.filter((id) => id !== enrollmentId)
   }

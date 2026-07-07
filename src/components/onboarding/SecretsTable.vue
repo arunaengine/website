@@ -41,8 +41,11 @@ const props = withDefaults(
     // Action label + empty copy (aruna#271 uses "Evict"); default to today's values.
     revokeLabel?: string
     emptyText?: string
+    // In-progress label shown while a row is being revoked/evicted (aruna#271
+    // uses "Evicting…"); default to today's value.
+    busyLabel?: string
   }>(),
-  { revokeLabel: 'Revoke', emptyText: 'No outstanding onboarding secrets.' },
+  { revokeLabel: 'Revoke', emptyText: 'No outstanding onboarding secrets.', busyLabel: 'Revoking…' },
 )
 const emit = defineEmits<{ (e: 'revoke', id: string): void }>()
 
@@ -140,7 +143,7 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
           </td>
           <td class="px-3 py-2.5 text-right">
             <template v-if="canRevoke">
-              <span v-if="busy.has(row.id)" class="text-xs text-muted-foreground">Revoking…</span>
+              <span v-if="busy.has(row.id)" class="text-xs text-muted-foreground">{{ props.busyLabel }}</span>
               <Button
                 v-else-if="confirmingId === row.id"
                 variant="destructive"
