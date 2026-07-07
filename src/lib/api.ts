@@ -805,3 +805,42 @@ export interface PlacementTransition {
 export interface PlacementTransitionsResponse {
   transitions: PlacementTransition[]
 }
+
+// ── Group subscriptions / offline leases (aruna#273) ────────────────────────
+// ASSUMED API — NOT yet provided by the backend (aruna#273 workplan item 1;
+// depends on aruna#271 user nodes and #257). A subscription is a READ-ONLY
+// LEASE: the node this portal is served from follows the group's metadata;
+// leased copies must never count toward the replication factor or trigger
+// repair (backend invariant — the portal only states it). Shapes follow
+// existing conventions: snake_case, ULID ids, `{ subscriptions: [...] }`
+// list wrapper, unix-ms timestamps like NotificationResponse.created_at_ms.
+// All consumers are gated behind featureEnabled('subscriptions').
+
+export type SubscriptionSyncState = 'pending' | 'syncing' | 'synced' | 'error'
+
+export interface GroupSubscription {
+  group_id: string
+  // Echoed display name for rendering; fall back to a client-side join
+  // against the loaded group lists when absent.
+  group_display_name?: string | null
+  // Node holding the lease — the node serving this portal. Subscriptions are
+  // per-device; the portal always manages the local node's leases, which is
+  // why the API is not node-addressed.
+  node_id: string
+  state: SubscriptionSyncState
+  documents_synced: number
+  // null while the total is not known yet (initial handshake).
+  documents_total: number | null
+  last_synced_at_ms: number | null
+  // Human-readable sync failure when state === 'error'.
+  error?: string | null
+  created_at_ms: number
+}
+
+export interface ListSubscriptionsResponse {
+  subscriptions: GroupSubscription[]
+}
+
+export interface CreateSubscriptionRequest {
+  group_id: string
+}
