@@ -15,11 +15,12 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useS3, s3ErrorMessage, isS3AuthError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type UploadHandle } from '@/composables/useS3'
+import { useS3, s3ErrorMessage, isS3AuthError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
+import { useUploadQueue } from '@/composables/useUploadQueue'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { UsageResponse } from '@/lib/api'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   Boxes,
@@ -66,19 +67,20 @@ const manualSecret = ref('')
 
 const keyTail = computed(() => s3.activeKey.value?.accessKeyId.slice(-4) ?? '')
 
-interface UploadItem {
-  id: number
-  name: string
-  state: 'uploading' | 'done' | 'error' | 'canceled'
-  progress: number
-  error?: string
-  quotaExceeded?: boolean
-}
-const uploads = ref<UploadItem[]>([])
-const uploadHandles = new Map<number, UploadHandle>()
-let uploadCounter = 0
+// Uploads live in a module-singleton queue so they keep running (with progress,
+// cancel and retry) while the user navigates away from this view.
+const queue = useUploadQueue()
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragActive = ref(false)
+
+// A finished upload into the current bucket refreshes the listing; completions
+// in other buckets are ignored (the queue is global).
+watch(
+  () => queue.lastCompleted.value,
+  (done) => {
+    if (done && done.bucket === bucket.value) void loadObjects()
+  },
+)
 
 const deleteTarget = ref<ObjectEntry | null>(null)
 const deleteBusy = ref(false)
@@ -286,66 +288,20 @@ async function requestUpload(files: File[]) {
       }
     }
   }
-  await uploadFiles(files)
+  enqueueUpload(files)
 }
 
 function confirmPrecheckUpload() {
   const files = precheck.value?.files ?? []
   precheck.value = null
-  if (files.length) void uploadFiles(files)
+  if (files.length) enqueueUpload(files)
 }
 
-async function uploadFiles(files: File[]) {
-  for (const file of files) {
-    const item: UploadItem = { id: ++uploadCounter, name: file.name, state: 'uploading', progress: 0 }
-    uploads.value = [...uploads.value, item]
-    const handle = s3.uploadObject(bucket.value, `${s3Prefix.value}${file.name}`, file, (loaded, total) => {
-      item.progress = total ? Math.round((loaded / total) * 100) : 0
-      uploads.value = [...uploads.value]
-    })
-    uploadHandles.set(item.id, handle)
-    try {
-      await handle.promise
-      item.state = 'done'
-      item.progress = 100
-    } catch (err) {
-      if (item.state !== 'canceled') {
-        item.state = 'error'
-        if (isS3QuotaError(err)) {
-          item.quotaExceeded = true
-          item.error = 'The group’s storage quota is exhausted — the node rejected this upload (QuotaExceeded).'
-        } else {
-          item.error = s3ErrorMessage(err)
-        }
-      }
-    } finally {
-      uploadHandles.delete(item.id)
-    }
-    uploads.value = [...uploads.value]
-  }
-  await loadObjects()
+// The single hand-off into the shared queue; every upload path (file picker,
+// drop, dialog, the precheck "Upload anyway" button) funnels through here.
+function enqueueUpload(files: File[]) {
+  queue.enqueue(files, { bucket: bucket.value, prefix: s3Prefix.value, groupId: activeGroupId.value })
 }
-
-async function cancelUpload(item: UploadItem) {
-  const handle = uploadHandles.get(item.id)
-  if (!handle) return
-  item.state = 'canceled'
-  uploads.value = [...uploads.value]
-  await handle.abort().catch(() => undefined)
-}
-
-function clearFinishedUploads() {
-  uploads.value = uploads.value.filter((item) => item.state === 'uploading')
-}
-
-// A reload mid-upload silently discards the multipart upload, so ask the
-// browser to confirm while one is running.
-function onBeforeUnload(event: BeforeUnloadEvent) {
-  if (!uploads.value.some((item) => item.state === 'uploading')) return
-  event.preventDefault()
-}
-window.addEventListener('beforeunload', onBeforeUnload)
-onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload))
 
 async function download(object: ObjectEntry) {
   try {
@@ -504,29 +460,51 @@ const isEmpty = computed(
               </div>
             </div>
 
-            <div v-if="uploads.length" class="surface space-y-1 p-3">
+            <div v-if="queue.items.value.length" class="surface space-y-1 p-3">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Uploads</span>
-                <Button variant="ghost" size="sm" @click="clearFinishedUploads">Clear finished</Button>
+                <Button variant="ghost" size="sm" @click="queue.clearFinished()">Clear finished</Button>
               </div>
-              <div v-for="item in uploads" :key="item.id" class="flex items-center gap-2 text-xs">
+              <div v-for="item in queue.items.value" :key="item.id" class="flex items-center gap-2 text-xs">
                 <Loader2 v-if="item.state === 'uploading'" class="h-3 w-3 shrink-0 animate-spin text-primary" />
-                <Badge v-else :variant="item.state === 'done' ? 'accent' : item.state === 'canceled' ? 'secondary' : 'destructive'" class="text-[10px] uppercase">{{ item.state }}</Badge>
-                <span class="min-w-0 flex-none truncate font-mono" :class="item.state === 'uploading' ? 'max-w-[40%]' : ''">{{ item.name }}</span>
+                <Badge
+                  v-else
+                  :variant="item.state === 'done' ? 'accent' : item.state === 'error' ? 'destructive' : 'secondary'"
+                  class="text-[10px] uppercase"
+                >{{ item.state }}</Badge>
+                <span class="min-w-0 flex-none truncate font-mono" :class="item.state === 'uploading' ? 'max-w-[40%]' : ''">
+                  <span v-if="item.bucket !== bucket" class="text-muted-foreground">{{ item.bucket }}/</span>{{ item.name }}
+                </span>
                 <template v-if="item.state === 'uploading'">
                   <Progress :value="item.progress" :warn="101" :critical="101" class="h-1.5 flex-1" />
                   <span class="w-9 shrink-0 text-right font-mono text-muted-foreground">{{ item.progress }}%</span>
-                  <Button variant="ghost" size="sm" class="h-6 shrink-0 px-2" @click="cancelUpload(item)">Cancel</Button>
+                  <Button variant="ghost" size="sm" class="h-6 shrink-0 px-2" @click="queue.cancel(item)">Cancel</Button>
                 </template>
-                <span v-if="item.error" class="truncate text-destructive">{{ item.error }}</span>
-                <RouterLink
-                  v-if="item.quotaExceeded"
-                  :to="activeGroupId ? { name: 'groups', params: { id: activeGroupId }, hash: '#storage' } : { name: 'groups' }"
-                  class="shrink-0 text-xs font-medium text-primary hover:underline"
-                >
-                  View group quota
-                </RouterLink>
+                <template v-else-if="item.state === 'queued'">
+                  <span class="flex-1"></span>
+                  <Button variant="ghost" size="sm" class="h-6 shrink-0 px-2" @click="queue.cancel(item)">Cancel</Button>
+                </template>
+                <template v-else>
+                  <span v-if="item.error" class="min-w-0 flex-1 truncate text-destructive">{{ item.error }}</span>
+                  <RouterLink
+                    v-if="item.quotaExceeded"
+                    :to="item.groupId ? { name: 'groups', params: { id: item.groupId }, hash: '#storage' } : { name: 'groups' }"
+                    class="shrink-0 text-xs font-medium text-primary hover:underline"
+                  >
+                    View group quota
+                  </RouterLink>
+                  <Button
+                    v-if="item.state === 'error' || item.state === 'canceled'"
+                    variant="ghost"
+                    size="sm"
+                    class="h-6 shrink-0 px-2"
+                    @click="queue.retry(item)"
+                  >
+                    Retry
+                  </Button>
+                </template>
               </div>
+              <p class="text-[11px] text-muted-foreground">Uploads continue while you navigate the portal; closing the tab aborts them.</p>
             </div>
 
             <div
