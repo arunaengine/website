@@ -498,6 +498,36 @@ export interface StageBlobResponse {
   last_modified?: string | null
 }
 
+// ---------------------------------------------------------------------------
+// Staging jobs — arunaengine/aruna#276 ("staging jobs get a side panel").
+// POST /staging/ is synchronous and today's backend keeps NO job registry;
+// the types below document the assumed listing contract so the panel flips
+// on trivially once it ships:
+//   GET /staging/jobs -> 200 ListStagingJobsResponse
+// Callers MUST gate on featureEnabled('stagingJobs'); the flag ships off.
+// ---------------------------------------------------------------------------
+export type StagingJobState = 'queued' | 'running' | 'done' | 'failed'
+
+export interface StagingJob {
+  job_id: string
+  strategy: StagingStrategy
+  group_id: string
+  connector_id: string
+  source_path: string
+  bucket: string
+  key: string
+  state: StagingJobState
+  submitted_at: string
+  finished_at?: string | null
+  error?: string | null
+  version_id?: string | null
+  size?: number | null
+}
+
+export interface ListStagingJobsResponse {
+  jobs: StagingJob[]
+}
+
 // The backend deserializes CreateMetadataRequest as an untagged enum with
 // deny_unknown_fields, so a request must match exactly one variant shape.
 export interface CreateMetadataScaffoldRequest {

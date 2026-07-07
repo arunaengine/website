@@ -20,6 +20,7 @@ import {
   type ListMetadataResponse,
   type ListS3CredentialsResponse,
   type ListSourceConnectorsResponse,
+  type ListStagingJobsResponse,
   type StageBlobResponse,
   type StageBlobSubmission,
   type MetadataDocumentListItem,
@@ -400,6 +401,13 @@ async function listGroupConnectors(groupId: string): Promise<ListSourceConnector
 // callers must show a running state. The axum route is literally "/staging/".
 async function stageBlob(input: StageBlobSubmission): Promise<StageBlobResponse> {
   return request<StageBlobResponse>('/staging/', { method: 'POST', body: JSON.stringify(input) })
+}
+
+// STUB against the assumed #276 job registry (see api.ts). On today's backends
+// this 404s; callers gate on featureEnabled('stagingJobs') and treat 404/405 as
+// "backend does not keep a staging job registry yet".
+async function listStagingJobs(): Promise<ListStagingJobsResponse> {
+  return request<ListStagingJobsResponse>('/staging/jobs')
 }
 
 async function revokeS3Credential(accessKeyId: string): Promise<void> {
@@ -914,6 +922,7 @@ export function useAruna() {
     createS3Credentials,
     listGroupConnectors,
     stageBlob,
+    listStagingJobs,
     revokeS3Credential,
     listGroupMembers,
     addGroupMember,

@@ -14,10 +14,13 @@ import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
+import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3, s3ErrorMessage, isS3AuthError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { useUploadQueue } from '@/composables/useUploadQueue'
+import { useStaging } from '@/composables/useStaging'
+import { featureEnabled } from '@/lib/config'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { UsageResponse } from '@/lib/api'
 import { buildCrateReferenceIndex, type CrateObjectReference } from '@/lib/crateReferences'
@@ -74,6 +77,12 @@ const keyTail = computed(() => s3.activeKey.value?.accessKeyId.slice(-4) ?? '')
 const queue = useUploadQueue()
 const dragActive = ref(false)
 const addDataOpen = ref(false)
+
+// Staging jobs side panel: config-gated (no job-listing endpoint on today's
+// backends). Flag off ⇒ no toolbar button, no panel, no /staging/jobs request.
+const staging = useStaging()
+const stagingJobsEnabled = featureEnabled('stagingJobs')
+const stagingPanelOpen = ref(false)
 
 // A finished upload into the current bucket refreshes the listing; completions
 // in other buckets are ignored (the queue is global).
@@ -455,6 +464,10 @@ function objectRefs(object: ObjectEntry): CrateObjectReference[] {
               </div>
               <div class="flex items-center gap-2">
                 <Button variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
+                <Button v-if="stagingJobsEnabled" variant="outline" size="sm" @click="stagingPanelOpen = true">
+                  Staging
+                  <Badge v-if="staging.runningCount.value" variant="secondary" class="ml-1">{{ staging.runningCount.value }}</Badge>
+                </Button>
                 <Button size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>
             </div>
@@ -595,6 +608,8 @@ function objectRefs(object: ObjectEntry): CrateObjectReference[] {
     </div>
 
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />
+
+    <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />
 
     <Dialog :open="newFolderOpen" @update:open="(v: boolean) => (newFolderOpen = v)">
       <DialogContent class="max-w-sm">
