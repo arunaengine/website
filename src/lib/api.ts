@@ -683,3 +683,47 @@ export interface OnboardingSecretSummary {
 export interface ListOnboardingSecretsResponse {
   secrets: OnboardingSecretSummary[]
 }
+
+// --- User devices (aruna#271) -----------------------------------------------
+// ASSUMED API — NOT yet provided by the backend (aruna#271; self-service
+// enrollment is gated on the aruna#272 security guard). Shapes are a
+// user-scoped sibling of the admin onboarding surface
+// (/admin/onboarding/secrets): unix-second timestamps, ULID enrollment ids,
+// a one-time secret carried exactly once, and a `{ devices: [...] }` list
+// wrapper. The 'user' node kind and quota.max_devices_per_user already exist on
+// the backend (RealmNodeInfo.kind / RealmQuotaConfig above); only these
+// self-service endpoints are missing. All consumers are gated behind
+// featureEnabled('deviceEnrollment').
+
+export interface UserDevice {
+  enrollment_id: string // ULID; stable across pending → claimed
+  device_name: string | null
+  // iroh node id once the device redeemed its token (matches
+  // RealmNodeInfo.node_id for kind 'user'); null while pending.
+  node_id: string | null
+  created_at: number // unix seconds
+  // Pending-token expiry (unix seconds); null once claimed.
+  expires_at: number | null
+}
+
+export interface ListUserDevicesResponse {
+  devices: UserDevice[]
+}
+
+export interface EnrollUserDeviceRequest {
+  // Origin-style URL of a realm node reachable from the device; the device
+  // calls {seed_url}/api/v1/onboarding/bootstrap — never include /api/v1
+  // (same semantics as CreateOnboardingSecretRequest.seed_url).
+  seed_url: string
+  device_name?: string
+  // Mirrors the admin clamp 60..86400 seconds, default 3600.
+  expires_in_seconds?: number
+}
+
+export interface EnrollUserDeviceResponse {
+  // One-time device token; the server keeps only a hash (sibling of
+  // CreateOnboardingSecretResponse.onboarding_secret).
+  onboarding_secret: string
+  enrollment_id: string
+  expires_at: number // unix seconds
+}
