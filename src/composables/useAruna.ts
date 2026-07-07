@@ -495,13 +495,13 @@ async function searchMetadata(
   return request<MetadataSearchResponse>('/metadata/search', {
     query: {
       q: query,
-      // Backend clamps to 1..=250 (default 25); the portal additionally
-      // respects the aruna#258 page cap of 100 hits per page.
+      // Backend defaults to 25 and clamps 1..=100 (verified in aruna
+      // operations/src/metadata/search_cursor.rs); mirror the clamp here.
       limit: Math.min(Math.max(options.limit ?? 25, 1), 100),
-      // Forward-compatible aruna#258 param. Only callers gated behind
-      // featureEnabled('searchCursor') pass it; today's backend has no such
-      // parameter (axum Query ignores unknown params, but we never send it
-      // unless the flag is on).
+      // Query-bound cursor (aruna#258, served since 9ae6bd68): the backend binds
+      // it to the query and rejects a mismatched/expired cursor with 400
+      // InvalidCursor. Only callers gated behind featureEnabled('searchCursor')
+      // pass it; apiRequest drops undefined, so it is absent otherwise.
       cursor: options.cursor,
     },
     signal: options.signal,

@@ -364,14 +364,18 @@ export interface ReplaceMetadataRoCrateRequest {
   public?: boolean
 }
 
-// GET /metadata/search — verified against aruna api/src/routes/metadata.rs.
-// The backend accepts only q, limit (default 25, clamped 1..=250) and
-// mode=local|distributed; hits are deduplicated per document and ordered by
-// descending score; nodes_failed > 0 marks a partial result.
-// `title`, `snippet`, `partial`, `failed_nodes` and `next_cursor` are NOT
-// served yet — they are the forward-compatible fields proposed in aruna#258
-// (opaque cursor bound to the query, score ordering, page cap 100) and stay
-// optional so today's responses type-check unchanged.
+// GET /metadata/search — verified against aruna api/src/routes/metadata.rs and
+// operations/src/metadata/{api.rs,search_cursor.rs} (aruna 9ae6bd68).
+// Contract: `q` is required and non-empty (empty ⇒ 400); `limit` defaults to 25
+// and is clamped 1..=100 (METADATA_SEARCH_MAX_PAGE_SIZE); `mode=local|distributed`.
+// `cursor` is an accepted, query-bound opaque token — a cursor whose fingerprint
+// does not match the query is rejected with 400 InvalidCursor (never 409/410).
+// Hits are ordered by descending score and deduplicated server-side per
+// (graph_iri, subject_iri), so one document may span multiple hits. `title` is
+// always served (schema:name with subject/path fallback); `snippet` is optional;
+// `next_cursor` is served for cursor paging. Only `partial` and `failed_nodes`
+// remain aruna#258 forward-compat (not served yet). Enrichment fields stay
+// optional client-side so older deployed nodes still type-check.
 export interface MetadataSearchHit {
   document_id: string
   group_id: string
@@ -379,7 +383,8 @@ export interface MetadataSearchHit {
   graph_iri: string
   subject_iri: string
   score: number
-  // aruna#258 server-side enrichment (not served yet)
+  // Server-side enrichment: `title` always served, `snippet` optional; kept
+  // optional here to tolerate older nodes that predate aruna 9ae6bd68.
   title?: string | null
   snippet?: string | null
 }
@@ -390,9 +395,10 @@ export interface MetadataSearchResponse {
   nodes_queried: number
   /** Node partitions that failed or timed out; > 0 ⇒ partial. Served today. */
   nodes_failed: number
-  // aruna#258 forward-compatible fields (not served yet)
+  // partial/failed_nodes remain aruna#258 forward-compat (not served yet).
   partial?: boolean
   failed_nodes?: string[]
+  /** Query-bound cursor for the next page; served for cursor paging (aruna 9ae6bd68). */
   next_cursor?: string | null
 }
 

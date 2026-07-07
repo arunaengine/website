@@ -59,10 +59,16 @@ const sparqlResult = ref<SparqlResult | null>(null)
 const sparqlError = ref<string | null>(null)
 const running = ref(false)
 
-watch(q, (next) => router.replace({ query: { ...route.query, q: next || undefined } }))
-watch(profileFilter, (next) => router.replace({ query: { ...route.query, profile: next || undefined } }))
-watch(groupFilter, (next) => router.replace({ query: { ...route.query, group: next || undefined } }))
-watch(expertMode, (next) => router.replace({ query: { ...route.query, expert: next ? '1' : undefined } }))
+// One watcher builds the whole query from the refs. Spreading route.query in a
+// per-ref watcher re-applies a stale value when two refs change in the same tick
+// (e.g. clearFilters): vue-router only updates route.query after the async
+// navigation settles, so the second replace would resurrect a param the first
+// meant to drop.
+watch([q, profileFilter, groupFilter, expertMode], ([nq, np, ng, ne]) =>
+  router.replace({
+    query: { ...route.query, q: nq || undefined, profile: np || undefined, group: ng || undefined, expert: ne ? '1' : undefined },
+  }),
+)
 
 const PAGE_SIZE = 12
 const page = ref(1)
@@ -215,11 +221,13 @@ async function runQuery() {
             <Button variant="outline" size="sm" class="ml-auto" @click="retrySearch">Retry</Button>
           </div>
 
-          <section v-if="searchPending && !searchResults.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ErrorPanel v-if="searchError" :message="searchError" @retry="retrySearch" />
+
+          <!-- Skeletons cover the debounce window too (!searched), so the area
+               never goes blank between the filter surface and the footer. -->
+          <section v-else-if="(searchPending || !searched) && !searchResults.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Skeleton v-for="n in 6" :key="n" class="h-36" />
           </section>
-
-          <ErrorPanel v-else-if="searchError" :message="searchError" @retry="retrySearch" />
 
           <section v-else-if="visibleResults.length">
             <div class="mb-3 flex items-center gap-2">
@@ -277,7 +285,7 @@ async function runQuery() {
                 <Button variant="outline" size="sm" @click="loadMore">Try again</Button>
               </div>
               <!-- IntersectionObserver sentinel (observed by useMetadataSearch). -->
-              <div v-if="nextCursor" ref="sentinel" class="h-1" aria-hidden="true" />
+              <div v-if="nextCursor && !moreError" ref="sentinel" class="h-1" aria-hidden="true" />
               <p v-else class="py-2 text-center text-[11px] text-muted-foreground">End of results.</p>
             </template>
             <p v-else-if="capped" class="py-2 text-center text-[11px] text-muted-foreground">
@@ -286,7 +294,7 @@ async function runQuery() {
           </section>
 
           <EmptyState
-            v-else-if="searched && !searchPending"
+            v-else
             :title="searchResults.length ? 'No matches after filters' : 'No matches'"
             :description="searchResults.length
               ? 'Results were hidden by the active group, profile or favourites filters.'

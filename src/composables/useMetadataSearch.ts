@@ -27,6 +27,18 @@ export interface SearchResultLine {
   snippet: string | null
 }
 
+// The backend deduplicates hits per (graph_iri, subject_iri) with score-desc
+// ordering, so a single document can surface as several hits within one page
+// and across pages. The portal renders one card per document, so collapse by
+// document_id everywhere; first occurrence wins, which — given the server's
+// score-desc order — keeps the highest-scoring hit for each document.
+function dedupeByDocument(
+  list: MetadataSearchHit[],
+  seen = new Set<string>(),
+): MetadataSearchHit[] {
+  return list.filter((hit) => (seen.has(hit.document_id) ? false : (seen.add(hit.document_id), true)))
+}
+
 export function useMetadataSearch(query: Ref<string>) {
   const { metadata, searchMetadata } = useAruna()
   const cursorEnabled = featureEnabled('searchCursor')
@@ -77,6 +89,10 @@ export function useMetadataSearch(query: Ref<string>) {
   // The query the current cursor was issued for. aruna#258 binds the opaque
   // cursor to the query, so it is only ever valid for exactly this string.
   let cursorQuery = ''
+  // The query we have already transparently restarted once after a cursor
+  // rejection. A second rejection for the same query surfaces the error instead
+  // of looping (restart → sentinel remount → loadMore → reject → …).
+  let restartedFor = ''
 
   function reset() {
     hits.value = []
@@ -111,7 +127,7 @@ export function useMetadataSearch(query: Ref<string>) {
     try {
       const response = await searchMetadata(term, { limit: pageSize, signal: controller.signal })
       if (mySeq !== seq) return // superseded
-      hits.value = response.hits
+      hits.value = dedupeByDocument(response.hits)
       cursorQuery = term
       applyMeta(response)
       searched.value = true
@@ -140,23 +156,33 @@ export function useMetadataSearch(query: Ref<string>) {
     try {
       const response = await searchMetadata(term, { limit: pageSize, cursor })
       if (mySeq !== seq) return
-      // Defensive dedup across pages; the server already dedups within one.
+      // Collapse per document across pages (see dedupeByDocument): the server
+      // dedups per (graph_iri, subject_iri), so a later page can repeat a
+      // document already shown from an earlier one.
       const known = new Set(hits.value.map((hit) => hit.document_id))
-      hits.value = [...hits.value, ...response.hits.filter((hit) => !known.has(hit.document_id))]
+      hits.value = [...hits.value, ...dedupeByDocument(response.hits, known)]
       applyMeta(response)
+      restartedFor = ''
     } catch (err) {
       if (mySeq !== seq) return
-      if (err instanceof ApiError && [400, 409, 410].includes(err.status)) {
+      if (err instanceof ApiError && [400, 409, 410].includes(err.status) && restartedFor !== term) {
         // Server rejected the cursor (query changed / cursor expired, per the
-        // aruna#258 contract): restart transparently from the first page.
+        // aruna#258 contract): restart transparently from the first page — but
+        // only once per query. A backend that keeps rejecting falls through to
+        // moreError below instead of looping (restart → sentinel → loadMore → …).
+        restartedFor = term
         nextCursor.value = null
         void runSearch(term)
       } else {
-        // A failed "more" page must not wipe already-rendered results.
+        // A failed "more" page (or a repeated cursor rejection) must not wipe
+        // already-rendered results; surface it via the manual "Try again".
         moreError.value = err instanceof Error ? err.message : String(err)
       }
     } finally {
-      if (mySeq === seq) loadingMore.value = false
+      // Unconditional: loadMore is the only writer and re-entry is blocked by its
+      // own guard, so even a superseded flight must release the lock — otherwise
+      // the guard wedges and pagination stalls forever (review #258 F1).
+      loadingMore.value = false
     }
   }
 
