@@ -13,6 +13,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
+import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3, s3ErrorMessage, isS3AuthError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
@@ -35,7 +36,6 @@ import {
   RefreshCw,
   ShieldAlert,
   Trash2,
-  Upload,
 } from '@lucide/vue'
 
 const route = useRoute()
@@ -72,8 +72,8 @@ const keyTail = computed(() => s3.activeKey.value?.accessKeyId.slice(-4) ?? '')
 // Uploads live in a module-singleton queue so they keep running (with progress,
 // cancel and retry) while the user navigates away from this view.
 const queue = useUploadQueue()
-const fileInput = ref<HTMLInputElement | null>(null)
 const dragActive = ref(false)
+const addDataOpen = ref(false)
 
 // A finished upload into the current bucket refreshes the listing; completions
 // in other buckets are ignored (the queue is global).
@@ -226,16 +226,6 @@ async function createFolder() {
   } finally {
     newFolderBusy.value = false
   }
-}
-
-function pickFiles() {
-  fileInput.value?.click()
-}
-
-function onFileInput(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (input.files?.length) void requestUpload(Array.from(input.files))
-  input.value = ''
 }
 
 function onDrop(event: DragEvent) {
@@ -464,9 +454,8 @@ function objectRefs(object: ObjectEntry): CrateObjectReference[] {
                 <Loader2 v-if="listLoading" class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
               </div>
               <div class="flex items-center gap-2">
-                <input ref="fileInput" type="file" multiple class="hidden" @change="onFileInput" />
                 <Button variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
-                <Button size="sm" @click="pickFiles"><Upload class="h-4 w-4" /> Upload</Button>
+                <Button size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>
             </div>
 
@@ -591,6 +580,15 @@ function objectRefs(object: ObjectEntry): CrateObjectReference[] {
                 <Button variant="ghost" size="sm" :disabled="listLoading" @click="loadObjects(true)">Load more</Button>
               </div>
             </div>
+
+            <AddDataDialog
+              v-model:open="addDataOpen"
+              :bucket="bucket"
+              :prefix="s3Prefix"
+              :group-id="activeGroupId"
+              @upload="(files) => void requestUpload(files)"
+              @staged="() => void loadObjects()"
+            />
           </template>
         </div>
       </section>
