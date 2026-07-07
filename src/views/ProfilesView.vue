@@ -221,7 +221,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                   <span>{{ selected.domain }}</span>
                   <span v-if="selected.managed" class="inline-flex items-center gap-1"><Lock class="h-3 w-3" /> public</span>
                 </div>
-                <h1 class="mt-1 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ selected.name }}</h1>
+                <h2 class="mt-1 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ selected.name }}</h2>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">{{ selected.description || 'No description in RO-Crate.' }}</p>
               </div>
             </div>

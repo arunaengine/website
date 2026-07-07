@@ -340,7 +340,7 @@ function entitySize(row: DataEntityRow): string {
                 :error-count="conformance.errorCount"
                 :warning-count="conformance.warningCount"
               />
-              <h1 class="mt-3 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ current.title }}</h1>
+              <h2 class="mt-3 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ current.title }}</h2>
               <p class="mt-3 max-w-3xl text-sm leading-relaxed text-foreground/85">{{ current.description || 'No description in RO-Crate summary.' }}</p>
               <div class="mt-4 flex flex-wrap gap-1.5">
                 <span v-for="keyword in current.keywords" :key="keyword" class="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-foreground/80">#{{ keyword }}</span>
@@ -406,7 +406,7 @@ function entitySize(row: DataEntityRow): string {
       <article v-else-if="docState === 'found' && fetchedSummary" class="surface p-6">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0 flex-1">
-            <h1 class="break-all font-display text-xl font-semibold tracking-tight text-aruna-navy">{{ fetchedSummary.document_path }}</h1>
+            <h2 class="break-all font-display text-xl font-semibold tracking-tight text-aruna-navy">{{ fetchedSummary.document_path }}</h2>
             <p class="mt-2 text-sm text-muted-foreground">Showing this document's registry summary; it is not in the catalog listing yet.</p>
           </div>
           <Badge :variant="fetchedSummary.public ? 'success' : 'secondary'" class="text-[10px] uppercase">{{ fetchedSummary.public ? 'public' : 'private' }}</Badge>
