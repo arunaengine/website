@@ -12,7 +12,7 @@ import JoinRequestsInbox from '@/components/groups/JoinRequestsInbox.vue'
 import UsageHistoryChart from '@/components/groups/UsageHistoryChart.vue'
 import StrategyEditor from '@/components/placement/StrategyEditor.vue'
 import GroupPlacementMap from '@/components/placement/GroupPlacementMap.vue'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, toRaw, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { ChartArea, FileJson2, HardDrive, Inbox, LogOut, MapPinned, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
@@ -144,6 +144,9 @@ const strategyDirty = computed(
 )
 
 function resetPlacementState() {
+  // Bump the sequence first so any loadPlacement/saveStrategy still in flight for
+  // the previous group can no longer write into the just-cleared state.
+  placementSeq++
   strategyResp.value = null
   strategyDraft.value = null
   strategyError.value = null
@@ -197,8 +200,12 @@ async function loadPlacement() {
 async function saveStrategy() {
   if (!strategyDraft.value || !strategyDirty.value || busy.value) return
   saveError.value = null
+  const seq = placementSeq
   try {
     const resp = await putGroupStrategy(props.groupId, strategyDraft.value)
+    // A group switch during the save bumps placementSeq (resetPlacementState);
+    // drop this stale response so we never write group A's strategy onto group B.
+    if (seq !== placementSeq) return
     strategyResp.value = resp
     strategyDraft.value = structuredClone(resp.strategy)
     // Refresh the computed map against the new strategy.
@@ -210,7 +217,9 @@ async function saveStrategy() {
 }
 
 function resetStrategy() {
-  if (strategyResp.value) strategyDraft.value = structuredClone(strategyResp.value.strategy)
+  // strategyResp is a ref, so .strategy is a reactive proxy — structuredClone a
+  // proxy throws DataCloneError; toRaw() hands back the plain object.
+  if (strategyResp.value) strategyDraft.value = structuredClone(toRaw(strategyResp.value.strategy))
   saveError.value = null
 }
 

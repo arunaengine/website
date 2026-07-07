@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, toRaw, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
@@ -114,7 +114,9 @@ async function saveDefaults() {
 }
 
 function resetDefaults() {
-  if (defaultsResp.value) defaultsDraft.value = structuredClone(defaultsResp.value.default_strategy)
+  // defaultsResp is a ref, so .default_strategy is a reactive proxy — cloning a
+  // proxy throws DataCloneError; toRaw() hands back the plain object.
+  if (defaultsResp.value) defaultsDraft.value = structuredClone(toRaw(defaultsResp.value.default_strategy))
   saveError.value = null
   saveMessage.value = null
 }

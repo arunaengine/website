@@ -50,6 +50,19 @@ const spreadNote = computed(
     props.modelValue.replica_count > props.knownLocations.length,
 )
 
+// Chips iterate the union of the realm's known locations and any locations the
+// strategy already pins. A pin for a location the realm no longer reports would
+// otherwise render nowhere, so the admin could neither see nor unpin it.
+const chipLocations = computed(() =>
+  [...new Set([...props.knownLocations, ...locationPins(props.modelValue.affinity)])].sort((a, b) =>
+    a.localeCompare(b),
+  ),
+)
+const knownSet = computed(() => new Set(props.knownLocations))
+function badgeClass(location: string): string {
+  return knownSet.value.has(location) ? 'gap-1' : 'gap-1 opacity-70 ring-1 ring-inset ring-amber-400/60'
+}
+
 const pinned = computed(() => new Set(locationPins(props.modelValue.affinity)))
 function togglePin(location: string) {
   const next = new Set(pinned.value)
@@ -99,17 +112,18 @@ function ruleLabel(rule: PlacementStrategyConfig['affinity'][number]): string {
 
     <div>
       <div class="text-xs font-medium text-foreground">Location pins</div>
-      <div v-if="knownLocations.length" class="mt-1.5 flex flex-wrap gap-1.5">
+      <div v-if="chipLocations.length" class="mt-1.5 flex flex-wrap gap-1.5">
         <button
-          v-for="location in knownLocations"
+          v-for="location in chipLocations"
           :key="location"
           type="button"
           :disabled="disabled"
           :aria-pressed="pinned.has(location)"
+          :title="knownSet.has(location) ? undefined : 'Location not currently reported by the realm'"
           class="disabled:cursor-not-allowed disabled:opacity-60"
           @click="togglePin(location)"
         >
-          <Badge :variant="pinned.has(location) ? 'default' : 'outline'" class="gap-1">
+          <Badge :variant="pinned.has(location) ? 'default' : 'outline'" :class="badgeClass(location)">
             <Pin class="h-3 w-3" />
             {{ location }}
           </Badge>
