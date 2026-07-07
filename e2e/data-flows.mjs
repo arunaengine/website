@@ -164,6 +164,16 @@ try {
   await page.waitForTimeout(2000)
   step('dataset deleted and removed from Discover', !(await page.textContent('body')).includes('Coral genome assembly'))
 
+  // Join requests (aruna#248) are config-gated OFF by default: with no
+  // features.joinRequests flag, no join UI renders on the groups page.
+  await page.goto(BASE + '/app/groups')
+  await page.waitForTimeout(1500)
+  const groupsBody = await page.textContent('body')
+  step(
+    'join requests hidden while feature flag is off',
+    !groupsBody.includes('Request to join') && !groupsBody.includes('Your join requests'),
+  )
+
   // The only tolerated console error is the known API projection-race 500 on
   // GET /metadata, which the portal retries and recovers from.
   const unexpected = consoleErrors.filter(
