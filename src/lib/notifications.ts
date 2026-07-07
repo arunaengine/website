@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import { Bell, Check, FileJson2, HardDrive, Inbox, Upload, UserMinus, UserPlus, Users } from '@lucide/vue'
+import { AlertTriangle, Ban, Bell, Check, FileJson2, HardDrive, Inbox, Upload, UserMinus, UserPlus, Users } from '@lucide/vue'
 import type { ApiNotification } from '@/lib/api'
 import { formatBytes, truncateMiddle } from '@/lib/utils'
 
@@ -114,6 +114,37 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     title: (n, ctx) => `Your join request for ${groupLabel(n, ctx)} was reviewed`,
     detail: () => undefined,
     link: () => ({ name: 'groups', hash: '#join-requests' }),
+  },
+  // ── Quota state (aruna#250) ─────────────────────────────────────────────────
+  // NOT emitted by any backend yet. Two spellings covered: the backend's
+  // snake_case NotificationKind::name() convention (quota_warned/quota_blocked)
+  // and the dotted names from the issue text (quota.warned/quota.blocked).
+  // Static entries (not wrapped in featureEnabled): a kind that can only arrive
+  // once the backend emits it is inert until then. Both deep-link to the
+  // group's #storage section (anchor added in the quota-reporting UI).
+  quota_warned: {
+    icon: AlertTriangle,
+    title: (n, ctx) => `Storage nearing quota for ${groupLabel(n, ctx)}`,
+    detail: () => undefined,
+    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+  },
+  quota_blocked: {
+    icon: Ban,
+    title: (n, ctx) => `Storage quota exceeded for ${groupLabel(n, ctx)}`,
+    detail: () => 'Uploads are blocked until storage is freed or the quota is raised.',
+    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+  },
+  'quota.warned': {
+    icon: AlertTriangle,
+    title: (n, ctx) => `Storage nearing quota for ${groupLabel(n, ctx)}`,
+    detail: () => undefined,
+    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+  },
+  'quota.blocked': {
+    icon: Ban,
+    title: (n, ctx) => `Storage quota exceeded for ${groupLabel(n, ctx)}`,
+    detail: () => 'Uploads are blocked until storage is freed or the quota is raised.',
+    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
   },
 }
 
