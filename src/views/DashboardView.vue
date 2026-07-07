@@ -2,6 +2,7 @@
 import Button from '@/components/ui/Button.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
+import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import StatCard from '@/components/ui/StatCard.vue'
@@ -13,7 +14,7 @@ import { useAruna } from '@/composables/useAruna'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, nodes, groups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh } = useAruna()
+const { currentUser, metadata, profiles, nodes, groups, myGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh } = useAruna()
 const showNewDataset = ref(false)
 
 const onlineNodes = computed(() => nodes.value.filter((node) => node.status === 'healthy').length)
@@ -114,6 +115,10 @@ const pageDescription = computed(() =>
           :value="formatNumber(usageInfo.buckets)"
           :icon="FolderOpen"
         />
+      </section>
+
+      <section v-if="currentUser && myGroups.length">
+        <GroupQuotaCards />
       </section>
 
       <section class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
