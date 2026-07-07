@@ -4,28 +4,57 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogFooter from '@/components/ui/DialogFooter.vue'
+import DialogClose from '@/components/ui/DialogClose.vue'
 import { computed, ref, watch } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
-import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil } from '@lucide/vue'
+import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil, Trash2 } from '@lucide/vue'
 
 const route = useRoute()
+const router = useRouter()
 const {
   metadata,
+  metadataItems,
   profiles,
   currentUser,
   userInfo,
   bootstrapped,
+  saving,
   loadRoCrate,
   loadMetadata,
   getMetadataDocument,
+  deleteMetadataDocument,
   fullCrates,
   cratePending,
 } = useAruna()
 
 const showEdit = ref(false)
+const showDelete = ref(false)
+const deleteError = ref<string | null>(null)
+// The document's S3 key path, for the delete confirmation copy.
+const currentPath = computed(
+  () => metadataItems.value.find((i) => i.document_id === detailId.value)?.document_path ?? fetchedSummary.value?.document_path ?? '',
+)
+
+async function confirmDelete() {
+  if (!current.value) return
+  deleteError.value = null
+  try {
+    await deleteMetadataDocument(current.value.ulid)
+    showDelete.value = false
+    router.push({ name: 'search' })
+  } catch (err) {
+    deleteError.value = err instanceof Error ? err.message : String(err)
+  }
+}
 // The owning group_id is the document's realmId (see mapMetadataDoc). Membership
 // is a UI heuristic; the backend still enforces write permission (a 403 surfaces
 // inside the edit dialog).
@@ -156,6 +185,7 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
     >
       <template #actions>
         <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
+        <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
         <RouterLink :to="{ name: 'search' }">
           <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Discover</Button>
         </RouterLink>
@@ -295,5 +325,22 @@ const referencedFiles = computed<Array<{ id: string; name: string }>>(() => {
     </div>
 
     <EditMetadataDialog v-if="current" v-model:open="showEdit" :document-id="current.ulid" @saved="onSaved" />
+
+    <Dialog :open="showDelete" @update:open="(v: boolean) => (showDelete = v)">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete metadata document</DialogTitle>
+          <DialogDescription>
+            Deletes <span class="font-medium text-foreground">{{ current?.title }}</span>
+            (<span class="font-mono text-xs">{{ currentPath }}</span>) and its graph from the catalog. This removes only the RO-Crate metadata; any S3 objects it references are not touched.
+          </DialogDescription>
+        </DialogHeader>
+        <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
+        <DialogFooter>
+          <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+          <Button variant="destructive" :disabled="saving" @click="confirmDelete">{{ saving ? 'Deleting…' : 'Delete' }}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
