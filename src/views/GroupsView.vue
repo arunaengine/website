@@ -5,6 +5,7 @@ import Badge from '@/components/ui/Badge.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import GroupDetail from '@/components/groups/GroupDetail.vue'
+import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRoute } from 'vue-router'
 import { computed, ref, watch } from 'vue'
@@ -103,18 +104,23 @@ const description = computed(() =>
         </header>
         <ul class="divide-y divide-border">
           <li v-for="group in discoverableGroups" :key="group.id">
-            <button
-              type="button"
-              class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40"
-              :class="selectedGroupId === group.id ? 'bg-muted/30' : ''"
-              @click="toggleGroup(group.id)"
-            >
-              <span class="h-2 w-2 shrink-0 rounded-full bg-border" />
-              <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div>
-                <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div>
+            <div class="flex items-center">
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40"
+                :class="selectedGroupId === group.id ? 'bg-muted/30' : ''"
+                @click="toggleGroup(group.id)"
+              >
+                <span class="h-2 w-2 shrink-0 rounded-full bg-border" />
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div>
+                  <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div>
+                </div>
+              </button>
+              <div class="shrink-0 pr-5">
+                <JoinRequestButton :group-id="group.id" :group-name="group.name" />
               </div>
-            </button>
+            </div>
             <div v-if="selectedGroupId === group.id" class="border-t border-border bg-muted/10 p-4">
               <GroupDetail :group-id="group.id" />
             </div>

@@ -4,6 +4,7 @@ import Badge from '@/components/ui/Badge.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
+import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { FileJson2, HardDrive, LogOut, ShieldCheck, Users } from '@lucide/vue'
@@ -122,6 +123,7 @@ async function leave() {
         <Button v-if="isMember" variant="outline" size="sm" :disabled="saving" @click="leave">
           <LogOut class="h-3.5 w-3.5" /> Leave group
         </Button>
+        <JoinRequestButton v-if="group" :group-id="group.group_id" :group-name="group.display_name" />
       </header>
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
 
