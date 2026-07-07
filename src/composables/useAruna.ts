@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { Group, MetadataDoc, MetadataProfile, Node, Realm, SparqlResult, User } from '@/data/types'
+import type { Group, MetadataDoc, MetadataProfile, Node, Realm, User } from '@/data/types'
 import {
   ApiError,
   apiRequest,
@@ -466,30 +466,6 @@ async function searchUsers(q: string, limit = 20): Promise<UserSearchResponse> {
   return request<UserSearchResponse>('/users/search', { query: { q, limit } })
 }
 
-async function runSparql(query: string): Promise<SparqlResult> {
-  const started = performance.now()
-  const result = await request<SparqlResponse>('/metadata/sparql/query', {
-    method: 'POST',
-    body: JSON.stringify({ query }),
-  })
-  if (result.kind === 'Boolean') {
-    return {
-      columns: ['value'],
-      rows: [{ value: String(result.value) }],
-      tookMs: Math.max(1, Math.round(performance.now() - started)),
-      totalRows: 1,
-    }
-  }
-  const rows = Array.isArray(result.value) ? result.value : []
-  const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))))
-  return {
-    columns,
-    rows,
-    tookMs: Math.max(1, Math.round(performance.now() - started)),
-    totalRows: rows.length,
-  }
-}
-
 // Raw, typed SPARQL execution. scope.documentId switches to the
 // document-scoped endpoint; visibility filtering is server-side, so this
 // works signed out (public graphs only). No `saving` guard: read-only.
@@ -929,7 +905,6 @@ export function useAruna() {
     createGroupRole,
     deleteGroupRole,
     searchUsers,
-    runSparql,
     runSparqlQuery,
     searchMetadata,
     setAuthToken,

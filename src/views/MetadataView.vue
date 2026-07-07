@@ -18,7 +18,7 @@ import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useArun
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil, Trash2, Star } from '@lucide/vue'
+import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil, SquareTerminal, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -292,6 +292,9 @@ function entitySize(row: DataEntityRow): string {
         >
           <Star class="h-4 w-4" :class="isFav ? 'text-amber-500' : ''" :fill="isFav ? 'currentColor' : 'none'" />
         </Button>
+        <RouterLink v-if="detailId" :to="{ name: 'query', query: { document: detailId } }">
+          <Button variant="outline"><SquareTerminal class="h-4 w-4" /> Query</Button>
+        </RouterLink>
         <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
         <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
         <RouterLink :to="{ name: 'search' }">
