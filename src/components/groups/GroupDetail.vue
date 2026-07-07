@@ -10,19 +10,26 @@ import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
 import JoinRequestsInbox from '@/components/groups/JoinRequestsInbox.vue'
 import UsageHistoryChart from '@/components/groups/UsageHistoryChart.vue'
+import StrategyEditor from '@/components/placement/StrategyEditor.vue'
+import GroupPlacementMap from '@/components/placement/GroupPlacementMap.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { ChartArea, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
+import { ChartArea, FileJson2, HardDrive, Inbox, LogOut, MapPinned, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
+import { isPlacementUnsupported, usePlacement } from '@/composables/usePlacement'
 import { assessQuota, quotaCountedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
+import { knownLocations as computeKnownLocations } from '@/lib/placement'
 import { featureEnabled } from '@/lib/config'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import {
   ApiError,
   type GroupDetailResponse,
   type GroupMember,
+  type GroupPlacementResponse,
+  type GroupPlacementStrategyResponse,
   type MetadataDocumentListItem,
+  type PlacementStrategyConfig,
   type UsageHistoryPoint,
   type UsageResponse,
 } from '@/lib/api'
@@ -30,8 +37,9 @@ import {
 const props = defineProps<{ groupId: string }>()
 const emit = defineEmits<{ (e: 'left'): void }>()
 
-const { getGroup, getGroupUsage, getGroupUsageHistory, listGroupMembers, listGroupMetadata, leaveGroup, saving, currentUser } = useAruna()
+const { getGroup, getGroupUsage, getGroupUsageHistory, listGroupMembers, listGroupMetadata, leaveGroup, saving, currentUser, realmInfo } = useAruna()
 const { joinRequestsEnabled } = useJoinRequests()
+const { placementAdminEnabled, busy, getGroupStrategy, putGroupStrategy, getGroupPlacement } = usePlacement()
 const route = useRoute()
 
 // One-shot deep-link scroll to the storage section. Set per navigation (in the
@@ -110,12 +118,109 @@ const canManage = computed(() =>
   ),
 )
 
+// Placement administration (aruna#269), admin-only and gated: with the
+// placementAdmin flag off (the default) loadPlacement() short-circuits before
+// any fetch and the whole section is hidden. Strategy and computed map load
+// independently, so one failing never blanks the other.
+const knownLocations = computed(() => computeKnownLocations(realmInfo.value?.nodes ?? []))
+const strategyResp = ref<GroupPlacementStrategyResponse | null>(null)
+const strategyDraft = ref<PlacementStrategyConfig | null>(null)
+const strategyLoading = ref(false)
+const strategyError = ref<string | null>(null)
+const strategyUnsupported = ref(false)
+const saveError = ref<string | null>(null)
+const placementView = ref<GroupPlacementResponse | null>(null)
+const mapLoading = ref(false)
+const mapError = ref<string | null>(null)
+const mapUnsupported = ref(false)
+// Guards against out-of-order writes when the group changes (or a save-triggered
+// refresh overlaps) while a fetch is in flight: only the latest run writes state.
+let placementSeq = 0
+
+const strategyDirty = computed(
+  () =>
+    Boolean(strategyResp.value && strategyDraft.value) &&
+    JSON.stringify(strategyDraft.value) !== JSON.stringify(strategyResp.value?.strategy),
+)
+
+function resetPlacementState() {
+  strategyResp.value = null
+  strategyDraft.value = null
+  strategyError.value = null
+  strategyUnsupported.value = false
+  saveError.value = null
+  placementView.value = null
+  mapError.value = null
+  mapUnsupported.value = false
+}
+
+async function loadPlacement() {
+  if (!placementAdminEnabled.value || !canManage.value || !group.value) return
+  const seq = ++placementSeq
+  strategyLoading.value = true
+  strategyError.value = null
+  strategyUnsupported.value = false
+  saveError.value = null
+  try {
+    const resp = await getGroupStrategy(props.groupId)
+    if (seq !== placementSeq) return
+    strategyResp.value = resp
+    strategyDraft.value = structuredClone(resp.strategy)
+  } catch (err) {
+    if (seq !== placementSeq) return
+    strategyResp.value = null
+    strategyDraft.value = null
+    if (isPlacementUnsupported(err)) strategyUnsupported.value = true
+    else strategyError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    if (seq === placementSeq) strategyLoading.value = false
+  }
+
+  if (seq !== placementSeq) return
+  mapLoading.value = true
+  mapError.value = null
+  mapUnsupported.value = false
+  try {
+    const view = await getGroupPlacement(props.groupId)
+    if (seq !== placementSeq) return
+    placementView.value = view
+  } catch (err) {
+    if (seq !== placementSeq) return
+    placementView.value = null
+    if (isPlacementUnsupported(err)) mapUnsupported.value = true
+    else mapError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    if (seq === placementSeq) mapLoading.value = false
+  }
+}
+
+async function saveStrategy() {
+  if (!strategyDraft.value || !strategyDirty.value || busy.value) return
+  saveError.value = null
+  try {
+    const resp = await putGroupStrategy(props.groupId, strategyDraft.value)
+    strategyResp.value = resp
+    strategyDraft.value = structuredClone(resp.strategy)
+    // Refresh the computed map against the new strategy.
+    void loadPlacement()
+  } catch (err) {
+    // A 400 is the server's bounds message — render it verbatim, never paraphrase.
+    saveError.value = err instanceof ApiError ? err.message : err instanceof Error ? err.message : String(err)
+  }
+}
+
+function resetStrategy() {
+  if (strategyResp.value) strategyDraft.value = structuredClone(strategyResp.value.strategy)
+  saveError.value = null
+}
+
 async function reload() {
   loadingDetail.value = true
   loadError.value = null
   usage.value = null
   docs.value = null
   docsError.value = null
+  resetPlacementState()
   try {
     group.value = await getGroup(props.groupId)
     // Old backends have no per-group usage endpoint; a 404 just hides the block.
@@ -146,8 +251,9 @@ async function reload() {
   } finally {
     loadingDetail.value = false
   }
-  // Independent endpoint (aruna#250), gated; no-op when the flag is off.
+  // Independent endpoints (aruna#250 / aruna#269), gated; no-op when off.
   void loadHistory()
+  void loadPlacement()
   // The storage section renders only after getGroup + getGroupUsage resolve, so
   // the router's one-shot hash retry misses it (aruna#248 review F4). Scroll here
   // once per navigation; @changed reloads keep the flag consumed.
@@ -236,6 +342,62 @@ async function leave() {
           <p v-else-if="quotaAssessment.state === 'over-ceiling'" class="mt-1 text-[11px] text-destructive">
             The node is rejecting uploads for this group (QuotaExceeded). Free storage or ask a realm admin to raise the quota.
           </p>
+        </div>
+      </div>
+
+      <div
+        v-if="placementAdminEnabled && canManage && group"
+        id="placement"
+        class="scroll-mt-24 border-b border-border"
+      >
+        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
+          <MapPinned class="h-3.5 w-3.5 text-primary" />
+          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Placement</span>
+          <Badge v-if="strategyResp?.inherited" variant="outline" class="text-[10px] uppercase">inherited from realm</Badge>
+          <Badge v-else-if="strategyResp" variant="secondary" class="text-[10px] uppercase">group strategy</Badge>
+        </div>
+        <div class="space-y-4 px-5 py-3">
+          <template v-if="strategyLoading && !strategyDraft">
+            <Skeleton class="h-8" />
+            <Skeleton class="h-8" />
+          </template>
+          <div
+            v-else-if="strategyUnsupported"
+            class="rounded-md border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground"
+          >
+            This backend does not serve placement strategy endpoints yet (aruna#269).
+          </div>
+          <ErrorPanel v-else-if="strategyError" :message="strategyError" @retry="loadPlacement" />
+          <template v-else-if="strategyDraft">
+            <StrategyEditor v-model="strategyDraft" :known-locations="knownLocations" :disabled="busy" />
+            <p v-if="saveError" class="text-xs text-destructive">{{ saveError }}</p>
+            <div class="flex items-center gap-2">
+              <Button size="sm" :disabled="!strategyDirty || busy" @click="saveStrategy">Save strategy</Button>
+              <Button variant="ghost" size="sm" :disabled="!strategyDirty || busy" @click="resetStrategy">Reset</Button>
+            </div>
+            <p class="text-[11px] text-muted-foreground">
+              Changes are validated against realm policy and re-signed by a management node.
+            </p>
+          </template>
+
+          <div class="border-t border-border/70 pt-3">
+            <div class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Where this group’s data lives
+            </div>
+            <Skeleton v-if="mapLoading && !placementView" class="h-16" />
+            <div
+              v-else-if="mapUnsupported"
+              class="rounded-md border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground"
+            >
+              This backend does not compute per-group placement yet (aruna#269).
+            </div>
+            <p v-else-if="mapError" class="text-xs text-destructive">{{ mapError }}</p>
+            <EmptyState
+              v-else-if="!placementView || placementView.node_ids.length === 0"
+              title="No placement computed yet"
+            />
+            <GroupPlacementMap v-else :placement="placementView" :nodes="realmInfo?.nodes ?? []" />
+          </div>
         </div>
       </div>
 
