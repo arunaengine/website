@@ -2,29 +2,35 @@
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
+import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
 import JoinRequestsInbox from '@/components/groups/JoinRequestsInbox.vue'
+import UsageHistoryChart from '@/components/groups/UsageHistoryChart.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
+import { ChartArea, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { assessQuota, quotaCountedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
+import { featureEnabled } from '@/lib/config'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import {
   ApiError,
   type GroupDetailResponse,
   type GroupMember,
   type MetadataDocumentListItem,
+  type UsageHistoryPoint,
   type UsageResponse,
 } from '@/lib/api'
 
 const props = defineProps<{ groupId: string }>()
 const emit = defineEmits<{ (e: 'left'): void }>()
 
-const { getGroup, getGroupUsage, listGroupMembers, listGroupMetadata, leaveGroup, saving, currentUser } = useAruna()
+const { getGroup, getGroupUsage, getGroupUsageHistory, listGroupMembers, listGroupMetadata, leaveGroup, saving, currentUser } = useAruna()
 const { joinRequestsEnabled } = useJoinRequests()
 
 const DOC_LIMIT = 8
@@ -46,6 +52,40 @@ const quotaStatus = computed(() => usage.value?.quota ?? null)
 const usedBytes = computed(() => (usage.value ? quotaCountedBytes(usage.value) : 0))
 const quotaAssessment = computed(() => assessQuota(quotaStatus.value, usedBytes.value))
 const quotaBadge = computed(() => QUOTA_STATE_BADGES[quotaAssessment.value.state])
+
+// Usage history is gated off by default: the backend endpoint does not exist
+// yet (aruna#250). With the flag off, loadHistory() short-circuits before any
+// fetch and the whole section is hidden.
+const usageHistoryEnabled = featureEnabled('usageHistory')
+const historyRange = ref<'7d' | '30d' | '90d'>('30d')
+const historyPoints = ref<UsageHistoryPoint[] | null>(null)
+const historyLoading = ref(false)
+const historyError = ref<string | null>(null)
+const historyUnsupported = ref(false)
+
+async function loadHistory() {
+  if (!usageHistoryEnabled) return
+  historyLoading.value = true
+  historyError.value = null
+  historyUnsupported.value = false
+  const days = { '7d': 7, '30d': 30, '90d': 90 }[historyRange.value]
+  const to = new Date()
+  const from = new Date(to.getTime() - days * 86_400_000)
+  try {
+    const response = await getGroupUsageHistory(props.groupId, {
+      from: from.toISOString(),
+      to: to.toISOString(),
+      resolution: days === 7 ? 'hour' : 'day',
+    })
+    historyPoints.value = response.points
+  } catch (err) {
+    historyPoints.value = null
+    if (err instanceof ApiError && (err.status === 404 || err.status === 405)) historyUnsupported.value = true
+    else historyError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    historyLoading.value = false
+  }
+}
 
 const isMember = computed(() =>
   Boolean(group.value?.roles.some((role) => role.assigned_users?.includes(currentUser.value?.id ?? ''))),
@@ -94,9 +134,12 @@ async function reload() {
   } finally {
     loadingDetail.value = false
   }
+  // Independent endpoint (aruna#250), gated; no-op when the flag is off.
+  void loadHistory()
 }
 
 watch(() => props.groupId, () => { leaveError.value = null; void reload() }, { immediate: true })
+watch(historyRange, () => void loadHistory())
 
 async function leave() {
   leaveError.value = null
@@ -165,6 +208,51 @@ async function leave() {
           <p v-else-if="quotaAssessment.state === 'over-ceiling'" class="mt-1 text-[11px] text-destructive">
             The node is rejecting uploads for this group (QuotaExceeded). Free storage or ask a realm admin to raise the quota.
           </p>
+        </div>
+      </div>
+
+      <div v-if="usageHistoryEnabled" class="border-b border-border">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-5 pb-1 pt-4">
+          <div class="flex items-center gap-2">
+            <ChartArea class="h-3.5 w-3.5 text-primary" />
+            <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Usage history</span>
+          </div>
+          <div class="flex gap-1">
+            <Button
+              v-for="range in (['7d', '30d', '90d'] as const)"
+              :key="range"
+              size="sm"
+              :variant="historyRange === range ? 'default' : 'outline'"
+              @click="historyRange = range"
+            >
+              {{ range }}
+            </Button>
+          </div>
+        </div>
+        <div class="px-5 py-3">
+          <Skeleton v-if="historyLoading && !historyPoints" class="h-36" />
+          <div
+            v-else-if="historyUnsupported"
+            class="rounded-md border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground"
+          >
+            This backend does not serve usage history yet. The chart appears once snapshot recording ships (aruna#250).
+          </div>
+          <ErrorPanel v-else-if="historyError" :message="historyError" @retry="loadHistory" />
+          <EmptyState
+            v-else-if="!historyPoints || historyPoints.length < 2"
+            title="No usage history yet"
+            description="Snapshots appear once the server starts recording them."
+          />
+          <template v-else>
+            <div :class="historyLoading ? 'opacity-60 transition-opacity' : ''">
+              <UsageHistoryChart
+                :points="historyPoints"
+                :quota-bytes="quotaStatus?.quota_bytes"
+                :ceiling-bytes="quotaStatus?.ceiling_bytes"
+              />
+            </div>
+            <p class="mt-2 text-[11px] text-muted-foreground">Logical bytes — the counter quotas are enforced against.</p>
+          </template>
         </div>
       </div>
 
