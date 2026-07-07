@@ -83,8 +83,13 @@ function openSearchPage() {
   router.push({ name: 'search', query: { q: term } })
 }
 
-function scheduleHide() {
-  window.setTimeout(() => (showResults.value = false), 120)
+const wrapperEl = ref<HTMLElement | null>(null)
+// Hide results only when focus leaves the whole search wrapper (input + result
+// buttons), so keyboard users can Tab into the quick results. Mouse clicks use
+// @mousedown.prevent on the buttons, so focus never leaves the input for them.
+function onSearchFocusOut(event: FocusEvent) {
+  const next = event.relatedTarget as Node | null
+  if (!next || !wrapperEl.value?.contains(next)) showResults.value = false
 }
 </script>
 
@@ -93,18 +98,21 @@ function scheduleHide() {
     <div class="container flex h-14 items-center gap-3">
       <RealmSwitcher />
 
-      <div class="relative min-w-0 max-w-xl flex-1">
+      <div ref="wrapperEl" class="relative min-w-0 max-w-xl flex-1" @focusout="onSearchFocusOut">
         <Search
           class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
         />
         <input
           v-model="q"
+          aria-label="Search this realm — metadata and groups"
           @focus="showResults = true"
-          @blur="scheduleHide"
+          @keydown.enter.prevent="q.trim() && openSearchPage()"
+          @keydown.esc="showResults = false"
           class="h-9 w-full rounded-md border border-input bg-field pl-8 pr-16 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :placeholder="`Search in ${realm.shortName} — metadata and groups…`"
         />
         <kbd
+          aria-hidden="true"
           class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-flex"
         >
           ⌘K
