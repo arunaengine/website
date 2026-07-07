@@ -11,6 +11,7 @@ import { RouterLink } from 'vue-router'
 import { FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
+import { assessQuota, quotaCountedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import {
   ApiError,
@@ -40,13 +41,11 @@ const docs = ref<MetadataDocumentListItem[] | null>(null)
 const docsError = ref<string | null>(null)
 const docsLoading = ref(false)
 
-const usageTotals = computed(() => usage.value?.realm ?? null)
 const quotaStatus = computed(() => usage.value?.quota ?? null)
-// Finite quota (a number, not null) means a bar; null means unlimited or no quota block.
-const quotaBytes = computed<number | null>(() => {
-  const q = quotaStatus.value
-  return q && q.quota_bytes != null ? q.quota_bytes : null
-})
+// The counter the backend QuotaGate enforces against (realm-wide logical bytes).
+const usedBytes = computed(() => (usage.value ? quotaCountedBytes(usage.value) : 0))
+const quotaAssessment = computed(() => assessQuota(quotaStatus.value, usedBytes.value))
+const quotaBadge = computed(() => QUOTA_STATE_BADGES[quotaAssessment.value.state])
 
 const isMember = computed(() =>
   Boolean(group.value?.roles.some((role) => role.assigned_users?.includes(currentUser.value?.id ?? ''))),
@@ -131,20 +130,40 @@ async function leave() {
       </header>
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
 
-      <div v-if="usageTotals" class="border-b border-border">
+      <div v-if="usage" id="storage" class="scroll-mt-24 border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <HardDrive class="h-3.5 w-3.5 text-primary" />
           <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Storage</span>
-          <Badge v-if="quotaStatus?.warning" variant="warn" class="text-[10px] uppercase">near quota</Badge>
+          <Badge v-if="quotaBadge" :variant="quotaBadge.variant" class="text-[10px] uppercase">{{ quotaBadge.label }}</Badge>
         </div>
         <div class="px-5 py-3">
-          <QuotaBar v-if="quotaBytes != null" :used="usageTotals.logical_bytes" :quota="quotaBytes" label="Group storage" />
-          <div v-else class="flex items-center justify-between text-[11px]">
+          <!-- Old backend: usage but no quota block. Do NOT claim unlimited. -->
+          <div v-if="!quotaStatus" class="flex items-center justify-between text-[11px]">
             <span class="font-medium text-muted-foreground">Group storage</span>
-            <span class="tabular-nums text-foreground/80">{{ formatBytes(usageTotals.logical_bytes) }} <span v-if="quotaStatus" class="text-muted-foreground">· unlimited</span></span>
+            <span class="tabular-nums text-foreground/80">{{ formatBytes(usedBytes) }}</span>
           </div>
-          <p v-if="quotaBytes != null && quotaStatus?.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
+          <QuotaBar
+            v-else-if="quotaStatus.quota_bytes == null"
+            :used="usedBytes"
+            :quota="null"
+            label="Group storage"
+          />
+          <QuotaBar
+            v-else
+            :used="usedBytes"
+            :quota="quotaStatus.quota_bytes"
+            :ceiling="quotaStatus.ceiling_bytes"
+            :warn="quotaStatus.warning"
+            label="Group storage"
+          />
+          <p v-if="quotaStatus && quotaStatus.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
             Hard cap {{ formatBytes(quotaStatus.ceiling_bytes) }}.
+          </p>
+          <p v-if="quotaAssessment.state === 'over-quota'" class="mt-1 text-[11px] text-muted-foreground">
+            Writes are accepted until the hard cap; above it the node rejects uploads (QuotaExceeded).
+          </p>
+          <p v-else-if="quotaAssessment.state === 'over-ceiling'" class="mt-1 text-[11px] text-destructive">
+            The node is rejecting uploads for this group (QuotaExceeded). Free storage or ask a realm admin to raise the quota.
           </p>
         </div>
       </div>
