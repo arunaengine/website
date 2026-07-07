@@ -10,7 +10,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { useRoute } from 'vue-router'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Inbox, Plus, RefreshCw, Users } from '@lucide/vue'
 import { relativeTime } from '@/lib/utils'
 import type { JoinRequest } from '@/lib/api'
@@ -29,8 +29,15 @@ const route = useRoute()
 const createGroupOpen = ref(false)
 const selectedGroupId = ref('')
 
-function loadOwnJoinRequests() {
-  if (joinRequestsEnabled.value && currentUser.value) void ensureOwnRequestsLoaded()
+async function loadOwnJoinRequests() {
+  if (!joinRequestsEnabled.value || !currentUser.value) return
+  await ensureOwnRequestsLoaded()
+  // The section only renders once the async fetch resolves, so the router's
+  // one-shot hash retry misses it; scroll here after the section is in the DOM.
+  if (route.hash === '#join-requests') {
+    await nextTick()
+    document.getElementById('join-requests')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 onMounted(loadOwnJoinRequests)
 // A post-mount sign-in must also load the requests.
@@ -139,7 +146,7 @@ const description = computed(() =>
       <section
         v-if="joinRequestsEnabled && currentUser && (ownRequests.length || ownRequestsError)"
         id="join-requests"
-        class="surface overflow-hidden"
+        class="surface overflow-hidden scroll-mt-20"
       >
         <header class="flex items-center justify-between border-b border-border px-5 py-4">
           <div class="flex items-center gap-2">
@@ -203,7 +210,7 @@ const description = computed(() =>
                   <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div>
                 </div>
               </button>
-              <div class="shrink-0 pr-5">
+              <div v-if="joinRequestsEnabled" class="shrink-0 pr-5">
                 <JoinRequestButton :group-id="group.id" :group-name="group.name" />
               </div>
             </div>

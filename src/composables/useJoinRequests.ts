@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   apiRequest,
   type CreateJoinRequestRequest,
@@ -19,6 +19,29 @@ const ownRequests = ref<JoinRequest[]>([])
 const ownRequestsLoaded = ref(false)
 const ownRequestsError = ref<string | null>(null)
 const busy = ref(false)
+// Serializes the first-load fan-out: every JoinRequestButton plus GroupsView call
+// ensureOwnRequestsLoaded() in the same tick before ownRequestsLoaded flips.
+let ownRequestsInflight: Promise<void> | null = null
+
+// Sign-out via the non-Keycloak fallback and account switches (manual token swap)
+// change currentUser without a page reload, so the module-singleton own-request
+// cache would otherwise survive and render the previous account's requests.
+// Mirror useNotifications: reset on account change. Reset only — no HTTP, no
+// featureEnabled read — so the flag-off zero-HTTP guarantee is untouched. Keying
+// on the id (not just null) also covers a direct A→B token swap; consumers' own
+// watches then refetch because ownRequestsLoaded is false again.
+if (typeof window !== 'undefined') {
+  const { currentUser } = useAruna()
+  watch(
+    () => currentUser.value?.id,
+    (id, prev) => {
+      if (id === prev) return
+      ownRequests.value = []
+      ownRequestsLoaded.value = false
+      ownRequestsError.value = null
+    },
+  )
+}
 
 const joinRequestsEnabled = computed(() => featureEnabled('joinRequests'))
 
@@ -69,7 +92,14 @@ async function ensureOwnRequestsLoaded(): Promise<void> {
   if (!featureEnabled('joinRequests')) return
   const { authToken } = useAruna()
   if (ownRequestsLoaded.value || !authToken.value) return
-  await loadOwnRequests()
+  // Collapse the mount-time fan-out into a single request; callers all await the
+  // same in-flight promise and it clears once settled so a later reload can refetch.
+  if (!ownRequestsInflight) {
+    ownRequestsInflight = loadOwnRequests().finally(() => {
+      ownRequestsInflight = null
+    })
+  }
+  await ownRequestsInflight
 }
 
 // POST /groups/{groupId}/join-requests — not yet provided by the backend (aruna#248).
