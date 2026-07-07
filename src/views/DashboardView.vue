@@ -5,6 +5,7 @@ import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import StatCard from '@/components/ui/StatCard.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref } from 'vue'
@@ -12,7 +13,7 @@ import { useAruna } from '@/composables/useAruna'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, nodes, groups, realm, nodeInfo, usageInfo, loading, error, authError, refresh } = useAruna()
+const { currentUser, metadata, profiles, nodes, groups, realm, nodeInfo, usageInfo, bootstrapped, error, authError, refresh } = useAruna()
 const showNewDataset = ref(false)
 
 const onlineNodes = computed(() => nodes.value.filter((node) => node.status === 'healthy').length)
@@ -84,15 +85,20 @@ const pageDescription = computed(() =>
       </div>
 
       <section class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-        <div v-for="stat in stats" :key="stat.label" class="surface flex items-center gap-3.5 px-4 py-4">
-          <div :class="['grid h-9 w-9 shrink-0 place-items-center rounded-lg', stat.tone]">
-            <component :is="stat.icon" class="h-[17px] w-[17px]" />
+        <template v-if="!bootstrapped">
+          <Skeleton v-for="n in 4" :key="n" class="h-16" />
+        </template>
+        <template v-else>
+          <div v-for="stat in stats" :key="stat.label" class="surface flex items-center gap-3.5 px-4 py-4">
+            <div :class="['grid h-9 w-9 shrink-0 place-items-center rounded-lg', stat.tone]">
+              <component :is="stat.icon" class="h-[17px] w-[17px]" />
+            </div>
+            <div class="min-w-0">
+              <div class="truncate font-display text-xl font-bold leading-tight text-foreground">{{ stat.value }}</div>
+              <div class="mt-0.5 truncate text-[11px] text-muted-foreground">{{ stat.label }}</div>
+            </div>
           </div>
-          <div class="min-w-0">
-            <div class="truncate font-display text-xl font-bold leading-tight text-foreground">{{ stat.value }}</div>
-            <div class="mt-0.5 truncate text-[11px] text-muted-foreground">{{ stat.label }}</div>
-          </div>
-        </div>
+        </template>
       </section>
 
       <section v-if="usageInfo" class="grid gap-3.5 sm:grid-cols-3">
@@ -124,7 +130,13 @@ const pageDescription = computed(() =>
             </div>
             <RouterLink to="/app/metadata" class="text-xs font-medium text-primary hover:underline">Catalog</RouterLink>
           </header>
-          <ul class="divide-y divide-border">
+          <ul v-if="!bootstrapped" class="divide-y divide-border">
+            <li v-for="n in 4" :key="n" class="px-5 py-3.5">
+              <Skeleton class="h-4 w-2/3" />
+              <Skeleton class="mt-2 h-3 w-1/2" />
+            </li>
+          </ul>
+          <ul v-else class="divide-y divide-border">
             <li v-for="doc in recentMetadata" :key="doc.ulid">
               <RouterLink :to="{ name: 'metadata-detail', params: { id: doc.ulid } }" class="block px-5 py-3 hover:bg-muted/40">
                 <div class="flex items-center justify-between gap-3">
@@ -138,7 +150,7 @@ const pageDescription = computed(() =>
               </RouterLink>
             </li>
             <li v-if="!recentMetadata.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
-              {{ loading ? 'Loading metadata…' : 'No visible metadata documents.' }}
+              No visible metadata documents yet.
             </li>
           </ul>
         </div>

@@ -4,6 +4,9 @@ import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Pagination from '@/components/ui/Pagination.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
+import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import { computed, ref, watch } from 'vue'
@@ -14,7 +17,7 @@ import type { SparqlResult } from '@/data/types'
 
 const route = useRoute()
 const router = useRouter()
-const { realm, metadata, profiles, currentUser, runSparql } = useAruna()
+const { realm, metadata, profiles, currentUser, loading, error, bootstrapped, refresh, runSparql } = useAruna()
 
 const q = ref<string>((route.query.q as string) ?? '')
 const profileFilter = ref<string | null>((route.query.profile as string) ?? null)
@@ -50,6 +53,11 @@ const paged = computed(() => hits.value.slice((page.value - 1) * PAGE_SIZE, page
 
 function isFavourite(id: string) {
   return favouriteIds.value.includes(id)
+}
+
+function clearFilters() {
+  q.value = ''
+  profileFilter.value = null
 }
 
 async function runQuery() {
@@ -98,7 +106,13 @@ async function runQuery() {
           </div>
         </div>
 
-        <section v-if="hits.length">
+        <section v-if="!bootstrapped || (loading && !metadata.length)" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Skeleton v-for="n in 6" :key="n" class="h-36" />
+        </section>
+
+        <ErrorPanel v-else-if="error" :message="error" @retry="refresh" />
+
+        <section v-else-if="hits.length">
           <div class="mb-3 flex items-center gap-2">
             <FileJson2 class="h-4 w-4 text-primary" />
             <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ filtering ? 'Matching metadata' : 'Catalog' }}</h2>
@@ -125,9 +139,21 @@ async function runQuery() {
           </div>
         </section>
 
-        <div v-else class="surface p-10 text-center text-sm text-muted-foreground">
-          No visible metadata in {{ realm.shortName }}{{ q ? ` for &quot;${q}&quot;` : '' }}.
-        </div>
+        <EmptyState
+          v-else-if="filtering"
+          title="No matches"
+          :description="`Nothing in ${realm.shortName} matches your current search${profileFilter ? ' and profile filter' : ''}.`"
+        >
+          <Button variant="outline" @click="clearFilters">Clear filters</Button>
+        </EmptyState>
+
+        <EmptyState
+          v-else
+          :title="`No visible metadata in ${realm.shortName}`"
+          description="No RO-Crate metadata documents are visible here yet."
+        >
+          <Button v-if="currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
+        </EmptyState>
       </template>
 
       <template v-else>
