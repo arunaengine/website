@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Star } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
+import ConformanceBadge from '@/components/metadata/ConformanceBadge.vue'
+import { useProfileConformance } from '@/composables/useProfileConformance'
 import type { MetadataDoc } from '@/data/types'
 
 const props = defineProps<{
@@ -13,6 +16,16 @@ const props = defineProps<{
   score?: number // rendered as a Badge when provided (search mode)
 }>()
 const emit = defineEmits<{ (e: 'toggle-favourite', id: string): void }>()
+
+// Cache-only: no fetch option, so browsing never triggers N crate fetches — the
+// chip appears once a user has visited the detail page (crates cached). Only a
+// completed check is shown; a conformant pass that still leaves external
+// profiles unchecked is suppressed so a card never overstates what it verified.
+const { conformance } = useProfileConformance(() => props.doc)
+const showConformance = computed(() => {
+  const state = conformance.value.state
+  return state === 'errors' || state === 'warnings' || (state === 'conformant' && conformance.value.uncheckedIris.length === 0)
+})
 </script>
 
 <template>
@@ -47,6 +60,13 @@ const emit = defineEmits<{ (e: 'toggle-favourite', id: string): void }>()
       <span class="truncate">{{ props.doc.author || props.doc.ulid }}</span>
       <div class="flex shrink-0 items-center gap-1.5">
         <Badge v-if="props.score !== undefined" variant="outline" class="text-[10px]">score {{ props.score.toFixed(2) }}</Badge>
+        <ConformanceBadge
+          v-if="showConformance"
+          compact
+          :state="conformance.state"
+          :error-count="conformance.errorCount"
+          :warning-count="conformance.warningCount"
+        />
         <ProfileChip :doc="props.doc" />
       </div>
     </div>
