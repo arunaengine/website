@@ -95,6 +95,13 @@ const fetchedSummary = ref<MetadataDocumentSummary | null>(null)
 
 const detailId = computed(() => (route.params.id as string) || '')
 const current = computed(() => metadata.value.find((doc) => doc.ulid === detailId.value))
+// Reconcile the two independent v-if chains: once the doc resolves via the
+// catalog (e.g. a retry after a transient error repopulates `metadata`), flip
+// docState to 'found' so a stale error/not-found/forbidden panel can't render
+// alongside the rich article.
+watch(current, (c) => {
+  if (c && docState.value !== 'found') docState.value = 'found'
+})
 const currentCrate = computed(() => fullCrates.value[detailId.value] ?? current.value?.roCrate ?? {})
 const currentProfile = computed(() => profiles.value.find((profile) => profile.id === current.value?.profileId))
 // When no local profile resolves, fall back to the first raw conformsTo IRI so an external

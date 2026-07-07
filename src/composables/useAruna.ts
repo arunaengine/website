@@ -275,7 +275,7 @@ async function listGroupMetadata(groupId: string): Promise<ListMetadataResponse>
 
 // Favourites live in the user attribute ui.favourite_metadata_ids as a
 // comma-separated id list (see backend user_preferences_from_attributes).
-async function toggleFavourite(documentId: string): Promise<void> {
+async function doToggleFavourite(documentId: string): Promise<void> {
   const current = userInfo.value?.preferences.favourite_metadata_ids ?? []
   const next = current.includes(documentId)
     ? current.filter((id) => id !== documentId)
@@ -288,6 +288,19 @@ async function toggleFavourite(documentId: string): Promise<void> {
     body: JSON.stringify(body),
   })
   userInfo.value = updated // PATCH returns the full GetUserInfoResponse
+}
+
+// Serialize toggles: every call PATCHes the whole comma-joined attribute from
+// the id list at run time, so concurrent toggles across documents would race
+// (last write wins, silently reverting the other). Chaining forces each toggle
+// to observe the prior one's committed userInfo. Per-call errors still
+// propagate to the caller; the queue absorbs them so one failure can't wedge
+// the chain.
+let favouriteQueue: Promise<unknown> = Promise.resolve()
+async function toggleFavourite(documentId: string): Promise<void> {
+  const run = favouriteQueue.then(() => doToggleFavourite(documentId))
+  favouriteQueue = run.catch(() => undefined)
+  return run
 }
 
 async function updateUserProfile(input: {
