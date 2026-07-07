@@ -5,15 +5,24 @@ import QuotaBar from '@/components/ui/QuotaBar.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import { computed, ref, watch } from 'vue'
-import { HardDrive, LogOut, ShieldCheck, Users } from '@lucide/vue'
+import { RouterLink } from 'vue-router'
+import { FileJson2, HardDrive, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
-import { formatBytes } from '@/lib/utils'
-import { ApiError, type GroupDetailResponse, type GroupMember, type UsageResponse } from '@/lib/api'
+import { formatBytes, relativeTime } from '@/lib/utils'
+import {
+  ApiError,
+  type GroupDetailResponse,
+  type GroupMember,
+  type MetadataDocumentListItem,
+  type UsageResponse,
+} from '@/lib/api'
 
 const props = defineProps<{ groupId: string }>()
 const emit = defineEmits<{ (e: 'left'): void }>()
 
-const { getGroup, getGroupUsage, listGroupMembers, leaveGroup, saving, currentUser } = useAruna()
+const { getGroup, getGroupUsage, listGroupMembers, listGroupMetadata, leaveGroup, saving, currentUser } = useAruna()
+
+const DOC_LIMIT = 8
 
 const group = ref<GroupDetailResponse | null>(null)
 const members = ref<GroupMember[]>([])
@@ -22,6 +31,9 @@ const loadError = ref<string | null>(null)
 const leaveError = ref<string | null>(null)
 const loadingDetail = ref(false)
 const usage = ref<UsageResponse | null>(null)
+const docs = ref<MetadataDocumentListItem[] | null>(null)
+const docsError = ref<string | null>(null)
+const docsLoading = ref(false)
 
 const usageTotals = computed(() => usage.value?.realm ?? null)
 const quotaStatus = computed(() => usage.value?.quota ?? null)
@@ -46,6 +58,8 @@ async function reload() {
   loadingDetail.value = true
   loadError.value = null
   usage.value = null
+  docs.value = null
+  docsError.value = null
   try {
     group.value = await getGroup(props.groupId)
     // Old backends have no per-group usage endpoint; a 404 just hides the block.
@@ -60,6 +74,15 @@ async function reload() {
       } else {
         throw err
       }
+    }
+    // Documents are loaded separately: a failure here must not blank the panel.
+    docsLoading.value = true
+    try {
+      docs.value = (await listGroupMetadata(props.groupId)).documents
+    } catch (err) {
+      docsError.value = err instanceof Error ? err.message : String(err)
+    } finally {
+      docsLoading.value = false
     }
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : String(err)
@@ -117,6 +140,35 @@ async function leave() {
           <p v-if="quotaBytes != null && quotaStatus?.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
             Hard cap {{ formatBytes(quotaStatus.ceiling_bytes) }}.
           </p>
+        </div>
+      </div>
+
+      <div class="border-b border-border">
+        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
+          <FileJson2 class="h-3.5 w-3.5 text-primary" />
+          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Documents</span>
+          <Badge v-if="docs" variant="outline" class="tabular-nums">{{ docs.length }}</Badge>
+        </div>
+        <div class="px-5 py-3">
+          <p v-if="docsLoading && !docs" class="text-xs text-muted-foreground">Loading documents…</p>
+          <p v-else-if="docsError" class="text-xs text-destructive">{{ docsError }}</p>
+          <p v-else-if="docs && !docs.length" class="text-xs text-muted-foreground">This group has no metadata documents yet.</p>
+          <ul v-else-if="docs" class="space-y-1">
+            <li v-for="doc in docs.slice(0, DOC_LIMIT)" :key="doc.document_id">
+              <RouterLink :to="{ name: 'metadata-detail', params: { id: doc.document_id } }" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
+                <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80">{{ doc.document_path }}</span>
+                <Badge :variant="doc.public ? 'success' : 'secondary'" class="shrink-0 text-[10px] uppercase">{{ doc.public ? 'public' : 'private' }}</Badge>
+                <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(doc.updated_at) }}</span>
+              </RouterLink>
+            </li>
+          </ul>
+          <RouterLink
+            v-if="docs && docs.length > DOC_LIMIT"
+            :to="{ name: 'search' }"
+            class="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
+          >
+            View all {{ docs.length }} in Discover →
+          </RouterLink>
         </div>
       </div>
 
