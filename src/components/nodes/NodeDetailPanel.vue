@@ -36,6 +36,29 @@ defineProps<{
       </div>
     </dl>
 
+    <div class="border-t border-border/70 pt-3">
+      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Placement</div>
+      <dl v-if="node.placement" class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+        <div>
+          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Location</dt>
+          <dd class="mt-0.5 text-xs text-foreground/90">{{ node.placement.location }}</dd>
+        </div>
+        <div>
+          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Weight</dt>
+          <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ node.placement.weight }}</dd>
+        </div>
+        <div>
+          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Full</dt>
+          <dd class="mt-0.5 text-xs text-foreground/90">{{ node.placement.full ? 'yes' : 'no' }}</dd>
+        </div>
+        <div>
+          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Draining</dt>
+          <dd class="mt-0.5 text-xs text-foreground/90">{{ node.placement.draining ? 'yes' : 'no' }}</dd>
+        </div>
+      </dl>
+      <p v-else class="mt-1 text-xs text-muted-foreground">Not in the realm's placement map.</p>
+    </div>
+
     <div>
       <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Node id</div>
       <div class="mt-1 flex items-start gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5">
