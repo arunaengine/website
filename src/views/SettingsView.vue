@@ -15,6 +15,7 @@ import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { RouterLink } from 'vue-router'
+import { featureEnabled } from '@/lib/config'
 import { relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { ChevronRight, ExternalLink, KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from '@lucide/vue'
@@ -134,6 +135,10 @@ async function revoke(accessKeyId: string) {
 function toggleGroup(groupId: string) {
   selectedGroupId.value = selectedGroupId.value === groupId ? '' : groupId
 }
+
+// aruna#271: the "My devices" cross-link only appears when device enrollment is
+// enabled (config is loaded before mount, so this setup-time read is safe).
+const deviceEnrollmentEnabled = featureEnabled('deviceEnrollment')
 </script>
 
 <template>
@@ -153,6 +158,11 @@ function toggleGroup(groupId: string) {
         <a href="#groups" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Groups &amp; roles</a>
         <a href="#credentials" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">S3 credentials</a>
         <a href="#appearance" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Appearance</a>
+        <RouterLink
+          v-if="deviceEnrollmentEnabled"
+          :to="{ name: 'settings-devices' }"
+          class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >My devices &rarr;</RouterLink>
       </nav>
 
       <div class="space-y-6">

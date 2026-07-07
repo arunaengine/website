@@ -35,6 +35,11 @@ const routes: RouteRecordRaw[] = [
       { path: 'status', name: 'status', component: () => import('@/views/StatusView.vue') },
       // Settings (consolidates account preferences, members, tokens)
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
+      // My devices (aruna#271) — the view self-gates on featureEnabled('deviceEnrollment')
+      // and renders NotFoundView when the flag is off, since routes are registered
+      // before the runtime config loads (gating cannot live here). The component is
+      // lazy, so the flag is read at navigation time, after config load.
+      { path: 'settings/devices', name: 'settings-devices', component: () => import('@/views/DevicesView.vue') },
       // Realm admin — quota policy and realm-wide usage
       { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
       // Realm admin — node onboarding wizard and outstanding secrets
