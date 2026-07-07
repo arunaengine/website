@@ -336,6 +336,23 @@
         ]
       },
       "expect": [{ "ruleId": "matrix/Dataset/hasPart/requiredInstance.1", "severity": "error", "pointer": "/hasPart" }]
+    },
+    {
+      "name": "non-multi scalar array-wrapped by a foreign crate → unwrapped, no fabricated type error",
+      "profile": {
+        "slug": "matrix",
+        "entityRules": [],
+        "datasetPropertyRules": [
+          { "id": "rDesc", "label": "Description", "description": "", "kind": "text", "propertyUri": "http://schema.org/description", "valueName": "description", "obligation": "MAY" }
+        ]
+      },
+      "crate": {
+        "@graph": [
+          { "@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": { "@id": "./" } },
+          { "@id": "./", "@type": "Dataset", "description": ["A single value a foreign crate re-serialized as a one-element array"] }
+        ]
+      },
+      "expect": []
     }
   ]
 }

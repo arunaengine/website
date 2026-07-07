@@ -16,6 +16,16 @@ export interface DocConformance {
 
 const NONE: DocConformance = { state: 'none', evaluations: [], uncheckedIris: [], errorCount: 0, warningCount: 0 }
 
+// A profile is evaluable only once its machine-readable rules are present: a
+// schema, entity rules, or dataset property rules. mapProfile (useAruna) maps a
+// malformed/unparseable — or still summary-truncated — profile crate to empty
+// rules and no schema; evaluating such a profile yields zero violations and a
+// false green "Conformant" badge (evaluate.ts:46-47). Non-evaluable profiles must
+// surface as "not checked" instead.
+function isEvaluable(profile: MetadataProfile): boolean {
+  return Boolean(profile.schema) || profile.entityRules.length > 0 || profile.propertyRules.length > 0
+}
+
 // Evaluate a stored metadata document against the local profiles it declares
 // conformance to. Purely reactive over the useAruna crate cache: a profile is
 // scored only when BOTH the doc's full crate and the profile's full crate are
@@ -37,11 +47,19 @@ export function useProfileConformance(
       .filter((profile): profile is MetadataProfile => Boolean(profile))
   })
 
-  // conformsTo IRIs that matched no local profile graph IRI — reported as "not checked".
+  // Local profiles whose rules actually parsed; only these can be scored. A
+  // resolved-but-rule-less profile stays out so its IRI reports "not checked".
+  const evaluableProfiles = computed<MetadataProfile[]>(() => localProfiles.value.filter(isEvaluable))
+
+  // conformsTo IRIs not covered by an evaluable local profile — reported as "not
+  // checked". Building the checked set from evaluableProfiles (not localProfiles)
+  // means a resolved-but-rule-less profile's IRI still surfaces as unchecked,
+  // which both suppresses the compact card badge and drives the detail panel's
+  // honest "not checked" line.
   const uncheckedIris = computed<string[]>(() => {
     const current = doc()
     if (!current) return []
-    const checked = new Set(localProfiles.value.map((profile) => profile.graphIri).filter(Boolean))
+    const checked = new Set(evaluableProfiles.value.map((profile) => profile.graphIri).filter(Boolean))
     return (current.conformsToIds ?? []).filter((iri) => !checked.has(iri))
   })
 
@@ -87,7 +105,7 @@ export function useProfileConformance(
     const docCrate = fullCrates.value[current.ulid]
     const evaluations: DocConformance['evaluations'] = []
     if (docCrate) {
-      for (const profile of localProfiles.value) {
+      for (const profile of evaluableProfiles.value) {
         // Rules must have come from the full crate, not a truncated summary.
         if (!(profile.documentId && fullCrates.value[profile.documentId])) continue
         evaluations.push({

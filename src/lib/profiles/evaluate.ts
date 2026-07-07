@@ -283,7 +283,13 @@ function entityValueRecord(
       const refIds = idValues(entity[rule.valueName])
       values[rule.valueName] = ruleMultiple(rule) ? refIds : refIds[0] ?? ''
     } else {
-      values[rule.valueName] = scalarValue(entity[rule.valueName])
+      // Non-multi scalar rules: a foreign/re-serialized crate may array-wrap a
+      // single value (`"description": ["text"]` — a normal JSON-LD shape). Unwrap
+      // the one-element array so it scores as the scalar it is, instead of a
+      // fabricated type.*/format.* error against the schema's scalar shape.
+      const raw = entity[rule.valueName]
+      const scalar = !ruleMultiple(rule) && Array.isArray(raw) && raw.length === 1 ? raw[0] : raw
+      values[rule.valueName] = scalarValue(scalar)
     }
   }
   return { values, hasPartEntries }
