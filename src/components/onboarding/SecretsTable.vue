@@ -1,9 +1,13 @@
 <script setup lang="ts">
 // Outstanding-secrets table over VIEW-MODEL rows (SecretRow), not the raw API
 // type, so the device-enrollment flow (aruna#271) can map its own enrollments
-// into the same table. All labels/variants/links are supplied by the caller;
-// no onboarding copy or API calls live here. Revoke is an inline two-step
-// confirm — no extra dialog component.
+// into the same table — with presence labels ("online"/"offline") via the
+// optional per-row statusLabel/statusVariant overrides and an "Evict" action
+// via the revokeLabel prop. All labels/variants/links are supplied by the
+// caller; no onboarding copy or API calls live here. Revoke is an inline
+// two-step confirm — no extra dialog component. Every extension is an optional
+// prop defaulting to today's behaviour, so the AdminOnboardingView call site is
+// unchanged.
 import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
@@ -20,12 +24,26 @@ export interface SecretRow {
   expiresAt: number | null
   expiresHint?: string
   status: 'outstanding' | 'claimed' | 'expired'
+  // Optional overrides for the status badge (aruna#271 renders presence as
+  // "online"/"offline"/"not in realm"); default to the status text/variant.
+  statusLabel?: string
+  statusVariant?: BadgeVariant
   claimedBy?: string | null
   // Rendered as a RouterLink when set (e.g. a deep link to Status).
   claimedLink?: RouteLocationRaw | null
 }
 
-const props = defineProps<{ rows: SecretRow[]; busyIds: string[]; canRevoke: boolean }>()
+const props = withDefaults(
+  defineProps<{
+    rows: SecretRow[]
+    busyIds: string[]
+    canRevoke: boolean
+    // Action label + empty copy (aruna#271 uses "Evict"); default to today's values.
+    revokeLabel?: string
+    emptyText?: string
+  }>(),
+  { revokeLabel: 'Revoke', emptyText: 'No outstanding onboarding secrets.' },
+)
 const emit = defineEmits<{ (e: 'revoke', id: string): void }>()
 
 const busy = computed(() => new Set(props.busyIds))
@@ -102,7 +120,7 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
           </td>
           <td class="px-3 py-2.5">
             <div class="flex flex-col items-start gap-0.5">
-              <Badge :variant="STATUS_VARIANT[row.status]" class="text-[10px] uppercase">{{ row.status }}</Badge>
+              <Badge :variant="row.statusVariant ?? STATUS_VARIANT[row.status]" class="text-[10px] uppercase">{{ row.statusLabel ?? row.status }}</Badge>
               <RouterLink
                 v-if="row.status === 'claimed' && row.claimedBy && row.claimedLink"
                 :to="row.claimedLink"
@@ -129,7 +147,7 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
                 size="sm"
                 @click="confirmRevoke(row.id)"
               >
-                Confirm revoke
+                Confirm {{ props.revokeLabel.toLowerCase() }}
               </Button>
               <Button
                 v-else
@@ -138,14 +156,14 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
                 class="text-destructive hover:text-destructive"
                 @click="requestRevoke(row.id)"
               >
-                Revoke
+                {{ props.revokeLabel }}
               </Button>
             </template>
           </td>
         </tr>
         <tr v-if="!rows.length">
           <td colspan="5" class="px-3 py-8 text-center text-xs text-muted-foreground">
-            No outstanding onboarding secrets.
+            {{ props.emptyText }}
           </td>
         </tr>
       </tbody>
