@@ -16,6 +16,8 @@ import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3, s3ErrorMessage, isS3AuthError, type BucketEntry, type FolderEntry, type ObjectEntry, type UploadHandle } from '@/composables/useS3'
+import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
+import type { UsageResponse } from '@/lib/api'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -35,7 +37,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { currentUser, bootstrapped } = useAruna()
+const { currentUser, bootstrapped, credentials, getGroupUsage } = useAruna()
 const s3 = useS3()
 
 const bucket = computed(() => (route.params.bucketId as string | undefined) ?? '')
@@ -227,14 +229,69 @@ function pickFiles() {
 
 function onFileInput(event: Event) {
   const input = event.target as HTMLInputElement
-  if (input.files?.length) void uploadFiles(Array.from(input.files))
+  if (input.files?.length) void requestUpload(Array.from(input.files))
   input.value = ''
 }
 
 function onDrop(event: DragEvent) {
   dragActive.value = false
   if (!bucket.value || !event.dataTransfer?.files.length) return
-  void uploadFiles(Array.from(event.dataTransfer.files))
+  void requestUpload(Array.from(event.dataTransfer.files))
+}
+
+// The bucket namespace is the credential's group, so quota state for uploads
+// comes from that group's usage endpoint. Manual keys not in the caller's
+// credential list resolve to null -> the precheck silently skips (advisory).
+const activeGroupId = computed(
+  () => credentials.value.find((c) => c.access_key_id === s3.activeKey.value?.accessKeyId)?.group_id ?? null,
+)
+
+// 30s-cached usage fetch that never throws: any failure returns null so the
+// precheck simply degrades to "just upload".
+let cachedUsage: { groupId: string; at: number; usage: UsageResponse } | null = null
+async function groupUsageFresh(groupId: string): Promise<UsageResponse | null> {
+  if (cachedUsage && cachedUsage.groupId === groupId && Date.now() - cachedUsage.at < 30_000) {
+    return cachedUsage.usage
+  }
+  try {
+    const usage = await getGroupUsage(groupId)
+    cachedUsage = { groupId, at: Date.now(), usage }
+    return usage
+  } catch {
+    return null
+  }
+}
+
+const precheck = ref<{
+  files: File[]
+  totalBytes: number
+  projected: QuotaAssessment
+  current: QuotaAssessment
+} | null>(null)
+
+// Advisory only: this may warn but never blocks. Every path ends in an upload.
+async function requestUpload(files: File[]) {
+  const groupId = activeGroupId.value
+  if (groupId) {
+    const usage = await groupUsageFresh(groupId)
+    const quota = usage?.quota
+    if (usage && quota && quota.quota_bytes != null) {
+      const used = quotaCountedBytes(usage)
+      const totalBytes = files.reduce((sum, file) => sum + file.size, 0)
+      const projected = assessQuota(quota, used + totalBytes)
+      if (projected.state === 'over-quota' || projected.state === 'over-ceiling') {
+        precheck.value = { files, totalBytes, projected, current: assessQuota(quota, used) }
+        return
+      }
+    }
+  }
+  await uploadFiles(files)
+}
+
+function confirmPrecheckUpload() {
+  const files = precheck.value?.files ?? []
+  precheck.value = null
+  if (files.length) void uploadFiles(files)
 }
 
 async function uploadFiles(files: File[]) {
@@ -563,6 +620,41 @@ const isEmpty = computed(
         <DialogFooter>
           <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
           <Button variant="destructive" :disabled="deleteBusy" @click="confirmDelete">{{ deleteBusy ? 'Deleting…' : 'Delete' }}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog :open="precheck !== null" @update:open="(v: boolean) => { if (!v) precheck = null }">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Storage quota warning</DialogTitle>
+          <DialogDescription>
+            This upload would push the group past its storage quota. The check is advisory — you can still upload.
+          </DialogDescription>
+        </DialogHeader>
+        <div v-if="precheck" class="space-y-2 text-xs">
+          <div
+            v-if="precheck.projected.state === 'over-ceiling'"
+            class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive"
+          >
+            This upload adds <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
+            <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>. It would exceed the group's hard cap of
+            <strong>{{ formatBytes(precheck.projected.ceilingBytes ?? 0) }}</strong> — the node rejects writes above the cap with <code>QuotaExceeded</code>.
+          </div>
+          <div
+            v-else
+            class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300"
+          >
+            This upload adds <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
+            <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>. It crosses the group quota of
+            <strong>{{ formatBytes(precheck.projected.quotaBytes ?? 0) }}</strong> into the grace headroom. Uploads still succeed until the hard cap of
+            <strong>{{ formatBytes(precheck.projected.ceilingBytes ?? 0) }}</strong>.
+          </div>
+          <p class="text-muted-foreground">Counters on remote nodes can lag, so these numbers are approximate.</p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="precheck = null">Cancel</Button>
+          <Button @click="confirmPrecheckUpload">Upload anyway</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
