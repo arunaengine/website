@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import { Bell, FileJson2, HardDrive, Upload, UserMinus, UserPlus, Users } from '@lucide/vue'
+import { Bell, Check, FileJson2, HardDrive, Inbox, Upload, UserMinus, UserPlus, Users } from '@lucide/vue'
 import type { ApiNotification } from '@/lib/api'
 import { formatBytes, truncateMiddle } from '@/lib/utils'
 
@@ -79,6 +79,41 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
       const prefix = n.key ? keyPrefix(n.key) : ''
       return { name: 'bucket', params: { bucketId: n.bucket }, query: prefix ? { prefix } : {} }
     },
+  },
+  // ── Join requests (aruna#248) ──────────────────────────────────────────────
+  // NOT emitted by any backend yet. Names follow the backend's snake_case
+  // NotificationKind::name() convention (added_to_group, group_member_added, …);
+  // the dotted aliases cover the alternative naming from the portal-side design
+  // notes, so whichever the backend picks is handled. These entries are static
+  // (not wrapped in featureEnabled): the registry is a plain Record and an entry
+  // for a kind that can only arrive once the backend implements aruna#248 is
+  // inert with the flag off, so registering it unconditionally is honest.
+  // Deep links target the group workflow: created → the admin inbox in the
+  // group detail (commit 4); decided → the requester's own-requests section
+  // (commit 3) via the #join-requests anchor.
+  join_request_created: {
+    icon: Inbox,
+    title: (n, ctx) => `New join request for ${groupLabel(n, ctx)}`,
+    detail: (n) => (n.actor_user_id ? `From ${truncateMiddle(n.actor_user_id)}` : undefined),
+    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id } } : { name: 'groups' }),
+  },
+  join_request_decided: {
+    icon: Check,
+    title: (n, ctx) => `Your join request for ${groupLabel(n, ctx)} was reviewed`,
+    detail: () => undefined,
+    link: () => ({ name: 'groups', hash: '#join-requests' }),
+  },
+  'group.join_request.created': {
+    icon: Inbox,
+    title: (n, ctx) => `New join request for ${groupLabel(n, ctx)}`,
+    detail: (n) => (n.actor_user_id ? `From ${truncateMiddle(n.actor_user_id)}` : undefined),
+    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id } } : { name: 'groups' }),
+  },
+  'group.join_request.decided': {
+    icon: Check,
+    title: (n, ctx) => `Your join request for ${groupLabel(n, ctx)} was reviewed`,
+    detail: () => undefined,
+    link: () => ({ name: 'groups', hash: '#join-requests' }),
   },
 }
 
