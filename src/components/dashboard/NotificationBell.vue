@@ -154,7 +154,6 @@ function onLoadMore(event: Event) {
               class="mt-0.5 hidden shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground group-hover:block"
               aria-label="Mark as read"
               @click="markOnly($event, n)"
-              @pointerdown.stop
             >
               <Check class="h-3.5 w-3.5" />
             </button>

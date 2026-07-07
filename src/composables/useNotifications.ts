@@ -29,7 +29,11 @@ const listLoaded = ref(false)
 const listLoading = ref(false)
 const loadingMore = ref(false)
 const listError = ref<string | null>(null)
-const marking = ref(false)
+// In-flight mark-read requests. Concurrent markRead calls are allowed (rows can
+// be marked back-to-back within a network RTT); `marking` stays truthy while any
+// request is pending so the "Mark all read" header button remains disabled.
+const markingCount = ref(0)
+const marking = computed(() => markingCount.value > 0)
 
 const available = computed(() => supported.value && !forbidden.value && Boolean(currentUser.value))
 // Badge text; the server count is capped at 100 by design, so cap display at 99+.
@@ -110,17 +114,15 @@ async function loadMore(): Promise<void> {
 }
 
 interface MarkSnapshot {
-  items: ApiNotification[]
   count: number
   capped: boolean
 }
 
 function snapshot(): MarkSnapshot {
-  return { items: items.value, count: unreadCount.value, capped: unreadCapped.value }
+  return { count: unreadCount.value, capped: unreadCapped.value }
 }
 
 function restore(s: MarkSnapshot) {
-  items.value = s.items
   unreadCount.value = s.count
   unreadCapped.value = s.capped
 }
@@ -130,12 +132,12 @@ function restore(s: MarkSnapshot) {
 // is a capped lower bound, so local arithmetic drifts once capped was true).
 async function markRead(ids: string[]): Promise<void> {
   const targets = items.value.filter((n) => !n.read && ids.includes(n.id)).map((n) => n.id)
-  if (!targets.length || marking.value) return
+  if (!targets.length) return
   const before = snapshot()
   const targetSet = new Set(targets)
   items.value = items.value.map((n) => (targetSet.has(n.id) ? { ...n, read: true } : n))
   unreadCount.value = Math.max(0, unreadCount.value - targets.length)
-  marking.value = true
+  markingCount.value++
   try {
     const body: MarkReadRequest = { ids: targets }
     await request<MarkReadResponse>('/notifications/read', {
@@ -144,10 +146,14 @@ async function markRead(ids: string[]): Promise<void> {
     })
     void fetchUnread()
   } catch (err) {
+    // Roll back only the ids this call flipped, so a concurrent mark or a page
+    // appended by loadMore/loadNotifications while this request was in flight
+    // survives (a whole-array restore would clobber it).
+    items.value = items.value.map((n) => (targetSet.has(n.id) && n.read ? { ...n, read: false } : n))
     restore(before)
     if (!noteUnavailable(err)) reportGlobalError(`Could not mark notification read: ${errorMessage(err)}`)
   } finally {
-    marking.value = false
+    markingCount.value--
   }
 }
 
@@ -156,12 +162,13 @@ async function markRead(ids: string[]): Promise<void> {
 async function markAllRead(): Promise<void> {
   if (marking.value) return
   const before = snapshot()
+  const wasUnread = new Set(items.value.filter((n) => !n.read).map((n) => n.id))
   const newestLoadedMs = items.value[0]?.created_at_ms ?? 0
   const upTo = Math.max(Date.now(), newestLoadedMs)
   items.value = items.value.map((n) => (n.read ? n : { ...n, read: true }))
   unreadCount.value = 0
   unreadCapped.value = false
-  marking.value = true
+  markingCount.value++
   try {
     const body: MarkReadRequest = { ids: [], up_to_ms: upTo }
     await request<MarkReadResponse>('/notifications/read', {
@@ -170,10 +177,13 @@ async function markAllRead(): Promise<void> {
     })
     void fetchUnread()
   } catch (err) {
+    // Un-flag only the rows this sweep marked read; leaves rows a concurrent
+    // markRead flipped (and any page loaded meanwhile) intact.
+    items.value = items.value.map((n) => (wasUnread.has(n.id) ? { ...n, read: false } : n))
     restore(before)
     if (!noteUnavailable(err)) reportGlobalError(`Could not mark notifications read: ${errorMessage(err)}`)
   } finally {
-    marking.value = false
+    markingCount.value--
   }
 }
 
