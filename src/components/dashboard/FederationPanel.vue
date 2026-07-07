@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import type { Node } from '@/data/types'
+import Badge from '@/components/ui/Badge.vue'
+import type { RealmNodeInfo } from '@/lib/api'
+import { connectionLabel, connectionVariant, kindVariant } from '@/components/nodes/node-display'
+import { formatBytes, formatNumber, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{
-  nodes: Node[]
+  nodes: RealmNodeInfo[]
+  replicationFactor: number
   /** peer id of the node this portal is connected to */
-  primaryId?: string
+  localPeerId?: string
 }>()
 
 const router = useRouter()
@@ -15,327 +19,93 @@ function openNode(id: string) {
   void router.push({ name: 'status', query: { node: id } })
 }
 
-/* SVG viewport — everything below lives in this coordinate system. */
-const VW = 600
-const VH = 300
-const RING = 14
-const TRIM = RING + 3
+const connectedCount = computed(() => props.nodes.filter((node) => node.connection_status === 'connected').length)
 
-/* Preset layout spots (percent of canvas) for up to 8 nodes. */
-const SPOTS: Array<[number, number]> = [
-  [22, 24],
-  [78, 30],
-  [50, 78],
-  [14, 70],
-  [86, 74],
-  [50, 10],
-  [32, 50],
-  [68, 54],
-]
-
-type PlacedNode = Node & { cx: number; cy: number; primary: boolean }
-
-const placed = computed<PlacedNode[]>(() =>
-  props.nodes.slice(0, SPOTS.length).map((node, i) => ({
-    ...node,
-    cx: 80 + (SPOTS[i][0] / 100) * (VW - 160),
-    cy: 44 + (SPOTS[i][1] / 100) * (VH - 112),
-    primary: !!props.primaryId && node.id === props.primaryId,
-  })),
-)
-
-/* Only connections the realm actually reports: local node to present peers,
-   trimmed so lines terminate at the node rings. */
-const edges = computed(() => {
-  const list = placed.value
-  const local = list.find((node) => node.primary)
-  if (!local) return []
-  return list
-    .filter((node) => node.id !== local.id && node.status !== 'offline')
-    .map((node) => {
-      const dx = node.cx - local.cx
-      const dy = node.cy - local.cy
-      const len = Math.hypot(dx, dy) || 1
-      const ux = dx / len
-      const uy = dy / len
-      return {
-        id: node.id,
-        x1: local.cx + ux * TRIM,
-        y1: local.cy + uy * TRIM,
-        x2: node.cx - ux * TRIM,
-        y2: node.cy - uy * TRIM,
-        syncing: node.status === 'syncing' || node.status === 'degraded',
-      }
-    })
+const kindCounts = computed<Array<[RealmNodeInfo['kind'], number]>>(() => {
+  const counts = new Map<RealmNodeInfo['kind'], number>()
+  for (const node of props.nodes) counts.set(node.kind, (counts.get(node.kind) ?? 0) + 1)
+  return [...counts.entries()]
 })
 
-function statusColor(status: Node['status']): string {
-  if (status === 'healthy') return '#4ade80'
-  if (status === 'syncing' || status === 'degraded') return '#fbbf24'
-  return '#5C6378'
-}
-
-const statusLabel: Record<Node['status'], string> = {
-  healthy: 'online',
-  degraded: 'degraded',
-  syncing: 'syncing',
-  offline: 'offline',
-}
+// Published labels flattened across nodes into `key=value → count`, most common
+// first. Only real, self-published labels — no fabricated per-node numbers.
+const labelCounts = computed<Array<[string, number]>>(() => {
+  const counts = new Map<string, number>()
+  for (const node of props.nodes) {
+    for (const [key, value] of Object.entries(node.info?.labels ?? {})) {
+      const chip = `${key}=${value}`
+      counts.set(chip, (counts.get(chip) ?? 0) + 1)
+    }
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])
+})
 </script>
 
 <template>
   <section>
-    <div class="mb-3.5 flex items-center justify-between">
-      <h2 class="font-display text-[15px] font-semibold text-foreground/85">
-        Federation network
-      </h2>
-      <div class="flex items-center gap-4 text-[11px] text-muted-foreground">
-        <span class="flex items-center gap-1.5">
-          <span class="h-2 w-2 rounded-full bg-emerald-400" /> Online
-        </span>
-        <span class="flex items-center gap-1.5">
-          <span class="h-2 w-2 rounded-full bg-amber-400" /> Syncing
-        </span>
-        <span class="flex items-center gap-1.5">
-          <span class="h-2 w-2 rounded-full bg-muted-foreground/50" /> Offline
-        </span>
-        <RouterLink to="/app/status" class="text-xs font-medium text-primary hover:underline">
-          Node status
-        </RouterLink>
+    <div class="mb-3.5 flex flex-wrap items-center justify-between gap-2">
+      <h2 class="font-display text-[15px] font-semibold text-foreground/85">Federation network</h2>
+      <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <Badge variant="outline" class="tabular-nums">{{ nodes.length }} nodes</Badge>
+        <Badge variant="outline" class="tabular-nums">{{ connectedCount }} connected</Badge>
+        <Badge variant="outline">replication ×{{ replicationFactor }}</Badge>
+        <RouterLink to="/app/status" class="text-xs font-medium text-primary hover:underline">Node status</RouterLink>
       </div>
     </div>
 
     <div class="surface overflow-hidden rounded-xl p-0">
-      <div
-        v-if="!placed.length"
-        class="px-5 py-12 text-center text-xs text-muted-foreground"
-      >
+      <div v-if="!nodes.length" class="px-5 py-12 text-center text-xs text-muted-foreground">
         This realm has no nodes yet.
       </div>
 
       <template v-else>
-        <!-- Topology — a single SVG so connections truly terminate at nodes -->
-        <div class="border-b border-border/60 bg-background">
-          <svg
-            :viewBox="`0 0 ${VW} ${VH}`"
-            preserveAspectRatio="xMidYMid meet"
-            class="block h-auto w-full"
-            role="img"
-            aria-label="Realm node topology"
-          >
-            <defs>
-              <pattern
-                id="fed-grid"
-                width="32"
-                height="32"
-                patternUnits="userSpaceOnUse"
-              >
-                <path
-                  d="M 32 0 L 0 0 0 32"
-                  fill="none"
-                  stroke="hsl(var(--border))"
-                  stroke-opacity="0.55"
-                  stroke-width="1"
-                />
-              </pattern>
-              <radialGradient id="fed-glow" cx="0.5" cy="0.5" r="0.5">
-                <stop offset="0%" stop-color="#4E86D7" stop-opacity="0.12" />
-                <stop offset="100%" stop-color="#4E86D7" stop-opacity="0" />
-              </radialGradient>
-              <radialGradient id="fed-glow-primary" cx="0.5" cy="0.5" r="0.5">
-                <stop offset="0%" stop-color="#55C4DE" stop-opacity="0.18" />
-                <stop offset="100%" stop-color="#55C4DE" stop-opacity="0" />
-              </radialGradient>
-            </defs>
-
-            <rect :width="VW" :height="VH" fill="url(#fed-grid)" opacity="0.5" />
-            <ellipse
-              :cx="VW / 2"
-              :cy="VH / 2 - 20"
-              :rx="VW * 0.4"
-              :ry="VH * 0.5"
-              fill="url(#fed-glow)"
-            />
-
-            <!-- Edges first so nodes sit on top -->
-            <g v-for="e in edges" :key="e.id">
-              <line
-                :x1="e.x1"
-                :y1="e.y1"
-                :x2="e.x2"
-                :y2="e.y2"
-                :stroke="e.syncing ? '#fbbf24' : '#4E86D7'"
-                stroke-opacity="0.45"
-                stroke-width="1.5"
-                stroke-linecap="round"
-              />
-              <line
-                class="fed-flow"
-                :x1="e.x1"
-                :y1="e.y1"
-                :x2="e.x2"
-                :y2="e.y2"
-                :stroke="e.syncing ? '#fbbf24' : '#4E86D7'"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-opacity="0.5"
-              />
-            </g>
-
-            <!-- Nodes -->
-            <g
-              v-for="n in placed"
-              :key="n.id"
-              class="cursor-pointer focus:outline-none"
-              role="link"
-              tabindex="0"
-              :aria-label="`View ${n.slug} on the status page`"
-              @click="openNode(n.id)"
-              @keydown.enter="openNode(n.id)"
-            >
-              <title>View {{ n.slug }} on the status page</title>
-              <circle
-                v-if="n.primary"
-                :cx="n.cx"
-                :cy="n.cy"
-                :r="RING + 10"
-                fill="url(#fed-glow-primary)"
-              />
-              <circle
-                :cx="n.cx"
-                :cy="n.cy"
-                :r="RING"
-                fill="hsl(var(--card))"
-                :stroke="n.primary ? '#55C4DE' : 'hsl(var(--input))'"
-                :stroke-width="n.primary ? 1.5 : 1"
-              />
-              <circle :cx="n.cx" :cy="n.cy" r="5" :fill="statusColor(n.status)" />
-              <circle
-                :cx="n.cx - 1.2"
-                :cy="n.cy - 1.2"
-                r="1.2"
-                fill="rgba(255,255,255,0.5)"
-              />
-              <g :transform="`translate(${n.cx}, ${n.cy + RING + 14})`">
-                <text
-                  text-anchor="middle"
-                  font-family="JetBrains Mono, monospace"
-                  font-size="10"
-                  font-weight="600"
-                  fill="hsl(var(--foreground))"
-                >
-                  {{ n.slug }}
-                </text>
-                <text
-                  y="11"
-                  text-anchor="middle"
-                  font-family="Inter, sans-serif"
-                  font-size="9"
-                  fill="hsl(var(--muted-foreground))"
-                >
-                  {{ n.country }}{{ n.primary ? ' · this node' : '' }}
-                </text>
-              </g>
-            </g>
-          </svg>
+        <!-- Real aggregates: kinds and self-published labels -->
+        <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Kinds</span>
+          <Badge v-for="[kind, count] in kindCounts" :key="kind" :variant="kindVariant[kind]" class="text-[10px]">
+            {{ kind }} · {{ count }}
+          </Badge>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Labels</span>
+          <template v-if="labelCounts.length">
+            <span v-for="[label, count] in labelCounts" :key="label" class="chip">{{ label }} · {{ count }}</span>
+          </template>
+          <span v-else class="text-[11px] text-muted-foreground">No nodes have published labels yet.</span>
         </div>
 
-        <!-- Node detail cards -->
-        <div
-          class="grid"
-          :style="{ gridTemplateColumns: `repeat(${Math.min(placed.length, 3)}, 1fr)` }"
-        >
-          <div
-            v-for="(n, i) in placed"
-            :key="n.id"
+        <!-- Node rows: only data the realm actually reports -->
+        <ul class="divide-y divide-border/60">
+          <li
+            v-for="node in nodes"
+            :key="node.node_id"
             role="link"
             tabindex="0"
-            :aria-label="`View ${n.slug} on the status page`"
-            :class="[
-              'flex cursor-pointer flex-col gap-3 px-5 py-4 transition-colors hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/40',
-              i % 3 !== 0 && 'border-l border-border/60',
-              i >= 3 && 'border-t border-border/60',
-            ]"
-            @click="openNode(n.id)"
-            @keydown.enter="openNode(n.id)"
+            :aria-label="`View ${truncateMiddle(node.node_id)} on the status page`"
+            class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 transition-colors hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/40"
+            @click="openNode(node.node_id)"
+            @keydown.enter="openNode(node.node_id)"
           >
-            <div>
-              <div class="mb-1 flex items-center gap-1.5">
-                <span
-                  class="h-1.5 w-1.5 rounded-full"
-                  :style="{ background: statusColor(n.status) }"
-                />
-                <span
-                  class="text-[10px] font-semibold uppercase tracking-wider"
-                  :style="{ color: statusColor(n.status) }"
-                >
-                  {{ statusLabel[n.status] }}
-                </span>
-                <span
-                  v-if="n.primary"
-                  class="rounded-sm border border-aruna-aqua/30 bg-aruna-aqua/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-aruna-aqua"
-                >
-                  Primary
-                </span>
-              </div>
-              <div class="truncate font-mono text-[13px] font-semibold text-foreground">
-                {{ n.name }}
-              </div>
-              <div class="mt-0.5 truncate font-mono text-[11px] text-muted-foreground/80">
-                {{ n.endpoint }}
-              </div>
-            </div>
-
-            <div
-              class="grid grid-cols-3 gap-2 border-t border-border/60 pt-2.5"
+            <Badge :variant="kindVariant[node.kind]" class="shrink-0 text-[10px] uppercase">{{ node.kind }}</Badge>
+            <span class="font-mono text-[13px] font-semibold text-foreground">{{ truncateMiddle(node.node_id) }}</span>
+            <span
+              v-if="localPeerId && node.node_id === localPeerId"
+              class="rounded-sm border border-aruna-aqua/30 bg-aruna-aqua/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-aruna-aqua"
             >
-              <div>
-                <div class="text-[9px] uppercase tracking-wider text-muted-foreground/70">
-                  Kind
-                </div>
-                <div class="mt-0.5 font-mono text-xs font-semibold text-foreground/80">
-                  {{ n.country }}
-                </div>
-              </div>
-              <div>
-                <div class="text-[9px] uppercase tracking-wider text-muted-foreground/70">
-                  Replicas
-                </div>
-                <div class="mt-0.5 font-mono text-xs font-semibold text-foreground/80">
-                  ×{{ n.replicaFactor }}
-                </div>
-              </div>
-              <div>
-                <div class="text-[9px] uppercase tracking-wider text-muted-foreground/70">
-                  Docs
-                </div>
-                <div class="mt-0.5 font-mono text-xs font-semibold text-foreground/80">
-                  {{ n.metadataCount }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+              this node
+            </span>
+            <Badge :variant="connectionVariant(node)" class="shrink-0 text-[10px] uppercase">{{ connectionLabel(node) }}</Badge>
+            <span class="ml-auto font-mono text-[11px] text-muted-foreground">
+              <template v-if="node.info">
+                {{ formatNumber(node.info.utilization.documents_held) }} docs ·
+                {{ formatBytes(node.info.utilization.storage_bytes_used) }} ·
+                load {{ node.info.utilization.load_permille }}‰
+              </template>
+              <template v-else>no published info</template>
+            </span>
+          </li>
+        </ul>
       </template>
     </div>
   </section>
 </template>
-
-<style scoped>
-.fed-flow {
-  stroke-dasharray: 2 14;
-  animation: fed-dash 1.4s linear infinite;
-}
-
-@keyframes fed-dash {
-  to {
-    stroke-dashoffset: -16;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fed-flow {
-    animation: none;
-  }
-}
-</style>

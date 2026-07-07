@@ -13,7 +13,7 @@ import { useAruna } from '@/composables/useAruna'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, nodes, groups, realm, nodeInfo, usageInfo, bootstrapped, error, authError, refresh } = useAruna()
+const { currentUser, metadata, profiles, nodes, groups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, error, authError, refresh } = useAruna()
 const showNewDataset = ref(false)
 
 const onlineNodes = computed(() => nodes.value.filter((node) => node.status === 'healthy').length)
@@ -178,7 +178,11 @@ const pageDescription = computed(() =>
         </div>
       </section>
 
-      <FederationPanel :nodes="nodes" :primary-id="nodeInfo?.node.peer_id" />
+      <FederationPanel
+        :nodes="realmInfo?.nodes ?? []"
+        :replication-factor="realmInfo?.metadata_replication.default_replication_factor ?? 1"
+        :local-peer-id="nodeInfo?.node.peer_id"
+      />
     </div>
 
     <NewDatasetDialog

@@ -10,7 +10,7 @@ export interface NodeProbe {
 const PROBE_TIMEOUT_MS = 3000
 
 export function nodeApiBase(node: RealmNodeInfo): string | null {
-  const url = (node.rest_url ?? '').replace(/\/+$/, '')
+  const url = (node.info?.urls?.api ?? node.rest_url ?? '').replace(/\/+$/, '')
   if (!url) return null
   return url.endsWith('/api/v1') ? url : `${url}/api/v1`
 }

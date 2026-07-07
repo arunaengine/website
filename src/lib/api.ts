@@ -171,13 +171,35 @@ export interface RealmUserGroupCapOverride {
   max_groups: number | null
 }
 
+export interface RealmNodePlacement {
+  location: string
+  weight: number
+  full: boolean
+  draining: boolean
+}
+
+export interface RealmNodePublishedInfo {
+  labels: Record<string, string>
+  urls: { api?: string | null; s3?: string | null }
+  utilization: {
+    storage_bytes_used: number
+    documents_held: number
+    load_permille: number
+    heartbeat_at_ms: number
+  }
+  updated_at_ms: number
+}
+
 export interface RealmNodeInfo {
   node_id: string
   kind: 'management' | 'server' | 'local' | 'user'
   configured: boolean
   present: boolean
   connection_status: 'connected' | 'configured'
-  // Advertised by newer backends; absent until nodes publish their REST endpoint.
+  placement?: RealmNodePlacement | null
+  // Latest self-published node document; null until the node publishes one.
+  info?: RealmNodePublishedInfo | null
+  /** @deprecated older field, never served by current backends */
   rest_url?: string | null
 }
 
