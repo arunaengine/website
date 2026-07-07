@@ -81,3 +81,43 @@ export function buildComposeSnippet(input: NodeConfigInput): string {
     ...env,
   ].join('\n')
 }
+
+// --- User device agent (aruna#271) ------------------------------------------
+
+export interface DeviceEnvInput {
+  secret: string // the one-time device token (aruna#271)
+  dataDir?: string // default './aruna-device-data'
+  httpPort?: number // default 3000
+  p2pPort?: number // default 3001
+  s3Port?: number // default 1337
+  deviceName?: string // emitted as ARUNA_NODE_LABELS=device=<slug> when set
+}
+
+// ARUNA_NODE_LABELS is a verified k=v map; slug the device name so it is a valid
+// label value and recognizable on StatusView.
+function slugLabel(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/^-+|-+$/g, '')
+}
+
+// Device-agent .env for enrolling a laptop as a 'user' node (aruna#271). Reuses
+// buildEnvBlock — the device runs the same aruna binary, and
+// STORAGE_PATH/SOCKET_ADDRESS/S3_HOST/S3_ADDRESS are required by its config
+// loader even on a personal device. No new env keys are introduced (so the
+// key-allowlist grep over this module still covers everything).
+export function buildDeviceEnv(input: DeviceEnvInput): string {
+  const slug = input.deviceName ? slugLabel(input.deviceName) : ''
+  const node: NodeConfigInput = {
+    secret: input.secret,
+    httpPort: input.httpPort ?? 3000,
+    p2pPort: input.p2pPort ?? 3001,
+    s3Port: input.s3Port ?? 1337,
+    dataDir: input.dataDir?.trim() || './aruna-device-data',
+    labels: slug ? `device=${slug}` : undefined,
+  }
+  const header = [
+    '# Aruna user device — self-service enrollment (aruna#271)',
+    "# This device joins as a 'user' node: bound to your account at enrollment,",
+    '# never mints tokens, never serves as a replication or routing target.',
+  ].join('\n')
+  return `${header}\n${buildEnvBlock(node)}`
+}
