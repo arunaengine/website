@@ -492,7 +492,7 @@ function objectRefs(object: ObjectEntry): CrateObjectReference[] {
                   <span v-if="item.bucket !== bucket" class="text-muted-foreground">{{ item.bucket }}/</span>{{ item.name }}
                 </span>
                 <template v-if="item.state === 'uploading'">
-                  <Progress :value="item.progress" :warn="101" :critical="101" class="h-1.5 flex-1" />
+                  <Progress :value="item.progress" :warn="101" :critical="101" label="Upload progress" class="h-1.5 flex-1" />
                   <span class="w-9 shrink-0 text-right font-mono text-muted-foreground">{{ item.progress }}%</span>
                   <Button variant="ghost" size="sm" class="h-6 shrink-0 px-2" @click="queue.cancel(item)">Cancel</Button>
                 </template>

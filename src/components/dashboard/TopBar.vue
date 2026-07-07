@@ -125,7 +125,8 @@ function onSearchFocusOut(event: FocusEvent) {
           <button
             v-for="r in results"
             :key="r.id"
-            @mousedown.prevent="openResult(r)"
+            @mousedown.prevent
+            @click="openResult(r)"
             class="flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted"
           >
             <Badge variant="secondary" class="shrink-0">{{ r.badge }}</Badge>
@@ -136,7 +137,8 @@ function onSearchFocusOut(event: FocusEvent) {
           </button>
           <button
             v-if="q"
-            @mousedown.prevent="openSearchPage"
+            @mousedown.prevent
+            @click="openSearchPage"
             class="flex w-full items-center gap-2 border-t border-border bg-muted/30 px-3 py-2.5 text-left text-xs font-medium text-primary hover:bg-muted"
           >
             See all results for "{{ q }}" in Search →

@@ -174,7 +174,7 @@ export function a11yAudit(opts) {
   // ── GATING: dialog-name ──────────────────────────────────────────────────
   for (const el of document.querySelectorAll('[role="dialog"], [role="alertdialog"]')) {
     if (!rendered(el)) continue
-    if (!el.getAttribute('aria-label') && !el.getAttribute('aria-labelledby'))
+    if (!el.getAttribute('aria-label') && !fromLabelledby(el))
       push(violations, 'dialog-name', 'serious', el, 'dialog has no accessible name (aria-label/-labelledby)')
   }
 
