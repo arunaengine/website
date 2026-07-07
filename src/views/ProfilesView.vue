@@ -4,9 +4,9 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import NewProfileDialog from '@/components/metadata/NewProfileDialog.vue'
 import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
-import { ListChecks, Plus, Star, Lock, Download } from '@lucide/vue'
+import { ListChecks, Plus, Star, Lock, Download, FileJson2 } from '@lucide/vue'
 import {
   OBLIGATION_ACCENT,
   OBLIGATION_ORDER,
@@ -235,6 +235,11 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
               >
                 <Download class="h-3.5 w-3.5" /> {{ downloadingCrate ? 'Preparing…' : 'Download profile crate' }}
               </Button>
+              <RouterLink v-if="selected.documentId" :to="{ name: 'metadata-detail', params: { id: selected.documentId } }">
+                <Button variant="outline" size="sm" title="The stored RO-Crate document backing this profile">
+                  <FileJson2 class="h-3.5 w-3.5" /> Catalog record
+                </Button>
+              </RouterLink>
               <Button
                 variant="outline"
                 size="sm"

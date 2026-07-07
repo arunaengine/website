@@ -110,6 +110,17 @@ const conformsIri = computed(() => (currentProfile.value ? '' : current.value?.c
 const profileName = computed(() => currentProfile.value?.name ?? (conformsIri.value ? readableIri(conformsIri.value) : 'No profile'))
 const profileShortName = computed(() => currentProfile.value?.shortName ?? (conformsIri.value ? readableIri(conformsIri.value) : 'No profile'))
 
+// Profile documents are excluded from the catalog list (useAruna filters
+// path_prefix 'profiles/' out of metadataItems), so `current` is never set for
+// them and only the bare registry summary renders. Resolve the matching profile
+// record so the header can name it and point at its dedicated renderer.
+const profileForDoc = computed(() => profiles.value.find((profile) => profile.documentId === detailId.value))
+const profileSlugFromPath = computed(() =>
+  currentPath.value.startsWith('profiles/') ? currentPath.value.slice('profiles/'.length) : '',
+)
+const isProfileDoc = computed(() => Boolean(profileForDoc.value || profileSlugFromPath.value))
+const profileDetailId = computed(() => profileForDoc.value?.id ?? profileSlugFromPath.value)
+
 let crateFetchToken = 0
 
 async function fetchCrate(id: string) {
@@ -278,7 +289,7 @@ function entitySize(row: DataEntityRow): string {
 <template>
   <div>
     <PageHeader
-      :title="current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Metadata'"
+      :title="current ? current.title : fetchedSummary ? (profileForDoc?.name ?? fetchedSummary.document_path) : 'Metadata'"
       :description="current ? `${profileName} · ${current.ulid}` : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate metadata document.'"
     >
       <template #actions>
@@ -355,6 +366,15 @@ function entitySize(row: DataEntityRow): string {
             <p class="mt-2 text-sm text-muted-foreground">Showing this document's registry summary; it is not in the catalog listing yet.</p>
           </div>
           <Badge :variant="fetchedSummary.public ? 'success' : 'secondary'" class="text-[10px] uppercase">{{ fetchedSummary.public ? 'public' : 'private' }}</Badge>
+        </div>
+        <div v-if="isProfileDoc" class="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+          <span class="inline-flex items-center gap-2 text-foreground">
+            <ListChecks class="h-4 w-4 text-primary" />
+            This document is a metadata profile{{ profileForDoc ? `: ${profileForDoc.name}` : '' }}.
+          </span>
+          <RouterLink :to="{ name: 'profile-detail', params: { profileId: profileDetailId } }">
+            <Button variant="outline" size="sm">Open in Profiles</Button>
+          </RouterLink>
         </div>
         <dl class="mt-6 grid gap-3 sm:grid-cols-4">
           <div class="surface-muted p-3">
