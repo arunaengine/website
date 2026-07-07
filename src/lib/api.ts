@@ -644,3 +644,42 @@ export interface DecideJoinRequestRequest {
 export interface DecideJoinRequestResponse {
   request: JoinRequest
 }
+
+// --- Node onboarding (POST+GET /admin/onboarding/secrets, DELETE /admin/onboarding/secrets/{id}) ---
+
+// Serialized aruna_core::onboarding::OnboardingMode — plain unit variants,
+// so capitalized strings on the wire.
+export type OnboardingMode = 'Management' | 'Server' | 'Local'
+
+export interface CreateOnboardingSecretRequest {
+  // Origin-style base URL of a management node reachable by the joiner; the
+  // node calls {seed_url}/api/v1/onboarding/bootstrap — never include /api/v1.
+  seed_url: string
+  mode: OnboardingMode
+  // Clamped server-side to 60..86400 seconds; default 3600.
+  expires_in_seconds?: number
+}
+
+export interface CreateOnboardingSecretResponse {
+  // Carried exactly once — the server keeps only a hash. No enrollment_id here.
+  onboarding_secret: string
+  mode: OnboardingMode
+  // Unix seconds.
+  expires_at: number
+}
+
+export interface OnboardingSecretSummary {
+  enrollment_id: string // ULID
+  // Debug-formatted mode; equals OnboardingMode values today, kept open for new kinds.
+  mode: string
+  // Unix seconds. u64::MAX (~1.84e19) marks the never-expiring initial
+  // admin-claim secret minted at realm initialization.
+  expires_at: number
+  // Node id for node claims; a user id when a Local secret was redeemed at
+  // registration (first admin claim). Serialized as null when unclaimed.
+  claimed_node_id: string | null
+}
+
+export interface ListOnboardingSecretsResponse {
+  secrets: OnboardingSecretSummary[]
+}

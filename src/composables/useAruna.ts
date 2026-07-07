@@ -568,11 +568,12 @@ const currentUser = computed<User | null>(() => {
   }
 })
 
-// The backend authorizes quota edits with WRITE on exactly /{realm_id}/admin/config.
-const isRealmAdmin = computed<boolean>(() => {
+// True when the current user holds a WRITE role permission that covers `target`,
+// either as an exact key or via a trailing `/**` wildcard (the seeded
+// realm_admin role grants /{realm_id}/admin/**, which covers every admin path).
+function hasRealmWrite(target: string): boolean {
   const info = userInfo.value
   if (!info) return false
-  const target = `/${info.realm.realm_id}/admin/config`
   return info.realm.roles.some((role) =>
     Object.entries(role.permissions).some(([key, value]) => {
       if (value !== 'Write') return false
@@ -582,6 +583,20 @@ const isRealmAdmin = computed<boolean>(() => {
       return target === base || target.startsWith(`${base}/`)
     }),
   )
+}
+
+// The backend authorizes quota edits with WRITE on exactly /{realm_id}/admin/config.
+const isRealmAdmin = computed<boolean>(() => {
+  const info = userInfo.value
+  return info ? hasRealmWrite(`/${info.realm.realm_id}/admin/config`) : false
+})
+
+// The backend authorizes onboarding-secret management with WRITE on exactly
+// /{realm_id}/admin/onboarding (api/src/routes/onboarding.rs::authorize_onboarding_admin).
+// The seeded realm_admin role grants /{realm_id}/admin/**, which covers both.
+const canManageOnboarding = computed<boolean>(() => {
+  const info = userInfo.value
+  return info ? hasRealmWrite(`/${info.realm.realm_id}/admin/onboarding`) : false
 })
 
 // Quota edits are only accepted by a management node; server/local nodes 403.
@@ -890,6 +905,7 @@ export function useAruna() {
     realm,
     currentUser,
     isRealmAdmin,
+    canManageOnboarding,
     isManagementNode,
     nodes,
     groups,
