@@ -550,7 +550,7 @@ function entitySize(row: DataEntityRow): string {
         </DialogHeader>
         <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
         <DialogFooter>
-          <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+          <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
           <Button variant="destructive" :disabled="saving || writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="confirmDelete">{{ saving ? 'Deleting…' : 'Delete' }}</Button>
         </DialogFooter>
       </DialogContent>

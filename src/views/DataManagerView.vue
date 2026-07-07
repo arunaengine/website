@@ -630,7 +630,7 @@ function objectRefs(object: ObjectEntry): CrateObjectReference[] {
           <p v-if="newFolderError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ newFolderError }}</p>
         </div>
         <DialogFooter>
-          <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+          <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
           <Button :disabled="newFolderInvalid || newFolderBusy" @click="createFolder">{{ newFolderBusy ? 'Creating…' : 'Create' }}</Button>
         </DialogFooter>
       </DialogContent>
@@ -647,7 +647,7 @@ function objectRefs(object: ObjectEntry): CrateObjectReference[] {
         </DialogHeader>
         <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
         <DialogFooter>
-          <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+          <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
           <Button variant="destructive" :disabled="deleteBusy" @click="confirmDelete">{{ deleteBusy ? 'Deleting…' : 'Delete' }}</Button>
         </DialogFooter>
       </DialogContent>

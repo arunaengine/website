@@ -99,7 +99,7 @@ async function withdraw() {
           </div>
 
           <DialogFooter>
-            <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+            <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
             <Button :disabled="busy" @click="submit">
               {{ busy ? 'Sending…' : 'Send request' }}
             </Button>

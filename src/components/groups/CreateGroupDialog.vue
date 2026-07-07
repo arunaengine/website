@@ -78,7 +78,7 @@ async function submit() {
       </div>
 
       <DialogFooter>
-        <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+        <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <Button :disabled="!name.trim() || saving || writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="submit">
           {{ saving ? 'Creating…' : 'Create group' }}
         </Button>

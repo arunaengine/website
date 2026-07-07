@@ -268,7 +268,7 @@ async function save() {
       </template>
 
       <DialogFooter>
-        <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+        <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <Button :disabled="loading || Boolean(loadError) || saving || writesDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined" @click="save">{{ saving ? 'Saving…' : 'Save changes' }}</Button>
       </DialogFooter>
     </DialogContent>

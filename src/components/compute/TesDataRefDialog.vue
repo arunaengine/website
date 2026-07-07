@@ -177,7 +177,7 @@ function addReference() {
       </Tabs>
 
       <DialogFooter>
-        <DialogClose><Button variant="outline">Close</Button></DialogClose>
+        <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
       </DialogFooter>
 
       <CreateCredentialDialog v-model:open="credentialDialogOpen" />
