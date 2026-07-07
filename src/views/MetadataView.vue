@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
+import ConformanceBadge from '@/components/metadata/ConformanceBadge.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -15,6 +16,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
+import { useProfileConformance } from '@/composables/useProfileConformance'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { formatBytes, relativeTime } from '@/lib/utils'
@@ -120,6 +122,10 @@ const profileSlugFromPath = computed(() =>
 )
 const isProfileDoc = computed(() => Boolean(profileForDoc.value || profileSlugFromPath.value))
 const profileDetailId = computed(() => profileForDoc.value?.id ?? profileSlugFromPath.value)
+
+// Evaluate the resolved dataset against its declared profile(s). fetch:true warms
+// the profile crates (the dataset crate is already fetched by fetchCrate below).
+const { conformance } = useProfileConformance(() => current.value, { fetch: true })
 
 let crateFetchToken = 0
 
@@ -325,6 +331,12 @@ function entitySize(row: DataEntityRow): string {
               <span v-else-if="conformsIri" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary" :title="conformsIri">
                 <ListChecks class="h-3 w-3" /> {{ profileName }}
               </span>
+              <ConformanceBadge
+                class="ml-1 align-middle"
+                :state="conformance.state"
+                :error-count="conformance.errorCount"
+                :warning-count="conformance.warningCount"
+              />
               <h1 class="mt-3 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ current.title }}</h1>
               <p class="mt-3 max-w-3xl text-sm leading-relaxed text-foreground/85">{{ current.description || 'No description in RO-Crate summary.' }}</p>
               <div class="mt-4 flex flex-wrap gap-1.5">
@@ -356,6 +368,35 @@ function entitySize(row: DataEntityRow): string {
             </div>
           </dl>
         </article>
+
+        <!-- Profile conformance: the stored crate evaluated against its declared
+             profile(s). Only shown when there is something to say (violations, or
+             a clean pass that still leaves external profiles unchecked). -->
+        <section
+          v-if="conformance.state === 'errors' || conformance.state === 'warnings' || (conformance.state === 'conformant' && conformance.uncheckedIris.length)"
+          class="surface p-4"
+        >
+          <div class="flex items-center gap-2 text-sm font-medium text-foreground">
+            <ListChecks class="h-4 w-4 text-primary" /> Profile conformance
+          </div>
+          <div v-for="entry in conformance.evaluations" :key="entry.profile.id" class="mt-3">
+            <div v-if="conformance.evaluations.length > 1" class="text-xs font-medium text-muted-foreground">{{ entry.profile.name }}</div>
+            <p v-if="!entry.evaluation.violations.length" class="mt-1 text-xs text-muted-foreground">Conforms to {{ entry.profile.name }}.</p>
+            <ul v-else class="mt-1 space-y-1.5">
+              <li v-for="violation in entry.evaluation.violations" :key="violation.ruleId + violation.pointer" class="flex items-start gap-2 text-xs">
+                <span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full" :class="violation.severity === 'error' ? 'bg-destructive' : 'bg-amber-500'" />
+                <span class="min-w-0">
+                  <span class="text-foreground">{{ violation.message }}</span>
+                  <span v-if="violation.hint" class="text-muted-foreground"> {{ violation.hint }}</span>
+                  <span class="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground" :title="violation.pointer">{{ violation.ruleId }}</span>
+                </span>
+              </li>
+            </ul>
+          </div>
+          <p v-if="conformance.uncheckedIris.length" class="mt-3 text-xs text-muted-foreground">
+            Declared profile(s) not locally known — not checked: {{ conformance.uncheckedIris.map(readableIri).join(', ') }}
+          </p>
+        </section>
       </template>
 
       <!-- Resolved directly but not (yet) in the catalog listing: registry summary. -->
