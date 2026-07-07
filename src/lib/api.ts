@@ -1,3 +1,5 @@
+import { portalConfig } from './config'
+
 const DEFAULT_API_BASE_URL = '/api/v1'
 
 export class ApiError extends Error {
@@ -21,7 +23,9 @@ export interface ApiRequestOptions extends RequestInit {
 }
 
 export function defaultApiBaseUrl(): string {
-  return import.meta.env.VITE_ARUNA_API_BASE_URL || DEFAULT_API_BASE_URL
+  // The build-time env pin wins over runtime config so existing deployments
+  // keep their behaviour; the localStorage override in useAruna wins over both.
+  return import.meta.env.VITE_ARUNA_API_BASE_URL || portalConfig().apiBaseUrl || DEFAULT_API_BASE_URL
 }
 
 export async function apiRequest<T>(
