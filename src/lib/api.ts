@@ -727,3 +727,69 @@ export interface EnrollUserDeviceResponse {
   enrollment_id: string
   expires_at: number // unix seconds
 }
+
+// ── Placement administration (aruna#269) ────────────────────────────────────
+// ASSUMED API — NOT yet provided by the backend (issue #269 workplan item 1;
+// blocked by aruna#261/#265). Field vocabulary follows the existing core
+// structs (core/src/structs/placement.rs: PlacementStrategy, AffinityRule,
+// LabelMatch, AffinityEffect::Filter|Multiply{permille}) flattened into the
+// REST style of routes/info.rs. All consumers gate on
+// featureEnabled('placementAdmin'); the flag ships off.
+
+export interface PlacementAffinityRule {
+  key: string
+  value: string
+  // 'filter' restricts placement to matching nodes; 'multiply' scales their
+  // selection weight by `permille` (1000 = neutral).
+  effect: 'filter' | 'multiply'
+  permille?: number
+}
+
+export interface PlacementStrategyConfig {
+  // null ⇒ store on all sync-eligible nodes (core: replica_count: None).
+  replica_count: number | null
+  distinct_locations: boolean
+  affinity: PlacementAffinityRule[]
+}
+
+export interface GroupPlacementStrategyResponse {
+  group_id: string
+  strategy: PlacementStrategyConfig
+  // True when the group has no own binding and inherits the realm default.
+  inherited: boolean
+}
+
+export interface PutPlacementStrategyRequest {
+  strategy: PlacementStrategyConfig
+}
+
+export interface RealmPlacementDefaultsResponse {
+  default_strategy: PlacementStrategyConfig
+}
+
+export interface GroupPlacementResponse {
+  group_id: string
+  // Strategy that produced this computed view (realm default when inherited).
+  strategy_id: string | null
+  // Union of nodes currently selected to hold the group's records; the
+  // portal aggregates these by location against GET /info/realm.
+  node_ids: string[]
+  // Unix ms at which a management node computed the view.
+  computed_at_ms: number
+}
+
+export type PlacementTransitionState = 'pending' | 'copying' | 'verifying' | 'done' | 'failed'
+
+export interface PlacementTransition {
+  transition_id: string
+  // Opaque subject (document/shard) being moved.
+  subject: string
+  from_node_id: string | null
+  to_node_id: string
+  state: PlacementTransitionState
+  updated_at_ms: number
+}
+
+export interface PlacementTransitionsResponse {
+  transitions: PlacementTransition[]
+}

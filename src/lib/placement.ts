@@ -3,7 +3,7 @@
 // "default", see api/src/routes/info.rs), so placement.location is never
 // empty on the wire. Nodes without a placement entry are NOT in the realm's
 // placement map and are aggregated into a separate honest bucket.
-import type { RealmNodeInfo } from './api'
+import type { PlacementAffinityRule, RealmNodeInfo } from './api'
 
 export const UNMAPPED = '(not in placement map)'
 
@@ -73,4 +73,35 @@ export function knownLocations(nodes: RealmNodeInfo[]): string[] {
     if (node.placement) locations.add(node.placement.location)
   }
   return [...locations].sort((a, b) => a.localeCompare(b))
+}
+
+// Assumed reserved matcher key for location pinning (aruna#269): affinity
+// matches label key/value pairs, and core's built-in matcher keys use the
+// 'aruna.io/' prefix (the core tests match 'aruna.io/kind'). Until the backend
+// fixes the vocabulary, location pins are emitted as
+// { key: LOCATION_AFFINITY_KEY, value: <location>, effect: 'filter' }.
+export const LOCATION_AFFINITY_KEY = 'aruna.io/location'
+
+export function isLocationPin(rule: PlacementAffinityRule): boolean {
+  return rule.key === LOCATION_AFFINITY_KEY && rule.effect === 'filter'
+}
+
+// The locations currently pinned by the strategy's affinity filter rules.
+export function locationPins(affinity: PlacementAffinityRule[]): string[] {
+  return affinity.filter(isLocationPin).map((rule) => rule.value)
+}
+
+// Replaces all location-filter rules with the given pins; every other rule is
+// preserved verbatim so the editor never destroys config it can't render.
+export function setLocationPins(
+  affinity: PlacementAffinityRule[],
+  locations: string[],
+): PlacementAffinityRule[] {
+  const preserved = affinity.filter((rule) => !isLocationPin(rule))
+  const pins: PlacementAffinityRule[] = locations.map((location) => ({
+    key: LOCATION_AFFINITY_KEY,
+    value: location,
+    effect: 'filter',
+  }))
+  return [...preserved, ...pins]
 }
