@@ -13,9 +13,13 @@ export const DEFAULT_SELECT_LIMIT = 100
 
 // First significant keyword after comments/PREFIX/BASE headers.
 export function sparqlQueryForm(query: string): 'select' | 'ask' | 'unknown' {
+  // PREFIX/BASE declarations are IRI-aware (<[^>]*> tolerates an internal '#')
+  // and MUST be stripped before comments, otherwise a hash-namespace IRI like
+  // <http://www.w3.org/1999/02/22-rdf-syntax-ns#> loses its '#>' to the comment
+  // strip and the query is misclassified as 'unknown' (rdf/rdfs/xsd/owl).
   const stripped = query
-    .replace(/#[^\n]*/g, ' ')
     .replace(/\b(?:PREFIX\s+[^\s<]*\s*<[^>]*>|BASE\s*<[^>]*>)/gi, ' ')
+    .replace(/#[^\n]*/g, ' ')
     .trim()
   if (/^SELECT\b/i.test(stripped)) return 'select'
   if (/^ASK\b/i.test(stripped)) return 'ask'
@@ -182,6 +186,7 @@ export function loadQueryHistory(): QueryHistoryEntry[] {
         Boolean(e && typeof e === 'object')
         && typeof (e as QueryHistoryEntry).query === 'string'
         && typeof (e as QueryHistoryEntry).scope === 'string'
+        && ((e as QueryHistoryEntry).mode === 'local' || (e as QueryHistoryEntry).mode === 'distributed')
         && typeof (e as QueryHistoryEntry).at === 'number',
     )
   } catch {

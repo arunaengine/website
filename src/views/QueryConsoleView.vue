@@ -20,6 +20,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   SquareTerminal,
+  Compass,
   Play,
   LoaderCircle,
   History,
@@ -176,9 +177,17 @@ function renderCell(raw: string | undefined): RenderCell {
   const term = parseSparqlTerm(raw)
   switch (term.type) {
     case 'iri':
-      return term.documentId
-        ? { kind: 'link', text: term.value, title: term.value, href: '', documentId: term.documentId, suffix: '' }
-        : { kind: 'external', text: term.value, title: term.value, href: term.value, documentId: '', suffix: '' }
+      if (term.documentId) {
+        return { kind: 'link', text: term.value, title: term.value, href: '', documentId: term.documentId, suffix: '' }
+      }
+      // Graph content is user-authored, so only http(s) IRIs become clickable
+      // anchors — a hostile document could otherwise plant javascript:/data:
+      // IRIs that rel="noopener" does not neutralize. Everything else renders
+      // as an inert monospace literal with the full IRI preserved.
+      if (/^https?:\/\//i.test(term.value)) {
+        return { kind: 'external', text: term.value, title: term.value, href: term.value, documentId: '', suffix: '' }
+      }
+      return { kind: 'literal', text: term.value, title: term.value, href: '', documentId: '', suffix: '' }
     case 'literal':
       return {
         kind: 'literal',
@@ -271,7 +280,7 @@ function firstLine(query: string): string {
     >
       <template #actions>
         <RouterLink :to="{ name: 'search' }">
-          <Button variant="outline"><SquareTerminal class="h-4 w-4" /> Discover</Button>
+          <Button variant="outline"><Compass class="h-4 w-4" /> Discover</Button>
         </RouterLink>
       </template>
     </PageHeader>
