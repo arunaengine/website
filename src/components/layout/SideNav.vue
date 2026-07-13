@@ -13,6 +13,7 @@ import {
   Compass,
   LayoutDashboard,
   ListChecks,
+  ListTodo,
   MapPinned,
   ServerCog,
   Settings,
@@ -40,12 +41,16 @@ const placementAdminEnabled = featureEnabled('placementAdmin')
 // Config resolves before the app mounts, so a plain read is safe here.
 const tesEnabled = featureEnabled('tes')
 
+// Durable jobs API — served by aruna feat/job-framework backends only.
+const jobsEnabled = featureEnabled('jobs')
+
 const nav = computed<NavItem[]>(() => [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
   { to: '/app/query', icon: SquareTerminal, label: 'Query' },
   { to: '/app/buckets', icon: Boxes, label: 'Data' },
   ...(tesEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
+  ...(jobsEnabled ? [{ to: '/app/jobs', icon: ListTodo, label: 'Jobs' }] : []),
   { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
   { to: '/app/groups', icon: Users, label: 'Groups' },
   { to: '/app/status', icon: Activity, label: 'Status' },

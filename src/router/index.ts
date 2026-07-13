@@ -50,6 +50,10 @@ const routes: RouteRecordRaw[] = [
       { path: 'admin/onboarding', name: 'admin-onboarding', component: () => import('@/views/AdminOnboardingView.vue') },
       // Realm admin — placement defaults and transitions (feature-gated in-view)
       { path: 'admin/placement', name: 'admin-placement', component: () => import('@/views/AdminPlacementView.vue') },
+      // Jobs — durable background jobs (feature-gated in-view; the backend
+      // surface lives on aruna feat/job-framework)
+      { path: 'jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
+      { path: 'jobs/:jobId', name: 'job-detail', component: () => import('@/views/JobsView.vue') },
       // Compute — GA4GH TES tasks (feature-gated in-view, aruna#290)
       { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
       { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue') },
