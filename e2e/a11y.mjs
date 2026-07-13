@@ -8,7 +8,7 @@ import { a11yAudit } from './a11y-checker.mjs'
 // a few keyboard flows (skip link, dialog open/close focus, menu, query view).
 // A view PASSES when it reports ZERO gating violations; the fuzzier heuristics
 // (contrast, heading order, scrollable regions) print as warnings and never
-// gate. Config-gated surfaces (tes / placementAdmin / deviceEnrollment /
+// gate. Config-gated surfaces (tes / jobs / placementAdmin / deviceEnrollment /
 // subscriptions) are visited only when their flag is on, else logged as SKIP.
 //
 // Branch gate (per engagement — e2e never blocks on a live stack):
@@ -176,6 +176,7 @@ try {
   // ── Config-gated views (visited only when enabled) ──────────────────────────
   const gated = [
     { flag: 'tes', paths: [['/app/compute', 'compute'], ['/app/compute/new', 'compute submit']] },
+    { flag: 'jobs', paths: [['/app/jobs', 'jobs']] },
     { flag: 'placementAdmin', paths: [['/app/admin/placement', 'placement admin']] },
     { flag: 'deviceEnrollment', paths: [['/app/settings/devices', 'devices']] },
     { flag: 'subscriptions', paths: [['/app/settings/subscriptions', 'subscriptions']] },
