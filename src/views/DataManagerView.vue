@@ -80,10 +80,11 @@ const queue = useUploadQueue()
 const dragActive = ref(false)
 const addDataOpen = ref(false)
 
-// Staging jobs side panel: config-gated (no job-listing endpoint on today's
-// backends). Flag off ⇒ no toolbar button, no panel, no /staging/jobs request.
+// Staging jobs side panel: gated on the durable jobs API flag (the backend
+// surface lives on aruna feat/job-framework). Flag off ⇒ no toolbar button,
+// no panel, no /jobs request.
 const staging = useStaging()
-const stagingJobsEnabled = featureEnabled('stagingJobs')
+const stagingJobsEnabled = featureEnabled('jobs')
 const stagingPanelOpen = ref(false)
 
 // A finished upload into the current bucket refreshes the listing; completions
