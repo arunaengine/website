@@ -81,8 +81,13 @@ const swaggerUrl = computed(() => {
 })
 
 function saveConnection() {
+  const nextToken = tokenDraft.value.trim()
+  const tokenWasEdited = nextToken !== authToken.value
+  const baseWillChange = (apiBaseDraft.value.trim() || '/api/v1') !== apiBaseUrl.value
   setApiBaseUrl(apiBaseDraft.value)
-  setAuthToken(tokenDraft.value)
+  // Do not send an endpoint's existing bearer token to a different API unless
+  // the user explicitly replaced the token as part of this connection change.
+  if (!baseWillChange || tokenWasEdited) setAuthToken(nextToken)
   void refresh()
 }
 

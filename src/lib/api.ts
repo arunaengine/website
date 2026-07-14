@@ -1,6 +1,8 @@
 import { portalConfig } from './config'
+import { fetchWithTimeout } from './fetch'
 
 const DEFAULT_API_BASE_URL = '/api/v1'
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 
 export class ApiError extends Error {
   constructor(
@@ -49,7 +51,7 @@ export async function apiRequest<T>(
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await fetch(url, { ...options, headers })
+  const response = await fetchWithTimeout(url, { ...options, headers }, DEFAULT_REQUEST_TIMEOUT_MS)
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`
     try {
@@ -61,8 +63,10 @@ export async function apiRequest<T>(
     throw new ApiError(response.status, message)
   }
 
-  if (response.status === 204) return undefined as T
-  return response.json() as Promise<T>
+  if (response.status === 204 || response.status === 205) return undefined as T
+  const body = await response.text()
+  if (!body) return undefined as T
+  return JSON.parse(body) as T
 }
 
 export interface InfoResponse {

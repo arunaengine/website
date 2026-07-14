@@ -13,11 +13,12 @@ export interface OidcTokenResponse {
 }
 
 const discoveryCache = new Map<string, Promise<OidcDiscoveryDocument>>()
+const OIDC_TIMEOUT_MS = 15_000
 
 export function fetchDiscovery(discoveryUrl: string): Promise<OidcDiscoveryDocument> {
   let cached = discoveryCache.get(discoveryUrl)
   if (!cached) {
-    cached = fetch(discoveryUrl).then(async (response) => {
+    cached = fetchWithTimeout(discoveryUrl, {}, OIDC_TIMEOUT_MS).then(async (response) => {
       if (!response.ok) {
         throw new Error(`OIDC discovery failed: ${response.status} ${response.statusText}`)
       }
@@ -79,11 +80,15 @@ export async function exchangeAuthorizationCode(input: {
     code: input.code,
     code_verifier: input.codeVerifier,
   })
-  const response = await fetch(input.tokenEndpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  })
+  const response = await fetchWithTimeout(
+    input.tokenEndpoint,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    },
+    OIDC_TIMEOUT_MS,
+  )
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`
     try {
@@ -109,3 +114,4 @@ export function buildEndSessionUrl(input: {
   url.searchParams.set('client_id', input.clientId)
   return url.toString()
 }
+import { fetchWithTimeout } from './fetch'

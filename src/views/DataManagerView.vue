@@ -15,7 +15,7 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useS3, s3ErrorMessage, isS3AuthError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type UploadHandle } from '@/composables/useS3'
+import { useS3, s3ErrorMessage, isS3AuthError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type S3Key, type UploadHandle } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { UsageResponse } from '@/lib/api'
 import { formatBytes, relativeTime } from '@/lib/utils'
@@ -40,8 +40,13 @@ const router = useRouter()
 const { currentUser, bootstrapped, credentials, getGroupUsage } = useAruna()
 const s3 = useS3()
 
-const bucket = computed(() => (route.params.bucketId as string | undefined) ?? '')
-const prefix = computed(() => (route.query.prefix as string | undefined) ?? '')
+function routeString(value: unknown): string {
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
+  return typeof value === 'string' ? value : ''
+}
+
+const bucket = computed(() => routeString(route.params.bucketId))
+const prefix = computed(() => routeString(route.query.prefix))
 const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
 
 const buckets = ref<BucketEntry[]>([])
@@ -77,10 +82,11 @@ interface UploadItem {
 const uploads = ref<UploadItem[]>([])
 const uploadHandles = new Map<number, UploadHandle>()
 let uploadCounter = 0
+let disposed = false
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragActive = ref(false)
 
-const deleteTarget = ref<ObjectEntry | null>(null)
+const deleteTarget = ref<{ bucket: string; object: ObjectEntry } | null>(null)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 
@@ -93,34 +99,52 @@ const newFolderInvalid = computed(() => {
   return !name || name.includes('/')
 })
 
+let bucketRequestId = 0
+let listRequestId = 0
+
+function clearObjectListing() {
+  ++listRequestId
+  folders.value = []
+  objects.value = []
+  nextToken.value = undefined
+  listLoading.value = false
+  listError.value = null
+  listAuthError.value = false
+  deleteTarget.value = null
+}
+
 async function refreshBuckets() {
   if (!s3.hasActiveKey.value || !s3.endpoint.value) return
+  const requestId = ++bucketRequestId
   bucketsLoading.value = true
   bucketsError.value = null
   bucketsAuthError.value = false
   try {
-    buckets.value = await s3.listBuckets()
+    const entries = await s3.listBuckets()
+    if (requestId !== bucketRequestId) return
+    buckets.value = entries
   } catch (err) {
-    bucketsError.value = s3ErrorMessage(err)
-    bucketsAuthError.value = isS3AuthError(err)
-    buckets.value = []
+    if (requestId === bucketRequestId) {
+      bucketsError.value = s3ErrorMessage(err)
+      bucketsAuthError.value = isS3AuthError(err)
+      buckets.value = []
+    }
   } finally {
-    bucketsLoading.value = false
+    if (requestId === bucketRequestId) bucketsLoading.value = false
   }
 }
-
-// Listings refresh in the background: rendered rows stay in place until the
-// new page arrives, and stale responses are dropped via a request id.
-let listRequestId = 0
 
 async function loadObjects(more = false) {
   if (!s3.hasActiveKey.value || !s3.endpoint.value || !bucket.value) return
   const requestId = ++listRequestId
+  const targetBucket = bucket.value
+  const targetPrefix = s3Prefix.value
+  const continuation = more ? nextToken.value : undefined
   listLoading.value = true
   listError.value = null
   listAuthError.value = false
   try {
-    const page = await s3.listObjects(bucket.value, s3Prefix.value, more ? nextToken.value : undefined)
+    const page = await s3.listObjects(targetBucket, targetPrefix, continuation)
     if (requestId !== listRequestId) return
     folders.value = more ? [...folders.value, ...page.folders] : page.folders
     objects.value = more ? [...objects.value, ...page.objects] : page.objects
@@ -146,13 +170,14 @@ function refreshAll() {
 watch(
   [() => s3.activeKey.value, () => s3.endpoint.value],
   ([key, endpoint]) => {
-    if (!key) {
-      buckets.value = []
-      folders.value = []
-      objects.value = []
-      nextToken.value = undefined
-      return
-    }
+    ++bucketRequestId
+    buckets.value = []
+    bucketsLoading.value = false
+    bucketsError.value = null
+    bucketsAuthError.value = false
+    clearObjectListing()
+    abortActiveUploads()
+    if (!key) return
     if (!endpoint) return
     refreshAll()
   },
@@ -160,6 +185,7 @@ watch(
 )
 
 watch([bucket, prefix], () => {
+  clearObjectListing()
   if (bucket.value) void loadObjects()
 })
 
@@ -171,10 +197,12 @@ function activateManualKey() {
 }
 
 function openBucket(name: string) {
+  clearObjectListing()
   router.push({ name: 'bucket', params: { bucketId: name } })
 }
 
 function navigateTo(path: string) {
+  clearObjectListing()
   router.push({
     name: 'bucket',
     params: { bucketId: bucket.value },
@@ -213,10 +241,12 @@ async function createFolder() {
   if (newFolderInvalid.value || newFolderBusy.value) return
   newFolderBusy.value = true
   newFolderError.value = null
+  const targetBucket = bucket.value
+  const targetPrefix = s3Prefix.value
   try {
-    await s3.createFolder(bucket.value, s3Prefix.value, newFolderName.value.trim())
+    await s3.createFolder(targetBucket, targetPrefix, newFolderName.value.trim())
     newFolderOpen.value = false
-    await loadObjects()
+    if (targetBucket === bucket.value && targetPrefix === s3Prefix.value) await loadObjects()
   } catch (err) {
     newFolderError.value = s3ErrorMessage(err)
   } finally {
@@ -264,42 +294,83 @@ async function groupUsageFresh(groupId: string): Promise<UsageResponse | null> {
 }
 
 const precheck = ref<{
-  files: File[]
+  context: UploadContext
   totalBytes: number
   projected: QuotaAssessment
   current: QuotaAssessment
 } | null>(null)
 
+interface UploadContext {
+  files: File[]
+  bucket: string
+  prefix: string
+  endpoint: string
+  key: S3Key
+  groupId: string | null
+}
+
+function captureUploadContext(files: File[]): UploadContext | null {
+  const key = s3.activeKey.value
+  const endpoint = s3.endpoint.value
+  if (!key || !endpoint || !bucket.value) return null
+  return {
+    files,
+    bucket: bucket.value,
+    prefix: s3Prefix.value,
+    endpoint,
+    key,
+    groupId: activeGroupId.value,
+  }
+}
+
+function sameS3Session(context: UploadContext): boolean {
+  const key = s3.activeKey.value
+  return Boolean(
+    !disposed &&
+      key &&
+      s3.endpoint.value === context.endpoint &&
+      key.accessKeyId === context.key.accessKeyId &&
+      key.secretAccessKey === context.key.secretAccessKey,
+  )
+}
+
 // Advisory only: this may warn but never blocks. Every path ends in an upload.
 async function requestUpload(files: File[]) {
-  const groupId = activeGroupId.value
+  const context = captureUploadContext(files)
+  if (!context) return
+  const groupId = context.groupId
   if (groupId) {
     const usage = await groupUsageFresh(groupId)
+    if (!sameS3Session(context)) return
     const quota = usage?.quota
     if (usage && quota && quota.quota_bytes != null) {
       const used = quotaCountedBytes(usage)
       const totalBytes = files.reduce((sum, file) => sum + file.size, 0)
       const projected = assessQuota(quota, used + totalBytes)
       if (projected.state === 'over-quota' || projected.state === 'over-ceiling') {
-        precheck.value = { files, totalBytes, projected, current: assessQuota(quota, used) }
+        precheck.value = { context, totalBytes, projected, current: assessQuota(quota, used) }
         return
       }
     }
   }
-  await uploadFiles(files)
+  await uploadFiles(context)
 }
 
 function confirmPrecheckUpload() {
-  const files = precheck.value?.files ?? []
+  const context = precheck.value?.context ?? null
   precheck.value = null
-  if (files.length) void uploadFiles(files)
+  if (context) void uploadFiles(context)
 }
 
-async function uploadFiles(files: File[]) {
-  for (const file of files) {
+async function uploadFiles(context: UploadContext) {
+  for (const file of context.files) {
+    if (!sameS3Session(context)) {
+      listError.value = 'The active S3 credentials changed, so the remaining uploads were canceled.'
+      break
+    }
     const item: UploadItem = { id: ++uploadCounter, name: file.name, state: 'uploading', progress: 0 }
     uploads.value = [...uploads.value, item]
-    const handle = s3.uploadObject(bucket.value, `${s3Prefix.value}${file.name}`, file, (loaded, total) => {
+    const handle = s3.uploadObject(context.bucket, `${context.prefix}${file.name}`, file, (loaded, total) => {
       item.progress = total ? Math.round((loaded / total) * 100) : 0
       uploads.value = [...uploads.value]
     })
@@ -323,7 +394,9 @@ async function uploadFiles(files: File[]) {
     }
     uploads.value = [...uploads.value]
   }
-  await loadObjects()
+  if (context.bucket === bucket.value && context.prefix === s3Prefix.value && sameS3Session(context)) {
+    await loadObjects()
+  }
 }
 
 async function cancelUpload(item: UploadItem) {
@@ -338,6 +411,15 @@ function clearFinishedUploads() {
   uploads.value = uploads.value.filter((item) => item.state === 'uploading')
 }
 
+function abortActiveUploads() {
+  for (const [id, handle] of uploadHandles) {
+    const item = uploads.value.find((entry) => entry.id === id)
+    if (item) item.state = 'canceled'
+    void handle.abort().catch(() => undefined)
+  }
+  if (uploadHandles.size) uploads.value = [...uploads.value]
+}
+
 // A reload mid-upload silently discards the multipart upload, so ask the
 // browser to confirm while one is running.
 function onBeforeUnload(event: BeforeUnloadEvent) {
@@ -345,11 +427,16 @@ function onBeforeUnload(event: BeforeUnloadEvent) {
   event.preventDefault()
 }
 window.addEventListener('beforeunload', onBeforeUnload)
-onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload))
+onBeforeUnmount(() => {
+  disposed = true
+  window.removeEventListener('beforeunload', onBeforeUnload)
+  abortActiveUploads()
+})
 
 async function download(object: ObjectEntry) {
+  const sourceBucket = bucket.value
   try {
-    const url = await s3.downloadUrl(bucket.value, object.key)
+    const url = await s3.downloadUrl(sourceBucket, object.key)
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = object.name
@@ -363,12 +450,13 @@ async function download(object: ObjectEntry) {
 
 async function confirmDelete() {
   if (!deleteTarget.value) return
+  const target = deleteTarget.value
   deleteBusy.value = true
   deleteError.value = null
   try {
-    await s3.deleteObject(bucket.value, deleteTarget.value.key)
+    await s3.deleteObject(target.bucket, target.object.key)
     deleteTarget.value = null
-    await loadObjects()
+    if (target.bucket === bucket.value) await loadObjects()
   } catch (err) {
     deleteError.value = s3ErrorMessage(err)
   } finally {
@@ -577,7 +665,7 @@ const isEmpty = computed(
                     <td class="px-4 py-2.5">
                       <div class="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon-sm" aria-label="Download" @click="download(object)"><Download class="size-3.5" /></Button>
-                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click="deleteTarget = object; deleteError = null"><Trash2 class="size-3.5" /></Button>
+                         <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click="deleteTarget = { bucket, object }; deleteError = null"><Trash2 class="size-3.5" /></Button>
                       </div>
                     </td>
                   </tr>
@@ -625,8 +713,8 @@ const isEmpty = computed(
         <DialogHeader>
           <DialogTitle>Delete object</DialogTitle>
           <DialogDescription>
-            Deletes <span class="font-mono text-xs">{{ deleteTarget?.key }}</span> from
-            <span class="font-mono text-xs">{{ bucket }}</span>. A delete marker is written; earlier versions stay retrievable by version ID.
+             Deletes <span class="font-mono text-xs">{{ deleteTarget?.object.key }}</span> from
+             <span class="font-mono text-xs">{{ deleteTarget?.bucket }}</span>. A delete marker is written; earlier versions stay retrievable by version ID.
           </DialogDescription>
         </DialogHeader>
         <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>

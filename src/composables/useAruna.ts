@@ -41,7 +41,7 @@ const TOKEN_KEY = 'aruna.authToken'
 const API_BASE_KEY = 'aruna.apiBaseUrl'
 
 const apiBaseUrl = ref(readStored(API_BASE_KEY) || defaultApiBaseUrl())
-const authToken = ref(readStored(TOKEN_KEY) || import.meta.env.VITE_ARUNA_TOKEN || '')
+const authToken = ref(readStored(TOKEN_KEY))
 const loading = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
@@ -58,16 +58,25 @@ const credentials = ref<S3CredentialSummary[]>([])
 const fullCrates = ref<Record<string, unknown>>({})
 const cratePending = ref<Record<string, boolean>>({})
 const bootstrapped = ref(false)
+let sessionEpoch = 0
 
 function readStored(key: string): string {
   if (typeof window === 'undefined') return ''
-  return window.localStorage.getItem(key) ?? ''
+  try {
+    return window.localStorage.getItem(key) ?? ''
+  } catch {
+    return ''
+  }
 }
 
 function storeValue(key: string, value: string) {
   if (typeof window === 'undefined') return
-  if (value) window.localStorage.setItem(key, value)
-  else window.localStorage.removeItem(key)
+  try {
+    if (value) window.localStorage.setItem(key, value)
+    else window.localStorage.removeItem(key)
+  } catch {
+    // The live in-memory session still works when storage is unavailable.
+  }
 }
 
 function client() {
@@ -78,39 +87,69 @@ async function request<T>(path: string, options = {}) {
   return apiRequest<T>(path, options, client())
 }
 
+function refreshContext() {
+  return { epoch: sessionEpoch, client: client() }
+}
+
+function clearIdentityState(clearPublic = false) {
+  userInfo.value = null
+  apiGroups.value = []
+  credentials.value = []
+  metadataItems.value = []
+  profileItems.value = []
+  fullCrates.value = {}
+  cratePending.value = {}
+  authError.value = null
+  if (clearPublic) {
+    nodeInfo.value = null
+    realmInfo.value = null
+    usageInfo.value = null
+  }
+}
+
 async function refresh() {
+  const context = refreshContext()
   loading.value = true
   error.value = null
   authError.value = null
   try {
-    await Promise.all([loadInfo(), loadMetadata()])
-    if (authToken.value) {
-      await loadAuthenticated().catch((err: unknown) => {
-        authError.value = errorMessage(err)
+    const [publicResult, authResult] = await Promise.allSettled([
+      Promise.all([loadInfo(context), loadMetadata(context)]),
+      context.client.token ? loadAuthenticated(context) : Promise.resolve(),
+    ])
+    if (context.epoch !== sessionEpoch) return
+    if (publicResult.status === 'rejected') error.value = errorMessage(publicResult.reason)
+    if (authResult.status === 'rejected') {
+      if (context.client.token) {
+        authError.value = errorMessage(authResult.reason)
         userInfo.value = null
         apiGroups.value = []
         credentials.value = []
-      })
-    } else {
+      } else {
+        apiGroups.value = []
+      }
+    } else if (!context.client.token) {
       userInfo.value = null
-      apiGroups.value = []
       credentials.value = []
     }
   } catch (err) {
-    error.value = errorMessage(err)
+    if (context.epoch === sessionEpoch) error.value = errorMessage(err)
   } finally {
-    loading.value = false
-    bootstrapped.value = true
+    if (context.epoch === sessionEpoch) {
+      loading.value = false
+      bootstrapped.value = true
+    }
   }
 }
 
-async function loadInfo() {
+async function loadInfo(context = refreshContext()) {
   // /info/usage is not deployed everywhere yet; hide the stats on failure.
   const [info, realm, usage] = await Promise.all([
-    request<InfoResponse>('/info'),
-    request<RealmInfoResponse>('/info/realm'),
-    request<UsageResponse>('/info/usage').catch(() => null),
+    apiRequest<InfoResponse>('/info', {}, context.client),
+    apiRequest<RealmInfoResponse>('/info/realm', {}, context.client),
+    apiRequest<UsageResponse>('/info/usage', {}, context.client).catch(() => null),
   ])
+  if (context.epoch !== sessionEpoch) return
   nodeInfo.value = info
   realmInfo.value = realm
   usageInfo.value = usage
@@ -119,13 +158,18 @@ async function loadInfo() {
 // Right after a create, the RO-Crate graph projection can lag behind the
 // document registry, so listing with include=summary briefly 500s. Retry a
 // few times, then fall back to a summary-less list so the catalog still loads.
-async function listMetadata(query: Record<string, string | number>): Promise<ListMetadataResponse> {
+async function listMetadataPage(
+  query: Record<string, string | number>,
+  context = refreshContext(),
+): Promise<ListMetadataResponse> {
   const attempts = 3
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      return await request<ListMetadataResponse>('/metadata', {
-        query: { include: 'summary', limit: 1000, ...query },
-      })
+      return await apiRequest<ListMetadataResponse>(
+        '/metadata',
+        { query: { include: 'summary', limit: 1000, ...query } },
+        context.client,
+      )
     } catch (err) {
       const transient = err instanceof ApiError && err.status >= 500
       if (transient && attempt < attempts - 1) {
@@ -133,7 +177,11 @@ async function listMetadata(query: Record<string, string | number>): Promise<Lis
         continue
       }
       if (transient) {
-        return request<ListMetadataResponse>('/metadata', { query: { limit: 1000, ...query } })
+        return apiRequest<ListMetadataResponse>(
+          '/metadata',
+          { query: { limit: 1000, ...query } },
+          context.client,
+        )
       }
       throw err
     }
@@ -141,24 +189,65 @@ async function listMetadata(query: Record<string, string | number>): Promise<Lis
   throw new Error('unreachable')
 }
 
-async function loadMetadata() {
-  const [metadata, profiles] = await Promise.all([
-    listMetadata({}),
-    listMetadata({ path_prefix: 'profiles/' }),
-  ])
-  metadataItems.value = metadata.documents.filter((doc) => !doc.document_path.startsWith('profiles/'))
-  profileItems.value = profiles.documents
+async function listMetadata(
+  query: Record<string, string | number>,
+  context = refreshContext(),
+): Promise<ListMetadataResponse> {
+  const documents: MetadataDocumentListItem[] = []
+  let offset = 0
+  let last: ListMetadataResponse | null = null
+  do {
+    last = await listMetadataPage({ ...query, offset }, context)
+    documents.push(...last.documents)
+    offset = last.offset + last.total_returned
+  } while (last.total_returned > 0 && last.total_returned >= last.limit)
+
+  return {
+    documents,
+    limit: last?.limit ?? 1000,
+    offset: 0,
+    total_returned: documents.length,
+  }
 }
 
-async function loadAuthenticated() {
-  const [me, groups, credentialList] = await Promise.all([
-    request<UserInfoResponse>('/users/info'),
-    request<ListGroupsResponse>('/groups', { query: { include: 'roles', limit: 1000 } }),
-    request<ListS3CredentialsResponse>('/users/credentials'),
-  ])
+async function loadMetadata(context = refreshContext()) {
+  const catalog = await listMetadata({}, context)
+  if (context.epoch !== sessionEpoch) return
+  metadataItems.value = catalog.documents.filter((doc) => !doc.document_path.startsWith('profiles/'))
+  profileItems.value = catalog.documents.filter((doc) => doc.document_path.startsWith('profiles/'))
+}
+
+async function loadAuthenticated(context = refreshContext()) {
+  // /users/info is the authentication authority. Optional group and credential
+  // capabilities must not turn a valid session into a signed-out one.
+  const me = await apiRequest<UserInfoResponse>('/users/info', {}, context.client)
+  if (context.epoch !== sessionEpoch) return
   userInfo.value = me
-  apiGroups.value = groups.groups
-  credentials.value = credentialList.credentials
+  const [groups, credentialList] = await Promise.allSettled([
+    listGroups(context),
+    apiRequest<ListS3CredentialsResponse>('/users/credentials', {}, context.client),
+  ])
+  if (context.epoch !== sessionEpoch) return
+  apiGroups.value = groups.status === 'fulfilled' ? groups.value.groups : []
+  credentials.value = credentialList.status === 'fulfilled' ? credentialList.value.credentials : []
+}
+
+async function listGroups(context = refreshContext()): Promise<ListGroupsResponse> {
+  const groups: ApiGroup[] = []
+  const limit = 1000
+  let offset = 0
+  while (true) {
+    const page = await apiRequest<ListGroupsResponse>(
+      '/groups',
+      { query: { include: 'roles', limit, offset } },
+      context.client,
+    )
+    groups.push(...page.groups)
+    if (page.groups.length < limit) break
+    offset += page.groups.length
+  }
+  if (context.epoch === sessionEpoch) apiGroups.value = groups
+  return { groups }
 }
 
 // Thrown when the RO-Crate graph projection is still materializing after the
@@ -168,6 +257,10 @@ export class CrateNotReadyError extends Error {
     super('The RO-Crate is still being prepared. Try again in a moment.')
     this.name = 'CrateNotReadyError'
   }
+}
+
+function assertCurrentSession(epoch: number) {
+  if (epoch !== sessionEpoch) throw new DOMException('The API session changed.', 'AbortError')
 }
 
 // Backoff while the graph projection materializes right after a create.
@@ -182,15 +275,23 @@ function setCratePending(documentId: string, pending: boolean) {
 // of surfacing an error, and give up with CrateNotReadyError after ~20s.
 async function loadRoCrate(documentId: string): Promise<unknown> {
   if (fullCrates.value[documentId]) return fullCrates.value[documentId]
+  const context = refreshContext()
   try {
     for (let attempt = 0; ; attempt++) {
       try {
-        const response = await request<MetadataRoCrateResponse>(`/metadata/${documentId}/rocrate`)
+        assertCurrentSession(context.epoch)
+        const response = await apiRequest<MetadataRoCrateResponse>(
+          `/metadata/${documentId}/rocrate`,
+          { query: { view: 'full' } },
+          context.client,
+        )
+        assertCurrentSession(context.epoch)
         // Public profile crates reference their artifacts on S3 instead of
         // embedding text; fetch that content once here so the synchronous
         // consumers (mapProfile, the dataset dialog) keep reading `text`.
         // Crates without external artifacts pass through untouched.
         const resolved = await resolveProfileArtifacts(response.rocrate)
+        assertCurrentSession(context.epoch)
         fullCrates.value = { ...fullCrates.value, [documentId]: resolved }
         return resolved
       } catch (err) {
@@ -202,7 +303,7 @@ async function loadRoCrate(documentId: string): Promise<unknown> {
       }
     }
   } finally {
-    setCratePending(documentId, false)
+    if (context.epoch === sessionEpoch) setCratePending(documentId, false)
   }
 }
 
@@ -223,13 +324,26 @@ async function createMetadata(input: CreateMetadataRequest) {
 }
 
 async function getMetadataDocument(documentId: string): Promise<MetadataDocumentSummary> {
-  return request<MetadataDocumentSummary>(`/metadata/${encodeURIComponent(documentId)}`)
+  const context = refreshContext()
+  const summary = await apiRequest<MetadataDocumentSummary>(
+    `/metadata/${encodeURIComponent(documentId)}`,
+    {},
+    context.client,
+  )
+  assertCurrentSession(context.epoch)
+  return summary
 }
 
 // Uncached, unresolved crate for editing (loadRoCrate caches and resolves
 // profile artifacts, which must never be written back).
 async function fetchRoCrateRaw(documentId: string): Promise<unknown> {
-  const response = await request<MetadataRoCrateResponse>(`/metadata/${encodeURIComponent(documentId)}/rocrate`)
+  const context = refreshContext()
+  const response = await apiRequest<MetadataRoCrateResponse>(
+    `/metadata/${encodeURIComponent(documentId)}/rocrate`,
+    { query: { view: 'full' } },
+    context.client,
+  )
+  assertCurrentSession(context.epoch)
   return response.rocrate
 }
 
@@ -271,9 +385,7 @@ async function deleteMetadataDocument(documentId: string): Promise<void> {
 }
 
 async function listGroupMetadata(groupId: string): Promise<ListMetadataResponse> {
-  return request<ListMetadataResponse>('/metadata', {
-    query: { group_id: groupId, include: 'summary', limit: 1000 },
-  })
+  return listMetadata({ group_id: groupId })
 }
 
 // Favourites live in the user attribute ui.favourite_metadata_ids as a
@@ -509,13 +621,26 @@ async function searchMetadata(
 }
 
 function setAuthToken(token: string) {
-  authToken.value = token.trim()
+  const next = token.trim()
+  if (next === authToken.value) return
+  sessionEpoch++
+  authToken.value = next
   storeValue(TOKEN_KEY, authToken.value)
+  clearIdentityState()
+  loading.value = false
 }
 
 function setApiBaseUrl(url: string) {
-  apiBaseUrl.value = url.trim() || defaultApiBaseUrl()
+  const next = url.trim() || defaultApiBaseUrl()
+  if (next === apiBaseUrl.value) return
+  sessionEpoch++
+  apiBaseUrl.value = next
   storeValue(API_BASE_KEY, apiBaseUrl.value === defaultApiBaseUrl() ? '' : apiBaseUrl.value)
+  authToken.value = ''
+  storeValue(TOKEN_KEY, '')
+  clearIdentityState(true)
+  loading.value = false
+  bootstrapped.value = false
 }
 
 const realm = computed<Realm>(() => {
@@ -746,7 +871,13 @@ function graph(value: unknown): Array<Record<string, unknown>> {
 }
 
 function primaryEntity(value: unknown): Record<string, unknown> | undefined {
-  return graph(value).find((entry) => entry['@id'] !== 'ro-crate-metadata.json')
+  const entries = graph(value)
+  const descriptor = entries.find((entry) => entry['@id'] === 'ro-crate-metadata.json')
+  const rootId = idValue(descriptor?.about)
+  return (
+    (rootId ? entries.find((entry) => entry['@id'] === rootId) : undefined) ??
+    entries.find((entry) => entry['@id'] !== 'ro-crate-metadata.json')
+  )
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

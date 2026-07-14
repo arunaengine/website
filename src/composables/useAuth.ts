@@ -59,6 +59,7 @@ async function signIn(options: { onboardingSecret?: string; redirectTo?: string 
     const discovery = await fetchDiscovery(discoveryUrl)
     const verifier = randomUrlSafeString(48)
     const state = randomUrlSafeString(16)
+    window.sessionStorage.removeItem(ID_TOKEN_KEY)
     window.sessionStorage.setItem(VERIFIER_KEY, verifier)
     window.sessionStorage.setItem(STATE_KEY, state)
     window.sessionStorage.setItem(REDIRECT_KEY, options.redirectTo ?? '/app')
@@ -79,7 +80,6 @@ async function signIn(options: { onboardingSecret?: string; redirectTo?: string 
   } catch (err) {
     stage.value = 'error'
     stageError.value = err instanceof Error ? err.message : String(err)
-    throw err
   }
 }
 
@@ -91,20 +91,25 @@ async function signIn(options: { onboardingSecret?: string; redirectTo?: string 
 async function completeSignIn(params: URLSearchParams): Promise<string> {
   const aruna = useAruna()
   stageError.value = null
+  let consumeTransaction = false
+  let appliedArunaToken = false
   try {
+    const state = params.get('state')
+    const expectedState = window.sessionStorage.getItem(STATE_KEY)
+    if (!expectedState) throw new Error('This sign-in attempt was not started here — please try again.')
+    if (state !== expectedState) throw new Error('State mismatch — please try signing in again.')
+    consumeTransaction = true
+
     const oidcError = params.get('error')
     if (oidcError) {
       throw new Error(params.get('error_description') || `Sign-in was rejected (${oidcError}).`)
     }
     const code = params.get('code')
-    const state = params.get('state')
-    const expectedState = window.sessionStorage.getItem(STATE_KEY)
     const verifier = window.sessionStorage.getItem(VERIFIER_KEY)
     if (!code) throw new Error('The identity provider did not return an authorization code.')
-    if (!expectedState || !verifier) {
+    if (!verifier) {
       throw new Error('This sign-in attempt was not started here — please try again.')
     }
-    if (state !== expectedState) throw new Error('State mismatch — please try signing in again.')
 
     stage.value = 'exchanging'
     const { clientId, discoveryUrl } = await resolveProvider()
@@ -134,20 +139,28 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
     )
     const issued = await apiRequest<GetTokenResponse>('/users/token', {}, client)
     aruna.setAuthToken(issued.token)
+    appliedArunaToken = true
     await aruna.refresh()
+    if (!aruna.currentUser.value) {
+      throw new Error(aruna.authError.value || 'The issued session could not be validated by this Aruna node.')
+    }
 
     stage.value = 'done'
     const redirectTo = window.sessionStorage.getItem(REDIRECT_KEY) || '/app'
     return redirectTo
   } catch (err) {
+    if (appliedArunaToken) aruna.setAuthToken('')
+    window.sessionStorage.removeItem(ID_TOKEN_KEY)
     stage.value = 'error'
     stageError.value = err instanceof Error ? err.message : String(err)
     throw err
   } finally {
-    window.sessionStorage.removeItem(VERIFIER_KEY)
-    window.sessionStorage.removeItem(STATE_KEY)
-    window.sessionStorage.removeItem(REDIRECT_KEY)
-    window.sessionStorage.removeItem(ONBOARDING_KEY)
+    if (consumeTransaction) {
+      window.sessionStorage.removeItem(VERIFIER_KEY)
+      window.sessionStorage.removeItem(STATE_KEY)
+      window.sessionStorage.removeItem(REDIRECT_KEY)
+      window.sessionStorage.removeItem(ONBOARDING_KEY)
+    }
   }
 }
 

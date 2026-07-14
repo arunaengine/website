@@ -37,6 +37,8 @@ const activeTab = ref<'fields' | 'raw'>('fields')
 // The pristine, unresolved crate fetched from the backend; edits mutate a clone.
 const pristine = ref<unknown>(null)
 const rawText = ref('')
+const loadedDocumentId = ref<string | null>(null)
+let loadToken = 0
 
 const name = ref('')
 const description = ref('')
@@ -49,32 +51,47 @@ const licenseWasString = ref(false)
 const isPublic = ref(false)
 
 watch(
-  () => props.open,
-  (open) => {
-    if (!open) return
+  [() => props.open, () => props.documentId],
+  ([open]) => {
+    ++loadToken
+    loadedDocumentId.value = null
+    pristine.value = null
+    if (!open) {
+      loading.value = false
+      return
+    }
     activeTab.value = 'fields'
     saveError.value = null
     rawError.value = null
-    void load()
+    void load(props.documentId, loadToken)
   },
 )
 
-async function load() {
+function reload() {
+  const token = ++loadToken
+  loadedDocumentId.value = null
+  pristine.value = null
+  void load(props.documentId, token)
+}
+
+async function load(documentId: string, token: number) {
   loading.value = true
   loadError.value = null
   try {
     const [crate, summary] = await Promise.all([
-      fetchRoCrateRaw(props.documentId),
-      getMetadataDocument(props.documentId),
+      fetchRoCrateRaw(documentId),
+      getMetadataDocument(documentId),
     ])
+    if (token !== loadToken || !props.open || documentId !== props.documentId) return
     pristine.value = crate
+    loadedDocumentId.value = documentId
     isPublic.value = summary.public
     seedFields(crate)
     rawText.value = JSON.stringify(crate, null, 2)
   } catch (err) {
-    loadError.value = err instanceof Error ? err.message : String(err)
+    if (token === loadToken) loadError.value = err instanceof Error ? err.message : String(err)
   } finally {
-    loading.value = false
+    if (token === loadToken) loading.value = false
   }
 }
 
@@ -171,6 +188,11 @@ function upsertLicenseEntity(crate: unknown, licenseValue: string) {
 async function save() {
   saveError.value = null
   rawError.value = null
+  const documentId = loadedDocumentId.value
+  if (!documentId || documentId !== props.documentId) {
+    saveError.value = 'This document changed while the editor was loading. Reload it before saving.'
+    return
+  }
   let rocrate: unknown
   try {
     rocrate = activeTab.value === 'raw' ? JSON.parse(rawText.value) : buildFromFields()
@@ -183,7 +205,7 @@ async function save() {
   try {
     // The update is accepted into the pipeline; the projection may lag, so the
     // detail view's crate re-fetch (loadRoCrate) polls until it materializes.
-    const summary = await replaceMetadataRoCrate(props.documentId, { rocrate, public: isPublic.value })
+    const summary = await replaceMetadataRoCrate(documentId, { rocrate, public: isPublic.value })
     emit('saved', summary)
     emit('update:open', false)
   } catch (err) {
@@ -206,7 +228,7 @@ async function save() {
       <div v-if="loading" class="py-8 text-center text-sm text-muted-foreground">Loading crate…</div>
       <div v-else-if="loadError" class="space-y-3">
         <p class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ loadError }}</p>
-        <Button variant="outline" size="sm" @click="load">Try again</Button>
+        <Button variant="outline" size="sm" @click="reload">Try again</Button>
       </div>
 
       <template v-else>

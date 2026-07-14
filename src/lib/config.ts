@@ -3,6 +3,8 @@
 // forward-extensible, so unknown fields are ignored and missing fields fall
 // back to the typed defaults. Later features that lack backend endpoints are
 // gated behind `features` flags (off by default).
+import { fetchWithTimeout } from './fetch'
+
 export interface PortalRuntimeConfig {
   apiBaseUrl: string
   features: Record<string, boolean>
@@ -35,7 +37,11 @@ export function featureEnabled(flag: string): boolean {
 // still boots when the config endpoint is absent (e.g. vite dev server).
 export async function loadPortalConfig(): Promise<PortalRuntimeConfig> {
   try {
-    const response = await fetch('/portal-config.json', { headers: { Accept: 'application/json' } })
+    const response = await fetchWithTimeout(
+      '/portal-config.json',
+      { headers: { Accept: 'application/json' } },
+      3_000,
+    )
     if (!response.ok) return current
     const raw: unknown = await response.json()
     if (raw && typeof raw === 'object') current = mergeConfig(raw as Record<string, unknown>)

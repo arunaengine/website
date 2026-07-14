@@ -33,30 +33,48 @@ const listLoading = ref(false)
 const listError = ref<string | null>(null)
 
 // Stale responses are dropped via a request id (same pattern as DataManagerView).
+let bucketRequestId = 0
 let listRequestId = 0
+
+function clearObjects() {
+  ++listRequestId
+  folders.value = []
+  objects.value = []
+  nextToken.value = undefined
+  listLoading.value = false
+  listError.value = null
+}
 
 async function refreshBuckets() {
   if (!s3.hasActiveKey.value || !s3.endpoint.value) return
+  const requestId = ++bucketRequestId
   bucketsLoading.value = true
   bucketsError.value = null
   try {
-    buckets.value = await s3.listBuckets()
+    const entries = await s3.listBuckets()
+    if (requestId !== bucketRequestId) return
+    buckets.value = entries
   } catch (err) {
-    bucketsError.value = s3ErrorMessage(err)
-    buckets.value = []
-    if (isS3AuthError(err)) emit('auth-error')
+    if (requestId === bucketRequestId) {
+      bucketsError.value = s3ErrorMessage(err)
+      buckets.value = []
+      if (isS3AuthError(err)) emit('auth-error')
+    }
   } finally {
-    bucketsLoading.value = false
+    if (requestId === bucketRequestId) bucketsLoading.value = false
   }
 }
 
 async function loadObjects(more = false) {
   if (!s3.hasActiveKey.value || !s3.endpoint.value || !bucket.value) return
   const requestId = ++listRequestId
+  const targetBucket = bucket.value
+  const targetPrefix = s3Prefix.value
+  const continuation = more ? nextToken.value : undefined
   listLoading.value = true
   listError.value = null
   try {
-    const page = await s3.listObjects(bucket.value, s3Prefix.value, more ? nextToken.value : undefined)
+    const page = await s3.listObjects(targetBucket, targetPrefix, continuation)
     if (requestId !== listRequestId) return
     folders.value = more ? [...folders.value, ...page.folders] : page.folders
     objects.value = more ? [...objects.value, ...page.objects] : page.objects
@@ -74,11 +92,12 @@ async function loadObjects(more = false) {
 watch(
   [() => s3.activeKey.value, () => s3.endpoint.value],
   ([key, endpoint]) => {
+    ++bucketRequestId
+    buckets.value = []
+    bucketsLoading.value = false
+    bucketsError.value = null
+    clearObjects()
     if (!key || !endpoint) {
-      buckets.value = []
-      folders.value = []
-      objects.value = []
-      nextToken.value = undefined
       return
     }
     void refreshBuckets()
@@ -88,12 +107,14 @@ watch(
 )
 
 function openBucket(name: string) {
+  clearObjects()
   bucket.value = name
   prefix.value = ''
   void loadObjects()
 }
 
 function navigateTo(path: string) {
+  clearObjects()
   prefix.value = path
   void loadObjects()
 }

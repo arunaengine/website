@@ -40,7 +40,7 @@ function dedupeByDocument(
 }
 
 export function useMetadataSearch(query: Ref<string>) {
-  const { metadata, searchMetadata } = useAruna()
+  const { metadata, searchMetadata, authToken, apiBaseUrl } = useAruna()
   const cursorEnabled = featureEnabled('searchCursor')
   const pageSize = cursorEnabled ? CURSOR_PAGE_SIZE : SEARCH_PAGE_CAP
 
@@ -191,15 +191,16 @@ export function useMetadataSearch(query: Ref<string>) {
     if (term) void runSearch(term)
   }
 
-  watch(query, (next) => {
+  watch([query, authToken, apiBaseUrl], ([next]) => {
     window.clearTimeout(timer)
+    ++seq
+    controller?.abort()
+    controller = null
+    cursorQuery = ''
+    restartedFor = ''
+    reset()
     const term = next.trim()
-    if (!term) {
-      seq++ // invalidate any in-flight response
-      controller?.abort()
-      reset()
-      return
-    }
+    if (!term) return
     timer = window.setTimeout(() => void runSearch(term), SEARCH_DEBOUNCE_MS)
   })
 

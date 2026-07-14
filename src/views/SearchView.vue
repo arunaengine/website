@@ -22,13 +22,22 @@ const router = useRouter()
 const { realm, metadata, profiles, currentUser, loading, error, bootstrapped, refresh, runSparql, toggleFavourite, myGroups, discoverableGroups } =
   useAruna()
 
-const q = ref<string>((route.query.q as string) ?? '')
-const profileFilter = ref<string | null>((route.query.profile as string) ?? null)
+function queryString(value: unknown): string {
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
+  return typeof value === 'string' ? value : ''
+}
+
+function queryFilter(value: unknown): string | null {
+  return queryString(value) || null
+}
+
+const q = ref(queryString(route.query.q))
+const profileFilter = ref<string | null>(queryFilter(route.query.profile))
 // GET /metadata/search accepts only q, limit and mode today (verified in
 // aruna api/src/routes/metadata.rs MetadataSearchParams). The group filter
 // is applied client-side to both browse and search results; push it down
 // to the server once the backend accepts a group_id param (aruna#258).
-const groupFilter = ref<string | null>((route.query.group as string) ?? null)
+const groupFilter = ref<string | null>(queryFilter(route.query.group))
 const favouritesOnly = ref(false)
 
 const {
@@ -50,7 +59,7 @@ const {
   loadMore,
   retry: retrySearch,
 } = useMetadataSearch(q)
-const expertMode = ref<boolean>(route.query.expert === '1')
+const expertMode = ref(queryString(route.query.expert) === '1')
 const favBusy = ref<Set<string>>(new Set())
 const favError = ref<string | null>(null)
 const showNewDataset = ref(false)
@@ -64,10 +73,29 @@ const running = ref(false)
 // (e.g. clearFilters): vue-router only updates route.query after the async
 // navigation settles, so the second replace would resurrect a param the first
 // meant to drop.
-watch([q, profileFilter, groupFilter, expertMode], ([nq, np, ng, ne]) =>
-  router.replace({
+watch([q, profileFilter, groupFilter, expertMode], ([nq, np, ng, ne]) => {
+  if (
+    queryString(route.query.q) === nq &&
+    queryFilter(route.query.profile) === np &&
+    queryFilter(route.query.group) === ng &&
+    (queryString(route.query.expert) === '1') === ne
+  ) {
+    return
+  }
+  void router.replace({
     query: { ...route.query, q: nq || undefined, profile: np || undefined, group: ng || undefined, expert: ne ? '1' : undefined },
-  }),
+  })
+})
+
+// Keep the mounted view in sync with top-bar navigation and browser history.
+watch(
+  () => route.query,
+  (query) => {
+    q.value = queryString(query.q)
+    profileFilter.value = queryFilter(query.profile)
+    groupFilter.value = queryFilter(query.group)
+    expertMode.value = queryString(query.expert) === '1'
+  },
 )
 
 const PAGE_SIZE = 12
@@ -83,7 +111,7 @@ const favouriteIds = computed(() => currentUser.value?.favouriteMetadataIds ?? [
 
 const hits = computed(() =>
   metadata.value.filter((doc) => {
-    if (profileFilter.value && doc.profileId !== profileFilter.value) return false
+    if (profileFilter.value && !(doc.profileIds ?? []).includes(profileFilter.value)) return false
     if (groupFilter.value && doc.realmId !== groupFilter.value) return false
     if (favouritesOnly.value && !favouriteIds.value.includes(doc.ulid)) return false
     return true
@@ -274,23 +302,6 @@ async function runQuery() {
               {{ hiddenByProfile }} result(s) without catalog details are hidden by the profile filter.
             </p>
 
-            <!-- Cursor paging (aruna#258) behind featureEnabled('searchCursor').
-                 Flag off ⇒ no sentinel, no cursor param: one ≤100-hit page. -->
-            <template v-if="cursorEnabled">
-              <div v-if="loadingMore" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <Skeleton v-for="n in 3" :key="n" class="h-36" />
-              </div>
-              <div v-if="moreError" class="mt-3 flex items-center gap-2 text-xs text-destructive">
-                {{ moreError }}
-                <Button variant="outline" size="sm" @click="loadMore">Try again</Button>
-              </div>
-              <!-- IntersectionObserver sentinel (observed by useMetadataSearch). -->
-              <div v-if="nextCursor && !moreError" ref="sentinel" class="h-1" aria-hidden="true" />
-              <p v-else class="py-2 text-center text-[11px] text-muted-foreground">End of results.</p>
-            </template>
-            <p v-else-if="capped" class="py-2 text-center text-[11px] text-muted-foreground">
-              Showing the first 100 matches by relevance — refine the query to narrow results.
-            </p>
           </section>
 
           <EmptyState
@@ -302,6 +313,24 @@ async function runQuery() {
           >
             <Button v-if="searchResults.length" variant="outline" @click="clearFilters">Clear filters</Button>
           </EmptyState>
+
+          <!-- Paging stays outside the visible-results branch so filters cannot
+               strand matches on later server pages. Re-keying the sentinel
+               continues paging while a fully filtered page is on screen. -->
+          <template v-if="cursorEnabled && searched && !searchError">
+            <div v-if="loadingMore" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Skeleton v-for="n in 3" :key="n" class="h-36" />
+            </div>
+            <div v-if="moreError" class="mt-3 flex items-center justify-center gap-2 text-xs text-destructive">
+              {{ moreError }}
+              <Button variant="outline" size="sm" @click="loadMore">Try again</Button>
+            </div>
+            <div v-if="nextCursor && !moreError && !loadingMore" :key="nextCursor" ref="sentinel" class="h-1" aria-hidden="true" />
+            <p v-else-if="!moreError && !loadingMore" class="py-2 text-center text-[11px] text-muted-foreground">End of results.</p>
+          </template>
+          <p v-else-if="!cursorEnabled && capped" class="py-2 text-center text-[11px] text-muted-foreground">
+            Showing the first 100 matches by relevance — refine the query to narrow results.
+          </p>
         </template>
 
         <!-- Browse path: client-side catalog browsing, unchanged apart from the group filter. -->

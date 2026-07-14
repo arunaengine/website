@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   CreateBucketCommand,
   DeleteObjectCommand,
@@ -42,13 +42,16 @@ export interface ObjectPage {
   nextToken?: string
 }
 
-const { nodeInfo, realmInfo } = useAruna()
+const { nodeInfo, realmInfo, authToken, apiBaseUrl } = useAruna()
 
 const STORAGE_KEY = 'aruna.s3Key'
 
 function loadStoredKey(): S3Key | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    // Secrets survive reloads in this tab, but not browser restarts or a new
+    // tab. Remove credentials persisted by older portal versions.
+    localStorage.removeItem(STORAGE_KEY)
+    const raw = sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<S3Key>
     if (typeof parsed.accessKeyId === 'string' && typeof parsed.secretAccessKey === 'string') {
@@ -97,14 +100,30 @@ function client(): S3Client {
 
 function setActiveKey(key: S3Key) {
   activeKey.value = key
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(key))
+  cached = null
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(key))
+  } catch {
+    // Keep the key in memory when storage is unavailable.
+  }
 }
 
 function clearActiveKey() {
   activeKey.value = null
   cached = null
-  localStorage.removeItem(STORAGE_KEY)
+  try {
+    sessionStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // The in-memory key is already cleared.
+  }
 }
+
+// An S3 secret is valid only for the REST identity and API connection under
+// which it was activated. This also makes sign-out revoke browser-side access.
+watch([authToken, apiBaseUrl], ([token, base], [previousToken, previousBase]) => {
+  if (token !== previousToken || base !== previousBase) clearActiveKey()
+})
 
 async function listBuckets(): Promise<BucketEntry[]> {
   const response = await client().send(new ListBucketsCommand({}))
