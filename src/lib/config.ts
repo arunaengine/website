@@ -17,11 +17,9 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
 
 // Per-flag default states, layered UNDER any served `features` map: an explicit
 // served value (including `false`) always wins, and any flag absent here stays
-// off. The backend has served cursor paging since aruna 9ae6bd68, so
-// `searchCursor` defaults on; it stays a version-skew / deployment toggle — an
-// older node that never returns `next_cursor` simply ends pagination, so the UI
-// degrades gracefully, and a deployment can still force it off via config.
-const DEFAULT_FEATURES: Record<string, boolean> = { searchCursor: true }
+// off. Cursor paging must be positively advertised by runtime config so older
+// nodes that do not return `next_cursor` use the capped non-cursor fallback.
+const DEFAULT_FEATURES: Record<string, boolean> = { searchCursor: false }
 
 let current: PortalRuntimeConfig = { ...DEFAULT_PORTAL_CONFIG, features: { ...DEFAULT_FEATURES } }
 

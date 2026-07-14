@@ -84,7 +84,10 @@ function client() {
 }
 
 async function request<T>(path: string, options = {}) {
-  return apiRequest<T>(path, options, client())
+  const context = refreshContext()
+  const response = await apiRequest<T>(path, options, context.client)
+  assertCurrentSession(context.epoch)
+  return response
 }
 
 function refreshContext() {

@@ -301,11 +301,10 @@ async function runQuery() {
             <p v-if="hiddenByProfile > 0" class="mt-3 text-[11px] text-muted-foreground">
               {{ hiddenByProfile }} result(s) without catalog details are hidden by the profile filter.
             </p>
-
           </section>
 
           <EmptyState
-            v-else
+            v-else-if="!cursorEnabled || (searched && !searchPending && !nextCursor && !loadingMore)"
             :title="searchResults.length ? 'No matches after filters' : 'No matches'"
             :description="searchResults.length
               ? 'Results were hidden by the active group, profile or favourites filters.'
@@ -326,7 +325,7 @@ async function runQuery() {
               <Button variant="outline" size="sm" @click="loadMore">Try again</Button>
             </div>
             <div v-if="nextCursor && !moreError && !loadingMore" :key="nextCursor" ref="sentinel" class="h-1" aria-hidden="true" />
-            <p v-else-if="!moreError && !loadingMore" class="py-2 text-center text-[11px] text-muted-foreground">End of results.</p>
+            <p v-else-if="!moreError && !searchPending && !loadingMore" class="py-2 text-center text-[11px] text-muted-foreground">End of results.</p>
           </template>
           <p v-else-if="!cursorEnabled && capped" class="py-2 text-center text-[11px] text-muted-foreground">
             Showing the first 100 matches by relevance — refine the query to narrow results.

@@ -16,6 +16,7 @@ export const SEARCH_DEBOUNCE_MS = 300
 export const SEARCH_PAGE_CAP = 100
 // Page size under cursor paging (backend default page size).
 const CURSOR_PAGE_SIZE = 25
+const SEARCH_REQUEST_TIMEOUT_MS = 30_000
 
 export interface SearchResultLine {
   hit: MetadataSearchHit
@@ -58,8 +59,8 @@ export function useMetadataSearch(query: Ref<string>) {
 
   const active = computed(() => query.value.trim().length > 0)
   // nodes_failed is served by today's backend; `partial` is the aruna#258
-  // field and wins when present.
-  const partial = computed(() => serverPartial.value ?? nodesFailed.value > 0)
+  // field. Either one makes the current query's results partial.
+  const partial = computed(() => serverPartial.value === true || nodesFailed.value > 0)
   // Without cursor paging we get exactly one page (cap 100); a full page
   // means more matches may exist that we cannot fetch.
   const capped = computed(() => !cursorEnabled && hits.value.length >= SEARCH_PAGE_CAP)
@@ -86,6 +87,7 @@ export function useMetadataSearch(query: Ref<string>) {
   let timer: number | undefined
   let seq = 0
   let controller: AbortController | null = null
+  let moreController: AbortController | null = null
   // The query the current cursor was issued for. aruna#258 binds the opaque
   // cursor to the query, so it is only ever valid for exactly this string.
   let cursorQuery = ''
@@ -110,19 +112,31 @@ export function useMetadataSearch(query: Ref<string>) {
 
   function applyMeta(response: MetadataSearchResponse) {
     nodesQueried.value = response.nodes_queried ?? 0
-    nodesFailed.value = response.nodes_failed ?? 0
-    failedNodes.value = response.failed_nodes ?? []
-    serverPartial.value = typeof response.partial === 'boolean' ? response.partial : null
+    failedNodes.value = [...new Set([...failedNodes.value, ...(response.failed_nodes ?? [])])]
+    nodesFailed.value = Math.max(
+      nodesFailed.value,
+      response.nodes_failed ?? 0,
+      failedNodes.value.length,
+    )
+    if (response.partial === true) serverPartial.value = true
+    else if (response.partial === false && serverPartial.value === null) serverPartial.value = false
     nextCursor.value = cursorEnabled ? (response.next_cursor ?? null) : null
   }
 
   async function runSearch(term: string) {
     const mySeq = ++seq
+    moreController?.abort()
+    moreController = null
+    loadingMore.value = false
     controller?.abort()
     controller = new AbortController()
     pending.value = true
     error.value = null
     moreError.value = null
+    nodesQueried.value = 0
+    nodesFailed.value = 0
+    failedNodes.value = []
+    serverPartial.value = null
     nextCursor.value = null
     try {
       const response = await searchMetadata(term, { limit: pageSize, signal: controller.signal })
@@ -151,11 +165,21 @@ export function useMetadataSearch(query: Ref<string>) {
       return
     }
     const mySeq = seq
+    const pageController = new AbortController()
+    moreController = pageController
     loadingMore.value = true
     moreError.value = null
+    const timeout = window.setTimeout(
+      () => pageController.abort(new DOMException('Request timed out.', 'TimeoutError')),
+      SEARCH_REQUEST_TIMEOUT_MS,
+    )
     try {
-      const response = await searchMetadata(term, { limit: pageSize, cursor })
-      if (mySeq !== seq) return
+      const response = await searchMetadata(term, {
+        limit: pageSize,
+        cursor,
+        signal: pageController.signal,
+      })
+      if (mySeq !== seq || moreController !== pageController) return
       // Collapse per document across pages (see dedupeByDocument): the server
       // dedups per (graph_iri, subject_iri), so a later page can repeat a
       // document already shown from an earlier one.
@@ -164,7 +188,7 @@ export function useMetadataSearch(query: Ref<string>) {
       applyMeta(response)
       restartedFor = ''
     } catch (err) {
-      if (mySeq !== seq) return
+      if (mySeq !== seq || moreController !== pageController) return
       if (err instanceof ApiError && [400, 409, 410].includes(err.status) && restartedFor !== term) {
         // Server rejected the cursor (query changed / cursor expired, per the
         // aruna#258 contract): restart transparently from the first page — but
@@ -179,10 +203,11 @@ export function useMetadataSearch(query: Ref<string>) {
         moreError.value = err instanceof Error ? err.message : String(err)
       }
     } finally {
-      // Unconditional: loadMore is the only writer and re-entry is blocked by its
-      // own guard, so even a superseded flight must release the lock — otherwise
-      // the guard wedges and pagination stalls forever (review #258 F1).
-      loadingMore.value = false
+      window.clearTimeout(timeout)
+      if (moreController === pageController) {
+        moreController = null
+        loadingMore.value = false
+      }
     }
   }
 
@@ -196,6 +221,8 @@ export function useMetadataSearch(query: Ref<string>) {
     ++seq
     controller?.abort()
     controller = null
+    moreController?.abort()
+    moreController = null
     cursorQuery = ''
     restartedFor = ''
     reset()
@@ -227,6 +254,7 @@ export function useMetadataSearch(query: Ref<string>) {
     window.clearTimeout(timer)
     seq++
     controller?.abort()
+    moreController?.abort()
     observer?.disconnect()
   })
 
