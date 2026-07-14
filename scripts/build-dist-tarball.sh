@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds the portal release assets consumed by Aruna artifact mode.
 set -euo pipefail
+PACKAGER_VERSION=2
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -10,13 +11,7 @@ SHA_FILE="${TARBALL}.sha256"
 MANIFEST="portal-manifest.json"
 
 rm -f "$TARBALL" "$SHA_FILE" "$MANIFEST"
-if [ -z "${PORTAL_PACKAGE_RUNNER:-}" ]; then
-    if command -v bun >/dev/null 2>&1; then
-        PORTAL_PACKAGE_RUNNER="bun"
-    else
-        PORTAL_PACKAGE_RUNNER="npm"
-    fi
-fi
+PORTAL_PACKAGE_RUNNER="${PORTAL_PACKAGE_RUNNER:-npm}"
 
 if [ -n "${PORTAL_API_BASE_URL:-}" ] && [ -z "${VITE_ARUNA_API_BASE_URL:-}" ]; then
     export VITE_ARUNA_API_BASE_URL="$PORTAL_API_BASE_URL"
@@ -24,14 +19,16 @@ fi
 
 "$PORTAL_PACKAGE_RUNNER" run build
 
-if command -v bun >/dev/null 2>&1; then
-    VERSION="$(bun --print "require('./package.json').version")"
-else
-    VERSION="$(node -p "require('./package.json').version")"
+EXACT_TAG="$(git describe --tags --exact-match HEAD 2>/dev/null || true)"
+VERSION="${PORTAL_VERSION:-${EXACT_TAG:-$(node -p "require('./package.json').version")}}"
+VERSION="${VERSION#v}"
+GIT_COMMIT="${PORTAL_GIT_COMMIT:-$(git rev-parse HEAD)}"
+GIT_REF="${PORTAL_GIT_REF:-${GITHUB_REF_NAME:-${EXACT_TAG:-$(git rev-parse --abbrev-ref HEAD)}}}"
+if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
+    GIT_REF="${GIT_REF}-dirty"
 fi
-GIT_COMMIT="${GITHUB_SHA:-$(git rev-parse HEAD)}"
-GIT_REF="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
-BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git show -s --format=%ct "$GIT_COMMIT")}"
+BUILT_AT="$(node -e "process.stdout.write(new Date(Number(process.argv[1]) * 1000).toISOString().replace('.000Z', 'Z'))" "$SOURCE_DATE_EPOCH")"
 SOURCE="${PORTAL_SOURCE:-arunaengine/website@${GIT_REF}}"
 
 json_escape() {
@@ -65,8 +62,8 @@ write_manifest() {
 write_manifest
 cp "$MANIFEST" "dist/$MANIFEST"
 
-tar -C dist -czf "$TARBALL" .
-ARTIFACT_SHA256="$(sha256sum "$TARBALL" | cut -d' ' -f1)"
+LC_ALL=C tar --sort=name --mtime="@${SOURCE_DATE_EPOCH}" --owner=0 --group=0 --numeric-owner --mode='a=rX,u+w' -C dist -cf - . | gzip -n > "$TARBALL"
+ARTIFACT_SHA256="$(node -e "const fs=require('fs'),crypto=require('crypto');process.stdout.write(crypto.createHash('sha256').update(fs.readFileSync(process.argv[1])).digest('hex'))" "$TARBALL")"
 printf '%s  %s\n' "$ARTIFACT_SHA256" "$TARBALL" > "$SHA_FILE"
 write_manifest "$ARTIFACT_SHA256"
 

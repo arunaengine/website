@@ -13,7 +13,7 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0',
+    host: process.env.ARUNA_DEV_HOST || '127.0.0.1',
     port: 5173,
     proxy: apiBaseUrl
       ? undefined
