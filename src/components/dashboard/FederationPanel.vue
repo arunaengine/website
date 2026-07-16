@@ -97,9 +97,13 @@ const labelCounts = computed<Array<[string, number]>>(() => {
             <Badge :variant="connectionVariant(node)" class="shrink-0 text-[10px] uppercase">{{ connectionLabel(node) }}</Badge>
             <span class="ml-auto font-mono text-[11px] text-muted-foreground">
               <template v-if="node.info">
-                {{ formatNumber(node.info.utilization.documents_held) }} docs ·
-                {{ formatBytes(node.info.utilization.storage_bytes_used) }} ·
-                load {{ node.info.utilization.load_permille }}‰
+                <template v-if="node.info.utilization.documents_held !== undefined">
+                  {{ formatNumber(node.info.utilization.documents_held) }} docs ·
+                </template>
+                {{ formatBytes(node.info.utilization.storage_bytes_used) }}
+                <template v-if="node.info.utilization.load_permille !== undefined">
+                  · load {{ node.info.utilization.load_permille }}‰
+                </template>
               </template>
               <template v-else>no published info</template>
             </span>

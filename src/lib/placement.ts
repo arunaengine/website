@@ -18,7 +18,8 @@ export interface LocationAggregate {
   // Utilization sums cover only nodes that published an info document.
   reportingCount: number
   storageBytesUsed: number
-  documentsHeld: number
+  // null until at least one node in the bucket reports documents_held.
+  documentsHeld: number | null
 }
 
 // Buckets nodes by their effective placement location. Mapped buckets sort by
@@ -42,7 +43,7 @@ export function aggregateByLocation(nodes: RealmNodeInfo[]): LocationAggregate[]
         totalWeight: 0,
         reportingCount: 0,
         storageBytesUsed: 0,
-        documentsHeld: 0,
+        documentsHeld: null,
       }
       buckets.set(location, bucket)
     }
@@ -56,7 +57,8 @@ export function aggregateByLocation(nodes: RealmNodeInfo[]): LocationAggregate[]
     if (node.info) {
       bucket.reportingCount += 1
       bucket.storageBytesUsed += node.info.utilization.storage_bytes_used
-      bucket.documentsHeld += node.info.utilization.documents_held
+      const docs = node.info.utilization.documents_held
+      if (docs !== undefined) bucket.documentsHeld = (bucket.documentsHeld ?? 0) + docs
     }
   }
   return [...buckets.values()].sort((a, b) => {

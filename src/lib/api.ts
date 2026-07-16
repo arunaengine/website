@@ -211,8 +211,10 @@ export interface RealmNodePublishedInfo {
   urls: { api?: string | null; s3?: string | null }
   utilization: {
     storage_bytes_used: number
-    documents_held: number
-    load_permille: number
+    // Omitted from the wire until a node publishes them
+    // (skip_serializing_if on the backend response struct).
+    documents_held?: number
+    load_permille?: number
     heartbeat_at_ms: number
   }
   updated_at_ms: number

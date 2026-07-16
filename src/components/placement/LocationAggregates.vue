@@ -52,8 +52,9 @@ function connectedWidth(a: LocationAggregate): string {
         </div>
         <p class="mt-1.5 font-mono text-[11px] text-muted-foreground">
           <template v-if="a.reportingCount > 0">
-            {{ formatBytes(a.storageBytesUsed) }} · {{ formatNumber(a.documentsHeld) }} docs · across
-            {{ a.reportingCount }}/{{ a.nodeCount }} reporting
+            {{ formatBytes(a.storageBytesUsed)
+            }}<template v-if="a.documentsHeld !== null"> · {{ formatNumber(a.documentsHeld) }} docs</template>
+            · across {{ a.reportingCount }}/{{ a.nodeCount }} reporting
           </template>
           <template v-else>no published utilization</template>
         </p>
