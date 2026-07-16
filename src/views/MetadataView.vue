@@ -19,7 +19,7 @@ import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useArun
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Pencil, Trash2, Star } from '@lucide/vue'
+import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Link2, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -269,6 +269,42 @@ function entityLink(row: DataEntityRow): string | undefined {
   return target.startsWith('http') ? target : undefined
 }
 
+// Cross-document references from the root's mentions/citation/about, split
+// into in-portal links (a catalog document's graph IRI or document id) and
+// plain external IRIs.
+interface RelatedDocRow {
+  iri: string
+  label: string
+  documentId?: string
+}
+const relatedDocs = computed<RelatedDocRow[]>(() => {
+  const crate = fullCrates.value[detailId.value] ?? current.value?.roCrate
+  const g = crateGraph(crate)
+  if (!g.length) return []
+  const rootId = crateRootId(crate)
+  const root = rootId ? g.find((e) => e['@id'] === rootId) : undefined
+  if (!root) return []
+  const rows: RelatedDocRow[] = []
+  const seen = new Set<string>()
+  for (const property of ['mentions', 'citation', 'about'] as const) {
+    const refs = root[property]
+    for (const ref of Array.isArray(refs) ? refs : refs ? [refs] : []) {
+      const iri = stringProp(ref)
+      if (!iri || seen.has(iri)) continue
+      seen.add(iri)
+      const item = metadataItems.value.find((entry) => entry.graph_iri === iri || entry.document_id === iri)
+      const entity = g.find((e) => e['@id'] === iri)
+      const catalogDoc = item ? metadata.value.find((doc) => doc.ulid === item.document_id) : undefined
+      rows.push({
+        iri,
+        documentId: item?.document_id,
+        label: catalogDoc?.title || stringProp(entity?.name) || item?.document_path || iri,
+      })
+    }
+  }
+  return rows
+})
+
 function entitySize(row: DataEntityRow): string {
   if (!row.contentSize) return '—'
   const n = Number(row.contentSize)
@@ -441,6 +477,37 @@ function entitySize(row: DataEntityRow): string {
             This document does not reference any data files. Files can be attached by editing the crate.
           </p>
         </section>
+
+        <section v-if="relatedDocs.length" class="surface overflow-hidden">
+          <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
+            <Link2 class="h-4 w-4 text-primary" /> Related datasets
+            <span class="text-xs font-normal text-muted-foreground">{{ relatedDocs.length }}</span>
+          </div>
+          <ul class="divide-y divide-border">
+            <li v-for="row in relatedDocs" :key="row.iri" class="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+              <RouterLink
+                v-if="row.documentId"
+                :to="{ name: 'metadata-detail', params: { id: row.documentId } }"
+                class="min-w-0 truncate font-medium text-primary hover:underline"
+                :title="row.iri"
+              >
+                {{ row.label }}
+              </RouterLink>
+              <a
+                v-else-if="row.iri.startsWith('http')"
+                :href="row.iri"
+                target="_blank"
+                rel="noopener"
+                class="inline-flex min-w-0 items-center gap-1 truncate text-primary hover:underline"
+                :title="row.iri"
+              >
+                {{ row.label }} <ExternalLink class="h-3 w-3 shrink-0" />
+              </a>
+              <span v-else class="min-w-0 truncate text-muted-foreground" :title="row.iri">{{ row.label }}</span>
+              <Badge variant="outline" class="shrink-0 text-[10px] uppercase">{{ row.documentId ? 'in portal' : 'external' }}</Badge>
+            </li>
+          </ul>
+        </section>
       </template>
 
       <div v-else-if="docState === 'loading'" class="surface p-12 text-center text-sm text-muted-foreground">
@@ -472,7 +539,7 @@ function entitySize(row: DataEntityRow): string {
       />
     </div>
 
-    <EditMetadataDialog v-if="current" v-model:open="showEdit" :document-id="current.ulid" @saved="onSaved" />
+    <EditMetadataDialog v-if="current" v-model:open="showEdit" :document-id="current.ulid" :profile="currentProfile" @saved="onSaved" />
 
     <Dialog :open="showDelete" @update:open="(v: boolean) => (showDelete = v)">
       <DialogContent class="max-w-md">

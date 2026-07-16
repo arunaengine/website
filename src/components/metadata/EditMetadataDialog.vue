@@ -14,19 +14,28 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
-import { Pencil } from '@lucide/vue'
-import { ref, watch } from 'vue'
+import Select from '@/components/ui/Select.vue'
+import { Pencil, Plus, X } from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { licenseEntity } from '@/lib/profiles/rocrate'
+import { validateProfileData } from '@/lib/profiles/validate'
+import type { MetadataProfile } from '@/data/types'
 
-const props = defineProps<{ open: boolean; documentId: string }>()
+const props = defineProps<{
+  open: boolean
+  documentId: string
+  // The document's resolved profile, when one exists — drives the (non-blocking)
+  // validation panel in the Fields tab.
+  profile?: MetadataProfile | null
+}>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   (e: 'saved', summary: MetadataDocumentSummary): void
 }>()
 
-const { saving, fetchRoCrateRaw, getMetadataDocument, replaceMetadataRoCrate } = useAruna()
+const { saving, fetchRoCrateRaw, getMetadataDocument, replaceMetadataRoCrate, metadata, metadataItems } = useAruna()
 
 const loading = ref(false)
 const loadError = ref<string | null>(null)
@@ -49,6 +58,28 @@ const license = ref('')
 // value is written as { "@id": … } plus a contextual CreativeWork entity.
 const licenseWasString = ref(false)
 const isPublic = ref(false)
+
+// Additional scalar root properties beyond the managed built-ins. Only string/
+// number/boolean values seed as rows; structured values stay untouched in the
+// crate (edit them via the Raw JSON tab).
+const MANAGED_KEYS = new Set([
+  '@id', '@type', '@context', 'name', 'description', 'keywords', 'datePublished',
+  'license', 'hasPart', 'author', 'creator', 'contributor', 'conformsTo',
+  'mentions', 'about', 'identifier',
+])
+interface CustomFieldRow {
+  key: string
+  value: string
+}
+const customFields = ref<CustomFieldRow[]>([])
+let seededCustomKeys: string[] = []
+
+// Cross-document references: root `mentions` entries whose @id matches a
+// catalog document's graph IRI are editable here; anything else in `mentions`
+// is preserved verbatim.
+const relatedIds = ref<string[]>([])
+let preservedMentions: unknown[] = []
+const relatedPick = ref('')
 
 watch(
   [() => props.open, () => props.documentId],
@@ -144,6 +175,12 @@ function licenseIri(value: unknown): string {
   return ''
 }
 
+function refIdOf(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  if (isRecord(value) && typeof value['@id'] === 'string') return value['@id']
+  return undefined
+}
+
 function seedFields(crate: unknown) {
   const root = findRoot(crate)
   name.value = stringField(root?.name)
@@ -152,6 +189,27 @@ function seedFields(crate: unknown) {
   datePublished.value = stringField(root?.datePublished)
   licenseWasString.value = typeof root?.license === 'string'
   license.value = licenseIri(root?.license)
+
+  const rows: CustomFieldRow[] = []
+  for (const [key, value] of Object.entries(root ?? {})) {
+    if (MANAGED_KEYS.has(key)) continue
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      rows.push({ key, value: String(value) })
+    }
+  }
+  customFields.value = rows
+  seededCustomKeys = rows.map((row) => row.key)
+
+  const mentions = Array.isArray(root?.mentions) ? root.mentions : root?.mentions ? [root.mentions] : []
+  const catalogIris = new Set(metadataItems.value.map((item) => item.graph_iri))
+  relatedIds.value = []
+  preservedMentions = []
+  for (const mention of mentions) {
+    const id = refIdOf(mention)
+    if (id && catalogIris.has(id)) relatedIds.value.push(id)
+    else preservedMentions.push(mention)
+  }
+  relatedPick.value = ''
 }
 
 function buildFromFields(): unknown {
@@ -174,8 +232,84 @@ function buildFromFields(): unknown {
     root.license = { '@id': licenseValue }
     upsertLicenseEntity(clone, licenseValue)
   }
+
+  // Custom fields: rows removed since seeding delete their key; blank or
+  // managed keys are skipped rather than clobbering structured properties.
+  const liveKeys = new Set(customFields.value.map((row) => row.key.trim()).filter(Boolean))
+  for (const key of seededCustomKeys) {
+    if (!liveKeys.has(key)) delete root[key]
+  }
+  for (const row of customFields.value) {
+    const key = row.key.trim()
+    if (!key || MANAGED_KEYS.has(key)) continue
+    root[key] = row.value
+  }
+
+  const mentionRefs = [...preservedMentions, ...relatedIds.value.map((id) => ({ '@id': id }))]
+  if (mentionRefs.length) root.mentions = mentionRefs
+  else delete root.mentions
+  for (const id of relatedIds.value) upsertRelatedEntity(clone, id)
   return clone
 }
+
+// Each related document gets a resolvable contextual entity so the reference
+// stays meaningful outside this portal.
+function upsertRelatedEntity(crate: unknown, graphIri: string) {
+  if (!isRecord(crate)) return
+  const g = Array.isArray(crate['@graph']) ? (crate['@graph'] as unknown[]) : []
+  if (g.some((entity) => isRecord(entity) && entity['@id'] === graphIri)) return
+  const item = metadataItems.value.find((entry) => entry.graph_iri === graphIri)
+  g.push({
+    '@id': graphIri,
+    '@type': 'Dataset',
+    name: relatedLabel(graphIri),
+    ...(item ? { identifier: item.document_id } : {}),
+  })
+  crate['@graph'] = g
+}
+
+function relatedLabel(graphIri: string): string {
+  const item = metadataItems.value.find((entry) => entry.graph_iri === graphIri)
+  if (!item) return graphIri
+  return metadata.value.find((doc) => doc.ulid === item.document_id)?.title || item.document_path
+}
+
+const relatedOptions = computed(() =>
+  metadataItems.value
+    .filter((item) => item.document_id !== props.documentId && !relatedIds.value.includes(item.graph_iri))
+    .map((item) => ({ value: item.graph_iri, label: relatedLabel(item.graph_iri) })),
+)
+
+function addRelated() {
+  if (relatedPick.value && !relatedIds.value.includes(relatedPick.value)) {
+    relatedIds.value = [...relatedIds.value, relatedPick.value]
+  }
+  relatedPick.value = ''
+}
+
+function removeRelated(graphIri: string) {
+  relatedIds.value = relatedIds.value.filter((id) => id !== graphIri)
+}
+
+// Live, non-blocking profile validation over the Fields tab state. Editing an
+// existing document must stay possible even when it never conformed, so
+// violations inform rather than gate the save.
+const violations = computed(() => {
+  const schema = props.profile?.schema
+  if (!schema || !props.open || loading.value) return []
+  const values: Record<string, unknown> = {
+    name: name.value.trim(),
+    description: description.value.trim(),
+    keywords: keywordsText.value.split(',').map((keyword) => keyword.trim()).filter(Boolean),
+    datePublished: datePublished.value.trim(),
+    license: license.value.trim(),
+  }
+  for (const row of customFields.value) {
+    const key = row.key.trim()
+    if (key && !(key in values)) values[key] = row.value
+  }
+  return validateProfileData(schema, values)
+})
 
 function upsertLicenseEntity(crate: unknown, licenseValue: string) {
   if (!isRecord(crate)) return
@@ -260,6 +394,54 @@ async function save() {
                 <label class="text-xs font-medium text-foreground">License (IRI)</label>
                 <Input v-model="license" class="mt-1" placeholder="https://creativecommons.org/licenses/by/4.0" />
               </div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between gap-3">
+                <label class="text-xs font-medium text-foreground">Additional fields</label>
+                <Button variant="outline" size="sm" @click="customFields.push({ key: '', value: '' })">
+                  <Plus class="h-3.5 w-3.5" /> Add field
+                </Button>
+              </div>
+              <div v-for="(row, index) in customFields" :key="index" class="mt-1.5 flex items-center gap-2">
+                <Input v-model="row.key" class="w-44 font-mono text-xs" placeholder="property" />
+                <Input v-model="row.value" placeholder="value" />
+                <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" aria-label="Remove field" @click="customFields.splice(index, 1)">
+                  <X class="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                Simple text properties on the root entity. Structured values are preserved as-is; edit them in the Raw JSON tab.
+              </p>
+            </div>
+
+            <div>
+              <label class="text-xs font-medium text-foreground">Related datasets</label>
+              <div class="mt-1.5 flex items-center gap-2">
+                <Select v-model="relatedPick" :options="relatedOptions" placeholder="Pick a dataset from the catalog" class="flex-1" />
+                <Button variant="outline" size="sm" :disabled="!relatedPick" @click="addRelated"><Plus class="h-3.5 w-3.5" /> Link</Button>
+              </div>
+              <ul v-if="relatedIds.length" class="mt-2 space-y-1">
+                <li v-for="id in relatedIds" :key="id" class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs">
+                  <span class="min-w-0 truncate text-foreground" :title="id">{{ relatedLabel(id) }}</span>
+                  <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" aria-label="Unlink dataset" @click="removeRelated(id)">
+                    <X class="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              </ul>
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                Written as <code class="font-mono">mentions</code> references; they render as browsable links on the detail page.
+              </p>
+            </div>
+
+            <div v-if="violations.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
+              <div class="font-medium text-amber-800 dark:text-amber-300">Profile check — {{ profile?.name }}</div>
+              <ul class="mt-1 list-disc space-y-0.5 pl-4">
+                <li v-for="violation in violations" :key="violation.pointer + violation.message" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
+                  <span class="font-mono">{{ violation.fieldId ?? violation.pointer }}</span>: {{ violation.message }}
+                </li>
+              </ul>
+              <p class="mt-1 text-muted-foreground">Violations don't block saving an existing document.</p>
             </div>
           </TabsContent>
 
