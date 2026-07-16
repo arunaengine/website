@@ -3,10 +3,14 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
+import Popover from '@/components/ui/Popover.vue'
+import CopyButton from '@/components/nodes/CopyButton.vue'
 import { computed, ref, watch } from 'vue'
 import { ShieldCheck, UserMinus, UserPlus, X } from '@lucide/vue'
 import { useDebounceFn } from '@vueuse/core'
 import { useAruna } from '@/composables/useAruna'
+import { useUserDirectory } from '@/composables/useUserDirectory'
+import { shortUserId } from '@/lib/utils'
 import type { ApiRole, GroupMember, UserSearchHit } from '@/lib/api'
 
 const props = defineProps<{
@@ -19,6 +23,30 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
 const { addGroupMember, removeGroupMember, searchUsers, saving, currentUser } = useAruna()
+const { resolveUsers, cachedUser } = useUserDirectory()
+
+// The members endpoint only carries ids; names come from GET /users/{id}
+// through the shared directory cache (reactive, so rows fill in as resolved).
+watch(
+  () => props.members,
+  (members) => void resolveUsers(members.map((member) => member.user_id)),
+  { immediate: true },
+)
+
+const memberIdList = computed(() => props.members.map((member) => member.user_id))
+
+function displayName(member: GroupMember): string {
+  return member.name ?? cachedUser(member.user_id)?.name ?? shortUserId(member.user_id, memberIdList.value)
+}
+
+function shortId(userId: string): string {
+  return shortUserId(userId, memberIdList.value)
+}
+
+function attribute(member: GroupMember, key: string): string | undefined {
+  const value = cachedUser(member.user_id)?.attributes[key]
+  return value || undefined
+}
 
 const memberError = ref<string | null>(null)
 const query = ref('')
@@ -118,11 +146,41 @@ async function removeMember(member: GroupMember, roleId?: string) {
             <div class="flex items-center gap-2">
               <ShieldCheck v-if="isAdmin(member)" class="h-3.5 w-3.5 shrink-0 text-primary" />
               <div class="min-w-0">
-                <div class="truncate text-sm font-medium text-foreground">
-                  {{ member.name ?? member.user_id }}
-                  <span v-if="member.user_id === currentUser?.id" class="text-[11px] font-normal text-muted-foreground">(you)</span>
-                </div>
-                <div v-if="member.name" class="truncate font-mono text-[10px] text-muted-foreground">{{ member.user_id }}</div>
+                <Popover>
+                  <button type="button" class="max-w-full truncate text-left text-sm font-medium text-foreground decoration-dotted underline-offset-2 hover:underline">
+                    {{ displayName(member) }}
+                    <span v-if="member.user_id === currentUser?.id" class="text-[11px] font-normal text-muted-foreground">(you)</span>
+                  </button>
+                  <template #content>
+                    <div class="space-y-2">
+                      <div>
+                        <div class="text-sm font-semibold text-foreground">{{ displayName(member) }}</div>
+                        <div v-if="attribute(member, 'email')" class="text-xs text-muted-foreground">{{ attribute(member, 'email') }}</div>
+                        <div v-if="attribute(member, 'affiliation')" class="text-xs text-muted-foreground">{{ attribute(member, 'affiliation') }}</div>
+                        <a
+                          v-if="attribute(member, 'orcid')"
+                          :href="`https://orcid.org/${attribute(member, 'orcid')}`"
+                          target="_blank"
+                          rel="noopener"
+                          class="text-xs text-primary hover:underline"
+                        >
+                          ORCID {{ attribute(member, 'orcid') }}
+                        </a>
+                      </div>
+                      <div class="rounded-md border border-border bg-muted/40 px-2 py-1.5">
+                        <div class="text-[10px] uppercase tracking-wider text-muted-foreground">User ID</div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="break-all font-mono text-[10px] text-foreground">{{ member.user_id }}</span>
+                          <CopyButton :value="member.user_id" label="Copy user ID" />
+                        </div>
+                      </div>
+                      <div v-if="member.roles.length" class="flex flex-wrap gap-1">
+                        <AccessBadge v-for="role in member.roles" :key="role.role_id" :access="role.name" />
+                      </div>
+                    </div>
+                  </template>
+                </Popover>
+                <div class="truncate font-mono text-[10px] text-muted-foreground" :title="member.user_id">{{ shortId(member.user_id) }}</div>
               </div>
             </div>
           </td>
@@ -174,7 +232,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
               @click="selectedUser = hit; query = hit.name"
             >
               <span class="truncate text-foreground">{{ hit.name }}</span>
-              <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{{ hit.user_id.slice(0, 8) }}</span>
+              <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{{ shortUserId(hit.user_id) }}</span>
             </button>
           </div>
         </div>
@@ -185,7 +243,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
       </div>
       <div v-if="selectedUser" class="mt-1.5 text-[11px] text-muted-foreground">
         Adding <span class="font-medium text-foreground">{{ selectedUser.name }}</span>
-        <span class="font-mono">({{ selectedUser.user_id }})</span>
+        <span class="font-mono" :title="selectedUser.user_id">({{ shortUserId(selectedUser.user_id) }})</span>
       </div>
     </div>
   </div>

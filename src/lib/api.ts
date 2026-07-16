@@ -333,6 +333,14 @@ export interface UserSearchResponse {
   next_start_after?: string | null
 }
 
+// GET /users/{id} — resolves any user id within the caller's realm.
+export interface GetUserResponse {
+  user_id: string
+  name: string
+  subject_ids: string[]
+  attributes: Record<string, string>
+}
+
 export interface MetadataDocumentListItem {
   document_id: string
   group_id: string

@@ -34,6 +34,7 @@ import {
   type UsageResponse,
   type UserInfoResponse,
   type UserSearchResponse,
+  type GetUserResponse,
 } from '@/lib/api'
 import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
 
@@ -579,6 +580,10 @@ async function searchUsers(q: string, limit = 20): Promise<UserSearchResponse> {
   return request<UserSearchResponse>('/users/search', { query: { q, limit } })
 }
 
+async function getUser(userId: string): Promise<GetUserResponse> {
+  return request<GetUserResponse>(`/users/${encodeURIComponent(userId)}`)
+}
+
 async function runSparql(query: string): Promise<SparqlResult> {
   const started = performance.now()
   const result = await request<SparqlResponse>('/metadata/sparql/query', {
@@ -1046,6 +1051,7 @@ export function useAruna() {
     createGroupRole,
     deleteGroupRole,
     searchUsers,
+    getUser,
     runSparql,
     searchMetadata,
     setAuthToken,

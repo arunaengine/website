@@ -37,6 +37,23 @@ export function truncateMiddle(s: string, head = 8, tail = 6) {
   return `${s.slice(0, head)}…${s.slice(-tail)}`
 }
 
+// Short display form of a `{ulid}@{realm}` user id. The realm suffix is the
+// realm's public key (identical for every user shown together) and the ULID
+// head is timestamp bits, so the random tail is what disambiguates: keep a
+// 4-char head as a visual anchor and grow the tail until unique in `taken`.
+export function shortUserId(userId: string, taken?: Iterable<string>): string {
+  const ulid = userId.split('@')[0] ?? userId
+  const others = new Set<string>()
+  for (const other of taken ?? []) {
+    if (other !== userId) others.add(other.split('@')[0] ?? other)
+  }
+  let tail = 4
+  const short = () => (ulid.length <= 4 + tail + 1 ? ulid : `${ulid.slice(0, 4)}…${ulid.slice(-tail)}`)
+  const clashes = () => [...others].some((other) => other !== ulid && short() === (other.length <= 4 + tail + 1 ? other : `${other.slice(0, 4)}…${other.slice(-tail)}`))
+  while (tail < ulid.length && clashes()) tail += 2
+  return short()
+}
+
 export function copyToClipboard(text: string): Promise<void> {
   if (typeof navigator !== 'undefined' && navigator.clipboard) {
     return navigator.clipboard.writeText(text)
