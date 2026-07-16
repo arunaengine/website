@@ -57,18 +57,14 @@ try {
   )
 
   // ── Runtime gate ──────────────────────────────────────────────────────────
-  const sidebarHasPlacement = (await page.locator('nav[aria-label="Portal navigation"]').getByText('Placement').count()) > 0
-  step('sidebar placement entry follows runtime gate', FLAG_ON ? sidebarHasPlacement : !sidebarHasPlacement)
-
+  // Placement lives as a tab of the Admin view; the legacy /app/admin/placement
+  // URL redirects to /app/admin?tab=placement and the tab hides when gated off.
   await page.goto(BASE + '/app/admin/placement')
   await page.waitForTimeout(1500)
-  const gatedBody = await page.textContent('body')
-  step('disabled view is honest when overridden off', FLAG_ON || gatedBody.includes('not enabled'))
+  step('legacy placement url redirects into the admin view', page.url().includes('/app/admin'))
 
-  await page.goto(BASE + '/app/admin')
-  await page.waitForTimeout(1500)
-  const adminBody = await page.textContent('body')
-  step('admin placement link follows runtime gate', FLAG_ON ? adminBody.includes('Placement →') : !adminBody.includes('Placement →'))
+  const placementTabCount = await page.getByRole('tab', { name: 'Placement' }).count()
+  step('admin placement tab follows runtime gate', FLAG_ON ? placementTabCount > 0 : placementTabCount === 0)
 
   // ── Unified placement API ─────────────────────────────────────────────────
   if (FLAG_ON) {

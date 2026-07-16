@@ -5,7 +5,8 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
-import { RouterLink } from 'vue-router'
+import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { featureEnabled } from '@/lib/config'
@@ -20,8 +21,19 @@ const { isAuthenticated } = useAuth()
 
 const nodeCapability = computed(() => nodeInfo.value?.node.capabilities ?? 'server')
 
-// Placement admin lives on its own route (aruna#269), config-gated (default off).
+// Placement admin is a tab of this view (config-gated); the legacy
+// /app/admin/placement route redirects here with ?tab=placement.
 const placementAdminEnabled = featureEnabled('placementAdmin')
+
+const route = useRoute()
+const router = useRouter()
+type AdminTab = 'realm' | 'placement'
+const tab = computed<AdminTab>(() =>
+  route.query.tab === 'placement' && placementAdminEnabled ? 'placement' : 'realm',
+)
+function setTab(next: AdminTab) {
+  void router.replace({ query: { ...route.query, tab: next === 'realm' ? undefined : next } })
+}
 
 // Mirrors aruna's `impl Default for QuotaConfig` — the effective policy when a
 // backend serves no quota block. null = unlimited.
@@ -282,7 +294,7 @@ async function save() {
 
 <template>
   <div>
-    <PageHeader title="Realm administration" description="Review realm-wide usage and edit the quota policy applied to every group and member.">
+    <PageHeader title="Realm administration" description="Realm-wide usage, quota policy and placement configuration.">
       <template #actions>
         <Button variant="outline" @click="refresh"><RefreshCw class="h-4 w-4" /> Refresh</Button>
       </template>
@@ -298,19 +310,39 @@ async function save() {
       </section>
     </div>
 
-    <div v-else class="container grid max-w-[1400px] gap-6 py-8 lg:grid-cols-[260px_1fr]">
+    <template v-else>
+      <div v-if="placementAdminEnabled" class="container max-w-[1400px] pt-6">
+        <div class="flex items-center gap-1 border-b border-border" role="tablist" aria-label="Realm administration sections">
+          <button
+            v-for="entry in [
+              { id: 'realm' as const, label: 'Quota & usage' },
+              { id: 'placement' as const, label: 'Placement' },
+            ]"
+            :key="entry.id"
+            type="button"
+            role="tab"
+            :aria-selected="tab === entry.id"
+            :class="[
+              '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+              tab === entry.id
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            ]"
+            @click="setTab(entry.id)"
+          >
+            {{ entry.label }}
+          </button>
+        </div>
+      </div>
+
+      <PlacementAdminPanel v-if="tab === 'placement'" />
+
+      <div v-else class="container grid max-w-[1400px] gap-6 py-8 lg:grid-cols-[260px_1fr]">
       <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">
         <a href="#usage" class="rounded-md px-3 py-2 font-medium text-primary bg-primary/5">Realm usage</a>
         <a href="#policy" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Quota policy</a>
         <a href="#group-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Group overrides</a>
         <a href="#user-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">User caps</a>
-        <RouterLink
-          v-if="placementAdminEnabled"
-          :to="{ name: 'admin-placement' }"
-          class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          Placement →
-        </RouterLink>
       </nav>
 
       <div class="space-y-6">
@@ -460,6 +492,7 @@ async function save() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </template>
   </div>
 </template>

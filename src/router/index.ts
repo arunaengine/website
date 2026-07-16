@@ -32,10 +32,9 @@ const routes: RouteRecordRaw[] = [
       { path: 'status', name: 'status', component: () => import('@/views/StatusView.vue') },
       // Settings (consolidates account preferences, members, tokens)
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
-      // Realm admin — quota policy and realm-wide usage
+      // Realm admin — usage, quota policy and placement (tabs of one view)
       { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
-      // Realm admin — placement configuration (feature-gated in-view)
-      { path: 'admin/placement', name: 'admin-placement', component: () => import('@/views/AdminPlacementView.vue') },
+      { path: 'admin/placement', redirect: { path: '/app/admin', query: { tab: 'placement' } } },
       // Jobs — durable background jobs (feature-gated in-view; the backend
       // surface lives on aruna feat/job-framework)
       { path: 'jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },

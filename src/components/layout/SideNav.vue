@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   ListChecks,
   ListTodo,
-  MapPinned,
   Settings,
   ShieldCheck,
   Users,
@@ -29,12 +28,12 @@ interface NavItem {
   match?: string[]
 }
 
-const { isRealmAdmin } = useAruna()
+interface NavSection {
+  label: string
+  items: NavItem[]
+}
 
-// Placement admin is config-gated (aruna#269, default off); the nav entry only
-// appears for a realm admin on a portal with the flag on. Config resolves
-// pre-mount (#275), so a static read is safe.
-const placementAdminEnabled = featureEnabled('placementAdmin')
+const { isRealmAdmin } = useAruna()
 
 // Config resolves before the app mounts, so a plain read is safe here.
 const tesEnabled = featureEnabled('tes')
@@ -42,23 +41,35 @@ const tesEnabled = featureEnabled('tes')
 // Durable jobs API — served by aruna feat/job-framework backends only.
 const jobsEnabled = featureEnabled('jobs')
 
-const nav = computed<NavItem[]>(() => [
-  { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
-  { to: '/app/buckets', icon: Boxes, label: 'Data' },
-  ...(tesEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
-  ...(jobsEnabled ? [{ to: '/app/jobs', icon: ListTodo, label: 'Jobs' }] : []),
-  { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
-  { to: '/app/groups', icon: Users, label: 'Groups' },
-  { to: '/app/status', icon: Activity, label: 'Status' },
-  { to: '/app/settings', icon: Settings, label: 'Settings' },
+// Placement admin moved into the Admin view as a tab, so the admin section
+// holds a single entry regardless of the placementAdmin flag.
+const sections = computed<NavSection[]>(() => [
+  {
+    label: 'Workspace',
+    items: [
+      { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
+      { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
+      { to: '/app/buckets', icon: Boxes, label: 'Data' },
+      ...(tesEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
+      ...(jobsEnabled ? [{ to: '/app/jobs', icon: ListTodo, label: 'Jobs' }] : []),
+      { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
+      { to: '/app/groups', icon: Users, label: 'Groups' },
+    ],
+  },
+  {
+    label: 'Realm',
+    items: [
+      { to: '/app/status', icon: Activity, label: 'Status' },
+      { to: '/app/settings', icon: Settings, label: 'Settings' },
+    ],
+  },
   ...(isRealmAdmin.value
     ? [
-        { to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true },
+        {
+          label: 'Admin',
+          items: [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin' }],
+        },
       ]
-    : []),
-  ...(isRealmAdmin.value && placementAdminEnabled
-    ? [{ to: '/app/admin/placement', icon: MapPinned, label: 'Placement' }]
     : []),
 ])
 
@@ -95,24 +106,33 @@ watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1
     </div>
 
     <nav class="flex-1 overflow-y-auto px-2.5 py-3" aria-label="Portal navigation">
-      <ul class="space-y-0.5">
-        <li v-for="item in nav" :key="item.to">
-          <RouterLink
-            :to="item.to"
-            :title="collapsed ? item.label : undefined"
-            :class="[
-              'flex items-center gap-2.5 rounded-md py-2 text-[13px] font-medium transition-colors',
-              collapsed ? 'justify-center px-0' : 'px-2.5',
-              isActive(item)
-                ? 'bg-primary/[0.14] text-foreground hover:bg-primary/[0.18]'
-                : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
-            ]"
-          >
-            <component :is="item.icon" class="h-4 w-4 shrink-0" />
-            <span v-if="!collapsed">{{ item.label }}</span>
-          </RouterLink>
-        </li>
-      </ul>
+      <div v-for="(section, index) in sections" :key="section.label" class="mb-4 last:mb-0">
+        <div
+          v-if="!collapsed"
+          class="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70"
+        >
+          {{ section.label }}
+        </div>
+        <div v-else-if="index > 0" class="mx-2 mb-2 border-t border-border/60" />
+        <ul class="space-y-0.5">
+          <li v-for="item in section.items" :key="item.to">
+            <RouterLink
+              :to="item.to"
+              :title="collapsed ? item.label : undefined"
+              :class="[
+                'flex items-center gap-2.5 rounded-md py-2 text-[13px] font-medium transition-colors',
+                collapsed ? 'justify-center px-0' : 'px-2.5',
+                isActive(item)
+                  ? 'bg-primary/[0.14] text-foreground hover:bg-primary/[0.18]'
+                  : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+              ]"
+            >
+              <component :is="item.icon" class="h-4 w-4 shrink-0" />
+              <span v-if="!collapsed">{{ item.label }}</span>
+            </RouterLink>
+          </li>
+        </ul>
+      </div>
     </nav>
 
     <div class="border-t border-border/60 px-2.5 py-3 text-xs">

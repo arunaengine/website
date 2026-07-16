@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from 'vue-router'
-import { Home, Boxes, Compass, Users, Settings } from '@lucide/vue'
+import { LayoutDashboard, Boxes, Compass, Users, Settings } from '@lucide/vue'
 
 const route = useRoute()
 
+// Mirrors the desktop SideNav labels; only the five most-used entries fit.
 const nav = [
-  { to: '/app', icon: Home, label: 'Home', exact: true },
+  { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/buckets', icon: Boxes, label: 'Data' },
   { to: '/app/search', icon: Compass, label: 'Discover', also: ['/app/metadata'] },
   { to: '/app/groups', icon: Users, label: 'Groups' },

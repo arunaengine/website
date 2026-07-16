@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, toRaw, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import PageHeader from '@/components/dashboard/PageHeader.vue'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import StrategyEditor from '@/components/placement/StrategyEditor.vue'
 import Button from '@/components/ui/Button.vue'
@@ -11,7 +10,6 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useAuth } from '@/composables/useAuth'
 import { isPlacementUnsupported, usePlacement } from '@/composables/usePlacement'
 import type {
   RealmPlacementBinding,
@@ -19,10 +17,11 @@ import type {
   RealmPlacementStrategy,
 } from '@/lib/api'
 import { aggregateByLocation, knownLocations as computeKnownLocations } from '@/lib/placement'
-import { Link2, MapPinned, Plus, RefreshCw, ShieldCheck, SlidersHorizontal } from '@lucide/vue'
+import { Link2, MapPinned, Plus, RefreshCw, SlidersHorizontal } from '@lucide/vue'
 
+// Realm-admin access is gated by the parent AdminView; this panel only guards
+// the placement-specific requirements (feature flag, management node).
 const { bootstrapped, currentUser, isRealmAdmin, isManagementNode, realmInfo } = useAruna()
-const { isAuthenticated } = useAuth()
 const { placementAdminEnabled, busy, getRealmPlacement, mutateRealmPlacement } = usePlacement()
 
 const locationAggregates = computed(() => aggregateByLocation(realmInfo.value?.nodes ?? []))
@@ -231,14 +230,6 @@ watch(
 
 <template>
   <div>
-    <PageHeader title="Placement" description="Realm placement strategies, defaults, and group bindings.">
-      <template #actions>
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'admin' }">Admin</RouterLink>
-        </Button>
-      </template>
-    </PageHeader>
-
     <div v-if="!bootstrapped" class="container max-w-[1400px] space-y-3 py-8">
       <Skeleton class="h-24" />
       <Skeleton class="h-40" />
@@ -249,16 +240,6 @@ watch(
         <EmptyState title="Placement administration is not enabled" description="Enable features.placementAdmin in portal-config.json for a backend that serves the realm placement API.">
           <template #icon><MapPinned class="h-8 w-8" /></template>
         </EmptyState>
-      </section>
-    </div>
-
-    <div v-else-if="!currentUser || !isRealmAdmin" class="container max-w-[1400px] py-8">
-      <section class="surface mx-auto max-w-xl p-8 text-center">
-        <ShieldCheck class="mx-auto h-8 w-8 text-muted-foreground/70" />
-        <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Realm admin access required</h2>
-        <p class="mt-1.5 text-sm text-muted-foreground">
-          {{ isAuthenticated ? 'Your account cannot manage realm placement.' : 'Sign in with a realm admin account to manage placement.' }}
-        </p>
       </section>
     </div>
 
