@@ -26,13 +26,21 @@ import type { MetadataProfile } from '@/data/types'
 import { buildProfileArtifactTexts, buildProfileCrate } from '@/lib/profiles/rocrate'
 import { entityRulesToMode } from '@/lib/profiles/mode'
 
-const props = defineProps<{ open: boolean }>()
+const props = defineProps<{
+  open: boolean
+  // When set, the dialog edits this existing profile in place: the builder is
+  // seeded from its parsed rules and saving replaces the stored crate instead
+  // of creating a new document. Slug and owning group stay fixed.
+  editProfile?: MetadataProfile | null
+}>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   (e: 'created', profile: MetadataProfile): void
+  (e: 'updated', profile: MetadataProfile): void
 }>()
 
-const { profiles, createMetadata, saving } = useAruna()
+const { profiles, profileItems, createMetadata, replaceMetadataRoCrate, saving } = useAruna()
+const isEditing = computed(() => Boolean(props.editProfile))
 const s3 = useS3()
 const { publishProfileArtifacts } = useProfilePublish()
 const builder = useProfileBuilder()
@@ -81,6 +89,22 @@ watch(
     builder.reset()
     step.value = 1
     startTab.value = 'create'
+    const profile = props.editProfile
+    if (profile) {
+      builder.applyImport({
+        kind: 'crate',
+        basics: { name: profile.name, description: profile.description, version: profile.version },
+        entityRules: profile.entityRules,
+        mode: profile.mode ?? null,
+      })
+      // Editing keeps the document identity: path profiles/<slug> and group.
+      builder.setSlug(profile.id)
+      const item = profileItems.value.find((entry) => entry.document_id === profile.documentId)
+      if (item) builder.groupId = item.group_id
+      builder.isPublic = profile.managed
+      // The import chip is meant for the import tab, not the edit seeding.
+      builder.importSummary = null
+    }
   },
   { immediate: true },
 )
@@ -112,6 +136,15 @@ async function submit() {
       ? await publishProfileArtifacts(builder.groupId, basics.slug, buildProfileArtifactTexts(crateInput))
       : undefined
     const profileCrate = buildProfileCrate({ ...crateInput, externalArtifacts })
+    if (props.editProfile?.documentId) {
+      await replaceMetadataRoCrate(props.editProfile.documentId, {
+        rocrate: profileCrate,
+        public: builder.isPublic,
+      })
+      emit('updated', props.editProfile)
+      emit('update:open', false)
+      return
+    }
     const created = await createMetadata({
       group_id: builder.groupId,
       path: `profiles/${basics.slug}`,
@@ -156,10 +189,11 @@ async function submit() {
     <DialogContent class="max-w-6xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
-          <ListChecks class="h-4 w-4 text-primary" /> New metadata profile
+          <ListChecks class="h-4 w-4 text-primary" /> {{ isEditing ? 'Edit metadata profile' : 'New metadata profile' }}
         </DialogTitle>
         <DialogDescription>
-          Define which RO-Crate entities must, should, or may exist, and the property rules for each — step by step.
+          <template v-if="isEditing">Adjust the profile's rules and details; saving replaces the stored profile crate in place.</template>
+          <template v-else>Define which RO-Crate entities must, should, or may exist, and the property rules for each — step by step.</template>
         </DialogDescription>
       </DialogHeader>
 
@@ -194,7 +228,8 @@ async function submit() {
       </div>
 
       <div class="max-h-[72vh] overflow-y-auto px-1 scrollbar-thin">
-        <Tabs v-if="step === 1" v-model="startTab">
+        <ProfileBasicsStep v-if="step === 1 && isEditing" :builder="builder" locked />
+        <Tabs v-else-if="step === 1" v-model="startTab">
           <TabsList>
             <TabsTrigger value="create">Create</TabsTrigger>
             <TabsTrigger value="import">Import existing</TabsTrigger>
@@ -256,7 +291,7 @@ async function submit() {
             Next <ArrowRight class="h-3.5 w-3.5" />
           </Button>
           <Button v-else :disabled="builder.allErrors.length > 0 || saving || publishing || publishBlocked" @click="submit">
-            {{ publishing ? 'Publishing…' : saving ? 'Creating…' : 'Create profile' }}
+            {{ publishing ? 'Publishing…' : saving ? 'Saving…' : isEditing ? 'Save profile' : 'Create profile' }}
           </Button>
         </div>
       </DialogFooter>

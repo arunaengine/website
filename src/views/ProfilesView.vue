@@ -6,7 +6,7 @@ import NewProfileDialog from '@/components/metadata/NewProfileDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
-import { ListChecks, Plus, Star, Lock, Download } from '@lucide/vue'
+import { ListChecks, Pencil, Plus, Star, Lock, Download } from '@lucide/vue'
 import {
   OBLIGATION_ACCENT,
   OBLIGATION_ORDER,
@@ -23,8 +23,10 @@ import type { ProfilePropertyRule } from '@/lib/profiles/types'
 
 const route = useRoute()
 const router = useRouter()
-const { profiles, currentUser, updateUserProfile, saving, loadRoCrate, fullCrates } = useAruna()
+const { profiles, profileItems, currentUser, userInfo, updateUserProfile, saving, loadRoCrate, fullCrates } = useAruna()
 const showNewProfile = ref(false)
+// Set while the dialog edits an existing profile; null keeps it in create mode.
+const editingProfile = ref<MetadataProfile | null>(null)
 
 const selectedId = computed(() => (route.params.profileId as string) || profiles.value[0]?.id || '')
 const selected = computed(() => profiles.value.find((profile) => profile.id === selectedId.value))
@@ -32,6 +34,23 @@ const preferredId = computed(() => currentUser.value?.preferredProfileId ?? '')
 
 function select(id: string) {
   router.push({ name: 'profile-detail', params: { profileId: id } })
+}
+
+// Membership in the owning group is the same write heuristic the metadata
+// detail view uses; the backend still enforces the actual permission.
+const canEditSelected = computed(() => {
+  const item = profileItems.value.find((entry) => entry.document_id === selected.value?.documentId)
+  return Boolean(item && userInfo.value?.groups.some((group) => group.group_id === item.group_id))
+})
+
+function openEdit(profile: MetadataProfile) {
+  editingProfile.value = profile
+  showNewProfile.value = true
+}
+
+function openCreate() {
+  editingProfile.value = null
+  showNewProfile.value = true
 }
 
 async function setPreferred(id: string) {
@@ -173,7 +192,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
       description="Profiles are ordinary RO-Crate metadata documents stored under profiles/."
     >
       <template #actions>
-        <Button @click="showNewProfile = true" :disabled="!currentUser">
+        <Button @click="openCreate" :disabled="!currentUser">
           <Plus class="h-4 w-4" /> New profile
         </Button>
       </template>
@@ -226,6 +245,16 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+              <Button
+                v-if="canEditSelected"
+                variant="outline"
+                size="sm"
+                :disabled="selectedLoadingFull"
+                title="Edit this profile's rules and details in the builder"
+                @click="openEdit(selected)"
+              >
+                <Pencil class="h-3.5 w-3.5" /> Edit
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -346,6 +375,11 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
       </section>
     </div>
 
-    <NewProfileDialog v-model:open="showNewProfile" @created="(profile) => router.push({ name: 'profile-detail', params: { profileId: profile.id } })" />
+    <NewProfileDialog
+      v-model:open="showNewProfile"
+      :edit-profile="editingProfile"
+      @created="(profile) => router.push({ name: 'profile-detail', params: { profileId: profile.id } })"
+      @updated="editingProfile = null"
+    />
   </div>
 </template>
