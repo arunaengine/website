@@ -3,6 +3,7 @@ import AppLogo from '@/components/layout/AppLogo.vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { featureEnabled } from '@/lib/config'
 import {
   Activity,
   ArrowLeft,
@@ -12,9 +13,12 @@ import {
   Compass,
   LayoutDashboard,
   ListChecks,
+  ListTodo,
+  MapPinned,
   Settings,
   ShieldCheck,
   Users,
+  Workflow,
 } from '@lucide/vue'
 
 interface NavItem {
@@ -27,15 +31,35 @@ interface NavItem {
 
 const { isRealmAdmin } = useAruna()
 
+// Placement admin is config-gated (aruna#269, default off); the nav entry only
+// appears for a realm admin on a portal with the flag on. Config resolves
+// pre-mount (#275), so a static read is safe.
+const placementAdminEnabled = featureEnabled('placementAdmin')
+
+// Config resolves before the app mounts, so a plain read is safe here.
+const tesEnabled = featureEnabled('tes')
+
+// Durable jobs API — served by aruna feat/job-framework backends only.
+const jobsEnabled = featureEnabled('jobs')
+
 const nav = computed<NavItem[]>(() => [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
   { to: '/app/buckets', icon: Boxes, label: 'Data' },
+  ...(tesEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
+  ...(jobsEnabled ? [{ to: '/app/jobs', icon: ListTodo, label: 'Jobs' }] : []),
   { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
   { to: '/app/groups', icon: Users, label: 'Groups' },
   { to: '/app/status', icon: Activity, label: 'Status' },
   { to: '/app/settings', icon: Settings, label: 'Settings' },
-  ...(isRealmAdmin.value ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin' }] : []),
+  ...(isRealmAdmin.value
+    ? [
+        { to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true },
+      ]
+    : []),
+  ...(isRealmAdmin.value && placementAdminEnabled
+    ? [{ to: '/app/admin/placement', icon: MapPinned, label: 'Placement' }]
+    : []),
 ])
 
 const route = useRoute()

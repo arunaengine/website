@@ -34,6 +34,16 @@ const routes: RouteRecordRaw[] = [
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
       // Realm admin — quota policy and realm-wide usage
       { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
+      // Realm admin — placement configuration (feature-gated in-view)
+      { path: 'admin/placement', name: 'admin-placement', component: () => import('@/views/AdminPlacementView.vue') },
+      // Jobs — durable background jobs (feature-gated in-view; the backend
+      // surface lives on aruna feat/job-framework)
+      { path: 'jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
+      { path: 'jobs/:jobId', name: 'job-detail', component: () => import('@/views/JobsView.vue') },
+      // Compute — GA4GH TES tasks (feature-gated in-view, aruna#290)
+      { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
+      { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue') },
+      { path: 'compute/:taskId', name: 'compute-task', component: () => import('@/views/ComputeView.vue') },
       // Compatibility redirects from prior IA
       { path: 'data', redirect: { name: 'buckets' } },
       { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },

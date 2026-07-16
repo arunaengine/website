@@ -146,7 +146,7 @@ async function reload() {
   } finally {
     loadingDetail.value = false
   }
-  // Independent endpoint (aruna#250), gated; no-op when the flag is off.
+  // Independent usage-history endpoint, gated; no-op when off.
   void loadHistory()
   // The storage section renders only after getGroup + getGroupUsage resolve, so
   // the router's one-shot hash retry misses it (aruna#248 review F4). Scroll here

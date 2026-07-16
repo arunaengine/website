@@ -7,13 +7,15 @@ import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
+import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import { connectionLabel, connectionVariant, isDegradedStatus, kindVariant, statusVariant, type BadgeVariant } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
+import { aggregateByLocation } from '@/lib/placement'
 import { formatBytes, formatNumber, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
 import { ApiError } from '@/lib/api'
-import { Boxes, ChevronRight, Globe2, HardDrive, RefreshCw } from '@lucide/vue'
+import { Boxes, ChevronRight, Globe2, HardDrive, MapPin, MapPinned, RefreshCw } from '@lucide/vue'
 
 const route = useRoute()
 const { realm, realmInfo, nodeInfo, usageInfo, loadInfo } = useAruna()
@@ -104,6 +106,11 @@ const sortedNodes = computed(() =>
 const connectedCount = computed(
   () => sortedNodes.value.filter((node) => node.connection_status === 'connected').length,
 )
+
+// Placement location aggregates over the live /info/realm data (aruna#269). Pure
+// derivation of the already-served placement map — no gate, no assumed endpoint.
+const locationAggregates = computed(() => aggregateByLocation(realmInfo.value?.nodes ?? []))
+const mappedLocationCount = computed(() => locationAggregates.value.filter((a) => a.mapped).length)
 
 const unreachableNodes = computed(() =>
   sortedNodes.value.filter(
@@ -230,6 +237,21 @@ watch(
       <section class="surface overflow-hidden">
         <header class="flex items-center justify-between border-b border-border px-5 py-4">
           <div class="flex items-center gap-2">
+            <MapPinned class="h-4 w-4 text-primary" />
+            <h2 class="font-display text-sm font-semibold text-aruna-navy">Locations</h2>
+          </div>
+          <Badge variant="outline" class="tabular-nums">
+            {{ mappedLocationCount }} {{ mappedLocationCount === 1 ? 'location' : 'locations' }}
+          </Badge>
+        </header>
+        <div class="px-5 py-4">
+          <LocationAggregates :aggregates="locationAggregates" />
+        </div>
+      </section>
+
+      <section class="surface overflow-hidden">
+        <header class="flex items-center justify-between border-b border-border px-5 py-4">
+          <div class="flex items-center gap-2">
             <Boxes class="h-4 w-4 text-primary" />
             <h2 class="font-display text-sm font-semibold text-aruna-navy">Realm nodes</h2>
           </div>
@@ -256,6 +278,18 @@ watch(
                 <Badge :variant="kindVariant[node.kind]" class="w-24 justify-center text-[10px] uppercase">
                   {{ node.kind }}
                 </Badge>
+                <template v-if="node.placement">
+                  <span class="chip hidden shrink-0 sm:inline-flex" :title="`Placement location: ${node.placement.location}`">
+                    <MapPin class="h-3 w-3" />
+                    {{ node.placement.location }}
+                  </span>
+                  <Badge v-if="node.placement.full" variant="destructive" class="hidden shrink-0 text-[10px] uppercase sm:inline-flex">
+                    full
+                  </Badge>
+                  <Badge v-if="node.placement.draining" variant="warn" class="hidden shrink-0 text-[10px] uppercase sm:inline-flex">
+                    draining
+                  </Badge>
+                </template>
                 <code class="min-w-0 truncate font-mono text-xs text-foreground/90" :title="node.node_id">
                   {{ truncateMiddle(node.node_id, 14, 10) }}
                 </code>

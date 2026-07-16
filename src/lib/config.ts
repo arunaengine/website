@@ -15,11 +15,16 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
   features: {},
 }
 
-// Per-flag default states, layered UNDER any served `features` map: an explicit
-// served value (including `false`) always wins, and any flag absent here stays
-// off. Cursor paging must be positively advertised by runtime config so older
-// nodes that do not return `next_cursor` use the capped non-cursor fallback.
-const DEFAULT_FEATURES: Record<string, boolean> = { searchCursor: false }
+// Per-flag defaults are layered under the served `features` map, so deployments
+// can still explicitly disable a surface. The current backend serves placement
+// and durable jobs. Cursor paging and TES remain opt-in because their availability
+// depends on a newer search contract and node-local compute configuration.
+const DEFAULT_FEATURES: Record<string, boolean> = {
+  jobs: true,
+  placementAdmin: true,
+  searchCursor: false,
+  tes: false,
+}
 
 let current: PortalRuntimeConfig = { ...DEFAULT_PORTAL_CONFIG, features: { ...DEFAULT_FEATURES } }
 
