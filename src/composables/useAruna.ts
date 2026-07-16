@@ -954,14 +954,14 @@ export function readableIri(iri: string): string {
   return withoutQuery.split(/[/#]/).filter(Boolean).pop() || iri
 }
 
-function colorFor(value: string): string {
+export function colorFor(value: string): string {
   const colors = ['#335DC6', '#24A9E6', '#16a34a', '#0d9488', '#a855f7', '#f97316', '#dc2626']
   let hash = 0
   for (const char of value) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
   return colors[hash % colors.length]
 }
 
-function initials(name: string): string {
+export function initials(name: string): string {
   return name
     .split(/\s+/)
     .filter(Boolean)

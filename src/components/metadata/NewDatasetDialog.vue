@@ -789,7 +789,15 @@ function buildRoCrate() {
   if (showAuthorsScaffold.value && creatorList.value.length) {
     dataset.author = creatorList.value.map((name, index) => {
       const id = uniqueId(`#person-${slugify(name) || String(index + 1)}`, usedSyntheticIds)
-      addEntity({ '@id': id, '@type': 'Person', name })
+      const person: Record<string, unknown> = { '@id': id, '@type': 'Person', name }
+      // The signed-in user's own entry carries their portal identity so the
+      // detail view can link the author chip to /app/users/{id}.
+      const me = currentUser.value
+      if (me && name.trim() === me.name) {
+        person.identifier = me.orcid ? [me.id, `https://orcid.org/${me.orcid}`] : me.id
+        if (me.affiliation) person.affiliation = me.affiliation
+      }
+      addEntity(person)
       return { '@id': id }
     })
   }
@@ -1081,9 +1089,19 @@ async function submit() {
         <div v-if="showAuthorsScaffold">
           <div class="flex items-center justify-between gap-3">
             <label class="text-xs font-medium text-foreground">Authors</label>
-            <Button variant="outline" size="sm" @click="creators.push('')">
-              <Plus class="size-3.5" /> Add author
-            </Button>
+            <div class="flex items-center gap-1.5">
+              <Button
+                v-if="currentUser && !creators.includes(currentUser.name)"
+                variant="ghost"
+                size="sm"
+                @click="creators.push(currentUser.name)"
+              >
+                Add yourself
+              </Button>
+              <Button variant="outline" size="sm" @click="creators.push('')">
+                <Plus class="size-3.5" /> Add author
+              </Button>
+            </div>
           </div>
           <div v-for="(creator, index) in creators" :key="index" class="mt-1 flex items-center gap-2">
             <Input v-model="creators[index]" placeholder="Ada Lovelace" />

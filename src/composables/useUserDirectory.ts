@@ -11,7 +11,8 @@ const pending = new Map<string, Promise<GetUserResponse | null>>()
 export function useUserDirectory() {
   const { getUser } = useAruna()
 
-  function resolveUser(userId: string): Promise<GetUserResponse | null> {
+  function resolveUser(userId: string, opts?: { force?: boolean }): Promise<GetUserResponse | null> {
+    if (opts?.force) cache.delete(userId)
     if (cache.has(userId)) return Promise.resolve(cache.get(userId) ?? null)
     const inFlight = pending.get(userId)
     if (inFlight) return inFlight
@@ -28,7 +29,7 @@ export function useUserDirectory() {
   }
 
   function resolveUsers(userIds: string[]): Promise<Array<GetUserResponse | null>> {
-    return Promise.all(userIds.map(resolveUser))
+    return Promise.all(userIds.map((id) => resolveUser(id)))
   }
 
   function cachedUser(userId: string): GetUserResponse | null {

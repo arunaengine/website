@@ -177,6 +177,12 @@ async function removeMember(member: GroupMember, roleId?: string) {
                       <div v-if="member.roles.length" class="flex flex-wrap gap-1">
                         <AccessBadge v-for="role in member.roles" :key="role.role_id" :access="role.name" />
                       </div>
+                      <RouterLink
+                        :to="{ name: 'user-profile', params: { id: member.user_id } }"
+                        class="block text-xs font-medium text-primary hover:underline"
+                      >
+                        View profile →
+                      </RouterLink>
                     </div>
                   </template>
                 </Popover>

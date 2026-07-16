@@ -29,6 +29,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'profiles/:profileId', name: 'profile-detail', component: () => import('@/views/ProfilesView.vue') },
       // Groups — dedicated management page
       { path: 'groups/:id?', name: 'groups', component: () => import('@/views/GroupsView.vue') },
+      // Public user profile resolved from the realm's user directory
+      { path: 'users/:id', name: 'user-profile', component: () => import('@/views/UserProfileView.vue') },
       { path: 'status', name: 'status', component: () => import('@/views/StatusView.vue') },
       // Settings (consolidates account preferences, members, tokens)
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },

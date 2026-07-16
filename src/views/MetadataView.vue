@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
+import AuthorChips from '@/components/metadata/AuthorChips.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -316,6 +317,7 @@ function entitySize(row: DataEntityRow): string {
               <div class="mt-4 flex flex-wrap gap-1.5">
                 <span v-for="keyword in current.keywords" :key="keyword" class="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-foreground/80">#{{ keyword }}</span>
               </div>
+              <AuthorChips :crate="currentCrate" class="mt-4" />
             </div>
             <Badge variant="secondary">{{ relativeTime(current.updatedAt) }}</Badge>
           </div>
