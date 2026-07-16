@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
+import NodesHealth from '@/components/dashboard/NodesHealth.vue'
 import type { RealmNodeInfo } from '@/lib/api'
-import { connectionLabel, connectionVariant, kindVariant } from '@/components/nodes/node-display'
-import { formatBytes, formatNumber, truncateMiddle } from '@/lib/utils'
+import { kindVariant } from '@/components/nodes/node-display'
 
 const props = defineProps<{
   nodes: RealmNodeInfo[]
@@ -74,41 +74,8 @@ const labelCounts = computed<Array<[string, number]>>(() => {
           <span v-else class="text-[11px] text-muted-foreground">No nodes have published labels yet.</span>
         </div>
 
-        <!-- Node rows: only data the realm actually reports -->
-        <ul class="divide-y divide-border/60">
-          <li
-            v-for="node in nodes"
-            :key="node.node_id"
-            role="link"
-            tabindex="0"
-            :aria-label="`View ${truncateMiddle(node.node_id)} on the status page`"
-            class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 transition-colors hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/40"
-            @click="openNode(node.node_id)"
-            @keydown.enter="openNode(node.node_id)"
-          >
-            <Badge :variant="kindVariant[node.kind]" class="shrink-0 text-[10px] uppercase">{{ node.kind }}</Badge>
-            <span class="font-mono text-[13px] font-semibold text-foreground">{{ truncateMiddle(node.node_id) }}</span>
-            <span
-              v-if="localPeerId && node.node_id === localPeerId"
-              class="rounded-sm border border-aruna-aqua/30 bg-aruna-aqua/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-aruna-aqua"
-            >
-              this node
-            </span>
-            <Badge :variant="connectionVariant(node)" class="shrink-0 text-[10px] uppercase">{{ connectionLabel(node) }}</Badge>
-            <span class="ml-auto font-mono text-[11px] text-muted-foreground">
-              <template v-if="node.info">
-                <template v-if="node.info.utilization.documents_held !== undefined">
-                  {{ formatNumber(node.info.utilization.documents_held) }} docs ·
-                </template>
-                {{ formatBytes(node.info.utilization.storage_bytes_used) }}
-                <template v-if="node.info.utilization.load_permille !== undefined">
-                  · load {{ node.info.utilization.load_permille }}‰
-                </template>
-              </template>
-              <template v-else>no published info</template>
-            </span>
-          </li>
-        </ul>
+        <!-- Node health grid: only data the realm actually reports -->
+        <NodesHealth :nodes="nodes" :local-peer-id="localPeerId" @select="openNode" />
       </template>
     </div>
   </section>
