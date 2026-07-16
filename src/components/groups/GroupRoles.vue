@@ -3,8 +3,9 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Badge from '@/components/ui/Badge.vue'
+import PermissionPathPicker from './PermissionPathPicker.vue'
 import { computed, ref } from 'vue'
-import { Lock, Plus, Trash2 } from '@lucide/vue'
+import { ChevronRight, FolderSearch, Lock, Plus, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import type { ApiRole, GroupDetailResponse, GroupPermissionLevel } from '@/lib/api'
 
@@ -21,6 +22,7 @@ const roleError = ref<string | null>(null)
 const newRoleName = ref('')
 const newPathSuffix = ref('')
 const newLevel = ref<GroupPermissionLevel>('read')
+const showPathBrowser = ref(false)
 
 const pathPrefix = computed(() => `/${props.group.realm_id}/g/${props.group.group_id}/`)
 
@@ -184,6 +186,22 @@ async function removeRole(role: ApiRole) {
         </Button>
       </div>
       <p class="mt-1.5 text-[11px] text-muted-foreground">Permission paths must stay inside this group's scope; type only the suffix.</p>
+      <button
+        type="button"
+        class="mt-2 flex items-center gap-1 text-xs font-medium text-foreground/80 hover:text-foreground"
+        @click="showPathBrowser = !showPathBrowser"
+      >
+        <ChevronRight :class="['h-3.5 w-3.5 transition-transform', showPathBrowser && 'rotate-90']" />
+        <FolderSearch class="h-3.5 w-3.5" />
+        Browse resource paths
+      </button>
+      <PermissionPathPicker
+        v-if="showPathBrowser"
+        :group-id="group.group_id"
+        :selected="newPathSuffix"
+        class="mt-2 max-w-xl"
+        @select="(suffix) => (newPathSuffix = suffix)"
+      />
     </div>
   </div>
 </template>
