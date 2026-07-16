@@ -100,7 +100,7 @@ function scheduleHide() {
           @focus="showResults = true"
           @blur="scheduleHide"
           class="h-9 w-full rounded-md border border-input bg-field pl-8 pr-16 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :placeholder="`Search in ${realm.shortName} — metadata and groups…`"
+          :placeholder="`Search in ${realm.shortName} - metadata and groups…`"
         />
         <kbd
           class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-flex"
@@ -196,7 +196,7 @@ function scheduleHide() {
           :disabled="signingIn"
           @click="onSignIn"
         >
-          <RefreshCw class="h-3.5 w-3.5" /> Session expired — sign in again
+          <RefreshCw class="h-3.5 w-3.5" /> Session expired - sign in again
         </Button>
         <Button v-else size="sm" class="h-9" :disabled="loading || signingIn" @click="onSignIn">
           <LogIn class="h-4 w-4" /> Sign in
