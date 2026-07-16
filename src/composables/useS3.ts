@@ -42,20 +42,31 @@ export interface ObjectPage {
   nextToken?: string
 }
 
-const { nodeInfo, realmInfo, authToken, apiBaseUrl } = useAruna()
+const { nodeInfo, realmInfo, authToken, apiBaseUrl, currentUser } = useAruna()
 
 const STORAGE_KEY = 'aruna.s3Key'
 
-function loadStoredKey(): S3Key | null {
+// The persisted key is scoped to the connection and account it was activated
+// under so a stored secret is never reused against a different API or user.
+interface StoredS3Key extends S3Key {
+  userId?: string
+  apiBase?: string
+}
+
+function loadStoredKey(): StoredS3Key | null {
   try {
-    // Secrets survive reloads in this tab, but not browser restarts or a new
-    // tab. Remove credentials persisted by older portal versions.
-    localStorage.removeItem(STORAGE_KEY)
-    const raw = sessionStorage.getItem(STORAGE_KEY)
+    // Keys persist across restarts, same trust level as aruna.authToken.
+    // Fall back to sessionStorage once to migrate older portal versions.
+    const raw = localStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<S3Key>
-    if (typeof parsed.accessKeyId === 'string' && typeof parsed.secretAccessKey === 'string') {
-      return { accessKeyId: parsed.accessKeyId, secretAccessKey: parsed.secretAccessKey }
+    const parsed = JSON.parse(raw) as Partial<StoredS3Key>
+    if (typeof parsed.accessKeyId !== 'string' || typeof parsed.secretAccessKey !== 'string') return null
+    if (typeof parsed.apiBase === 'string' && parsed.apiBase !== apiBaseUrl.value) return null
+    return {
+      accessKeyId: parsed.accessKeyId,
+      secretAccessKey: parsed.secretAccessKey,
+      userId: typeof parsed.userId === 'string' ? parsed.userId : undefined,
+      apiBase: typeof parsed.apiBase === 'string' ? parsed.apiBase : undefined,
     }
   } catch {
     // fall through to no key
@@ -63,7 +74,7 @@ function loadStoredKey(): S3Key | null {
   return null
 }
 
-const activeKey = ref<S3Key | null>(loadStoredKey())
+const activeKey = ref<StoredS3Key | null>(loadStoredKey())
 
 const endpoint = computed(
   () =>
@@ -99,10 +110,17 @@ function client(): S3Client {
 }
 
 function setActiveKey(key: S3Key) {
-  activeKey.value = key
+  const stored: StoredS3Key = {
+    accessKeyId: key.accessKeyId,
+    secretAccessKey: key.secretAccessKey,
+    userId: currentUser.value?.id,
+    apiBase: apiBaseUrl.value,
+  }
+  activeKey.value = stored
   cached = null
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(key))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
+    sessionStorage.removeItem(STORAGE_KEY)
   } catch {
     // Keep the key in memory when storage is unavailable.
   }
@@ -119,10 +137,20 @@ function clearActiveKey() {
   }
 }
 
-// An S3 secret is valid only for the REST identity and API connection under
-// which it was activated. This also makes sign-out revoke browser-side access.
+// The persisted secret survives re-logins on this device; only an explicit
+// sign-out (token cleared) or an API switch revokes browser-side access.
 watch([authToken, apiBaseUrl], ([token, base], [previousToken, previousBase]) => {
-  if (token !== previousToken || base !== previousBase) clearActiveKey()
+  if (base !== previousBase) clearActiveKey()
+  else if (!token && previousToken) clearActiveKey()
+})
+
+// A key activated by one account must never survive into another account's
+// session; stamp legacy entries that predate the userId scope.
+watch(currentUser, (user) => {
+  const key = activeKey.value
+  if (!user || !key) return
+  if (key.userId && key.userId !== user.id) clearActiveKey()
+  else if (!key.userId) setActiveKey(key)
 })
 
 async function listBuckets(): Promise<BucketEntry[]> {

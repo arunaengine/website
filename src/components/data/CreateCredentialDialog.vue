@@ -175,7 +175,7 @@ function activate() {
       <div v-else class="space-y-3">
         <div class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
           <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>The secret is shown once. Copy it now; it cannot be retrieved later.</span>
+          <span>The secret is shown once and cannot be retrieved later. Activating it below remembers it in this browser until you sign out or revoke it.</span>
         </div>
         <div class="space-y-2 text-sm">
           <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
