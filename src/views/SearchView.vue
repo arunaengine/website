@@ -13,13 +13,15 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
-import { truncateMiddle } from '@/lib/utils'
-import { Search, FileJson2, Code2, Play, Plus, Star, AlertTriangle } from '@lucide/vue'
+import { useDebounceFn } from '@vueuse/core'
+import { shortUserId, truncateMiddle } from '@/lib/utils'
+import { Search, FileJson2, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound } from '@lucide/vue'
 import type { SparqlResult } from '@/data/types'
+import type { UserSearchHit } from '@/lib/api'
 
 const route = useRoute()
 const router = useRouter()
-const { realm, metadata, profiles, currentUser, loading, error, bootstrapped, refresh, runSparql, toggleFavourite, myGroups, discoverableGroups } =
+const { realm, metadata, profiles, currentUser, loading, error, bootstrapped, refresh, runSparql, toggleFavourite, myGroups, discoverableGroups, searchUsers } =
   useAruna()
 
 function queryString(value: unknown): string {
@@ -149,6 +151,56 @@ const hiddenByProfile = computed(() =>
   profileFilter.value ? searchResults.value.filter((line) => !line.doc).length : 0,
 )
 
+// Beyond metadata, an active query also discovers groups (client-side over the
+// loaded group lists, like the top bar) and people (server /users/search).
+type SearchKind = 'all' | 'datasets' | 'groups' | 'people'
+const kindFilter = ref<SearchKind>('all')
+const KIND_OPTIONS: Array<{ id: SearchKind; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'datasets', label: 'Datasets' },
+  { id: 'groups', label: 'Groups' },
+  { id: 'people', label: 'People' },
+]
+function showKind(kind: Exclude<SearchKind, 'all'>): boolean {
+  return kindFilter.value === 'all' || kindFilter.value === kind
+}
+
+const groupMatches = computed(() => {
+  const term = q.value.trim().toLowerCase()
+  if (!term) return []
+  const seen = new Set<string>()
+  const matches = []
+  for (const group of [...myGroups.value, ...discoverableGroups.value]) {
+    if (seen.has(group.id)) continue
+    seen.add(group.id)
+    if (`${group.name} ${group.description}`.toLowerCase().includes(term)) matches.push(group)
+  }
+  return matches
+})
+
+const peopleResults = ref<UserSearchHit[]>([])
+const peopleSearching = ref(false)
+let peopleSeq = 0
+const runPeopleSearch = useDebounceFn(async (term: string) => {
+  const seq = ++peopleSeq
+  // /users/search needs an authenticated session and at least two characters.
+  if (term.length < 2 || !currentUser.value) {
+    peopleResults.value = []
+    peopleSearching.value = false
+    return
+  }
+  peopleSearching.value = true
+  try {
+    const response = await searchUsers(term)
+    if (seq === peopleSeq) peopleResults.value = response.users
+  } catch {
+    if (seq === peopleSeq) peopleResults.value = []
+  } finally {
+    if (seq === peopleSeq) peopleSearching.value = false
+  }
+}, 300)
+watch(q, (term) => void runPeopleSearch(term.trim()), { immediate: true })
+
 function isFavourite(id: string) {
   return favouriteIds.value.includes(id)
 }
@@ -209,7 +261,7 @@ async function runQuery() {
         <div class="surface p-4">
           <div class="relative">
             <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input v-model="q" placeholder="Search title, keywords, description, author…" class="h-11 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+            <input v-model="q" placeholder="Search datasets, groups and people…" class="h-11 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
           </div>
           <div class="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
             <span class="text-muted-foreground">Profile:</span>
@@ -249,6 +301,76 @@ async function runQuery() {
             <Button variant="outline" size="sm" class="ml-auto" @click="retrySearch">Retry</Button>
           </div>
 
+          <!-- Entity-kind chips: metadata stays the primary result set; groups and
+               people render as extra sections like the top-bar quick search. -->
+          <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Result types">
+            <button
+              v-for="kind in KIND_OPTIONS"
+              :key="kind.id"
+              type="button"
+              :class="[
+                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                kindFilter === kind.id
+                  ? 'border-primary/50 bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:text-foreground',
+              ]"
+              @click="kindFilter = kind.id"
+            >
+              {{ kind.label }}
+            </button>
+          </div>
+
+          <section v-if="showKind('groups') && groupMatches.length">
+            <div class="mb-3 flex items-center gap-2">
+              <Users class="h-4 w-4 text-primary" />
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Groups</h2>
+              <span class="text-xs text-muted-foreground">{{ groupMatches.length }}</span>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <RouterLink
+                v-for="group in groupMatches"
+                :key="group.id"
+                :to="{ name: 'groups', params: { id: group.id } }"
+                class="surface flex flex-col gap-1 p-4 transition-shadow hover:shadow-md"
+              >
+                <div class="text-sm font-medium text-foreground">{{ group.name }}</div>
+                <p class="line-clamp-2 text-xs text-muted-foreground">{{ group.description || 'No description.' }}</p>
+              </RouterLink>
+            </div>
+          </section>
+
+          <section v-if="showKind('people') && (peopleResults.length || peopleSearching)">
+            <div class="mb-3 flex items-center gap-2">
+              <UserRound class="h-4 w-4 text-primary" />
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">People</h2>
+              <span class="text-xs text-muted-foreground">{{ peopleSearching ? 'Searching…' : peopleResults.length }}</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <RouterLink
+                v-for="hit in peopleResults"
+                :key="hit.user_id"
+                :to="{ name: 'user-profile', params: { id: hit.user_id } }"
+                class="surface inline-flex items-center gap-2 px-3 py-2 text-sm transition-shadow hover:shadow-md"
+              >
+                <UserRound class="h-3.5 w-3.5 text-primary/70" />
+                <span class="font-medium text-foreground">{{ hit.name }}</span>
+                <span class="font-mono text-[10px] text-muted-foreground" :title="hit.user_id">{{ shortUserId(hit.user_id) }}</span>
+              </RouterLink>
+            </div>
+          </section>
+
+          <EmptyState
+            v-if="kindFilter === 'groups' && !groupMatches.length"
+            title="No matching groups"
+            :description="`No loaded group in ${realm.shortName} matched “${q.trim()}”.`"
+          />
+          <EmptyState
+            v-else-if="kindFilter === 'people' && !peopleSearching && !peopleResults.length"
+            title="No matching people"
+            :description="currentUser ? `No user in ${realm.shortName} matched “${q.trim()}”.` : 'Sign in to search for people.'"
+          />
+
+          <template v-if="showKind('datasets')">
           <ErrorPanel v-if="searchError" :message="searchError" @retry="retrySearch" />
 
           <!-- Skeletons cover the debounce window too (!searched), so the area
@@ -330,6 +452,7 @@ async function runQuery() {
           <p v-else-if="!cursorEnabled && capped" class="py-2 text-center text-[11px] text-muted-foreground">
             Showing the first 100 matches by relevance — refine the query to narrow results.
           </p>
+          </template>
         </template>
 
         <!-- Browse path: client-side catalog browsing, unchanged apart from the group filter. -->
