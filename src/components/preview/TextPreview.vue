@@ -2,7 +2,8 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView, lineNumbers } from '@codemirror/view'
-import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { EDITOR_FONT, highlightExtension } from '@/lib/codemirror'
+import { useTheme } from '@/composables/useTheme'
 
 const props = defineProps<{ text: string; language?: string }>()
 
@@ -55,9 +56,11 @@ async function languageExtension(language?: string): Promise<Extension | null> {
   }
 }
 
+const { isDark } = useTheme()
+
 const baseTheme = EditorView.theme({
   '&': { backgroundColor: 'transparent', fontSize: '12.5px', maxHeight: '72vh' },
-  '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: '1.55' },
+  '.cm-scroller': { fontFamily: EDITOR_FONT, lineHeight: '1.55' },
   '.cm-gutters': { backgroundColor: 'transparent', border: 'none', opacity: '0.6' },
   '.cm-activeLineGutter, .cm-activeLine': { backgroundColor: 'transparent' },
 })
@@ -69,7 +72,7 @@ async function build() {
   const extensions: Extension[] = [
     lineNumbers(),
     EditorView.lineWrapping,
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    highlightExtension(isDark.value),
     EditorState.readOnly.of(true),
     EditorView.editable.of(false),
     baseTheme,
@@ -79,7 +82,7 @@ async function build() {
 }
 
 watch(
-  () => [props.text, props.language],
+  () => [props.text, props.language, isDark.value],
   () => void build(),
   { immediate: true, flush: 'post' },
 )

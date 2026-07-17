@@ -11,10 +11,10 @@ import {
   lineNumbers,
 } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
-import { bracketMatching, defaultHighlightStyle, HighlightStyle, indentUnit, syntaxHighlighting } from '@codemirror/language'
+import { bracketMatching, indentUnit } from '@codemirror/language'
 import { python } from '@codemirror/lang-python'
 import { javascript } from '@codemirror/lang-javascript'
-import { tags as t } from '@lezer/highlight'
+import { EDITOR_FONT, highlightExtension } from '@/lib/codemirror'
 import { useTheme } from '@/composables/useTheme'
 
 // Lazy-loaded on its own chunk: the quick-run wizard mounts it through
@@ -39,37 +39,33 @@ function langExtension(lang: ScriptLang): Extension {
   return []
 }
 
-// Token palette for the brand-default dark surface; the light theme keeps
-// CodeMirror's dark-on-light default style.
-const darkHighlight = HighlightStyle.define([
-  { tag: [t.keyword, t.operatorKeyword, t.modifier, t.controlKeyword, t.moduleKeyword], color: '#c678dd' },
-  { tag: [t.string, t.special(t.string), t.regexp], color: '#98c379' },
-  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: '#7d8799', fontStyle: 'italic' },
-  { tag: [t.number, t.integer, t.float, t.bool, t.null, t.atom], color: '#d19a66' },
-  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: '#61afef' },
-  { tag: [t.definition(t.variableName), t.typeName, t.className, t.namespace], color: '#e5c07b' },
-  { tag: [t.propertyName, t.attributeName], color: '#e06c75' },
-  { tag: [t.operator, t.punctuation, t.separator, t.bracket], color: '#abb2bf' },
-  { tag: t.invalid, color: '#e06c75' },
-])
-
-function highlightExtension(dark: boolean): Extension {
-  return syntaxHighlighting(dark ? darkHighlight : defaultHighlightStyle, { fallback: true })
-}
-
+// The mono stack lives on .cm-scroller so gutter and content share font,
+// size and line-height — an inherited proportional font in the gutters made
+// the line numbers misaligned and visually off.
 const theme = EditorView.theme({
   '&': { fontSize: '12.5px', backgroundColor: 'transparent', color: 'hsl(var(--foreground))' },
-  '.cm-content': {
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-    padding: '10px 0',
-    caretColor: 'hsl(var(--foreground))',
+  '.cm-scroller': {
+    fontFamily: EDITOR_FONT,
+    lineHeight: '1.6',
+    minHeight: '10rem',
+    maxHeight: '360px',
+    overflow: 'auto',
   },
+  '.cm-content': { padding: '10px 0', caretColor: 'hsl(var(--foreground))' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'hsl(var(--foreground))' },
-  '.cm-gutters': { backgroundColor: 'transparent', border: 'none', color: 'hsl(var(--muted-foreground))' },
+  '.cm-gutters': {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: 'hsl(var(--muted-foreground) / 0.8)',
+  },
+  '.cm-lineNumbers .cm-gutterElement': {
+    padding: '0 10px 0 14px',
+    minWidth: '36px',
+    fontVariantNumeric: 'tabular-nums',
+  },
   '.cm-activeLine': { backgroundColor: 'hsl(var(--muted) / 0.5)' },
   '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'hsl(var(--foreground))' },
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': { backgroundColor: 'hsl(var(--accent))' },
-  '.cm-scroller': { fontFamily: 'inherit', maxHeight: '360px', overflow: 'auto', lineHeight: '1.5' },
   '&.cm-focused': { outline: 'none' },
 })
 
@@ -126,5 +122,8 @@ watch(isDark, (dark) => view.value?.dispatch({ effects: highlightConf.reconfigur
 </script>
 
 <template>
-  <div ref="host" class="overflow-hidden rounded-md border border-border bg-muted/20" />
+  <div
+    ref="host"
+    class="overflow-hidden rounded-md border border-input bg-field shadow-sm transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring"
+  />
 </template>

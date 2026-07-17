@@ -12,6 +12,29 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  optimizeDeps: {
+    // Pre-bundle the whole editor stack eagerly: a mid-session dev
+    // re-optimization can split @codemirror/@lezer into duplicate module
+    // instances, which silently disables syntax highlighting.
+    include: [
+      '@codemirror/state',
+      '@codemirror/view',
+      '@codemirror/language',
+      '@codemirror/commands',
+      '@codemirror/lang-python',
+      '@codemirror/lang-javascript',
+      '@codemirror/lang-json',
+      '@codemirror/lang-css',
+      '@codemirror/lang-rust',
+      '@codemirror/lang-sql',
+      '@codemirror/lang-xml',
+      '@codemirror/lang-yaml',
+      '@codemirror/legacy-modes/mode/shell',
+      '@codemirror/legacy-modes/mode/toml',
+      '@codemirror/legacy-modes/mode/properties',
+      '@lezer/highlight',
+    ],
+  },
   server: {
     host: process.env.ARUNA_DEV_HOST || '127.0.0.1',
     port: 5173,
