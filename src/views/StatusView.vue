@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
@@ -11,6 +11,7 @@ import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import { connectionLabel, connectionVariant, isDegradedStatus, kindVariant, statusVariant, type BadgeVariant } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
+import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { aggregateByLocation } from '@/lib/placement'
 import { formatBytes, formatNumber, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
@@ -20,14 +21,13 @@ import { Boxes, ChevronRight, Globe2, HardDrive, MapPin, MapPinned, RefreshCw } 
 const route = useRoute()
 const { realm, realmInfo, nodeInfo, usageInfo, loadInfo } = useAruna()
 
-const REFRESH_INTERVAL_MS = 10_000
+const REFRESH_INTERVAL_MS = 60_000
 
 const expandedId = ref('')
 const statusError = ref<string | null>(null)
 const lastUpdated = ref<Date | null>(null)
 const refreshing = ref(false)
 const probes = ref<Record<string, NodeProbe>>({})
-let timer: number | undefined
 
 async function refreshStatus() {
   if (refreshing.value) return
@@ -55,11 +55,13 @@ async function probeRealmNodes() {
   probes.value = Object.fromEntries(results)
 }
 
-onMounted(() => {
-  void refreshStatus()
-  timer = window.setInterval(() => void refreshStatus(), REFRESH_INTERVAL_MS)
-})
-onUnmounted(() => window.clearInterval(timer))
+onMounted(() => void refreshStatus())
+// Minute cadence, paused while the tab is hidden (DashboardView's pattern);
+// refreshStatus only swaps refs, so scroll and the open panel are untouched.
+const visibility = useDocumentVisibility()
+useIntervalFn(() => {
+  if (visibility.value === 'visible' && !refreshing.value) void refreshStatus()
+}, REFRESH_INTERVAL_MS)
 
 const localPeerId = computed(() => nodeInfo.value?.node.peer_id ?? '')
 
