@@ -1,20 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
-import Select from '@/components/ui/Select.vue'
+import FilterChips from '@/components/ui/FilterChips.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import TaskDetailPanel from '@/components/compute/TaskDetailPanel.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
-import { relativeTime, truncateMiddle } from '@/lib/utils'
+import { formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import {
   TES_GROUP_TAG,
-  TES_STATE_META,
   isActiveTesState,
   type TesServiceInfo,
   type TesState,
@@ -73,39 +71,43 @@ async function loadServiceInfo() {
   }
 }
 
-// ── Filters ──────────────────────────────────────────────────────────────────
-const TES_STATE_ORDER: TesState[] = [
-  'UNKNOWN',
-  'QUEUED',
-  'INITIALIZING',
-  'RUNNING',
-  'PAUSED',
-  'COMPLETE',
-  'EXECUTOR_ERROR',
-  'SYSTEM_ERROR',
-  'CANCELING',
-  'CANCELED',
-  'PREEMPTED',
-]
-const stateFilter = ref('')
-const groupFilter = ref('')
-// Radix SelectItem forbids empty-string values, so 'all' is the sentinel.
-const stateOptions = [
-  { value: 'all', label: 'All' },
-  ...TES_STATE_ORDER.map((s) => ({ value: s, label: TES_STATE_META[s].label })),
-]
-const stateModel = computed({
-  get: () => stateFilter.value || 'all',
-  set: (v: string) => (stateFilter.value = v === 'all' ? '' : v),
+// ── State filter ─────────────────────────────────────────────────────────────
+// Chips cover only states the facade actually emits (aruna api tes.rs):
+// PAUSED and PREEMPTED never occur; UNKNOWN (indeterminate) counts as failed.
+type StateGroup = 'all' | 'active' | 'done' | 'failed' | 'canceled'
+const GROUP_STATES: Record<Exclude<StateGroup, 'all'>, TesState[]> = {
+  active: ['QUEUED', 'INITIALIZING', 'RUNNING', 'CANCELING'],
+  done: ['COMPLETE'],
+  failed: ['EXECUTOR_ERROR', 'SYSTEM_ERROR', 'UNKNOWN'],
+  canceled: ['CANCELED'],
+}
+const GROUP_LABELS: Record<Exclude<StateGroup, 'all'>, string> = {
+  active: 'Active',
+  done: 'Completed',
+  failed: 'Failed',
+  canceled: 'Canceled',
+}
+const stateGroup = ref<StateGroup>('all')
+
+function inGroup(task: TesTask, group: Exclude<StateGroup, 'all'>): boolean {
+  return !!task.state && GROUP_STATES[group].includes(task.state)
+}
+const visibleTasks = computed(() => {
+  const group = stateGroup.value
+  return group === 'all' ? tasks.value : tasks.value.filter((task) => inGroup(task, group))
 })
-const groupOptions = computed(() => [
-  { value: 'all', label: 'All' },
-  ...myGroups.value.map((g) => ({ value: g.id, label: g.name })),
+const emptyGroupLabel = computed(() => {
+  const group = stateGroup.value
+  return group === 'all' ? '' : `${GROUP_LABELS[group].toLowerCase()} `
+})
+const chipOptions = computed(() => [
+  { value: 'all', label: 'All', count: tasks.value.length },
+  ...(Object.keys(GROUP_LABELS) as Array<Exclude<StateGroup, 'all'>>).map((group) => ({
+    value: group,
+    label: GROUP_LABELS[group],
+    count: tasks.value.filter((task) => inGroup(task, group)).length,
+  })),
 ])
-const groupModel = computed({
-  get: () => groupFilter.value || 'all',
-  set: (v: string) => (groupFilter.value = v === 'all' ? '' : v),
-})
 
 // ── Task list ────────────────────────────────────────────────────────────────
 const tasks = ref<TesTask[]>([])
@@ -127,6 +129,27 @@ function taskGroup(task: TesTask): { text: string; mono: boolean } | null {
   return name ? { text: name, mono: false } : { text: truncateMiddle(id), mono: true }
 }
 
+function taskResources(task: TesTask): string {
+  const r = task.resources
+  if (!r) return ''
+  const parts: string[] = []
+  if (r.cpu_cores) parts.push(`${r.cpu_cores} cpu`)
+  if (r.ram_gb) parts.push(`${r.ram_gb} GB RAM`)
+  if (r.disk_gb) parts.push(`${r.disk_gb} GB disk`)
+  return parts.join(' · ')
+}
+
+function taskDuration(task: TesTask): string {
+  const log = task.logs?.[0]
+  if (!log?.start_time) return ''
+  const start = Date.parse(log.start_time)
+  const end = log.end_time ? Date.parse(log.end_time) : isActiveTesState(task.state) ? Date.now() : NaN
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return ''
+  const label = formatDuration(end - start)
+  if (!label) return ''
+  return log.end_time ? label : `${label} so far`
+}
+
 async function fetchList({ more = false, silent = false } = {}) {
   if (!currentUser.value) return
   const requestId = ++listRequestId
@@ -136,9 +159,6 @@ async function fetchList({ more = false, silent = false } = {}) {
     const res = await listTasks({
       view: 'BASIC',
       page_size: 50,
-      state: (stateFilter.value || undefined) as TesState | undefined,
-      tag_key: groupFilter.value ? TES_GROUP_TAG : undefined,
-      tag_value: groupFilter.value || undefined,
       page_token: more ? nextPageToken.value : undefined,
     })
     if (requestId !== listRequestId) return
@@ -168,9 +188,6 @@ async function fetchList({ more = false, silent = false } = {}) {
 function reload() {
   void fetchList()
 }
-
-// Re-filtering starts a fresh page-one query.
-watch([stateFilter, groupFilter], () => void fetchList())
 
 async function init() {
   await loadServiceInfo()
@@ -207,11 +224,12 @@ onUnmounted(() => window.clearInterval(pollTimer))
       Tasks are runs <span class="font-medium text-foreground">you submit</span> to this node — start one with Quick run or describe a full GA4GH TES task.
     </p>
 
-    <!-- Service banner -->
+    <!-- Service banner: capability and version only — the realm identity
+         already sits in the page header badge. -->
     <p v-if="serviceState === 'ready' && serviceInfo" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-      <span class="font-medium text-foreground">{{ serviceInfo.name }}</span>
+      <span class="font-medium text-foreground">Task execution service</span>
       <span>·</span>
-      <span>TES {{ serviceInfo.type.version }}</span>
+      <span>GA4GH TES {{ serviceInfo.type.version }}</span>
       <template v-if="serviceInfo.storage?.length">
         <span>·</span>
         <Badge v-for="s in serviceInfo.storage" :key="s" variant="outline" class="font-mono">{{ s }}</Badge>
@@ -224,16 +242,6 @@ onUnmounted(() => window.clearInterval(pollTimer))
       This node does not expose the TES endpoint. Configure a compute backend before enabling TES.
     </p>
     <ErrorPanel v-else-if="serviceState === 'error'" :message="serviceError || 'Failed to load the TES service info.'" @retry="loadServiceInfo" />
-
-    <!-- Filters -->
-    <div class="flex flex-wrap items-center gap-2">
-      <Select v-model="stateModel" :options="stateOptions" label="State" aria-label="Filter tasks by state" class="h-8 w-40 text-xs" />
-      <Select v-model="groupModel" :options="groupOptions" label="Group" aria-label="Filter tasks by group" class="h-8 w-48 text-xs" />
-      <Button variant="ghost" size="sm" :disabled="refreshing" @click="reload">
-        <RefreshCw class="h-3.5 w-3.5" :class="refreshing ? 'animate-spin' : ''" /> Refresh
-      </Button>
-      <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed — {{ lastPollError }}</span>
-    </div>
 
     <!-- List -->
     <div v-if="listState === 'loading'" class="surface divide-y divide-border overflow-hidden">
@@ -249,50 +257,72 @@ onUnmounted(() => window.clearInterval(pollTimer))
       Tasks cannot be listed until this node exposes the GA4GH TES endpoint.
     </p>
 
-    <EmptyState
-      v-else-if="listState === 'ready' && !tasks.length"
-      title="No compute tasks"
-      description="Run a quick script or describe a full GA4GH TES task; submissions appear here."
-    >
-      <div class="flex items-center justify-center gap-2">
-        <Button size="sm" @click="goQuick"><Zap class="h-4 w-4" /> Quick run</Button>
-        <Button variant="outline" size="sm" @click="goNew"><ListPlus class="h-4 w-4" /> New task</Button>
+    <!-- First-run empty state doubles as the run-mode chooser. -->
+    <section v-else-if="listState === 'ready' && !tasks.length" class="surface px-5 py-10 text-center">
+      <p class="text-sm font-medium text-foreground">No compute tasks yet</p>
+      <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Start your first run — submissions appear here.</p>
+      <div class="mx-auto mt-5 grid max-w-xl gap-3 text-left sm:grid-cols-2">
+        <button type="button" class="surface-inline p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40" @click="goQuick">
+          <span class="flex items-center gap-1.5 text-sm font-semibold text-foreground"><Zap class="h-4 w-4 text-primary" /> Quick run</span>
+          <span class="mt-1 block text-xs text-muted-foreground">Write a short script — the portal stages it and builds the task for you.</span>
+        </button>
+        <button type="button" class="surface-inline p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40" @click="goNew">
+          <span class="flex items-center gap-1.5 text-sm font-semibold text-foreground"><ListPlus class="h-4 w-4 text-primary" /> New task</span>
+          <span class="mt-1 block text-xs text-muted-foreground">Describe a full GA4GH TES task by hand — image, command, resources.</span>
+        </button>
       </div>
-    </EmptyState>
+    </section>
 
     <div v-else-if="tasks.length" class="surface overflow-hidden">
-      <table class="w-full text-sm">
+      <!-- List toolbar -->
+      <div class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-3 py-2">
+        <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter tasks by state" />
+        <div class="ml-auto flex items-center gap-2">
+          <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed — {{ lastPollError }}</span>
+          <Button variant="ghost" size="icon-sm" :disabled="refreshing" aria-label="Refresh tasks" @click="reload">
+            <RefreshCw class="h-3.5 w-3.5" :class="refreshing ? 'animate-spin' : ''" />
+          </Button>
+        </div>
+      </div>
+
+      <p v-if="!visibleTasks.length" class="px-5 py-8 text-center text-sm text-muted-foreground">
+        No {{ emptyGroupLabel }}tasks in the loaded list.
+      </p>
+
+      <table v-else class="w-full text-sm">
         <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th class="px-5 py-2 text-left font-semibold">Name</th>
+            <th class="px-5 py-2 text-left font-semibold">Task</th>
             <th class="px-5 py-2 text-left font-semibold">State</th>
-            <th class="px-5 py-2 text-left font-semibold">Group</th>
-            <th class="px-5 py-2 text-left font-semibold">Created</th>
+            <th class="hidden px-5 py-2 text-left font-semibold md:table-cell">Group</th>
+            <th class="hidden px-5 py-2 text-left font-semibold lg:table-cell">Resources</th>
+            <th class="px-5 py-2 text-left font-semibold">Submitted</th>
+            <th class="hidden px-5 py-2 text-left font-semibold sm:table-cell">Duration</th>
             <th class="px-5 py-2"></th>
           </tr>
         </thead>
         <tbody>
           <tr
-            v-for="task in tasks"
+            v-for="task in visibleTasks"
             :key="task.id || task.name"
             class="border-t border-border"
             :class="task.id ? 'cursor-pointer hover:bg-muted/40' : ''"
             @click="openTask(task)"
           >
             <td class="px-5 py-2.5">
-              <div class="font-medium text-foreground" :class="!task.name ? 'font-mono text-[11px]' : ''">
-                {{ task.name || truncateMiddle(task.id || '') }}
-              </div>
-              <div v-if="task.description" class="text-[11px] text-muted-foreground">{{ task.description }}</div>
+              <div class="font-medium text-foreground">{{ task.name || 'Untitled task' }}</div>
+              <div v-if="task.id" class="font-mono text-[11px] text-muted-foreground" :title="task.id">{{ truncateMiddle(task.id) }}</div>
             </td>
             <td class="px-5 py-2.5"><TaskStateBadge :state="task.state" /></td>
-            <td class="px-5 py-2.5 text-[11px] text-muted-foreground">
+            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground md:table-cell">
               <span v-if="taskGroup(task)" :class="taskGroup(task)!.mono ? 'font-mono' : ''">{{ taskGroup(task)!.text }}</span>
               <span v-else>—</span>
             </td>
-            <td class="px-5 py-2.5 text-[11px] text-muted-foreground">
+            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground lg:table-cell">{{ taskResources(task) || '—' }}</td>
+            <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="task.creation_time">
               {{ task.creation_time ? relativeTime(task.creation_time) : '—' }}
             </td>
+            <td class="hidden px-5 py-2.5 text-[11px] tabular-nums text-muted-foreground sm:table-cell">{{ taskDuration(task) || '—' }}</td>
             <td class="px-5 py-2.5 text-right"><ChevronRight v-if="task.id" class="ml-auto h-4 w-4 text-muted-foreground" /></td>
           </tr>
         </tbody>

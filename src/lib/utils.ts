@@ -32,6 +32,17 @@ export function relativeTime(iso: string): string {
   return `${Math.round(mo / 12)}y ago`
 }
 
+// Compact elapsed-time label ("42s", "3m 10s", "2h 05m") for run durations.
+export function formatDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return ''
+  const s = Math.round(ms / 1000)
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ${String(s % 60).padStart(2, '0')}s`
+  const h = Math.floor(m / 60)
+  return `${h}h ${String(m % 60).padStart(2, '0')}m`
+}
+
 export function truncateMiddle(s: string, head = 8, tail = 6) {
   if (!s || s.length <= head + tail + 1) return s
   return `${s.slice(0, head)}…${s.slice(-tail)}`
