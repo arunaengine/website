@@ -13,8 +13,12 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
+import AddDataDialog from '@/components/data/AddDataDialog.vue'
+import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useStaging } from '@/composables/useStaging'
+import { featureEnabled } from '@/lib/config'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type S3Key, type UploadHandle } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { UsageResponse } from '@/lib/api'
@@ -85,6 +89,13 @@ let uploadCounter = 0
 let disposed = false
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragActive = ref(false)
+
+const addDataOpen = ref(false)
+const staging = useStaging()
+// Staging jobs side panel: config-gated (no job-listing endpoint on today's
+// backend). The dialog's ingest tab covers registered connectors regardless.
+const stagingJobsEnabled = featureEnabled('stagingJobs')
+const stagingPanelOpen = ref(false)
 
 const deleteTarget = ref<{ bucket: string; object: ObjectEntry } | null>(null)
 const deleteBusy = ref(false)
@@ -588,7 +599,12 @@ const isEmpty = computed(
               <div class="flex items-center gap-2">
                 <input ref="fileInput" type="file" multiple class="hidden" @change="onFileInput" />
                 <Button variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
-                <Button size="sm" @click="pickFiles"><Upload class="h-4 w-4" /> Upload</Button>
+                <Button v-if="stagingJobsEnabled" variant="outline" size="sm" @click="stagingPanelOpen = true">
+                  Staging
+                  <Badge v-if="staging.runningCount.value" variant="secondary" class="ml-1">{{ staging.runningCount.value }}</Badge>
+                </Button>
+                <Button variant="outline" size="sm" @click="pickFiles"><Upload class="h-4 w-4" /> Upload</Button>
+                <Button size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>
             </div>
 
@@ -686,6 +702,17 @@ const isEmpty = computed(
     </div>
 
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />
+
+    <AddDataDialog
+      v-model:open="addDataOpen"
+      :bucket="bucket"
+      :prefix="s3Prefix"
+      :group-id="activeGroupId"
+      @upload="(files) => void requestUpload(files)"
+      @staged="() => void loadObjects()"
+    />
+
+    <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />
 
     <Dialog :open="newFolderOpen" @update:open="(v: boolean) => (newFolderOpen = v)">
       <DialogContent class="max-w-sm">
