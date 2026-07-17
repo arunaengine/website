@@ -8,8 +8,8 @@ import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { isTerminalTesState, type TesTask } from '@/lib/tes'
-import { formatBytes, relativeTime } from '@/lib/utils'
-import { Download, ExternalLink, FolderOpen, RefreshCw } from '@lucide/vue'
+import { formatBytes, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
+import { ArrowDownToLine, ArrowUpFromLine, CornerDownRight, Download, ExternalLink, FolderOpen, RefreshCw } from '@lucide/vue'
 
 const props = defineProps<{ taskId: string; outputBucket: string; outputPrefix: string }>()
 
@@ -74,6 +74,17 @@ const latestLog = computed(() => {
 const executorLog = computed(() => latestLog.value?.logs?.[0])
 const isTerminal = computed(() => isTerminalTesState(task.value?.state))
 
+const duration = computed(() => {
+  const log = latestLog.value
+  if (!log?.start_time) return ''
+  const start = Date.parse(log.start_time)
+  const end = log.end_time ? Date.parse(log.end_time) : isTerminal.value ? NaN : Date.now()
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return ''
+  const label = formatDuration(end - start)
+  if (!label) return ''
+  return log.end_time ? label : `${label} so far`
+})
+
 // ── Output prefix listing (useS3) ────────────────────────────────────────────
 interface OutputFile {
   name: string
@@ -127,14 +138,25 @@ const bucketPrefixQuery = computed(() => props.outputPrefix.replace(/\/$/, ''))
     <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the task.'" @retry="load" />
 
     <template v-else-if="task">
-      <!-- State -->
-      <div class="flex flex-wrap items-center gap-2">
-        <TaskStateBadge :state="task.state" />
-        <span v-if="!isTerminal" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <RefreshCw class="h-3.5 w-3.5 animate-spin" /> Tracking…
-        </span>
+      <!-- Header -->
+      <div class="surface flex flex-wrap items-center gap-3 px-5 py-4">
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <h3 class="text-sm font-semibold text-foreground">{{ task.name || 'Quick run' }}</h3>
+            <TaskStateBadge :state="task.state" />
+            <span v-if="!isTerminal" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <RefreshCw class="h-3.5 w-3.5 animate-spin" /> Tracking…
+            </span>
+          </div>
+          <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+            <span class="font-mono" :title="taskId">{{ truncateMiddle(taskId) }}</span>
+            <span v-if="task.creation_time">· submitted {{ relativeTime(task.creation_time) }}</span>
+            <span v-if="duration" class="tabular-nums">· {{ duration }}</span>
+            <span v-if="executorLog?.exit_code != null">· exit code <span class="font-mono text-foreground">{{ executorLog.exit_code }}</span></span>
+          </div>
+        </div>
         <RouterLink
-          class="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          class="inline-flex shrink-0 items-center gap-1 text-xs text-primary hover:underline"
           :to="{ name: 'compute-task', params: { taskId } }"
         >
           Open full task detail <ExternalLink class="h-3 w-3" />
@@ -142,7 +164,54 @@ const bucketPrefixQuery = computed(() => props.outputPrefix.replace(/\/$/, ''))
       </div>
       <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed — {{ lastPollError }}</p>
 
-      <!-- stdout / stderr -->
+      <!-- In / out — mirrors the wizard's data step. -->
+      <div class="grid gap-4 lg:grid-cols-2">
+        <section class="surface-muted space-y-2 p-4">
+          <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <ArrowDownToLine class="h-3.5 w-3.5 text-primary" /> Into the container
+          </div>
+          <ul v-if="task.inputs?.length" class="space-y-1.5 font-mono text-[11px]">
+            <li v-for="input in task.inputs" :key="input.path">
+              <div class="truncate text-foreground" :title="input.url">{{ input.name || input.url }}</div>
+              <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ input.path }}</div>
+            </li>
+          </ul>
+          <p v-else class="text-[11px] text-muted-foreground">No input data was staged.</p>
+        </section>
+
+        <section class="surface-muted space-y-2 p-4">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+              <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Out of the container
+            </div>
+            <RouterLink
+              class="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+              :to="{ name: 'bucket', params: { bucketId: outputBucket }, query: bucketPrefixQuery ? { prefix: bucketPrefixQuery } : {} }"
+            >
+              <FolderOpen class="h-3.5 w-3.5" /> Browse prefix
+            </RouterLink>
+          </div>
+          <p v-if="!isTerminal" class="text-[11px] text-muted-foreground">
+            Declared output files are uploaded to the bucket when the run finishes.
+          </p>
+          <div v-else-if="outputsState === 'loading'" class="text-[11px] text-muted-foreground">Listing the output prefix…</div>
+          <p v-else-if="outputsState === 'error'" class="text-[11px] text-destructive">{{ outputsError }}</p>
+          <p v-else-if="!outputs.length" class="text-[11px] text-muted-foreground">
+            No files under <code class="rounded bg-muted px-1 font-mono">{{ outputPrefix || '/' }}</code> — stdout and stderr live in the streams below.
+          </p>
+          <ul v-else class="divide-y divide-border/70 overflow-hidden rounded-md border border-border/70 bg-card">
+            <li v-for="file in outputs" :key="file.key" class="flex items-center gap-3 px-3 py-2 text-xs">
+              <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ file.name }}</span>
+              <span v-if="file.size !== undefined" class="text-muted-foreground">{{ formatBytes(file.size) }}</span>
+              <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="file.href" target="_blank" rel="noopener">
+                <Download class="h-3.5 w-3.5" /> Download
+              </a>
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- stdout / stderr in the editor's mono pane style -->
       <section class="space-y-3">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output streams</h3>
         <p v-if="!isTerminal" class="text-xs text-muted-foreground">
@@ -151,49 +220,17 @@ const bucketPrefixQuery = computed(() => props.outputPrefix.replace(/\/$/, ''))
         <template v-else-if="executorLog">
           <div>
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground">stdout</div>
-            <pre v-if="executorLog.stdout" class="mt-0.5 max-h-60 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]">{{ executorLog.stdout }}</pre>
+            <pre v-if="executorLog.stdout" class="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-all rounded-md border border-input bg-field p-3 font-mono text-[11.5px] leading-relaxed shadow-sm">{{ executorLog.stdout }}</pre>
             <p v-else class="text-[11px] text-muted-foreground">no stdout captured</p>
           </div>
           <div>
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground">stderr</div>
-            <pre v-if="executorLog.stderr" class="mt-0.5 max-h-60 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]">{{ executorLog.stderr }}</pre>
+            <pre v-if="executorLog.stderr" class="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-all rounded-md border border-input bg-field p-3 font-mono text-[11.5px] leading-relaxed shadow-sm">{{ executorLog.stderr }}</pre>
             <p v-else class="text-[11px] text-muted-foreground">no stderr captured</p>
-          </div>
-          <div v-if="executorLog.exit_code != null" class="text-[11px] text-muted-foreground">
-            exit code <span class="font-mono text-foreground">{{ executorLog.exit_code }}</span>
           </div>
         </template>
         <p v-else class="text-xs text-muted-foreground">No execution log was recorded.</p>
       </section>
-
-      <!-- Output files -->
-      <section v-if="isTerminal" class="space-y-2">
-        <div class="flex items-center justify-between gap-2">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output files</h3>
-          <RouterLink
-            class="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-            :to="{ name: 'bucket', params: { bucketId: outputBucket }, query: bucketPrefixQuery ? { prefix: bucketPrefixQuery } : {} }"
-          >
-            <FolderOpen class="h-3.5 w-3.5" /> Browse prefix
-          </RouterLink>
-        </div>
-        <div v-if="outputsState === 'loading'" class="text-xs text-muted-foreground">Listing the output prefix…</div>
-        <p v-else-if="outputsState === 'error'" class="text-xs text-destructive">{{ outputsError }}</p>
-        <p v-else-if="!outputs.length" class="text-xs text-muted-foreground">
-          No files under <code class="rounded bg-muted px-1 font-mono">{{ outputPrefix || '/' }}</code> yet. Declared outputs are written here; stdout/stderr stay in the streams above.
-        </p>
-        <ul v-else class="divide-y divide-border overflow-hidden rounded-md border border-border">
-          <li v-for="file in outputs" :key="file.key" class="flex items-center gap-3 px-3 py-2 text-xs">
-            <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ file.name }}</span>
-            <span v-if="file.size !== undefined" class="text-muted-foreground">{{ formatBytes(file.size) }}</span>
-            <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="file.href" target="_blank" rel="noopener">
-              <Download class="h-3.5 w-3.5" /> Download
-            </a>
-          </li>
-        </ul>
-      </section>
-
-      <p v-if="task.creation_time" class="text-[11px] text-muted-foreground">Submitted {{ relativeTime(task.creation_time) }}</p>
     </template>
   </div>
 </template>

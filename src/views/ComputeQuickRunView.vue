@@ -336,9 +336,16 @@ function runAnother() {
 
     <!-- Result -->
     <div v-else-if="submittedTaskId" class="container space-y-6 py-8">
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex flex-wrap items-center justify-between gap-2">
         <h2 class="font-display text-base font-semibold text-aruna-navy">Run submitted</h2>
-        <Button variant="outline" size="sm" @click="runAnother"><ListPlus class="h-4 w-4" /> Run another</Button>
+        <div class="flex items-center gap-2">
+          <Button variant="outline" size="sm" @click="router.push({ name: 'compute' })">
+            <ArrowLeft class="h-3.5 w-3.5" /> Back to Compute
+          </Button>
+          <Button size="sm" title="Starts the wizard again with this run's script and data settings" @click="runAnother">
+            <ListPlus class="h-4 w-4" /> Run again
+          </Button>
+        </div>
       </div>
       <QuickRunResult :task-id="submittedTaskId" :output-bucket="outputBucket.trim()" :output-prefix="normalizedPrefix" />
     </div>
