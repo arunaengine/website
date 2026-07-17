@@ -14,6 +14,7 @@ import CopyButton from '@/components/nodes/CopyButton.vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useWatches } from '@/composables/useWatches'
 import { useS3 } from '@/composables/useS3'
 import { RouterLink } from 'vue-router'
 import { relativeTime } from '@/lib/utils'
@@ -40,6 +41,8 @@ const {
 } = useAruna()
 const { signIn, signOut, isAuthenticated, stage, stageError } = useAuth()
 const { activeKey, clearActiveKey } = useS3()
+// Optimistic until a watch request answers 404/403 (mirrors the bell's probe).
+const { available: watchesAvailable } = useWatches()
 
 const apiBaseDraft = ref(apiBaseUrl.value)
 const tokenDraft = ref(authToken.value)
@@ -159,6 +162,7 @@ function toggleGroup(groupId: string) {
         <a href="#groups" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Groups &amp; roles</a>
         <a href="#credentials" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">S3 credentials</a>
         <a href="#appearance" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Appearance</a>
+        <RouterLink v-if="watchesAvailable" :to="{ name: 'settings-watches' }" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Watched resources &rarr;</RouterLink>
       </nav>
 
       <div class="space-y-6">

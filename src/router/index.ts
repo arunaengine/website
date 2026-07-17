@@ -34,6 +34,9 @@ const routes: RouteRecordRaw[] = [
       { path: 'status', name: 'status', component: () => import('@/views/StatusView.vue') },
       // Settings (consolidates account preferences, members, tokens)
       { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
+      // Watched resources — served by the merged notifications backend, so no
+      // feature flag; the view degrades inline when the endpoints are absent.
+      { path: 'settings/watches', name: 'settings-watches', component: () => import('@/views/WatchesView.vue') },
       // Realm admin — usage, quota policy and placement (tabs of one view)
       { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
       { path: 'admin/placement', redirect: { path: '/app/admin', query: { tab: 'placement' } } },
