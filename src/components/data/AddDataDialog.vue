@@ -58,7 +58,7 @@ function emitUpload(files: File[]) {
 
 function onBrowse(event: Event) {
   const input = event.target as HTMLInputElement
-  if (input.files?.length) emitUpload(Array.from(input.files))
+  if (!writesDisabled.value && input.files?.length) emitUpload(Array.from(input.files))
   input.value = ''
 }
 
@@ -107,6 +107,7 @@ const sourcePathError = computed(() => Boolean(trimmedSourcePath.value) && sourc
 const submitDisabled = computed(
   () =>
     busy.value ||
+    writesDisabled.value ||
     sourcePathInvalid.value ||
     !groupSel.value ||
     !connectorSel.value ||
@@ -234,7 +235,15 @@ const recentSubmissions = computed(() => staging.submissions.value.slice(0, 5))
             <p class="mt-2 text-sm text-foreground">Drop files here to upload</p>
             <p class="mt-1 text-xs text-muted-foreground">or</p>
             <input ref="fileInput" type="file" multiple class="hidden" @change="onBrowse" />
-            <Button variant="outline" size="sm" class="mt-2" @click="fileInput?.click()">Browse files</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              class="mt-2"
+              :disabled="writesDisabled"
+              :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+              @click="fileInput?.click()"
+              >Browse files</Button
+            >
           </div>
           <p class="text-[11px] text-muted-foreground">
             Uploads are multipart (16 MiB parts), run up to three at a time, and keep going while you navigate. Cancel or retry them from the Uploads panel.
