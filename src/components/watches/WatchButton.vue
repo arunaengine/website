@@ -11,7 +11,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogTrigger from '@/components/ui/DialogTrigger.vue'
 import { Eye, EyeOff } from '@lucide/vue'
 import { useWatches } from '@/composables/useWatches'
-import { WATCH_EVENT_KINDS, type WatchEventKind } from '@/lib/watches'
+import { WATCH_EVENT_KINDS, watchKindDescription, type WatchEventKind } from '@/lib/watches'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 
 // "Watch this" affordance for one canonical resource prefix. The event kind is
@@ -105,9 +105,17 @@ async function onDelete() {
       </DialogHeader>
 
       <div class="space-y-3">
-        <div class="surface-muted px-3 py-2">
-          <div class="text-[11px] uppercase tracking-wider text-muted-foreground">Watched prefix</div>
-          <div class="mt-1 break-all font-mono text-xs text-foreground">{{ pathPrefix }}</div>
+        <!-- Human identity first; the canonical path is a technical detail. -->
+        <div class="surface-muted px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-wider text-muted-foreground">
+            {{ props.eventKind === 'data_uploaded' ? 'Watched folder' : 'Watched catalog path' }}
+          </div>
+          <div class="mt-1 truncate text-sm font-medium text-foreground" :title="resourceLabel">{{ resourceLabel }}</div>
+          <p class="mt-1 text-[11px] leading-relaxed text-muted-foreground">{{ watchKindDescription(props.eventKind) }}</p>
+          <details class="mt-1.5">
+            <summary class="cursor-pointer select-none text-[11px] text-muted-foreground/80 hover:text-foreground">Technical path</summary>
+            <code class="mt-1 block break-all font-mono text-[11px] text-muted-foreground">{{ pathPrefix }}</code>
+          </details>
         </div>
 
         <fieldset v-if="!watching">

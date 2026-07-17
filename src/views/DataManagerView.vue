@@ -26,7 +26,7 @@ import { useS3, s3ErrorMessage, isS3AuthError, isS3QuotaError, type BucketEntry,
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { UsageResponse } from '@/lib/api'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { dataWatchPathPrefix } from '@/lib/watches'
+import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
@@ -46,7 +46,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { currentUser, bootstrapped, credentials, getGroupUsage, nodeInfo } = useAruna()
+const { currentUser, bootstrapped, credentials, getGroupUsage, nodeInfo, realmInfo } = useAruna()
 const s3 = useS3()
 
 function routeString(value: unknown): string {
@@ -312,10 +312,20 @@ const activeGroupId = computed(
 
 // Canonical data watch prefix for the browsed bucket/prefix. Needs the
 // credential's group (manual keys outside the caller's credential list cannot
-// resolve one) and this node's id — the watch path is node-disambiguated.
+// resolve one) and the id of the node SERVING the S3 endpoint — uploads emit
+// under that node, so watching the wrong node id would never fire.
+const watchNodeId = computed(() =>
+  s3EndpointNodeId(
+    s3.endpoint.value,
+    nodeInfo.value
+      ? { nodeId: nodeInfo.value.node.peer_id, s3Url: nodeInfo.value.services?.interfaces?.s3?.url }
+      : null,
+    (realmInfo.value?.nodes ?? []).map((node) => ({ nodeId: node.node_id, s3Url: node.info?.urls?.s3 })),
+  ),
+)
 const watchPathPrefix = computed(() => {
   const groupId = activeGroupId.value
-  const nodeId = nodeInfo.value?.node.peer_id
+  const nodeId = watchNodeId.value
   if (!groupId || !nodeId || !bucket.value) return ''
   return dataWatchPathPrefix(groupId, nodeId, bucket.value, s3Prefix.value)
 })

@@ -122,10 +122,9 @@ watch(currentUser, () => void ensureLoaded())
                     class="truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
                     :title="w.path_prefix"
                   >{{ info.label }}</RouterLink>
-                  <span v-else class="truncate text-sm font-medium text-foreground" :title="w.path_prefix">{{ w.path_prefix }}</span>
+                  <span v-else class="truncate text-sm font-medium text-foreground" :title="w.path_prefix">{{ info?.label ?? w.path_prefix }}</span>
                 </div>
-                <p class="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" :title="w.path_prefix">{{ w.path_prefix }}</p>
-                <p class="text-[11px] text-muted-foreground">
+                <p class="mt-0.5 text-[11px] text-muted-foreground">
                   <span v-for="(event, i) in w.events" :key="event">{{ i ? ', ' : '' }}{{ watchEventLabel(event) }}</span>
                   <span v-if="groupName"> · {{ groupName }}</span>
                   · created {{ timeOf(w) }}
@@ -146,9 +145,12 @@ watch(currentUser, () => void ensureLoaded())
           </ul>
         </div>
 
-        <p class="text-xs text-muted-foreground">
-          Watch events arrive in the notification bell. Each account can hold up to 50 watches.
-        </p>
+        <!-- What each watch kind actually covers. -->
+        <div class="surface-muted space-y-1.5 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+          <p><span class="font-medium text-foreground">Data watches</span> cover a bucket folder: you are notified for every object uploaded under it, including all folders below — never just a single object.</p>
+          <p><span class="font-medium text-foreground">Metadata watches</span> cover a catalog path: you are notified when a new metadata document (dataset, profile, run record) is created under it.</p>
+          <p>Events arrive in the notification bell. Each account can hold up to 50 watches; hover a watch to see its technical path.</p>
+        </div>
       </template>
     </div>
   </div>

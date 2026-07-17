@@ -18,14 +18,20 @@ export const WATCH_EVENT_KINDS: WatchEventKindInfo[] = [
   {
     kind: 'metadata_created',
     label: 'Metadata created',
-    description: 'A metadata document is created under this path.',
+    description:
+      'Notifies you when a new metadata document (dataset, profile, run record) is created under this catalog path.',
   },
   {
     kind: 'data_uploaded',
     label: 'Data uploaded',
-    description: 'An object is uploaded under this prefix.',
+    description:
+      'Notifies you when any object is uploaded under this folder, including all folders below it — a watch always covers a whole prefix, never a single object.',
   },
 ]
+
+export function watchKindDescription(kind: string): string {
+  return WATCH_EVENT_KINDS.find((k) => k.kind === kind)?.description ?? ''
+}
 
 export function watchEventLabel(kind: string): string {
   return WATCH_EVENT_KINDS.find((k) => k.kind === kind)?.label ?? kind.replace(/_/g, ' ')
@@ -37,9 +43,33 @@ export function normalizeDocumentPath(path: string): string {
   return path.trim().replace(/^\/+|\/+$/g, '')
 }
 
+// Mirrors aruna core/src/structs/notification_watch.rs data_watch_resource_path:
+// `s3/{group_id}/{node_id}/{bucket}/{key}` — uploads emit exactly this shape.
 // The trailing slash after the bucket is required even for an empty key prefix.
 export function dataWatchPathPrefix(groupId: string, nodeId: string, bucket: string, keyPrefix = ''): string {
   return `s3/${groupId}/${nodeId}/${bucket}/${keyPrefix}`
+}
+
+export interface S3NodeCandidate {
+  nodeId: string
+  s3Url?: string | null
+}
+
+// The node segment must be the node whose S3 endpoint receives the upload —
+// uploads emit that node's id, so a watch registered under any other node id
+// never fires. Resolves the endpoint's owner, falling back to the local node.
+export function s3EndpointNodeId(
+  endpoint: string | null,
+  local: S3NodeCandidate | null,
+  realmNodes: S3NodeCandidate[],
+): string | null {
+  const normalize = (url: string | null | undefined) => (url ? url.replace(/\/+$/, '') : null)
+  const target = normalize(endpoint)
+  if (!target) return null
+  if (local && normalize(local.s3Url) === target) return local.nodeId
+  const owner = realmNodes.find((node) => normalize(node.s3Url) === target)
+  if (owner) return owner.nodeId
+  return local?.nodeId ?? null
 }
 
 export function metaWatchPathPrefix(groupId: string, documentPathPrefix: string): string {
