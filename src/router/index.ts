@@ -19,6 +19,8 @@ const routes: RouteRecordRaw[] = [
       // Buckets — primary research surface (formerly "Data manager")
       { path: 'buckets', name: 'buckets', component: () => import('@/views/DataManagerView.vue') },
       { path: 'buckets/:bucketId', name: 'bucket', component: () => import('@/views/DataManagerView.vue') },
+      // Bucket builder — assemble a bucket from internal, connector and local sources
+      { path: 'buckets/:bucketId/builder', name: 'bucket-builder', component: () => import('@/views/BucketBuilderView.vue') },
       // Discover — the metadata catalog plus search, SPARQL in expert mode
       { path: 'search', name: 'search', component: () => import('@/views/SearchView.vue') },
       // The old catalog listing merged into Discover; detail pages stay here
