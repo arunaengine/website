@@ -40,7 +40,14 @@ function dedupeByDocument(
   return list.filter((hit) => (seen.has(hit.document_id) ? false : (seen.add(hit.document_id), true)))
 }
 
-export function useMetadataSearch(query: Ref<string>) {
+export interface MetadataSearchFilters {
+  /** Server-side group_id push-down; null clears it. */
+  groupId?: Ref<string | null>
+  /** Server-side conformsTo profile IRI push-down; null clears it. */
+  conformsTo?: Ref<string | null>
+}
+
+export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFilters = {}) {
   const { metadata, searchMetadata, authToken, apiBaseUrl } = useAruna()
   const cursorEnabled = featureEnabled('searchCursor')
   const pageSize = cursorEnabled ? CURSOR_PAGE_SIZE : SEARCH_PAGE_CAP
@@ -53,14 +60,13 @@ export function useMetadataSearch(query: Ref<string>) {
   const searched = ref(false) // at least one response for the current query
   const nodesQueried = ref(0)
   const nodesFailed = ref(0)
-  const failedNodes = ref<string[]>([])
-  const serverPartial = ref<boolean | null>(null)
+  const truncated = ref(false)
   const nextCursor = ref<string | null>(null)
 
   const active = computed(() => query.value.trim().length > 0)
-  // nodes_failed is served by today's backend; `partial` is the aruna#258
-  // field. Either one makes the current query's results partial.
-  const partial = computed(() => serverPartial.value === true || nodesFailed.value > 0)
+  // The backend signals partial results through nodes_failed (a per-node id list
+  // is not served); a non-zero count means matches on failed nodes are missing.
+  const partial = computed(() => nodesFailed.value > 0)
   // Without cursor paging we get exactly one page (cap 100); a full page
   // means more matches may exist that we cannot fetch.
   const capped = computed(() => !cursorEnabled && hits.value.length >= SEARCH_PAGE_CAP)
@@ -96,6 +102,13 @@ export function useMetadataSearch(query: Ref<string>) {
   // of looping (restart → sentinel remount → loadMore → reject → …).
   let restartedFor = ''
 
+  function filterValues(): { group_id?: string; conforms_to?: string } {
+    return {
+      group_id: filters.groupId?.value ?? undefined,
+      conforms_to: filters.conformsTo?.value ?? undefined,
+    }
+  }
+
   function reset() {
     hits.value = []
     error.value = null
@@ -105,21 +118,14 @@ export function useMetadataSearch(query: Ref<string>) {
     loadingMore.value = false
     nodesQueried.value = 0
     nodesFailed.value = 0
-    failedNodes.value = []
-    serverPartial.value = null
+    truncated.value = false
     nextCursor.value = null
   }
 
   function applyMeta(response: MetadataSearchResponse) {
-    nodesQueried.value = response.nodes_queried ?? 0
-    failedNodes.value = [...new Set([...failedNodes.value, ...(response.failed_nodes ?? [])])]
-    nodesFailed.value = Math.max(
-      nodesFailed.value,
-      response.nodes_failed ?? 0,
-      failedNodes.value.length,
-    )
-    if (response.partial === true) serverPartial.value = true
-    else if (response.partial === false && serverPartial.value === null) serverPartial.value = false
+    nodesQueried.value = Math.max(nodesQueried.value, response.nodes_queried ?? 0)
+    nodesFailed.value = Math.max(nodesFailed.value, response.nodes_failed ?? 0)
+    if (response.truncated) truncated.value = true
     nextCursor.value = cursorEnabled ? (response.next_cursor ?? null) : null
   }
 
@@ -135,11 +141,14 @@ export function useMetadataSearch(query: Ref<string>) {
     moreError.value = null
     nodesQueried.value = 0
     nodesFailed.value = 0
-    failedNodes.value = []
-    serverPartial.value = null
+    truncated.value = false
     nextCursor.value = null
     try {
-      const response = await searchMetadata(term, { limit: pageSize, signal: controller.signal })
+      const response = await searchMetadata(term, {
+        limit: pageSize,
+        ...filterValues(),
+        signal: controller.signal,
+      })
       if (mySeq !== seq) return // superseded
       hits.value = dedupeByDocument(response.hits)
       cursorQuery = term
@@ -177,6 +186,7 @@ export function useMetadataSearch(query: Ref<string>) {
       const response = await searchMetadata(term, {
         limit: pageSize,
         cursor,
+        ...filterValues(),
         signal: pageController.signal,
       })
       if (mySeq !== seq || moreController !== pageController) return
@@ -216,7 +226,12 @@ export function useMetadataSearch(query: Ref<string>) {
     if (term) void runSearch(term)
   }
 
-  watch([query, authToken, apiBaseUrl], ([next]) => {
+  // A filter change re-binds the cursor, so the watched deps include the server
+  // push-down filters: any change restarts paging from the first page.
+  const watchDeps: Array<Ref<unknown>> = [query, authToken, apiBaseUrl]
+  if (filters.groupId) watchDeps.push(filters.groupId)
+  if (filters.conformsTo) watchDeps.push(filters.conformsTo)
+  watch(watchDeps, () => {
     window.clearTimeout(timer)
     ++seq
     controller?.abort()
@@ -226,7 +241,7 @@ export function useMetadataSearch(query: Ref<string>) {
     cursorQuery = ''
     restartedFor = ''
     reset()
-    const term = next.trim()
+    const term = query.value.trim()
     if (!term) return
     timer = window.setTimeout(() => void runSearch(term), SEARCH_DEBOUNCE_MS)
   })
@@ -268,7 +283,7 @@ export function useMetadataSearch(query: Ref<string>) {
     results,
     nodesQueried,
     nodesFailed,
-    failedNodes,
+    truncated,
     partial,
     capped,
     nextCursor,
