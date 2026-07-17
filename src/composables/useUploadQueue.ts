@@ -16,6 +16,9 @@ export interface UploadQueueItem {
   // Group backing the credential at enqueue time — keeps the "View group
   // quota" link working after navigation. Null for manual keys.
   groupId: string | null
+  // Endpoint+key fingerprint at enqueue time; a queued item never uploads
+  // through a session it was not queued under.
+  session: string | null
 }
 
 export interface UploadTarget {
@@ -43,6 +46,11 @@ const MAX_CONCURRENT_FILES = 3
 
 const lastCompleted = ref<{ bucket: string; key: string; at: number } | null>(null)
 
+function sessionOf(): string | null {
+  const key = s3.activeKey.value
+  return key && s3.endpoint.value ? `${s3.endpoint.value}|${key.accessKeyId}` : null
+}
+
 const hasActiveUploads = computed(() =>
   items.value.some((item) => item.state === 'queued' || item.state === 'uploading'),
 )
@@ -64,6 +72,7 @@ function enqueue(list: File[], target: UploadTarget): void {
       state: 'queued',
       progress: 0,
       groupId: target.groupId,
+      session: sessionOf(),
     }
     files.set(item.id, file)
     items.value.push(item)
@@ -85,6 +94,12 @@ async function run(item: UploadQueueItem): Promise<void> {
   if (!file) {
     item.state = 'error'
     item.error = 'File no longer available for upload.'
+    touch()
+    return
+  }
+  if (item.session !== sessionOf()) {
+    item.state = 'error'
+    item.error = 'The S3 key or endpoint changed after this file was queued — retry to upload with the current session.'
     touch()
     return
   }
@@ -144,6 +159,8 @@ function retry(item: UploadQueueItem): void {
   item.progress = 0
   item.error = undefined
   item.quotaExceeded = undefined
+  // A retry is an explicit user action under whatever session is now active.
+  item.session = sessionOf()
   item.state = 'queued'
   touch()
   pump()
