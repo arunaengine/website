@@ -512,6 +512,12 @@ export interface UnreadCountResponse {
   capped: boolean
 }
 
+export interface NotificationStateResponse {
+  epoch: string
+  revision: number
+  unread: UnreadCountResponse
+}
+
 export interface MarkReadRequest {
   ids: string[]
   // Inclusive created_at_ms sweep; ids: [] + up_to_ms marks everything up to it.
