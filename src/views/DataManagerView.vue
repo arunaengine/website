@@ -213,14 +213,23 @@ function activateManualKey() {
   manualSecret.value = ''
 }
 
+// Navigating to the current location must reload, not clear: a push to an
+// identical route never fires the [bucket, prefix] watch, so a pre-cleared
+// listing would stay empty (the "home shows an empty bucket" bug).
 function openBucket(name: string) {
-  clearObjectListing()
-  router.push({ name: 'bucket', params: { bucketId: name } })
+  if (name === bucket.value && !prefix.value) {
+    void loadObjects()
+    return
+  }
+  void router.push({ name: 'bucket', params: { bucketId: name } })
 }
 
 function navigateTo(path: string) {
-  clearObjectListing()
-  router.push({
+  if (path === prefix.value) {
+    void loadObjects()
+    return
+  }
+  void router.push({
     name: 'bucket',
     params: { bucketId: bucket.value },
     query: path ? { prefix: path } : {},
