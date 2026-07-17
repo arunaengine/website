@@ -15,6 +15,7 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
+import PreviewPane from '@/components/preview/PreviewPane.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -31,6 +32,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   Boxes,
   Download,
+  Eye,
   FolderPlus,
   KeyRound,
   Loader2,
@@ -458,6 +460,13 @@ onBeforeUnmount(() => {
   abortActiveUploads()
 })
 
+const previewOpen = ref(false)
+const previewObject = ref<ObjectEntry | null>(null)
+function openPreview(object: ObjectEntry) {
+  previewObject.value = object
+  previewOpen.value = true
+}
+
 async function download(object: ObjectEntry) {
   const sourceBucket = bucket.value
   try {
@@ -702,6 +711,7 @@ const isEmpty = computed(
                     <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '—' }}</td>
                     <td class="px-4 py-2.5">
                       <div class="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon-sm" aria-label="Preview" @click="openPreview(object)"><Eye class="size-3.5" /></Button>
                         <Button variant="ghost" size="icon-sm" aria-label="Download" @click="download(object)"><Download class="size-3.5" /></Button>
                          <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click="deleteTarget = { bucket, object }; deleteError = null"><Trash2 class="size-3.5" /></Button>
                       </div>
@@ -735,6 +745,14 @@ const isEmpty = computed(
     />
 
     <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />
+
+    <PreviewPane
+      v-model:open="previewOpen"
+      :bucket="bucket"
+      :object-key="previewObject?.key ?? ''"
+      :name="previewObject?.name ?? ''"
+      :size="previewObject?.size"
+    />
 
     <Dialog :open="newFolderOpen" @update:open="(v: boolean) => (newFolderOpen = v)">
       <DialogContent class="max-w-sm">

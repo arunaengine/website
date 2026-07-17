@@ -7,6 +7,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
 import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import AuthorChips from '@/components/metadata/AuthorChips.vue'
+import PreviewPane from '@/components/preview/PreviewPane.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -18,6 +19,7 @@ import WatchButton from '@/components/watches/WatchButton.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
+import { useS3 } from '@/composables/useS3'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { formatBytes, relativeTime } from '@/lib/utils'
@@ -26,10 +28,11 @@ import { parseRunCrate } from '@/lib/runCrate'
 import { crateGraph, crateRootId, dataEntitiesOf, stringProp, type DataEntity } from '@/lib/dataEntities'
 import { useCrateReferences } from '@/composables/useCrateReferences'
 import type { CrateObjectReference } from '@/lib/crateReferences'
-import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Link2, Pencil, Trash2, Star } from '@lucide/vue'
+import { ArrowLeft, ListChecks, Code2, Eye, FileJson2, ExternalLink, Link2, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
+const s3 = useS3()
 const {
   metadata,
   metadataItems,
@@ -233,6 +236,34 @@ const runProvenance = computed(() => parseRunCrate(currentCrate.value, currentPa
 function entityLink(row: DataEntity): string | undefined {
   const target = row.contentUrl ?? row.id
   return target.startsWith('http') ? target : undefined
+}
+
+// A file entity's @id is a stable `s3://bucket/key` reference; preview is only
+// offered when the active S3 client can plausibly reach that node.
+function s3RefOf(id: string): { bucket: string; key: string } | null {
+  const match = /^s3:\/\/([^/]+)\/(.+)$/.exec(id)
+  return match ? { bucket: match[1] as string, key: match[2] as string } : null
+}
+
+function canPreview(row: DataEntity): boolean {
+  return Boolean(s3.hasActiveKey.value && s3.endpoint.value && s3RefOf(row.id))
+}
+
+const previewOpen = ref(false)
+const previewTarget = ref<{ bucket: string; key: string; name: string; size?: number; contentType?: string } | null>(null)
+
+function openPreview(row: DataEntity) {
+  const parsed = s3RefOf(row.id)
+  if (!parsed) return
+  const bytes = Number(row.contentSize)
+  previewTarget.value = {
+    bucket: parsed.bucket,
+    key: parsed.key,
+    name: row.name,
+    size: row.contentSize && Number.isFinite(bytes) ? bytes : undefined,
+    contentType: row.encodingFormat,
+  }
+  previewOpen.value = true
 }
 
 // Cross-document references from the root's mentions/citation/about, split
@@ -442,10 +473,15 @@ function entitySize(row: DataEntity): string {
                 <td class="px-5 py-2.5 text-muted-foreground">{{ row.encodingFormat || '—' }}</td>
                 <td class="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ entitySize(row) }}</td>
                 <td class="px-5 py-2.5 text-right">
-                  <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open ${row.name} in a new tab`">
-                    <ExternalLink class="h-3.5 w-3.5" />
-                  </a>
-                  <span v-else class="text-muted-foreground">—</span>
+                  <div class="flex items-center justify-end gap-1">
+                    <Button v-if="canPreview(row)" variant="ghost" size="icon-sm" aria-label="Preview" @click="openPreview(row)">
+                      <Eye class="size-3.5" />
+                    </Button>
+                    <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open ${row.name} in a new tab`">
+                      <ExternalLink class="h-3.5 w-3.5" />
+                    </a>
+                    <span v-if="!canPreview(row) && !entityLink(row)" class="text-muted-foreground">—</span>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -520,6 +556,16 @@ function entitySize(row: DataEntity): string {
         @retry="resolveDoc(detailId)"
       />
     </div>
+
+    <PreviewPane
+      v-if="previewTarget"
+      v-model:open="previewOpen"
+      :bucket="previewTarget.bucket"
+      :object-key="previewTarget.key"
+      :name="previewTarget.name"
+      :size="previewTarget.size"
+      :content-type="previewTarget.contentType"
+    />
 
     <EditMetadataDialog v-if="current" v-model:open="showEdit" :document-id="current.ulid" :profile="currentProfile" @saved="onSaved" />
 
