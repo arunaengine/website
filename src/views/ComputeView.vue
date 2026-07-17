@@ -22,7 +22,7 @@ import {
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { ChevronRight, Cpu, ListPlus, LogIn, RefreshCw } from '@lucide/vue'
+import { ChevronRight, Cpu, ListPlus, LogIn, RefreshCw, Zap } from '@lucide/vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -32,6 +32,9 @@ const { signIn, stage } = useAuth()
 
 function goNew() {
   void router.push({ name: 'compute-new' })
+}
+function goQuick() {
+  void router.push({ name: 'compute-quick' })
 }
 
 // Deep-linkable task drawer driven by the :taskId route param (the back button
@@ -210,7 +213,8 @@ watch(currentUser, (u, prev) => {
   <div>
     <PageHeader title="Compute" description="Submit and monitor GA4GH TES tasks executed on this node.">
       <template v-if="tesEnabled && currentUser" #actions>
-        <Button size="sm" @click="goNew"><ListPlus class="h-4 w-4" /> New task</Button>
+        <Button size="sm" @click="goQuick"><Zap class="h-4 w-4" /> Quick run</Button>
+        <Button variant="outline" size="sm" @click="goNew"><ListPlus class="h-4 w-4" /> New task</Button>
       </template>
     </PageHeader>
 
@@ -218,7 +222,7 @@ watch(currentUser, (u, prev) => {
     <div v-if="!tesEnabled" class="container max-w-[1100px] py-8">
       <EmptyState
         title="Compute is not enabled"
-        description="Enable the tes feature flag in portal-config.json once this realm's nodes serve the GA4GH TES endpoint (aruna#290)."
+        description="Set features.tes to true in portal-config.json for this deployment; the Compute surface then targets any node that exposes the GA4GH TES endpoint."
       >
         <template #icon><Cpu class="h-7 w-7" /></template>
       </EmptyState>
@@ -279,15 +283,18 @@ watch(currentUser, (u, prev) => {
         v-else-if="listState === 'unsupported'"
         class="surface px-5 py-8 text-center text-sm text-muted-foreground"
       >
-        Tasks cannot be listed until this node serves the GA4GH TES endpoint (aruna#290).
+        Tasks cannot be listed until this node exposes the GA4GH TES endpoint.
       </p>
 
       <EmptyState
         v-else-if="listState === 'ready' && !tasks.length"
         title="No compute tasks"
-        description="Tasks submitted to this node appear here."
+        description="Run a quick script or describe a full GA4GH TES task; submissions appear here."
       >
-        <Button size="sm" @click="goNew"><ListPlus class="h-4 w-4" /> New task</Button>
+        <div class="flex items-center justify-center gap-2">
+          <Button size="sm" @click="goQuick"><Zap class="h-4 w-4" /> Quick run</Button>
+          <Button variant="outline" size="sm" @click="goNew"><ListPlus class="h-4 w-4" /> New task</Button>
+        </div>
       </EmptyState>
 
       <div v-else-if="tasks.length" class="surface overflow-hidden">

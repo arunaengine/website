@@ -1,0 +1,199 @@
+<script setup lang="ts">
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
+import Button from '@/components/ui/Button.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
+import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
+import { useTes, isTesUnsupported } from '@/composables/useTes'
+import { useS3, s3ErrorMessage } from '@/composables/useS3'
+import { isTerminalTesState, type TesTask } from '@/lib/tes'
+import { formatBytes, relativeTime } from '@/lib/utils'
+import { Download, ExternalLink, FolderOpen, RefreshCw } from '@lucide/vue'
+
+const props = defineProps<{ taskId: string; outputBucket: string; outputPrefix: string }>()
+
+const { getTask } = useTes()
+const s3 = useS3()
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
+const task = ref<TesTask | null>(null)
+const loadState = ref<'loading' | 'ready' | 'error' | 'unsupported'>('loading')
+const loadError = ref<string | null>(null)
+const lastPollError = ref<string | null>(null)
+
+// ── Poll to terminal (view-owned, mirrors TaskDetailPanel) ───────────────────
+let pollTimer: number | undefined
+function stopPolling() {
+  if (pollTimer) {
+    window.clearInterval(pollTimer)
+    pollTimer = undefined
+  }
+}
+async function poll() {
+  try {
+    task.value = await getTask(props.taskId, 'FULL')
+    lastPollError.value = null
+    if (isTerminalTesState(task.value.state)) {
+      stopPolling()
+      void listOutputs()
+    }
+  } catch (err) {
+    lastPollError.value = errorMessage(err)
+  }
+}
+async function load() {
+  loadState.value = 'loading'
+  loadError.value = null
+  stopPolling()
+  try {
+    task.value = await getTask(props.taskId, 'FULL')
+    loadState.value = 'ready'
+    if (isTerminalTesState(task.value.state)) void listOutputs()
+    else pollTimer = window.setInterval(() => !document.hidden && void poll(), 5000)
+  } catch (err) {
+    if (isTesUnsupported(err)) loadState.value = 'unsupported'
+    else {
+      loadState.value = 'error'
+      loadError.value = errorMessage(err)
+    }
+  }
+}
+
+watch(() => props.taskId, load, { immediate: true })
+onUnmounted(stopPolling)
+
+// ── Executor logs ────────────────────────────────────────────────────────────
+const latestLog = computed(() => {
+  const logs = task.value?.logs
+  return logs?.length ? logs[logs.length - 1] : undefined
+})
+const executorLog = computed(() => latestLog.value?.logs?.[0])
+const isTerminal = computed(() => isTerminalTesState(task.value?.state))
+
+// ── Output prefix listing (useS3) ────────────────────────────────────────────
+interface OutputFile {
+  name: string
+  key: string
+  size?: number
+  href: string
+}
+const outputs = ref<OutputFile[]>([])
+const outputsState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
+const outputsError = ref<string | null>(null)
+
+async function listOutputs() {
+  if (!s3.hasActiveKey.value || !s3.endpoint.value || !props.outputBucket) return
+  outputsState.value = 'loading'
+  outputsError.value = null
+  try {
+    const page = await s3.listObjects(props.outputBucket, props.outputPrefix)
+    // Immediate files only; the uploaded script lives under the .aruna/ folder,
+    // which the delimiter keeps out of this listing.
+    outputs.value = await Promise.all(
+      page.objects
+        .filter((o) => o.name && !o.name.startsWith('.aruna/'))
+        .map(async (o) => ({
+          name: o.name,
+          key: o.key,
+          size: o.size,
+          href: await s3.downloadUrl(props.outputBucket, o.key),
+        })),
+    )
+    outputsState.value = 'ready'
+  } catch (err) {
+    outputsError.value = s3ErrorMessage(err)
+    outputsState.value = 'error'
+  }
+}
+
+const bucketPrefixQuery = computed(() => props.outputPrefix.replace(/\/$/, ''))
+</script>
+
+<template>
+  <div class="space-y-5">
+    <div v-if="loadState === 'loading'" class="space-y-3">
+      <Skeleton class="h-7 w-1/3" />
+      <Skeleton class="h-32 w-full" />
+    </div>
+
+    <div v-else-if="loadState === 'unsupported'" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+      This node does not expose the TES endpoint. The task cannot be tracked here.
+    </div>
+
+    <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the task.'" @retry="load" />
+
+    <template v-else-if="task">
+      <!-- State -->
+      <div class="flex flex-wrap items-center gap-2">
+        <TaskStateBadge :state="task.state" />
+        <span v-if="!isTerminal" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <RefreshCw class="h-3.5 w-3.5 animate-spin" /> Tracking…
+        </span>
+        <RouterLink
+          class="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          :to="{ name: 'compute-task', params: { taskId } }"
+        >
+          Open full task detail <ExternalLink class="h-3 w-3" />
+        </RouterLink>
+      </div>
+      <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed — {{ lastPollError }}</p>
+
+      <!-- stdout / stderr -->
+      <section class="space-y-3">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output streams</h3>
+        <p v-if="!isTerminal" class="text-xs text-muted-foreground">
+          stdout and stderr are captured once the task reaches a terminal state.
+        </p>
+        <template v-else-if="executorLog">
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-muted-foreground">stdout</div>
+            <pre v-if="executorLog.stdout" class="mt-0.5 max-h-60 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]">{{ executorLog.stdout }}</pre>
+            <p v-else class="text-[11px] text-muted-foreground">no stdout captured</p>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-muted-foreground">stderr</div>
+            <pre v-if="executorLog.stderr" class="mt-0.5 max-h-60 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]">{{ executorLog.stderr }}</pre>
+            <p v-else class="text-[11px] text-muted-foreground">no stderr captured</p>
+          </div>
+          <div v-if="executorLog.exit_code != null" class="text-[11px] text-muted-foreground">
+            exit code <span class="font-mono text-foreground">{{ executorLog.exit_code }}</span>
+          </div>
+        </template>
+        <p v-else class="text-xs text-muted-foreground">No execution log was recorded.</p>
+      </section>
+
+      <!-- Output files -->
+      <section v-if="isTerminal" class="space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output files</h3>
+          <RouterLink
+            class="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            :to="{ name: 'bucket', params: { bucketId: outputBucket }, query: bucketPrefixQuery ? { prefix: bucketPrefixQuery } : {} }"
+          >
+            <FolderOpen class="h-3.5 w-3.5" /> Browse prefix
+          </RouterLink>
+        </div>
+        <div v-if="outputsState === 'loading'" class="text-xs text-muted-foreground">Listing the output prefix…</div>
+        <p v-else-if="outputsState === 'error'" class="text-xs text-destructive">{{ outputsError }}</p>
+        <p v-else-if="!outputs.length" class="text-xs text-muted-foreground">
+          No files under <code class="rounded bg-muted px-1 font-mono">{{ outputPrefix || '/' }}</code> yet. Declared outputs are written here; stdout/stderr stay in the streams above.
+        </p>
+        <ul v-else class="divide-y divide-border overflow-hidden rounded-md border border-border">
+          <li v-for="file in outputs" :key="file.key" class="flex items-center gap-3 px-3 py-2 text-xs">
+            <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ file.name }}</span>
+            <span v-if="file.size !== undefined" class="text-muted-foreground">{{ formatBytes(file.size) }}</span>
+            <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="file.href" target="_blank" rel="noopener">
+              <Download class="h-3.5 w-3.5" /> Download
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <p v-if="task.creation_time" class="text-[11px] text-muted-foreground">Submitted {{ relativeTime(task.creation_time) }}</p>
+    </template>
+  </div>
+</template>

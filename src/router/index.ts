@@ -48,8 +48,9 @@ const routes: RouteRecordRaw[] = [
       // surface lives on aruna feat/job-framework)
       { path: 'jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
       { path: 'jobs/:jobId', name: 'job-detail', component: () => import('@/views/JobsView.vue') },
-      // Compute — GA4GH TES tasks (feature-gated in-view, aruna#290)
+      // Compute — GA4GH TES tasks (feature-gated in-view)
       { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
+      { path: 'compute/quick', name: 'compute-quick', component: () => import('@/views/ComputeQuickRunView.vue') },
       { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue') },
       { path: 'compute/:taskId', name: 'compute-task', component: () => import('@/views/ComputeView.vue') },
       // Compatibility redirects from prior IA
