@@ -23,6 +23,9 @@ import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { metaWatchPathPrefix } from '@/lib/watches'
 import { parseRunCrate } from '@/lib/runCrate'
+import { crateGraph, crateRootId, dataEntitiesOf, stringProp, type DataEntity } from '@/lib/dataEntities'
+import { useCrateReferences } from '@/composables/useCrateReferences'
+import type { CrateObjectReference } from '@/lib/crateReferences'
 import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Link2, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
@@ -195,85 +198,31 @@ watch(
   { immediate: true },
 )
 
-interface DataEntityRow {
-  id: string
-  name: string
-  types: string[]
-  encodingFormat?: string
-  contentSize?: string
-  contentUrl?: string
-}
-
-function crateGraph(crate: unknown): Array<Record<string, unknown>> {
-  if (!crate || typeof crate !== 'object') return []
-  const g = (crate as Record<string, unknown>)['@graph']
-  return Array.isArray(g)
-    ? g.filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object' && !Array.isArray(e)))
-    : []
-}
-
-// Same about-based root heuristic as the edit dialog.
-function crateRootId(crate: unknown): string | undefined {
-  const g = crateGraph(crate)
-  const descriptor = g.find((e) => e['@id'] === 'ro-crate-metadata.json')
-  const about = descriptor?.about
-  if (about && typeof about === 'object' && !Array.isArray(about)) {
-    const id = (about as Record<string, unknown>)['@id']
-    if (typeof id === 'string') return id
-  }
-  return g.find((e) => e['@id'] !== 'ro-crate-metadata.json')?.['@id'] as string | undefined
-}
-
-function typesOf(entity: Record<string, unknown>): string[] {
-  const t = entity['@type']
-  if (typeof t === 'string') return [t]
-  if (Array.isArray(t)) return t.filter((x): x is string => typeof x === 'string')
-  return []
-}
-
-function stringProp(value: unknown): string | undefined {
-  if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  if (Array.isArray(value)) return stringProp(value[0])
-  if (value && typeof value === 'object') {
-    const id = (value as Record<string, unknown>)['@id']
-    return typeof id === 'string' ? id : undefined
-  }
-  return undefined
-}
-
 // The union of entities referenced from the root's hasPart and every File/Dataset
-// entity (excluding the root and the metadata descriptor).
-const dataEntities = computed<DataEntityRow[]>(() => {
-  const crate = fullCrates.value[detailId.value] ?? current.value?.roCrate
-  const g = crateGraph(crate)
-  if (!g.length) return []
-  const rootId = crateRootId(crate)
-  const root = rootId ? g.find((e) => e['@id'] === rootId) : undefined
-  const hasPartIds = new Set<string>()
-  const hasPart = root?.hasPart
-  for (const ref of Array.isArray(hasPart) ? hasPart : hasPart ? [hasPart] : []) {
-    const id = stringProp(ref)
-    if (id) hasPartIds.add(id)
+// entity (excluding the root and the metadata descriptor), shared with the editor.
+const dataEntities = computed<DataEntity[]>(() =>
+  dataEntitiesOf(fullCrates.value[detailId.value] ?? current.value?.roCrate),
+)
+
+// Which OTHER catalog documents reference each file entity here, from the cache-fed
+// reverse index (keyed by the row's @id, so self-references are dropped).
+const { referencesFor } = useCrateReferences()
+const referencedBy = computed(() => {
+  const map = new Map<string, CrateObjectReference[]>()
+  for (const row of dataEntities.value) {
+    const seen = new Set<string>()
+    const refs: CrateObjectReference[] = []
+    for (const url of [row.id, row.contentUrl]) {
+      if (!url) continue
+      for (const ref of referencesFor(url)) {
+        if (ref.documentId === detailId.value || seen.has(ref.documentId)) continue
+        seen.add(ref.documentId)
+        refs.push(ref)
+      }
+    }
+    if (refs.length) map.set(row.id, refs)
   }
-  const rows: DataEntityRow[] = []
-  const seen = new Set<string>()
-  for (const entity of g) {
-    const id = typeof entity['@id'] === 'string' ? entity['@id'] : ''
-    if (!id || id === 'ro-crate-metadata.json' || id === rootId || seen.has(id)) continue
-    const types = typesOf(entity)
-    if (!hasPartIds.has(id) && !types.includes('File') && !types.includes('Dataset')) continue
-    seen.add(id)
-    rows.push({
-      id,
-      name: stringProp(entity.name) || id,
-      types,
-      encodingFormat: stringProp(entity.encodingFormat),
-      contentSize: stringProp(entity.contentSize),
-      contentUrl: stringProp(entity.contentUrl),
-    })
-  }
-  return rows
+  return map
 })
 
 // A compute run crate (written by the backend at runs/{jobId}) parses into a
@@ -281,7 +230,7 @@ const dataEntities = computed<DataEntityRow[]>(() => {
 // CreateAction is missing — renders the generic data-entity table below.
 const runProvenance = computed(() => parseRunCrate(currentCrate.value, currentPath.value))
 
-function entityLink(row: DataEntityRow): string | undefined {
+function entityLink(row: DataEntity): string | undefined {
   const target = row.contentUrl ?? row.id
   return target.startsWith('http') ? target : undefined
 }
@@ -322,7 +271,7 @@ const relatedDocs = computed<RelatedDocRow[]>(() => {
   return rows
 })
 
-function entitySize(row: DataEntityRow): string {
+function entitySize(row: DataEntity): string {
   if (!row.contentSize) return '—'
   const n = Number(row.contentSize)
   return row.contentSize.trim() !== '' && Number.isFinite(n) ? formatBytes(n) : row.contentSize
@@ -480,7 +429,15 @@ function entitySize(row: DataEntityRow): string {
                 </tr>
               </template>
               <tr v-for="row in dataEntities" v-else :key="row.id" class="border-t border-border">
-                <td class="px-5 py-2.5 font-medium text-foreground" :title="row.id">{{ row.name }}</td>
+                <td class="px-5 py-2.5 font-medium text-foreground" :title="row.id">
+                  {{ row.name }}
+                  <span v-if="referencedBy.get(row.id)?.length" class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] font-normal text-muted-foreground">
+                    <Link2 class="h-3 w-3 shrink-0" /> Referenced by
+                    <template v-for="(ref, i) in referencedBy.get(row.id) ?? []" :key="ref.documentId">
+                      <RouterLink :to="{ name: 'metadata-detail', params: { id: ref.documentId } }" class="text-primary hover:underline">{{ ref.title }}</RouterLink><span v-if="i < (referencedBy.get(row.id)?.length ?? 0) - 1">,</span>
+                    </template>
+                  </span>
+                </td>
                 <td class="px-5 py-2.5 text-muted-foreground">{{ row.types.join(', ') || '—' }}</td>
                 <td class="px-5 py-2.5 text-muted-foreground">{{ row.encodingFormat || '—' }}</td>
                 <td class="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ entitySize(row) }}</td>
