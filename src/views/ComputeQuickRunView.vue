@@ -213,18 +213,29 @@ function removeOutput(i: number) {
 // ── Buckets ──────────────────────────────────────────────────────────────────
 const buckets = ref<string[]>([])
 const bucketsLoading = ref(false)
+const bucketsLoaded = ref(false)
 async function loadBuckets() {
   if (!s3.hasActiveKey.value || !s3.endpoint.value) return
   bucketsLoading.value = true
   try {
     buckets.value = (await s3.listBuckets()).map((b) => b.name)
+    bucketsLoaded.value = true
     if (!outputBucket.value && buckets.value.length) outputBucket.value = buckets.value[0]
   } catch {
     buckets.value = []
+    bucketsLoaded.value = false
   } finally {
     bucketsLoading.value = false
   }
 }
+
+// Runs only write into existing buckets; once the listing is known, a typed
+// name must match it (with a failed listing only non-empty is enforceable).
+const bucketValid = computed(() => {
+  const name = outputBucket.value.trim()
+  if (!name) return false
+  return !bucketsLoaded.value || buckets.value.includes(name)
+})
 
 function initDefaults() {
   if (!groupId.value && myGroups.value.length) groupId.value = myGroups.value[0].id
@@ -240,7 +251,7 @@ const outputsValid = computed(() => {
   return names.every((name) => name.length > 0 && !name.includes('/')) && new Set(names).size === names.length
 })
 const dataReady = computed(
-  () => !!s3.endpoint.value && s3.hasActiveKey.value && groupId.value.length > 0 && outputBucket.value.trim().length > 0,
+  () => !!s3.endpoint.value && s3.hasActiveKey.value && groupId.value.length > 0 && bucketValid.value,
 )
 const canContinue = computed(() => {
   switch (step.value) {
@@ -388,10 +399,22 @@ function runAnother() {
                 <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its Process Run crate.</p>
               </div>
               <div>
-                <label class="text-xs font-medium text-foreground">Output bucket</label>
+                <label class="text-xs font-medium text-foreground">Output bucket <span class="text-destructive">*</span></label>
                 <Select v-if="bucketOptions.length" v-model="outputBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
-                <Input v-else v-model="outputBucket" class="mt-1 font-mono" :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Receives output files and the staged script.</p>
+                <Input
+                  v-else
+                  v-model="outputBucket"
+                  class="mt-1 font-mono"
+                  :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'"
+                  :invalid="outputBucket.trim() && !bucketValid ? 'error' : undefined"
+                />
+                <p v-if="outputBucket.trim() && !bucketValid" class="mt-1 text-[11px] text-destructive">
+                  This bucket does not exist — results can only be written to one of your buckets.
+                </p>
+                <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
+                  You have no buckets yet — create one in Data first.
+                </p>
+                <p v-else class="mt-1 text-[11px] text-muted-foreground">Required — receives output files and the staged script.</p>
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">Output prefix</label>
