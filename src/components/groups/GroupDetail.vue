@@ -5,6 +5,7 @@ import QuotaBar from '@/components/ui/QuotaBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import ConnectorsSection from '@/components/groups/ConnectorsSection.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
@@ -12,7 +13,7 @@ import JoinRequestsInbox from '@/components/groups/JoinRequestsInbox.vue'
 import UsageHistoryChart from '@/components/groups/UsageHistoryChart.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { ChartArea, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
+import { Cable, ChartArea, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { assessQuota, quotaCountedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
@@ -109,6 +110,26 @@ const canManage = computed(() =>
     ),
   ),
 )
+const connectorCount = ref<number | null>(null)
+// Mirrors the backend gate for connector management: WRITE on
+// /{realm}/g/{gid}/data/** (api/src/routes/connectors.rs). Public roles apply
+// to every principal, so they count too.
+const canWriteData = computed(() => {
+  const detail = group.value
+  if (!detail) return false
+  const userId = currentUser.value?.id ?? ''
+  const target = `/${detail.realm_id}/g/${detail.group_id}/data/**`
+  return detail.roles.some((role) => {
+    if (!(role.public || role.assigned_users?.includes(userId))) return false
+    return Object.entries(role.permissions).some(([key, value]) => {
+      if (value.toLowerCase() !== 'write') return false
+      if (key === target) return true
+      if (!key.endsWith('/**')) return false
+      const base = key.slice(0, -3)
+      return target === base || target.startsWith(`${base}/`)
+    })
+  })
+})
 
 async function reload() {
   loadingDetail.value = true
@@ -162,6 +183,7 @@ watch(
   () => props.groupId,
   () => {
     leaveError.value = null
+    connectorCount.value = null
     storageAnchorPending = true
     void reload()
   },
@@ -311,6 +333,19 @@ async function leave() {
             View all {{ docs.length }} in Discover →
           </RouterLink>
         </div>
+      </div>
+
+      <div v-if="isMember" id="connectors" class="scroll-mt-24 border-b border-border">
+        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
+          <Cable class="h-3.5 w-3.5 text-primary" />
+          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Source connectors</span>
+          <Badge v-if="connectorCount !== null" variant="outline" class="tabular-nums">{{ connectorCount }}</Badge>
+        </div>
+        <ConnectorsSection
+          :group-id="group.group_id"
+          :can-write="canWriteData"
+          @count="connectorCount = $event"
+        />
       </div>
 
       <div class="border-b border-border">

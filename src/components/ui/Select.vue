@@ -28,6 +28,9 @@ const props = defineProps<
     placeholder?: string
     class?: string
     invalid?: 'error' | 'warning'
+    // Accessible name for the trigger; without it the combobox is announced
+    // only by its selected value.
+    ariaLabel?: string
   }
 >()
 const emits = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
@@ -44,7 +47,7 @@ const triggerClasses = computed(() =>
 
 <template>
   <SelectRoot v-bind="forwarded">
-    <SelectTrigger :class="triggerClasses">
+    <SelectTrigger :class="triggerClasses" :aria-label="props.ariaLabel">
       <SelectValue :placeholder="placeholder" />
       <SelectIcon><ChevronDown class="h-4 w-4 opacity-60" /></SelectIcon>
     </SelectTrigger>
