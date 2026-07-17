@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -38,6 +39,8 @@ import {
 // CodeMirror lands on its own async chunk, mounted only at the script step.
 const ScriptEditor = defineAsyncComponent(() => import('@/components/compute/ScriptEditor.vue'))
 
+const router = useRouter()
+const route = useRoute()
 const { tesEnabled, busy, createTask } = useTes()
 const { currentUser, myGroups } = useAruna()
 const { signIn, stage } = useAuth()
@@ -97,7 +100,15 @@ const RUNTIMES: Runtime[] = [
 
 const WIZARD_STEPS = ['Runtime', 'Script', 'Data', 'Review']
 const REVIEW_STEP = 3
-const step = ref(0)
+// The step lives in ?step=N so browser back/forward walks the wizard instead
+// of leaving it.
+const step = computed(() => {
+  const raw = Number(route.query.step)
+  return Number.isInteger(raw) && raw > 0 && raw < WIZARD_STEPS.length ? raw : 0
+})
+function goStep(target: number) {
+  void router.push({ query: { ...route.query, step: target > 0 ? String(target) : undefined } })
+}
 
 // ── Draft ────────────────────────────────────────────────────────────────────
 const runtimeId = ref<Runtime['id']>('python')
@@ -242,10 +253,12 @@ const canContinue = computed(() => {
   }
 })
 function next() {
-  if (canContinue.value && step.value < WIZARD_STEPS.length - 1) step.value++
+  if (canContinue.value && step.value < WIZARD_STEPS.length - 1) goStep(step.value + 1)
 }
+// The first step's Back leaves the wizard, and the button says so.
 function back() {
-  if (step.value > 0) step.value--
+  if (step.value > 0) goStep(step.value - 1)
+  else void router.push({ name: 'compute' })
 }
 
 // ── Submit ───────────────────────────────────────────────────────────────────
@@ -271,7 +284,7 @@ async function submit() {
 function runAnother() {
   submittedTaskId.value = null
   submitError.value = null
-  step.value = 0
+  goStep(0)
   runId.value = crypto.randomUUID()
 }
 </script>
@@ -488,7 +501,9 @@ function runAnother() {
       </section>
 
       <div class="flex items-center justify-between">
-        <Button variant="outline" size="sm" :disabled="step === 0" @click="back">Back</Button>
+        <Button variant="outline" size="sm" @click="back">
+          <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
+        </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
         <Button v-else size="sm" :disabled="busy || submitting || !dataReady" @click="submit">
           <ListPlus class="h-4 w-4" /> {{ submitting ? 'Submitting…' : 'Submit run' }}

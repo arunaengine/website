@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -27,6 +27,7 @@ import {
 import { ArrowLeft, Cpu, ListPlus, LogIn, Plus, X } from '@lucide/vue'
 
 const router = useRouter()
+const route = useRoute()
 const { tesEnabled, busy, createTask } = useTes()
 const { currentUser, myGroups } = useAruna()
 const { signIn, stage } = useAuth()
@@ -40,7 +41,15 @@ function errorMessage(err: unknown): string {
 }
 
 const WIZARD_STEPS = ['Basics', 'Inputs', 'Executor', 'Outputs & resources', 'Review']
-const step = ref(0)
+// The step lives in ?step=N so browser back/forward walks the wizard instead
+// of leaving it.
+const step = computed(() => {
+  const raw = Number(route.query.step)
+  return Number.isInteger(raw) && raw > 0 && raw < WIZARD_STEPS.length ? raw : 0
+})
+function goStep(target: number) {
+  void router.push({ query: { ...route.query, step: target > 0 ? String(target) : undefined } })
+}
 
 // ── Draft ────────────────────────────────────────────────────────────────────
 const name = ref('')
@@ -119,10 +128,12 @@ const canContinue = computed(() => {
 })
 
 function next() {
-  if (canContinue.value && step.value < WIZARD_STEPS.length - 1) step.value++
+  if (canContinue.value && step.value < WIZARD_STEPS.length - 1) goStep(step.value + 1)
 }
+// The first step's Back leaves the wizard, and the button says so.
 function back() {
-  if (step.value > 0) step.value--
+  if (step.value > 0) goStep(step.value - 1)
+  else void router.push({ name: 'compute' })
 }
 
 function addOutputRow() {
@@ -271,7 +282,9 @@ async function submit() {
       </section>
 
       <div class="flex items-center justify-between">
-        <Button variant="outline" size="sm" :disabled="step === 0" @click="back">Back</Button>
+        <Button variant="outline" size="sm" @click="back">
+          <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
+        </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
         <Button v-else size="sm" :disabled="busy" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
       </div>
