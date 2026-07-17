@@ -42,6 +42,9 @@ import {
   type UserInfoResponse,
   type UserSearchResponse,
   type GetUserResponse,
+  type ResolveUserResult,
+  type UnifiedSearchOptions,
+  type UnifiedSearchResponse,
 } from '@/lib/api'
 import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
 
@@ -695,16 +698,42 @@ async function searchMetadata(
   return request<MetadataSearchResponse>('/metadata/search', {
     query: {
       q: query,
-      // Backend defaults to 25 and clamps 1..=100 (verified in aruna
-      // operations/src/metadata/search_cursor.rs); mirror the clamp here.
+      // Backend defaults to 25 and clamps 1..=100; mirror the clamp here.
       limit: Math.min(Math.max(options.limit ?? 25, 1), 100),
-      // Query-bound cursor (aruna#258, served since 9ae6bd68): the backend binds
-      // it to the query and rejects a mismatched/expired cursor with 400
-      // InvalidCursor. Only callers gated behind featureEnabled('searchCursor')
-      // pass it; apiRequest drops undefined, so it is absent otherwise.
+      // Query- and filter-bound cursor: the backend rejects a cursor whose
+      // fingerprint no longer matches the query or filters with 400. apiRequest
+      // drops undefined, so these are absent when the caller omits them.
       cursor: options.cursor,
+      group_id: options.group_id,
+      conforms_to: options.conforms_to,
     },
     signal: options.signal,
+  })
+}
+
+async function searchUnified(
+  query: string,
+  options: UnifiedSearchOptions = {},
+): Promise<UnifiedSearchResponse> {
+  return request<UnifiedSearchResponse>('/search', {
+    query: {
+      q: query,
+      // A cursor is only accepted with exactly one type (backend contract).
+      types: options.types?.length ? options.types.join(',') : undefined,
+      limit: options.limit,
+      cursor: options.cursor,
+      group_id: options.group_id,
+      conforms_to: options.conforms_to,
+      mode: options.mode,
+    },
+    signal: options.signal,
+  })
+}
+
+async function resolveUsers(userIds: string[]): Promise<ResolveUserResult[]> {
+  return request<ResolveUserResult[]>('/users/resolve', {
+    method: 'POST',
+    body: JSON.stringify({ user_ids: userIds }),
   })
 }
 
@@ -1159,9 +1188,11 @@ export function useAruna() {
     deleteGroupRole,
     searchUsers,
     getUser,
+    resolveUsers,
     listUsers,
     runSparql,
     searchMetadata,
+    searchUnified,
     setAuthToken,
     setApiBaseUrl,
   }
