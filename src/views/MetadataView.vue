@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
+import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import AuthorChips from '@/components/metadata/AuthorChips.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -21,6 +22,7 @@ import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { metaWatchPathPrefix } from '@/lib/watches'
+import { parseRunCrate } from '@/lib/runCrate'
 import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Link2, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
@@ -274,6 +276,11 @@ const dataEntities = computed<DataEntityRow[]>(() => {
   return rows
 })
 
+// A compute run crate (written by the backend at runs/{jobId}) parses into a
+// provenance model; anything else — including a runs/ document whose expected
+// CreateAction is missing — renders the generic data-entity table below.
+const runProvenance = computed(() => parseRunCrate(currentCrate.value, currentPath.value))
+
 function entityLink(row: DataEntityRow): string | undefined {
   const target = row.contentUrl ?? row.id
   return target.startsWith('http') ? target : undefined
@@ -444,7 +451,9 @@ function entitySize(row: DataEntityRow): string {
           <pre v-if="showCrate" class="mt-3 max-h-[560px] overflow-auto whitespace-pre-wrap rounded-md bg-muted/30 p-4 font-mono text-[11.5px] leading-relaxed text-foreground/85 scrollbar-thin"><code>{{ JSON.stringify(currentCrate, null, 2) }}</code></pre>
         </section>
 
-        <section class="surface overflow-hidden">
+        <RunProvenancePanel v-if="runProvenance" :run="runProvenance" />
+
+        <section v-else class="surface overflow-hidden">
           <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
             <FileJson2 class="h-4 w-4 text-primary" /> Referenced data
             <span v-if="dataEntities.length" class="text-xs font-normal text-muted-foreground">{{ dataEntities.length }}</span>
