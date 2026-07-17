@@ -438,17 +438,17 @@ export interface ReplaceMetadataRoCrateRequest {
 }
 
 // GET /metadata/search — verified against aruna api/src/routes/metadata.rs and
-// operations/src/metadata/{api.rs,search_cursor.rs} (aruna 9ae6bd68).
-// Contract: `q` is required and non-empty (empty ⇒ 400); `limit` defaults to 25
-// and is clamped 1..=100 (METADATA_SEARCH_MAX_PAGE_SIZE); `mode=local|distributed`.
-// `cursor` is an accepted, query-bound opaque token — a cursor whose fingerprint
-// does not match the query is rejected with 400 InvalidCursor (never 409/410).
+// operations/src/metadata/{api.rs,search_cursor.rs} (aruna feat/portal-backend).
+// Contract: `q` is required and trimmed to >= 2 chars (shorter ⇒ 400); `limit`
+// defaults to 25 and is clamped 1..=100; `mode=local|distributed`. `group_id`
+// and `conforms_to` (exact conformsTo profile IRI) filter documents server-side.
+// `cursor` is an accepted, query- and filter-bound opaque token — a cursor whose
+// fingerprint does not match the query or filters is rejected with 400.
 // Hits are ordered by descending score and deduplicated server-side per
 // (graph_iri, subject_iri), so one document may span multiple hits. `title` is
-// always served (schema:name with subject/path fallback); `snippet` is optional;
-// `next_cursor` is served for cursor paging. Only `partial` and `failed_nodes`
-// remain aruna#258 forward-compat (not served yet). Enrichment fields stay
-// optional client-side so older deployed nodes still type-check.
+// always served (schema:name with subject/path fallback); `snippet` is optional.
+// Partiality is signalled by `nodes_failed` (not a `partial` flag); `truncated`
+// marks a page that stopped at the server depth cap before exhausting matches.
 export interface MetadataSearchHit {
   document_id: string
   group_id: string
@@ -456,29 +456,88 @@ export interface MetadataSearchHit {
   graph_iri: string
   subject_iri: string
   score: number
-  // Server-side enrichment: `title` always served, `snippet` optional; kept
-  // optional here to tolerate older nodes that predate aruna 9ae6bd68.
-  title?: string | null
+  // Always served by the answering node (schema:name, then subject/path fallback).
+  title: string
+  // Query-relevant excerpt; absent when the resource has no indexed literals.
   snippet?: string | null
 }
 
 export interface MetadataSearchResponse {
   hits: MetadataSearchHit[]
-  /** Node partitions queried; served today. */
+  /** Node partitions queried. */
   nodes_queried: number
-  /** Node partitions that failed or timed out; > 0 ⇒ partial. Served today. */
+  /** Node partitions that failed or timed out; > 0 ⇒ partial. */
   nodes_failed: number
-  // partial/failed_nodes remain aruna#258 forward-compat (not served yet).
-  partial?: boolean
-  failed_nodes?: string[]
-  /** Query-bound cursor for the next page; served for cursor paging (aruna 9ae6bd68). */
+  /** True when paging stopped at the server depth cap before exhausting matches. */
+  truncated?: boolean
+  /** Query- and filter-bound cursor for the next page. */
   next_cursor?: string | null
 }
 
 export interface MetadataSearchOptions {
   limit?: number
   cursor?: string
+  group_id?: string
+  conforms_to?: string
   signal?: AbortSignal
+}
+
+// GET /search — unified realm search (aruna api/src/routes/search.rs). Returns
+// only the requested sections; `types` defaults to all three. `cursor` continues
+// exactly one section and is rejected with 400 when more than one type is asked
+// for. `limit` is per-section (default 10, clamped 1..=100). `group_id`,
+// `conforms_to` and `mode` apply to the documents section only.
+export type SearchSectionType = 'documents' | 'groups' | 'users'
+
+export interface UnifiedSearchOptions {
+  types?: SearchSectionType[]
+  limit?: number
+  cursor?: string
+  group_id?: string
+  conforms_to?: string
+  mode?: 'local' | 'distributed'
+  signal?: AbortSignal
+}
+
+export interface SearchDocumentsSection {
+  hits: MetadataSearchHit[]
+  next_cursor?: string | null
+  nodes_queried: number
+  nodes_failed: number
+}
+
+export interface SearchGroupHit {
+  group_id: string
+  display_name: string
+}
+
+export interface SearchGroupsSection {
+  hits: SearchGroupHit[]
+  next_cursor?: string | null
+}
+
+export interface SearchUserHit {
+  user_id: string
+  name: string
+}
+
+export interface SearchUsersSection {
+  hits: SearchUserHit[]
+  next_cursor?: string | null
+}
+
+export interface UnifiedSearchResponse {
+  documents?: SearchDocumentsSection
+  groups?: SearchGroupsSection
+  users?: SearchUsersSection
+}
+
+// POST /users/resolve — batch id → profile resolution (cap 100 ids). `attributes`
+// is the safe scholarly subset only; sensitive keys (e.g. email) are excluded.
+export interface ResolveUserResult {
+  user_id: string
+  name: string
+  attributes: Record<string, string>
 }
 
 export interface SparqlResponse {
