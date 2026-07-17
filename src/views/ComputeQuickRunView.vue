@@ -22,7 +22,18 @@ import {
   type TesOutput,
   type TesTask,
 } from '@/lib/tes'
-import { ArrowLeft, Cpu, KeyRound, ListPlus, LogIn, Plus, X } from '@lucide/vue'
+import {
+  ArrowDownToLine,
+  ArrowLeft,
+  ArrowUpFromLine,
+  CornerDownRight,
+  Cpu,
+  KeyRound,
+  ListPlus,
+  LogIn,
+  Plus,
+  X,
+} from '@lucide/vue'
 
 // CodeMirror lands on its own async chunk, mounted only at the script step.
 const ScriptEditor = defineAsyncComponent(() => import('@/components/compute/ScriptEditor.vue'))
@@ -180,6 +191,9 @@ function removeInput(i: number) {
 }
 function addOutput() {
   outputFiles.value.push({ name: 'result.txt' })
+}
+function outputDestination(name: string): string {
+  return `s3://${outputBucket.value.trim() || '<bucket>'}/${normalizedPrefix.value}${name.trim() || '<name>'}`
 }
 function removeOutput(i: number) {
   outputFiles.value.splice(i, 1)
@@ -354,63 +368,119 @@ function runAnother() {
           </div>
 
           <template v-else>
-            <div class="grid gap-3 sm:grid-cols-2">
+            <div class="grid gap-3 sm:grid-cols-3">
               <div>
                 <label class="text-xs font-medium text-foreground">Group</label>
                 <Select v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its Process Run crate (sets the required group tag).</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its Process Run crate.</p>
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">Output bucket</label>
                 <Select v-if="bucketOptions.length" v-model="outputBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
                 <Input v-else v-model="outputBucket" class="mt-1 font-mono" :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'" />
+                <p class="mt-1 text-[11px] text-muted-foreground">Receives output files and the staged script.</p>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-foreground">Output prefix</label>
+                <Input v-model="outputPrefix" class="mt-1 font-mono" placeholder="quickruns/" />
+                <p class="mt-1 text-[11px] text-muted-foreground">Everything this run writes lands under this prefix.</p>
               </div>
             </div>
-            <div>
-              <label class="text-xs font-medium text-foreground">Output prefix</label>
-              <Input v-model="outputPrefix" class="mt-1 font-mono" placeholder="quickruns/" />
-              <p class="mt-1 text-[11px] text-muted-foreground">Declared outputs and the staged script are written under this prefix.</p>
-            </div>
 
-            <!-- Inputs -->
-            <div class="space-y-2">
-              <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Inputs</div>
-              <p class="text-[11px] text-muted-foreground">Files are staged read-only under <code class="rounded bg-muted px-1 font-mono">/work/in/</code>.</p>
-              <div v-if="inputs.length" class="space-y-2">
-                <div v-for="(input, i) in inputs" :key="i" class="surface flex items-center gap-3 p-3 text-xs">
-                  <div class="min-w-0 flex-1">
-                    <div class="truncate font-mono text-foreground" :title="input.url">{{ input.url }}</div>
-                    <div class="font-mono text-[11px] text-muted-foreground">→ /work/in/{{ input.name }}</div>
+            <div class="grid gap-4 lg:grid-cols-2">
+              <!-- Input data -->
+              <section class="surface-muted space-y-3 p-4">
+                <div>
+                  <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <ArrowDownToLine class="h-3.5 w-3.5 text-primary" /> Input data
                   </div>
-                  <Button variant="ghost" size="icon-sm" aria-label="Remove input" @click="removeInput(i)"><X class="h-4 w-4" /></Button>
+                  <p class="mt-1 text-[11px] text-muted-foreground">
+                    Staged read-only into the container under <code class="rounded bg-muted px-1 font-mono">/work/in/</code> before the script starts.
+                  </p>
                 </div>
-              </div>
-              <Button variant="outline" size="sm" @click="inputDialogOpen = true"><ListPlus class="size-3.5" /> Add input</Button>
-            </div>
+                <div v-if="inputs.length" class="space-y-2">
+                  <div v-for="(input, i) in inputs" :key="i" class="surface-inline flex items-center gap-3 p-2.5 text-xs">
+                    <div class="min-w-0 flex-1 font-mono">
+                      <div class="truncate text-foreground" :title="input.url">{{ input.url }}</div>
+                      <div class="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <CornerDownRight class="h-3 w-3 shrink-0" /> /work/in/{{ input.name }}
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon-sm" aria-label="Remove input" @click="removeInput(i)"><X class="h-4 w-4" /></Button>
+                  </div>
+                </div>
+                <p v-else class="text-[11px] text-muted-foreground">No input data — the script starts with an empty <code class="rounded bg-muted px-1 font-mono">/work/in/</code>.</p>
+                <Button variant="outline" size="sm" @click="inputDialogOpen = true"><ListPlus class="size-3.5" /> Add input</Button>
+              </section>
 
-            <!-- Declared outputs -->
-            <div class="space-y-2">
-              <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output files <span class="normal-case text-muted-foreground">(optional)</span></div>
-              <p class="text-[11px] text-muted-foreground">
-                Name each file the script writes to <code class="rounded bg-muted px-1 font-mono">/work/out/</code> to capture it in the bucket. stdout and stderr are always captured.
-              </p>
-              <div v-for="(row, i) in outputFiles" :key="i" class="flex items-center gap-2">
-                <Input v-model="row.name" class="font-mono" placeholder="result.txt" />
-                <span class="shrink-0 font-mono text-[11px] text-muted-foreground">→ /work/out/</span>
-                <Button variant="ghost" size="icon-sm" aria-label="Remove output" @click="removeOutput(i)"><X class="h-4 w-4" /></Button>
-              </div>
-              <p v-if="!outputsValid" class="text-[11px] text-destructive">Output names must be unique, non-empty single filenames (no slashes).</p>
-              <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output file</Button>
+              <!-- Output data -->
+              <section class="surface-muted space-y-3 p-4">
+                <div>
+                  <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Output data
+                  </div>
+                  <p class="mt-1 text-[11px] text-muted-foreground">
+                    Files the script writes to <code class="rounded bg-muted px-1 font-mono">/work/out/</code> are uploaded to the output bucket after the run. stdout and stderr are always captured.
+                  </p>
+                </div>
+                <div v-if="outputFiles.length" class="space-y-2">
+                  <div v-for="(row, i) in outputFiles" :key="i" class="surface-inline space-y-1 p-2.5 text-xs">
+                    <div class="flex items-center gap-2">
+                      <span class="shrink-0 font-mono text-[11px] text-muted-foreground">/work/out/</span>
+                      <Input v-model="row.name" class="h-8 font-mono text-xs" placeholder="result.txt" />
+                      <Button variant="ghost" size="icon-sm" aria-label="Remove output" @click="removeOutput(i)"><X class="h-4 w-4" /></Button>
+                    </div>
+                    <div class="flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                      <CornerDownRight class="h-3 w-3 shrink-0" />
+                      <span class="truncate" :title="outputDestination(row.name)">{{ outputDestination(row.name) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <p v-else class="text-[11px] text-muted-foreground">No output files declared — only stdout and stderr are captured.</p>
+                <p v-if="!outputsValid" class="text-[11px] text-destructive">Output names must be unique, non-empty single filenames (no slashes).</p>
+                <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output file</Button>
+              </section>
             </div>
           </template>
         </div>
 
-        <!-- Step 4: Review -->
-        <div v-else class="space-y-3">
+        <!-- Step 4: Review — mirrors the data step's in/out structure. -->
+        <div v-else class="space-y-4">
+          <div class="grid gap-4 text-xs lg:grid-cols-2">
+            <section class="surface-muted space-y-2 p-4">
+              <div class="flex items-center gap-1.5 font-semibold text-foreground">
+                <ArrowDownToLine class="h-3.5 w-3.5 text-primary" /> Into the container
+              </div>
+              <ul class="space-y-1.5 font-mono text-[11px]">
+                <li>
+                  <div class="truncate text-foreground" :title="scriptUrl">{{ runtime.file }} <span class="font-sans text-muted-foreground">(uploaded on submit)</span></div>
+                  <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ scriptContainerPath }}</div>
+                </li>
+                <li v-for="(input, i) in inputs" :key="i">
+                  <div class="truncate text-foreground" :title="input.url">{{ input.url }}</div>
+                  <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> /work/in/{{ input.name }}</div>
+                </li>
+              </ul>
+            </section>
+            <section class="surface-muted space-y-2 p-4">
+              <div class="flex items-center gap-1.5 font-semibold text-foreground">
+                <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Out of the container
+              </div>
+              <ul v-if="declaredOutputs.length" class="space-y-1.5 font-mono text-[11px]">
+                <li v-for="output in declaredOutputs" :key="output.path">
+                  <div class="text-foreground">{{ output.path }}</div>
+                  <div class="flex min-w-0 items-center gap-1 text-muted-foreground">
+                    <CornerDownRight class="h-3 w-3 shrink-0" /> <span class="truncate" :title="output.url">{{ output.url }}</span>
+                  </div>
+                </li>
+              </ul>
+              <p v-else class="text-[11px] text-muted-foreground">No declared output files.</p>
+              <p class="text-[11px] text-muted-foreground">stdout and stderr are always captured.</p>
+            </section>
+          </div>
           <p class="text-xs text-muted-foreground">
-            On submit the script is uploaded to
-            <code class="rounded bg-muted px-1 font-mono">{{ scriptUrl }}</code>
-            and referenced as a task input (the backend does not accept inline script content).
+            Runs as <code class="rounded bg-muted px-1 font-mono">{{ runtime.interpreter }} {{ scriptContainerPath }}</code> in
+            <code class="rounded bg-muted px-1 font-mono">{{ runtime.image }}</code>; the script is uploaded on submit (the backend does not accept inline script content).
           </p>
           <CodeSnippet title="TES task (POST /ga4gh/tes/v1/tasks)" :code="JSON.stringify(task, null, 2)" />
           <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ submitError }}</p>
