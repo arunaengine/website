@@ -154,7 +154,7 @@ function toggleGroup(groupId: string) {
       </template>
     </PageHeader>
 
-    <div class="container grid max-w-[1400px] gap-6 py-8 lg:grid-cols-[260px_1fr]">
+    <div class="container grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
       <nav class="flex flex-col gap-1 text-sm">
         <a href="#connection" class="rounded-md px-3 py-2 font-medium text-primary bg-primary/5">API connection</a>
         <a href="#profile" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Profile</a>

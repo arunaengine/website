@@ -44,7 +44,7 @@ const isSelf = computed(() => currentUser.value?.id === userId.value)
   <div>
     <PageHeader :title="user?.name ?? 'User profile'" description="Public profile resolved from this realm's user directory." />
 
-    <div class="container max-w-3xl py-8">
+    <div class="container py-8">
       <div v-if="loading" class="space-y-3">
         <Skeleton class="h-20" />
         <Skeleton class="h-32" />

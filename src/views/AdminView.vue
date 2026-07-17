@@ -300,7 +300,7 @@ async function save() {
       </template>
     </PageHeader>
 
-    <div v-if="!isRealmAdmin" class="container max-w-[1400px] py-8">
+    <div v-if="!isRealmAdmin" class="container py-8">
       <section class="surface mx-auto max-w-xl p-8 text-center">
         <ShieldCheck class="mx-auto h-8 w-8 text-muted-foreground/70" />
         <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Realm admin access required</h2>
@@ -311,7 +311,7 @@ async function save() {
     </div>
 
     <template v-else>
-      <div v-if="placementAdminEnabled" class="container max-w-[1400px] pt-6">
+      <div v-if="placementAdminEnabled" class="container pt-6">
         <div class="flex items-center gap-1 border-b border-border" role="tablist" aria-label="Realm administration sections">
           <button
             v-for="entry in [
@@ -337,7 +337,7 @@ async function save() {
 
       <PlacementAdminPanel v-if="tab === 'placement'" />
 
-      <div v-else class="container grid max-w-[1400px] gap-6 py-8 lg:grid-cols-[260px_1fr]">
+      <div v-else class="container grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
       <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">
         <a href="#usage" class="rounded-md px-3 py-2 font-medium text-primary bg-primary/5">Realm usage</a>
         <a href="#policy" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Quota policy</a>

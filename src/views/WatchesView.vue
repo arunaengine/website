@@ -69,7 +69,7 @@ watch(currentUser, () => void ensureLoaded())
       </template>
     </PageHeader>
 
-    <div class="container max-w-[900px] space-y-6 py-8">
+    <div class="container space-y-6 py-8">
       <template v-if="!bootstrapped">
         <Skeleton class="h-20" />
         <Skeleton class="h-40" />

@@ -158,7 +158,7 @@ async function submit() {
     </PageHeader>
 
     <!-- Gate 1: feature disabled -->
-    <div v-if="!tesEnabled" class="container max-w-[900px] py-8">
+    <div v-if="!tesEnabled" class="container py-8">
       <EmptyState
         title="Compute is not enabled"
         description="Set features.tes to true in portal-config.json for this deployment; the Compute surface then targets any node that exposes the GA4GH TES endpoint."
@@ -168,7 +168,7 @@ async function submit() {
     </div>
 
     <!-- Gate 2: not signed in -->
-    <div v-else-if="!currentUser" class="container max-w-[900px] py-8">
+    <div v-else-if="!currentUser" class="container py-8">
       <section class="surface mx-auto max-w-xl p-8 text-center">
         <Cpu class="mx-auto h-8 w-8 text-muted-foreground/70" />
         <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Sign in to submit a task</h2>
@@ -178,12 +178,12 @@ async function submit() {
     </div>
 
     <!-- Wizard -->
-    <div v-else class="container max-w-[900px] space-y-6 py-8">
+    <div v-else class="container space-y-6 py-8">
       <WizardSteps :steps="WIZARD_STEPS" :current="step" />
 
       <section class="surface space-y-5 p-6">
         <!-- Step 1: Basics -->
-        <div v-if="step === 0" class="space-y-4">
+        <div v-if="step === 0" class="max-w-xl space-y-4">
           <div>
             <label class="text-xs font-medium text-foreground">Name <span class="text-muted-foreground">(optional)</span></label>
             <Input v-model="name" class="mt-1" placeholder="align-and-count" />

@@ -230,12 +230,12 @@ watch(
 
 <template>
   <div>
-    <div v-if="!bootstrapped" class="container max-w-[1400px] space-y-3 py-8">
+    <div v-if="!bootstrapped" class="container space-y-3 py-8">
       <Skeleton class="h-24" />
       <Skeleton class="h-40" />
     </div>
 
-    <div v-else-if="!placementAdminEnabled" class="container max-w-[1400px] py-8">
+    <div v-else-if="!placementAdminEnabled" class="container py-8">
       <section class="surface mx-auto max-w-xl p-8">
         <EmptyState title="Placement administration is not enabled" description="Enable features.placementAdmin in portal-config.json for a backend that serves the realm placement API.">
           <template #icon><MapPinned class="h-8 w-8" /></template>
@@ -243,7 +243,7 @@ watch(
       </section>
     </div>
 
-    <div v-else-if="!isManagementNode" class="container max-w-[1400px] py-8">
+    <div v-else-if="!isManagementNode" class="container py-8">
       <section class="surface mx-auto max-w-xl p-8 text-center">
         <MapPinned class="mx-auto h-8 w-8 text-muted-foreground/70" />
         <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Management node required</h2>
@@ -251,7 +251,7 @@ watch(
       </section>
     </div>
 
-    <div v-else class="container grid max-w-[1400px] gap-6 py-8 lg:grid-cols-[260px_1fr]">
+    <div v-else class="container grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
       <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">
         <a href="#locations" class="rounded-md bg-primary/5 px-3 py-2 font-medium text-primary">Locations</a>
         <a href="#strategies" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Strategies</a>

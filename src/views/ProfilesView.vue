@@ -198,7 +198,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
       </template>
     </PageHeader>
 
-    <div class="container grid max-w-[1400px] gap-6 py-8 lg:grid-cols-[360px_1fr]">
+    <div class="container grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
       <aside class="surface max-h-[80vh] overflow-y-auto scrollbar-thin">
         <ul v-if="profiles.length" class="divide-y divide-border">
           <li v-for="profile in profiles" :key="profile.id">

@@ -174,7 +174,7 @@ watch(
       </template>
     </PageHeader>
 
-    <div class="container max-w-[1100px] space-y-6 py-8">
+    <div class="container space-y-6 py-8">
       <div
         v-if="statusError"
         class="surface border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-800 dark:text-amber-300"
