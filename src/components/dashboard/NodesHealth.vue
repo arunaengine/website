@@ -27,8 +27,9 @@ function storageWidth(node: RealmNodeInfo): string {
   return `${Math.min((used / maxStorage.value) * 100, 100)}%`
 }
 
-// Reading `now` re-renders the labels as time passes.
-const now = useNow({ interval: 10_000 })
+// Reading `now` re-renders the labels as time passes; 1s so ages count up
+// smoothly instead of jumping.
+const now = useNow({ interval: 1_000 })
 function heartbeat(node: RealmNodeInfo): string | null {
   const ms = node.info?.utilization.heartbeat_at_ms
   return ms && now.value ? relativeTime(new Date(ms).toISOString()) : null
