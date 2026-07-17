@@ -12,12 +12,13 @@ import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
-import SelectDataDialog from '@/components/data/SelectDataDialog.vue'
+import DatasetFilesEditor from '@/components/metadata/DatasetFilesEditor.vue'
 import DatasetEntityInstances from '@/components/metadata/DatasetEntityInstances.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
 import { computed, ref, watch } from 'vue'
 import { Check, FileJson2, Plus, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
+import type { DataEntity } from '@/lib/dataEntities'
 import type { MetadataDoc } from '@/data/types'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
 import { buildEntityInstance, emitEntityReference, emitSelectObject, isHasPartUri, slugify, uniqueId } from '@/lib/profiles/emit'
@@ -80,7 +81,6 @@ const creators = ref<string[]>([])
 const dataRefs = ref<Array<{ label: string; url: string }>>([])
 const submitError = ref<string | null>(null)
 const createGroupOpen = ref(false)
-const selectDataOpen = ref(false)
 const profileSchema = ref<JsonSchema | undefined>()
 const profileControls = ref<ProfileControl[]>([])
 // The raw Dataset property rules behind profileControls, kept so hasPart rules can
@@ -128,6 +128,15 @@ const dataRefList = computed(() =>
     .map((entry) => ({ label: entry.label.trim(), url: entry.url.trim() }))
     .filter((entry) => entry.url),
 )
+// Bridge the shared files editor onto the existing {label,url} model so buildRoCrate
+// keeps emitting hasPart File entities from `dataRefs`; per-file details are omitted
+// here (`detailed: false`) because the create emit shape carries only id + name.
+const filesModel = computed<DataEntity[]>({
+  get: () => dataRefs.value.map((entry) => ({ id: entry.url, name: entry.label, types: ['File'] })),
+  set: (next) => {
+    dataRefs.value = next.map((file) => ({ label: file.name, url: file.id }))
+  },
+})
 // A labelled reference needs a URL, and every supplied URL must be an absolute
 // URI (http(s)://, s3://, …) so it emits as a valid `{"@id"}` reference.
 function dataRefUrlError(entry: { label: string; url: string }): boolean {
@@ -1111,13 +1120,7 @@ async function submit() {
           </div>
         </div>
         <div>
-          <div class="flex items-center justify-between gap-3">
-            <label class="text-xs font-medium text-foreground">Data references</label>
-            <Button variant="outline" size="sm" @click="selectDataOpen = true">
-              <Plus class="size-3.5" /> Add data reference
-            </Button>
-          </div>
-          <p class="mt-1 text-[11px] text-muted-foreground">Each reference becomes a hasPart File entity in the RO-Crate.</p>
+          <DatasetFilesEditor v-model="filesModel" :detailed="false" />
           <!-- WS5: the profile's required contents for hasPart. A reference is
                matched by its @id (url) or name (label), the same way the File
                entities are emitted, so this checklist agrees with validation. -->
@@ -1145,18 +1148,6 @@ async function submit() {
           >
             {{ violation.message }}
           </p>
-          <div v-for="(entry, index) in dataRefs" :key="index" class="mt-1">
-            <div class="flex items-center gap-2">
-              <Input v-model="entry.label" placeholder="Label" class="w-2/5" />
-              <Input v-model="entry.url" placeholder="s3://bucket/key or https://..." class="flex-1" :invalid="dataRefUrlError(entry) ? 'error' : undefined" />
-              <Button variant="ghost" size="icon" aria-label="Remove data reference" @click="dataRefs.splice(index, 1)">
-                <X />
-              </Button>
-            </div>
-            <p v-if="dataRefUrlError(entry)" class="mt-1 text-[11px] text-destructive">
-              {{ entry.url.trim() ? 'Use a valid absolute URL (http(s)://, s3://, …).' : 'Add a URL for this labelled reference, or remove it.' }}
-            </p>
-          </div>
         </div>
         <label class="flex items-center justify-between rounded-md border border-border p-3 text-sm">
           <span>
@@ -1180,7 +1171,6 @@ async function submit() {
       </DialogFooter>
 
       <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (groupId = group.group_id)" />
-      <SelectDataDialog v-model:open="selectDataOpen" @add="(entry) => dataRefs.push(entry)" />
     </DialogContent>
   </Dialog>
 </template>
