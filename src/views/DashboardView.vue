@@ -43,6 +43,17 @@ watch(dashboardRevision, () => void refreshDashboard(), { immediate: true })
 
 const onlineNodes = computed(() => nodes.value.filter((node) => node.status === 'healthy').length)
 
+// Honest realm figure: the sum of documents each node reports holding (replicas
+// included), shown only once at least one node publishes the count.
+const docsHeld = computed(() => {
+  const reporting = (realmInfo.value?.nodes ?? []).filter(
+    (node) => node.info?.utilization.documents_held !== undefined,
+  )
+  if (!reporting.length) return null
+  const total = reporting.reduce((sum, node) => sum + (node.info?.utilization.documents_held ?? 0), 0)
+  return { total, nodes: reporting.length }
+})
+
 const stats = computed(() => [
   {
     label: 'Metadata documents',
@@ -187,6 +198,13 @@ const pageDescription = computed(() =>
             </div>
             <div class="mt-3 text-sm font-medium text-foreground">{{ realm.name }}</div>
             <div class="mt-1 break-all font-mono text-[11px] text-muted-foreground">{{ realm.id }}</div>
+            <div
+              v-if="docsHeld"
+              class="mt-3 border-t border-border pt-3 text-xs text-muted-foreground"
+              :title="`Summed across ${docsHeld.nodes} reporting node${docsHeld.nodes === 1 ? '' : 's'}; replicas included`"
+            >
+              <span class="font-semibold text-foreground">{{ formatNumber(docsHeld.total) }}</span> documents held
+            </div>
           </section>
 
           <section class="surface p-5">

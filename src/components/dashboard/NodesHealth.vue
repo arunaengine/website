@@ -31,6 +31,34 @@ function heartbeat(node: RealmNodeInfo): string | null {
   return ms ? relativeTime(new Date(ms).toISOString()) : null
 }
 
+// load_permille is the 1-minute load average scaled to permille of logical
+// cores (1000‰ = one runnable task per core), clamped 0..1000 by the node.
+function loadPermille(node: RealmNodeInfo): number {
+  return node.info?.utilization.load_permille ?? 0
+}
+
+function loadPercent(node: RealmNodeInfo): number {
+  return Math.round(loadPermille(node) / 10)
+}
+
+function loadWidth(node: RealmNodeInfo): string {
+  return `${Math.min(loadPermille(node) / 10, 100)}%`
+}
+
+function loadFill(node: RealmNodeInfo): string {
+  const permille = loadPermille(node)
+  if (permille >= 800) return 'bg-destructive'
+  if (permille >= 500) return 'bg-amber-500'
+  return 'bg-emerald-500'
+}
+
+function loadTextTone(node: RealmNodeInfo): string {
+  const permille = loadPermille(node)
+  if (permille >= 800) return 'text-destructive'
+  if (permille >= 500) return 'text-amber-600 dark:text-amber-500'
+  return 'text-muted-foreground'
+}
+
 function labelChips(node: RealmNodeInfo): string[] {
   return Object.entries(node.info?.labels ?? {}).map(([key, value]) => `${key}=${value}`)
 }
@@ -74,11 +102,26 @@ function labelChips(node: RealmNodeInfo): string[] {
           <div class="h-1.5 w-full overflow-hidden rounded-full bg-muted/50">
             <div class="h-full rounded-full bg-primary/70" :style="{ width: storageWidth(node) }" />
           </div>
-          <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] text-muted-foreground">
+          <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-muted-foreground">
             <span>{{ formatBytes(node.info.utilization.storage_bytes_used) }}</span>
-            <span v-if="node.info.utilization.documents_held !== undefined">· {{ formatNumber(node.info.utilization.documents_held) }} docs</span>
-            <span v-if="node.info.utilization.load_permille !== undefined">· load {{ node.info.utilization.load_permille }}‰</span>
-            <span v-if="heartbeat(node)" class="ml-auto" :title="'Last heartbeat'">♥ {{ heartbeat(node) }}</span>
+            <span
+              v-if="node.info.utilization.documents_held !== undefined"
+              title="Metadata documents this node holds by placement shard"
+            >
+              · {{ formatNumber(node.info.utilization.documents_held) }} docs
+            </span>
+            <span
+              v-if="node.info.utilization.load_permille !== undefined"
+              class="inline-flex items-center gap-1"
+              :title="`1-minute load average at ${loadPercent(node)}% of CPU cores (1000‰ = one runnable task per core)`"
+            >
+              ·
+              <span class="inline-block h-1.5 w-8 overflow-hidden rounded-full bg-muted">
+                <span class="block h-full rounded-full" :class="loadFill(node)" :style="{ width: loadWidth(node) }" />
+              </span>
+              <span :class="loadTextTone(node)">{{ loadPercent(node) }}%</span>
+            </span>
+            <span v-if="heartbeat(node)" class="ml-auto" title="Last heartbeat">♥ {{ heartbeat(node) }}</span>
           </div>
         </template>
         <p v-else class="text-[11px] text-muted-foreground">No published info yet.</p>
