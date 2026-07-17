@@ -14,7 +14,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { bracketMatching, indentUnit } from '@codemirror/language'
 import { python } from '@codemirror/lang-python'
 import { javascript } from '@codemirror/lang-javascript'
-import { EDITOR_FONT, highlightExtension } from '@/lib/codemirror'
+import { EDITOR_FONT, highlightExtension, shadowMount } from '@/lib/codemirror'
 import { useTheme } from '@/composables/useTheme'
 
 // Lazy-loaded on its own chunk: the quick-run wizard mounts it through
@@ -92,7 +92,8 @@ onMounted(() => {
       }),
     ],
   })
-  view.value = new EditorView({ state, parent: host.value })
+  const { parent, root } = shadowMount(host.value)
+  view.value = new EditorView({ state, parent, root })
 })
 
 onBeforeUnmount(() => {

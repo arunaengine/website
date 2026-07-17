@@ -25,3 +25,16 @@ export function highlightExtension(dark: boolean): Extension {
 // .cm-scroller so gutters and content share one typography — a proportional
 // gutter font skews the line numbers against the code lines.
 export const EDITOR_FONT = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
+
+// CSP-safe mount point. The served policy (aruna api/src/csp.rs) has
+// style-src 'self', which blocks the <style> tags style-mod injects into the
+// document; in a shadow root it uses constructed adoptedStyleSheets instead.
+export function shadowMount(host: HTMLElement): { parent: HTMLElement; root: ShadowRoot } {
+  const root = host.shadowRoot ?? host.attachShadow({ mode: 'open' })
+  let parent = root.firstElementChild as HTMLElement | null
+  if (!parent) {
+    parent = document.createElement('div')
+    root.appendChild(parent)
+  }
+  return { parent, root }
+}

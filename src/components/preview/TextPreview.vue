@@ -2,7 +2,7 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView, lineNumbers } from '@codemirror/view'
-import { EDITOR_FONT, highlightExtension } from '@/lib/codemirror'
+import { EDITOR_FONT, highlightExtension, shadowMount } from '@/lib/codemirror'
 import { useTheme } from '@/composables/useTheme'
 
 const props = defineProps<{ text: string; language?: string }>()
@@ -78,7 +78,8 @@ async function build() {
     baseTheme,
   ]
   if (language) extensions.push(language)
-  view = new EditorView({ parent: host.value, doc: props.text, extensions })
+  const { parent, root } = shadowMount(host.value)
+  view = new EditorView({ parent, root, doc: props.text, extensions })
 }
 
 watch(
