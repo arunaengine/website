@@ -19,6 +19,7 @@ import WatchButton from '@/components/watches/WatchButton.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useStaging } from '@/composables/useStaging'
+import { builderEnabled } from '@/composables/useBuilderBasket'
 import { featureEnabled } from '@/lib/config'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type S3Key, type UploadHandle } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
@@ -97,6 +98,7 @@ const staging = useStaging()
 // Staging jobs side panel: config-gated (no job-listing endpoint on today's
 // backend). The dialog's ingest tab covers registered connectors regardless.
 const stagingJobsEnabled = featureEnabled('stagingJobs')
+const builderOn = builderEnabled()
 const stagingPanelOpen = ref(false)
 
 const deleteTarget = ref<{ bucket: string; object: ObjectEntry } | null>(null)
@@ -623,6 +625,7 @@ const isEmpty = computed(
                   <Badge v-if="staging.runningCount.value" variant="secondary" class="ml-1">{{ staging.runningCount.value }}</Badge>
                 </Button>
                 <Button variant="outline" size="sm" @click="pickFiles"><Upload class="h-4 w-4" /> Upload</Button>
+                <Button v-if="builderOn" variant="outline" size="sm" @click="router.push({ name: 'bucket-builder', params: { bucketId: bucket }, query: prefix ? { prefix } : {} })"><Boxes class="h-4 w-4" /> Builder</Button>
                 <Button size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>
             </div>

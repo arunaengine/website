@@ -15,7 +15,9 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import ConnectorDialog from '@/components/groups/ConnectorDialog.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useStaging, stagingErrorMessage } from '@/composables/useStaging'
+import { useStaging, stagingErrorMessage, invalidSourcePath } from '@/composables/useStaging'
+import { builderEnabled } from '@/composables/useBuilderBasket'
+import { useRouter } from 'vue-router'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import type { SourceConnectorSummary, StageBlobResponse } from '@/lib/api'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
@@ -32,6 +34,14 @@ const emit = defineEmits<{
 const { myGroups, listGroupConnectors } = useAruna()
 const staging = useStaging()
 const { writesDisabled } = useConnectivity()
+const router = useRouter()
+const builderOn = builderEnabled()
+
+function openBuilder() {
+  emit('update:open', false)
+  const target = props.prefix.replace(/\/+$/, '')
+  void router.push({ name: 'bucket-builder', params: { bucketId: props.bucket }, query: target ? { prefix: target } : {} })
+}
 
 const tab = ref('upload')
 
@@ -89,15 +99,8 @@ const STRATEGY_OPTIONS = [
   { value: 'reference', label: 'Reference — register without copying; read on demand' },
 ]
 
-// Mirrors aruna validate_relative_source_path: non-empty, not absolute, no
-// backslashes, no '.'/'..' segments.
 const trimmedSourcePath = computed(() => sourcePath.value.trim())
-const sourcePathInvalid = computed(() => {
-  const path = trimmedSourcePath.value
-  if (!path) return true
-  if (path.startsWith('/') || path.includes('\\')) return true
-  return path.split('/').some((segment) => segment === '.' || segment === '..')
-})
+const sourcePathInvalid = computed(() => invalidSourcePath(sourcePath.value))
 // Only surface the reason once the user has typed something wrong.
 const sourcePathError = computed(() => Boolean(trimmedSourcePath.value) && sourcePathInvalid.value)
 
@@ -329,6 +332,12 @@ const recentSubmissions = computed(() => staging.submissions.value.slice(0, 5))
           </div>
         </TabsContent>
       </Tabs>
+
+      <div v-if="builderOn && bucket" class="flex justify-center border-t border-border pt-3">
+        <button class="text-xs text-primary hover:underline" @click="openBuilder">
+          Importing many sources at once? Open the builder
+        </button>
+      </div>
 
       <ConnectorDialog v-model:open="registerOpen" :group-id="groupSel" @saved="onConnectorSaved" />
     </DialogContent>
