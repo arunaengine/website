@@ -6,7 +6,7 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { featureEnabled } from '@/lib/config'
@@ -16,7 +16,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { Database, HardDrive, Layers, Boxes, RefreshCw, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
 
-const { realmInfo, usageInfo, isRealmAdmin, isManagementNode, nodeInfo, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
+const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, isManagementNode, nodeInfo, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
 const { isAuthenticated } = useAuth()
 
 const nodeCapability = computed(() => nodeInfo.value?.node.capabilities ?? 'server')
@@ -343,6 +343,7 @@ async function save() {
         <a href="#policy" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Quota policy</a>
         <a href="#group-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Group overrides</a>
         <a href="#user-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">User caps</a>
+        <RouterLink v-if="canInspectUsers" :to="{ name: 'admin-users' }" class="mt-1 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Users &rarr;</RouterLink>
       </nav>
 
       <div class="space-y-6">

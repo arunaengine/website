@@ -40,6 +40,8 @@ const routes: RouteRecordRaw[] = [
       // Realm admin — usage, quota policy and placement (tabs of one view)
       { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
       { path: 'admin/placement', redirect: { path: '/app/admin', query: { tab: 'placement' } } },
+      // Realm admin — read-only user directory
+      { path: 'admin/users', name: 'admin-users', component: () => import('@/views/AdminUsersView.vue') },
       // Jobs — durable background jobs (feature-gated in-view; the backend
       // surface lives on aruna feat/job-framework)
       { path: 'jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
