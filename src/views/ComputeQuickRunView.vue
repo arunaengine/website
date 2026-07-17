@@ -11,6 +11,7 @@ import CodeSnippet from '@/components/onboarding/CodeSnippet.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import QuickRunResult from '@/components/compute/QuickRunResult.vue'
+import { asyncChunkError } from '@/lib/chunk-recovery'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
@@ -37,7 +38,10 @@ import {
 } from '@lucide/vue'
 
 // CodeMirror lands on its own async chunk, mounted only at the script step.
-const ScriptEditor = defineAsyncComponent(() => import('@/components/compute/ScriptEditor.vue'))
+const ScriptEditor = defineAsyncComponent({
+  loader: () => import('@/components/compute/ScriptEditor.vue'),
+  onError: asyncChunkError,
+})
 
 const router = useRouter()
 const route = useRoute()

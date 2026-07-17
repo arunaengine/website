@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { defineAsyncComponent, watch } from 'vue'
+import { asyncChunkError } from '@/lib/chunk-recovery'
 import Sheet from '@/components/ui/Sheet.vue'
 import SheetContent from '@/components/ui/SheetContent.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
@@ -22,8 +23,8 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 // Viewer deps (CodeMirror, markdown-it, papaparse, native players) stay in
 // dynamic chunks fetched only when their kind is shown.
-const TextPreview = defineAsyncComponent(() => import('./TextPreview.vue'))
-const MarkdownPreview = defineAsyncComponent(() => import('./MarkdownPreview.vue'))
+const TextPreview = defineAsyncComponent({ loader: () => import('./TextPreview.vue'), onError: asyncChunkError })
+const MarkdownPreview = defineAsyncComponent({ loader: () => import('./MarkdownPreview.vue'), onError: asyncChunkError })
 const CsvPreview = defineAsyncComponent(() => import('./CsvPreview.vue'))
 const ImagePreview = defineAsyncComponent(() => import('./ImagePreview.vue'))
 const MediaPreview = defineAsyncComponent(() => import('./MediaPreview.vue'))
