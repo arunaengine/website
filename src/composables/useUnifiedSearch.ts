@@ -1,0 +1,225 @@
+// Debounced, server-backed unified search against GET /search: one call fans
+// out to the documents, groups and users sections; each section pages on its own
+// (backend accepts a cursor only for a single-type request).
+//
+// Per-view FACTORY, not a module singleton: the debounce timer, in-flight
+// AbortControllers and section cursors are bound to the owning view. Must be
+// called during component setup (uses onBeforeUnmount).
+import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import {
+  type MetadataSearchHit,
+  type SearchGroupHit,
+  type SearchSectionType,
+  type SearchUserHit,
+  type UnifiedSearchResponse,
+} from '@/lib/api'
+import { useAruna } from '@/composables/useAruna'
+
+export const UNIFIED_DEBOUNCE_MS = 250
+// Backend rejects a query shorter than two characters with 400.
+export const UNIFIED_MIN_CHARS = 2
+
+const ALL_TYPES: SearchSectionType[] = ['documents', 'groups', 'users']
+
+export interface UnifiedSearchConfig {
+  types?: SearchSectionType[]
+  limit?: number
+  groupId?: Ref<string | null>
+  conformsTo?: Ref<string | null>
+}
+
+export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig = {}) {
+  const { searchUnified, authToken, apiBaseUrl } = useAruna()
+  const types = config.types?.length ? config.types : ALL_TYPES
+  const limit = config.limit ?? 10
+
+  const documents = ref<MetadataSearchHit[]>([])
+  const groups = ref<SearchGroupHit[]>([])
+  const users = ref<SearchUserHit[]>([])
+  const documentCursor = ref<string | null>(null)
+  const groupCursor = ref<string | null>(null)
+  const userCursor = ref<string | null>(null)
+  const nodesQueried = ref(0)
+  const nodesFailed = ref(0)
+
+  const pending = ref(false)
+  const loadingSection = ref<SearchSectionType | null>(null)
+  const error = ref<string | null>(null)
+  const searched = ref(false)
+
+  const active = computed(() => query.value.trim().length >= UNIFIED_MIN_CHARS)
+  const partial = computed(() => nodesFailed.value > 0)
+  const empty = computed(() => !documents.value.length && !groups.value.length && !users.value.length)
+
+  let timer: number | undefined
+  let seq = 0
+  let controller: AbortController | null = null
+  let sectionController: AbortController | null = null
+  // The query the section cursors were issued for; a cursor is only valid for it.
+  let cursorQuery = ''
+
+  function filters(): { group_id?: string; conforms_to?: string } {
+    return {
+      group_id: config.groupId?.value ?? undefined,
+      conforms_to: config.conformsTo?.value ?? undefined,
+    }
+  }
+
+  function reset() {
+    documents.value = []
+    groups.value = []
+    users.value = []
+    documentCursor.value = null
+    groupCursor.value = null
+    userCursor.value = null
+    nodesQueried.value = 0
+    nodesFailed.value = 0
+    error.value = null
+    searched.value = false
+    pending.value = false
+    loadingSection.value = null
+  }
+
+  function apply(response: UnifiedSearchResponse) {
+    if (response.documents) {
+      documents.value = response.documents.hits
+      documentCursor.value = response.documents.next_cursor ?? null
+      nodesQueried.value = response.documents.nodes_queried
+      nodesFailed.value = response.documents.nodes_failed
+    }
+    if (response.groups) {
+      groups.value = response.groups.hits
+      groupCursor.value = response.groups.next_cursor ?? null
+    }
+    if (response.users) {
+      users.value = response.users.hits
+      userCursor.value = response.users.next_cursor ?? null
+    }
+  }
+
+  async function runSearch(term: string) {
+    const mySeq = ++seq
+    sectionController?.abort()
+    sectionController = null
+    loadingSection.value = null
+    controller?.abort()
+    controller = new AbortController()
+    pending.value = true
+    error.value = null
+    try {
+      const response = await searchUnified(term, {
+        types,
+        limit,
+        ...filters(),
+        signal: controller.signal,
+      })
+      if (mySeq !== seq) return // superseded
+      reset()
+      apply(response)
+      cursorQuery = term
+      searched.value = true
+    } catch (err) {
+      if (mySeq !== seq) return // superseded or aborted
+      error.value = err instanceof Error ? err.message : String(err)
+    } finally {
+      if (mySeq === seq) pending.value = false
+    }
+  }
+
+  function cursorFor(section: SearchSectionType): Ref<string | null> {
+    if (section === 'documents') return documentCursor
+    if (section === 'groups') return groupCursor
+    return userCursor
+  }
+
+  async function loadMore(section: SearchSectionType) {
+    if (loadingSection.value || pending.value) return
+    const cursorRef = cursorFor(section)
+    const cursor = cursorRef.value
+    const term = query.value.trim()
+    if (!cursor || term !== cursorQuery) return
+    const mySeq = seq
+    const pageController = new AbortController()
+    sectionController = pageController
+    loadingSection.value = section
+    try {
+      const response = await searchUnified(term, {
+        types: [section],
+        limit,
+        cursor,
+        ...(section === 'documents' ? filters() : {}),
+        signal: pageController.signal,
+      })
+      if (mySeq !== seq || sectionController !== pageController) return
+      if (section === 'documents' && response.documents) {
+        documents.value = [...documents.value, ...response.documents.hits]
+        documentCursor.value = response.documents.next_cursor ?? null
+      } else if (section === 'groups' && response.groups) {
+        groups.value = [...groups.value, ...response.groups.hits]
+        groupCursor.value = response.groups.next_cursor ?? null
+      } else if (section === 'users' && response.users) {
+        users.value = [...users.value, ...response.users.hits]
+        userCursor.value = response.users.next_cursor ?? null
+      }
+    } catch (err) {
+      if (mySeq !== seq || sectionController !== pageController) return
+      error.value = err instanceof Error ? err.message : String(err)
+    } finally {
+      if (sectionController === pageController) {
+        sectionController = null
+        loadingSection.value = null
+      }
+    }
+  }
+
+  function retry() {
+    const term = query.value.trim()
+    if (term.length >= UNIFIED_MIN_CHARS) void runSearch(term)
+  }
+
+  const deps: Array<Ref<unknown>> = [query, authToken, apiBaseUrl]
+  if (config.groupId) deps.push(config.groupId)
+  if (config.conformsTo) deps.push(config.conformsTo)
+  watch(deps, () => {
+    window.clearTimeout(timer)
+    ++seq
+    controller?.abort()
+    controller = null
+    sectionController?.abort()
+    sectionController = null
+    cursorQuery = ''
+    reset()
+    const term = query.value.trim()
+    if (term.length < UNIFIED_MIN_CHARS) return
+    timer = window.setTimeout(() => void runSearch(term), UNIFIED_DEBOUNCE_MS)
+  })
+
+  if (query.value.trim().length >= UNIFIED_MIN_CHARS) void runSearch(query.value.trim())
+
+  onBeforeUnmount(() => {
+    window.clearTimeout(timer)
+    seq++
+    controller?.abort()
+    sectionController?.abort()
+  })
+
+  return {
+    documents,
+    groups,
+    users,
+    documentCursor,
+    groupCursor,
+    userCursor,
+    nodesQueried,
+    nodesFailed,
+    pending,
+    loadingSection,
+    error,
+    searched,
+    active,
+    partial,
+    empty,
+    loadMore,
+    retry,
+  }
+}
