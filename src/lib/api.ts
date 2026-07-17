@@ -452,6 +452,95 @@ export interface CreateS3CredentialsResponse {
   access_secret: string
 }
 
+// Source connectors (GET/POST /groups/{group_id}/connectors — verified against
+// aruna api/src/routes/connectors.rs). Real, served contract — no gating.
+export type SourceConnectorKind = 'http' | 's3' | 'webdav' | 'ftp' | 'aruna_native'
+
+export interface SourceConnectorSummary {
+  connector_id: string
+  group_id: string
+  name: string
+  kind: SourceConnectorKind
+  public_config: Record<string, string>
+  created_at: string
+  updated_at: string
+  created_by: string
+  has_secret_config: boolean
+}
+
+export interface ListSourceConnectorsResponse {
+  connectors: SourceConnectorSummary[]
+}
+
+// Shared body of POST and PUT (CreateSourceConnectorRequest /
+// ReplaceSourceConnectorRequest are field-identical in the backend). PUT is a
+// full replace: secret_config always overwrites the stored secrets, and
+// responses never echo them back (only has_secret_config). Allowed/required
+// config keys are validated per kind server-side
+// (aruna operations/src/connectors/validation.rs); `aruna_native` is rejected.
+export interface SourceConnectorRequest {
+  name: string
+  kind: SourceConnectorKind
+  public_config: Record<string, string>
+  secret_config?: Record<string, string>
+}
+
+// Blob staging (POST /staging/ — verified against aruna api/src/routes/staging.rs).
+// Internally tagged: the `strategy` discriminant sits beside the flattened
+// target fields. Synchronous one-shot materialization (201 on success);
+// 'sync' exists in the API enum but returns 501 on today's backends.
+export type StagingStrategy = 'snapshot' | 'reference' | 'sync'
+
+export interface StageBlobSubmission {
+  strategy: StagingStrategy
+  group_id: string
+  connector_id: string
+  source_path: string
+  bucket: string
+  key: string
+}
+
+export interface StageBlobResponse {
+  strategy: StagingStrategy
+  bucket: string
+  key: string
+  version_id: string
+  size: number
+  content_type?: string | null
+  etag?: string | null
+  last_modified?: string | null
+}
+
+// ---------------------------------------------------------------------------
+// Staging jobs — arunaengine/aruna#276 ("staging jobs get a side panel").
+// POST /staging/ is synchronous and today's backend keeps NO job registry;
+// the types below document the assumed listing contract so the panel flips
+// on trivially once it ships:
+//   GET /staging/jobs -> 200 ListStagingJobsResponse
+// Callers MUST gate on featureEnabled('stagingJobs'); the flag ships off.
+// ---------------------------------------------------------------------------
+export type StagingJobState = 'queued' | 'running' | 'done' | 'failed'
+
+export interface StagingJob {
+  job_id: string
+  strategy: StagingStrategy
+  group_id: string
+  connector_id: string
+  source_path: string
+  bucket: string
+  key: string
+  state: StagingJobState
+  submitted_at: string
+  finished_at?: string | null
+  error?: string | null
+  version_id?: string | null
+  size?: number | null
+}
+
+export interface ListStagingJobsResponse {
+  jobs: StagingJob[]
+}
+
 // The backend deserializes CreateMetadataRequest as an untagged enum with
 // deny_unknown_fields, so a request must match exactly one variant shape.
 export interface CreateMetadataScaffoldRequest {

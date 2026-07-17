@@ -28,6 +28,12 @@ import {
   type RealmInfoResponse,
   type RealmQuotaConfig,
   type S3CredentialSummary,
+  type ListSourceConnectorsResponse,
+  type ListStagingJobsResponse,
+  type SourceConnectorRequest,
+  type SourceConnectorSummary,
+  type StageBlobResponse,
+  type StageBlobSubmission,
   type SparqlResponse,
   type UsageHistoryResolution,
   type UsageHistoryResponse,
@@ -509,6 +515,73 @@ async function revokeS3Credential(accessKeyId: string): Promise<void> {
   } finally {
     saving.value = false
   }
+}
+
+// Source connectors registered on a group (GET /groups/{group_id}/connectors).
+async function listGroupConnectors(groupId: string): Promise<ListSourceConnectorsResponse> {
+  return request<ListSourceConnectorsResponse>(`/groups/${groupId}/connectors`)
+}
+
+async function getGroupConnector(groupId: string, connectorId: string): Promise<SourceConnectorSummary> {
+  return request<SourceConnectorSummary>(`/groups/${groupId}/connectors/${encodeURIComponent(connectorId)}`)
+}
+
+async function createGroupConnector(
+  groupId: string,
+  input: SourceConnectorRequest,
+): Promise<SourceConnectorSummary> {
+  saving.value = true
+  try {
+    return await request<SourceConnectorSummary>(`/groups/${groupId}/connectors`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  } finally {
+    saving.value = false
+  }
+}
+
+// PUT replaces the whole connector, secrets included: an empty secret_config
+// removes any stored credentials (there is no partial update on the backend).
+async function replaceGroupConnector(
+  groupId: string,
+  connectorId: string,
+  input: SourceConnectorRequest,
+): Promise<SourceConnectorSummary> {
+  saving.value = true
+  try {
+    return await request<SourceConnectorSummary>(
+      `/groups/${groupId}/connectors/${encodeURIComponent(connectorId)}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+    )
+  } finally {
+    saving.value = false
+  }
+}
+
+async function deleteGroupConnector(groupId: string, connectorId: string): Promise<void> {
+  saving.value = true
+  try {
+    await request<void>(`/groups/${groupId}/connectors/${encodeURIComponent(connectorId)}`, {
+      method: 'DELETE',
+    })
+  } finally {
+    saving.value = false
+  }
+}
+
+// Synchronous one-shot staging: the node pulls source_path from the connector
+// and materializes it as bucket/key (201 on success). Slow for big blobs —
+// callers must show a running state. The axum route is literally "/staging/".
+async function stageBlob(input: StageBlobSubmission): Promise<StageBlobResponse> {
+  return request<StageBlobResponse>('/staging/', { method: 'POST', body: JSON.stringify(input) })
+}
+
+// STUB against the assumed #276 job registry (see api.ts). On today's backends
+// this 404s; callers gate on featureEnabled('stagingJobs') and treat 404/405 as
+// "backend does not keep a staging job registry yet".
+async function listStagingJobs(): Promise<ListStagingJobsResponse> {
+  return request<ListStagingJobsResponse>('/staging/jobs')
 }
 
 async function listGroupMembers(groupId: string): Promise<GroupMembersResponse> {
@@ -1043,6 +1116,13 @@ export function useAruna() {
     getGroupUsage,
     getGroupUsageHistory,
     createS3Credentials,
+    listGroupConnectors,
+    getGroupConnector,
+    createGroupConnector,
+    replaceGroupConnector,
+    deleteGroupConnector,
+    stageBlob,
+    listStagingJobs,
     revokeS3Credential,
     listGroupMembers,
     addGroupMember,
