@@ -31,6 +31,8 @@ const props = defineProps<
     // Accessible name for the trigger; without it the combobox is announced
     // only by its selected value.
     ariaLabel?: string
+    // Visible prefix inside the trigger ("State: All") for filter controls.
+    label?: string
   }
 >()
 const emits = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
@@ -48,7 +50,10 @@ const triggerClasses = computed(() =>
 <template>
   <SelectRoot v-bind="forwarded">
     <SelectTrigger :class="triggerClasses" :aria-label="props.ariaLabel">
-      <SelectValue :placeholder="placeholder" />
+      <span class="flex min-w-0 items-center gap-1.5">
+        <span v-if="props.label" class="shrink-0 text-muted-foreground">{{ props.label }}:</span>
+        <span class="truncate"><SelectValue :placeholder="placeholder" /></span>
+      </span>
       <SelectIcon><ChevronDown class="h-4 w-4 opacity-60" /></SelectIcon>
     </SelectTrigger>
     <SelectPortal>
