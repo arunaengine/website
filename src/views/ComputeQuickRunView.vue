@@ -209,12 +209,11 @@ onMounted(initDefaults)
 watch([currentUser, () => s3.hasActiveKey.value, myGroups], initDefaults)
 
 // ── Validity ─────────────────────────────────────────────────────────────────
-const outputsValid = computed(() =>
-  outputFiles.value.every((f) => {
-    const name = f.name.trim()
-    return name.length > 0 && !name.includes('/')
-  }),
-)
+const outputsValid = computed(() => {
+  // The backend rejects duplicate output destinations, so block them here.
+  const names = outputFiles.value.map((f) => f.name.trim())
+  return names.every((name) => name.length > 0 && !name.includes('/')) && new Set(names).size === names.length
+})
 const dataReady = computed(
   () => !!s3.endpoint.value && s3.hasActiveKey.value && groupId.value.length > 0 && outputBucket.value.trim().length > 0,
 )
@@ -400,7 +399,7 @@ function runAnother() {
                 <span class="shrink-0 font-mono text-[11px] text-muted-foreground">→ /work/out/</span>
                 <Button variant="ghost" size="icon-sm" aria-label="Remove output" @click="removeOutput(i)"><X class="h-4 w-4" /></Button>
               </div>
-              <p v-if="!outputsValid" class="text-[11px] text-destructive">Output names must be non-empty single filenames (no slashes).</p>
+              <p v-if="!outputsValid" class="text-[11px] text-destructive">Output names must be unique, non-empty single filenames (no slashes).</p>
               <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output file</Button>
             </div>
           </template>
