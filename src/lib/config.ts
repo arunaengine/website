@@ -16,13 +16,13 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
 }
 
 // Per-flag defaults are layered under the served `features` map, so deployments
-// can still explicitly disable a surface. The current backend serves placement
-// and durable jobs. Cursor paging and TES remain opt-in because their availability
-// depends on a newer search contract and node-local compute configuration.
+// can still explicitly disable a surface. The current backend serves placement,
+// durable jobs and cursor-paged search. TES remains opt-in because its
+// availability depends on node-local compute configuration.
 const DEFAULT_FEATURES: Record<string, boolean> = {
   jobs: true,
   placementAdmin: true,
-  searchCursor: false,
+  searchCursor: true,
   tes: false,
 }
 
