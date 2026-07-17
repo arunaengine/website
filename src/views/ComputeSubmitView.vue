@@ -161,7 +161,7 @@ async function submit() {
     <div v-if="!tesEnabled" class="container max-w-[900px] py-8">
       <EmptyState
         title="Compute is not enabled"
-        description="Enable the tes feature flag in portal-config.json once this realm's nodes serve the GA4GH TES endpoint (aruna#290)."
+        description="Set features.tes to true in portal-config.json for this deployment; the Compute surface then targets any node that exposes the GA4GH TES endpoint."
       >
         <template #icon><Cpu class="h-7 w-7" /></template>
       </EmptyState>
@@ -196,7 +196,7 @@ async function submit() {
             <label class="text-xs font-medium text-foreground">Group</label>
             <Select v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
             <p class="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-              Sets the required <code class="rounded bg-muted px-1">aruna.io/group</code> tag; the node accounts the run and writes its Process Run crate under this group.
+              Sets the required <code class="rounded bg-muted px-1">aruna-engine.org/group</code> tag; the node accounts the run and writes its Process Run crate under this group.
             </p>
           </div>
         </div>

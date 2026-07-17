@@ -1,9 +1,9 @@
 import type { BadgeVariant } from '@/components/nodes/node-display'
 
-// ── GA4GH TES v1.1 (aruna#290) ───────────────────────────────────────────────
-// Current Aruna TES facade. Consumers remain gated on featureEnabled('tes')
-// because the routes are useful only when the serving node has a compute
-// backend configured.
+// ── GA4GH TES v1.1 ───────────────────────────────────────────────────────────
+// Verified against the Aruna TES facade (api/src/routes/tes.rs, aruna #425).
+// Consumers stay gated on featureEnabled('tes') because the routes exist only
+// when the serving node has a compute backend configured.
 
 export type TesState =
   | 'UNKNOWN'
@@ -24,11 +24,12 @@ export type TesView = 'MINIMAL' | 'BASIC' | 'FULL'
 export interface TesInput {
   name?: string
   description?: string
-  // Required unless `content` carries the literal file body inline.
+  // Required by the backend; must be an s3://bucket/key URL. Inline `content`
+  // is rejected (400), so scripts are uploaded to S3 and referenced here.
   url?: string
   // Absolute path inside the container the input is materialized at.
   path: string
-  type?: TesFileType // default FILE
+  type?: TesFileType // default FILE; only FILE is accepted
 }
 
 export interface TesOutput {
@@ -100,31 +101,33 @@ export interface TesListTasksResponse {
   next_page_token?: string
 }
 
-// GA4GH service-info uses camelCase for its own fields (spec-faithful);
-// storage / tesResources_backend_parameters are the TES additions.
+// Shape verified against api/src/routes/tes.rs service_info: snake_case fields,
+// the GA4GH service-type triple under `type`, `storage` currently emitted empty.
 export interface TesServiceInfo {
   id: string
   name: string
   type: { group: string; artifact: string; version: string }
   description?: string
   organization: { name: string; url: string }
-  contactUrl?: string
-  documentationUrl?: string
-  createdAt?: string
-  updatedAt?: string
+  documentation_url?: string
   environment?: string
   version: string
   storage?: string[]
-  tesResources_backend_parameters?: string[]
 }
 
 // ── Task state helpers ───────────────────────────────────────────────────────
 
-// ASSUMED aruna extension (aruna#290): every task MUST carry the owning group
-// as a tag. Key follows the reserved aruna.io/ label prefix already used by
-// core placement matchers (aruna.io/kind) and plan #269 (aruna.io/location).
-export const TES_GROUP_TAG = 'aruna.io/group'
+// Owning-group tag (api/src/routes/tes.rs GROUP_TAG_KEY). The portal uses bearer
+// auth, for which the backend requires this tag; an S3-credential caller instead
+// derives the group and may omit it. The node accounts the run under this group.
+export const TES_GROUP_TAG = 'aruna-engine.org/group'
 
+// Optional dedup tag scoped per authenticated user (IDEMPOTENCY_TAG_KEY); a
+// duplicate key bound to a different task plan is rejected with 409.
+export const TES_IDEMPOTENCY_TAG = 'aruna-engine.org/idempotency-key'
+
+// The backend emits 9 of the 11 states; PAUSED and PREEMPTED are accepted as
+// list filters but never produced (api/src/routes/tes.rs tes_state).
 export const TES_TERMINAL_STATES: ReadonlySet<TesState> = new Set<TesState>([
   'COMPLETE',
   'EXECUTOR_ERROR',

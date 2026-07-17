@@ -12,8 +12,8 @@ import {
   type TesView,
 } from '@/lib/tes'
 
-// Compute orchestration via GA4GH TES. Calls remain feature-gated because the
-// serving node needs a configured compute backend before this surface is usable.
+// Compute orchestration via the GA4GH TES facade (api/src/routes/tes.rs). Calls
+// stay feature-gated because the node needs a configured compute backend first.
 
 const tesEnabled = computed(() => featureEnabled('tes'))
 const busy = ref(false)
@@ -37,8 +37,7 @@ function request<T>(path: string, options = {}) {
   return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
 }
 
-// GET /ga4gh/tes/v1/service-info — assumed endpoint, not yet provided by any
-// backend (aruna#290).
+// GET /ga4gh/tes/v1/service-info (api/src/routes/tes.rs service_info).
 async function getTesServiceInfo(): Promise<TesServiceInfo> {
   assertEnabled()
   return request<TesServiceInfo>('/ga4gh/tes/v1/service-info')
@@ -54,10 +53,9 @@ export interface ListTasksParams {
   view?: TesView
 }
 
-// GET /ga4gh/tes/v1/tasks — assumed endpoint, not yet provided by any backend
-// (aruna#290). The spec allows repeated tag_key/tag_value pairs; apiRequest
-// supports scalar query values only, and the UI needs at most one pair (the
-// group filter), so a single pair is sent.
+// GET /ga4gh/tes/v1/tasks (api/src/routes/tes.rs list_tasks). page_size caps at
+// 512 (default 256). The backend supports repeated tag_key/tag_value pairs;
+// apiRequest sends scalar query values and the UI needs only the group pair.
 async function listTasks(params: ListTasksParams): Promise<TesListTasksResponse> {
   assertEnabled()
   return request<TesListTasksResponse>('/ga4gh/tes/v1/tasks', {
@@ -73,20 +71,20 @@ async function listTasks(params: ListTasksParams): Promise<TesListTasksResponse>
   })
 }
 
-// GET /ga4gh/tes/v1/tasks/{id} — assumed endpoint, not yet provided by any
-// backend (aruna#290).
+// GET /ga4gh/tes/v1/tasks/{id} (api/src/routes/tes.rs get_task). stdout/stderr
+// and system logs are only populated at view=FULL once the task is terminal.
 async function getTask(id: string, view: TesView = 'FULL'): Promise<TesTask> {
   assertEnabled()
   return request<TesTask>(`/ga4gh/tes/v1/tasks/${encodeURIComponent(id)}`, { query: { view } })
 }
 
-// POST /ga4gh/tes/v1/tasks — assumed endpoint, not yet provided by any backend
-// (aruna#290). Client-side invariant checks mirror the issue's "submit with
-// validation incl. required group tag" before the request leaves the browser.
+// POST /ga4gh/tes/v1/tasks (api/src/routes/tes.rs create_task). Under the
+// portal's bearer auth the backend requires the owning-group tag, so it is
+// validated here before the request leaves the browser.
 async function createTask(task: TesTask): Promise<TesCreateTaskResponse> {
   assertEnabled()
   if (!task.tags?.[TES_GROUP_TAG]) {
-    throw new Error('A task must carry the owning group tag (aruna.io/group).')
+    throw new Error(`A task must carry the owning group tag (${TES_GROUP_TAG}).`)
   }
   if (!task.executors?.some((e) => e.image.trim() && e.command.some((arg) => arg.trim()))) {
     throw new Error('A task needs at least one executor with an image and command.')
@@ -102,8 +100,8 @@ async function createTask(task: TesTask): Promise<TesCreateTaskResponse> {
   }
 }
 
-// POST /ga4gh/tes/v1/tasks/{id}:cancel — assumed endpoint, not yet provided by
-// any backend (aruna#290).
+// POST /ga4gh/tes/v1/tasks/{id}:cancel (api/src/routes/tes.rs cancel_task). The
+// literal ':cancel' action suffix is required; the handler rejects it otherwise.
 async function cancelTask(id: string): Promise<void> {
   assertEnabled()
   busy.value = true

@@ -1,10 +1,11 @@
 import { chromium } from 'playwright-core'
 
-// Compute / GA4GH TES portal flow (aruna#290).
+// Compute / GA4GH TES portal flow.
 //
-// Section 1 is runnable against any stack TODAY: with the `tes` feature flag off
-// (the default), the Compute surface must be a no-op — no nav entry, honest
-// disabled panels on the routes, and ZERO /ga4gh/tes/ requests.
+// The `tes` feature now defaults ON (the facade is real, aruna #425), so the
+// flag-off path in Section 1 requires the test stack to serve
+// {"features":{"tes":false}}: the Compute surface must then be a no-op — no nav
+// entry, honest disabled panels on the routes, and ZERO /ga4gh/tes/ requests.
 //
 // Section 2 exercises the flag-on happy path (list → submit wizard → detail
 // drawer → cancel). The serving node must have a compute backend and explicitly
@@ -113,7 +114,7 @@ try {
     const reviewBody = await page.textContent('body')
     step(
       'review JSON carries the group tag and executors',
-      reviewBody.includes('aruna.io/group') && reviewBody.includes('executors'),
+      reviewBody.includes('aruna-engine.org/group') && reviewBody.includes('executors'),
     )
 
     await page.getByRole('button', { name: /Submit task/ }).click()
