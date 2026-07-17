@@ -323,6 +323,55 @@ export interface CreateGroupRoleRequest {
   public?: boolean
 }
 
+// GET /groups/{id}/data-paths — browsable data permission paths that feed the
+// role picker's data/ tree. Verified against aruna api/src/routes/groups.rs on
+// branch feat/pb-datapaths (in flight, 2026-07-17): member-gated (403 for
+// non-members, 401 unauthenticated), local node only in v1, and permission
+// paths are shaped /{realm}/g/{group}/data/{node}/{bucket}/{key} exactly as
+// consumed by role permissions (core blob_*_permission_path). An empty/absent
+// `prefix` lists the group's buckets; pass a folder's `permission_path`
+// (normalized with a trailing slash) as `prefix` to list its contents with
+// `delimiter=/`. `kind` is serialized lowercase. A prefix outside the group's
+// data root answers 400; a bucket owned by another group yields empty entries.
+export type DataPathKind = 'folder' | 'object'
+
+export interface DataPathEntry {
+  permission_path: string
+  kind: DataPathKind
+}
+
+export interface DataPathsResponse {
+  entries: DataPathEntry[]
+  // Opaque page token; omitted on the last page. Pass back verbatim.
+  continuation_token?: string
+}
+
+export interface DataPathsQuery {
+  prefix?: string
+  delimiter?: string
+  continuationToken?: string
+  limit?: number
+}
+
+export async function listGroupDataPaths(
+  groupId: string,
+  params: DataPathsQuery = {},
+  client: ApiClientOptions = {},
+): Promise<DataPathsResponse> {
+  return apiRequest<DataPathsResponse>(
+    `/groups/${encodeURIComponent(groupId)}/data-paths`,
+    {
+      query: {
+        prefix: params.prefix,
+        delimiter: params.delimiter,
+        continuation_token: params.continuationToken,
+        limit: params.limit,
+      },
+    },
+    client,
+  )
+}
+
 export interface UserSearchHit {
   user_id: string
   name: string
