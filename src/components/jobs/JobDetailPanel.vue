@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import Sheet from '@/components/ui/Sheet.vue'
-import SheetContent from '@/components/ui/SheetContent.vue'
+import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -50,8 +49,8 @@ async function confirmCancel() {
 </script>
 
 <template>
-  <Sheet :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <SheetContent side="right" class="w-full p-6 sm:max-w-xl">
+  <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
+    <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-1">
       <DialogTitle class="sr-only">Job details</DialogTitle>
 
       <div v-if="loadState === 'loading'" class="space-y-4">
@@ -160,6 +159,6 @@ async function confirmCancel() {
           <p v-if="cancelError" class="mt-2 text-[11px] text-destructive">{{ cancelError }}</p>
         </section>
       </div>
-    </SheetContent>
-  </Sheet>
+    </div>
+  </DetailDialog>
 </template>

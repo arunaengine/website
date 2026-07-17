@@ -719,7 +719,13 @@ const isEmpty = computed(
                     <td class="px-4 py-2.5 text-muted-foreground">—</td>
                     <td class="px-4 py-2.5"></td>
                   </tr>
-                  <tr v-for="object in objects" :key="object.key" class="border-t border-border hover:bg-muted/30">
+                  <!-- Row click previews; the action buttons stop propagation. -->
+                  <tr
+                    v-for="object in objects"
+                    :key="object.key"
+                    class="cursor-pointer border-t border-border hover:bg-muted/30"
+                    @click="openPreview(object)"
+                  >
                     <td class="px-4 py-2.5">
                       <span class="flex items-center gap-2"><ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span></span>
                     </td>
@@ -727,9 +733,9 @@ const isEmpty = computed(
                     <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '—' }}</td>
                     <td class="px-4 py-2.5">
                       <div class="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon-sm" aria-label="Preview" @click="openPreview(object)"><Eye class="size-3.5" /></Button>
-                        <Button variant="ghost" size="icon-sm" aria-label="Download" @click="download(object)"><Download class="size-3.5" /></Button>
-                         <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click="deleteTarget = { bucket, object }; deleteError = null"><Trash2 class="size-3.5" /></Button>
+                        <Button variant="ghost" size="icon-sm" aria-label="Preview" @click.stop="openPreview(object)"><Eye class="size-3.5" /></Button>
+                        <Button variant="ghost" size="icon-sm" aria-label="Download" @click.stop="download(object)"><Download class="size-3.5" /></Button>
+                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click.stop="deleteTarget = { bucket, object }; deleteError = null"><Trash2 class="size-3.5" /></Button>
                       </div>
                     </td>
                   </tr>

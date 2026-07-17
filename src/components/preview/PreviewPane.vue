@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent, watch } from 'vue'
 import { asyncChunkError } from '@/lib/chunk-recovery'
-import Sheet from '@/components/ui/Sheet.vue'
-import SheetContent from '@/components/ui/SheetContent.vue'
+import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
@@ -70,8 +69,7 @@ async function download() {
 </script>
 
 <template>
-  <Sheet :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <SheetContent side="right" class="flex w-full flex-col p-6 sm:max-w-3xl">
+  <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
       <div class="flex items-start justify-between gap-3 pr-8">
         <div class="min-w-0">
           <DialogTitle class="truncate text-base font-semibold text-foreground" :title="props.name">
@@ -154,6 +152,5 @@ async function download() {
           />
         </template>
       </div>
-    </SheetContent>
-  </Sheet>
+  </DetailDialog>
 </template>

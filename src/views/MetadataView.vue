@@ -463,7 +463,14 @@ function entitySize(row: DataEntity): string {
                   <td class="px-5 py-2.5"></td>
                 </tr>
               </template>
-              <tr v-for="row in dataEntities" v-else :key="row.id" class="border-t border-border">
+              <tr
+                v-for="row in dataEntities"
+                v-else
+                :key="row.id"
+                class="border-t border-border"
+                :class="canPreview(row) ? 'cursor-pointer hover:bg-muted/30' : ''"
+                @click="canPreview(row) && openPreview(row)"
+              >
                 <td class="px-5 py-2.5 font-medium text-foreground" :title="row.id">
                   {{ row.name }}
                   <span v-if="referencedBy.get(row.id)?.length" class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] font-normal text-muted-foreground">
@@ -478,10 +485,10 @@ function entitySize(row: DataEntity): string {
                 <td class="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ entitySize(row) }}</td>
                 <td class="px-5 py-2.5 text-right">
                   <div class="flex items-center justify-end gap-1">
-                    <Button v-if="canPreview(row)" variant="ghost" size="icon-sm" aria-label="Preview" @click="openPreview(row)">
+                    <Button v-if="canPreview(row)" variant="ghost" size="icon-sm" aria-label="Preview" @click.stop="openPreview(row)">
                       <Eye class="size-3.5" />
                     </Button>
-                    <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open ${row.name} in a new tab`">
+                    <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open ${row.name} in a new tab`" @click.stop>
                       <ExternalLink class="h-3.5 w-3.5" />
                     </a>
                     <span v-if="!canPreview(row) && !entityLink(row)" class="text-muted-foreground">—</span>
