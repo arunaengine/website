@@ -198,6 +198,7 @@ async function removeRole(role: ApiRole) {
       <PermissionPathPicker
         v-if="showPathBrowser"
         :group-id="group.group_id"
+        :path-prefix="pathPrefix"
         :selected="newPathSuffix"
         class="mt-2 max-w-xl"
         @select="(suffix) => (newPathSuffix = suffix)"

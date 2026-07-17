@@ -4,11 +4,15 @@ import { Boxes, Globe, ListChecks, RefreshCw, ShieldCheck } from '@lucide/vue'
 import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import MetaPathTree from './MetaPathTree.vue'
+import DataPathTree from './DataPathTree.vue'
 import { buildMetaPathTree, type MetaPathFolder } from './permission-paths'
 import { useAruna } from '@/composables/useAruna'
 
 const props = defineProps<{
   groupId: string
+  // Group scope prefix (/{realm}/g/{group}/) forwarded to the data/ tree so it
+  // can derive role-path suffixes from the served permission paths.
+  pathPrefix: string
   selected?: string
 }>()
 
@@ -16,13 +20,12 @@ const emit = defineEmits<{ (e: 'select', suffix: string): void }>()
 
 const { listGroupMetadata } = useAruna()
 
-// The three well-known scopes plus the whole group; data/ objects have no
-// browsable listing here (they live behind the S3 endpoint), so data stays a
-// scope-level choice.
+// The three well-known scopes plus the whole group; the meta/ and data/ trees
+// below narrow those coarse scopes to a folder subtree or a single entry.
 const SCOPES = [
   { suffix: '**', title: 'Everything', icon: Globe, hint: 'All metadata, data and admin operations in this group.' },
   { suffix: 'meta/**', title: 'Metadata', icon: ListChecks, hint: 'All RO-Crate metadata documents. Browse below to narrow the scope.' },
-  { suffix: 'data/**', title: 'Data', icon: Boxes, hint: 'All objects uploaded through the S3 endpoint.' },
+  { suffix: 'data/**', title: 'Data', icon: Boxes, hint: 'All objects on this node. Browse below to narrow to a bucket or object.' },
   { suffix: 'admin/**', title: 'Administration', icon: ShieldCheck, hint: 'Group settings, roles and membership.' },
 ]
 
@@ -98,6 +101,14 @@ onMounted(() => void load())
         This group has no metadata documents yet; use a scope above.
       </p>
       <MetaPathTree v-else-if="tree" :node="tree" :expanded="expanded" @toggle="toggle" @select="emit('select', $event)" />
+    </div>
+
+    <div class="mt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data objects</div>
+    <p class="mt-0.5 text-[11px] text-muted-foreground">
+      Expand a bucket to a folder or object; pick a folder for its subtree, or an object for exactly one key.
+    </p>
+    <div class="mt-1.5">
+      <DataPathTree :group-id="groupId" :path-prefix="pathPrefix" :selected="selected" @select="emit('select', $event)" />
     </div>
   </div>
 </template>
