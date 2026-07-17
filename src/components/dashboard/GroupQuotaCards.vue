@@ -13,6 +13,7 @@ import { formatBytes } from '@/lib/utils'
 import type { GroupQuotaStatus } from '@/lib/api'
 
 const { myGroups, getGroupUsage } = useAruna()
+const props = defineProps<{ refreshRevision: number }>()
 
 interface CardEntry {
   groupId: string
@@ -106,6 +107,10 @@ watch(
   () => void load(),
   { immediate: true },
 )
+
+watch(() => props.refreshRevision, (revision, previousRevision) => {
+  if (revision > previousRevision) void load()
+})
 </script>
 
 <template>

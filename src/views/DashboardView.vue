@@ -9,13 +9,37 @@ import StatCard from '@/components/ui/StatCard.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { useNotifications } from '@/composables/useNotifications'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, nodes, groups, myGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh } = useAruna()
+const { currentUser, metadata, profiles, nodes, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh } = useAruna()
+const { dashboardRevision } = useNotifications()
 const showNewDataset = ref(false)
+const refreshing = ref(false)
+const quotaRevision = ref(0)
+let refreshQueued = false
+
+async function refreshDashboard() {
+  if (refreshing.value) {
+    refreshQueued = true
+    return
+  }
+  refreshing.value = true
+  try {
+    do {
+      refreshQueued = false
+      await refresh()
+    } while (refreshQueued)
+  } finally {
+    refreshing.value = false
+    quotaRevision.value++
+  }
+}
+
+watch(dashboardRevision, () => void refreshDashboard(), { immediate: true })
 
 const onlineNodes = computed(() => nodes.value.filter((node) => node.status === 'healthy').length)
 
@@ -33,8 +57,8 @@ const stats = computed(() => [
     tone: 'bg-aruna-sky/15 text-aruna-sky',
   },
   {
-    label: 'Groups',
-    value: groups.value.length,
+    label: 'Realm groups',
+    value: myGroups.value.length + discoverableGroups.value.length,
     icon: Users,
     tone: 'bg-aruna-aqua/15 text-aruna-aqua',
   },
@@ -67,7 +91,7 @@ const pageDescription = computed(() =>
       :description="pageDescription"
     >
       <template #actions>
-        <Button variant="outline" @click="refresh">Refresh</Button>
+        <Button variant="outline" :disabled="refreshing" @click="refreshDashboard">Refresh</Button>
         <Button v-if="currentUser" variant="outline" @click="showNewDataset = true">
           <Plus class="h-4 w-4" /> New dataset
         </Button>
@@ -118,7 +142,7 @@ const pageDescription = computed(() =>
       </section>
 
       <section v-if="currentUser && myGroups.length">
-        <GroupQuotaCards />
+        <GroupQuotaCards :refresh-revision="quotaRevision" />
       </section>
 
       <section class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
