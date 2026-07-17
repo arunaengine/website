@@ -12,7 +12,7 @@ import CopyButton from '@/components/nodes/CopyButton.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import { useJobDetail } from '@/composables/useJobs'
 import { formatJobProgress, isTerminalJobState, jobProgressPercent } from '@/lib/jobs'
-import { relativeTime } from '@/lib/utils'
+import { relativeTime, truncateMiddle } from '@/lib/utils'
 import { Ban } from '@lucide/vue'
 
 const props = defineProps<{ jobId: string; open: boolean }>()
@@ -77,7 +77,7 @@ async function confirmCancel() {
             <Badge v-if="job.cancel_requested && !terminal" variant="warn">cancel requested</Badge>
           </div>
           <div class="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-            <span class="truncate">{{ job.job_id }}</span>
+            <span :title="job.job_id">{{ truncateMiddle(job.job_id) }}</span>
             <CopyButton :value="job.job_id" label="Copy job id" />
           </div>
         </div>

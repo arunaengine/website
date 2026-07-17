@@ -260,7 +260,7 @@ const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.
             <TaskStateBadge :state="task.state" />
           </div>
           <div class="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-            <span class="truncate">{{ task.id || taskId }}</span>
+            <span :title="task.id || taskId">{{ truncateMiddle(task.id || taskId) }}</span>
             <CopyButton :value="task.id || taskId" label="Copy task id" />
           </div>
           <p v-if="task.description" class="text-sm text-muted-foreground">{{ task.description }}</p>
