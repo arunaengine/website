@@ -12,6 +12,23 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              // Identity-carrying editor core must stay one chunk: a second
+              // @codemirror/state or @lezer/highlight instance silently breaks
+              // every extension (highlighting, theme, gutters).
+              name: 'codemirror',
+              test: /node_modules\/(@codemirror\/(state|view|language|commands|autocomplete|lint|search)|@lezer\/(common|highlight|lr)|style-mod|w3c-keyname|crelt)\//,
+            },
+          ],
+        },
+      },
+    },
+  },
   optimizeDeps: {
     // Pre-bundle the whole editor stack eagerly: a mid-session dev
     // re-optimization can split @codemirror/@lezer into duplicate module
