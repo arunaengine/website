@@ -25,6 +25,15 @@ let counter = 0
 
 const { stageBlob } = useAruna()
 
+// Mirrors aruna validate_relative_source_path: non-empty, not absolute, no
+// backslashes, no '.'/'..' segments.
+export function invalidSourcePath(path: string): boolean {
+  const trimmed = path.trim()
+  if (!trimmed) return true
+  if (trimmed.startsWith('/') || trimmed.includes('\\')) return true
+  return trimmed.split('/').some((segment) => segment === '.' || segment === '..')
+}
+
 // ApiError status mapping verified against aruna api/src/routes/staging.rs.
 export function stagingErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
