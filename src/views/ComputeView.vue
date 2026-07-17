@@ -3,6 +3,10 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -14,7 +18,7 @@ import { useTes } from '@/composables/useTes'
 import { useJobs } from '@/composables/useJobs'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
-import { Cpu, ListPlus, LogIn, Zap } from '@lucide/vue'
+import { ChevronDown, Cpu, ListPlus, LogIn, Play, Zap } from '@lucide/vue'
 
 // One surface for both compute planes: TES tasks (user-submitted) and durable
 // system jobs (node-produced). Each half degrades on its own feature flag.
@@ -54,9 +58,29 @@ function startSignIn() {
 <template>
   <div>
     <PageHeader title="Compute" description="Run tasks on this node and monitor the background jobs it produces.">
+      <!-- One Run entry point; the menu explains the two submission modes. -->
       <template v-if="tesEnabled && currentUser" #actions>
-        <Button size="sm" @click="goQuick"><Zap class="h-4 w-4" /> Quick run</Button>
-        <Button variant="outline" size="sm" @click="goNew"><ListPlus class="h-4 w-4" /> New task</Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button size="sm"><Play class="h-4 w-4" /> Run <ChevronDown class="h-3.5 w-3.5 opacity-70" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-80 p-1.5">
+            <DropdownMenuItem class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" @click="goQuick">
+              <Zap class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-foreground">Quick run</span>
+                <span class="block text-xs leading-relaxed text-muted-foreground">Write a short script — the portal stages it and builds the TES task for you.</span>
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" @click="goNew">
+              <ListPlus class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-foreground">New task</span>
+                <span class="block text-xs leading-relaxed text-muted-foreground">Describe a full GA4GH TES task by hand — image, command, resources.</span>
+              </span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </template>
     </PageHeader>
 
