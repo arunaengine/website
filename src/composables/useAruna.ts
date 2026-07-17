@@ -7,6 +7,7 @@ import {
   type AddGroupMemberRequest,
   type ApiGroup,
   type ApiRole,
+  type ListUsersResponse,
   type CreateGroupRoleRequest,
   type CreateMetadataRequest,
   type CreateMetadataResponse,
@@ -657,6 +658,12 @@ async function getUser(userId: string): Promise<GetUserResponse> {
   return request<GetUserResponse>(`/users/${encodeURIComponent(userId)}`)
 }
 
+async function listUsers(opts: { limit?: number; startAfter?: string } = {}): Promise<ListUsersResponse> {
+  return request<ListUsersResponse>('/users', {
+    query: { limit: opts.limit, start_after: opts.startAfter },
+  })
+}
+
 async function runSparql(query: string): Promise<SparqlResult> {
   const started = performance.now()
   const result = await request<SparqlResponse>('/metadata/sparql/query', {
@@ -766,6 +773,24 @@ const isRealmAdmin = computed<boolean>(() => {
   return info.realm.roles.some((role) =>
     Object.entries(role.permissions).some(([key, value]) => {
       if (value !== 'Write') return false
+      if (key === target) return true
+      if (!key.endsWith('/**')) return false
+      const base = key.slice(0, -3)
+      return target === base || target.startsWith(`${base}/`)
+    }),
+  )
+})
+
+// The backend gates the user directory on READ of /{realm_id}/admin/u/**
+// (operations list_users / get_user); the seeded realm_admin Write grant on
+// /{realm_id}/admin/** covers it.
+const canInspectUsers = computed<boolean>(() => {
+  const info = userInfo.value
+  if (!info) return false
+  const target = `/${info.realm.realm_id}/admin/u`
+  return info.realm.roles.some((role) =>
+    Object.entries(role.permissions).some(([key, value]) => {
+      if (value !== 'Read' && value !== 'Write') return false
       if (key === target) return true
       if (!key.endsWith('/**')) return false
       const base = key.slice(0, -3)
@@ -1082,10 +1107,12 @@ export function useAruna() {
     realmInfo,
     usageInfo,
     userInfo,
+    apiGroups,
     credentials,
     realm,
     currentUser,
     isRealmAdmin,
+    canInspectUsers,
     isManagementNode,
     nodes,
     groups,
@@ -1132,6 +1159,7 @@ export function useAruna() {
     deleteGroupRole,
     searchUsers,
     getUser,
+    listUsers,
     runSparql,
     searchMetadata,
     setAuthToken,

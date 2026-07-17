@@ -333,6 +333,16 @@ export interface UserSearchResponse {
   next_start_after?: string | null
 }
 
+// GET /users — realm user directory (verified against aruna
+// api/src/routes/users.rs: ListUsersResponse over GetUserResponse, which is
+// exactly ApiUser). `limit` defaults to 100, clamped 1..=1000;
+// `next_start_after` is the exclusive user-id cursor, absent on the last page.
+// Requires READ on /{realm_id}/admin/u/**.
+export interface ListUsersResponse {
+  users: ApiUser[]
+  next_start_after?: string | null
+}
+
 // GET /users/{id} — resolves any user id within the caller's realm.
 export interface GetUserResponse {
   user_id: string
