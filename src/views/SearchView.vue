@@ -35,12 +35,20 @@ function queryFilter(value: unknown): string | null {
 
 const q = ref(queryString(route.query.q))
 const profileFilter = ref<string | null>(queryFilter(route.query.profile))
-// GET /metadata/search accepts only q, limit and mode today (verified in
-// aruna api/src/routes/metadata.rs MetadataSearchParams). The group filter
-// is applied client-side to both browse and search results; push it down
-// to the server once the backend accepts a group_id param (aruna#258).
+// Search push-down: the group filter maps to the server group_id and the profile
+// filter to conforms_to when it resolves to a local profile IRI. Browse (no
+// active query) still filters the loaded catalog client-side.
 const groupFilter = ref<string | null>(queryFilter(route.query.group))
 const favouritesOnly = ref(false)
+
+// A local profile carries the conformsTo IRI that documents reference; a filter
+// that resolves to one is pushed to the server, otherwise it stays client-side.
+const conformsToIri = computed<string | null>(() => {
+  if (!profileFilter.value) return null
+  const profile = profiles.value.find((item) => item.id === profileFilter.value)
+  return profile?.profileUri ?? profile?.graphIri ?? null
+})
+const profilePushedDown = computed(() => conformsToIri.value !== null)
 
 const {
   active: searchActive,
@@ -52,7 +60,7 @@ const {
   results: searchResults,
   nodesQueried,
   nodesFailed,
-  failedNodes,
+  truncated,
   partial,
   capped,
   nextCursor,
@@ -60,7 +68,7 @@ const {
   sentinel,
   loadMore,
   retry: retrySearch,
-} = useMetadataSearch(q)
+} = useMetadataSearch(q, { groupId: groupFilter, conformsTo: conformsToIri })
 const expertMode = ref(queryString(route.query.expert) === '1')
 const favBusy = ref<Set<string>>(new Set())
 const favError = ref<string | null>(null)
@@ -127,28 +135,35 @@ const groupNames = computed(() => {
   for (const group of [...myGroups.value, ...discoverableGroups.value]) names.set(group.id, group.name)
   return names
 })
+// Stable option set from the loaded catalog and known groups, plus the active
+// filter, so a server-side group filter never hides the option it selected.
 const groupOptions = computed(() => {
-  const ids = new Set<string>()
-  for (const doc of metadata.value) ids.add(doc.realmId)
-  for (const line of searchResults.value) ids.add(line.hit.group_id)
-  return [...ids]
-    .map((id) => ({ id, label: groupNames.value.get(id) ?? truncateMiddle(id) }))
+  const labels = new Map<string, string>()
+  for (const doc of metadata.value) labels.set(doc.realmId, groupNames.value.get(doc.realmId) ?? truncateMiddle(doc.realmId))
+  for (const group of [...myGroups.value, ...discoverableGroups.value]) labels.set(group.id, group.name)
+  if (groupFilter.value && !labels.has(groupFilter.value)) {
+    labels.set(groupFilter.value, groupNames.value.get(groupFilter.value) ?? truncateMiddle(groupFilter.value))
+  }
+  return [...labels.entries()]
+    .map(([id, label]) => ({ id, label }))
     .sort((a, b) => a.label.localeCompare(b.label))
 })
 
-// Search-mode client-side filtering, order-preserving (server relevance order).
+// Group and profile filters are pushed to the server; only a favourites filter,
+// and a non-IRI profile filter, still narrow the returned hits client-side.
 const visibleResults = computed(() =>
   searchResults.value.filter((line) => {
-    if (groupFilter.value && line.hit.group_id !== groupFilter.value) return false
     if (favouritesOnly.value && !favouriteIds.value.includes(line.hit.document_id)) return false
-    // Profile conformance is only known for catalog-enriched hits; id-only
-    // hits are counted in hiddenByProfile and surfaced honestly below.
-    if (profileFilter.value && !(line.doc?.profileIds ?? []).includes(profileFilter.value)) return false
+    if (profileFilter.value && !profilePushedDown.value && !(line.doc?.profileIds ?? []).includes(profileFilter.value)) return false
     return true
   }),
 )
+// Only a client-side profile filter hides id-only hits; a pushed-down filter is
+// already applied server-side, so every returned hit conforms.
 const hiddenByProfile = computed(() =>
-  profileFilter.value ? searchResults.value.filter((line) => !line.doc).length : 0,
+  profileFilter.value && !profilePushedDown.value
+    ? searchResults.value.filter((line) => !line.doc).length
+    : 0,
 )
 
 // Beyond metadata, an active query also discovers groups (client-side over the
@@ -297,7 +312,6 @@ async function runQuery() {
           >
             <AlertTriangle class="h-4 w-4 text-amber-600" />
             <span>Partial results — {{ nodesQueried - nodesFailed }} of {{ nodesQueried }} nodes answered; matches on failed nodes are missing.</span>
-            <span v-for="node in failedNodes" :key="node" class="chip font-mono">{{ node }}</span>
             <Button variant="outline" size="sm" class="ml-auto" @click="retrySearch">Retry</Button>
           </div>
 
@@ -447,7 +461,9 @@ async function runQuery() {
               <Button variant="outline" size="sm" @click="loadMore">Try again</Button>
             </div>
             <div v-if="nextCursor && !moreError && !loadingMore" :key="nextCursor" ref="sentinel" class="h-1" aria-hidden="true" />
-            <p v-else-if="!moreError && !searchPending && !loadingMore" class="py-2 text-center text-[11px] text-muted-foreground">End of results.</p>
+            <p v-else-if="!moreError && !searchPending && !loadingMore" class="py-2 text-center text-[11px] text-muted-foreground">
+              {{ truncated ? 'End of the first results — refine the query to reach matches past the server depth cap.' : 'End of results.' }}
+            </p>
           </template>
           <p v-else-if="!cursorEnabled && capped" class="py-2 text-center text-[11px] text-muted-foreground">
             Showing the first 100 matches by relevance — refine the query to narrow results.
