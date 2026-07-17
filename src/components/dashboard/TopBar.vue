@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
-import Badge from '@/components/ui/Badge.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
@@ -11,13 +10,14 @@ import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import RealmSwitcher from '@/components/layout/RealmSwitcher.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
-import { ChevronDown, Plus, Search, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
-import { ref, computed } from 'vue'
+import { ChevronDown, Plus, Search, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw, FileJson2, Users, UserRound } from '@lucide/vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRealm } from '@/composables/useRealm'
 import { useTheme } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useUnifiedSearch } from '@/composables/useUnifiedSearch'
 
 const q = ref('')
 const showResults = ref(false)
@@ -40,38 +40,102 @@ async function handleSignOut() {
   await signOut()
   router.push({ name: 'landing' })
 }
-const results = computed(() => {
+type QuickSection = 'datasets' | 'groups' | 'people'
+interface QuickItem {
+  key: string
+  section: QuickSection
+  title: string
+  subtitle?: string
+  routeName: string
+  routeParams: Record<string, string>
+}
+
+const {
+  documents: quickDocuments,
+  groups: quickGroups,
+  users: quickUsers,
+  searched: quickSearched,
+} = useUnifiedSearch(q, { limit: 5 })
+
+// First paint: an instant filter over the already-loaded catalog and groups,
+// shown until the server search answers (quickSearched flips true per query).
+const instantItems = computed<QuickItem[]>(() => {
   const needle = q.value.trim().toLowerCase()
   if (!needle) return []
-  return [
-    ...metadata.value
-      .filter((doc) => `${doc.title} ${doc.description} ${doc.keywords.join(' ')}`.toLowerCase().includes(needle))
-      .map((doc) => ({
-        id: doc.ulid,
-        badge: 'metadata',
-        title: doc.title,
-        subtitle: doc.description || doc.ulid,
-        routeName: 'metadata-detail',
-        routeParams: { id: doc.ulid },
-      })),
-    ...groups.value
-      .filter((group) => `${group.name} ${group.description}`.toLowerCase().includes(needle))
-      .map((group) => ({
-        id: group.id,
-        badge: 'group',
-        title: group.name,
-        subtitle: group.description || group.id,
-        routeName: 'groups',
-        routeParams: { id: group.id },
-      })),
-  ].slice(0, 8)
+  const datasets = metadata.value
+    .filter((doc) => `${doc.title} ${doc.description} ${doc.keywords.join(' ')}`.toLowerCase().includes(needle))
+    .slice(0, 5)
+    .map((doc): QuickItem => ({
+      key: `d:${doc.ulid}`,
+      section: 'datasets',
+      title: doc.title,
+      subtitle: doc.description || doc.ulid,
+      routeName: 'metadata-detail',
+      routeParams: { id: doc.ulid },
+    }))
+  const groupHits = groups.value
+    .filter((group) => `${group.name} ${group.description}`.toLowerCase().includes(needle))
+    .slice(0, 5)
+    .map((group): QuickItem => ({
+      key: `g:${group.id}`,
+      section: 'groups',
+      title: group.name,
+      subtitle: group.description || group.id,
+      routeName: 'groups',
+      routeParams: { id: group.id },
+    }))
+  return [...datasets, ...groupHits]
 })
+
+const serverItems = computed<QuickItem[]>(() => [
+  ...quickDocuments.value.map((hit): QuickItem => ({
+    key: `d:${hit.document_id}`,
+    section: 'datasets',
+    title: hit.title || hit.document_path,
+    subtitle: hit.snippet ?? undefined,
+    routeName: 'metadata-detail',
+    routeParams: { id: hit.document_id },
+  })),
+  ...quickGroups.value.map((group): QuickItem => ({
+    key: `g:${group.group_id}`,
+    section: 'groups',
+    title: group.display_name,
+    routeName: 'groups',
+    routeParams: { id: group.group_id },
+  })),
+  ...quickUsers.value.map((user): QuickItem => ({
+    key: `u:${user.user_id}`,
+    section: 'people',
+    title: user.name,
+    routeName: 'user-profile',
+    routeParams: { id: user.user_id },
+  })),
+])
+
+const items = computed<QuickItem[]>(() => (quickSearched.value ? serverItems.value : instantItems.value))
+
+const SECTION_META: Array<{ id: QuickSection; label: string }> = [
+  { id: 'datasets', label: 'Datasets' },
+  { id: 'groups', label: 'Groups' },
+  { id: 'people', label: 'People' },
+]
+const sections = computed(() =>
+  SECTION_META.map((meta) => ({ ...meta, items: items.value.filter((item) => item.section === meta.id) })).filter(
+    (section) => section.items.length,
+  ),
+)
+
+const activeIndex = ref(-1)
+const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
+watch(items, () => (activeIndex.value = -1))
+watch(q, () => (activeIndex.value = -1))
+
 const router = useRouter()
 
-function openResult(r: { routeName: string; routeParams: Record<string, string> }) {
+function openItem(item: QuickItem) {
   showResults.value = false
   q.value = ''
-  router.push({ name: r.routeName, params: r.routeParams })
+  router.push({ name: item.routeName, params: item.routeParams })
 }
 
 function openSearchPage() {
@@ -79,6 +143,24 @@ function openSearchPage() {
   showResults.value = false
   q.value = ''
   router.push({ name: 'search', query: { q: term } })
+}
+
+function onKeydown(event: KeyboardEvent) {
+  const list = items.value
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    showResults.value = true
+    activeIndex.value = list.length ? (activeIndex.value + 1) % list.length : -1
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    activeIndex.value = list.length ? (activeIndex.value - 1 + list.length) % list.length : -1
+  } else if (event.key === 'Enter') {
+    const item = list[activeIndex.value]
+    if (item) openItem(item)
+    else if (q.value.trim()) openSearchPage()
+  } else if (event.key === 'Escape') {
+    showResults.value = false
+  }
 }
 
 function scheduleHide() {
@@ -99,8 +181,12 @@ function scheduleHide() {
           v-model="q"
           @focus="showResults = true"
           @blur="scheduleHide"
+          @keydown="onKeydown"
+          role="combobox"
+          aria-controls="quick-search-results"
+          :aria-expanded="showResults"
           class="h-9 w-full rounded-md border border-input bg-field pl-8 pr-16 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :placeholder="`Search in ${realm.shortName} - metadata and groups…`"
+          :placeholder="`Search ${realm.shortName} — datasets, groups and people…`"
         />
         <kbd
           class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-flex"
@@ -109,21 +195,35 @@ function scheduleHide() {
         </kbd>
 
         <div
-          v-if="showResults && (results.length || q)"
+          v-if="showResults && (items.length || q)"
+          id="quick-search-results"
+          role="listbox"
           class="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-md border border-border bg-popover shadow-xl"
         >
-          <button
-            v-for="r in results"
-            :key="r.id"
-            @mousedown.prevent="openResult(r)"
-            class="flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted"
-          >
-            <Badge variant="secondary" class="shrink-0">{{ r.badge }}</Badge>
-            <div class="flex-1 overflow-hidden">
-              <div class="truncate font-medium text-foreground">{{ r.title }}</div>
-              <div class="truncate text-xs text-muted-foreground">{{ r.subtitle }}</div>
+          <div v-for="section in sections" :key="section.id">
+            <div class="flex items-center gap-1.5 border-b border-border/70 bg-muted/30 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <FileJson2 v-if="section.id === 'datasets'" class="h-3 w-3" />
+              <Users v-else-if="section.id === 'groups'" class="h-3 w-3" />
+              <UserRound v-else class="h-3 w-3" />
+              {{ section.label }}
             </div>
-          </button>
+            <button
+              v-for="item in section.items"
+              :key="item.key"
+              role="option"
+              :aria-selected="activeKey === item.key"
+              @mousedown.prevent="openItem(item)"
+              :class="[
+                'flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted',
+                activeKey === item.key ? 'bg-muted' : '',
+              ]"
+            >
+              <div class="flex-1 overflow-hidden">
+                <div class="truncate font-medium text-foreground">{{ item.title }}</div>
+                <div v-if="item.subtitle" class="truncate text-xs text-muted-foreground">{{ item.subtitle }}</div>
+              </div>
+            </button>
+          </div>
           <button
             v-if="q"
             @mousedown.prevent="openSearchPage"
