@@ -350,7 +350,7 @@ function runAnother() {
           <Suspense>
             <ScriptEditor v-model="script" :language="runtime.lang" />
             <template #fallback>
-              <div class="grid h-40 place-items-center rounded-md border border-border bg-muted/20 text-xs text-muted-foreground">Loading editor…</div>
+              <div class="grid h-40 place-items-center rounded-md border border-input bg-field text-xs text-muted-foreground">Loading editor…</div>
             </template>
           </Suspense>
           <p v-if="!script.trim()" class="text-[11px] text-destructive">The script cannot be empty.</p>

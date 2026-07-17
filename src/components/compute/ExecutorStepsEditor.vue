@@ -61,7 +61,7 @@ function removeEnv(index: number) {
 </script>
 
 <template>
-  <div class="surface space-y-4 p-4">
+  <div class="surface-inline space-y-4 p-4">
     <div class="flex items-center gap-2 text-sm font-semibold text-foreground">
       <Terminal class="h-4 w-4 text-primary" /> Executor
     </div>

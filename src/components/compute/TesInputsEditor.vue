@@ -35,7 +35,7 @@ function remove(i: number) {
       No inputs — the task starts with an empty working directory.
     </p>
     <div v-else class="space-y-2">
-      <div v-for="(input, i) in modelValue" :key="i" class="surface flex flex-wrap items-center gap-3 p-3">
+      <div v-for="(input, i) in modelValue" :key="i" class="surface-inline flex flex-wrap items-center gap-3 p-3">
         <div class="min-w-0 flex-1">
           <div class="truncate font-mono text-[11px] text-foreground" :title="input.url">{{ truncateMiddle(input.url || '', 20, 16) }}</div>
         </div>

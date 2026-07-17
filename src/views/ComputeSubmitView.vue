@@ -225,7 +225,7 @@ async function submit() {
                 <Input v-model="outputPrefix" class="mt-1 font-mono" placeholder="runs/" />
               </div>
             </div>
-            <div v-for="(row, i) in outputRows" :key="i" class="surface space-y-2 p-3">
+            <div v-for="(row, i) in outputRows" :key="i" class="surface-inline space-y-2 p-3">
               <div class="flex items-end gap-3">
                 <div class="min-w-0 flex-1">
                   <label class="text-xs font-medium text-foreground">Container path</label>
