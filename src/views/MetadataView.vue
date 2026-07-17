@@ -13,12 +13,14 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import WatchButton from '@/components/watches/WatchButton.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { formatBytes, relativeTime } from '@/lib/utils'
+import { metaWatchPathPrefix } from '@/lib/watches'
 import { ArrowLeft, ListChecks, Code2, FileJson2, ExternalLink, Link2, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
@@ -77,6 +79,14 @@ async function confirmDelete() {
 // is a UI heuristic; the backend still enforces write permission (a 403 surfaces
 // inside the edit dialog).
 const canWrite = computed(() => Boolean(userInfo.value?.groups.some((g) => g.group_id === current.value?.realmId)))
+
+// Canonical metadata watch prefix for this document; empty until the owning
+// group and document path are both known.
+const watchPathPrefix = computed(() => {
+  const groupId = current.value?.realmId ?? fetchedSummary.value?.group_id
+  if (!groupId || !currentPath.value) return ''
+  return metaWatchPathPrefix(groupId, currentPath.value)
+})
 
 async function onSaved() {
   await fetchCrate(detailId.value)
@@ -329,6 +339,12 @@ function entitySize(row: DataEntityRow): string {
         >
           <Star class="h-4 w-4" :class="isFav ? 'text-amber-500' : ''" :fill="isFav ? 'currentColor' : 'none'" />
         </Button>
+        <WatchButton
+          v-if="watchPathPrefix"
+          :path-prefix="watchPathPrefix"
+          event-kind="metadata_created"
+          :resource-label="currentPath"
+        />
         <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
         <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
         <RouterLink :to="{ name: 'search' }">

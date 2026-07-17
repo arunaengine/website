@@ -9,9 +9,10 @@ import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { Bell, Check, ListChecks, Loader2 } from '@lucide/vue'
+import { Bell, Check, Eye, ListChecks, Loader2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useNotifications } from '@/composables/useNotifications'
+import { useWatches } from '@/composables/useWatches'
 import { describeNotification, type NotificationDisplayContext } from '@/lib/notifications'
 import type { ApiNotification } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
@@ -34,6 +35,8 @@ const {
   markRead,
   markAllRead,
 } = useNotifications()
+
+const { available: watchesAvailable } = useWatches()
 
 const open = ref(false)
 
@@ -167,6 +170,14 @@ function onLoadMore(event: Event) {
             <span v-else>Load more</span>
           </DropdownMenuItem>
         </template>
+      </div>
+      <div v-if="watchesAvailable" class="border-t border-border">
+        <DropdownMenuItem
+          class="gap-2 px-3 py-2 text-xs text-muted-foreground"
+          @select="router.push({ name: 'settings-watches' })"
+        >
+          <Eye class="h-3.5 w-3.5" /> Manage watched resources
+        </DropdownMenuItem>
       </div>
     </DropdownMenuContent>
   </DropdownMenu>

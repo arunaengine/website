@@ -15,6 +15,7 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
+import WatchButton from '@/components/watches/WatchButton.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useStaging } from '@/composables/useStaging'
@@ -23,6 +24,7 @@ import { useS3, s3ErrorMessage, isS3AuthError, isS3QuotaError, type BucketEntry,
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { UsageResponse } from '@/lib/api'
 import { formatBytes, relativeTime } from '@/lib/utils'
+import { dataWatchPathPrefix } from '@/lib/watches'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
@@ -41,7 +43,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { currentUser, bootstrapped, credentials, getGroupUsage } = useAruna()
+const { currentUser, bootstrapped, credentials, getGroupUsage, nodeInfo } = useAruna()
 const s3 = useS3()
 
 function routeString(value: unknown): string {
@@ -287,6 +289,16 @@ function onDrop(event: DragEvent) {
 const activeGroupId = computed(
   () => credentials.value.find((c) => c.access_key_id === s3.activeKey.value?.accessKeyId)?.group_id ?? null,
 )
+
+// Canonical data watch prefix for the browsed bucket/prefix. Needs the
+// credential's group (manual keys outside the caller's credential list cannot
+// resolve one) and this node's id — the watch path is node-disambiguated.
+const watchPathPrefix = computed(() => {
+  const groupId = activeGroupId.value
+  const nodeId = nodeInfo.value?.node.peer_id
+  if (!groupId || !nodeId || !bucket.value) return ''
+  return dataWatchPathPrefix(groupId, nodeId, bucket.value, s3Prefix.value)
+})
 
 // 30s-cached usage fetch that never throws: any failure returns null so the
 // precheck simply degrades to "just upload".
@@ -598,6 +610,13 @@ const isEmpty = computed(
               </div>
               <div class="flex items-center gap-2">
                 <input ref="fileInput" type="file" multiple class="hidden" @change="onFileInput" />
+                <WatchButton
+                  v-if="watchPathPrefix"
+                  :path-prefix="watchPathPrefix"
+                  event-kind="data_uploaded"
+                  :resource-label="`${bucket}/${s3Prefix}`"
+                  size="sm"
+                />
                 <Button variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
                 <Button v-if="stagingJobsEnabled" variant="outline" size="sm" @click="stagingPanelOpen = true">
                   Staging
