@@ -70,12 +70,26 @@ const showLabels = computed(() => spokes.value.length <= LABEL_CAP)
 
 type Placed = { node: RealmNodeInfo; cx: number; cy: number }
 
+// FNV-1a: a stable per-node seed so jitter is deterministic across refreshes.
+function nodeHash(id: string): number {
+  let hash = 2166136261
+  for (let i = 0; i < id.length; i += 1) {
+    hash ^= id.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
 const placedSpokes = computed<Placed[]>(() => {
   const list = spokes.value
   const count = Math.max(list.length, 1)
+  const slot = 360 / count
   return list.map((node, i) => {
-    const angle = (-90 + (360 / count) * i) * (Math.PI / 180)
-    return { node, cx: CX + Math.cos(angle) * RADIUS, cy: CY + Math.sin(angle) * RADIUS }
+    const seed = nodeHash(node.node_id)
+    const angleJitter = ((seed & 0xffff) / 0x10000 - 0.5) * Math.min(slot * 0.6, 26)
+    const radius = RADIUS * (0.8 + (((seed >>> 16) & 0xffff) / 0x10000) * 0.28)
+    const angle = (-90 + slot * i + angleJitter) * (Math.PI / 180)
+    return { node, cx: CX + Math.cos(angle) * radius, cy: CY + Math.sin(angle) * radius }
   })
 })
 
@@ -99,7 +113,7 @@ const edges = computed(() => {
 })
 
 // Reading `now` re-renders heartbeat freshness as time passes.
-const now = useNow({ interval: 10_000 })
+const now = useNow({ interval: 1_000 })
 
 function heartbeatAge(node: RealmNodeInfo): number | null {
   const ms = node.info?.utilization.heartbeat_at_ms
@@ -208,20 +222,45 @@ function loadArc(cx: number, cy: number, permille: number): string {
             <rect :width="VW" :height="VH" fill="url(#fed-grid)" opacity="0.5" />
             <ellipse :cx="CX" :cy="CY" :rx="VW * 0.4" :ry="VH * 0.42" fill="url(#fed-glow)" />
 
-            <!-- Edges first so nodes sit on top -->
-            <line
-              v-for="e in edges"
-              :key="e.id"
-              :x1="e.x1"
-              :y1="e.y1"
-              :x2="e.x2"
-              :y2="e.y2"
-              :stroke="e.connected ? '#10b981' : 'hsl(var(--muted-foreground))'"
-              :stroke-opacity="e.connected ? 0.55 : 0.3"
-              :stroke-dasharray="e.connected ? undefined : '3 6'"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
+            <!-- Edges first so nodes sit on top. Only connected links animate:
+                 the flow toward the hub is truthful for connection_status. -->
+            <g v-for="e in edges" :key="e.id">
+              <template v-if="e.connected">
+                <line
+                  :x1="e.x1"
+                  :y1="e.y1"
+                  :x2="e.x2"
+                  :y2="e.y2"
+                  stroke="#10b981"
+                  stroke-opacity="0.4"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+                <line
+                  class="fed-flow"
+                  :x1="e.x1"
+                  :y1="e.y1"
+                  :x2="e.x2"
+                  :y2="e.y2"
+                  stroke="#10b981"
+                  stroke-opacity="0.65"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                />
+              </template>
+              <line
+                v-else
+                :x1="e.x1"
+                :y1="e.y1"
+                :x2="e.x2"
+                :y2="e.y2"
+                stroke="hsl(var(--muted-foreground))"
+                stroke-opacity="0.3"
+                stroke-dasharray="3 6"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </g>
 
             <!-- Spoke nodes -->
             <g
@@ -342,6 +381,12 @@ function loadArc(cx: number, cy: number, permille: number): string {
   animation: fed-pulse 2.4s ease-out infinite;
 }
 
+/* Dashes drift toward the path start (the hub) to read as a live inbound link. */
+.fed-flow {
+  stroke-dasharray: 2 14;
+  animation: fed-flow 1.6s linear infinite;
+}
+
 @keyframes fed-pulse {
   0% {
     transform: scale(1);
@@ -353,10 +398,20 @@ function loadArc(cx: number, cy: number, permille: number): string {
   }
 }
 
+@keyframes fed-flow {
+  to {
+    stroke-dashoffset: 16;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fed-pulse {
     animation: none;
     opacity: 0;
+  }
+
+  .fed-flow {
+    animation: none;
   }
 }
 </style>
