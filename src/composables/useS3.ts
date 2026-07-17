@@ -285,6 +285,25 @@ async function downloadUrl(bucket: string, key: string): Promise<string> {
   })
 }
 
+// Fetch an object's bytes in the browser through a short-lived presigned GET so
+// previews can read content directly. A cross-origin fetch needs the bucket to
+// allow this portal's origin (CORS); when it does not the browser rejects with
+// a TypeError, which the caller treats as the known CORS gap.
+async function fetchObject(bucket: string, key: string): Promise<Response> {
+  const url = await downloadUrl(bucket, key)
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`The object could not be fetched (HTTP ${response.status}).`)
+  return response
+}
+
+async function getObjectText(bucket: string, key: string): Promise<string> {
+  return (await fetchObject(bucket, key)).text()
+}
+
+async function getObjectBlob(bucket: string, key: string): Promise<Blob> {
+  return (await fetchObject(bucket, key)).blob()
+}
+
 export function s3ErrorMessage(err: unknown): string {
   if (err && typeof err === 'object') {
     const error = err as { name?: string; message?: string }
@@ -341,5 +360,7 @@ export function useS3() {
     uploadObject,
     deleteObject,
     downloadUrl,
+    getObjectText,
+    getObjectBlob,
   }
 }
