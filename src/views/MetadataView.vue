@@ -17,6 +17,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import { computed, ref, watch } from 'vue'
+import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
@@ -232,6 +233,20 @@ const referencedBy = computed(() => {
 // provenance model; anything else — including a runs/ document whose expected
 // CreateAction is missing — renders the generic data-entity table below.
 const runProvenance = computed(() => parseRunCrate(currentCrate.value, currentPath.value))
+
+// While the displayed run is still executing, silently re-fetch its crate so
+// provenance grows live (no loading flag — the article must not flicker).
+const runActive = computed(() => {
+  const run = runProvenance.value
+  if (!run) return false
+  return run.actionStatus !== 'CompletedActionStatus' && run.actionStatus !== 'FailedActionStatus'
+})
+const crateVisibility = useDocumentVisibility()
+useIntervalFn(() => {
+  if (crateVisibility.value !== 'visible') return
+  if (!runActive.value || !detailId.value || loadingCrate.value) return
+  void loadRoCrate(detailId.value).catch(() => undefined)
+}, 12_000)
 
 function entityLink(row: DataEntity): string | undefined {
   const target = row.contentUrl ?? row.id
