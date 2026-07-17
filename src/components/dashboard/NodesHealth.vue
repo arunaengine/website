@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useNow } from '@vueuse/core'
 import Badge from '@/components/ui/Badge.vue'
 import type { RealmNodeInfo } from '@/lib/api'
 import { connectionLabel, connectionVariant, kindVariant } from '@/components/nodes/node-display'
@@ -26,9 +27,11 @@ function storageWidth(node: RealmNodeInfo): string {
   return `${Math.min((used / maxStorage.value) * 100, 100)}%`
 }
 
+// Reading `now` re-renders the labels as time passes.
+const now = useNow({ interval: 10_000 })
 function heartbeat(node: RealmNodeInfo): string | null {
   const ms = node.info?.utilization.heartbeat_at_ms
-  return ms ? relativeTime(new Date(ms).toISOString()) : null
+  return ms && now.value ? relativeTime(new Date(ms).toISOString()) : null
 }
 
 // load_permille is the 1-minute load average scaled to permille of logical

@@ -11,11 +11,12 @@ import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, 
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useNotifications } from '@/composables/useNotifications'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, nodes, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh } = useAruna()
+const { currentUser, metadata, profiles, nodes, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh, loadInfo } = useAruna()
 const { dashboardRevision } = useNotifications()
 const showNewDataset = ref(false)
 const refreshing = ref(false)
@@ -40,6 +41,13 @@ async function refreshDashboard() {
 }
 
 watch(dashboardRevision, () => void refreshDashboard(), { immediate: true })
+
+// Node heartbeats republish every 60s but never bump the SSE revision; poll
+// the light info endpoints so the federation panel stays current.
+const visibility = useDocumentVisibility()
+useIntervalFn(() => {
+  if (visibility.value === 'visible' && !refreshing.value) void loadInfo()
+}, 30_000)
 
 const onlineNodes = computed(() => nodes.value.filter((node) => node.status === 'healthy').length)
 
