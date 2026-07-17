@@ -15,10 +15,12 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import Select from '@/components/ui/Select.vue'
+import DatasetFilesEditor from '@/components/metadata/DatasetFilesEditor.vue'
 import { Pencil, Plus, X } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
+import { applyDataEntities, dataEntitiesOf, type DataEntity } from '@/lib/dataEntities'
 import { licenseEntity } from '@/lib/profiles/rocrate'
 import { validateProfileData } from '@/lib/profiles/validate'
 import type { MetadataProfile } from '@/data/types'
@@ -41,7 +43,7 @@ const loading = ref(false)
 const loadError = ref<string | null>(null)
 const saveError = ref<string | null>(null)
 const rawError = ref<string | null>(null)
-const activeTab = ref<'fields' | 'raw'>('fields')
+const activeTab = ref<'fields' | 'files' | 'raw'>('fields')
 
 // The pristine, unresolved crate fetched from the backend; edits mutate a clone.
 const pristine = ref<unknown>(null)
@@ -80,6 +82,10 @@ let seededCustomKeys: string[] = []
 const relatedIds = ref<string[]>([])
 let preservedMentions: unknown[] = []
 const relatedPick = ref('')
+
+// The dataset's data entities, seeded from the crate and written back through
+// buildFromFields so file edits ride the same parsed-crate path as the fields.
+const files = ref<DataEntity[]>([])
 
 watch(
   [() => props.open, () => props.documentId],
@@ -200,6 +206,8 @@ function seedFields(crate: unknown) {
   customFields.value = rows
   seededCustomKeys = rows.map((row) => row.key)
 
+  files.value = dataEntitiesOf(crate)
+
   const mentions = Array.isArray(root?.mentions) ? root.mentions : root?.mentions ? [root.mentions] : []
   const catalogIris = new Set(metadataItems.value.map((item) => item.graph_iri))
   relatedIds.value = []
@@ -216,6 +224,9 @@ function buildFromFields(): unknown {
   const clone: unknown = structuredClone(pristine.value)
   const root = findRoot(clone)
   if (!root) throw new Error('This crate has no root dataset entity to edit.')
+  // File edits rebuild hasPart and File entities before mentions are rewritten, so
+  // a removed file still counted as referenced by an existing mention is preserved.
+  applyDataEntities(clone, files.value)
   root.name = name.value.trim()
   root.description = description.value.trim()
   const keywords = keywordsText.value.split(',').map((k) => k.trim()).filter(Boolean)
@@ -369,6 +380,7 @@ async function save() {
         <Tabs v-model="activeTab">
           <TabsList>
             <TabsTrigger value="fields">Fields</TabsTrigger>
+            <TabsTrigger value="files">Files</TabsTrigger>
             <TabsTrigger value="raw">Raw JSON</TabsTrigger>
           </TabsList>
 
@@ -443,6 +455,13 @@ async function save() {
               </ul>
               <p class="mt-1 text-muted-foreground">Violations don't block saving an existing document.</p>
             </div>
+          </TabsContent>
+
+          <TabsContent value="files">
+            <DatasetFilesEditor v-model="files" />
+            <p class="mt-2 text-[11px] text-muted-foreground">
+              Reference identifiers are kept verbatim. Removing a file drops it from the crate unless another entity still references it.
+            </p>
           </TabsContent>
 
           <TabsContent value="raw" class="space-y-2">
