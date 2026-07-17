@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useNow } from '@vueuse/core'
 import { RouterLink, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import NodesHealth from '@/components/dashboard/NodesHealth.vue'
 import type { RealmNodeInfo } from '@/lib/api'
-import { kindVariant } from '@/components/nodes/node-display'
+import { connectionLabel, connectionVariant, kindVariant } from '@/components/nodes/node-display'
+import { relativeTime, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{
   nodes: RealmNodeInfo[]
@@ -39,6 +41,127 @@ const labelCounts = computed<Array<[string, number]>>(() => {
   }
   return [...counts.entries()].sort((a, b) => b[1] - a[1])
 })
+
+// Topology coordinate system — everything below lives in this viewBox.
+const VW = 600
+const VH = 360
+const CX = VW / 2
+const CY = VH / 2
+const RADIUS = 118
+const RING = 13
+const TRIM = RING + 3
+const ARC_R = RING + 4
+const LABEL_CAP = 10
+
+// Honesty: the hub is the node serving this portal, and each edge reflects only
+// that node's own connection_status to it — never a fabricated mesh.
+const hub = computed<RealmNodeInfo | undefined>(() => {
+  const byId = props.localPeerId ? props.nodes.find((node) => node.node_id === props.localPeerId) : undefined
+  return byId ?? props.nodes.find((node) => node.kind === 'local')
+})
+
+const spokes = computed(() =>
+  props.nodes
+    .filter((node) => node.node_id !== hub.value?.node_id)
+    .sort((a, b) => a.node_id.localeCompare(b.node_id)),
+)
+
+const showLabels = computed(() => spokes.value.length <= LABEL_CAP)
+
+type Placed = { node: RealmNodeInfo; cx: number; cy: number }
+
+const placedSpokes = computed<Placed[]>(() => {
+  const list = spokes.value
+  const count = Math.max(list.length, 1)
+  return list.map((node, i) => {
+    const angle = (-90 + (360 / count) * i) * (Math.PI / 180)
+    return { node, cx: CX + Math.cos(angle) * RADIUS, cy: CY + Math.sin(angle) * RADIUS }
+  })
+})
+
+const edges = computed(() => {
+  if (!hub.value) return []
+  return placedSpokes.value.map((placed) => {
+    const dx = placed.cx - CX
+    const dy = placed.cy - CY
+    const len = Math.hypot(dx, dy) || 1
+    const ux = dx / len
+    const uy = dy / len
+    return {
+      id: placed.node.node_id,
+      x1: CX + ux * TRIM,
+      y1: CY + uy * TRIM,
+      x2: placed.cx - ux * TRIM,
+      y2: placed.cy - uy * TRIM,
+      connected: placed.node.connection_status === 'connected',
+    }
+  })
+})
+
+// Reading `now` re-renders heartbeat freshness as time passes.
+const now = useNow({ interval: 10_000 })
+
+function heartbeatAge(node: RealmNodeInfo): number | null {
+  const ms = node.info?.utilization.heartbeat_at_ms
+  return ms && now.value ? now.value.getTime() - ms : null
+}
+
+function isFresh(node: RealmNodeInfo): boolean {
+  const age = heartbeatAge(node)
+  return age !== null && age < 90_000
+}
+
+function nodeOpacity(node: RealmNodeInfo): number {
+  return isFresh(node) ? 1 : 0.5
+}
+
+function heartbeatLabel(node: RealmNodeInfo): string | null {
+  const ms = node.info?.utilization.heartbeat_at_ms
+  return ms && now.value ? relativeTime(new Date(ms).toISOString()) : null
+}
+
+function nodeTitle(node: RealmNodeInfo): string {
+  const parts = [truncateMiddle(node.node_id), node.kind, connectionLabel(node)]
+  const beat = heartbeatLabel(node)
+  if (beat) parts.push(`heartbeat ${beat}`)
+  return parts.join(' · ')
+}
+
+const kindStroke: Record<RealmNodeInfo['kind'], string> = {
+  management: '#335DC6',
+  server: '#24A9E6',
+  local: '#55C4DE',
+  user: 'hsl(var(--muted-foreground))',
+}
+
+function connColor(node: RealmNodeInfo): string {
+  return connectionVariant(node) === 'success' ? '#10b981' : 'hsl(var(--muted-foreground))'
+}
+
+function loadPermille(node: RealmNodeInfo): number {
+  return node.info?.utilization.load_permille ?? 0
+}
+
+function hasLoad(node: RealmNodeInfo): boolean {
+  return loadPermille(node) > 0
+}
+
+function loadColor(node: RealmNodeInfo): string {
+  const permille = loadPermille(node)
+  if (permille >= 800) return 'hsl(var(--destructive))'
+  if (permille >= 500) return '#f59e0b'
+  return '#10b981'
+}
+
+function loadArc(cx: number, cy: number, permille: number): string {
+  const endDeg = Math.min(permille / 1000, 0.9999) * 360
+  const rad = (deg: number) => (deg - 90) * (Math.PI / 180)
+  const sx = cx + ARC_R * Math.cos(rad(0))
+  const sy = cy + ARC_R * Math.sin(rad(0))
+  const ex = cx + ARC_R * Math.cos(rad(endDeg))
+  const ey = cy + ARC_R * Math.sin(rad(endDeg))
+  return `M ${sx} ${sy} A ${ARC_R} ${ARC_R} 0 ${endDeg > 180 ? 1 : 0} 1 ${ex} ${ey}`
+}
 </script>
 
 <template>
@@ -59,6 +182,137 @@ const labelCounts = computed<Array<[string, number]>>(() => {
       </div>
 
       <template v-else>
+        <!-- Topology — a single SVG so connections truly terminate at nodes -->
+        <div class="border-b border-border/60 bg-background">
+          <svg
+            :viewBox="`0 0 ${VW} ${VH}`"
+            preserveAspectRatio="xMidYMid meet"
+            class="block h-auto w-full"
+            role="img"
+            aria-label="Realm node topology"
+          >
+            <defs>
+              <pattern id="fed-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+                <path d="M 32 0 L 0 0 0 32" fill="none" stroke="hsl(var(--border))" stroke-opacity="0.55" stroke-width="1" />
+              </pattern>
+              <radialGradient id="fed-glow" cx="0.5" cy="0.5" r="0.5">
+                <stop offset="0%" stop-color="#4E86D7" stop-opacity="0.12" />
+                <stop offset="100%" stop-color="#4E86D7" stop-opacity="0" />
+              </radialGradient>
+              <radialGradient id="fed-glow-hub" cx="0.5" cy="0.5" r="0.5">
+                <stop offset="0%" stop-color="#55C4DE" stop-opacity="0.18" />
+                <stop offset="100%" stop-color="#55C4DE" stop-opacity="0" />
+              </radialGradient>
+            </defs>
+
+            <rect :width="VW" :height="VH" fill="url(#fed-grid)" opacity="0.5" />
+            <ellipse :cx="CX" :cy="CY" :rx="VW * 0.4" :ry="VH * 0.42" fill="url(#fed-glow)" />
+
+            <!-- Edges first so nodes sit on top -->
+            <line
+              v-for="e in edges"
+              :key="e.id"
+              :x1="e.x1"
+              :y1="e.y1"
+              :x2="e.x2"
+              :y2="e.y2"
+              :stroke="e.connected ? '#10b981' : 'hsl(var(--muted-foreground))'"
+              :stroke-opacity="e.connected ? 0.55 : 0.3"
+              :stroke-dasharray="e.connected ? undefined : '3 6'"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+
+            <!-- Spoke nodes -->
+            <g
+              v-for="p in placedSpokes"
+              :key="p.node.node_id"
+              class="fed-node cursor-pointer focus:outline-none"
+              role="link"
+              tabindex="0"
+              :opacity="nodeOpacity(p.node)"
+              :aria-label="`View ${truncateMiddle(p.node.node_id)} on the status page`"
+              @click="openNode(p.node.node_id)"
+              @keydown.enter="openNode(p.node.node_id)"
+            >
+              <title>{{ nodeTitle(p.node) }}</title>
+              <circle
+                v-if="isFresh(p.node)"
+                class="fed-pulse"
+                :cx="p.cx"
+                :cy="p.cy"
+                :r="RING"
+                fill="none"
+                :stroke="kindStroke[p.node.kind]"
+                stroke-width="1"
+              />
+              <circle :cx="p.cx" :cy="p.cy" :r="RING" fill="hsl(var(--card))" :stroke="kindStroke[p.node.kind]" stroke-width="1.5" />
+              <path
+                v-if="hasLoad(p.node)"
+                :d="loadArc(p.cx, p.cy, loadPermille(p.node))"
+                fill="none"
+                :stroke="loadColor(p.node)"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <circle :cx="p.cx" :cy="p.cy" r="4" :fill="connColor(p.node)" />
+              <text
+                v-if="showLabels"
+                :x="p.cx"
+                :y="p.cy + RING + 14"
+                text-anchor="middle"
+                font-family="JetBrains Mono, monospace"
+                font-size="10"
+                font-weight="600"
+                fill="hsl(var(--foreground))"
+              >
+                {{ truncateMiddle(p.node.node_id, 6, 4) }}
+              </text>
+            </g>
+
+            <!-- Hub: the node serving this portal -->
+            <g
+              v-if="hub"
+              class="fed-node cursor-pointer focus:outline-none"
+              role="link"
+              tabindex="0"
+              :aria-label="`View ${truncateMiddle(hub.node_id)} on the status page`"
+              @click="openNode(hub.node_id)"
+              @keydown.enter="openNode(hub.node_id)"
+            >
+              <title>{{ nodeTitle(hub) }} · this node</title>
+              <circle :cx="CX" :cy="CY" :r="RING + 10" fill="url(#fed-glow-hub)" />
+              <circle :cx="CX" :cy="CY" :r="RING + 2" fill="hsl(var(--card))" stroke="#55C4DE" stroke-width="1.5" />
+              <path
+                v-if="hasLoad(hub)"
+                :d="loadArc(CX, CY, loadPermille(hub))"
+                fill="none"
+                :stroke="loadColor(hub)"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <circle :cx="CX" :cy="CY" r="4.5" fill="#55C4DE" />
+              <text
+                :x="CX"
+                :y="CY + RING + 16"
+                text-anchor="middle"
+                font-family="JetBrains Mono, monospace"
+                font-size="10"
+                font-weight="600"
+                fill="hsl(var(--foreground))"
+              >
+                {{ truncateMiddle(hub.node_id, 6, 4) }}
+              </text>
+              <text :x="CX" :y="CY + RING + 27" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="hsl(var(--muted-foreground))">
+                this node
+              </text>
+            </g>
+          </svg>
+          <p v-if="edges.length" class="border-t border-border/60 px-5 py-2 text-[11px] text-muted-foreground">
+            Edges show connections as seen by the node serving this portal — not full mesh topology.
+          </p>
+        </div>
+
         <!-- Real aggregates: kinds and self-published labels -->
         <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Kinds</span>
@@ -80,3 +334,29 @@ const labelCounts = computed<Array<[string, number]>>(() => {
     </div>
   </section>
 </template>
+
+<style scoped>
+.fed-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fed-pulse 2.4s ease-out infinite;
+}
+
+@keyframes fed-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fed-pulse {
+    animation: none;
+    opacity: 0;
+  }
+}
+</style>
