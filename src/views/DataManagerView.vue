@@ -94,6 +94,7 @@ let uploadCounter = 0
 let disposed = false
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragActive = ref(false)
+const stripDrag = ref(false)
 
 const addDataOpen = ref(false)
 const staging = useStaging()
@@ -292,6 +293,12 @@ function onFileInput(event: Event) {
 
 function onDrop(event: DragEvent) {
   dragActive.value = false
+  if (!bucket.value || !event.dataTransfer?.files.length) return
+  void requestUpload(Array.from(event.dataTransfer.files))
+}
+
+function onStripDrop(event: DragEvent) {
+  stripDrag.value = false
   if (!bucket.value || !event.dataTransfer?.files.length) return
   void requestUpload(Array.from(event.dataTransfer.files))
 }
@@ -737,6 +744,21 @@ const isEmpty = computed(
                 <Button variant="ghost" size="sm" :disabled="listLoading" @click="loadObjects(true)">Load more</Button>
               </div>
             </div>
+
+            <!-- Persistent drop target — same upload path and guards as the
+                 toolbar Upload button. -->
+            <button
+              type="button"
+              class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-5 text-xs transition-colors"
+              :class="stripDrag ? 'border-primary bg-primary/[0.06] text-foreground' : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'"
+              @click="pickFiles"
+              @dragover.prevent="stripDrag = true"
+              @dragleave="stripDrag = false"
+              @drop.prevent="onStripDrop"
+            >
+              <Upload class="h-4 w-4" />
+              <span>Drop files here to upload to <span class="font-mono">{{ bucket }}/{{ s3Prefix }}</span></span>
+            </button>
           </template>
         </div>
       </section>
