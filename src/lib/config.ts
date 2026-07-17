@@ -16,14 +16,14 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
 }
 
 // Per-flag defaults are layered under the served `features` map, so deployments
-// can still explicitly disable a surface. The current backend serves placement,
-// durable jobs and cursor-paged search. TES remains opt-in because its
-// availability depends on node-local compute configuration.
+// can still explicitly disable a surface. The backend serves placement, durable
+// jobs, cursor-paged search and the GA4GH TES facade; the Compute surface
+// degrades to an honest panel on nodes without a compute backend.
 const DEFAULT_FEATURES: Record<string, boolean> = {
   jobs: true,
   placementAdmin: true,
   searchCursor: true,
-  tes: false,
+  tes: true,
 }
 
 let current: PortalRuntimeConfig = { ...DEFAULT_PORTAL_CONFIG, features: { ...DEFAULT_FEATURES } }
