@@ -44,16 +44,17 @@ const routes: RouteRecordRaw[] = [
       { path: 'admin/placement', redirect: { path: '/app/admin', query: { tab: 'placement' } } },
       // Realm admin — read-only user directory
       { path: 'admin/users', name: 'admin-users', component: () => import('@/views/AdminUsersView.vue') },
-      // Jobs — durable background jobs (feature-gated in-view; the backend
-      // surface lives on aruna feat/job-framework)
-      { path: 'jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
-      { path: 'jobs/:jobId', name: 'job-detail', component: () => import('@/views/JobsView.vue') },
-      // Compute — GA4GH TES tasks (feature-gated in-view)
+      // Compute — GA4GH TES tasks and durable system jobs in one surface
+      // (each half is feature-gated in-view)
       { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
       { path: 'compute/quick', name: 'compute-quick', component: () => import('@/views/ComputeQuickRunView.vue') },
       { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue') },
+      { path: 'compute/jobs', redirect: { name: 'compute', query: { tab: 'jobs' } } },
+      { path: 'compute/jobs/:jobId', name: 'job-detail', component: () => import('@/views/ComputeView.vue') },
       { path: 'compute/:taskId', name: 'compute-task', component: () => import('@/views/ComputeView.vue') },
       // Compatibility redirects from prior IA
+      { path: 'jobs', redirect: { name: 'compute', query: { tab: 'jobs' } } },
+      { path: 'jobs/:jobId', redirect: (to) => ({ name: 'job-detail', params: { jobId: to.params.jobId } }) },
       { path: 'data', redirect: { name: 'buckets' } },
       { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },
       { path: 'query', redirect: { name: 'search' } },

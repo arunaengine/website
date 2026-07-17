@@ -13,7 +13,6 @@ import {
   Compass,
   LayoutDashboard,
   ListChecks,
-  ListTodo,
   Settings,
   ShieldCheck,
   Users,
@@ -35,10 +34,10 @@ interface NavSection {
 
 const { isRealmAdmin } = useAruna()
 
-// Config resolves before the app mounts, so a plain read is safe here.
+// Config resolves before the app mounts, so a plain read is safe here. The
+// unified Compute entry appears when either compute plane (TES tasks or
+// durable jobs) is enabled; the view degrades per flag.
 const tesEnabled = featureEnabled('tes')
-
-// Durable jobs API — served by aruna feat/job-framework backends only.
 const jobsEnabled = featureEnabled('jobs')
 
 // Placement admin moved into the Admin view as a tab, so the admin section
@@ -50,8 +49,9 @@ const sections = computed<NavSection[]>(() => [
       { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
       { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
       { to: '/app/buckets', icon: Boxes, label: 'Data' },
-      ...(tesEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
-      ...(jobsEnabled ? [{ to: '/app/jobs', icon: ListTodo, label: 'Jobs' }] : []),
+      ...(tesEnabled || jobsEnabled
+        ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }]
+        : []),
       { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
       { to: '/app/groups', icon: Users, label: 'Groups' },
     ],
