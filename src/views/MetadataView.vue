@@ -238,22 +238,26 @@ function entityLink(row: DataEntity): string | undefined {
   return target.startsWith('http') ? target : undefined
 }
 
-// A file entity's @id is a stable `s3://bucket/key` reference; preview is only
-// offered when the active S3 client can plausibly reach that node.
 function s3RefOf(id: string): { bucket: string; key: string } | null {
   const match = /^s3:\/\/([^/]+)\/(.+)$/.exec(id)
   return match ? { bucket: match[1] as string, key: match[2] as string } : null
 }
 
+// Profile artifacts carry a content-addressed W3ID as @id and the real S3
+// location in contentUrl, so the preview target prefers contentUrl.
+function previewRef(row: DataEntity): { bucket: string; key: string } | null {
+  return (row.contentUrl ? s3RefOf(row.contentUrl) : null) ?? s3RefOf(row.id)
+}
+
 function canPreview(row: DataEntity): boolean {
-  return Boolean(s3.hasActiveKey.value && s3.endpoint.value && s3RefOf(row.id))
+  return Boolean(s3.hasActiveKey.value && s3.endpoint.value && previewRef(row))
 }
 
 const previewOpen = ref(false)
 const previewTarget = ref<{ bucket: string; key: string; name: string; size?: number; contentType?: string } | null>(null)
 
 function openPreview(row: DataEntity) {
-  const parsed = s3RefOf(row.id)
+  const parsed = previewRef(row)
   if (!parsed) return
   const bytes = Number(row.contentSize)
   previewTarget.value = {
