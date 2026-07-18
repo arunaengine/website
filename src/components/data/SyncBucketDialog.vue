@@ -245,21 +245,21 @@ async function submit() {
 
         <div class="space-y-1 text-xs">
           <span class="font-medium text-foreground">Target bucket</span>
-          <Input v-model="targetBucket" placeholder="bucket-name" class="h-8 font-mono text-xs" :invalid="bucketInvalid ? 'error' : undefined" />
+          <!-- The picker input IS the bucket-name field: typing searches
+               existing buckets (narrowed to the chosen node) while any name —
+               matched or not — stays valid, because the backend auto-creates
+               missing target buckets. -->
+          <BucketSearchBox
+            v-model="targetBucket"
+            mode="picker"
+            :filter-node-id="pullMode ? realmNodes.localNodeId.value : targetNodeId || null"
+            placeholder="bucket-name"
+            @select="pickSuggestion"
+          />
           <p v-if="bucketInvalid" class="text-[11px] text-destructive">{{ bucketInvalid }}</p>
           <p v-else-if="targetBucket.trim() && targetNodeId" class="text-[11px] text-muted-foreground">
             If <span class="font-mono">{{ targetBucket.trim() }}</span> does not exist on {{ targetNodeLabel }} yet, it is created automatically.
           </p>
-          <!-- Suggestions from the federated bucket search, narrowed to the
-               chosen target node once one is selected. -->
-          <BucketSearchBox
-            v-if="!pullMode"
-            v-model="targetBucket"
-            mode="picker"
-            :filter-node-id="targetNodeId || null"
-            placeholder="Search existing buckets…"
-            @select="pickSuggestion"
-          />
         </div>
 
         <fieldset class="space-y-2">
