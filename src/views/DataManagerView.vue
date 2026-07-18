@@ -16,10 +16,12 @@ import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
+import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
+import SyncStatusPanel from '@/components/data/SyncStatusPanel.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import Progress from '@/components/ui/Progress.vue'
-import { useAruna } from '@/composables/useAruna'
+import { useAruna, isUnsupportedEndpoint } from '@/composables/useAruna'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStaging } from '@/composables/useStaging'
@@ -29,11 +31,13 @@ import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3QuotaError,
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, UsageResponse } from '@/lib/api'
+import { parseArunaArn, prefixesOverlap } from '@/lib/sync'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
+  ArrowLeftRight,
   Boxes,
   ChevronRight,
   CloudOff,
@@ -54,7 +58,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { currentUser, bootstrapped, credentials, getGroupUsage, nodeInfo, realmInfo } = useAruna()
+const { authToken, currentUser, bootstrapped, credentials, getGroupUsage, listSyncRelationships, nodeInfo, realmInfo } = useAruna()
 const s3 = useS3()
 
 function routeString(value: unknown): string {
@@ -86,6 +90,97 @@ const effectiveEndpoint = computed(() => s3.endpointForNode(remoteNodeId.value))
 const remoteEndpointMissing = computed(() => Boolean(remoteNodeId.value) && !effectiveEndpoint.value)
 const remoteBrowseBlocked = ref(false)
 const remoteBlocked = computed(() => remoteEndpointMissing.value || remoteBrowseBlocked.value)
+
+// ── Bucket sync (flag-gated) ────────────────────────────────────────────────
+const syncEnabled = featureEnabled('bucketSync')
+const syncDialogOpen = ref(false)
+const syncSource = ref<{ bucket: string; prefix: string; nodeId: string | null }>({
+  bucket: '',
+  prefix: '',
+  nodeId: null,
+})
+const syncPanelOpen = ref(false)
+
+interface BucketSyncInfo {
+  outgoing: number
+  incoming: number
+  /** Local-side key prefixes ('' = whole bucket) for row indicators. */
+  prefixes: string[]
+}
+// Local bucket name → relationship summary, from ONE batched direction=both
+// listing on bucket-list load (sidebar badges + row indicators).
+const syncByBucket = ref<Map<string, BucketSyncInfo>>(new Map())
+const syncSupported = ref(true)
+let syncOverviewRequestId = 0
+
+async function loadSyncOverview() {
+  if (!syncEnabled || !syncSupported.value || !authToken.value) return
+  const requestId = ++syncOverviewRequestId
+  try {
+    const response = await listSyncRelationships({ direction: 'both' })
+    if (requestId !== syncOverviewRequestId) return
+    const map = new Map<string, BucketSyncInfo>()
+    const add = (arn: string, direction: 'outgoing' | 'incoming') => {
+      const parsed = parseArunaArn(arn)
+      if (!parsed) return
+      const info = map.get(parsed.bucket) ?? { outgoing: 0, incoming: 0, prefixes: [] }
+      info[direction]++
+      info.prefixes.push(parsed.prefix)
+      map.set(parsed.bucket, info)
+    }
+    // The local side is the source of outgoing and the target of incoming rows.
+    for (const relationship of response.outgoing) add(relationship.source, 'outgoing')
+    for (const relationship of response.incoming) add(relationship.target, 'incoming')
+    syncByBucket.value = map
+  } catch (err) {
+    if (requestId !== syncOverviewRequestId) return
+    // Badges are a progressive enhancement: an older node without the routes
+    // disables them quietly; transient failures keep the previous state.
+    if (isUnsupportedEndpoint(err)) syncSupported.value = false
+  }
+}
+
+const bucketSyncInfo = computed(() =>
+  remoteNodeId.value ? null : (syncByBucket.value.get(bucket.value) ?? null),
+)
+const bucketSyncCount = computed(() =>
+  bucketSyncInfo.value ? bucketSyncInfo.value.outgoing + bucketSyncInfo.value.incoming : 0,
+)
+
+// Subtle per-row indicator: the row's key overlaps a synced prefix.
+function keyIsSynced(key: string): boolean {
+  const info = bucketSyncInfo.value
+  if (!info) return false
+  return info.prefixes.some((prefix) => prefixesOverlap(key, prefix))
+}
+
+const showSyncButton = computed(
+  () =>
+    syncEnabled &&
+    syncSupported.value &&
+    Boolean(bucket.value) &&
+    !isWorkspaceBucket(bucket.value) &&
+    Boolean(authToken.value),
+)
+
+function openSyncDialog() {
+  syncSource.value = { bucket: bucket.value, prefix: s3Prefix.value, nodeId: remoteNodeId.value }
+  syncDialogOpen.value = true
+}
+
+// "Sync to this node…" on a remote search hit: remote source → local target.
+function openSyncFromHit(hit: BucketSearchHit) {
+  syncSource.value = {
+    bucket: hit.bucket,
+    prefix: '',
+    nodeId: realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id,
+  }
+  syncDialogOpen.value = true
+}
+
+function onSyncChanged() {
+  void loadSyncOverview()
+}
 
 const buckets = ref<BucketEntry[]>([])
 const bucketsLoading = ref(false)
@@ -245,6 +340,7 @@ async function loadObjects(more = false) {
 
 function refreshAll() {
   void refreshBuckets()
+  void loadSyncOverview()
   if (bucket.value) void loadObjects()
 }
 
@@ -704,7 +800,7 @@ const isEmpty = computed(
       <section v-else class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside class="space-y-3">
           <div v-if="bucketSearchEnabled" class="surface p-3">
-            <BucketSearchBox @open="openSearchHit" />
+            <BucketSearchBox @open="openSearchHit" @sync="openSyncFromHit" />
           </div>
 
           <div
@@ -772,6 +868,11 @@ const isEmpty = computed(
                   >
                     <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
                     <span class="truncate">{{ entry.name }}</span>
+                    <ArrowLeftRight
+                      v-if="syncByBucket.has(entry.name)"
+                      class="ml-auto h-3 w-3 shrink-0 text-primary/60"
+                      aria-label="Sync relationships configured"
+                    />
                   </button>
                 </li>
               </ul>
@@ -841,6 +942,25 @@ const isEmpty = computed(
                   :resource-label="`${bucket}/${s3Prefix}`"
                   size="sm"
                 />
+                <Button
+                  v-if="showSyncButton"
+                  variant="outline"
+                  size="sm"
+                  :title="remoteNodeId ? 'Sync this remote bucket to the connected node' : 'Replicate this bucket to another node'"
+                  @click="openSyncDialog"
+                >
+                  <ArrowLeftRight class="h-4 w-4" /> Sync
+                </Button>
+                <Button
+                  v-if="syncEnabled && bucketSyncCount"
+                  variant="outline"
+                  size="sm"
+                  :title="`${bucketSyncCount} sync relationship${bucketSyncCount === 1 ? '' : 's'} — open sync status`"
+                  @click="syncPanelOpen = true"
+                >
+                  <ArrowLeftRight class="h-4 w-4 text-primary" />
+                  <Badge variant="secondary" class="ml-1">{{ bucketSyncCount }}</Badge>
+                </Button>
                 <Button v-if="!remoteBlocked" variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
                 <!-- Staging and the Add data pipeline always target the connected node. -->
                 <Button v-if="stagingJobsEnabled && !remoteNodeId" variant="outline" size="sm" @click="stagingPanelOpen = true">
@@ -868,6 +988,9 @@ const isEmpty = computed(
               <div class="mt-4 flex justify-center gap-2">
                 <Button v-if="!remoteEndpointMissing" variant="outline" size="sm" @click="loadObjects()">
                   <RefreshCw class="h-3.5 w-3.5" /> Try again
+                </Button>
+                <Button v-if="showSyncButton" size="sm" @click="openSyncDialog">
+                  <ArrowLeftRight class="h-3.5 w-3.5" /> Sync to this node…
                 </Button>
               </div>
             </div>
@@ -931,7 +1054,14 @@ const isEmpty = computed(
                     @click="openFolder(folder)"
                   >
                     <td class="px-4 py-2.5">
-                      <span class="flex items-center gap-2"><ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/</span>
+                      <span class="flex items-center gap-2">
+                        <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/
+                        <ArrowLeftRight
+                          v-if="keyIsSynced(folder.prefix)"
+                          class="h-3 w-3 shrink-0 text-primary/40"
+                          aria-label="Covered by a sync relationship"
+                        />
+                      </span>
                     </td>
                     <td class="px-4 py-2.5 text-right text-muted-foreground">—</td>
                     <td class="px-4 py-2.5 text-muted-foreground">—</td>
@@ -945,7 +1075,14 @@ const isEmpty = computed(
                     @click="openPreview(object)"
                   >
                     <td class="px-4 py-2.5">
-                      <span class="flex items-center gap-2"><ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span></span>
+                      <span class="flex items-center gap-2">
+                        <ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span>
+                        <ArrowLeftRight
+                          v-if="keyIsSynced(object.key)"
+                          class="h-3 w-3 shrink-0 text-primary/40"
+                          aria-label="Covered by a sync relationship"
+                        />
+                      </span>
                     </td>
                     <td class="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '—' }}</td>
                     <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '—' }}</td>
@@ -1000,6 +1137,21 @@ const isEmpty = computed(
     />
 
     <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />
+
+    <SyncBucketDialog
+      v-model:open="syncDialogOpen"
+      :source-bucket="syncSource.bucket"
+      :source-prefix="syncSource.prefix"
+      :source-node-id="syncSource.nodeId"
+      @created="onSyncChanged"
+    />
+
+    <SyncStatusPanel
+      v-if="syncEnabled"
+      v-model:open="syncPanelOpen"
+      :bucket="bucket"
+      @changed="onSyncChanged"
+    />
 
     <PreviewPane
       v-model:open="previewOpen"
