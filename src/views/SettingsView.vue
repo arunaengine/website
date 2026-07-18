@@ -60,6 +60,7 @@ const affiliation = ref('')
 const orcid = ref('')
 const preferredProfileId = ref('')
 const profileMessage = ref<string | null>(null)
+const profileError = ref<string | null>(null)
 
 watch(currentUser, (user) => {
   name.value = user?.name ?? ''
@@ -68,6 +69,26 @@ watch(currentUser, (user) => {
   orcid.value = user?.orcid ?? ''
   preferredProfileId.value = user?.preferredProfileId ?? ''
 }, { immediate: true })
+
+const profileDirty = computed(() => {
+  const user = currentUser.value
+  if (!user) return false
+  return (
+    name.value !== (user.name ?? '') ||
+    email.value !== (user.email ?? '') ||
+    affiliation.value !== (user.affiliation ?? '') ||
+    orcid.value !== (user.orcid ?? '') ||
+    preferredProfileId.value !== (user.preferredProfileId ?? '')
+  )
+})
+
+// Editing again invalidates the last save/error feedback.
+watch(profileDirty, (dirty) => {
+  if (dirty) {
+    profileMessage.value = null
+    profileError.value = null
+  }
+})
 
 const preferredProfile = computed(() => profiles.value.find((profile) => profile.id === preferredProfileId.value))
 
@@ -96,16 +117,21 @@ function saveConnection() {
 
 async function saveProfile() {
   profileMessage.value = null
-  await updateUserProfile({
-    name: name.value,
-    set_attributes: {
-      email: email.value,
-      affiliation: affiliation.value,
-      orcid: orcid.value,
-      ...(preferredProfileId.value ? { 'ui.preferred_profile_path': `profiles/${preferredProfileId.value}` } : {}),
-    },
-  })
-  profileMessage.value = 'Saved to /users/info.'
+  profileError.value = null
+  try {
+    await updateUserProfile({
+      name: name.value,
+      set_attributes: {
+        email: email.value,
+        affiliation: affiliation.value,
+        orcid: orcid.value,
+        ...(preferredProfileId.value ? { 'ui.preferred_profile_path': `profiles/${preferredProfileId.value}` } : {}),
+      },
+    })
+    profileMessage.value = 'Profile saved.'
+  } catch (err) {
+    profileError.value = err instanceof Error ? err.message : String(err)
+  }
 }
 
 const themeOptions: Array<{ id: ThemeMode; title: string; icon: unknown; preview: string }> = [
@@ -154,7 +180,7 @@ function toggleGroup(groupId: string) {
     <PageHeader title="Settings" description="API connection, current user, profiles, groups and credentials from the local Aruna API.">
       <template #actions>
         <Button variant="outline" @click="refresh"><RefreshCw class="h-4 w-4" /> Refresh</Button>
-        <Button :disabled="!currentUser || saving" @click="saveProfile"><Save class="h-4 w-4" /> Save profile</Button>
+        <Button :disabled="!currentUser || saving || !profileDirty" @click="saveProfile"><Save class="h-4 w-4" /> Save profile</Button>
       </template>
     </PageHeader>
 
@@ -255,7 +281,14 @@ function toggleGroup(groupId: string) {
             <div><label class="text-xs font-medium text-foreground">Affiliation</label><Input v-model="affiliation" class="mt-1" /></div>
             <div><label class="text-xs font-medium text-foreground">ORCID</label><Input v-model="orcid" placeholder="0000-0000-0000-0000" class="mt-1" /></div>
           </div>
-          <div v-if="profileMessage" class="border-t border-border px-5 py-3 text-xs text-emerald-700 dark:text-emerald-300">{{ profileMessage }}</div>
+          <div class="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+            <p class="min-w-0 text-xs" :class="profileError ? 'text-destructive' : profileMessage ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'">
+              {{ profileError ?? profileMessage ?? (profileDirty ? 'Unsaved changes.' : '') }}
+            </p>
+            <Button size="sm" :disabled="!currentUser || saving || !profileDirty" @click="saveProfile">
+              <Save class="h-3.5 w-3.5" /> {{ saving ? 'Saving…' : 'Save profile' }}
+            </Button>
+          </div>
         </section>
 
         <section id="default-profile" class="surface">
@@ -270,7 +303,7 @@ function toggleGroup(groupId: string) {
             </button>
             <div v-if="!profiles.length" class="text-sm text-muted-foreground">No visible profile documents.</div>
           </div>
-          <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span></div>
+          <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span><span v-if="profileDirty"> — apply with "Save profile" above.</span></div>
         </section>
 
         <section id="groups" class="surface overflow-hidden">
