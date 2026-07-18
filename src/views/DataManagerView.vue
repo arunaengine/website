@@ -25,6 +25,7 @@ import { useAruna, isUnsupportedEndpoint } from '@/composables/useAruna'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStaging } from '@/composables/useStaging'
+import { useStagingReferences } from '@/composables/useStagingReferences'
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import { featureEnabled } from '@/lib/config'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type S3Key, type UploadHandle } from '@/composables/useS3'
@@ -46,6 +47,7 @@ import {
   FolderPlus,
   History,
   KeyRound,
+  Link2,
   Loader2,
   LogIn,
   Pin,
@@ -181,6 +183,14 @@ function openSyncFromHit(hit: BucketSearchHit) {
 function onSyncChanged() {
   void loadSyncOverview()
 }
+
+// ── Reference visibility (flag-gated) ───────────────────────────────────────
+// One /staging/references load per opened LOCAL bucket (staging references
+// live on the connected node); remote browsing skips the listing entirely.
+const references = useStagingReferences(
+  bucket,
+  computed(() => !remoteNodeId.value),
+)
 
 const buckets = ref<BucketEntry[]>([])
 const bucketsLoading = ref(false)
@@ -1061,6 +1071,12 @@ const isEmpty = computed(
                           class="h-3 w-3 shrink-0 text-primary/40"
                           aria-label="Covered by a sync relationship"
                         />
+                        <Link2
+                          v-if="references.prefixHasReferences(folder.prefix)"
+                          class="h-3 w-3 shrink-0 text-primary/40"
+                          title="Contains objects referenced from an external source"
+                          aria-label="Contains objects referenced from an external source"
+                        />
                       </span>
                     </td>
                     <td class="px-4 py-2.5 text-right text-muted-foreground">—</td>
@@ -1081,6 +1097,12 @@ const isEmpty = computed(
                           v-if="keyIsSynced(object.key)"
                           class="h-3 w-3 shrink-0 text-primary/40"
                           aria-label="Covered by a sync relationship"
+                        />
+                        <Link2
+                          v-if="references.keyIsReferenced(object.key)"
+                          class="h-3 w-3 shrink-0 text-primary/40"
+                          title="Referenced from an external source"
+                          aria-label="Referenced from an external source"
                         />
                       </span>
                     </td>
