@@ -123,6 +123,13 @@ watch(currentUser, () => void ensureLoaded())
                     :title="w.path_prefix"
                   >{{ info.label }}</RouterLink>
                   <span v-else class="truncate text-sm font-medium text-foreground" :title="w.path_prefix">{{ info?.label ?? w.path_prefix }}</span>
+                  <!-- Optional per-watch health from newer backends. -->
+                  <Badge
+                    v-if="w.health === 'needs_attention'"
+                    variant="warn"
+                    class="text-[10px] uppercase"
+                    title="This watch may not be delivering events — remove and re-create it if notifications stay silent."
+                  >needs attention</Badge>
                 </div>
                 <p class="mt-0.5 text-[11px] text-muted-foreground">
                   <span v-for="(event, i) in w.events" :key="event">{{ i ? ', ' : '' }}{{ watchEventLabel(event) }}</span>
@@ -147,9 +154,9 @@ watch(currentUser, () => void ensureLoaded())
 
         <!-- What each watch kind actually covers. -->
         <div class="surface-muted space-y-1.5 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
-          <p><span class="font-medium text-foreground">Data watches</span> cover a bucket folder: you are notified for every object uploaded under it, including all folders below — never just a single object.</p>
+          <p><span class="font-medium text-foreground">Data watches</span> cover a bucket folder: every object uploaded under it — your own uploads included, across all folders below — triggers a notification; never just a single object.</p>
           <p><span class="font-medium text-foreground">Metadata watches</span> cover a catalog path: you are notified when a new metadata document (dataset, profile, run record) is created under it.</p>
-          <p>Events arrive in the notification bell. Each account can hold up to 50 watches; hover a watch to see its technical path.</p>
+          <p>Events arrive in the notification bell; delivery can lag a few seconds. Each account can hold up to 50 watches; hover a watch to see its technical path.</p>
         </div>
       </template>
     </div>

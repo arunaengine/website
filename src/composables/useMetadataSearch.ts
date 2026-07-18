@@ -63,7 +63,9 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
   const truncated = ref(false)
   const nextCursor = ref<string | null>(null)
 
-  const active = computed(() => query.value.trim().length > 0)
+  // Two-character minimum, aligned with useUnifiedSearch (the backend rejects
+  // shorter queries with 400 anyway).
+  const active = computed(() => query.value.trim().length >= 2)
   // The backend signals partial results through nodes_failed (a per-node id list
   // is not served); a non-zero count means matches on failed nodes are missing.
   const partial = computed(() => nodesFailed.value > 0)
