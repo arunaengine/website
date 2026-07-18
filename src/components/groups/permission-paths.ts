@@ -15,6 +15,33 @@ export interface MetaPathFolder {
   documents: MetaPathDocument[]
 }
 
+export function shortNodeId(id: string): string {
+  return id.length > 12 ? id.slice(0, 8) : id
+}
+
+// Human phrase for a role-path suffix, used by grant rows and summaries.
+export function describeTarget(suffix: string): string {
+  const clean = suffix.replace(/^\/+/, '').replace(/\/+$/, '')
+  if (clean === '**' || clean === '') return 'everything in this group'
+  if (clean === 'admin' || clean === 'admin/**') return 'group settings, roles and members'
+  if (clean === 'meta' || clean === 'meta/**') return 'all metadata documents'
+  if (clean.startsWith('meta/')) {
+    const rest = clean.slice('meta/'.length)
+    if (rest.endsWith('/**')) return `metadata documents in "${rest.slice(0, -3)}/"`
+    return `the metadata document "${rest}"`
+  }
+  if (clean === 'data' || clean === 'data/**') return 'all files on every node'
+  if (clean.startsWith('data/')) {
+    const [node, ...tail] = clean.slice('data/'.length).split('/')
+    const rest = tail.join('/')
+    const where = `on node ${shortNodeId(node ?? '')}`
+    if (!rest || rest === '**') return `all files ${where}`
+    if (rest.endsWith('/**')) return `files in "${rest.slice(0, -3)}/" ${where}`
+    return `the file "${rest}" ${where}`
+  }
+  return `"${clean}"`
+}
+
 export function buildMetaPathTree(documentPaths: string[]): MetaPathFolder {
   const root: MetaPathFolder = { name: '', path: '', folders: [], documents: [] }
   for (const documentPath of [...documentPaths].sort()) {

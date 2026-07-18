@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { Boxes, Globe, ListChecks, RefreshCw, ShieldCheck } from '@lucide/vue'
+import { computed, onMounted, ref } from 'vue'
+import { Boxes, Globe, Layers, ListChecks, RefreshCw, ShieldCheck } from '@lucide/vue'
 import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
+import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import MetaPathTree from './MetaPathTree.vue'
 import DataPathTree from './DataPathTree.vue'
-import { buildMetaPathTree, type MetaPathFolder } from './permission-paths'
+import { buildMetaPathTree, shortNodeId, type MetaPathFolder } from './permission-paths'
 import { useAruna } from '@/composables/useAruna'
 
 const props = defineProps<{
@@ -13,21 +15,29 @@ const props = defineProps<{
   // Group scope prefix (/{realm}/g/{group}/) forwarded to the data/ tree so it
   // can derive role-path suffixes from the served permission paths.
   pathPrefix: string
-  selected?: string
+  selected?: string[]
 }>()
 
-const emit = defineEmits<{ (e: 'select', suffix: string): void }>()
+// A selection is one or more role-path suffixes; "Data & metadata" is the only
+// scope that emits two (meta/** and data/** are siblings, ** would add admin).
+const emit = defineEmits<{ (e: 'select', suffixes: string[]): void }>()
 
-const { listGroupMetadata } = useAruna()
+const { listGroupMetadata, realmInfo, nodeInfo } = useAruna()
 
-// The three well-known scopes plus the whole group; the meta/ and data/ trees
-// below narrow those coarse scopes to a folder subtree or a single entry.
 const SCOPES = [
-  { suffix: '**', title: 'Everything', icon: Globe, hint: 'All metadata, data and admin operations in this group.' },
-  { suffix: 'meta/**', title: 'Metadata', icon: ListChecks, hint: 'All RO-Crate metadata documents. Browse below to narrow the scope.' },
-  { suffix: 'data/**', title: 'Data', icon: Boxes, hint: 'All objects on this node. Browse below to narrow to a bucket or object.' },
-  { suffix: 'admin/**', title: 'Administration', icon: ShieldCheck, hint: 'Group settings, roles and membership.' },
+  { key: 'all', title: 'Everything', icon: Globe, suffixes: ['**'], hint: 'Files, metadata and group administration — the whole group.' },
+  { key: 'data-meta', title: 'Data & metadata', icon: Layers, suffixes: ['meta/**', 'data/**'], hint: 'All files and all metadata documents, but no group administration.' },
+  { key: 'meta', title: 'Metadata', icon: ListChecks, suffixes: ['meta/**'], hint: 'All metadata documents. Browse below to narrow this down.' },
+  { key: 'data', title: 'Data', icon: Boxes, suffixes: ['data/**'], hint: 'All files on every node. Pick a node below to narrow this down.' },
+  { key: 'admin', title: 'Administration', icon: ShieldCheck, suffixes: ['admin/**'], hint: 'Group settings, roles and members.' },
 ]
+
+function isActive(suffixes: string[]): boolean {
+  const current = props.selected ?? []
+  return current.length === suffixes.length && suffixes.every((suffix) => current.includes(suffix))
+}
+
+const activeScope = computed(() => SCOPES.find((scope) => isActive(scope.suffixes)) ?? null)
 
 const loading = ref(false)
 const loadError = ref<string | null>(null)
@@ -56,31 +66,62 @@ function toggle(path: string) {
   expanded.value = next
 }
 
+// Data paths are node-scoped (data/{node}/…); the portal can only browse the
+// node it is connected to, other nodes get a typed-path fallback.
+const localNodeId = computed(() => nodeInfo.value?.node.peer_id ?? '')
+const realmNodes = computed(() => realmInfo.value?.nodes ?? [])
+const nodeOptions = computed(() => [
+  { value: 'all', label: 'All nodes' },
+  ...realmNodes.value.map((node) => ({
+    value: node.node_id,
+    label: `${node.kind} ${shortNodeId(node.node_id)}${node.node_id === localNodeId.value ? ' (this portal)' : ''}`,
+  })),
+])
+const nodeOverride = ref<string | null>(null)
+const nodeChoice = computed(() => {
+  if (nodeOverride.value) return nodeOverride.value
+  return realmNodes.value.some((node) => node.node_id === localNodeId.value) ? localNodeId.value : 'all'
+})
+const browsableNode = computed(() => nodeChoice.value === localNodeId.value && !!localNodeId.value)
+
+const allDataSuffix = computed(() =>
+  nodeChoice.value === 'all' ? 'data/**' : `data/${nodeChoice.value}/**`,
+)
+
+const typedFolder = ref('')
+function selectTyped() {
+  const cleaned = typedFolder.value.trim().replace(/^\/+|\/+$/g, '')
+  if (!cleaned) return
+  emit('select', [`data/${nodeChoice.value}/${cleaned}/**`])
+}
+
 onMounted(() => void load())
 </script>
 
 <template>
   <div class="rounded-lg border border-border bg-background p-3">
-    <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Resource scopes</div>
-    <ul class="mt-1.5 space-y-0.5">
-      <li v-for="scope in SCOPES" :key="scope.suffix">
-        <button
-          type="button"
-          :class="[
-            'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted',
-            selected === scope.suffix ? 'bg-primary/[0.08]' : '',
-          ]"
-          @click="emit('select', scope.suffix)"
-        >
-          <component :is="scope.icon" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-          <span class="min-w-0">
-            <span class="text-xs font-medium text-foreground">{{ scope.title }}</span>
-            <span class="ml-1.5 font-mono text-[10px] text-muted-foreground">{{ scope.suffix }}</span>
-            <span class="block text-[11px] leading-snug text-muted-foreground">{{ scope.hint }}</span>
-          </span>
-        </button>
-      </li>
-    </ul>
+    <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Quick scopes</div>
+    <div class="mt-1.5 flex flex-wrap gap-1.5">
+      <button
+        v-for="scope in SCOPES"
+        :key="scope.key"
+        type="button"
+        :class="[
+          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+          isActive(scope.suffixes)
+            ? 'border-primary/50 bg-primary/[0.08] text-foreground'
+            : 'border-border text-foreground/80 hover:bg-muted',
+        ]"
+        :title="`${scope.hint} (${scope.suffixes.join(' + ')})`"
+        @click="emit('select', scope.suffixes)"
+      >
+        <component :is="scope.icon" class="h-3.5 w-3.5 text-primary" />
+        {{ scope.title }}
+      </button>
+    </div>
+    <p class="mt-1.5 text-[11px] text-muted-foreground">
+      {{ activeScope ? activeScope.hint : 'Pick a quick scope, or browse below for something more specific.' }}
+    </p>
 
     <div class="mt-3 flex items-center justify-between">
       <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Metadata documents</div>
@@ -89,7 +130,7 @@ onMounted(() => void load())
       </Button>
     </div>
     <p class="mt-0.5 text-[11px] text-muted-foreground">
-      Pick a folder to cover its whole subtree, or a single document for exactly one entry.
+      Choose a folder to include everything inside it, or a single document.
     </p>
     <div class="mt-1.5">
       <div v-if="loading && !tree" class="space-y-1.5">
@@ -98,17 +139,74 @@ onMounted(() => void load())
       </div>
       <p v-else-if="loadError" class="text-xs text-destructive">{{ loadError }}</p>
       <p v-else-if="tree && !tree.folders.length && !tree.documents.length" class="text-xs text-muted-foreground">
-        This group has no metadata documents yet; use a scope above.
+        This group has no metadata documents yet; use a quick scope above.
       </p>
-      <MetaPathTree v-else-if="tree" :node="tree" :expanded="expanded" @toggle="toggle" @select="emit('select', $event)" />
+      <MetaPathTree
+        v-else-if="tree"
+        :node="tree"
+        :expanded="expanded"
+        :selected="selected"
+        @toggle="toggle"
+        @select="emit('select', [$event])"
+      />
     </div>
 
-    <div class="mt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data objects</div>
-    <p class="mt-0.5 text-[11px] text-muted-foreground">
-      Expand a bucket to a folder or object; pick a folder for its subtree, or an object for exactly one key.
-    </p>
-    <div class="mt-1.5">
-      <DataPathTree :group-id="groupId" :path-prefix="pathPrefix" :selected="selected" @select="emit('select', $event)" />
+    <div class="mt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Files</div>
+    <div class="mt-1.5 flex items-center gap-2">
+      <span class="shrink-0 text-[11px] text-muted-foreground">Node</span>
+      <Select
+        :model-value="nodeChoice"
+        :options="nodeOptions"
+        aria-label="Node"
+        class="h-8 max-w-64 text-xs"
+        @update:model-value="(value: string) => (nodeOverride = value)"
+      />
     </div>
+    <button
+      type="button"
+      :class="[
+        'mt-1.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted',
+        isActive([allDataSuffix]) ? 'bg-primary/[0.08]' : '',
+      ]"
+      :title="`Everything under ${allDataSuffix}`"
+      @click="emit('select', [allDataSuffix])"
+    >
+      <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
+      <span class="font-medium text-foreground">
+        {{ nodeChoice === 'all' ? 'All files on every node' : 'All files on this node' }}
+      </span>
+    </button>
+    <template v-if="browsableNode">
+      <p class="mt-0.5 text-[11px] text-muted-foreground">
+        Open a bucket and choose a folder to include everything inside it, or a single file.
+      </p>
+      <div class="mt-1.5">
+        <DataPathTree
+          :group-id="groupId"
+          :path-prefix="pathPrefix"
+          :selected="selected"
+          @select="emit('select', [$event])"
+        />
+      </div>
+    </template>
+    <p v-else-if="nodeChoice === 'all'" class="mt-0.5 text-[11px] text-muted-foreground">
+      Pick a specific node to narrow the scope; folders can be browsed on the node this portal is connected to.
+    </p>
+    <template v-else>
+      <p class="mt-0.5 text-[11px] text-muted-foreground">
+        This portal can only browse folders on its own node — type a bucket or folder path instead.
+      </p>
+      <div class="mt-1.5 flex items-center gap-2">
+        <Input
+          v-model="typedFolder"
+          class="h-8 text-xs"
+          placeholder="bucket or bucket/folder"
+          @keydown.enter.prevent="selectTyped"
+        />
+        <Button variant="outline" size="sm" class="shrink-0" :disabled="!typedFolder.trim()" @click="selectTyped">
+          Select folder
+        </Button>
+      </div>
+    </template>
   </div>
 </template>

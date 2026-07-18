@@ -14,7 +14,7 @@ const props = defineProps<{
   // Group scope prefix (/{realm}/g/{group}/) used to derive role-path suffixes.
   pathPrefix: string
   prefix?: string
-  selected?: string
+  selected?: string[]
   depth?: number
 }>()
 
@@ -94,14 +94,14 @@ onMounted(() => void load(false))
       <Skeleton class="h-5" />
     </div>
     <p v-else-if="status === 'forbidden'" class="text-[11px] text-muted-foreground">
-      You must be a group member to browse data objects; use the Data scope above.
+      Only group members can browse files; use a quick scope above.
     </p>
     <p v-else-if="status === 'unavailable'" class="text-[11px] text-muted-foreground">
-      Data browsing is not available on this node; use the Data scope above.
+      File browsing is not available on this node; use a quick scope above.
     </p>
     <p v-else-if="error" class="text-xs text-destructive">{{ error }}</p>
     <p v-else-if="!entries.length" class="text-[11px] text-muted-foreground">
-      {{ prefix ? 'This folder is empty.' : 'This group has no buckets yet; use the Data scope above.' }}
+      {{ prefix ? 'This folder is empty.' : 'This group has no buckets yet; use a quick scope above.' }}
     </p>
     <ul v-else class="space-y-0.5">
       <li v-for="entry in entries" :key="entry.permission_path">
@@ -121,12 +121,12 @@ onMounted(() => void load(false))
               type="button"
               :class="[
                 'rounded px-1.5 py-0.5 text-[10px] transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100',
-                selected === subtreeSuffix(entry.permission_path) ? 'text-primary opacity-100' : 'text-muted-foreground opacity-0',
+                selected?.includes(subtreeSuffix(entry.permission_path)) ? 'text-primary opacity-100' : 'text-muted-foreground opacity-0',
               ]"
-              :title="`Use ${subtreeSuffix(entry.permission_path)} — everything under this folder`"
+              :title="`Select this folder — includes everything inside (${subtreeSuffix(entry.permission_path)})`"
               @click="emit('select', subtreeSuffix(entry.permission_path))"
             >
-              use subtree
+              select folder
             </button>
           </div>
           <div v-if="expanded.has(entry.permission_path)" class="ml-3.5 border-l border-border/60 pl-2">
@@ -145,9 +145,9 @@ onMounted(() => void load(false))
           type="button"
           :class="[
             'flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-xs hover:bg-muted hover:text-foreground',
-            selected === suffixOf(entry.permission_path) ? 'text-primary' : 'text-muted-foreground',
+            selected?.includes(suffixOf(entry.permission_path)) ? 'text-primary' : 'text-muted-foreground',
           ]"
-          :title="`Use ${suffixOf(entry.permission_path)} — this object only`"
+          :title="`Select only this file (${suffixOf(entry.permission_path)})`"
           @click="emit('select', suffixOf(entry.permission_path))"
         >
           <span class="w-3 shrink-0" />

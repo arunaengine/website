@@ -5,6 +5,7 @@ import type { MetaPathFolder } from './permission-paths'
 defineProps<{
   node: MetaPathFolder
   expanded: Set<string>
+  selected?: string[]
 }>()
 
 defineEmits<{
@@ -29,17 +30,21 @@ defineEmits<{
         </button>
         <button
           type="button"
-          class="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-          :title="`Use meta/${folder.path}/** — everything under this folder`"
+          :class="[
+            'rounded px-1.5 py-0.5 text-[10px] transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100',
+            selected?.includes(`meta/${folder.path}/**`) ? 'text-primary opacity-100' : 'text-muted-foreground opacity-0',
+          ]"
+          :title="`Select this folder — includes everything inside (meta/${folder.path}/**)`"
           @click="$emit('select', `meta/${folder.path}/**`)"
         >
-          use subtree
+          select folder
         </button>
       </div>
       <div v-if="expanded.has(folder.path)" class="ml-3.5 border-l border-border/60 pl-2">
         <MetaPathTree
           :node="folder"
           :expanded="expanded"
+          :selected="selected"
           @toggle="$emit('toggle', $event)"
           @select="$emit('select', $event)"
         />
@@ -48,8 +53,11 @@ defineEmits<{
     <li v-for="doc in node.documents" :key="doc.path">
       <button
         type="button"
-        class="flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        :title="`Use meta/${doc.path} — this document only`"
+        :class="[
+          'flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-xs hover:bg-muted hover:text-foreground',
+          selected?.includes(`meta/${doc.path}`) ? 'text-primary' : 'text-muted-foreground',
+        ]"
+        :title="`Select only this document (meta/${doc.path})`"
         @click="$emit('select', `meta/${doc.path}`)"
       >
         <span class="w-3 shrink-0" />

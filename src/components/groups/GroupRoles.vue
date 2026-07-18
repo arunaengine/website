@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
-import Input from '@/components/ui/Input.vue'
-import Select from '@/components/ui/Select.vue'
 import Badge from '@/components/ui/Badge.vue'
-import PermissionPathPicker from './PermissionPathPicker.vue'
+import RoleBuilder from './RoleBuilder.vue'
 import { computed, ref } from 'vue'
-import { ChevronRight, FolderSearch, Lock, Plus, Trash2 } from '@lucide/vue'
+import { Lock, Pencil, Plus, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
-import type { ApiRole, GroupDetailResponse, GroupPermissionLevel } from '@/lib/api'
+import type { ApiRole, GroupDetailResponse } from '@/lib/api'
 
 const props = defineProps<{
   group: GroupDetailResponse
@@ -16,21 +14,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
-const { createGroupRole, deleteGroupRole, saving } = useAruna()
+const { deleteGroupRole, saving } = useAruna()
 
 const roleError = ref<string | null>(null)
-const newRoleName = ref('')
-const newPathSuffix = ref('')
-const newLevel = ref<GroupPermissionLevel>('read')
-const showPathBrowser = ref(false)
+// null = builder closed; { role: null } = create; { role } = edit.
+const editor = ref<{ role: ApiRole | null } | null>(null)
+
+// Built-in role names the create API rejects, so edit-as-recreate cannot work.
+const BUILTIN_NAMES = ['admin', 'user']
 
 const pathPrefix = computed(() => `/${props.group.realm_id}/g/${props.group.group_id}/`)
-
-const levelOptions = [
-  { value: 'read', label: 'read' },
-  { value: 'write', label: 'write' },
-  { value: 'deny', label: 'deny' },
-]
 
 const wellKnownOrder = ['everything', 'group admin', 'metadata', 'data']
 
@@ -100,21 +93,9 @@ function levelVariant(level: string) {
   }
 }
 
-async function addRole() {
-  if (!newRoleName.value.trim() || !newPathSuffix.value.trim()) return
-  roleError.value = null
-  try {
-    await createGroupRole(props.group.group_id, {
-      name: newRoleName.value.trim(),
-      permissions: { [`${pathPrefix.value}${newPathSuffix.value.trim().replace(/^\/+/, '')}`]: newLevel.value },
-    })
-    newRoleName.value = ''
-    newPathSuffix.value = ''
-    newLevel.value = 'read'
-    emit('changed')
-  } catch (err) {
-    roleError.value = err instanceof Error ? err.message : String(err)
-  }
+function closeEditor(changed: boolean) {
+  editor.value = null
+  if (changed) emit('changed')
 }
 
 async function removeRole(role: ApiRole) {
@@ -158,12 +139,32 @@ async function removeRole(role: ApiRole) {
               {{ role.assigned_users ? role.assigned_users.length : '—' }}
             </td>
             <td v-if="canManage" class="px-5 py-2.5 text-right">
-              <span v-if="role.name === 'admin'" class="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title="The admin role cannot be deleted.">
+              <span v-if="role.name === 'admin'" class="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title="The admin role cannot be changed or deleted.">
                 <Lock class="h-3 w-3" /> protected
               </span>
-              <Button v-else variant="ghost" size="sm" :disabled="saving" @click="removeRole(role)">
-                <Trash2 class="h-3.5 w-3.5" /> Delete
-              </Button>
+              <template v-else>
+                <Button
+                  v-if="!BUILTIN_NAMES.includes(role.name)"
+                  variant="ghost"
+                  size="icon-sm"
+                  class="text-muted-foreground"
+                  :aria-label="`Edit role ${role.name}`"
+                  :disabled="saving"
+                  @click="editor = { role }"
+                >
+                  <Pencil class="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  class="text-muted-foreground"
+                  :aria-label="`Delete role ${role.name}`"
+                  :disabled="saving"
+                  @click="removeRole(role)"
+                >
+                  <Trash2 class="h-3.5 w-3.5" />
+                </Button>
+              </template>
             </td>
           </tr>
         </tbody>
@@ -173,35 +174,16 @@ async function removeRole(role: ApiRole) {
     <div v-if="roleError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ roleError }}</div>
 
     <div v-if="canManage" class="border-t border-border px-5 py-4">
-      <div class="text-xs font-medium text-foreground">Create role</div>
-      <div class="mt-2 grid gap-2 sm:grid-cols-[180px_1fr_120px_auto]">
-        <Input v-model="newRoleName" placeholder="Role name" />
-        <div class="flex items-center gap-0">
-          <span class="flex h-9 max-w-[45%] items-center truncate rounded-l-md border border-r-0 border-input bg-muted/40 px-2 font-mono text-[11px] text-muted-foreground" :title="pathPrefix">{{ pathPrefix }}</span>
-          <Input v-model="newPathSuffix" class="rounded-l-none" placeholder="data/** or meta/reports/**" />
-        </div>
-        <Select :model-value="newLevel" :options="levelOptions" @update:model-value="(v: string) => (newLevel = v as GroupPermissionLevel)" />
-        <Button :disabled="!newRoleName.trim() || !newPathSuffix.trim() || saving" @click="addRole">
-          <Plus class="h-3.5 w-3.5" /> Add role
-        </Button>
-      </div>
-      <p class="mt-1.5 text-[11px] text-muted-foreground">Permission paths must stay inside this group's scope; type only the suffix.</p>
-      <button
-        type="button"
-        class="mt-2 flex items-center gap-1 text-xs font-medium text-foreground/80 hover:text-foreground"
-        @click="showPathBrowser = !showPathBrowser"
-      >
-        <ChevronRight :class="['h-3.5 w-3.5 transition-transform', showPathBrowser && 'rotate-90']" />
-        <FolderSearch class="h-3.5 w-3.5" />
-        Browse resource paths
-      </button>
-      <PermissionPathPicker
-        v-if="showPathBrowser"
-        :group-id="group.group_id"
-        :path-prefix="pathPrefix"
-        :selected="newPathSuffix"
-        class="mt-2 max-w-xl"
-        @select="(suffix) => (newPathSuffix = suffix)"
+      <Button v-if="!editor" variant="outline" size="sm" @click="editor = { role: null }">
+        <Plus class="h-3.5 w-3.5" /> New role
+      </Button>
+      <RoleBuilder
+        v-else
+        :key="editor.role?.role_id ?? 'new'"
+        :group="group"
+        :role="editor.role"
+        @saved="closeEditor(true)"
+        @cancel="closeEditor(true)"
       />
     </div>
   </div>
