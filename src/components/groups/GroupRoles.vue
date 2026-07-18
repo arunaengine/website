@@ -112,6 +112,10 @@ async function removeRole(role: ApiRole) {
 
 <template>
   <div>
+    <p class="border-b border-border px-5 py-3 text-xs text-muted-foreground">
+      Roles decide what members can reach: each role is a set of grants — an access level on part of this
+      group — and is assigned to members in the Members tab.
+    </p>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
