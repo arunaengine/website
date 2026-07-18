@@ -80,10 +80,14 @@ const wordmark = computed(() =>
           Open source, Apache 2.0 and MIT
         </div>
         <div
-          class="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground"
+          class="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-[11px] font-medium text-muted-foreground"
         >
-          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          Federated compute next to your data
+          <span
+            class="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-primary"
+          >
+            Upcoming
+          </span>
+          Federated Compute
         </div>
       </div>
     </div>

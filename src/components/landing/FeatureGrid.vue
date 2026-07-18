@@ -6,8 +6,18 @@ import {
   KeyRound,
   Share2,
 } from '@lucide/vue'
+import type { FunctionalComponent } from 'vue'
 
-const features = [
+interface Feature {
+  title: string
+  desc: string
+  icon: FunctionalComponent
+  tone: string
+  /** Blue preview treatment: announced, not shipped yet. */
+  upcoming?: boolean
+}
+
+const features: Feature[] = [
   {
     title: 'Object storage',
     desc: 'An S3-compatible API on every node, with browsing and uploads built into this portal. Your clients, scripts and pipelines keep working, unchanged.',
@@ -34,9 +44,10 @@ const features = [
   },
   {
     title: 'Federated compute',
-    desc: 'Submit GA4GH TES tasks from the portal — a quick-run wizard, workspace lifecycle choices, and tasks that run next to the data on any realm node.',
+    desc: 'Submit GA4GH TES tasks from the portal: a quick-run wizard, workspace lifecycle choices, and tasks that run next to the data on any realm node.',
     icon: Cpu,
     tone: 'bg-aruna-indigo/15 text-aruna-indigo dark:text-aruna-tagline',
+    upcoming: true,
   },
 ]
 </script>
@@ -62,9 +73,18 @@ const features = [
           v-for="f in features"
           :key="f.title"
           class="surface flex h-full flex-col gap-3 p-5"
+          :class="f.upcoming ? 'border-primary/30 bg-primary/[0.03]' : ''"
         >
-          <div :class="['grid h-9 w-9 place-items-center rounded-lg', f.tone]">
-            <component :is="f.icon" class="h-4 w-4" />
+          <div class="flex items-start justify-between">
+            <div :class="['grid h-9 w-9 place-items-center rounded-lg', f.tone]">
+              <component :is="f.icon" class="h-4 w-4" />
+            </div>
+            <span
+              v-if="f.upcoming"
+              class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+            >
+              Upcoming
+            </span>
           </div>
           <h3 class="font-display text-base font-semibold text-aruna-navy">
             {{ f.title }}
