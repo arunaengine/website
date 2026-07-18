@@ -775,8 +775,7 @@ export interface StagingReferencesResponse {
 // Bucket sync relationships (verified against aruna api/src/routes/sync.rs on
 // feat/portal_extensions):
 //   POST   /data/sync-relationships          201 SyncRelationship; 409 duplicate;
-//                                            501 mode "reference"; 502 target
-//                                            unreachable
+//                                            502 target unreachable
 //   GET    /data/sync-relationships          ?bucket=&prefix=&direction=out|in|both
 //   GET    /data/sync-relationships/{id}     SyncRelationshipDetail
 //   POST   /data/sync-relationships/{id}/run 202 (re-run once / backfill continuous)

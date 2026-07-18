@@ -1,11 +1,3 @@
-<script lang="ts">
-import { ref } from 'vue'
-
-// Sticky for the session: once any node answers 501 for reference mode, the
-// option renders disabled with a "coming soon" hint until the page reloads.
-const referenceUnsupported = ref(false)
-</script>
-
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -24,7 +16,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { ApiError, type BucketSearchHit, type CreateSyncRelationshipRequest, type SyncMode, type SyncRelationship } from '@/lib/api'
 import { isWorkspaceBucket } from '@/lib/workspaces'
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ArrowRight, Loader2 } from '@lucide/vue'
 
 // Creates a sync relationship for one bucket (optionally narrowed to a key
@@ -144,7 +136,6 @@ const canSubmit = computed(
     Boolean(targetBucket.value.trim()) &&
     !bucketInvalid.value &&
     !sameEndpoint.value &&
-    !(mode.value === 'reference' && referenceUnsupported.value) &&
     !(pullMode.value && !sourceApiBase.value),
 )
 
@@ -170,10 +161,7 @@ async function submit() {
     emit('update:open', false)
   } catch (err) {
     if (err instanceof ApiError) {
-      if (err.status === 501) {
-        referenceUnsupported.value = true
-        error.value = 'Reference mode is not available on this backend yet — coming soon.'
-      } else if (err.status === 409) {
+      if (err.status === 409) {
         error.value = 'This sync relationship already exists.'
       } else if (err.status === 502) {
         error.value = 'The target node is unreachable right now — the relationship was not created.'
@@ -268,20 +256,15 @@ async function submit() {
             v-for="option in MODE_OPTIONS"
             :key="option.value"
             class="flex items-start gap-2 text-sm"
-            :class="option.value === 'reference' && referenceUnsupported ? 'opacity-50' : ''"
           >
             <input
               v-model="mode"
               type="radio"
               :value="option.value"
-              :disabled="option.value === 'reference' && referenceUnsupported"
               class="mt-1 h-3.5 w-3.5 shrink-0 accent-primary"
             />
             <span>
-              <span class="text-xs font-medium text-foreground">
-                {{ option.label }}
-                <Badge v-if="option.value === 'reference' && referenceUnsupported" variant="secondary" class="ml-1 text-[10px]">coming soon</Badge>
-              </span>
+              <span class="text-xs font-medium text-foreground">{{ option.label }}</span>
               <span class="block text-[11px] text-muted-foreground">{{ option.description }}</span>
             </span>
           </label>
