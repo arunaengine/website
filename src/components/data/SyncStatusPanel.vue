@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import Sheet from '@/components/ui/Sheet.vue'
-import SheetContent from '@/components/ui/SheetContent.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
-import DialogTitle from '@/components/ui/DialogTitle.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { type SyncRelationship, type SyncRelationshipDetail } from '@/lib/api'
@@ -16,8 +18,9 @@ import { computed, ref, watch } from 'vue'
 import { ArrowLeftRight, ArrowLeft, ArrowRight, Loader2, Play, RefreshCw, Trash2 } from '@lucide/vue'
 
 // Sync relationships touching one bucket on the connected node, outgoing and
-// incoming (StagingJobsPanel's side-panel pattern). The backend only lists
-// relationships created by the caller; run/delete are creator-only as well.
+// incoming, presented as a centered dialog opened from the sync chip. The
+// backend only lists relationships created by the caller; run/delete are
+// creator-only as well.
 const props = defineProps<{ open: boolean; bucket: string }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -147,23 +150,24 @@ async function remove(row: Row) {
 </script>
 
 <template>
-  <Sheet :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <SheetContent side="right" class="w-full p-6 sm:max-w-md">
-      <DialogTitle class="sr-only">Sync status</DialogTitle>
-      <div class="flex items-center justify-between pr-8">
-        <h2 class="flex min-w-0 items-center gap-2 text-base font-semibold text-foreground">
-          <ArrowLeftRight class="h-4 w-4 shrink-0 text-primary" />
-          <span class="truncate">Sync — <span class="font-mono text-sm">{{ props.bucket }}</span></span>
-        </h2>
-        <Button variant="ghost" size="icon-sm" aria-label="Reload" :disabled="loading" @click="load">
-          <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" />
-        </Button>
-      </div>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Your sync relationships where this bucket is the source (outgoing) or the target (incoming).
-      </p>
+  <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
+    <DialogContent class="flex max-h-[85vh] max-w-xl flex-col">
+      <DialogHeader>
+        <div class="flex items-center justify-between gap-2 pr-8">
+          <DialogTitle class="flex min-w-0 items-center gap-2">
+            <ArrowLeftRight class="h-4 w-4 shrink-0 text-primary" />
+            <span class="truncate">Sync status: <span class="font-mono text-sm">{{ props.bucket }}</span></span>
+          </DialogTitle>
+          <Button variant="ghost" size="icon-sm" aria-label="Reload" :disabled="loading" @click="load">
+            <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" />
+          </Button>
+        </div>
+        <DialogDescription>
+          Your sync relationships where this bucket is the source (outgoing) or the target (incoming).
+        </DialogDescription>
+      </DialogHeader>
 
-      <section class="mt-4 space-y-2">
+      <section class="scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto">
         <div v-if="loading && !rows.length" class="space-y-2">
           <Skeleton class="h-16 w-full" />
           <Skeleton class="h-16 w-full" />
@@ -256,6 +260,6 @@ async function remove(row: Row) {
           </div>
         </div>
       </section>
-    </SheetContent>
-  </Sheet>
+    </DialogContent>
+  </Dialog>
 </template>
