@@ -152,7 +152,7 @@ function ruleLabel(rule: RealmPlacementStrategy['affinity'][number]): string {
         </button>
       </div>
       <p v-else class="mt-1.5 text-[11px] text-muted-foreground">
-        The realm reports no placement locations yet — pinning becomes available once nodes are mapped.
+        The realm reports no placement locations yet, pinning becomes available once nodes are mapped.
       </p>
       <p class="mt-1 text-[11px] text-muted-foreground">
         Pinning restricts placement to the selected locations (affinity filter rules).

@@ -123,7 +123,7 @@ onMounted(() => void load(false))
                 'rounded px-1.5 py-0.5 text-[10px] transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100',
                 selected?.includes(subtreeSuffix(entry.permission_path)) ? 'text-primary opacity-100' : 'text-muted-foreground opacity-0',
               ]"
-              :title="`Select this folder — includes everything inside (${subtreeSuffix(entry.permission_path)})`"
+              :title="`Select this folder, includes everything inside (${subtreeSuffix(entry.permission_path)})`"
               @click="emit('select', subtreeSuffix(entry.permission_path))"
             >
               select folder

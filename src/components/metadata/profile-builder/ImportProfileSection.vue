@@ -101,7 +101,7 @@ async function ingest(json: unknown) {
       preservedKeys: preservedKeys(parsed.mode),
     }
   } else {
-    throw new Error('Unrecognized file — expected a Describo/Crate-O mode file or an RO-Crate profile crate (with @graph).')
+    throw new Error('Unrecognized file, expected a Describo/Crate-O mode file or an RO-Crate profile crate (with @graph).')
   }
   if (props.builder.hasEdits) {
     pendingImport.value = result
@@ -160,7 +160,7 @@ async function fromUrl() {
   } catch (err) {
     // Cross-origin / network failures surface as an opaque TypeError.
     if (err instanceof TypeError) {
-      error.value = 'Could not fetch that URL — it may block cross-origin requests (CORS) or be unreachable. Download the file and upload it instead.'
+      error.value = 'Could not fetch that URL, it may block cross-origin requests (CORS) or be unreachable. Download the file and upload it instead.'
       pendingImport.value = null
     } else {
       fail(err)
@@ -218,7 +218,7 @@ async function fromUrl() {
     <div v-if="pendingImport" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
       <div class="flex items-center gap-2 font-medium">
         <AlertTriangle class="h-3.5 w-3.5 shrink-0" />
-        Importing replaces your current draft — the basics and every rule you have edited.
+        Importing replaces your current draft, the basics and every rule you have edited.
       </div>
       <div class="mt-2 flex items-center gap-2">
         <Button type="button" variant="outline" size="sm" @click="apply(pendingImport)">Replace draft</Button>
@@ -244,7 +244,7 @@ async function fromUrl() {
          those only come with a full profile crate (D1). -->
     <div v-if="builder.importSummary?.kind === 'mode'" class="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
       <FileJson class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-      <span>Mode files carry form structure only — value constraints and recommended levels import when you upload a <b class="text-foreground">profile crate</b> instead.</span>
+      <span>Mode files carry form structure only, value constraints and recommended levels import when you upload a <b class="text-foreground">profile crate</b> instead.</span>
     </div>
   </div>
 </template>

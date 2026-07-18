@@ -27,7 +27,7 @@ const online = computed(() => !offline.value)
 const nodeReachable = computed(() => !networkFailing.value)
 const writesDisabled = computed(() => offline.value)
 
-export const OFFLINE_WRITE_HINT = 'You appear to be offline — writing needs connectivity.'
+export const OFFLINE_WRITE_HINT = 'You appear to be offline, writing needs connectivity.'
 
 // Called by apiRequest. Deliberate cancellations (AbortController, used by
 // the debounced search composable) say nothing about connectivity.

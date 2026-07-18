@@ -35,7 +35,7 @@ export function useProfilePublish() {
     const endpoint = s3.endpoint.value
     if (!endpoint) throw new Error('Publishing a public profile needs the node S3 endpoint, which this node does not advertise.')
     if (!s3.hasActiveKey.value) {
-      throw new Error('Publishing a public profile uploads its artifacts to S3 — create S3 credentials for this group first (Data manager or Settings).')
+      throw new Error('Publishing a public profile uploads its artifacts to S3, create S3 credentials for this group first (Data manager or Settings).')
     }
 
     const bucket = `profiles-${groupId.toLowerCase()}`
@@ -88,7 +88,7 @@ export function useProfilePublish() {
   async function localNodeId(): Promise<string> {
     const { nodeInfo } = useAruna()
     const nodeId = nodeInfo.value?.node.peer_id
-    if (!nodeId) throw new Error('The node id is not known yet — try again once the node info has loaded.')
+    if (!nodeId) throw new Error('The node id is not known yet, try again once the node info has loaded.')
     return nodeId
   }
 

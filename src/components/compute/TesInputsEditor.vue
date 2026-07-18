@@ -32,7 +32,7 @@ function remove(i: number) {
 <template>
   <div class="space-y-3">
     <p v-if="!modelValue.length" class="text-sm text-muted-foreground">
-      No inputs — the task starts with an empty working directory.
+      No inputs, the task starts with an empty working directory.
     </p>
     <div v-else class="space-y-2">
       <div v-for="(input, i) in modelValue" :key="i" class="surface-inline flex flex-wrap items-center gap-3 p-3">

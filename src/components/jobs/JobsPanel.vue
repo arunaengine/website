@@ -112,7 +112,7 @@ onMounted(() => void list.load())
 <template>
   <div class="space-y-4">
     <p class="text-xs text-muted-foreground">
-      System jobs are durable background jobs <span class="font-medium text-foreground">the node runs for your account</span> — staging, provenance and maintenance. They cannot be submitted here, only monitored and cancelled.
+      System jobs are durable background jobs <span class="font-medium text-foreground">the node runs for your account</span>, staging, provenance and maintenance. They cannot be submitted here, only monitored and cancelled.
     </p>
 
     <div v-if="listState === 'loading'" class="surface divide-y divide-border overflow-hidden">
@@ -132,7 +132,7 @@ onMounted(() => void list.load())
       v-else-if="listState === 'forbidden'"
       class="surface px-5 py-8 text-center text-sm text-muted-foreground"
     >
-      This token cannot list jobs — path-restricted tokens have no access to the job surface.
+      This token cannot list jobs, path-restricted tokens have no access to the job surface.
     </p>
 
     <EmptyState
@@ -149,7 +149,7 @@ onMounted(() => void list.load())
         <div class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-3 py-2">
           <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter jobs by state" />
           <div class="ml-auto flex items-center gap-2">
-            <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed — {{ lastPollError }}</span>
+            <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
             <Button variant="ghost" size="icon-sm" :disabled="refreshing" aria-label="Refresh jobs" @click="reload">
               <RefreshCw class="h-3.5 w-3.5" :class="refreshing ? 'animate-spin' : ''" />
             </Button>

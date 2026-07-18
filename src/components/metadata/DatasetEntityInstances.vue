@@ -95,8 +95,8 @@ function refPlaceholder(field: ProfileControl): string {
 
 // Empty-state hint that reflects the derived obligation of the entity control.
 function emptyStateText(): string {
-  if (props.control.required) return `No ${props.typeLabel} added yet — at least one is required.`
-  if (props.control.obligation === 'SHOULD') return `No ${props.typeLabel} added yet — at least one is recommended.`
+  if (props.control.required) return `No ${props.typeLabel} added yet, at least one is required.`
+  if (props.control.obligation === 'SHOULD') return `No ${props.typeLabel} added yet, at least one is recommended.`
   return `No ${props.typeLabel} added yet.`
 }
 </script>

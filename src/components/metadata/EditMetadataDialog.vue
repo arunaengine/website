@@ -447,7 +447,7 @@ async function save() {
             </div>
 
             <div v-if="violations.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
-              <div class="font-medium text-amber-800 dark:text-amber-300">Profile check — {{ profile?.name }}</div>
+              <div class="font-medium text-amber-800 dark:text-amber-300">Profile check: {{ profile?.name }}</div>
               <ul class="mt-1 list-disc space-y-0.5 pl-4">
                 <li v-for="violation in violations" :key="violation.pointer + violation.message" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
                   <span class="font-mono">{{ violation.fieldId ?? violation.pointer }}</span>: {{ violation.message }}

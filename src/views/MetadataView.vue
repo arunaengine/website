@@ -322,7 +322,7 @@ const relatedDocs = computed<RelatedDocRow[]>(() => {
 })
 
 function entitySize(row: DataEntity): string {
-  if (!row.contentSize) return '—'
+  if (!row.contentSize) return '-'
   const n = Number(row.contentSize)
   return row.contentSize.trim() !== '' && Number.isFinite(n) ? formatBytes(n) : row.contentSize
 }
@@ -495,8 +495,8 @@ function entitySize(row: DataEntity): string {
                     </template>
                   </span>
                 </td>
-                <td class="px-5 py-2.5 text-muted-foreground">{{ row.types.join(', ') || '—' }}</td>
-                <td class="px-5 py-2.5 text-muted-foreground">{{ row.encodingFormat || '—' }}</td>
+                <td class="px-5 py-2.5 text-muted-foreground">{{ row.types.join(', ') || '-' }}</td>
+                <td class="px-5 py-2.5 text-muted-foreground">{{ row.encodingFormat || '-' }}</td>
                 <td class="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ entitySize(row) }}</td>
                 <td class="px-5 py-2.5 text-right">
                   <div class="flex items-center justify-end gap-1">
@@ -506,7 +506,7 @@ function entitySize(row: DataEntity): string {
                     <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open ${row.name} in a new tab`" @click.stop>
                       <ExternalLink class="h-3.5 w-3.5" />
                     </a>
-                    <span v-if="!canPreview(row) && !entityLink(row)" class="text-muted-foreground">—</span>
+                    <span v-if="!canPreview(row) && !entityLink(row)" class="text-muted-foreground">-</span>
                   </div>
                 </td>
               </tr>

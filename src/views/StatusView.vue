@@ -138,7 +138,7 @@ function nodeIdList(nodes: RealmNodeInfo[]): string {
 const lastUpdatedLabel = computed(() =>
   lastUpdated.value
     ? lastUpdated.value.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : '—',
+    : '-',
 )
 
 function toggleNode(nodeId: string) {

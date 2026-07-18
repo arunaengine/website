@@ -108,13 +108,13 @@ const valueNameError = computed(() => {
   const typed = trimmed(property.value.valueName)
   if (!typed) return ''
   if (!isValidPropertyTermName(typed)) {
-    return 'Property names start with a lowercase letter and use only letters and digits — e.g. assayType.'
+    return 'Property names start with a lowercase letter and use only letters and digits, e.g. assayType.'
   }
   const classNames = new Set(
     props.builder.entities.map((item) => entityClassName(item).toLowerCase()).filter(Boolean),
   )
   if (classNames.has(typed.toLowerCase())) {
-    return 'This name collides with an entity class name — rename it so property and class names stay distinct.'
+    return 'This name collides with an entity class name, rename it so property and class names stay distinct.'
   }
   return ''
 })
@@ -128,7 +128,7 @@ const enumOptionsError = computed(() => {
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean)
-  return options.length ? '' : 'Add at least one allowed value — comma-separated, e.g. LC-MS, MALDI-TOF.'
+  return options.length ? '' : 'Add at least one allowed value, comma-separated, e.g. LC-MS, MALDI-TOF.'
 })
 
 // M2: when a quick action creates this card, scroll it into view and briefly flash
@@ -310,7 +310,7 @@ const termOptions = computed(() => {
   const options: { value: string; label: string }[] = []
   const seen = new Set<string>()
   for (const term of curatedTerms.value) {
-    options.push({ value: term.uri, label: `${term.label} — schema.org/${term.name}` })
+    options.push({ value: term.uri, label: `${term.label}, schema.org/${term.name}` })
     seen.add(term.uri)
   }
   for (const term of customTerms.value) {
@@ -532,7 +532,7 @@ function createEntityRule(uri: string) {
         </div>
       </div>
       <p class="mt-2 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-        Preserved from import — {{ preservedOptionCount }} {{ preservedOptionCount === 1 ? 'option' : 'options' }}. Edit the option list in Describo/Crate-O; label, description and obligation are editable here.
+        Preserved from import, {{ preservedOptionCount }} {{ preservedOptionCount === 1 ? 'option' : 'options' }}. Edit the option list in Describo/Crate-O; label, description and obligation are editable here.
       </p>
       <p class="mt-2 text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[property.obligation].help }}</p>
       <div v-if="!anyLock" class="mt-2 flex justify-end">
@@ -619,7 +619,7 @@ function createEntityRule(uri: string) {
         v-if="isPreservedUrlOptions"
         class="mt-1 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
       >
-        Preserved from import — {{ preservedOptionCount }} {{ preservedOptionCount === 1 ? 'option' : 'options' }} kept as-is because they include structured (non-URL) values. Edit the option list in Describo/Crate-O.
+        Preserved from import, {{ preservedOptionCount }} {{ preservedOptionCount === 1 ? 'option' : 'options' }} kept as-is because they include structured (non-URL) values. Edit the option list in Describo/Crate-O.
       </p>
       <template v-else>
       <div class="mt-1 space-y-1.5">
@@ -769,7 +769,7 @@ function createEntityRule(uri: string) {
         :key="target.uri"
         class="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 px-2.5 py-1.5 text-[11px] text-amber-800 dark:text-amber-300"
       >
-        <span>No entity rule defines <b>{{ target.label }}</b> — no sub-form is generated for it yet.</span>
+        <span>No entity rule defines <b>{{ target.label }}</b>, no sub-form is generated for it yet.</span>
         <Button v-if="!anyLock" type="button" variant="outline" size="sm" @click="createEntityRule(target.uri)">
           <Plus class="h-3 w-3" /> Create entity rule for {{ target.label }}
         </Button>
@@ -784,7 +784,7 @@ function createEntityRule(uri: string) {
           Checked against the dataset's data references; more files are always allowed.
         </p>
         <p class="mt-0.5 text-[11px] text-muted-foreground">
-          Match by <b>Name</b> against the entry's label / filename (e.g. <code class="rounded bg-muted px-1">index.html</code>). Match by <b>@id</b> only against its exact reference URL — data references are absolute URLs, so a bare filename never matches.
+          Match by <b>Name</b> against the entry's label / filename (e.g. <code class="rounded bg-muted px-1">index.html</code>). Match by <b>@id</b> only against its exact reference URL, data references are absolute URLs, so a bare filename never matches.
         </p>
         <div v-for="(row, index) in property.requiredInstances" :key="index" class="mt-1.5 space-y-1">
           <div class="flex flex-wrap items-center gap-1.5">

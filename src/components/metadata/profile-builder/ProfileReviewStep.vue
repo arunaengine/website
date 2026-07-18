@@ -40,7 +40,7 @@ function constraintLines(rule: ProfilePropertyRule): string[] {
   }
   for (const instance of rule.requiredInstances ?? []) {
     const match = instance.id !== undefined ? `@id ${instance.id}` : `name ${instance.name}`
-    lines.push(`Must contain an entry matching ${match}${instance.hint ? ` — ${instance.hint}` : ''}.`)
+    lines.push(`Must contain an entry matching ${match}${instance.hint ? `, ${instance.hint}` : ''}.`)
   }
   return lines
 }
@@ -148,7 +148,7 @@ function violationsFor(property: string) {
       <b class="text-foreground">profile.html</b> is the human-readable specification,
       <b class="text-foreground">mode.json</b> is the editor form structure (Describo/Crate-O-compatible), and
       <b class="text-foreground">schema.json</b> holds the validation rules. They all travel together in the Profile Crate.
-      Editors read the mode file; validation reads the validation rules — mode files have no vocabulary for constraints or recommended levels.
+      Editors read the mode file; validation reads the validation rules, mode files have no vocabulary for constraints or recommended levels.
     </p>
 
     <Tabs default-value="preview">
@@ -162,13 +162,13 @@ function violationsFor(property: string) {
       <TabsContent value="preview">
         <div class="rounded-lg border border-border p-4">
           <p class="text-xs text-muted-foreground">
-            A read-only preview of the form people see when they create a Dataset with this profile — built by
+            A read-only preview of the form people see when they create a Dataset with this profile, built by
             saving your rules into the Profile Crate and reading them back, so it shows exactly what survives
             (including any documented round-trip simplifications).
             Required (MUST) values that are empty show an error, recommended (SHOULD) values show an amber warning.
           </p>
           <p v-if="roundTrip.error" class="mt-2 text-[11px] text-destructive">
-            The emitted crate could not be parsed back ({{ roundTrip.error }}) — the preview below falls back to the in-memory rules.
+            The emitted crate could not be parsed back ({{ roundTrip.error }}), the preview below falls back to the in-memory rules.
           </p>
           <div v-if="!controls.length" class="mt-3 text-xs text-muted-foreground">
             The Dataset entity has no property rules yet, so no inputs are generated.
@@ -190,7 +190,7 @@ function violationsFor(property: string) {
               <div class="mt-1 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
                 References
                 <span class="font-medium text-foreground">{{ control.entityRule ? entityTypeLabel(control.entityRule.type) : entityTypeLabel(control.entityTypes?.[0] ?? '') || 'an entity' }}</span>
-                — added as {{ control.multiple ? 'one or more sub-forms' : 'a sub-form' }} when creating a dataset.
+               , added as {{ control.multiple ? 'one or more sub-forms' : 'a sub-form' }} when creating a dataset.
               </div>
               <p
                 v-for="violation in violationsFor(control.property)"
@@ -215,17 +215,17 @@ function violationsFor(property: string) {
       </TabsContent>
 
       <TabsContent value="schema">
-        <p class="mb-2 text-[11px] text-muted-foreground">Validation rules — value constraints plus which properties are required (MUST) and recommended (SHOULD).</p>
+        <p class="mb-2 text-[11px] text-muted-foreground">Validation rules, value constraints plus which properties are required (MUST) and recommended (SHOULD).</p>
         <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedSchemaText }}</pre>
       </TabsContent>
 
       <TabsContent value="mode">
-        <p class="mb-2 text-[11px] text-muted-foreground">Describo/Crate-O-compatible mode file — form structure only, usable directly in those editors. Constraints and recommended levels stay in the validation rules.</p>
+        <p class="mb-2 text-[11px] text-muted-foreground">Describo/Crate-O-compatible mode file, form structure only, usable directly in those editors. Constraints and recommended levels stay in the validation rules.</p>
         <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ modeText }}</pre>
       </TabsContent>
 
       <TabsContent value="crate">
-        <p class="mb-2 text-[11px] text-muted-foreground">The complete profile document that is saved — all three files travel inside it.</p>
+        <p class="mb-2 text-[11px] text-muted-foreground">The complete profile document that is saved, all three files travel inside it.</p>
         <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedCrateText }}</pre>
       </TabsContent>
     </Tabs>

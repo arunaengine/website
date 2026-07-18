@@ -527,7 +527,7 @@ const submitBlockerSummary = computed<string[]>(() => {
     + dataRefs.value.filter(dataRefUrlError).length
   if (fieldErrorCount) parts.push(`${fieldErrorCount} ${fieldErrorCount === 1 ? 'field needs' : 'fields need'} attention (marked at the inputs).`)
   if (profileLoading.value) parts.push('Waiting for the profile rules to finish loading.')
-  if (profileLoadFailed.value) parts.push('The profile rules could not be loaded — retry above or choose "No profile reference".')
+  if (profileLoadFailed.value) parts.push('The profile rules could not be loaded, retry above or choose "No profile reference".')
   return parts
 })
 
@@ -986,20 +986,20 @@ async function submit() {
             <Select v-model="profileId" :options="profileOptions" placeholder="Optional profile" class="mt-1" />
             <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
               <template v-if="profileLoading">Loading profile rules…</template>
-              <template v-else-if="profileInputCount">Adds {{ profileInputCount }} {{ profileInputCount === 1 ? 'field' : 'fields' }} below — <span class="text-destructive">*</span> marks required. The RO-Crate references {{ selectedProfile.name }} by its saved graph IRI.</template>
-              <template v-else>No additional fields — the RO-Crate references {{ selectedProfile.name }} by its saved graph IRI (conformance only).</template>
+              <template v-else-if="profileInputCount">Adds {{ profileInputCount }} {{ profileInputCount === 1 ? 'field' : 'fields' }} below, <span class="text-destructive">*</span> marks required. The RO-Crate references {{ selectedProfile.name }} by its saved graph IRI.</template>
+              <template v-else>No additional fields, the RO-Crate references {{ selectedProfile.name }} by its saved graph IRI (conformance only).</template>
             </p>
           </div>
         </div>
 
         <div v-if="profileId && profileLoadError && !profileLoadFailed" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          {{ profileLoadError }} You can still create the dataset — it will reference this profile via <code>conformsTo</code> when a profile URI is available.
+          {{ profileLoadError }} You can still create the dataset, it will reference this profile via <code>conformsTo</code> when a profile URI is available.
         </div>
         <div v-if="profileCollisionKeys.length" class="text-xs text-destructive">
           Profile field target collides with built-in dataset fields: {{ profileCollisionKeys.join(', ') }}.
         </div>
         <div v-if="scaffoldClaimedKeys.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          This profile defines {{ scaffoldClaimedKeys.join(', ') }} — those values come from the built-in inputs above, so the profile's own label, input kind and constraints for them are partially ignored.
+          This profile defines {{ scaffoldClaimedKeys.join(', ') }}, those values come from the built-in inputs above, so the profile's own label, input kind and constraints for them are partially ignored.
         </div>
         <div v-if="hasPartScalarCollisionKeys.length" class="text-xs text-destructive">
           A hasPart rule must be an entity reference so it can bind to the Data references section. These hasPart rules use a scalar value and can't be applied: {{ hasPartScalarCollisionKeys.join(', ') }}.

@@ -9,7 +9,7 @@ import './assets/main.css'
 router.onError((error, to) => {
   if (!isChunkError(error)) return
   if (!recoverFromChunkError(to.fullPath)) {
-    reportGlobalError('This page failed to load after an update — please reload the tab.')
+    reportGlobalError('This page failed to load after an update, please reload the tab.')
   }
 })
 

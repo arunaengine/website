@@ -11,10 +11,10 @@ const facts = computed(() => {
   const portal = props.info.portal
   const portalVersion = portal?.installed ? portal.version || 'unknown version' : 'not installed'
   return [
-    { label: 'API version', value: props.info.api_version || '—' },
+    { label: 'API version', value: props.info.api_version || '-' },
     { label: 'Portal', value: portalVersion },
-    { label: 'Portal source', value: portal?.source || '—' },
-    { label: 'Connections', value: connectionCount.value ?? '—' },
+    { label: 'Portal source', value: portal?.source || '-' },
+    { label: 'Connections', value: connectionCount.value ?? '-' },
   ]
 })
 
@@ -58,7 +58,7 @@ const services = computed(() =>
           <span class="w-10 shrink-0 text-xs font-medium text-foreground">{{ iface.label }}</span>
           <Badge :variant="statusVariant(iface.status)" class="shrink-0 text-[10px] uppercase">{{ iface.status || 'unknown' }}</Badge>
           <span class="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-muted-foreground" :title="iface.url || iface.bind || ''">
-            {{ iface.url || iface.bind || '—' }}
+            {{ iface.url || iface.bind || '-' }}
           </span>
         </li>
       </ul>

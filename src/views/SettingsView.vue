@@ -204,7 +204,7 @@ function toggleGroup(groupId: string) {
           <div class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div class="text-sm">
               <div class="font-medium text-foreground">{{ isAuthenticated ? `Signed in as ${currentUser?.name}` : 'Not signed in' }}</div>
-              <div class="text-xs text-muted-foreground">{{ isAuthenticated ? 'Authenticated endpoints are available.' : 'Public endpoints only — sign in to manage data.' }}</div>
+              <div class="text-xs text-muted-foreground">{{ isAuthenticated ? 'Authenticated endpoints are available.' : 'Public endpoints only, sign in to manage data.' }}</div>
             </div>
             <Button v-if="isAuthenticated" variant="outline" size="sm" @click="signOut"><LogOut class="h-3.5 w-3.5" /> Sign out</Button>
             <Button v-else size="sm" :disabled="signingIn" @click="startSignIn"><LogIn class="h-3.5 w-3.5" /> Sign in</Button>
@@ -231,7 +231,7 @@ function toggleGroup(groupId: string) {
             <div>
               <label class="text-xs font-medium text-foreground">Onboarding secret (first admin, optional)</label>
               <Input v-model="onboardingSecret" class="mt-1" type="password" placeholder="Paste onboarding secret" />
-              <p class="mt-1 text-[11px] text-muted-foreground">Only for the first user on a fresh node — claims the realm admin role. Applied on the next sign-in.</p>
+              <p class="mt-1 text-[11px] text-muted-foreground">Only for the first user on a fresh node, claims the realm admin role. Applied on the next sign-in.</p>
             </div>
             <div>
               <label class="text-xs font-medium text-foreground">Existing API token (advanced)</label>
@@ -303,7 +303,7 @@ function toggleGroup(groupId: string) {
             </button>
             <div v-if="!profiles.length" class="text-sm text-muted-foreground">No visible profile documents.</div>
           </div>
-          <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span><span v-if="profileDirty"> — apply with "Save profile" above.</span></div>
+          <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span><span v-if="profileDirty">, apply with "Save profile" above.</span></div>
         </section>
 
         <section id="groups" class="surface overflow-hidden">
@@ -324,7 +324,7 @@ function toggleGroup(groupId: string) {
               </div>
             </li>
             <li v-if="!myGroups.length" class="px-5 py-6 text-center text-xs text-muted-foreground">
-              <p>You are not a member of any group yet — create one to get started.</p>
+              <p>You are not a member of any group yet, create one to get started.</p>
               <Button v-if="currentUser" variant="outline" size="sm" class="mt-3" @click="createGroupOpen = true">
                 <Plus class="h-3.5 w-3.5" /> Create group
               </Button>

@@ -16,7 +16,7 @@ function retry() {
 const stageLabels: Record<string, string> = {
   exchanging: 'Verifying your identity…',
   registering: 'Preparing your Aruna session…',
-  done: 'Signed in — taking you to the portal.',
+  done: 'Signed in, taking you to the portal.',
 }
 
 onMounted(async () => {

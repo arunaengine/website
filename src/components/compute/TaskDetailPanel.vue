@@ -271,11 +271,11 @@ const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.
         <!-- Details -->
         <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
           <dt class="text-muted-foreground">Created</dt>
-          <dd class="text-foreground">{{ task.creation_time ? relativeTime(task.creation_time) : '—' }}</dd>
+          <dd class="text-foreground">{{ task.creation_time ? relativeTime(task.creation_time) : '-' }}</dd>
           <dt class="text-muted-foreground">Group</dt>
           <dd class="text-foreground">
             <span v-if="groupTagLabel" :class="groupTagId && !myGroups.find((g) => g.id === groupTagId) ? 'font-mono' : ''">{{ groupTagLabel }}</span>
-            <span v-else class="text-muted-foreground">—</span>
+            <span v-else class="text-muted-foreground">-</span>
           </dd>
           <template v-if="resourceSummary">
             <dt class="text-muted-foreground">Resources</dt>

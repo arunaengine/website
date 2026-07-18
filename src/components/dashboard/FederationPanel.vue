@@ -362,7 +362,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
             </g>
           </svg>
           <p v-if="edges.length" class="border-t border-border/60 px-5 py-2 text-[11px] text-muted-foreground">
-            Edges show connections as seen by the node serving this portal — not full mesh topology.
+            Edges show connections as seen by the node serving this portal, not full mesh topology.
           </p>
         </div>
 

@@ -79,7 +79,7 @@ function addGrants(suffixes: string[], level: GroupPermissionLevel) {
     }
   }
   notice.value = updated.length
-    ? `Updated the existing access rule for ${updated.join(' and ')} — a role holds one access level per path.`
+    ? `Updated the existing access rule for ${updated.join(' and ')}, a role holds one access level per path.`
     : null
 }
 
@@ -141,7 +141,7 @@ async function submit() {
         </div>
         <p class="mt-0.5 text-xs text-muted-foreground">
           A role is a named set of access rules. Name it, select what it covers, choose an access level, and
-          add access rules — members holding the role get exactly what its rules allow.
+          add access rules, members holding the role get exactly what its rules allow.
         </p>
       </div>
       <Button variant="ghost" size="sm" class="shrink-0" @click="emit('cancel')"><X class="h-3.5 w-3.5" /> Close</Button>
@@ -175,7 +175,7 @@ async function submit() {
             @update:model-value="(value: string) => (pendingLevel = toLevel(value))"
           />
           <span class="min-w-0 flex-1 text-xs" :class="pending.length ? 'text-foreground' : 'text-muted-foreground'">
-            {{ pending.length ? pendingPreview : 'Nothing selected yet — pick a scope or browse above.' }}
+            {{ pending.length ? pendingPreview : 'Nothing selected yet, pick a scope or browse above.' }}
           </span>
           <Button variant="outline" size="sm" class="shrink-0" :disabled="!pending.length" @click="commitPending">
             <Plus class="h-3.5 w-3.5" /> Add access rule
@@ -186,10 +186,10 @@ async function submit() {
       <div class="min-w-0 lg:sticky lg:top-20 lg:self-start">
         <div class="rounded-lg border border-border bg-muted/10 p-4">
           <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {{ role?.public ? 'Everyone — including anonymous visitors — can' : 'Members with this role can' }}
+            {{ role?.public ? 'Everyone, including anonymous visitors, can' : 'Members with this role can' }}
           </div>
           <p v-if="!grants.length" class="mt-1.5 text-xs text-muted-foreground">
-            Add your first access rule — choose what members of this role can reach.
+            Add your first access rule, choose what members of this role can reach.
           </p>
           <ul v-else class="mt-1.5 space-y-1">
             <li v-for="(grant, index) in grants" :key="grant.suffix" class="flex items-center gap-2">

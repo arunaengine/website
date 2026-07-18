@@ -39,11 +39,11 @@ export function stagingErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     switch (err.status) {
       case 400:
-        return 'Invalid source path — use a relative path without "." or ".." segments.'
+        return 'Invalid source path, use a relative path without "." or ".." segments.'
       case 403:
-        return 'Forbidden — you need write access to the target path and read access to the connector source. A group over its storage quota is also rejected with 403.'
+        return 'Forbidden, you need write access to the target path and read access to the connector source. A group over its storage quota is also rejected with 403.'
       case 404:
-        return 'Bucket, connector or source not found — the bucket must belong to the selected group.'
+        return 'Bucket, connector or source not found, the bucket must belong to the selected group.'
       case 501:
         return 'This staging strategy is not implemented by the backend.'
       case 502:

@@ -260,7 +260,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 size="sm"
                 :disabled="downloadingCrate"
                 @click="downloadProfileCrate(selected)"
-                title="Full-fidelity RO-Crate profile — validation rules and form structure travel together"
+                title="Full-fidelity RO-Crate profile, validation rules and form structure travel together"
               >
                 <Download class="h-3.5 w-3.5" /> {{ downloadingCrate ? 'Preparing…' : 'Download profile crate' }}
               </Button>
@@ -268,7 +268,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 variant="outline"
                 size="sm"
                 @click="downloadModeFile(selected)"
-                title="Mode file (Describo/Crate-O) — structure only; validation rules travel in the profile crate"
+                title="Mode file (Describo/Crate-O), structure only; validation rules travel in the profile crate"
               >
                 <Download class="h-3.5 w-3.5" /> Mode file (Describo/Crate-O)
               </Button>
@@ -317,7 +317,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 <Badge :variant="obligationBadgeVariant(entry.obligation)" class="text-[10px] font-semibold uppercase tracking-wide">{{ entry.obligation }}</Badge>
                 <span>include an entity of type</span>
                 <b class="font-semibold text-aruna-navy">{{ entityTypeLabel(entry.rule.type) }}</b>
-                <span v-if="entry.rule.label && entry.rule.label.toLowerCase() !== entityTypeLabel(entry.rule.type).toLowerCase()" class="text-muted-foreground">— {{ entry.rule.label }}</span>
+                <span v-if="entry.rule.label && entry.rule.label.toLowerCase() !== entityTypeLabel(entry.rule.type).toLowerCase()" class="text-muted-foreground">- {{ entry.rule.label }}</span>
                 <!-- Derived obligation is explained by the property that references this type. -->
                 <span v-if="entry.via" class="text-[11px] text-muted-foreground">via <code class="hash rounded bg-muted px-1 py-0.5 text-foreground/70">{{ entry.via.valueName }}</code></span>
               </div>

@@ -25,7 +25,7 @@ const emit = defineEmits<{ (e: 'select', suffixes: string[]): void }>()
 const { listGroupMetadata, realmInfo, nodeInfo } = useAruna()
 
 const SCOPES = [
-  { key: 'all', title: 'Everything', icon: Globe, suffixes: ['**'], hint: 'Files, metadata and group administration — the whole group.' },
+  { key: 'all', title: 'Everything', icon: Globe, suffixes: ['**'], hint: 'Files, metadata and group administration, the whole group.' },
   { key: 'data-meta', title: 'Data & metadata', icon: Layers, suffixes: ['meta/**', 'data/**'], hint: 'All files and all metadata documents, but no group administration.' },
   { key: 'meta', title: 'Metadata', icon: ListChecks, suffixes: ['meta/**'], hint: 'All metadata documents. Browse below to narrow this down.' },
   { key: 'data', title: 'Data', icon: Boxes, suffixes: ['data/**'], hint: 'All files on every node. Pick a node below to narrow this down.' },
@@ -259,7 +259,7 @@ watch(
           </p>
           <template v-else>
             <p class="mt-1 text-[11px] text-muted-foreground">
-              This portal can only browse folders on its own node — type a bucket or folder path instead.
+              This portal can only browse folders on its own node, type a bucket or folder path instead.
             </p>
             <div class="mt-1.5 flex items-center gap-2">
               <Input

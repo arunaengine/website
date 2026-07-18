@@ -77,7 +77,7 @@ watch(
 const nodeOptions = computed(() =>
   realmNodes.nodes.value.map((node) => ({
     value: node.nodeId,
-    label: `${node.label}${node.isLocal ? ' (this node)' : ''}${node.reachable ? '' : ' — offline'}`,
+    label: `${node.label}${node.isLocal ? ' (this node)' : ''}${node.reachable ? '' : ' (offline)'}`,
   })),
 )
 
@@ -164,7 +164,7 @@ async function submit() {
       if (err.status === 409) {
         error.value = 'This sync relationship already exists.'
       } else if (err.status === 502) {
-        error.value = 'The target node is unreachable right now — the relationship was not created.'
+        error.value = 'The target node is unreachable right now, the relationship was not created.'
       } else if (err.status === 401 || err.status === 403) {
         error.value = 'You need read access on the source bucket to set up a sync.'
       } else {
@@ -279,7 +279,7 @@ async function submit() {
         </label>
 
         <p v-if="sameEndpoint" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          Source and target are the same bucket and prefix — pick a different node, bucket or prefix.
+          Source and target are the same bucket and prefix, pick a different node, bucket or prefix.
         </p>
         <p v-if="pullMode && !sourceApiBase" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
           {{ sourceNodeLabel }} does not publish an API URL, so the sync cannot be created from here. Create it from that node's portal instead.

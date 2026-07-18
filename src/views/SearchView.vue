@@ -383,7 +383,7 @@ async function runQuery() {
             class="surface flex flex-wrap items-center gap-2 border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs"
           >
             <AlertTriangle class="h-4 w-4 text-amber-600" />
-            <span>Partial results — {{ nodesQueried - nodesFailed }} of {{ nodesQueried }} nodes answered; matches on failed nodes are missing.</span>
+            <span>Partial results, {{ nodesQueried - nodesFailed }} of {{ nodesQueried }} nodes answered; matches on failed nodes are missing.</span>
             <Button variant="outline" size="sm" class="ml-auto" @click="retrySearch">Retry</Button>
           </div>
 
@@ -529,7 +529,7 @@ async function runQuery() {
                     <h3 v-if="line.title" class="font-display text-sm font-semibold text-aruna-navy">{{ line.title }}</h3>
                     <h3 v-else class="break-all font-mono text-xs font-semibold text-aruna-navy">{{ line.hit.document_path }}</h3>
                     <p v-if="line.snippet" class="mt-1 line-clamp-2 text-xs text-muted-foreground">{{ line.snippet }}</p>
-                    <p class="mt-1 text-[11px] text-muted-foreground">Not in the loaded catalog — open for details.</p>
+                    <p class="mt-1 text-[11px] text-muted-foreground">Not in the loaded catalog, open for details.</p>
                   </div>
                   <div class="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                     <span class="truncate font-mono">{{ truncateMiddle(line.hit.document_id) }}</span>
@@ -569,11 +569,11 @@ async function runQuery() {
             </div>
             <div v-if="nextCursor && !moreError && !loadingMore" :key="nextCursor" ref="sentinel" class="h-1" aria-hidden="true" />
             <p v-else-if="!moreError && !searchPending && !loadingMore" class="py-2 text-center text-[11px] text-muted-foreground">
-              {{ truncated ? 'End of the first results — refine the query to reach matches past the server depth cap.' : 'End of results.' }}
+              {{ truncated ? 'End of the first results, refine the query to reach matches past the server depth cap.' : 'End of results.' }}
             </p>
           </template>
           <p v-else-if="!cursorEnabled && capped" class="py-2 text-center text-[11px] text-muted-foreground">
-            Showing the first 100 matches by relevance — refine the query to narrow results.
+            Showing the first 100 matches by relevance, refine the query to narrow results.
           </p>
           </template>
         </template>

@@ -229,7 +229,7 @@ export function useJobDetail(jobId: () => string | null) {
       // pruned), so only 405 is safe to read as an absent endpoint.
       if (err instanceof ApiError && err.status === 404) {
         loadState.value = 'error'
-        loadError.value = 'Job not found — it may have been pruned.'
+        loadError.value = 'Job not found, it may have been pruned.'
       } else if (err instanceof ApiError && err.status === 405) {
         loadState.value = 'unsupported'
       } else {

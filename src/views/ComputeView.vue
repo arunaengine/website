@@ -69,14 +69,14 @@ function startSignIn() {
               <Zap class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span class="min-w-0">
                 <span class="block text-sm font-medium text-foreground">Quick run</span>
-                <span class="block text-xs leading-relaxed text-muted-foreground">Write a short script — the portal stages it and builds the TES task for you.</span>
+                <span class="block text-xs leading-relaxed text-muted-foreground">Write a short script, the portal stages it and builds the TES task for you.</span>
               </span>
             </DropdownMenuItem>
             <DropdownMenuItem class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" @click="goNew">
               <ListPlus class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span class="min-w-0">
                 <span class="block text-sm font-medium text-foreground">New task</span>
-                <span class="block text-xs leading-relaxed text-muted-foreground">Describe a full GA4GH TES task by hand — image, command, resources.</span>
+                <span class="block text-xs leading-relaxed text-muted-foreground">Describe a full GA4GH TES task by hand, image, command, resources.</span>
               </span>
             </DropdownMenuItem>
           </DropdownMenuContent>

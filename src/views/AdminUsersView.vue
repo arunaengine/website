@@ -297,14 +297,14 @@ const sharedGroups = computed(() => {
                 class="border-b border-border/60 last:border-b-0 hover:bg-muted/40"
               >
                 <td class="px-5 py-3">
-                  <div class="font-medium text-foreground">{{ row.user.name || '—' }}</div>
+                  <div class="font-medium text-foreground">{{ row.user.name || '-' }}</div>
                   <div class="font-mono text-[10px] text-muted-foreground">{{ truncateMiddle(row.user.user_id, 10, 6) }}</div>
                 </td>
                 <td class="px-5 py-3 tabular-nums text-muted-foreground">
-                  {{ row.hydrated ? row.user.subject_ids.length : '—' }}
+                  {{ row.hydrated ? row.user.subject_ids.length : '-' }}
                 </td>
                 <td class="px-5 py-3">
-                  <span v-if="!row.hydrated" class="text-muted-foreground">—</span>
+                  <span v-if="!row.hydrated" class="text-muted-foreground">-</span>
                   <span v-else-if="!attributeKeys(row.user).length" class="text-muted-foreground">none</span>
                   <span v-else class="flex flex-wrap items-center gap-1">
                     <Badge v-for="key in attributeKeys(row.user).slice(0, 3)" :key="key" variant="outline" class="font-mono">
@@ -355,7 +355,7 @@ const sharedGroups = computed(() => {
           v-else-if="!activeError && searching && searchTruncated"
           class="border-t border-border bg-muted/20 px-5 py-2 text-[11px] text-muted-foreground"
         >
-          Only the first {{ searchRows.length }} matches are shown — refine the search to narrow it down.
+          Only the first {{ searchRows.length }} matches are shown, refine the search to narrow it down.
         </footer>
       </section>
     </div>
@@ -384,7 +384,7 @@ const sharedGroups = computed(() => {
               <CopyButton :value="detail.user_id" label="Copy user id" />
             </div>
             <p v-if="detailError" class="text-[11px] text-amber-700 dark:text-amber-300">
-              Refresh failed ({{ detailError }}) — showing the last loaded state.
+              Refresh failed ({{ detailError }}), showing the last loaded state.
             </p>
           </div>
 
@@ -429,7 +429,7 @@ const sharedGroups = computed(() => {
             </ul>
             <p class="text-[11px] text-muted-foreground">
               Group member lists are only visible to their members, so this shows the groups you share with this
-              user — not their full memberships.
+              user, not their full memberships.
             </p>
           </section>
         </div>

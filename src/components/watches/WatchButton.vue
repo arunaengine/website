@@ -98,7 +98,7 @@ async function onDelete() {
         <DialogDescription>
           {{
             watching
-              ? 'Uploads under this path — your own included — are delivered to your notifications; delivery can lag a few seconds. You can stop watching at any time.'
+              ? 'Uploads under this path, your own included, are delivered to your notifications; delivery can lag a few seconds. You can stop watching at any time.'
               : 'Get notified for every matching event under this path, your own uploads included. Delivery can lag a few seconds.'
           }}
         </DialogDescription>

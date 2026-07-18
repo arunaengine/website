@@ -22,7 +22,7 @@ export interface CustomEntityType {
 }
 
 export const CURATED_ENTITY_TYPES: EntityTypeOption[] = [
-  { uri: 'http://schema.org/Dataset', label: 'Dataset', description: 'A collection of data — the crate root and any nested datasets.' },
+  { uri: 'http://schema.org/Dataset', label: 'Dataset', description: 'A collection of data, the crate root and any nested datasets.' },
   { uri: 'http://schema.org/Person', label: 'Person', description: 'A person, e.g. an author, creator or contributor.' },
   { uri: 'http://schema.org/Organization', label: 'Organization', description: 'An organization such as a lab, institution or publisher.' },
   { uri: 'http://schema.org/CreativeWork', label: 'CreativeWork', description: 'A generic creative work referenced by the crate.' },

@@ -209,7 +209,7 @@ function pickRemote(hit: TermHit) {
         v-if="showDegradedHint"
         class="mt-1 flex items-baseline gap-1.5 text-[11px] text-muted-foreground"
       >
-        <span class="min-w-0">Remote terminology service unreachable — showing bundled vocabulary.</span>
+        <span class="min-w-0">Remote terminology service unreachable, showing bundled vocabulary.</span>
         <button
           type="button"
           class="shrink-0 font-medium underline-offset-2 hover:text-foreground hover:underline"

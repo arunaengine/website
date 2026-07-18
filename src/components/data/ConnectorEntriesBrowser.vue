@@ -193,10 +193,10 @@ defineExpose({ reload: load })
                   </span>
                 </td>
                 <td class="px-2 py-1.5 text-right font-mono text-[11px] text-muted-foreground">
-                  {{ entry.kind === 'file' && entry.size !== undefined ? formatBytes(entry.size) : '—' }}
+                  {{ entry.kind === 'file' && entry.size !== undefined ? formatBytes(entry.size) : '-' }}
                 </td>
                 <td class="px-2 py-1.5 text-right text-[11px] text-muted-foreground">
-                  {{ entry.modified_ms ? relativeTime(new Date(entry.modified_ms).toISOString()) : '—' }}
+                  {{ entry.modified_ms ? relativeTime(new Date(entry.modified_ms).toISOString()) : '-' }}
                 </td>
               </tr>
               <tr v-if="!loading && !entries.length && !gatewayError">
@@ -206,7 +206,7 @@ defineExpose({ reload: load })
           </table>
         </div>
         <div v-if="truncated" class="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">
-          Listing truncated — open a folder to narrow it down.
+          Listing truncated, open a folder to narrow it down.
         </div>
       </div>
 

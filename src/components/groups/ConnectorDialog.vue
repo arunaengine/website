@@ -258,7 +258,7 @@ async function submit() {
           <fieldset class="space-y-3 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">Credentials (optional)</legend>
             <p class="text-[11px] text-muted-foreground">
-              Stored write-only — the server never returns them.
+              Stored write-only, the server never returns them.
             </p>
             <div v-for="field in schema.secret" :key="field.key">
               <label :for="`${uid}-sec-${field.key}`" class="text-xs font-medium text-foreground">{{ field.label }}</label>
@@ -278,7 +278,7 @@ async function submit() {
               <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 This connector has stored credentials that cannot be shown. Saving replaces the whole
-                secret configuration — leave the fields blank to remove them, or re-enter values to keep
+                secret configuration, leave the fields blank to remove them, or re-enter values to keep
                 credentials on the connector.
               </span>
             </div>
@@ -290,7 +290,7 @@ async function submit() {
             class="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300"
           >
             <CheckCircle2 class="h-3.5 w-3.5 shrink-0" />
-            Connection OK{{ testResult.latency_ms !== undefined ? ` — ${testResult.latency_ms} ms` : '' }}.
+            Connection OK{{ testResult.latency_ms !== undefined ? `, ${testResult.latency_ms} ms` : '' }}.
           </p>
           <p
             v-else-if="testResult"
@@ -310,7 +310,7 @@ async function submit() {
             {{ submitError }}
           </p>
           <div v-if="writesDisabled" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            You're offline — saving a connector needs connectivity.
+            You're offline, saving a connector needs connectivity.
           </div>
         </div>
 

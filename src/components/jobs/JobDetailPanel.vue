@@ -90,7 +90,7 @@ async function confirmCancel() {
             :label="`Job progress: ${progressText}`"
           />
           <p class="text-xs text-foreground">{{ progressText }}</p>
-          <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed — {{ lastPollError }}</p>
+          <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
         </section>
 
         <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">

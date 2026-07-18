@@ -342,7 +342,7 @@ async function leave() {
                 :ceiling-bytes="quotaStatus?.ceiling_bytes"
               />
             </div>
-            <p class="mt-2 text-[11px] text-muted-foreground">Logical bytes — the counter quotas are enforced against.</p>
+            <p class="mt-2 text-[11px] text-muted-foreground">Logical bytes, the counter quotas are enforced against.</p>
           </template>
         </div>
       </div>

@@ -315,7 +315,7 @@ async function submit() {
     submittedTaskId.value = created.id
     if (created.workspaceIgnored) {
       workspaceNotice.value =
-        'Workspace choices are not supported by this node yet — the run was submitted without one.'
+        'Workspace choices are not supported by this node yet, the run was submitted without one.'
     }
   } catch (err) {
     submitError.value = isTesUnsupported(err)

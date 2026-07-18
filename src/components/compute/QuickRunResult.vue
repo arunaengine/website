@@ -162,7 +162,7 @@ const bucketPrefixQuery = computed(() => props.outputPrefix.replace(/\/$/, ''))
           Open full task detail <ExternalLink class="h-3 w-3" />
         </RouterLink>
       </div>
-      <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed — {{ lastPollError }}</p>
+      <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
 
       <!-- In / out — mirrors the wizard's data step. -->
       <div class="grid gap-4 lg:grid-cols-2">
@@ -197,7 +197,7 @@ const bucketPrefixQuery = computed(() => props.outputPrefix.replace(/\/$/, ''))
           <div v-else-if="outputsState === 'loading'" class="text-[11px] text-muted-foreground">Listing the output prefix…</div>
           <p v-else-if="outputsState === 'error'" class="text-[11px] text-destructive">{{ outputsError }}</p>
           <p v-else-if="!outputs.length" class="text-[11px] text-muted-foreground">
-            No files under <code class="rounded bg-muted px-1 font-mono">{{ outputPrefix || '/' }}</code> — stdout and stderr live in the streams below.
+            No files under <code class="rounded bg-muted px-1 font-mono">{{ outputPrefix || '/' }}</code>, stdout and stderr live in the streams below.
           </p>
           <ul v-else class="divide-y divide-border/70 overflow-hidden rounded-md border border-border/70 bg-card">
             <li v-for="file in outputs" :key="file.key" class="flex items-center gap-3 px-3 py-2 text-xs">

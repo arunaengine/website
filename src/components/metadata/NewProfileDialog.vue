@@ -74,7 +74,7 @@ const currentStepCallout = computed(() => {
   if (step.value === 1) {
     const unanchored = builder.basicsFieldErrors.filter((error) => !error.fieldId).map((error) => error.message)
     if (startTab.value === 'import' && builder.basicsFieldErrors.some((error) => error.fieldId && error.fieldId !== 'token')) {
-      return [...unanchored, 'Finish the profile details in the Create tab — importing prefills them.']
+      return [...unanchored, 'Finish the profile details in the Create tab, importing prefills them.']
     }
     return unanchored
   }
@@ -193,7 +193,7 @@ async function submit() {
         </DialogTitle>
         <DialogDescription>
           <template v-if="isEditing">Adjust the profile's rules and details; saving replaces the stored profile crate in place.</template>
-          <template v-else>Define which RO-Crate entities must, should, or may exist, and the property rules for each — step by step.</template>
+          <template v-else>Define which RO-Crate entities must, should, or may exist, and the property rules for each, step by step.</template>
         </DialogDescription>
       </DialogHeader>
 
@@ -238,7 +238,7 @@ async function submit() {
             <div v-if="builder.importSummary" class="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
               <CheckCircle2 class="h-3.5 w-3.5 shrink-0" />
               <span>
-                Imported from {{ builder.importSummary.kind === 'mode' ? 'a mode file' : 'a profile crate' }}<template v-if="builder.importSummary.name">: <b>{{ builder.importSummary.name }}</b></template> — review the prefilled fields below.
+                Imported from {{ builder.importSummary.kind === 'mode' ? 'a mode file' : 'a profile crate' }}<template v-if="builder.importSummary.name">: <b>{{ builder.importSummary.name }}</b></template>, review the prefilled fields below.
               </span>
             </div>
             <ProfileBasicsStep :builder="builder" />
@@ -273,7 +273,7 @@ async function submit() {
             Public profiles publish their artifacts to this node's S3 storage, but the node does not advertise an S3 endpoint.
           </template>
           <template v-else>
-            Public profiles publish their artifacts to S3 so other tools can fetch them without a token — create S3 credentials for this group first.
+            Public profiles publish their artifacts to S3 so other tools can fetch them without a token, create S3 credentials for this group first.
           </template>
         </span>
         <Button v-if="s3.endpoint.value" variant="outline" size="sm" @click="credentialDialogOpen = true">

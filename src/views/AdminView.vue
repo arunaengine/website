@@ -362,7 +362,7 @@ async function save() {
         </section>
 
         <p v-if="!isManagementNode" class="surface px-5 py-3 text-xs text-muted-foreground">
-          This node is a {{ nodeCapability }} node — the quota policy can only be edited through a management node.
+          This node is a {{ nodeCapability }} node, the quota policy can only be edited through a management node.
         </p>
 
         <section id="policy" class="surface">
@@ -404,7 +404,7 @@ async function save() {
               <div>
                 <label class="text-xs font-medium text-foreground">Max devices per user</label>
                 <Input v-model="draft.maxDevices" type="number" min="0" placeholder="Unlimited" class="mt-1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Stored in the policy; not enforced yet — device enrollment is still in development.</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">Stored in the policy; not enforced yet, device enrollment is still in development.</p>
               </div>
             </div>
           </div>
@@ -430,7 +430,7 @@ async function save() {
                 <Button variant="ghost" size="sm" class="ml-auto text-destructive hover:text-destructive" @click="removeOverride(i)"><Trash2 class="h-3.5 w-3.5" /></Button>
               </div>
               <div class="mt-1.5 text-[11px] text-muted-foreground">
-                <template v-if="o.quota.unlimited">Unlimited — exempts this group from byte quotas entirely.</template>
+                <template v-if="o.quota.unlimited">Unlimited, exempts this group from byte quotas entirely.</template>
                 <template v-else>
                   <span v-if="quotaFieldValid(o.quota)">Quota {{ formatBytes(fieldBytes(o.quota) ?? 0) }}</span>
                   · Grace {{ text(o.grace).trim() === '' ? 'inherits the global factor' : `${o.grace}%` }}
@@ -484,7 +484,7 @@ async function save() {
             <span v-if="saveError" class="text-destructive">{{ saveError }}</span>
             <span v-else-if="invalid" class="text-destructive">{{ clientErrors[0] }}</span>
             <span v-else-if="saveMessage" class="text-emerald-700 dark:text-emerald-300">{{ saveMessage }}</span>
-            <span v-else-if="dirty" class="text-muted-foreground">Unsaved changes — replaces the entire realm quota policy.</span>
+            <span v-else-if="dirty" class="text-muted-foreground">Unsaved changes, replaces the entire realm quota policy.</span>
             <span v-else class="text-muted-foreground">All changes saved.</span>
           </div>
           <div class="flex items-center gap-2">

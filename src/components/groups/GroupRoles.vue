@@ -113,8 +113,8 @@ async function removeRole(role: ApiRole) {
 <template>
   <div>
     <p class="border-b border-border px-5 py-3 text-xs text-muted-foreground">
-      Roles decide what members can reach: each role is a set of access rules — an access level on part of
-      this group — and is assigned to members in the Members tab.
+      Roles decide what members can reach: each role is a set of access rules, an access level on part of
+      this group, and is assigned to members in the Members tab.
     </p>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -138,10 +138,10 @@ async function removeRole(role: ApiRole) {
               <Badge v-if="cellLevel(role, scope.paths)" :variant="levelVariant(cellLevel(role, scope.paths)!)" class="text-[10px] uppercase">
                 {{ cellLevel(role, scope.paths) }}
               </Badge>
-              <span v-else class="text-muted-foreground">—</span>
+              <span v-else class="text-muted-foreground">-</span>
             </td>
             <td class="px-3 py-2.5 text-right text-[11px] tabular-nums text-muted-foreground">
-              {{ role.assigned_users ? role.assigned_users.length : '—' }}
+              {{ role.assigned_users ? role.assigned_users.length : '-' }}
             </td>
             <td v-if="canManage" class="px-5 py-2.5 text-right">
               <span v-if="role.name === 'admin'" class="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title="The admin role cannot be changed or deleted.">

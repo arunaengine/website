@@ -737,7 +737,7 @@ const isEmpty = computed(
         <template v-if="s3.hasActiveKey.value">
           <span
             class="flex items-center gap-1 font-mono text-[11px] text-muted-foreground"
-            :title="`Signing with key ${s3.activeKey.value?.accessKeyId} — manage keys in Settings`"
+            :title="`Signing with key ${s3.activeKey.value?.accessKeyId}, manage keys in Settings`"
           >
             <KeyRound class="h-3 w-3" /> …{{ keyTail }}
           </span>
@@ -932,7 +932,7 @@ const isEmpty = computed(
                   v-if="bucketSyncCount"
                   variant="outline"
                   size="sm"
-                  :title="`${bucketSyncCount} sync relationship${bucketSyncCount === 1 ? '' : 's'} — open sync status`"
+                  :title="`${bucketSyncCount} sync relationship${bucketSyncCount === 1 ? '' : 's'}, open sync status`"
                   @click="syncPanelOpen = true"
                 >
                   <ArrowLeftRight class="h-4 w-4 text-primary" />
@@ -942,7 +942,7 @@ const isEmpty = computed(
                   <Button
                     variant="outline"
                     size="sm"
-                    :title="`${referenceStats.count} referenced object${referenceStats.count === 1 ? '' : 's'} · ${formatBytes(referenceStats.bytes)} — open per-source breakdown`"
+                    :title="`${referenceStats.count} referenced object${referenceStats.count === 1 ? '' : 's'} · ${formatBytes(referenceStats.bytes)}, open per-source breakdown`"
                   >
                     <Link2 class="h-4 w-4 text-primary" />
                     <span class="font-mono text-xs">{{ formatBytes(referenceStats.bytes) }}</span>
@@ -990,13 +990,13 @@ const isEmpty = computed(
             <div v-if="remoteBlocked" class="surface p-8 text-center">
               <CloudOff class="mx-auto h-6 w-6 text-muted-foreground" />
               <p class="mt-3 text-sm font-medium text-foreground">
-                Hosted on {{ realmNodes.displayName(remoteNodeId) }} — browsing is unavailable from this origin.
+                Hosted on {{ realmNodes.displayName(remoteNodeId) }}, browsing is unavailable from this origin.
               </p>
               <p class="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
                 {{
                   remoteEndpointMissing
                     ? 'The node does not publish an S3 endpoint, so its objects cannot be listed here.'
-                    : 'The node’s S3 endpoint did not answer this browser — it may be unreachable or not allow cross-origin browsing.'
+                    : 'The node’s S3 endpoint did not answer this browser, it may be unreachable or not allow cross-origin browsing.'
                 }}
               </p>
               <div class="mt-4 flex justify-center gap-2">
@@ -1018,7 +1018,7 @@ const isEmpty = computed(
               @drop.prevent="onDrop"
             >
               <div v-if="listError && listAuthError" class="border-b border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
-                <p>Your S3 credentials were rejected — the key may be invalid, expired, or revoked.</p>
+                <p>Your S3 credentials were rejected, the key may be invalid, expired, or revoked.</p>
                 <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ listError }}</p>
                 <div class="mt-2 flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="h-3.5 w-3.5" /> Create new credentials</Button>
@@ -1063,8 +1063,8 @@ const isEmpty = computed(
                         </span>
                       </span>
                     </td>
-                    <td class="px-4 py-2.5 text-right text-muted-foreground">—</td>
-                    <td class="px-4 py-2.5 text-muted-foreground">—</td>
+                    <td class="px-4 py-2.5 text-right text-muted-foreground">-</td>
+                    <td class="px-4 py-2.5 text-muted-foreground">-</td>
                     <td class="px-4 py-2.5"></td>
                   </tr>
                   <!-- Row click previews; the action buttons stop propagation. -->
@@ -1094,8 +1094,8 @@ const isEmpty = computed(
                         </span>
                       </span>
                     </td>
-                    <td class="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '—' }}</td>
-                    <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '—' }}</td>
+                    <td class="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
+                    <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
                     <td class="px-4 py-2.5">
                       <div class="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon-sm" aria-label="Preview" @click.stop="openPreview(object)"><Eye class="size-3.5" /></Button>
@@ -1218,7 +1218,7 @@ const isEmpty = computed(
         <DialogHeader>
           <DialogTitle>Storage quota warning</DialogTitle>
           <DialogDescription>
-            This upload would push the group past its storage quota. The check is advisory — you can still upload.
+            This upload would push the group past its storage quota. The check is advisory, you can still upload.
           </DialogDescription>
         </DialogHeader>
         <div v-if="precheck" class="space-y-2 text-xs">
@@ -1228,7 +1228,7 @@ const isEmpty = computed(
           >
             This upload adds <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
             <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>. It would exceed the group's hard cap of
-            <strong>{{ formatBytes(precheck.projected.ceilingBytes ?? 0) }}</strong> — the node rejects writes above the cap with <code>QuotaExceeded</code>.
+            <strong>{{ formatBytes(precheck.projected.ceilingBytes ?? 0) }}</strong>, the node rejects writes above the cap with <code>QuotaExceeded</code>.
           </div>
           <div
             v-else

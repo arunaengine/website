@@ -170,7 +170,7 @@ function applyVocabClass(term: VocabTerm) {
 <template>
   <div class="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
     <div v-if="locked" class="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-      <Lock class="h-3.5 w-3.5" /> RO-Crate baseline — fixed
+      <Lock class="h-3.5 w-3.5" /> RO-Crate baseline, fixed
     </div>
 
     <!-- Derived, read-only obligation: an entity type is required iff a required
@@ -184,8 +184,8 @@ function applyVocabClass(term: VocabTerm) {
       <template v-else>
         <Badge :variant="obligationBadgeVariant(obligation.obligation)">{{ PROFILE_OBLIGATION_LABELS[obligation.obligation].label }}</Badge>
         <span class="text-[11px]">
-          <template v-if="obligation.via">derived — referenced by <code class="rounded bg-muted px-1">{{ obligation.via.valueName }}</code> on {{ obligation.via.entityLabel }}</template>
-          <template v-else>derived — no property references this type yet</template>
+          <template v-if="obligation.via">derived, referenced by <code class="rounded bg-muted px-1">{{ obligation.via.valueName }}</code> on {{ obligation.via.entityLabel }}</template>
+          <template v-else>derived, no property references this type yet</template>
         </span>
       </template>
     </div>
@@ -200,7 +200,7 @@ function applyVocabClass(term: VocabTerm) {
       <ul class="space-y-0.5">
         <li v-for="(reference, index) in references" :key="index" class="flex flex-wrap items-center gap-1">
           <Badge :variant="obligationBadgeVariant(reference.obligation)" class="text-[10px]">{{ PROFILE_OBLIGATION_LABELS[reference.obligation].label }}</Badge>
-          <span>— referenced by <code class="rounded bg-muted px-1 text-foreground">{{ reference.valueName }}</code> on {{ reference.entityLabel }}</span>
+          <span>- referenced by <code class="rounded bg-muted px-1 text-foreground">{{ reference.valueName }}</code> on {{ reference.entityLabel }}</span>
         </li>
       </ul>
     </div>
@@ -281,7 +281,7 @@ function applyVocabClass(term: VocabTerm) {
         >
           <component :is="showBaseline ? ChevronDown : ChevronRight" class="h-3.5 w-3.5 shrink-0" />
           <Lock class="h-3 w-3 shrink-0" />
-          RO-Crate baseline rules ({{ baselineProperties.length }}) — always applied, shown for reference
+          RO-Crate baseline rules ({{ baselineProperties.length }}), always applied, shown for reference
         </button>
         <div v-if="showBaseline" class="space-y-2 border-t border-border p-2">
           <PropertyRuleCard

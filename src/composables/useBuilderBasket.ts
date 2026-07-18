@@ -281,7 +281,7 @@ export function useBuilderBasket(ctx: {
         for (const row of batch) {
           if (row.isPrefix) {
             row.state = 'error'
-            row.error = 'Folder staging is not supported by this node yet — add the files individually.'
+            row.error = 'Folder staging is not supported by this node yet, add the files individually.'
           } else {
             row.state = 'ready'
           }
@@ -311,7 +311,7 @@ export function useBuilderBasket(ctx: {
       for (const row of stagingRows) {
         if (row.isPrefix) {
           row.state = 'error'
-          row.error = 'Folder staging is not supported by this node yet — add the files individually.'
+          row.error = 'Folder staging is not supported by this node yet, add the files individually.'
         } else {
           await runStaging(row)
         }

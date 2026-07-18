@@ -88,7 +88,7 @@ function addExternal() {
         <TabsContent value="node">
           <div v-if="!s3.endpoint.value" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>This node does not advertise an S3 endpoint — reference external data by URL instead.</span>
+            <span>This node does not advertise an S3 endpoint, reference external data by URL instead.</span>
           </div>
           <div v-else-if="!s3.hasActiveKey.value" class="space-y-2 rounded-md border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
             <p class="flex items-center gap-2 font-medium text-foreground"><KeyRound class="h-3.5 w-3.5" /> S3 credentials needed to browse node data.</p>

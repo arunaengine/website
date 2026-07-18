@@ -409,19 +409,19 @@ export function licenseEntity(license: string): Record<string, unknown> {
 const CC_LICENSES: Record<string, { name: string; description: string }> = {
   'https://creativecommons.org/licenses/by/4.0': {
     name: 'Creative Commons Attribution 4.0 International',
-    description: 'CC BY 4.0 — reuse with attribution.',
+    description: 'CC BY 4.0, reuse with attribution.',
   },
   'https://creativecommons.org/licenses/by-sa/4.0': {
     name: 'Creative Commons Attribution-ShareAlike 4.0 International',
-    description: 'CC BY-SA 4.0 — reuse with attribution under the same terms.',
+    description: 'CC BY-SA 4.0, reuse with attribution under the same terms.',
   },
   'https://creativecommons.org/licenses/by-nc/4.0': {
     name: 'Creative Commons Attribution-NonCommercial 4.0 International',
-    description: 'CC BY-NC 4.0 — non-commercial reuse with attribution.',
+    description: 'CC BY-NC 4.0, non-commercial reuse with attribution.',
   },
   'https://creativecommons.org/publicdomain/zero/1.0': {
     name: 'Creative Commons CC0 1.0 Universal',
-    description: 'CC0 1.0 — dedicated to the public domain.',
+    description: 'CC0 1.0, dedicated to the public domain.',
   },
 }
 
@@ -435,7 +435,7 @@ function profileHtml(profile: ProfileBasics, entities: ProfileEntityRule[]): str
             rule.kind === 'entity' && rule.entityTypes?.length
               ? ` referencing ${rule.entityTypes.map((type) => escapeHtml(termNameFromUri(type))).join(' or ')}`
               : ''
-          const detail = rule.description ? ` — ${escapeHtml(rule.description)}` : ''
+          const detail = rule.description ? `, ${escapeHtml(rule.description)}` : ''
           return `<li>${escapeHtml(entity.label)} entities ${verb} provide <strong>${escapeHtml(rule.label)}</strong> (<code>${escapeHtml(rule.valueName)}</code>)${target}${detail}.${ruleConstraintHtml(rule)}</li>`
         })
         .join('')
@@ -467,7 +467,7 @@ function ruleConstraintHtml(rule: ProfilePropertyRule): string {
         const match = instance.id
           ? `with @id <code>${escapeHtml(instance.id)}</code>`
           : `named <strong>${escapeHtml(instance.name ?? '')}</strong>`
-        const hint = instance.hint ? ` — ${escapeHtml(instance.hint)}` : ''
+        const hint = instance.hint ? `, ${escapeHtml(instance.hint)}` : ''
         return `<li>${rule.obligation} contain an entry ${match}${hint}; more are allowed.</li>`
       })
       .join('')

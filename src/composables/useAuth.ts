@@ -43,7 +43,7 @@ async function resolveProvider() {
   }
   const provider = info.oidc_providers[0]
   if (!provider) {
-    throw new Error('The realm has no OIDC provider configured — sign-in is not available.')
+    throw new Error('The realm has no OIDC provider configured, sign-in is not available.')
   }
   // The realm announces the audience its tokens must carry; for the Keycloak
   // public client this doubles as the client id (same convention as aruna-doctor).
@@ -96,8 +96,8 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
   try {
     const state = params.get('state')
     const expectedState = window.sessionStorage.getItem(STATE_KEY)
-    if (!expectedState) throw new Error('This sign-in attempt was not started here — please try again.')
-    if (state !== expectedState) throw new Error('State mismatch — please try signing in again.')
+    if (!expectedState) throw new Error('This sign-in attempt was not started here, please try again.')
+    if (state !== expectedState) throw new Error('State mismatch, please try signing in again.')
     consumeTransaction = true
 
     const oidcError = params.get('error')
@@ -108,7 +108,7 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
     const verifier = window.sessionStorage.getItem(VERIFIER_KEY)
     if (!code) throw new Error('The identity provider did not return an authorization code.')
     if (!verifier) {
-      throw new Error('This sign-in attempt was not started here — please try again.')
+      throw new Error('This sign-in attempt was not started here, please try again.')
     }
 
     stage.value = 'exchanging'

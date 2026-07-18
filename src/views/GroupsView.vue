@@ -77,7 +77,7 @@ function toggleGroup(groupId: string) {
 
 const description = computed(() =>
   currentUser.value
-    ? 'Your groups in this realm — manage members, roles and permissions.'
+    ? 'Your groups in this realm, manage members, roles and permissions.'
     : 'Groups in this realm. Sign in from the top bar to create and manage groups.',
 )
 </script>
@@ -132,7 +132,7 @@ const description = computed(() =>
                 loading
                   ? 'Loading groups…'
                   : currentUser
-                    ? 'You are not a member of any group yet — create one to get started.'
+                    ? 'You are not a member of any group yet, create one to get started.'
                     : 'Sign in to see the groups you belong to.'
               }}
             </p>

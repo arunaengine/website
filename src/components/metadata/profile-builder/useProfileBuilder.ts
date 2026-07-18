@@ -849,12 +849,12 @@ export function useProfileBuilder() {
       for (const rule of entity.propertyRules) {
         if (!isSchemaOrgUri(rule.propertyUri) && !curatedNames.has(rule.valueName)) {
           const canonical = curatedByLower.get(rule.valueName.toLowerCase())
-          if (canonical) hints.push(`${entity.label} / ${rule.label}: "${rule.valueName}" resembles the schema.org "${canonical}" term — consider using it.`)
+          if (canonical) hints.push(`${entity.label} / ${rule.label}: "${rule.valueName}" resembles the schema.org "${canonical}" term, consider using it.`)
         }
         if (rule.kind === 'entity') {
           for (const target of rule.entityTypes ?? []) {
             if (!normalizedEntities.value.some((candidate) => sameSchemaOrgType(candidate.type, target))) {
-              hints.push(`${entity.label} / ${rule.label} references ${entityTypeLabel(target)}, but no entity rule defines it — no sub-form will be generated for ${entityTypeLabel(target)}.`)
+              hints.push(`${entity.label} / ${rule.label} references ${entityTypeLabel(target)}, but no entity rule defines it, no sub-form will be generated for ${entityTypeLabel(target)}.`)
             }
           }
         }
@@ -866,7 +866,7 @@ export function useProfileBuilder() {
     for (const entity of normalizedEntities.value) {
       if (isDatasetType(entity.type)) continue
       if (!referencesToType(entity.type, normalizedEntities.value).length) {
-        hints.push(`"${entity.label}" is not referenced by any property — it will generate no dataset inputs or validation. Open it and use "Add reference", or add an entity-reference property that targets it.`)
+        hints.push(`"${entity.label}" is not referenced by any property, it will generate no dataset inputs or validation. Open it and use "Add reference", or add an entity-reference property that targets it.`)
       }
     }
     // L10: two entity rules sharing one type URI serialize entity references with
@@ -877,7 +877,7 @@ export function useProfileBuilder() {
       const prior = [...seenTypes.entries()].find(([type]) => sameSchemaOrgType(type, entity.type))
       if (prior && !reportedTypeCollisions.has(entity.type)) {
         reportedTypeCollisions.add(entity.type)
-        hints.push(`Two entity rules use the type ${entityTypeLabel(entity.type)} — entity references to ${entityTypeLabel(entity.type)} will use class "${entity.className}".`)
+        hints.push(`Two entity rules use the type ${entityTypeLabel(entity.type)}, entity references to ${entityTypeLabel(entity.type)} will use class "${entity.className}".`)
       }
       seenTypes.set(entity.type, entity)
     }
@@ -933,7 +933,7 @@ export function useProfileBuilder() {
       if (entityType && !isSchemaOrgUri(entityType)) {
         const className = trimmed(entity.className) || termNameFromUri(entityType)
         if (!isValidClassName(className)) {
-          errors.push(`${entityName}: class name "${className}" must start with a capital letter, then letters or digits only — e.g. Specimen.`)
+          errors.push(`${entityName}: class name "${className}" must start with a capital letter, then letters or digits only, e.g. Specimen.`)
         }
       }
       entity.properties.forEach((property, propertyIndex) => {
@@ -943,7 +943,7 @@ export function useProfileBuilder() {
         // the label (always valid), so only validate when the author typed one.
         const typedValueName = trimmed(property.valueName)
         if (typedValueName && !isValidPropertyTermName(typedValueName)) {
-          errors.push(`${entityName} / ${propLabel}: property name "${typedValueName}" must have a lowercase first letter and use only letters and digits — e.g. assayType.`)
+          errors.push(`${entityName} / ${propLabel}: property name "${typedValueName}" must have a lowercase first letter and use only letters and digits, e.g. assayType.`)
         }
         // M6: when nothing is typed and the label auto-derives to nothing usable
         // (all non-ASCII, or digits-only), normalization would silently fall back to
@@ -955,7 +955,7 @@ export function useProfileBuilder() {
         // Property terms and class names must stay distinct (case-insensitively)
         // so the merged @context can never shadow a type with a property.
         if (typedValueName && classNamesLower.has(typedValueName.toLowerCase())) {
-          errors.push(`${entityName} / ${propLabel}: property name "${typedValueName}" collides with an entity class name — rename it so property and class names stay distinct.`)
+          errors.push(`${entityName} / ${propLabel}: property name "${typedValueName}" collides with an entity class name, rename it so property and class names stay distinct.`)
         }
         // WS5/M2: only validate the required-contents rows that would actually be
         // emitted — entity references that are multi-valued. Otherwise a row hidden by
@@ -983,10 +983,10 @@ export function useProfileBuilder() {
 
     for (const entity of normalizedEntities.value) {
       // Duplicate derived entity ids collide on the crate `@id` and lose rules on reparse.
-      if (entityIds.has(entity.id)) errors.push(`Duplicate entity id "${entity.id}" — rename one entity.`)
+      if (entityIds.has(entity.id)) errors.push(`Duplicate entity id "${entity.id}", rename one entity.`)
       entityIds.add(entity.id)
       if (classNames.has(entity.className) && !reportedClassNames.has(entity.className)) {
-        errors.push(`Two entity rules use the same class name "${entity.className}" — give them distinct class names or types.`)
+        errors.push(`Two entity rules use the same class name "${entity.className}", give them distinct class names or types.`)
         reportedClassNames.add(entity.className)
       }
       classNames.add(entity.className)
@@ -997,7 +997,7 @@ export function useProfileBuilder() {
         (curated) => curated.label.toLowerCase() === entity.className.toLowerCase(),
       )
       if (curatedShadow && !sameSchemaOrgType(curatedShadow.uri, entity.type)) {
-        errors.push(`Class name "${entity.className}" would redefine the standard ${curatedShadow.label} type — rename the class or use the schema.org type.`)
+        errors.push(`Class name "${entity.className}" would redefine the standard ${curatedShadow.label} type, rename the class or use the schema.org type.`)
       }
       if (!entity.propertyRules.length) errors.push(`${entity.label} needs at least one property rule.`)
 
@@ -1009,7 +1009,7 @@ export function useProfileBuilder() {
         properties.add(property.valueName)
         // Two labels that slugify identically derive the same crate `@id`; block
         // it so a rule is not silently overwritten and lost on reparse.
-        if (propertyIds.has(property.id)) errors.push(`${entity.label} has two properties that derive the same id "${property.id}" — rename one.`)
+        if (propertyIds.has(property.id)) errors.push(`${entity.label} has two properties that derive the same id "${property.id}", rename one.`)
         propertyIds.add(property.id)
         // Every term must resolve via @context: an absolute URI (minted or external).
         if (!isAbsoluteUri(property.propertyUri)) {
@@ -1023,13 +1023,13 @@ export function useProfileBuilder() {
         if (priorUri === undefined) {
           uriByValueName.set(property.valueName, property.propertyUri)
         } else if (priorUri !== property.propertyUri && !reportedUriConflicts.has(property.valueName)) {
-          errors.push(`Property name "${property.valueName}" maps to two different term URIs (${priorUri} and ${property.propertyUri}) — a compact term can bind to only one URI in @context.`)
+          errors.push(`Property name "${property.valueName}" maps to two different term URIs (${priorUri} and ${property.propertyUri}), a compact term can bind to only one URI in @context.`)
           reportedUriConflicts.add(property.valueName)
         }
         // A non-schema.org term whose compact name exactly matches a curated
         // schema.org property shadows that base-context term — a hard error.
         if (!isSchemaOrgUri(property.propertyUri) && curatedNames.has(property.valueName)) {
-          errors.push(`${entity.label} / ${property.label}: "${property.valueName}" maps to a non-schema.org URI but shadows the schema.org "${property.valueName}" term in the base @context — use the schema.org term or rename the property.`)
+          errors.push(`${entity.label} / ${property.label}: "${property.valueName}" maps to a non-schema.org URI but shadows the schema.org "${property.valueName}" term in the base @context, use the schema.org term or rename the property.`)
         }
         if (property.kind === 'entity' && !property.entityTypes?.length) {
           errors.push(`${entity.label} / ${property.label} is an entity reference and needs at least one target type.`)
@@ -1052,7 +1052,7 @@ export function useProfileBuilder() {
             errors.push(`${entity.label} / ${property.label}: every allowed value must be an absolute URL, e.g. https://….`)
           }
         } else if (property.kind === 'select-object' && !property.valueOptions?.length) {
-          errors.push(`${entity.label} / ${property.label}: preserved choice property has no options — remove it or re-import.`)
+          errors.push(`${entity.label} / ${property.label}: preserved choice property has no options, remove it or re-import.`)
         }
         if (property.kind === 'enum' && !property.enumOptions?.length) errors.push(`${entity.label} / ${property.label} needs at least one allowed value.`)
         // WS2: list cardinality — min >= 1, max >= min. minItems/maxItems are only

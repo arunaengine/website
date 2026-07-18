@@ -24,7 +24,7 @@ const BASICS: ProfileBasics = {
   slug: WORKFLOW_RUN_CRATE_PROFILE_ID,
   name: 'Workflow Run Crate',
   description:
-    'Describes a computational run: which action produced the data, who ran it, with what tool, and which files went in and out. Follows the Workflow Run RO-Crate profiles (w3id.org/ro/wfrun) — the same shape the portal writes for finished compute jobs.',
+    'Describes a computational run: which action produced the data, who ran it, with what tool, and which files went in and out. Follows the Workflow Run RO-Crate profiles (w3id.org/ro/wfrun), the same shape the portal writes for finished compute jobs.',
   version: '0.5.0',
   // Fixed date: the bundled profile is versioned content, not a live document.
   datePublished: '2025-11-07',
@@ -46,7 +46,7 @@ const ENTITY_RULES: ProfileEntityRule[] = [
       {
         id: 'mentions',
         label: 'Workflow run',
-        description: 'The action that carried out the run — the crate root mentions it.',
+        description: 'The action that carried out the run, the crate root mentions it.',
         kind: 'entity',
         propertyUri: `${SCHEMA}mentions`,
         valueName: 'mentions',

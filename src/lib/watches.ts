@@ -25,7 +25,7 @@ export const WATCH_EVENT_KINDS: WatchEventKindInfo[] = [
     kind: 'data_uploaded',
     label: 'Data uploaded',
     description:
-      'Notifies you when any object is uploaded under this folder, including all folders below it — a watch always covers a whole prefix, never a single object.',
+      'Notifies you when any object is uploaded under this folder, including all folders below it, a watch always covers a whole prefix, never a single object.',
   },
 ]
 

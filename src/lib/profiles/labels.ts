@@ -42,8 +42,8 @@ export const REFERENCE_MODE_ORDER: ProfileReferenceMode[] = ['inline', 'external
 
 // Single source of truth for how RFC-2119 obligations are labelled and explained.
 export const PROFILE_OBLIGATION_LABELS: Record<ProfileObligation, { label: string; help: string }> = {
-  MUST: { label: 'Required', help: 'Required — validation fails without it' },
-  SHOULD: { label: 'Recommended', help: 'Recommended — warns when missing' },
+  MUST: { label: 'Required', help: 'Required, validation fails without it' },
+  SHOULD: { label: 'Recommended', help: 'Recommended, warns when missing' },
   MAY: { label: 'Optional', help: 'Optional' },
 }
 

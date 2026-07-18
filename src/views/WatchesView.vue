@@ -128,7 +128,7 @@ watch(currentUser, () => void ensureLoaded())
                     v-if="w.health === 'needs_attention'"
                     variant="warn"
                     class="text-[10px] uppercase"
-                    title="This watch may not be delivering events — remove and re-create it if notifications stay silent."
+                    title="This watch may not be delivering events, remove and re-create it if notifications stay silent."
                   >needs attention</Badge>
                 </div>
                 <p class="mt-0.5 text-[11px] text-muted-foreground">
@@ -154,7 +154,7 @@ watch(currentUser, () => void ensureLoaded())
 
         <!-- What each watch kind actually covers. -->
         <div class="surface-muted space-y-1.5 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
-          <p><span class="font-medium text-foreground">Data watches</span> cover a bucket folder: every object uploaded under it — your own uploads included, across all folders below — triggers a notification; never just a single object.</p>
+          <p><span class="font-medium text-foreground">Data watches</span> cover a bucket folder: every object uploaded under it, your own uploads included, across all folders below, triggers a notification; never just a single object.</p>
           <p><span class="font-medium text-foreground">Metadata watches</span> cover a catalog path: you are notified when a new metadata document (dataset, profile, run record) is created under it.</p>
           <p>Events arrive in the notification bell; delivery can lag a few seconds. Each account can hold up to 50 watches; hover a watch to see its technical path.</p>
         </div>

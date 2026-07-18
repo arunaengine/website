@@ -34,7 +34,7 @@ defineEmits<{
             'rounded px-1.5 py-0.5 text-[10px] transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100',
             selected?.includes(`meta/${folder.path}/**`) ? 'text-primary opacity-100' : 'text-muted-foreground opacity-0',
           ]"
-          :title="`Select this folder — includes everything inside (meta/${folder.path}/**)`"
+          :title="`Select this folder, includes everything inside (meta/${folder.path}/**)`"
           @click="$emit('select', `meta/${folder.path}/**`)"
         >
           select folder

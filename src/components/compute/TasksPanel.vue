@@ -221,7 +221,7 @@ onUnmounted(() => window.clearInterval(pollTimer))
 <template>
   <div class="space-y-4">
     <p class="text-xs text-muted-foreground">
-      Tasks are runs <span class="font-medium text-foreground">you submit</span> to this node — start one with Quick run or describe a full GA4GH TES task.
+      Tasks are runs <span class="font-medium text-foreground">you submit</span> to this node, start one with Quick run or describe a full GA4GH TES task.
     </p>
 
     <!-- Service banner: capability and version only — the realm identity
@@ -260,15 +260,15 @@ onUnmounted(() => window.clearInterval(pollTimer))
     <!-- First-run empty state doubles as the run-mode chooser. -->
     <section v-else-if="listState === 'ready' && !tasks.length" class="surface px-5 py-10 text-center">
       <p class="text-sm font-medium text-foreground">No compute tasks yet</p>
-      <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Start your first run — submissions appear here.</p>
+      <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Start your first run, submissions appear here.</p>
       <div class="mx-auto mt-5 grid max-w-xl gap-3 text-left sm:grid-cols-2">
         <button type="button" class="surface-inline p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40" @click="goQuick">
           <span class="flex items-center gap-1.5 text-sm font-semibold text-foreground"><Zap class="h-4 w-4 text-primary" /> Quick run</span>
-          <span class="mt-1 block text-xs text-muted-foreground">Write a short script — the portal stages it and builds the task for you.</span>
+          <span class="mt-1 block text-xs text-muted-foreground">Write a short script, the portal stages it and builds the task for you.</span>
         </button>
         <button type="button" class="surface-inline p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40" @click="goNew">
           <span class="flex items-center gap-1.5 text-sm font-semibold text-foreground"><ListPlus class="h-4 w-4 text-primary" /> New task</span>
-          <span class="mt-1 block text-xs text-muted-foreground">Describe a full GA4GH TES task by hand — image, command, resources.</span>
+          <span class="mt-1 block text-xs text-muted-foreground">Describe a full GA4GH TES task by hand, image, command, resources.</span>
         </button>
       </div>
     </section>
@@ -278,7 +278,7 @@ onUnmounted(() => window.clearInterval(pollTimer))
       <div class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-3 py-2">
         <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter tasks by state" />
         <div class="ml-auto flex items-center gap-2">
-          <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed — {{ lastPollError }}</span>
+          <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
           <Button variant="ghost" size="icon-sm" :disabled="refreshing" aria-label="Refresh tasks" @click="reload">
             <RefreshCw class="h-3.5 w-3.5" :class="refreshing ? 'animate-spin' : ''" />
           </Button>
@@ -316,13 +316,13 @@ onUnmounted(() => window.clearInterval(pollTimer))
             <td class="px-5 py-2.5"><TaskStateBadge :state="task.state" /></td>
             <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground md:table-cell">
               <span v-if="taskGroup(task)" :class="taskGroup(task)!.mono ? 'font-mono' : ''">{{ taskGroup(task)!.text }}</span>
-              <span v-else>—</span>
+              <span v-else>-</span>
             </td>
-            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground lg:table-cell">{{ taskResources(task) || '—' }}</td>
+            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground lg:table-cell">{{ taskResources(task) || '-' }}</td>
             <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="task.creation_time">
-              {{ task.creation_time ? relativeTime(task.creation_time) : '—' }}
+              {{ task.creation_time ? relativeTime(task.creation_time) : '-' }}
             </td>
-            <td class="hidden px-5 py-2.5 text-[11px] tabular-nums text-muted-foreground sm:table-cell">{{ taskDuration(task) || '—' }}</td>
+            <td class="hidden px-5 py-2.5 text-[11px] tabular-nums text-muted-foreground sm:table-cell">{{ taskDuration(task) || '-' }}</td>
             <td class="px-5 py-2.5 text-right"><ChevronRight v-if="task.id" class="ml-auto h-4 w-4 text-muted-foreground" /></td>
           </tr>
         </tbody>
