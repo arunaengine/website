@@ -133,129 +133,136 @@ async function submit() {
 </script>
 
 <template>
-  <div class="rounded-lg border border-border bg-background p-4">
-    <div class="flex items-center justify-between gap-2">
-      <div class="text-xs font-semibold text-foreground">
-        {{ role ? `Edit role "${role.name}"` : 'New role' }}
-      </div>
-      <Button variant="ghost" size="sm" @click="emit('cancel')"><X class="h-3.5 w-3.5" /> Close</Button>
-    </div>
-
-    <div class="mt-3 max-w-xs">
-      <label class="text-[11px] font-medium text-muted-foreground" for="role-name">Role name</label>
-      <Input id="role-name" v-model="name" class="mt-1" placeholder="e.g. curators" />
-      <p v-if="nameReserved" class="mt-1 text-[11px] text-destructive">
-        The names "admin" and "user" are reserved for built-in roles.
-      </p>
-    </div>
-
-    <div class="mt-4">
-      <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {{ role?.public ? 'Everyone — including anonymous visitors — can' : 'Members with this role can' }}
-      </div>
-      <p v-if="!grants.length" class="mt-1.5 text-xs text-muted-foreground">
-        Nothing yet — pick what this role should cover below.
-      </p>
-      <ul v-else class="mt-1.5 space-y-1">
-        <li v-for="(grant, index) in grants" :key="grant.suffix" class="flex items-center gap-2">
-          <Select
-            :model-value="grant.level"
-            :options="LEVEL_OPTIONS"
-            aria-label="Access level"
-            class="h-8 w-32 shrink-0 text-xs"
-            @update:model-value="(value: string) => (grant.level = toLevel(value))"
-          />
-          <span class="min-w-0 text-xs text-foreground">
-            {{ describeTarget(grant.suffix) }}
-            <span v-if="grant.level === 'deny'" class="text-muted-foreground">(blocks any other grant)</span>
-          </span>
-          <span class="hidden min-w-0 truncate font-mono text-[10px] text-muted-foreground sm:inline">{{ grant.suffix }}</span>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="ml-auto shrink-0 text-muted-foreground"
-            :aria-label="`Remove grant ${grant.suffix}`"
-            @click="removeGrant(index)"
-          >
-            <X class="h-3.5 w-3.5" />
-          </Button>
-        </li>
-      </ul>
-      <p v-if="notice" class="mt-1.5 text-[11px] text-muted-foreground">{{ notice }}</p>
-    </div>
-
-    <div class="mt-4">
-      <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Add access</div>
-      <PermissionPathPicker
-        :group-id="group.group_id"
-        :path-prefix="prefix"
-        :selected="pending"
-        class="mt-1.5 max-w-xl"
-        @select="(suffixes) => ((pending = suffixes), (notice = null))"
-      />
-      <div class="mt-2 flex flex-wrap items-center gap-2">
-        <Select
-          :model-value="pendingLevel"
-          :options="LEVEL_OPTIONS"
-          aria-label="Access level"
-          class="h-8 w-32 shrink-0 text-xs"
-          @update:model-value="(value: string) => (pendingLevel = toLevel(value))"
-        />
-        <span class="min-w-0 flex-1 text-xs" :class="pending.length ? 'text-foreground' : 'text-muted-foreground'">
-          {{ pending.length ? pendingPreview : 'Nothing selected yet — pick a scope or browse above.' }}
-        </span>
-        <Button variant="outline" size="sm" class="shrink-0" :disabled="!pending.length" @click="commitPending">
-          <Plus class="h-3.5 w-3.5" /> Add grant
-        </Button>
-      </div>
-    </div>
-
-    <div class="mt-4">
-      <button
-        type="button"
-        class="flex w-full items-center gap-1 text-left text-xs font-medium text-foreground/80 hover:text-foreground"
-        @click="showRaw = !showRaw"
-      >
-        <ChevronRight :class="['h-3.5 w-3.5 shrink-0 transition-transform', showRaw && 'rotate-90']" />
-        Technical details
-        <span class="min-w-0 truncate font-mono text-[10px] font-normal text-muted-foreground">
-          {{ prefix }}… · {{ grants.length }} {{ grants.length === 1 ? 'path' : 'paths' }}
-        </span>
-      </button>
-      <div v-if="showRaw" class="mt-2 rounded-md border border-border bg-muted/20 p-3">
-        <ul v-if="grants.length" class="space-y-0.5">
-          <li v-for="grant in grants" :key="grant.suffix" class="flex items-center gap-2 font-mono text-[11px]">
-            <span class="min-w-0 truncate text-foreground/80">{{ prefix }}{{ grant.suffix }}</span>
-            <span class="shrink-0 uppercase text-muted-foreground">{{ grant.level }}</span>
-          </li>
-        </ul>
-        <p v-else class="font-mono text-[11px] text-muted-foreground">(no paths yet)</p>
-        <div class="mt-2 flex items-center gap-2">
-          <span class="hidden max-w-[35%] shrink-0 truncate font-mono text-[10px] text-muted-foreground sm:inline" :title="prefix">{{ prefix }}</span>
-          <Input v-model="rawPath" class="h-8 text-xs" placeholder="data/** or meta/reports/**" @keydown.enter.prevent="commitRaw" />
-          <Select
-            :model-value="rawLevel"
-            :options="LEVEL_OPTIONS"
-            aria-label="Access level"
-            class="h-8 w-32 shrink-0 text-xs"
-            @update:model-value="(value: string) => (rawLevel = toLevel(value))"
-          />
-          <Button variant="outline" size="sm" class="shrink-0" :disabled="!rawPath.trim()" @click="commitRaw">Add</Button>
+  <div>
+    <div class="flex flex-wrap items-start justify-between gap-2 border-b border-border bg-muted/10 px-5 py-4">
+      <div class="min-w-0">
+        <div class="text-sm font-semibold text-foreground">
+          {{ role ? `Edit role "${role.name}"` : 'New role' }}
         </div>
-        <p class="mt-1.5 text-[11px] text-muted-foreground">
-          Paths are relative to this group; a trailing ** covers everything below the path.
+        <p class="mt-0.5 text-xs text-muted-foreground">
+          A role is a named set of grants. Browse and select what it covers, choose an access level, and add
+          grants — members holding the role get exactly what its grants allow.
         </p>
       </div>
+      <Button variant="ghost" size="sm" class="shrink-0" @click="emit('cancel')"><X class="h-3.5 w-3.5" /> Close</Button>
     </div>
 
-    <p v-if="error" class="mt-3 text-xs text-destructive">{{ error }}</p>
-    <p v-if="role" class="mt-3 text-[11px] text-muted-foreground">
-      Saving replaces the role with an updated copy; assigned members keep it.
-    </p>
+    <div class="grid gap-6 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+      <div class="min-w-0">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Add access</div>
+        <PermissionPathPicker
+          :group-id="group.group_id"
+          :path-prefix="prefix"
+          :selected="pending"
+          class="mt-1.5"
+          @select="(suffixes) => ((pending = suffixes), (notice = null))"
+        />
+        <div class="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+          <Select
+            :model-value="pendingLevel"
+            :options="LEVEL_OPTIONS"
+            aria-label="Access level"
+            class="h-8 w-32 shrink-0 text-xs"
+            @update:model-value="(value: string) => (pendingLevel = toLevel(value))"
+          />
+          <span class="min-w-0 flex-1 text-xs" :class="pending.length ? 'text-foreground' : 'text-muted-foreground'">
+            {{ pending.length ? pendingPreview : 'Nothing selected yet — pick a scope or browse above.' }}
+          </span>
+          <Button variant="outline" size="sm" class="shrink-0" :disabled="!pending.length" @click="commitPending">
+            <Plus class="h-3.5 w-3.5" /> Add grant
+          </Button>
+        </div>
+      </div>
 
-    <div class="mt-3 flex items-center gap-2">
-      <Button :disabled="!canSave" @click="submit">{{ role ? 'Save changes' : 'Create role' }}</Button>
-      <Button variant="ghost" :disabled="saving" @click="emit('cancel')">Cancel</Button>
+      <div class="min-w-0 lg:sticky lg:top-20 lg:self-start">
+        <div class="rounded-lg border border-border bg-muted/10 p-4">
+          <label class="text-[11px] font-medium text-muted-foreground" for="role-name">Role name</label>
+          <Input id="role-name" v-model="name" class="mt-1" placeholder="e.g. curators" />
+          <p v-if="nameReserved" class="mt-1 text-[11px] text-destructive">
+            The names "admin" and "user" are reserved for built-in roles.
+          </p>
+
+          <div class="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {{ role?.public ? 'Everyone — including anonymous visitors — can' : 'Members with this role can' }}
+          </div>
+          <p v-if="!grants.length" class="mt-1.5 text-xs text-muted-foreground">
+            Add your first grant — choose what members of this role can reach.
+          </p>
+          <ul v-else class="mt-1.5 space-y-1">
+            <li v-for="(grant, index) in grants" :key="grant.suffix" class="flex items-center gap-2">
+              <Select
+                :model-value="grant.level"
+                :options="LEVEL_OPTIONS"
+                aria-label="Access level"
+                class="h-8 w-32 shrink-0 text-xs"
+                @update:model-value="(value: string) => (grant.level = toLevel(value))"
+              />
+              <span class="min-w-0 flex-1 text-xs text-foreground" :title="`${prefix}${grant.suffix}`">
+                {{ describeTarget(grant.suffix) }}
+                <span v-if="grant.level === 'deny'" class="text-muted-foreground">(blocks any other grant)</span>
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                class="shrink-0 text-muted-foreground"
+                :aria-label="`Remove grant for ${describeTarget(grant.suffix)}`"
+                @click="removeGrant(index)"
+              >
+                <X class="h-3.5 w-3.5" />
+              </Button>
+            </li>
+          </ul>
+          <p v-if="notice" class="mt-1.5 text-[11px] text-muted-foreground">{{ notice }}</p>
+
+          <div class="mt-4">
+            <button
+              type="button"
+              class="flex w-full items-center gap-1 text-left text-xs font-medium text-foreground/80 hover:text-foreground"
+              @click="showRaw = !showRaw"
+            >
+              <ChevronRight :class="['h-3.5 w-3.5 shrink-0 transition-transform', showRaw && 'rotate-90']" />
+              Technical details
+              <span class="text-[10px] font-normal text-muted-foreground">
+                {{ grants.length }} {{ grants.length === 1 ? 'path' : 'paths' }}
+              </span>
+            </button>
+            <div v-if="showRaw" class="mt-2 rounded-md border border-border bg-muted/20 p-3">
+              <p class="break-all font-mono text-[10px] text-muted-foreground">{{ prefix }}</p>
+              <ul v-if="grants.length" class="mt-1.5 space-y-0.5">
+                <li v-for="grant in grants" :key="grant.suffix" class="flex items-center gap-2 font-mono text-[11px]">
+                  <span class="min-w-0 truncate text-foreground/80" :title="`${prefix}${grant.suffix}`">{{ grant.suffix }}</span>
+                  <span class="ml-auto shrink-0 uppercase text-muted-foreground">{{ grant.level }}</span>
+                </li>
+              </ul>
+              <p v-else class="mt-1.5 font-mono text-[11px] text-muted-foreground">(no paths yet)</p>
+              <div class="mt-2 flex items-center gap-2">
+                <Input v-model="rawPath" class="h-8 font-mono text-xs" placeholder="data/** or meta/reports/**" @keydown.enter.prevent="commitRaw" />
+                <Select
+                  :model-value="rawLevel"
+                  :options="LEVEL_OPTIONS"
+                  aria-label="Access level"
+                  class="h-8 w-32 shrink-0 text-xs"
+                  @update:model-value="(value: string) => (rawLevel = toLevel(value))"
+                />
+                <Button variant="outline" size="sm" class="shrink-0" :disabled="!rawPath.trim()" @click="commitRaw">Add</Button>
+              </div>
+              <p class="mt-1.5 text-[11px] text-muted-foreground">
+                Paths are relative to this group; a trailing ** covers everything below the path.
+              </p>
+            </div>
+          </div>
+
+          <p v-if="error" class="mt-3 text-xs text-destructive">{{ error }}</p>
+          <p v-if="role" class="mt-3 text-[11px] text-muted-foreground">
+            Saving replaces the role with an updated copy; assigned members keep it.
+          </p>
+
+          <div class="mt-4 flex items-center gap-2 border-t border-border/70 pt-3">
+            <Button :disabled="!canSave" @click="submit">{{ role ? 'Save changes' : 'Create role' }}</Button>
+            <Button variant="ghost" :disabled="saving" @click="emit('cancel')">Cancel</Button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

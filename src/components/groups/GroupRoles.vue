@@ -174,10 +174,12 @@ async function removeRole(role: ApiRole) {
 
     <div v-if="roleError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ roleError }}</div>
 
-    <div v-if="canManage" class="border-t border-border px-5 py-4">
-      <Button v-if="!editor" variant="outline" size="sm" @click="editor = { role: null }">
-        <Plus class="h-3.5 w-3.5" /> New role
-      </Button>
+    <div v-if="canManage" class="border-t border-border">
+      <div v-if="!editor" class="px-5 py-4">
+        <Button variant="outline" size="sm" @click="editor = { role: null }">
+          <Plus class="h-3.5 w-3.5" /> New role
+        </Button>
+      </div>
       <RoleBuilder
         v-else
         :key="editor.role?.role_id ?? 'new'"

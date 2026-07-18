@@ -99,7 +99,7 @@ onMounted(() => void load())
 </script>
 
 <template>
-  <div class="rounded-lg border border-border bg-background p-3">
+  <div>
     <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Quick scopes</div>
     <div class="mt-1.5 flex flex-wrap gap-1.5">
       <button
@@ -123,90 +123,102 @@ onMounted(() => void load())
       {{ activeScope ? activeScope.hint : 'Pick a quick scope, or browse below for something more specific.' }}
     </p>
 
-    <div class="mt-3 flex items-center justify-between">
-      <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Metadata documents</div>
-      <Button variant="ghost" size="sm" class="h-6 px-1.5 text-[10px]" :disabled="loading" @click="load">
-        <RefreshCw class="h-3 w-3" :class="loading ? 'animate-spin' : ''" /> Reload
-      </Button>
-    </div>
-    <p class="mt-0.5 text-[11px] text-muted-foreground">
-      Choose a folder to include everything inside it, or a single document.
-    </p>
-    <div class="mt-1.5">
-      <div v-if="loading && !tree" class="space-y-1.5">
-        <Skeleton class="h-5" />
-        <Skeleton class="h-5" />
-      </div>
-      <p v-else-if="loadError" class="text-xs text-destructive">{{ loadError }}</p>
-      <p v-else-if="tree && !tree.folders.length && !tree.documents.length" class="text-xs text-muted-foreground">
-        This group has no metadata documents yet; use a quick scope above.
-      </p>
-      <MetaPathTree
-        v-else-if="tree"
-        :node="tree"
-        :expanded="expanded"
-        :selected="selected"
-        @toggle="toggle"
-        @select="emit('select', [$event])"
-      />
-    </div>
+    <div class="mt-3 grid items-start gap-3 md:grid-cols-2">
+      <section class="rounded-lg border border-border bg-background">
+        <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Metadata documents</div>
+          <Button variant="ghost" size="sm" class="h-6 px-1.5 text-[10px]" :disabled="loading" @click="load">
+            <RefreshCw class="h-3 w-3" :class="loading ? 'animate-spin' : ''" /> Reload
+          </Button>
+        </div>
+        <div class="px-3 pb-3 pt-2">
+          <p class="text-[11px] text-muted-foreground">
+            Choose a folder to include everything inside it, or a single document.
+          </p>
+          <div class="scrollbar-thin mt-1.5 max-h-80 min-h-28 overflow-y-auto">
+            <div v-if="loading && !tree" class="space-y-1.5">
+              <Skeleton class="h-5" />
+              <Skeleton class="h-5" />
+            </div>
+            <p v-else-if="loadError" class="text-xs text-destructive">{{ loadError }}</p>
+            <p v-else-if="tree && !tree.folders.length && !tree.documents.length" class="text-xs text-muted-foreground">
+              This group has no metadata documents yet; use a quick scope above.
+            </p>
+            <MetaPathTree
+              v-else-if="tree"
+              :node="tree"
+              :expanded="expanded"
+              :selected="selected"
+              @toggle="toggle"
+              @select="emit('select', [$event])"
+            />
+          </div>
+        </div>
+      </section>
 
-    <div class="mt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Files</div>
-    <div class="mt-1.5 flex items-center gap-2">
-      <span class="shrink-0 text-[11px] text-muted-foreground">Node</span>
-      <Select
-        :model-value="nodeChoice"
-        :options="nodeOptions"
-        aria-label="Node"
-        class="h-8 max-w-64 text-xs"
-        @update:model-value="(value: string) => (nodeOverride = value)"
-      />
+      <section class="rounded-lg border border-border bg-background">
+        <div class="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-2">
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Files</div>
+          <div class="flex min-w-0 items-center gap-1.5">
+            <span class="shrink-0 text-[11px] text-muted-foreground">Node</span>
+            <Select
+              :model-value="nodeChoice"
+              :options="nodeOptions"
+              aria-label="Node"
+              class="h-7 max-w-52 text-xs"
+              @update:model-value="(value: string) => (nodeOverride = value)"
+            />
+          </div>
+        </div>
+        <div class="px-3 pb-3 pt-2">
+          <button
+            type="button"
+            :class="[
+              'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted',
+              isActive([allDataSuffix]) ? 'bg-primary/[0.08]' : '',
+            ]"
+            :title="`Everything under ${allDataSuffix}`"
+            @click="emit('select', [allDataSuffix])"
+          >
+            <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
+            <span class="font-medium text-foreground">
+              {{ nodeChoice === 'all' ? 'All files on every node' : 'All files on this node' }}
+            </span>
+          </button>
+          <template v-if="browsableNode">
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              Open a bucket and choose a folder to include everything inside it, or a single file.
+            </p>
+            <div class="scrollbar-thin mt-1.5 max-h-80 min-h-24 overflow-y-auto">
+              <DataPathTree
+                :group-id="groupId"
+                :path-prefix="pathPrefix"
+                :selected="selected"
+                @select="emit('select', [$event])"
+              />
+            </div>
+          </template>
+          <p v-else-if="nodeChoice === 'all'" class="mt-1 text-[11px] text-muted-foreground">
+            Pick a specific node to narrow the scope; folders can be browsed on the node this portal is connected to.
+          </p>
+          <template v-else>
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              This portal can only browse folders on its own node — type a bucket or folder path instead.
+            </p>
+            <div class="mt-1.5 flex items-center gap-2">
+              <Input
+                v-model="typedFolder"
+                class="h-8 text-xs"
+                placeholder="bucket or bucket/folder"
+                @keydown.enter.prevent="selectTyped"
+              />
+              <Button variant="outline" size="sm" class="shrink-0" :disabled="!typedFolder.trim()" @click="selectTyped">
+                Select folder
+              </Button>
+            </div>
+          </template>
+        </div>
+      </section>
     </div>
-    <button
-      type="button"
-      :class="[
-        'mt-1.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted',
-        isActive([allDataSuffix]) ? 'bg-primary/[0.08]' : '',
-      ]"
-      :title="`Everything under ${allDataSuffix}`"
-      @click="emit('select', [allDataSuffix])"
-    >
-      <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
-      <span class="font-medium text-foreground">
-        {{ nodeChoice === 'all' ? 'All files on every node' : 'All files on this node' }}
-      </span>
-    </button>
-    <template v-if="browsableNode">
-      <p class="mt-0.5 text-[11px] text-muted-foreground">
-        Open a bucket and choose a folder to include everything inside it, or a single file.
-      </p>
-      <div class="mt-1.5">
-        <DataPathTree
-          :group-id="groupId"
-          :path-prefix="pathPrefix"
-          :selected="selected"
-          @select="emit('select', [$event])"
-        />
-      </div>
-    </template>
-    <p v-else-if="nodeChoice === 'all'" class="mt-0.5 text-[11px] text-muted-foreground">
-      Pick a specific node to narrow the scope; folders can be browsed on the node this portal is connected to.
-    </p>
-    <template v-else>
-      <p class="mt-0.5 text-[11px] text-muted-foreground">
-        This portal can only browse folders on its own node — type a bucket or folder path instead.
-      </p>
-      <div class="mt-1.5 flex items-center gap-2">
-        <Input
-          v-model="typedFolder"
-          class="h-8 text-xs"
-          placeholder="bucket or bucket/folder"
-          @keydown.enter.prevent="selectTyped"
-        />
-        <Button variant="outline" size="sm" class="shrink-0" :disabled="!typedFolder.trim()" @click="selectTyped">
-          Select folder
-        </Button>
-      </div>
-    </template>
   </div>
 </template>
