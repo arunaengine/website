@@ -3,6 +3,7 @@ import {
   CreateBucketCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListBucketsCommand,
   ListObjectsV2Command,
   PutBucketCorsCommand,
@@ -40,6 +41,15 @@ export interface ObjectPage {
   objects: ObjectEntry[]
   folders: FolderEntry[]
   nextToken?: string
+}
+
+export interface ObjectHead {
+  size?: number
+  contentType?: string
+  etag?: string
+  lastModified?: Date
+  /** User metadata; the SDK strips the x-amz-meta- prefix from the keys. */
+  metadata: Record<string, string>
 }
 
 const { nodeInfo, realmInfo, authToken, apiBaseUrl, currentUser } = useAruna()
@@ -305,6 +315,19 @@ async function deleteObject(bucket: string, key: string, nodeId?: string | null)
   await client(nodeId).send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
 }
 
+// Single-object HEAD, mainly for the user metadata: reference-backed objects
+// expose aruna-last-refresh / aruna-source-etag there (lib/references.ts).
+async function headObject(bucket: string, key: string, nodeId?: string | null): Promise<ObjectHead> {
+  const response = await client(nodeId).send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
+  return {
+    size: response.ContentLength,
+    contentType: response.ContentType,
+    etag: response.ETag?.replaceAll('"', ''),
+    lastModified: response.LastModified,
+    metadata: response.Metadata ?? {},
+  }
+}
+
 async function downloadUrl(bucket: string, key: string, nodeId?: string | null): Promise<string> {
   return getSignedUrl(client(nodeId), new GetObjectCommand({ Bucket: bucket, Key: key }), {
     expiresIn: 900,
@@ -401,6 +424,7 @@ export function useS3() {
     createFolder,
     uploadObject,
     deleteObject,
+    headObject,
     downloadUrl,
     getObjectText,
     getObjectBlob,

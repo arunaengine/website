@@ -29,13 +29,15 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
 // `terminologyGateway` (remote term suggestions via the TS4NFDI gateway) is off
 // by default: published profiles never depend on it, so it is pure opt-in.
 // `federatedBucketSearch` (GET /search/buckets + the buckets section of
-// GET /search) and `bucketSync` (/data/sync-relationships) ship off until the
-// realm's nodes run a backend with the portal_extensions routes.
+// GET /search), `bucketSync` (/data/sync-relationships) and
+// `referenceVisibility` (GET /staging/references) ship off until the realm's
+// nodes run a backend with the portal_extensions routes.
 const DEFAULT_FEATURES: Record<string, boolean> = {
   bucketSync: false,
   federatedBucketSearch: false,
   jobs: true,
   placementAdmin: true,
+  referenceVisibility: false,
   searchCursor: true,
   terminologyGateway: false,
   tes: true,

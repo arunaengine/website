@@ -742,6 +742,36 @@ export interface ListStagingJobsResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Reference visibility (agreed contract):
+//   GET /staging/references?bucket=<b>&prefix=<p>&limit=&cursor=
+// reports which keys in a bucket are backed by a reference — an external
+// connector source or another Aruna node — instead of node-local bytes. The
+// listing MAY include non-referenced entries (referenced: false); consumers
+// aggregate client-side on `referenced`. The endpoint is new: older nodes
+// answer 404/501 and EVERY consumer degrades via isUnsupportedEndpoint. The
+// whole surface additionally gates on featureEnabled('referenceVisibility').
+// ---------------------------------------------------------------------------
+export interface StagingReferenceEntry {
+  key: string
+  size: number
+  referenced: boolean
+  /** Source kind; aruna_native marks a reference into another realm node. */
+  kind?: SourceConnectorKind
+  /** Path/URL of the object at its source, in the connector's namespace. */
+  source_path?: string
+  /** Connector the reference was staged through (non-native kinds). */
+  connector_id?: string
+  /** aruna_native only: the realm node actually holding the bytes. */
+  origin_node_id?: string
+}
+
+export interface StagingReferencesResponse {
+  entries: StagingReferenceEntry[]
+  /** Opaque cursor; omitted on the last page. Pass back verbatim. */
+  next_cursor?: string
+}
+
+// ---------------------------------------------------------------------------
 // Bucket sync relationships (verified against aruna api/src/routes/sync.rs on
 // feat/portal_extensions):
 //   POST   /data/sync-relationships          201 SyncRelationship; 409 duplicate;

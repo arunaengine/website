@@ -39,6 +39,8 @@ import {
   type StageBlobSubmission,
   type StagingBatchRequest,
   type StagingBatchResponse,
+  type StagingReferenceEntry,
+  type StagingReferencesResponse,
   type BucketSearchResponse,
   type CreateSyncRelationshipRequest,
   type SyncRelationship,
@@ -640,6 +642,30 @@ async function stageBatch(input: StagingBatchRequest): Promise<StagingBatchRespo
 // "backend does not keep a staging job registry yet".
 async function listStagingJobs(): Promise<ListStagingJobsResponse> {
   return request<ListStagingJobsResponse>('/staging/jobs')
+}
+
+// Client-side ceiling on the cursor-following reference listing: indicators
+// and stats are progressive enhancements, so a huge bucket yields an honest
+// lower bound instead of an unbounded request storm.
+const STAGING_REFERENCES_CAP = 2000
+
+// Reference-backed keys of a bucket (agreed contract, see api.ts). Follows
+// next_cursor until the listing is exhausted or the cap is reached. Older
+// nodes answer 404/501 — callers degrade via isUnsupportedEndpoint.
+async function listStagingReferences(
+  bucket: string,
+  prefix?: string,
+): Promise<StagingReferenceEntry[]> {
+  const entries: StagingReferenceEntry[] = []
+  let cursor: string | undefined
+  do {
+    const page = await request<StagingReferencesResponse>('/staging/references', {
+      query: { bucket, prefix: prefix || undefined, limit: 500, cursor },
+    })
+    entries.push(...(page.entries ?? []))
+    cursor = page.next_cursor
+  } while (cursor && entries.length < STAGING_REFERENCES_CAP)
+  return entries.length > STAGING_REFERENCES_CAP ? entries.slice(0, STAGING_REFERENCES_CAP) : entries
 }
 
 async function listGroupMembers(groupId: string): Promise<GroupMembersResponse> {
@@ -1308,6 +1334,7 @@ export function useAruna() {
     stageBlob,
     stageBatch,
     listStagingJobs,
+    listStagingReferences,
     revokeS3Credential,
     listGroupMembers,
     addGroupMember,
