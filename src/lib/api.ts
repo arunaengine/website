@@ -482,12 +482,35 @@ export interface MetadataSearchOptions {
   signal?: AbortSignal
 }
 
+// GET /search/buckets — federated bucket-name search (verified against aruna
+// api/src/routes/search.rs on feat/portal_extensions). `q` is a case-insensitive
+// bucket-name substring, trimmed to >= 2 chars (shorter ⇒ 400); `limit` defaults
+// to 10 and is clamped 1..=50. Partiality is signalled via nodes_failed with the
+// failing node ids listed in failed_nodes. Requires an authenticated session.
+export interface BucketSearchHit {
+  /** `arn:aruna:<realm>:<node>:s3/<bucket>` — parse with parseArunaArn. */
+  arn: string
+  bucket: string
+  node_id: string
+  group_id: string
+  group_name?: string | null
+  created_at: string
+}
+
+export interface BucketSearchResponse {
+  hits: BucketSearchHit[]
+  nodes_queried: number
+  nodes_failed: number
+  failed_nodes: string[]
+}
+
 // GET /search — unified realm search (aruna api/src/routes/search.rs). Returns
-// only the requested sections; `types` defaults to all three. `cursor` continues
+// only the requested sections; `types` defaults to all four. `cursor` continues
 // exactly one section and is rejected with 400 when more than one type is asked
-// for. `limit` is per-section (default 10, clamped 1..=100). `group_id`,
-// `conforms_to` and `mode` apply to the documents section only.
-export type SearchSectionType = 'documents' | 'groups' | 'users'
+// for (buckets never page — a buckets cursor is always 400). `limit` is
+// per-section (default 10, clamped 1..=100). `group_id`, `conforms_to` and
+// `mode` apply to the documents section only.
+export type SearchSectionType = 'documents' | 'buckets' | 'groups' | 'users'
 
 export interface UnifiedSearchOptions {
   types?: SearchSectionType[]
@@ -528,6 +551,7 @@ export interface SearchUsersSection {
 
 export interface UnifiedSearchResponse {
   documents?: SearchDocumentsSection
+  buckets?: BucketSearchResponse
   groups?: SearchGroupsSection
   users?: SearchUsersSection
 }
@@ -717,6 +741,87 @@ export interface ListStagingJobsResponse {
   jobs: StagingJob[]
 }
 
+// ---------------------------------------------------------------------------
+// Bucket sync relationships (verified against aruna api/src/routes/sync.rs on
+// feat/portal_extensions):
+//   POST   /data/sync-relationships          201 SyncRelationship; 409 duplicate;
+//                                            501 mode "reference"; 502 target
+//                                            unreachable
+//   GET    /data/sync-relationships          ?bucket=&prefix=&direction=out|in|both
+//   GET    /data/sync-relationships/{id}     SyncRelationshipDetail
+//   POST   /data/sync-relationships/{id}/run 202 (re-run once / backfill continuous)
+//   DELETE /data/sync-relationships/{id}     204 (synced data is retained)
+// Listing and detail only surface relationships CREATED BY the caller; run and
+// delete are creator-only too (403 otherwise). Older nodes without the routes
+// answer 404 — callers degrade via isUnsupportedEndpoint.
+// ---------------------------------------------------------------------------
+export type SyncMode = 'once' | 'reference' | 'continuous'
+
+// Wire state is a plain string ("enabled" | "paused" | "failed"); a failed
+// relationship carries failure_reason alongside. Kept open for future states.
+export type SyncRelationshipState = 'enabled' | 'paused' | 'failed' | (string & {})
+
+export interface SyncCounters {
+  versions_synced: number
+  bytes_synced: number
+  failures: number
+  consecutive_failures: number
+}
+
+export interface SyncStatusSnapshot {
+  last_synced_at?: string | null
+  last_error?: string | null
+  counters: SyncCounters
+}
+
+export interface SyncRelationship {
+  id: string
+  /** Source ARN `arn:aruna:<realm>:<node>:s3/<bucket>[/<prefix>]`. */
+  source: string
+  /** Target ARN, same shape as source. */
+  target: string
+  mode: SyncMode
+  replicate_deletes: boolean
+  created_by: string
+  created_at: string
+  state: SyncRelationshipState
+  failure_reason?: string | null
+  status: SyncStatusSnapshot
+}
+
+export interface SyncRelationshipListResponse {
+  outgoing: SyncRelationship[]
+  incoming: SyncRelationship[]
+}
+
+export interface SyncRelationshipDetail {
+  relationship: SyncRelationship
+  pending_jobs: number
+  oldest_lag_ms?: number | null
+  last_synced_at?: string | null
+  last_error?: string | null
+}
+
+export interface SyncRunResponse {
+  relationship_id: string
+  queued: number
+}
+
+// The source is always the node answering the request (it has no node_id);
+// creating a remote-source relationship means POSTing to that node's API.
+export interface CreateSyncRelationshipRequest {
+  source: { bucket: string; prefix?: string }
+  target: { node_id: string; bucket: string; prefix?: string }
+  mode: SyncMode
+  replicate_deletes?: boolean
+}
+
+export interface SyncRelationshipListQuery {
+  bucket?: string
+  prefix?: string
+  direction?: 'out' | 'in' | 'both'
+}
+
 // The backend deserializes CreateMetadataRequest as an untagged enum with
 // deny_unknown_fields, so a request must match exactly one variant shape.
 export interface CreateMetadataScaffoldRequest {
@@ -763,6 +868,10 @@ export interface ApiNotification {
   bucket?: string
   key?: string
   size_bytes?: number
+  // sync_completed / sync_failed (bucket sync watch events)
+  relationship_id?: string
+  versions_synced?: number
+  error?: string
 }
 
 export interface NotificationListResponse {
