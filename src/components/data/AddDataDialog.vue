@@ -18,42 +18,48 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import ConnectorDialog from '@/components/groups/ConnectorDialog.vue'
 import ConnectorEntriesBrowser from '@/components/data/ConnectorEntriesBrowser.vue'
+import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
+import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { invalidSourcePath } from '@/composables/useStaging'
 import { useBuilderBasket, type BuilderRow } from '@/composables/useBuilderBasket'
-import { useMetadataSearch } from '@/composables/useMetadataSearch'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { formatBytes } from '@/lib/utils'
-import type { ConnectorEntry, SourceConnectorSummary, UsageResponse } from '@/lib/api'
+import { isWorkspaceBucket } from '@/lib/workspaces'
+import { ApiError, type BucketSearchHit, type ConnectorEntry, type SourceConnectorSummary, type UsageResponse } from '@/lib/api'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { computed, ref, watch } from 'vue'
 import {
-  ArrowRight,
+  ArrowLeftRight,
+  Boxes,
   CloudDownload,
-  Database,
   FolderInput,
-  Layers,
   Loader2,
   Plus,
   RefreshCw,
-  Search,
   Upload,
   UploadCloud,
   X,
 } from '@lucide/vue'
 
-// The ONE "Add data" entry point: a basket dialog with three sources — local
-// files/folders (persistent upload queue), connector entries (batch staging),
-// and internal RO-Crate s3:// references — replacing the separate Upload
-// button, single-shot ingest tab and the full-page bucket builder.
+// The ONE "Add data" entry point: a basket dialog for local files/folders
+// (persistent upload queue) and connector entries (batch staging), plus an
+// "Other buckets" source that imports objects from any bucket in the realm
+// through sync relationships (copy once or reference).
 const props = defineProps<{ open: boolean; bucket: string; prefix: string; groupId: string | null }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   (e: 'staged'): void
+  // A sync relationship was created from the Other buckets tab.
+  (e: 'sync-created'): void
 }>()
 
-const { myGroups, listGroupConnectors, loadRoCrate, getGroupUsage } = useAruna()
+const { myGroups, listGroupConnectors, createSyncRelationship, getGroupUsage } = useAruna()
 const { writesDisabled } = useConnectivity()
+const realmNodes = useRealmNodes()
+const s3 = useS3()
 
 const basket = useBuilderBasket({
   bucket: computed(() => props.bucket),
@@ -81,7 +87,7 @@ function onDrop(event: DragEvent) {
   if (files?.length) basket.addUploads(Array.from(files))
 }
 
-// ── Connectors (shared by the connector and internal tabs) ──────────────────
+// ── Connectors ──────────────────────────────────────────────────────────────
 const groupSel = ref('')
 const connectors = ref<SourceConnectorSummary[]>([])
 const connectorsLoading = ref(false)
@@ -123,8 +129,8 @@ const connectorOptions = computed(() =>
   connectors.value.map((connector) => ({ value: connector.connector_id, label: `${connector.name} (${connector.kind})` })),
 )
 const STRATEGY_OPTIONS = [
-  { value: 'snapshot', label: 'Snapshot — copy the source into the bucket' },
-  { value: 'reference', label: 'Reference — register without copying; read on demand' },
+  { value: 'snapshot', label: 'Snapshot: copy the source into the bucket' },
+  { value: 'reference', label: 'Reference: register without copying; read on demand' },
 ]
 
 // ── Connector tab ───────────────────────────────────────────────────────────
@@ -182,148 +188,171 @@ function addTypedConnectorPath() {
   connectorPath.value = ''
 }
 
-// ── Internal datasets tab (RO-Crate s3:// reference harvesting) ─────────────
-const searchQuery = ref('')
-const search = useMetadataSearch(searchQuery)
-const arunaNativeConnectors = computed(() => connectors.value.filter((connector) => connector.kind === 'aruna_native'))
-const internalConnectorOptions = computed(() =>
-  arunaNativeConnectors.value.map((connector) => ({ value: connector.connector_id, label: connector.name })),
+// ── Other buckets tab ───────────────────────────────────────────────────────
+// Import from any bucket in the realm: pick a bucket (local list or federated
+// search), browse it (per-node S3 client for remote buckets), multi-select
+// objects/folders and create sync relationships into the current bucket —
+// mode "once" copies now, mode "reference" exposes without copying. The
+// create request POSTs to the SOURCE node's API (the source is always the
+// node receiving the request).
+type OtherMode = 'once' | 'reference'
+
+const sourceBucket = ref('')
+const sourceNodeId = ref<string | null>(null)
+const sourceSearch = ref('')
+const localBuckets = ref<string[]>([])
+const localBucketsLoading = ref(false)
+const otherDefaultMode = ref<OtherMode>('once')
+
+interface OtherBucketRow {
+  id: number
+  bucket: string
+  nodeId: string | null
+  /** Exact object key, or a folder prefix ending in '/'. */
+  sourcePrefix: string
+  isPrefix: boolean
+  mode: OtherMode
+  state: 'ready' | 'creating' | 'done' | 'error'
+  error: string | null
+}
+const otherRows = ref<OtherBucketRow[]>([])
+let otherCounter = 0
+const otherBusy = ref(false)
+
+const OTHER_MODE_OPTIONS: Array<{ value: OtherMode; label: string }> = [
+  { value: 'once', label: 'Copy (once)' },
+  { value: 'reference', label: 'Reference' },
+]
+
+// The current bucket never offers itself as an import source.
+const localBucketOptions = computed(() =>
+  localBuckets.value
+    .filter((name) => name !== props.bucket)
+    .map((name) => ({ value: name, label: name })),
 )
-const internalConnectorSel = ref('')
-const internalStrategy = ref<'snapshot' | 'reference'>('reference')
-watch(arunaNativeConnectors, () => {
-  if (!arunaNativeConnectors.value.some((connector) => connector.connector_id === internalConnectorSel.value)) {
-    internalConnectorSel.value = arunaNativeConnectors.value[0]?.connector_id ?? ''
+
+async function loadLocalBuckets() {
+  if (!s3.hasActiveKey.value || !s3.endpoint.value) return
+  localBucketsLoading.value = true
+  try {
+    localBuckets.value = (await s3.listBuckets())
+      .map((entry) => entry.name)
+      .filter((name) => !isWorkspaceBucket(name))
+  } catch {
+    localBuckets.value = []
+  } finally {
+    localBucketsLoading.value = false
   }
+}
+
+watch(tab, (value) => {
+  if (value === 'other' && !localBuckets.value.length) void loadLocalBuckets()
 })
 
-interface FileEntity {
-  ref: string
-  name: string
-  contentSize?: string
+function pickLocalSource(name: string) {
+  if (!name) return
+  sourceBucket.value = name
+  sourceNodeId.value = null
 }
-function crateGraph(crate: unknown): Array<Record<string, unknown>> {
-  if (!crate || typeof crate !== 'object') return []
-  const graphValue = (crate as Record<string, unknown>)['@graph']
-  return Array.isArray(graphValue)
-    ? graphValue.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === 'object' && !Array.isArray(entry)))
-    : []
+
+function pickSearchHit(hit: BucketSearchHit) {
+  sourceBucket.value = hit.bucket
+  sourceNodeId.value = realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id
 }
-function crateRootId(crate: unknown): string | undefined {
-  const entries = crateGraph(crate)
-  const descriptor = entries.find((entry) => entry['@id'] === 'ro-crate-metadata.json')
-  const about = descriptor?.about
-  if (about && typeof about === 'object' && !Array.isArray(about)) {
-    const id = (about as Record<string, unknown>)['@id']
-    if (typeof id === 'string') return id
-  }
-  return entries.find((entry) => entry['@id'] !== 'ro-crate-metadata.json')?.['@id'] as string | undefined
-}
-function stringProp(value: unknown): string | undefined {
-  if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  if (Array.isArray(value)) return stringProp(value[0])
-  if (value && typeof value === 'object') {
-    const id = (value as Record<string, unknown>)['@id']
-    return typeof id === 'string' ? id : undefined
-  }
-  return undefined
-}
-function typesOf(entity: Record<string, unknown>): string[] {
-  const value = entity['@type']
-  if (typeof value === 'string') return [value]
-  if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === 'string')
-  return []
-}
-// Only s3:// file references can be staged through an aruna_native connector;
-// external URLs are surfaced by the metadata manager, not this dialog.
-function fileEntities(crate: unknown): FileEntity[] {
-  const entries = crateGraph(crate)
-  if (!entries.length) return []
-  const rootId = crateRootId(crate)
-  const root = rootId ? entries.find((entry) => entry['@id'] === rootId) : undefined
-  const hasPartIds = new Set<string>()
-  const hasPart = root?.hasPart
-  for (const part of Array.isArray(hasPart) ? hasPart : hasPart ? [hasPart] : []) {
-    const id = stringProp(part)
-    if (id) hasPartIds.add(id)
-  }
-  const out: FileEntity[] = []
-  const seen = new Set<string>()
-  for (const entity of entries) {
-    const id = typeof entity['@id'] === 'string' ? (entity['@id'] as string) : ''
-    if (!id || id === 'ro-crate-metadata.json' || id === rootId || seen.has(id)) continue
-    if (!hasPartIds.has(id) && !typesOf(entity).includes('File')) continue
-    const reference = stringProp(entity.contentUrl) ?? id
-    if (!reference.startsWith('s3://')) continue
-    seen.add(id)
-    out.push({
-      ref: reference,
-      name: stringProp(entity.name) || reference.split('/').filter(Boolean).pop() || reference,
-      contentSize: stringProp(entity.contentSize),
+
+function addOtherSelection(selection: { objects: ObjectEntry[]; folders: FolderEntry[] }) {
+  const bucket = sourceBucket.value
+  if (!bucket) return
+  const seeds = [
+    ...selection.objects.map((object) => ({ sourcePrefix: object.key, isPrefix: false })),
+    ...selection.folders.map((folder) => ({ sourcePrefix: folder.prefix, isPrefix: true })),
+  ]
+  for (const seed of seeds) {
+    const duplicate = otherRows.value.some(
+      (row) =>
+        row.bucket === bucket &&
+        (row.nodeId ?? null) === (sourceNodeId.value ?? null) &&
+        row.sourcePrefix === seed.sourcePrefix,
+    )
+    if (duplicate) continue
+    otherRows.value.push({
+      id: ++otherCounter,
+      bucket,
+      nodeId: sourceNodeId.value,
+      ...seed,
+      mode: otherDefaultMode.value,
+      state: 'ready',
+      error: null,
     })
   }
-  return out
 }
 
-const expandedId = ref<string | null>(null)
-const expandedEntities = ref<FileEntity[]>([])
-const expandLoading = ref(false)
-const expandError = ref<string | null>(null)
-const selectedRefs = ref<Set<string>>(new Set())
-const crateCache = new Map<string, FileEntity[]>()
+function removeOtherRow(id: number) {
+  otherRows.value = otherRows.value.filter((row) => row.id !== id)
+}
 
-async function toggleExpand(documentId: string) {
-  if (expandedId.value === documentId) {
-    expandedId.value = null
-    return
+// Sync semantics map source-prefix remainders under the target prefix, so a
+// folder lands as `<current prefix><folder>/…` and an exact object key (its
+// remainder is empty) as `<current prefix><name>`.
+function otherTargetPrefix(row: OtherBucketRow): string {
+  const base = row.sourcePrefix.replace(/\/+$/, '').split('/').filter(Boolean).pop() ?? row.sourcePrefix
+  return row.isPrefix ? `${props.prefix}${base}/` : `${props.prefix}${base}`
+}
+
+function syncCreateError(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 409) return 'This sync relationship already exists.'
+    if (err.status === 501) return 'Reference mode is not supported by the source node yet.'
+    if (err.status === 502) return 'The source node could not reach this node right now.'
+    if (err.status === 401 || err.status === 403) return 'You need read access on the source bucket to import from it.'
+    return err.message
   }
-  expandedId.value = documentId
-  selectedRefs.value = new Set()
-  expandError.value = null
-  const cached = crateCache.get(documentId)
-  if (cached) {
-    expandedEntities.value = cached
-    return
-  }
-  expandLoading.value = true
-  expandedEntities.value = []
+  return err instanceof Error ? err.message : String(err)
+}
+
+const otherPendingCount = computed(
+  () => otherRows.value.filter((row) => row.state === 'ready' || row.state === 'error').length,
+)
+
+async function createOtherRelationships() {
+  const targetNode = realmNodes.localNodeId.value
+  if (!targetNode || !props.bucket || otherBusy.value) return
+  otherBusy.value = true
+  let created = false
   try {
-    const entities = fileEntities(await loadRoCrate(documentId))
-    crateCache.set(documentId, entities)
-    if (expandedId.value === documentId) expandedEntities.value = entities
-  } catch (err) {
-    if (expandedId.value === documentId) expandError.value = err instanceof Error ? err.message : String(err)
+    for (const row of otherRows.value) {
+      if (row.state === 'done' || row.state === 'creating') continue
+      const sourceApiBase = row.nodeId ? (realmNodes.nodeById(row.nodeId)?.apiBase ?? null) : null
+      if (row.nodeId && !sourceApiBase) {
+        row.state = 'error'
+        row.error = `${realmNodes.displayName(row.nodeId)} does not publish an API URL, so the import cannot be created from here.`
+        continue
+      }
+      row.state = 'creating'
+      row.error = null
+      try {
+        await createSyncRelationship(
+          {
+            source: { bucket: row.bucket, prefix: row.sourcePrefix },
+            target: { node_id: targetNode, bucket: props.bucket, prefix: otherTargetPrefix(row) },
+            mode: row.mode,
+          },
+          sourceApiBase ? { baseUrl: sourceApiBase } : {},
+        )
+        row.state = 'done'
+        created = true
+      } catch (err) {
+        row.state = 'error'
+        row.error = syncCreateError(err)
+      }
+    }
   } finally {
-    if (expandedId.value === documentId) expandLoading.value = false
+    otherBusy.value = false
+    if (created) {
+      emit('sync-created')
+      emit('staged')
+    }
   }
-}
-function toggleRef(reference: string) {
-  const next = new Set(selectedRefs.value)
-  if (next.has(reference)) next.delete(reference)
-  else next.add(reference)
-  selectedRefs.value = next
-}
-function addSelectedInternal() {
-  const groupId = groupSel.value
-  if (!groupId || !selectedRefs.value.size) return
-  const connectorId = internalConnectorSel.value || null
-  const connectorName = arunaNativeConnectors.value.find((connector) => connector.connector_id === connectorId)?.name ?? null
-  const blockedReason = connectorId
-    ? undefined
-    : 'Register an aruna_native connector in this group to import internal references.'
-  basket.addStaging(
-    'internal',
-    [...selectedRefs.value].map((reference) => ({
-      source: reference,
-      strategy: internalStrategy.value,
-      groupId,
-      connectorId,
-      connectorName,
-      blockedReason,
-    })),
-  )
-  selectedRefs.value = new Set()
 }
 
 // ── Quota precheck (advisory, never blocks) ─────────────────────────────────
@@ -399,6 +428,12 @@ watch(
         ? props.groupId
         : groups[0]?.id ?? ''
     void loadConnectors()
+    // Fresh Other-buckets session per dialog visit.
+    sourceBucket.value = ''
+    sourceNodeId.value = null
+    sourceSearch.value = ''
+    otherRows.value = []
+    if (tab.value === 'other') void loadLocalBuckets()
   },
   { immediate: true },
 )
@@ -412,7 +447,7 @@ watch(
           <Upload class="h-4 w-4 text-primary" /> Add data
         </DialogTitle>
         <DialogDescription>
-          Collect local files, connector sources and internal references in the basket, then submit them into
+          Collect local files, connector sources and objects from other buckets, then submit them into
           <span class="font-mono text-xs">{{ bucket }}/{{ prefix }}</span>.
         </DialogDescription>
       </DialogHeader>
@@ -422,7 +457,7 @@ watch(
           <TabsList>
             <TabsTrigger value="local"><Upload class="mr-1 h-3.5 w-3.5" /> Local files</TabsTrigger>
             <TabsTrigger value="connector"><CloudDownload class="mr-1 h-3.5 w-3.5" /> From connector</TabsTrigger>
-            <TabsTrigger value="internal"><Database class="mr-1 h-3.5 w-3.5" /> Internal datasets</TabsTrigger>
+            <TabsTrigger value="other"><Boxes class="mr-1 h-3.5 w-3.5" /> Other buckets</TabsTrigger>
           </TabsList>
 
           <!-- Local files & folders -->
@@ -544,74 +579,110 @@ watch(
             </template>
           </TabsContent>
 
-          <!-- Internal datasets -->
-          <TabsContent value="internal" class="space-y-3">
-            <div class="relative">
-              <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input v-model="searchQuery" placeholder="Search datasets…" class="pl-9" />
-            </div>
+          <!-- Other buckets -->
+          <TabsContent value="other" class="space-y-3">
+            <p class="text-[11px] text-muted-foreground">
+              Import objects from another bucket, local or on another realm node. "Copy (once)" duplicates the
+              selection into <span class="font-mono">{{ bucket }}/{{ prefix }}</span> now; "Reference" exposes it
+              there without copying the data.
+            </p>
+
             <div class="grid gap-3 sm:grid-cols-2">
               <div>
-                <label class="text-xs font-medium text-foreground">Stage via (aruna_native)</label>
+                <label class="text-xs font-medium text-foreground">Local bucket</label>
                 <Select
-                  v-model="internalConnectorSel"
-                  :options="internalConnectorOptions"
-                  placeholder="No aruna_native connector"
+                  :model-value="sourceNodeId ? '' : sourceBucket"
+                  :options="localBucketOptions"
+                  :placeholder="localBucketsLoading ? 'Loading buckets…' : 'Select a bucket'"
+                  :disabled="!localBucketOptions.length && !localBucketsLoading"
                   class="mt-1"
-                  :disabled="!internalConnectorOptions.length"
+                  @update:model-value="(v: string) => pickLocalSource(v)"
                 />
               </div>
               <div>
-                <label class="text-xs font-medium text-foreground">Strategy</label>
-                <Select v-model="internalStrategy" :options="STRATEGY_OPTIONS" class="mt-1" />
+                <label class="text-xs font-medium text-foreground">Or search across nodes</label>
+                <div class="mt-1">
+                  <BucketSearchBox v-model="sourceSearch" mode="picker" placeholder="Find buckets across nodes…" @select="pickSearchHit" />
+                </div>
               </div>
             </div>
-            <p v-if="!arunaNativeConnectors.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
-              This group has no aruna_native connector, so internal references cannot be staged. Add files to review them; register a connector to import.
-            </p>
 
-            <p v-if="search.pending.value" class="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 class="h-3.5 w-3.5 animate-spin" /> Searching…
-            </p>
-            <p v-else-if="search.error.value" class="text-xs text-destructive">{{ search.error.value }}</p>
-            <EmptyState
-              v-else-if="search.searched.value && !search.results.value.length"
-              title="No datasets"
-              description="No datasets match this search."
-            />
+            <template v-if="sourceBucket">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="font-medium text-foreground">Browsing</span>
+                <span class="font-mono">{{ sourceBucket }}</span>
+                <Badge v-if="sourceNodeId" variant="outline" class="text-[10px]" :title="sourceNodeId">
+                  on {{ realmNodes.displayName(sourceNodeId) }}
+                </Badge>
+                <div class="ml-auto flex items-center gap-1.5">
+                  <label class="text-[11px] text-muted-foreground">Add as</label>
+                  <Select v-model="otherDefaultMode" :options="OTHER_MODE_OPTIONS" class="h-8 w-36 text-xs" />
+                </div>
+              </div>
+              <ObjectBrowserPanel :bucket="sourceBucket" :node-id="sourceNodeId" selectable @add="addOtherSelection" />
+            </template>
 
-            <ul v-if="search.results.value.length" class="divide-y divide-border rounded-md border border-border">
-              <li v-for="line in search.results.value" :key="line.hit.document_id">
-                <button class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50" @click="toggleExpand(line.hit.document_id)">
-                  <Layers class="h-3.5 w-3.5 shrink-0 text-primary" />
-                  <span class="min-w-0 flex-1 truncate">{{ line.title || line.hit.document_path }}</span>
-                  <ArrowRight class="h-3.5 w-3.5 shrink-0 text-muted-foreground" :class="expandedId === line.hit.document_id ? 'rotate-90' : ''" />
-                </button>
-                <div v-if="expandedId === line.hit.document_id" class="space-y-2 border-t border-border bg-muted/20 px-3 py-2">
-                  <p v-if="expandLoading" class="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading files…
-                  </p>
-                  <p v-else-if="expandError" class="text-xs text-destructive">{{ expandError }}</p>
-                  <p v-else-if="!expandedEntities.length" class="text-xs text-muted-foreground">No s3:// file references in this dataset.</p>
-                  <template v-else>
-                    <label
-                      v-for="entity in expandedEntities"
-                      :key="entity.ref"
-                      class="flex items-center gap-2 text-xs"
-                    >
-                      <input type="checkbox" class="accent-primary" :checked="selectedRefs.has(entity.ref)" @change="toggleRef(entity.ref)" />
-                      <span class="min-w-0 flex-1 truncate">{{ entity.name }}</span>
-                      <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{{ entity.contentSize ?? '' }}</span>
-                    </label>
-                    <div class="flex justify-end pt-1">
-                      <Button size="sm" :disabled="!selectedRefs.size" @click="addSelectedInternal">
-                        <Plus class="h-3.5 w-3.5" /> Add {{ selectedRefs.size || '' }} to basket
+            <section v-if="otherRows.length" class="overflow-hidden rounded-md border border-border">
+              <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-3 py-2">
+                <div class="flex items-center gap-2">
+                  <ArrowLeftRight class="h-4 w-4 text-primary" />
+                  <h3 class="text-sm font-semibold text-foreground">Imports</h3>
+                  <Badge variant="outline">{{ otherRows.length }}</Badge>
+                </div>
+                <Button
+                  size="sm"
+                  :disabled="!otherPendingCount || otherBusy || writesDisabled"
+                  :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+                  @click="createOtherRelationships"
+                >
+                  <Loader2 v-if="otherBusy" class="h-3.5 w-3.5 animate-spin" />
+                  Import {{ otherPendingCount || '' }}
+                </Button>
+              </header>
+              <ul class="divide-y divide-border">
+                <li v-for="row in otherRows" :key="row.id" class="space-y-1 px-3 py-2">
+                  <div class="flex items-center gap-2 text-xs">
+                    <Badge v-if="row.isPrefix" variant="outline" class="shrink-0 text-[10px] uppercase">folder</Badge>
+                    <span class="min-w-0 truncate font-mono" :title="`${row.bucket}/${row.sourcePrefix}`">
+                      {{ row.bucket }}/{{ row.sourcePrefix }}
+                    </span>
+                    <Badge v-if="row.nodeId" variant="outline" class="shrink-0 text-[10px]" :title="row.nodeId">
+                      on {{ realmNodes.displayName(row.nodeId) }}
+                    </Badge>
+                    <div class="ml-auto flex shrink-0 items-center gap-1.5">
+                      <Select
+                        v-if="row.state === 'ready' || row.state === 'error'"
+                        :model-value="row.mode"
+                        :options="OTHER_MODE_OPTIONS"
+                        class="h-7 w-32 text-xs"
+                        :aria-label="`Import mode for ${row.sourcePrefix}`"
+                        @update:model-value="(v: string) => (row.mode = v as OtherMode)"
+                      />
+                      <Badge v-else variant="outline" class="text-[10px]">{{ row.mode === 'once' ? 'Copy (once)' : 'Reference' }}</Badge>
+                      <Loader2 v-if="row.state === 'creating'" class="h-3.5 w-3.5 animate-spin text-primary" />
+                      <Badge v-else-if="row.state === 'done'" variant="success" class="text-[10px] uppercase">done</Badge>
+                      <Badge v-else-if="row.state === 'error'" variant="destructive" class="text-[10px] uppercase">failed</Badge>
+                      <Button
+                        v-if="row.state !== 'creating'"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Remove import"
+                        @click="removeOtherRow(row.id)"
+                      >
+                        <X class="size-3.5" />
                       </Button>
                     </div>
-                  </template>
-                </div>
-              </li>
-            </ul>
+                  </div>
+                  <p class="truncate text-[10px] text-muted-foreground" :title="`${bucket}/${otherTargetPrefix(row)}`">
+                    into {{ bucket }}/{{ otherTargetPrefix(row) }}
+                  </p>
+                  <p v-if="row.error" class="text-[10px] text-destructive">{{ row.error }}</p>
+                </li>
+              </ul>
+              <p class="border-t border-border px-3 py-1.5 text-[10px] text-muted-foreground">
+                Each import becomes a sync relationship; created ones appear under the bucket's sync status.
+              </p>
+            </section>
           </TabsContent>
         </Tabs>
 
@@ -633,7 +704,7 @@ watch(
             </div>
           </header>
           <div v-if="!basket.rows.value.length" class="px-4 py-8 text-center text-xs text-muted-foreground">
-            The basket is empty. Add files, connector sources or internal references from the tabs above.
+            The basket is empty. Add files or connector sources from the tabs above.
           </div>
           <table v-else class="w-full text-sm">
             <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -696,15 +767,15 @@ watch(
             class="text-destructive"
           >
             These uploads add <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
-            <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong> — past the hard cap of
+            <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>, past the hard cap of
             <strong>{{ formatBytes(precheck.projected.ceilingBytes ?? 0) }}</strong>; the node rejects writes above it with <code>QuotaExceeded</code>.
           </p>
           <p v-else class="text-amber-800 dark:text-amber-300">
             These uploads add <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
-            <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong> — past the quota of
+            <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>, past the quota of
             <strong>{{ formatBytes(precheck.projected.quotaBytes ?? 0) }}</strong> into the grace headroom.
           </p>
-          <p class="mt-1 text-muted-foreground">Counters on remote nodes can lag, so these numbers are approximate. The check is advisory — you can still submit.</p>
+          <p class="mt-1 text-muted-foreground">Counters on remote nodes can lag, so these numbers are approximate. The check is advisory; you can still submit.</p>
           <div class="mt-2 flex items-center gap-2">
             <Button size="sm" @click="confirmPrecheckSubmit">Submit anyway</Button>
             <Button variant="ghost" size="sm" @click="precheck = null">Cancel</Button>

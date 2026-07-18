@@ -1253,6 +1253,7 @@ const isEmpty = computed(
       :prefix="s3Prefix"
       :group-id="activeGroupId"
       @staged="() => { void loadObjects(); void references.reload() }"
+      @sync-created="onSyncChanged"
     />
 
     <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />
