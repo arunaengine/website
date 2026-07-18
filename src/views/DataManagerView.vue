@@ -21,7 +21,6 @@ import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import SyncStatusPanel from '@/components/data/SyncStatusPanel.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
-import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -29,7 +28,7 @@ import { useStaging } from '@/composables/useStaging'
 import { useStagingReferences } from '@/composables/useStagingReferences'
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import { featureEnabled } from '@/lib/config'
-import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type S3Key, type UploadHandle } from '@/composables/useS3'
+import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
@@ -37,8 +36,8 @@ import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } 
 import { parseArunaArn, prefixesOverlap } from '@/lib/sync'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeftRight,
   Boxes,
@@ -247,18 +246,6 @@ const manualSecret = ref('')
 
 const keyTail = computed(() => s3.activeKey.value?.accessKeyId.slice(-4) ?? '')
 
-interface UploadItem {
-  id: number
-  name: string
-  state: 'uploading' | 'done' | 'error' | 'canceled'
-  progress: number
-  error?: string
-  quotaExceeded?: boolean
-}
-const uploads = ref<UploadItem[]>([])
-const uploadHandles = new Map<number, UploadHandle>()
-let uploadCounter = 0
-let disposed = false
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragActive = ref(false)
 const stripDrag = ref(false)
@@ -270,13 +257,19 @@ const staging = useStaging()
 const stagingJobsEnabled = featureEnabled('stagingJobs')
 const stagingPanelOpen = ref(false)
 
-// Background uploads run through the persistent queue (Add data dialog); when
-// one completes into the open bucket, refresh the listing.
+// ALL uploads (toolbar, drop zones and the Add data dialog) run through the
+// shared persistent queue; the floating transfers panel renders their
+// progress. When one completes into the open bucket, refresh the listing.
 const uploadQueue = useUploadQueue()
 watch(uploadQueue.lastCompleted, (completed) => {
-  // Queue uploads always target the connected node.
-  if (completed && completed.bucket === bucket.value && !remoteNodeId.value) void loadObjects()
+  if (completed && completed.bucket === bucket.value && completed.nodeId === remoteNodeId.value) {
+    void loadObjects()
+  }
 })
+
+// Keys visible in the current listing; queued uploads targeting one of them
+// get an "overwrites existing object" marker.
+const listedKeys = computed(() => new Set(objects.value.map((object) => object.key)))
 
 // The retired bucket-builder route redirects here with ?addData=1 so old links
 // land in the consolidated dialog; strip the marker once consumed.
@@ -394,7 +387,6 @@ watch(
     bucketsError.value = null
     bucketsAuthError.value = false
     clearObjectListing()
-    abortActiveUploads()
     if (!key) return
     if (!endpoint) return
     refreshAll()
@@ -585,36 +577,19 @@ interface UploadContext {
   files: File[]
   bucket: string
   prefix: string
-  endpoint: string
   nodeId: string | null
-  key: S3Key
   groupId: string | null
 }
 
 function captureUploadContext(files: File[]): UploadContext | null {
-  const key = s3.activeKey.value
-  const endpoint = effectiveEndpoint.value
-  if (!key || !endpoint || !bucket.value) return null
+  if (!s3.activeKey.value || !effectiveEndpoint.value || !bucket.value) return null
   return {
     files,
     bucket: bucket.value,
     prefix: s3Prefix.value,
-    endpoint,
     nodeId: remoteNodeId.value,
-    key,
     groupId: activeGroupId.value,
   }
-}
-
-function sameS3Session(context: UploadContext): boolean {
-  const key = s3.activeKey.value
-  return Boolean(
-    !disposed &&
-      key &&
-      s3.endpointForNode(context.nodeId) === context.endpoint &&
-      key.accessKeyId === context.key.accessKeyId &&
-      key.secretAccessKey === context.key.secretAccessKey,
-  )
 }
 
 // Advisory only: this may warn but never blocks. Every path ends in an upload.
@@ -624,7 +599,6 @@ async function requestUpload(files: File[]) {
   const groupId = context.groupId
   if (groupId) {
     const usage = await groupUsageFresh(groupId)
-    if (!sameS3Session(context)) return
     const quota = usage?.quota
     if (usage && quota && quota.quota_bytes != null) {
       const used = quotaCountedBytes(usage)
@@ -636,91 +610,33 @@ async function requestUpload(files: File[]) {
       }
     }
   }
-  await uploadFiles(context)
+  uploadFiles(context)
 }
 
 function confirmPrecheckUpload() {
   const context = precheck.value?.context ?? null
   precheck.value = null
-  if (context) void uploadFiles(context)
+  if (context) uploadFiles(context)
 }
 
-async function uploadFiles(context: UploadContext) {
+// Per-file enqueue so every item carries its exact target key plus the
+// overwrite marker from the listing visible at enqueue time. Progress and
+// cancel/retry live in the floating transfers panel; the session fingerprint
+// inside the queue guards against key/endpoint changes.
+function uploadFiles(context: UploadContext) {
+  const checkOverwrite = context.bucket === bucket.value && context.prefix === s3Prefix.value
   for (const file of context.files) {
-    if (!sameS3Session(context)) {
-      listError.value = 'The active S3 credentials changed, so the remaining uploads were canceled.'
-      break
-    }
-    const item: UploadItem = { id: ++uploadCounter, name: file.name, state: 'uploading', progress: 0 }
-    uploads.value = [...uploads.value, item]
-    const handle = s3.uploadObject(
-      context.bucket,
-      `${context.prefix}${file.name}`,
-      file,
-      (loaded, total) => {
-        item.progress = total ? Math.round((loaded / total) * 100) : 0
-        uploads.value = [...uploads.value]
-      },
-      context.nodeId,
-    )
-    uploadHandles.set(item.id, handle)
-    try {
-      await handle.promise
-      item.state = 'done'
-      item.progress = 100
-    } catch (err) {
-      if (item.state !== 'canceled') {
-        item.state = 'error'
-        if (isS3QuotaError(err)) {
-          item.quotaExceeded = true
-          item.error = 'The group’s storage quota is exhausted — the node rejected this upload (QuotaExceeded).'
-        } else {
-          item.error = s3ErrorMessage(err)
-        }
-      }
-    } finally {
-      uploadHandles.delete(item.id)
-    }
-    uploads.value = [...uploads.value]
-  }
-  if (context.bucket === bucket.value && context.prefix === s3Prefix.value && sameS3Session(context)) {
-    await loadObjects()
+    const key = `${context.prefix}${file.name}`
+    uploadQueue.enqueue([file], {
+      bucket: context.bucket,
+      prefix: context.prefix,
+      groupId: context.groupId,
+      nodeId: context.nodeId,
+      key,
+      overwrite: checkOverwrite && listedKeys.value.has(key),
+    })
   }
 }
-
-async function cancelUpload(item: UploadItem) {
-  const handle = uploadHandles.get(item.id)
-  if (!handle) return
-  item.state = 'canceled'
-  uploads.value = [...uploads.value]
-  await handle.abort().catch(() => undefined)
-}
-
-function clearFinishedUploads() {
-  uploads.value = uploads.value.filter((item) => item.state === 'uploading')
-}
-
-function abortActiveUploads() {
-  for (const [id, handle] of uploadHandles) {
-    const item = uploads.value.find((entry) => entry.id === id)
-    if (item) item.state = 'canceled'
-    void handle.abort().catch(() => undefined)
-  }
-  if (uploadHandles.size) uploads.value = [...uploads.value]
-}
-
-// A reload mid-upload silently discards the multipart upload, so ask the
-// browser to confirm while one is running.
-function onBeforeUnload(event: BeforeUnloadEvent) {
-  if (!uploads.value.some((item) => item.state === 'uploading')) return
-  event.preventDefault()
-}
-window.addEventListener('beforeunload', onBeforeUnload)
-onBeforeUnmount(() => {
-  disposed = true
-  window.removeEventListener('beforeunload', onBeforeUnload)
-  abortActiveUploads()
-})
 
 const previewOpen = ref(false)
 const previewObject = ref<ObjectEntry | null>(null)
@@ -1094,31 +1010,6 @@ const isEmpty = computed(
             </div>
 
             <template v-else>
-            <div v-if="uploads.length" class="surface space-y-1 p-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Uploads</span>
-                <Button variant="ghost" size="sm" @click="clearFinishedUploads">Clear finished</Button>
-              </div>
-              <div v-for="item in uploads" :key="item.id" class="flex items-center gap-2 text-xs">
-                <Loader2 v-if="item.state === 'uploading'" class="h-3 w-3 shrink-0 animate-spin text-primary" />
-                <Badge v-else :variant="item.state === 'done' ? 'accent' : item.state === 'canceled' ? 'secondary' : 'destructive'" class="text-[10px] uppercase">{{ item.state }}</Badge>
-                <span class="min-w-0 flex-none truncate font-mono" :class="item.state === 'uploading' ? 'max-w-[40%]' : ''">{{ item.name }}</span>
-                <template v-if="item.state === 'uploading'">
-                  <Progress :value="item.progress" :warn="101" :critical="101" class="h-1.5 flex-1" />
-                  <span class="w-9 shrink-0 text-right font-mono text-muted-foreground">{{ item.progress }}%</span>
-                  <Button variant="ghost" size="sm" class="h-6 shrink-0 px-2" @click="cancelUpload(item)">Cancel</Button>
-                </template>
-                <span v-if="item.error" class="truncate text-destructive">{{ item.error }}</span>
-                <RouterLink
-                  v-if="item.quotaExceeded"
-                  :to="activeGroupId ? { name: 'groups', params: { id: activeGroupId }, hash: '#storage' } : { name: 'groups' }"
-                  class="shrink-0 text-xs font-medium text-primary hover:underline"
-                >
-                  View group quota
-                </RouterLink>
-              </div>
-            </div>
-
             <div
               class="surface overflow-hidden"
               :class="dragActive ? 'ring-2 ring-primary ring-offset-2' : ''"
@@ -1252,6 +1143,7 @@ const isEmpty = computed(
       :bucket="bucket"
       :prefix="s3Prefix"
       :group-id="activeGroupId"
+      :existing-keys="listedKeys"
       @staged="() => { void loadObjects(); void references.reload() }"
       @sync-created="onSyncChanged"
     />

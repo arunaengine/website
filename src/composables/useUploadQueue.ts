@@ -16,6 +16,11 @@ export interface UploadQueueItem {
   // Group backing the credential at enqueue time — keeps the "View group
   // quota" link working after navigation. Null for manual keys.
   groupId: string | null
+  // Node hosting the target bucket; null = the connected node.
+  nodeId: string | null
+  // The target key already existed in the caller's listing at enqueue time,
+  // so completing this upload overwrites an existing object.
+  overwrite: boolean
   // Endpoint+key fingerprint at enqueue time; a queued item never uploads
   // through a session it was not queued under.
   session: string | null
@@ -25,10 +30,14 @@ export interface UploadTarget {
   bucket: string
   prefix: string
   groupId: string | null
+  // Node hosting the target bucket; omitted/null = the connected node.
+  nodeId?: string | null
   // Explicit object key override (single-file enqueues); defaults to
   // `${prefix}${file.name}`. Lets basket rows keep their edited target keys
   // and folder uploads their relative paths.
   key?: string
+  // Marks the enqueued item as overwriting an existing object.
+  overwrite?: boolean
 }
 
 const s3 = useS3()
@@ -48,11 +57,12 @@ let counter = 0
 // part PUTs — the browser's per-host connection pool serializes the rest.
 const MAX_CONCURRENT_FILES = 3
 
-const lastCompleted = ref<{ bucket: string; key: string; at: number } | null>(null)
+const lastCompleted = ref<{ bucket: string; key: string; nodeId: string | null; at: number } | null>(null)
 
-function sessionOf(): string | null {
+function sessionOf(nodeId: string | null): string | null {
   const key = s3.activeKey.value
-  return key && s3.endpoint.value ? `${s3.endpoint.value}|${key.accessKeyId}` : null
+  const endpoint = s3.endpointForNode(nodeId)
+  return key && endpoint ? `${endpoint}|${key.accessKeyId}` : null
 }
 
 const hasActiveUploads = computed(() =>
@@ -66,6 +76,7 @@ function touch() {
 }
 
 function enqueue(list: File[], target: UploadTarget): void {
+  const nodeId = target.nodeId ?? null
   for (const file of list) {
     const item: UploadQueueItem = {
       id: ++counter,
@@ -76,7 +87,9 @@ function enqueue(list: File[], target: UploadTarget): void {
       state: 'queued',
       progress: 0,
       groupId: target.groupId,
-      session: sessionOf(),
+      nodeId,
+      overwrite: target.overwrite ?? false,
+      session: sessionOf(nodeId),
     }
     files.set(item.id, file)
     items.value.push(item)
@@ -101,9 +114,9 @@ async function run(item: UploadQueueItem): Promise<void> {
     touch()
     return
   }
-  if (item.session !== sessionOf()) {
+  if (item.session !== sessionOf(item.nodeId)) {
     item.state = 'error'
-    item.error = 'The S3 key or endpoint changed after this file was queued — retry to upload with the current session.'
+    item.error = 'The S3 key or endpoint changed after this file was queued. Retry to upload with the current session.'
     touch()
     return
   }
@@ -111,17 +124,23 @@ async function run(item: UploadQueueItem): Promise<void> {
   item.progress = 0
   touch()
   try {
-    const handle = s3.uploadObject(item.bucket, item.key, file, (loaded, total) => {
-      item.progress = total ? Math.round((loaded / total) * 100) : 0
-      touch()
-    })
+    const handle = s3.uploadObject(
+      item.bucket,
+      item.key,
+      file,
+      (loaded, total) => {
+        item.progress = total ? Math.round((loaded / total) * 100) : 0
+        touch()
+      },
+      item.nodeId,
+    )
     handles.set(item.id, handle)
     await handle.promise
     if (item.state === 'uploading') {
       item.state = 'done'
       item.progress = 100
       files.delete(item.id) // free the blob; done items are not retryable
-      lastCompleted.value = { bucket: item.bucket, key: item.key, at: Date.now() }
+      lastCompleted.value = { bucket: item.bucket, key: item.key, nodeId: item.nodeId, at: Date.now() }
     }
   } catch (err) {
     // cancel() may have flipped the state to 'canceled' during the await, which
@@ -130,7 +149,7 @@ async function run(item: UploadQueueItem): Promise<void> {
       item.state = 'error'
       if (isS3QuotaError(err)) {
         item.quotaExceeded = true
-        item.error = 'The group’s storage quota is exhausted — the node rejected this upload (QuotaExceeded).'
+        item.error = 'The group’s storage quota is exhausted; the node rejected this upload (QuotaExceeded).'
       } else {
         item.error = s3ErrorMessage(err)
       }
@@ -164,10 +183,19 @@ function retry(item: UploadQueueItem): void {
   item.error = undefined
   item.quotaExceeded = undefined
   // A retry is an explicit user action under whatever session is now active.
-  item.session = sessionOf()
+  item.session = sessionOf(item.nodeId)
   item.state = 'queued'
   touch()
   pump()
+}
+
+// Removes one finished (done/error/canceled) row, e.g. the transfers panel
+// auto-clearing completed entries. Active items must be canceled first.
+function dismiss(id: number): void {
+  const item = items.value.find((entry) => entry.id === id)
+  if (!item || item.state === 'queued' || item.state === 'uploading') return
+  files.delete(id)
+  items.value = items.value.filter((entry) => entry.id !== id)
 }
 
 function clearFinished(): void {
@@ -187,5 +215,5 @@ if (typeof window !== 'undefined') {
 }
 
 export function useUploadQueue() {
-  return { items, hasActiveUploads, lastCompleted, enqueue, cancel, retry, clearFinished }
+  return { items, hasActiveUploads, lastCompleted, enqueue, cancel, retry, dismiss, clearFinished }
 }

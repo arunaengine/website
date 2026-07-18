@@ -3,6 +3,7 @@ import SideNav from '@/components/layout/SideNav.vue'
 import TopBar from '@/components/dashboard/TopBar.vue'
 import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import MobileNav from '@/components/dashboard/MobileNav.vue'
+import TransfersPanel from '@/components/data/TransfersPanel.vue'
 import { RouterView } from 'vue-router'
 </script>
 
@@ -17,5 +18,8 @@ import { RouterView } from 'vue-router'
       </main>
     </div>
     <MobileNav />
+    <!-- Uploads run through the shared queue and survive navigation, so the
+         floating transfers panel lives at the layout, bottom-right. -->
+    <TransfersPanel />
   </div>
 </template>

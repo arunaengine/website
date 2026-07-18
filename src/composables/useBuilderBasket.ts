@@ -66,6 +66,8 @@ export function useBuilderBasket(ctx: {
   bucket: Ref<string>
   prefix: Ref<string>
   groupId: Ref<string | null>
+  /** Keys already present in the caller's listing; uploads targeting one are marked as overwriting. */
+  existingKeys?: Ref<ReadonlySet<string>>
 }) {
   const staging = useStaging()
   const uploads = useUploadQueue()
@@ -198,11 +200,13 @@ export function useBuilderBasket(ctx: {
     }
     row.state = 'submitting'
     row.error = null
+    const targetKey = row.targetKey.trim()
     uploads.enqueue([file], {
       bucket: ctx.bucket.value,
       prefix: ctx.prefix.value,
       groupId: row.groupId,
-      key: row.targetKey.trim(),
+      key: targetKey,
+      overwrite: ctx.existingKeys?.value.has(targetKey) ?? false,
     })
     // enqueue appends synchronously, so the row's item is the last one.
     row.uploadId = uploads.items.value[uploads.items.value.length - 1]?.id ?? null

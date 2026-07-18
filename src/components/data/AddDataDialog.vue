@@ -32,6 +32,7 @@ import { ApiError, type BucketSearchHit, type ConnectorEntry, type SourceConnect
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { computed, ref, watch } from 'vue'
 import {
+  AlertTriangle,
   ArrowLeftRight,
   Boxes,
   CloudDownload,
@@ -48,7 +49,14 @@ import {
 // (persistent upload queue) and connector entries (batch staging), plus an
 // "Other buckets" source that imports objects from any bucket in the realm
 // through sync relationships (copy once or reference).
-const props = defineProps<{ open: boolean; bucket: string; prefix: string; groupId: string | null }>()
+const props = defineProps<{
+  open: boolean
+  bucket: string
+  prefix: string
+  groupId: string | null
+  /** Keys visible in the parent's current listing, for overwrite warnings. */
+  existingKeys?: ReadonlySet<string>
+}>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   (e: 'staged'): void
@@ -61,11 +69,20 @@ const { writesDisabled } = useConnectivity()
 const realmNodes = useRealmNodes()
 const s3 = useS3()
 
+const existingKeys = computed<ReadonlySet<string>>(() => props.existingKeys ?? new Set())
+
 const basket = useBuilderBasket({
   bucket: computed(() => props.bucket),
   prefix: computed(() => props.prefix),
   groupId: computed(() => props.groupId),
+  existingKeys,
 })
+
+// A ready/blocked row whose target key is already listed would overwrite it.
+function rowOverwrites(row: BuilderRow): boolean {
+  if (row.state !== 'ready' && row.state !== 'blocked') return false
+  return existingKeys.value.has(row.targetKey.trim())
+}
 
 const tab = ref('local')
 
@@ -733,6 +750,9 @@ watch(
                     class="h-8 font-mono text-xs"
                     @update:model-value="(v: string | number) => basket.editKey(row.id, String(v))"
                   />
+                  <p v-if="rowOverwrites(row)" class="mt-1 flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
+                    <AlertTriangle class="h-3 w-3 shrink-0" /> Overwrites existing object
+                  </p>
                 </td>
                 <td class="px-3 py-2">
                   <div class="flex items-center gap-2">
