@@ -39,6 +39,13 @@ import {
   type StageBlobSubmission,
   type StagingBatchRequest,
   type StagingBatchResponse,
+  type BucketSearchResponse,
+  type CreateSyncRelationshipRequest,
+  type SyncRelationship,
+  type SyncRelationshipDetail,
+  type SyncRelationshipListQuery,
+  type SyncRelationshipListResponse,
+  type SyncRunResponse,
   type SparqlResponse,
   type UsageHistoryResolution,
   type UsageHistoryResponse,
@@ -777,6 +784,71 @@ async function searchUnified(
   })
 }
 
+// GET /search/buckets — federated bucket-name substring search. Older nodes
+// answer 404: callers degrade via isUnsupportedEndpoint. Auth required.
+async function searchBuckets(
+  q: string,
+  options: { limit?: number; signal?: AbortSignal } = {},
+): Promise<BucketSearchResponse> {
+  return request<BucketSearchResponse>('/search/buckets', {
+    // Backend default is 10, clamped 1..=50; mirror the clamp here.
+    query: { q, limit: Math.min(Math.max(options.limit ?? 10, 1), 50) },
+    signal: options.signal,
+  })
+}
+
+// ── Bucket sync relationships (aruna feat/portal_extensions) ────────────────
+// Only relationships created by the caller are listed; run/delete are
+// creator-only too. Older nodes answer 404 → isUnsupportedEndpoint.
+
+async function listSyncRelationships(
+  query: SyncRelationshipListQuery = {},
+): Promise<SyncRelationshipListResponse> {
+  return request<SyncRelationshipListResponse>('/data/sync-relationships', {
+    query: { bucket: query.bucket, prefix: query.prefix, direction: query.direction },
+  })
+}
+
+async function getSyncRelationship(id: string): Promise<SyncRelationshipDetail> {
+  return request<SyncRelationshipDetail>(`/data/sync-relationships/${encodeURIComponent(id)}`)
+}
+
+// The source endpoint is always the node that receives the POST (the request
+// body carries no source node id). Creating a remote-source relationship
+// ("sync to this node") therefore POSTs to the remote node's API base — the
+// bearer token is realm-wide, like the S3 credentials. 409 duplicate, 502
+// target unreachable, 501 while mode "reference" is unimplemented.
+async function createSyncRelationship(
+  input: CreateSyncRelationshipRequest,
+  opts: { baseUrl?: string } = {},
+): Promise<SyncRelationship> {
+  saving.value = true
+  try {
+    const context = refreshContext()
+    const response = await apiRequest<SyncRelationship>(
+      '/data/sync-relationships',
+      { method: 'POST', body: JSON.stringify(input) },
+      opts.baseUrl ? { ...context.client, baseUrl: opts.baseUrl } : context.client,
+    )
+    assertCurrentSession(context.epoch)
+    return response
+  } finally {
+    saving.value = false
+  }
+}
+
+// 202: re-runs a "once" relationship / backfills a continuous one; also
+// re-enables a failed relationship before queueing.
+async function runSyncRelationship(id: string): Promise<SyncRunResponse> {
+  return request<SyncRunResponse>(`/data/sync-relationships/${encodeURIComponent(id)}/run`, {
+    method: 'POST',
+  })
+}
+
+async function deleteSyncRelationship(id: string): Promise<void> {
+  return request<void>(`/data/sync-relationships/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
 async function resolveUsers(userIds: string[]): Promise<ResolveUserResult[]> {
   return request<ResolveUserResult[]>('/users/resolve', {
     method: 'POST',
@@ -1250,6 +1322,12 @@ export function useAruna() {
     runSparql,
     searchMetadata,
     searchUnified,
+    searchBuckets,
+    listSyncRelationships,
+    getSyncRelationship,
+    createSyncRelationship,
+    runSyncRelationship,
+    deleteSyncRelationship,
     setAuthToken,
     setApiBaseUrl,
   }
