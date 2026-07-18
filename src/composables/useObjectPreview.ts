@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { formatBytes } from '@/lib/utils'
+import { hasReferenceMetadata } from '@/lib/references'
 import { s3ErrorMessage, useS3 } from './useS3'
 
 export type PreviewKind = 'text' | 'markdown' | 'table' | 'image' | 'media' | 'pdf' | 'download'
@@ -93,6 +94,8 @@ export function useObjectPreview() {
   const errorMessage = ref<string | null>(null)
   const corsBlocked = ref(false)
   const sizeNote = ref<string | null>(null)
+  const referenced = ref(false)
+  let referenceProbeId = 0
 
   function reset() {
     if (objectUrl.value) URL.revokeObjectURL(objectUrl.value)
@@ -107,6 +110,22 @@ export function useObjectPreview() {
     errorMessage.value = null
     corsBlocked.value = false
     sizeNote.value = null
+    referenced.value = false
+    ++referenceProbeId
+  }
+
+  // Zero-backend reference marker: on nodes without the /staging/references
+  // listing, a single HeadObject on the previewed object reveals the aruna-*
+  // reference metadata. Never throws — the marker simply stays off.
+  async function probeReferenced(target: PreviewTarget) {
+    const probeId = ++referenceProbeId
+    referenced.value = false
+    try {
+      const head = await s3.headObject(target.bucket, target.key, target.nodeId)
+      if (probeId === referenceProbeId) referenced.value = hasReferenceMetadata(head.metadata)
+    } catch {
+      // Leave the marker off; the preview itself is unaffected.
+    }
   }
 
   async function fallbackDownload(target: PreviewTarget, cap: number, actual: number) {
@@ -185,7 +204,9 @@ export function useObjectPreview() {
     errorMessage,
     corsBlocked,
     sizeNote,
+    referenced,
     load,
+    probeReferenced,
     reset,
   }
 }

@@ -31,7 +31,8 @@ import { featureEnabled } from '@/lib/config'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type S3Key, type UploadHandle } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
-import type { BucketSearchHit, UsageResponse } from '@/lib/api'
+import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
+import { referenceSourceLabel } from '@/lib/references'
 import { parseArunaArn, prefixesOverlap } from '@/lib/sync'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
@@ -60,7 +61,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { authToken, currentUser, bootstrapped, credentials, getGroupUsage, listSyncRelationships, nodeInfo, realmInfo } = useAruna()
+const { authToken, currentUser, bootstrapped, credentials, getGroupUsage, listGroupConnectors, listSyncRelationships, nodeInfo, realmInfo } = useAruna()
 const s3 = useS3()
 
 function routeString(value: unknown): string {
@@ -710,6 +711,54 @@ function openPreview(object: ObjectEntry) {
   previewOpen.value = true
 }
 
+// Connector names for the preview origin line and the stats breakdown: ONE
+// listing per credential group (the bucket namespace IS that group), loaded
+// lazily once a referenced entry actually carries a connector id.
+const connectorsById = ref<Map<string, SourceConnectorSummary>>(new Map())
+let connectorsLoadedFor: string | null = null
+watch(
+  [activeGroupId, () => references.stats.value],
+  async ([groupId, stats]) => {
+    if (!groupId || connectorsLoadedFor === groupId) return
+    if (!stats.groups.some((group) => group.connectorId)) return
+    connectorsLoadedFor = groupId
+    try {
+      const response = await listGroupConnectors(groupId)
+      connectorsById.value = new Map(
+        response.connectors.map((connector) => [connector.connector_id, connector]),
+      )
+    } catch {
+      // Names degrade to kind labels; retry on the next group/stats change.
+      connectorsLoadedFor = null
+    }
+  },
+  { immediate: true },
+)
+
+function connectorName(connectorId: string | undefined): string | null {
+  if (!connectorId) return null
+  return connectorsById.value.get(connectorId)?.name ?? null
+}
+
+const previewReference = computed(() =>
+  previewObject.value
+    ? (references.referencedByKey.value.get(previewObject.value.key) ?? null)
+    : null,
+)
+const previewReferencedFrom = computed(() => {
+  const entry = previewReference.value
+  if (!entry) return null
+  return referenceSourceLabel(entry, {
+    connectorName: connectorName(entry.connector_id),
+    nodeLabel: realmNodes.displayName,
+  })
+})
+// HEAD fallback: flag on but no listing to consult — the endpoint is absent,
+// or the bucket is remote (the connected node's listing does not cover it).
+const previewProbeReference = computed(
+  () => references.enabled && (remoteNodeId.value ? true : !references.supported.value),
+)
+
 async function download(object: ObjectEntry) {
   const sourceBucket = bucket.value
   try {
@@ -1182,6 +1231,8 @@ const isEmpty = computed(
       :name="previewObject?.name ?? ''"
       :size="previewObject?.size"
       :node-id="remoteNodeId"
+      :referenced-from="previewReferencedFrom"
+      :probe-reference="previewProbeReference"
     />
 
     <Dialog :open="newFolderOpen" @update:open="(v: boolean) => (newFolderOpen = v)">

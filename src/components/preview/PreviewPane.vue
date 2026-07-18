@@ -8,7 +8,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import { useObjectPreview } from '@/composables/useObjectPreview'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { formatBytes } from '@/lib/utils'
-import { Download, Loader2, ShieldAlert } from '@lucide/vue'
+import { Download, Link2, Loader2, ShieldAlert } from '@lucide/vue'
 
 const props = defineProps<{
   open: boolean
@@ -19,6 +19,13 @@ const props = defineProps<{
   contentType?: string
   /** Node hosting the bucket; null/absent = the connected node. */
   nodeId?: string | null
+  /** Resolved reference origin ("<connector> · <path>", "node <label>"). */
+  referencedFrom?: string | null
+  /**
+   * HeadObject fallback when no listing resolves the origin: probe the single
+   * previewed object for reference metadata and show a source-less marker.
+   */
+  probeReference?: boolean
 }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
@@ -37,13 +44,16 @@ const preview = useObjectPreview()
 
 function reload() {
   if (!props.objectKey) return
-  void preview.load({
+  const target = {
     bucket: props.bucket,
     key: props.objectKey,
     size: props.size,
     contentType: props.contentType,
     nodeId: props.nodeId,
-  })
+  }
+  void preview.load(target)
+  // After load(): its reset() would drop an earlier-started probe.
+  if (props.probeReference && !props.referencedFrom) void preview.probeReferenced(target)
 }
 
 watch(
@@ -81,6 +91,16 @@ async function download() {
           <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
             <span class="break-all">{{ props.bucket }}/{{ props.objectKey }}</span>
             <span v-if="props.size !== undefined"> · {{ formatBytes(props.size) }}</span>
+          </p>
+          <p
+            v-if="props.referencedFrom || preview.referenced.value"
+            class="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground"
+          >
+            <Link2 class="h-3 w-3 shrink-0 text-primary/70" />
+            <span v-if="props.referencedFrom" class="truncate" :title="`Referenced from ${props.referencedFrom}`">
+              Referenced from {{ props.referencedFrom }}
+            </span>
+            <span v-else>Referenced (external source)</span>
           </p>
         </div>
         <Button variant="outline" size="sm" class="shrink-0" @click="download">
