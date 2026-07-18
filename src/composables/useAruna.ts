@@ -33,8 +33,12 @@ import {
   type ListStagingJobsResponse,
   type SourceConnectorRequest,
   type SourceConnectorSummary,
+  type ConnectorCheckResponse,
+  type ConnectorEntriesResponse,
   type StageBlobResponse,
   type StageBlobSubmission,
+  type StagingBatchRequest,
+  type StagingBatchResponse,
   type SparqlResponse,
   type UsageHistoryResolution,
   type UsageHistoryResponse,
@@ -47,6 +51,7 @@ import {
   type UnifiedSearchResponse,
 } from '@/lib/api'
 import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
+import { WORKFLOW_RUN_CRATE_PROFILE } from '@/lib/profiles/builtinProfiles'
 
 const TOKEN_KEY = 'aruna.authToken'
 const API_BASE_KEY = 'aruna.apiBaseUrl'
@@ -574,11 +579,53 @@ async function deleteGroupConnector(groupId: string, connectorId: string): Promi
   }
 }
 
+// Connector check & browse (agreed contract; new endpoints — callers treat
+// 404/405/501 as "not supported by this node yet" and degrade).
+async function checkConnectorConfig(
+  groupId: string,
+  input: SourceConnectorRequest,
+): Promise<ConnectorCheckResponse> {
+  return request<ConnectorCheckResponse>(`/groups/${groupId}/connectors/check`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+async function checkGroupConnector(groupId: string, connectorId: string): Promise<ConnectorCheckResponse> {
+  return request<ConnectorCheckResponse>(
+    `/groups/${groupId}/connectors/${encodeURIComponent(connectorId)}/check`,
+    { method: 'POST' },
+  )
+}
+
+async function listConnectorEntries(
+  groupId: string,
+  connectorId: string,
+  path?: string,
+  limit?: number,
+): Promise<ConnectorEntriesResponse> {
+  return request<ConnectorEntriesResponse>(
+    `/groups/${groupId}/connectors/${encodeURIComponent(connectorId)}/entries`,
+    { query: { path: path || undefined, limit } },
+  )
+}
+
+// True when an error means the (new-contract) endpoint is absent on this node.
+export function isUnsupportedEndpoint(err: unknown): boolean {
+  return err instanceof ApiError && (err.status === 404 || err.status === 405 || err.status === 501)
+}
+
 // Synchronous one-shot staging: the node pulls source_path from the connector
 // and materializes it as bucket/key (201 on success). Slow for big blobs —
 // callers must show a running state. The axum route is literally "/staging/".
 async function stageBlob(input: StageBlobSubmission): Promise<StageBlobResponse> {
   return request<StageBlobResponse>('/staging/', { method: 'POST', body: JSON.stringify(input) })
+}
+
+// Batch staging (agreed contract): many items/prefixes through one connector in
+// one call. Older nodes answer 404/501 — callers fall back to per-item staging.
+async function stageBatch(input: StagingBatchRequest): Promise<StagingBatchResponse> {
+  return request<StagingBatchResponse>('/staging/batch', { method: 'POST', body: JSON.stringify(input) })
 }
 
 // STUB against the assumed #276 job registry (see api.ts). On today's backends
@@ -910,7 +957,13 @@ function memberCount(roles?: ApiRole[]): number | undefined {
   return users.size
 }
 
-const profiles = computed<MetadataProfile[]>(() => profileItems.value.map(mapProfile))
+// Stored profiles plus the bundled built-ins (a stored profile with the same id
+// wins, so a node can override the built-in with its own copy).
+const profiles = computed<MetadataProfile[]>(() => {
+  const stored = profileItems.value.map(mapProfile)
+  const taken = new Set(stored.map((profile) => profile.id))
+  return [...stored, ...(taken.has(WORKFLOW_RUN_CRATE_PROFILE.id) ? [] : [WORKFLOW_RUN_CRATE_PROFILE])]
+})
 const metadata = computed<MetadataDoc[]>(() => metadataItems.value.map(mapMetadataDoc))
 
 function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
@@ -1177,7 +1230,11 @@ export function useAruna() {
     createGroupConnector,
     replaceGroupConnector,
     deleteGroupConnector,
+    checkConnectorConfig,
+    checkGroupConnector,
+    listConnectorEntries,
     stageBlob,
+    stageBatch,
     listStagingJobs,
     revokeS3Credential,
     listGroupMembers,

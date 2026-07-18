@@ -603,6 +603,64 @@ export interface SourceConnectorRequest {
   secret_config?: Record<string, string>
 }
 
+// Connector check & browse (agreed portal↔backend contract; the endpoints are
+// new — older nodes answer 404/501 and callers degrade by hiding/disabling the
+// affordance with a short hint):
+//   POST /groups/{gid}/connectors/check            (inline config, incl. secrets)
+//   POST /groups/{gid}/connectors/{cid}/check      (stored config + secrets)
+//   GET  /groups/{gid}/connectors/{cid}/entries?path=&limit=
+export interface ConnectorCheckResponse {
+  ok: boolean
+  latency_ms?: number
+  error?: string
+}
+
+export interface ConnectorEntry {
+  name: string
+  path: string
+  kind: 'file' | 'dir'
+  size?: number
+  modified_ms?: number
+}
+
+export interface ConnectorEntriesResponse {
+  entries: ConnectorEntry[]
+  truncated: boolean
+}
+
+// Batch staging (agreed contract): POST /staging/batch stages many items (and
+// whole prefixes) through one connector in a single call.
+export interface StagingBatchItem {
+  source_path: string
+  target_key: string
+}
+
+export interface StagingBatchPrefix {
+  source_prefix: string
+  target_prefix: string
+}
+
+export interface StagingBatchRequest {
+  group_id: string
+  node_id?: string
+  connector_id: string
+  bucket: string
+  strategy: StagingStrategy
+  items?: StagingBatchItem[]
+  prefixes?: StagingBatchPrefix[]
+}
+
+export interface StagingBatchResult {
+  source_path: string
+  target_key: string
+  status: 'ok' | 'error'
+  error?: string
+}
+
+export interface StagingBatchResponse {
+  results: StagingBatchResult[]
+}
+
 // Blob staging (POST /staging/ — verified against aruna api/src/routes/staging.rs).
 // Internally tagged: the `strategy` discriminant sits beside the flattened
 // target fields. Synchronous one-shot materialization (201 on success);
@@ -744,6 +802,9 @@ export interface ApiWatch {
   path_prefix: string
   events: string[]
   created_at_ms: number
+  // Agreed contract addition: newer backends MAY report per-watch health;
+  // render it when present, kept an open string for forward compatibility.
+  health?: 'active' | 'needs_attention' | string
 }
 
 export interface WatchListResponse {

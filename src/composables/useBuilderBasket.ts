@@ -5,8 +5,9 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { useStaging, stagingErrorMessage } from './useStaging'
 import { useUploadQueue } from './useUploadQueue'
+import { isUnsupportedEndpoint, useAruna } from './useAruna'
 import { portalConfig } from '@/lib/config'
-import type { StagingStrategy } from '@/lib/api'
+import type { StagingBatchRequest, StagingStrategy } from '@/lib/api'
 
 export type BasketSourceKind = 'internal' | 'connector' | 'upload'
 export type BasketRowState = 'ready' | 'blocked' | 'submitting' | 'done' | 'error'
@@ -29,6 +30,9 @@ export interface BuilderRow {
   blockedReason: string | null
   // Links an upload row to its useUploadQueue item for live progress.
   uploadId: number | null
+  // Connector rows only: the source is a whole folder (staged via the batch
+  // endpoint's `prefixes`; per-item staging cannot express it).
+  isPrefix?: boolean
 }
 
 export interface StagingSeed {
@@ -38,6 +42,7 @@ export interface StagingSeed {
   connectorId: string | null
   connectorName: string | null
   blockedReason?: string
+  isPrefix?: boolean
 }
 
 // Builder ships on by default; a deployment can still disable it by serving
@@ -90,7 +95,7 @@ export function useBuilderBasket(ctx: {
         id: ++counter,
         sourceKind: kind,
         source: seed.source,
-        targetKey: targetFor(seed.source),
+        targetKey: seed.isPrefix ? `${ctx.prefix.value}${basename(seed.source)}/` : targetFor(seed.source),
         strategy: seed.strategy,
         groupId: seed.groupId,
         connectorId: seed.connectorId,
@@ -102,21 +107,30 @@ export function useBuilderBasket(ctx: {
         error: null,
         blockedReason: seed.blockedReason ?? (seed.connectorId ? null : 'No connector selected.'),
         uploadId: null,
+        ...(seed.isPrefix ? { isPrefix: true } : {}),
       })
       added++
     }
     return added
   }
 
+  // A picked folder's files carry webkitRelativePath — keep the folder
+  // structure in the source label and the target key.
+  function uploadSource(file: File): string {
+    const relative = file.webkitRelativePath
+    return relative && relative.length ? relative : file.name
+  }
+
   function addUploads(list: File[]): number {
     let added = 0
     for (const file of list) {
-      if (seen.value.has(dedupeKey('upload', file.name, file.size))) continue
+      const source = uploadSource(file)
+      if (seen.value.has(dedupeKey('upload', source, file.size))) continue
       const row: BuilderRow = {
         id: ++counter,
         sourceKind: 'upload',
-        source: file.name,
-        targetKey: targetFor(file.name),
+        source,
+        targetKey: `${ctx.prefix.value}${source}`,
         strategy: null,
         groupId: ctx.groupId.value,
         connectorId: null,
@@ -184,9 +198,101 @@ export function useBuilderBasket(ctx: {
     }
     row.state = 'submitting'
     row.error = null
-    uploads.enqueue([file], { bucket: ctx.bucket.value, prefix: ctx.prefix.value, groupId: row.groupId })
+    uploads.enqueue([file], {
+      bucket: ctx.bucket.value,
+      prefix: ctx.prefix.value,
+      groupId: row.groupId,
+      key: row.targetKey.trim(),
+    })
     // enqueue appends synchronously, so the row's item is the last one.
     row.uploadId = uploads.items.value[uploads.items.value.length - 1]?.id ?? null
+  }
+
+  // ── Batch staging (agreed contract) ────────────────────────────────────────
+  // Staging rows sharing group+connector+strategy submit as ONE POST
+  // /staging/batch. A node without the endpoint (404/501) falls back to per-item
+  // staging; folder (prefix) rows cannot be expressed per-item and error with a
+  // short "not supported" hint instead.
+  const { stageBatch } = useAruna()
+  let batchUnsupported = false
+
+  function batchGroups(pending: BuilderRow[]): BuilderRow[][] {
+    const groups = new Map<string, BuilderRow[]>()
+    for (const row of pending) {
+      const key = `${row.groupId}|${row.connectorId}|${row.strategy === 'sync' ? 'snapshot' : row.strategy}`
+      const list = groups.get(key) ?? []
+      list.push(row)
+      groups.set(key, list)
+    }
+    return [...groups.values()]
+  }
+
+  async function runBatch(batch: BuilderRow[]): Promise<void> {
+    const first = batch[0]
+    if (!first?.connectorId || !first.strategy || !first.groupId) return
+    for (const row of batch) {
+      row.state = 'submitting'
+      row.error = null
+    }
+    const body: StagingBatchRequest = {
+      group_id: first.groupId,
+      connector_id: first.connectorId,
+      bucket: ctx.bucket.value,
+      strategy: first.strategy === 'sync' ? 'snapshot' : first.strategy,
+      items: batch
+        .filter((row) => !row.isPrefix)
+        .map((row) => ({ source_path: stagingSourcePath(row), target_key: row.targetKey.trim() })),
+      prefixes: batch
+        .filter((row) => row.isPrefix)
+        .map((row) => ({ source_prefix: stagingSourcePath(row), target_prefix: row.targetKey.trim() })),
+    }
+    if (!body.items?.length) delete body.items
+    if (!body.prefixes?.length) delete body.prefixes
+    try {
+      const response = await stageBatch(body)
+      // Map results back by source path; a missing result counts as success for
+      // prefixes (their per-file results carry expanded paths) and as an error
+      // for items.
+      const bySource = new Map(response.results.map((result) => [result.source_path, result]))
+      for (const row of batch) {
+        const result = bySource.get(stagingSourcePath(row))
+        if (row.isPrefix) {
+          const failed = response.results.find(
+            (entry) => entry.status === 'error' && entry.source_path.startsWith(stagingSourcePath(row)),
+          )
+          row.state = failed ? 'error' : 'done'
+          row.error = failed ? failed.error ?? 'Some entries failed to stage.' : null
+          row.progress = failed ? 0 : 100
+        } else if (result && result.status === 'ok') {
+          row.state = 'done'
+          row.progress = 100
+        } else {
+          row.state = 'error'
+          row.error = result?.error ?? 'The node returned no result for this entry.'
+        }
+      }
+    } catch (err) {
+      if (isUnsupportedEndpoint(err)) {
+        batchUnsupported = true
+        for (const row of batch) {
+          if (row.isPrefix) {
+            row.state = 'error'
+            row.error = 'Folder staging is not supported by this node yet — add the files individually.'
+          } else {
+            row.state = 'ready'
+          }
+        }
+        // Per-item fallback for the file rows.
+        for (const row of batch) {
+          if (!row.isPrefix) await runStaging(row)
+        }
+        return
+      }
+      for (const row of batch) {
+        row.state = 'error'
+        row.error = stagingErrorMessage(err)
+      }
+    }
   }
 
   async function submit() {
@@ -194,9 +300,22 @@ export function useBuilderBasket(ctx: {
     for (const row of pending) {
       if (row.sourceKind === 'upload') startUpload(row)
     }
-    // Staging is a slow synchronous one-shot on the node: run rows one at a time.
-    for (const row of pending) {
-      if (row.sourceKind !== 'upload') await runStaging(row)
+    const stagingRows = pending.filter((row) => row.sourceKind !== 'upload')
+    if (!stagingRows.length) return
+    if (batchUnsupported) {
+      // Known-unsupported node: per-item staging, one at a time (slow sync op).
+      for (const row of stagingRows) {
+        if (row.isPrefix) {
+          row.state = 'error'
+          row.error = 'Folder staging is not supported by this node yet — add the files individually.'
+        } else {
+          await runStaging(row)
+        }
+      }
+      return
+    }
+    for (const batch of batchGroups(stagingRows)) {
+      await runBatch(batch)
     }
   }
 
@@ -204,6 +323,7 @@ export function useBuilderBasket(ctx: {
     const row = rows.value.find((entry) => entry.id === id)
     if (!row || (row.state !== 'error' && row.state !== 'blocked')) return
     if (row.sourceKind === 'upload') startUpload(row)
+    else if (row.isPrefix) await runBatch([row])
     else await runStaging(row)
   }
 
@@ -211,7 +331,12 @@ export function useBuilderBasket(ctx: {
   watch(ctx.prefix, () => {
     for (const row of rows.value) {
       if (!row.keyEdited && (row.state === 'ready' || row.state === 'blocked')) {
-        row.targetKey = targetFor(row.source)
+        row.targetKey =
+          row.sourceKind === 'upload'
+            ? `${ctx.prefix.value}${row.source}`
+            : row.isPrefix
+              ? `${ctx.prefix.value}${basename(row.source)}/`
+              : targetFor(row.source)
       }
     }
   })

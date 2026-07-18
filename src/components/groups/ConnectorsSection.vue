@@ -4,18 +4,24 @@ import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
 import ConnectorDialog from '@/components/groups/ConnectorDialog.vue'
+import ConnectorEntriesBrowser from '@/components/data/ConnectorEntriesBrowser.vue'
 import { ref, watch } from 'vue'
-import { KeyRound, Pencil, Plus, Trash2 } from '@lucide/vue'
-import { useAruna } from '@/composables/useAruna'
+import { FolderSearch, KeyRound, Loader2, Pencil, PlugZap, Plus, Trash2 } from '@lucide/vue'
+import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { relativeTime } from '@/lib/utils'
-import { ApiError, type SourceConnectorSummary } from '@/lib/api'
+import { ApiError, type ConnectorCheckResponse, type SourceConnectorSummary } from '@/lib/api'
 
 const props = defineProps<{ groupId: string; canWrite: boolean }>()
 const emit = defineEmits<{ (e: 'count', count: number): void }>()
 
-const { listGroupConnectors, deleteGroupConnector, saving } = useAruna()
+const { listGroupConnectors, deleteGroupConnector, checkGroupConnector, saving } = useAruna()
 const { writesDisabled } = useConnectivity()
 
 const connectors = ref<SourceConnectorSummary[] | null>(null)
@@ -86,6 +92,42 @@ function endpointOf(connector: SourceConnectorSummary): string {
   if (connector.kind === 's3' && bucket) return `${endpoint ?? ''} · ${bucket}`
   return endpoint ?? ''
 }
+
+// Stored-config connection test (agreed contract:
+// POST /groups/{gid}/connectors/{cid}/check). Once one call answers 404/501 the
+// affordance hides — the node predates the endpoint.
+const checkUnsupported = ref(false)
+const checkingId = ref<string | null>(null)
+const checkResults = ref<Record<string, ConnectorCheckResponse | { ok: false; error: string }>>({})
+
+async function testConnector(connector: SourceConnectorSummary) {
+  if (checkingId.value) return
+  checkingId.value = connector.connector_id
+  const results = { ...checkResults.value }
+  delete results[connector.connector_id]
+  checkResults.value = results
+  try {
+    checkResults.value = {
+      ...checkResults.value,
+      [connector.connector_id]: await checkGroupConnector(props.groupId, connector.connector_id),
+    }
+  } catch (err) {
+    if (isUnsupportedEndpoint(err)) {
+      checkUnsupported.value = true
+    } else {
+      checkResults.value = {
+        ...checkResults.value,
+        [connector.connector_id]: { ok: false, error: err instanceof Error ? err.message : String(err) },
+      }
+    }
+  } finally {
+    checkingId.value = null
+  }
+}
+
+// Entries browser dialog (read-only; reuses the Add data browser component).
+const browseTarget = ref<SourceConnectorSummary | null>(null)
+const browseUnsupported = ref(false)
 </script>
 
 <template>
@@ -129,6 +171,42 @@ function endpointOf(connector: SourceConnectorSummary): string {
           </Badge>
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{{ endpointOf(connector) }}</span>
           <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(connector.updated_at) }}</span>
+          <template v-if="checkResults[connector.connector_id]">
+            <Badge
+              v-if="checkResults[connector.connector_id].ok"
+              variant="success"
+              class="text-[10px] uppercase"
+              :title="'latency_ms' in checkResults[connector.connector_id] && (checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms !== undefined ? `${(checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms} ms` : undefined"
+            >
+              ok{{ (checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms !== undefined ? ` · ${(checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms} ms` : '' }}
+            </Badge>
+            <Badge v-else variant="destructive" class="max-w-[16rem] truncate text-[10px]" :title="checkResults[connector.connector_id].error">
+              {{ checkResults[connector.connector_id].error || 'failed' }}
+            </Badge>
+          </template>
+          <Button
+            v-if="!checkUnsupported && connector.kind !== 'aruna_native'"
+            variant="ghost"
+            size="sm"
+            class="h-6 px-2 text-xs text-muted-foreground"
+            :aria-label="`Test connector ${connector.name}`"
+            :disabled="checkingId !== null"
+            @click="testConnector(connector)"
+          >
+            <Loader2 v-if="checkingId === connector.connector_id" class="h-3 w-3 animate-spin" />
+            <PlugZap v-else class="h-3 w-3" />
+            Test
+          </Button>
+          <Button
+            v-if="!browseUnsupported && connector.kind !== 'aruna_native'"
+            variant="ghost"
+            size="sm"
+            class="h-6 px-2 text-xs text-muted-foreground"
+            :aria-label="`Browse connector ${connector.name}`"
+            @click="browseTarget = connector"
+          >
+            <FolderSearch class="h-3 w-3" /> Browse
+          </Button>
           <template v-if="canWrite">
             <template v-if="confirmingId === connector.connector_id">
               <span class="text-xs text-foreground">Delete this connector?</span>
@@ -182,5 +260,24 @@ function endpointOf(connector: SourceConnectorSummary): string {
       :connector="editing"
       @saved="load"
     />
+
+    <Dialog :open="browseTarget !== null" @update:open="(v: boolean) => { if (!v) browseTarget = null }">
+      <DialogContent class="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2">
+            <FolderSearch class="h-4 w-4 text-primary" /> Browse {{ browseTarget?.name }}
+          </DialogTitle>
+          <DialogDescription>
+            Lists what the node sees through this connector; ingest entries from a bucket's Add data dialog.
+          </DialogDescription>
+        </DialogHeader>
+        <ConnectorEntriesBrowser
+          v-if="browseTarget"
+          :group-id="props.groupId"
+          :connector-id="browseTarget.connector_id"
+          @unsupported="browseUnsupported = true"
+        />
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

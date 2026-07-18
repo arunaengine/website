@@ -25,6 +25,10 @@ export interface UploadTarget {
   bucket: string
   prefix: string
   groupId: string | null
+  // Explicit object key override (single-file enqueues); defaults to
+  // `${prefix}${file.name}`. Lets basket rows keep their edited target keys
+  // and folder uploads their relative paths.
+  key?: string
 }
 
 const s3 = useS3()
@@ -66,7 +70,7 @@ function enqueue(list: File[], target: UploadTarget): void {
     const item: UploadQueueItem = {
       id: ++counter,
       bucket: target.bucket,
-      key: `${target.prefix}${file.name}`,
+      key: target.key ?? `${target.prefix}${file.name}`,
       name: file.name,
       size: file.size,
       state: 'queued',

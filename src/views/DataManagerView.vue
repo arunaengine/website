@@ -20,10 +20,11 @@ import WatchButton from '@/components/watches/WatchButton.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useStaging } from '@/composables/useStaging'
-import { builderEnabled } from '@/composables/useBuilderBasket'
+import { useUploadQueue } from '@/composables/useUploadQueue'
 import { featureEnabled } from '@/lib/config'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type S3Key, type UploadHandle } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
+import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { UsageResponse } from '@/lib/api'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
@@ -31,6 +32,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   Boxes,
+  ChevronRight,
   Download,
   Eye,
   FolderPlus,
@@ -62,6 +64,14 @@ const buckets = ref<BucketEntry[]>([])
 const bucketsLoading = ref(false)
 const bucketsError = ref<string | null>(null)
 const bucketsAuthError = ref(false)
+
+// Per-run ws-<jobId> scratch buckets stay out of the main list; they live in a
+// collapsed "System workspaces" group at the bottom of the sidebar. Deep links
+// into a ws- bucket still open it (the route drives the listing), and the
+// group auto-expands so the open bucket is visible in the sidebar.
+const regularBuckets = computed(() => buckets.value.filter((entry) => !isWorkspaceBucket(entry.name)))
+const workspaceBuckets = computed(() => buckets.value.filter((entry) => isWorkspaceBucket(entry.name)))
+const workspacesOpen = ref(false)
 
 const folders = ref<FolderEntry[]>([])
 const objects = ref<ObjectEntry[]>([])
@@ -99,10 +109,29 @@ const stripDrag = ref(false)
 const addDataOpen = ref(false)
 const staging = useStaging()
 // Staging jobs side panel: config-gated (no job-listing endpoint on today's
-// backend). The dialog's ingest tab covers registered connectors regardless.
+// backend). The dialog's connector tab covers registered connectors regardless.
 const stagingJobsEnabled = featureEnabled('stagingJobs')
-const builderOn = builderEnabled()
 const stagingPanelOpen = ref(false)
+
+// Background uploads run through the persistent queue (Add data dialog); when
+// one completes into the open bucket, refresh the listing.
+const uploadQueue = useUploadQueue()
+watch(uploadQueue.lastCompleted, (completed) => {
+  if (completed && completed.bucket === bucket.value) void loadObjects()
+})
+
+// The retired bucket-builder route redirects here with ?addData=1 so old links
+// land in the consolidated dialog; strip the marker once consumed.
+watch(
+  () => route.query.addData,
+  (flag) => {
+    if (flag === undefined) return
+    if (flag === '1') addDataOpen.value = true
+    const { addData: _addData, ...rest } = route.query
+    void router.replace({ query: rest })
+  },
+  { immediate: true },
+)
 
 const deleteTarget = ref<{ bucket: string; object: ObjectEntry } | null>(null)
 const deleteBusy = ref(false)
@@ -206,6 +235,14 @@ watch([bucket, prefix], () => {
   clearObjectListing()
   if (bucket.value) void loadObjects()
 })
+
+watch(
+  bucket,
+  (name) => {
+    if (name && isWorkspaceBucket(name)) workspacesOpen.value = true
+  },
+  { immediate: true },
+)
 
 function activateManualKey() {
   if (!manualKeyId.value.trim() || !manualSecret.value.trim()) return
@@ -595,7 +632,7 @@ const isEmpty = computed(
           <div class="surface overflow-hidden">
             <header class="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 class="text-sm font-semibold text-foreground">Buckets</h2>
-              <Badge variant="outline">{{ buckets.length }}</Badge>
+              <Badge variant="outline">{{ regularBuckets.length }}</Badge>
             </header>
             <div v-if="bucketsLoading" class="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
               <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading buckets…
@@ -609,19 +646,45 @@ const isEmpty = computed(
               </div>
             </div>
             <p v-else-if="bucketsError" class="px-4 py-3 text-xs text-destructive">{{ bucketsError }}</p>
-            <ul v-else-if="buckets.length" class="max-h-[420px] overflow-y-auto py-1">
-              <li v-for="entry in buckets" :key="entry.name">
+            <template v-else>
+              <ul v-if="regularBuckets.length" class="max-h-[420px] overflow-y-auto py-1">
+                <li v-for="entry in regularBuckets" :key="entry.name">
+                  <button
+                    class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-muted"
+                    :class="entry.name === bucket ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
+                    @click="openBucket(entry.name)"
+                  >
+                    <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span class="truncate">{{ entry.name }}</span>
+                  </button>
+                </li>
+              </ul>
+              <p v-else class="px-4 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
+              <div v-if="workspaceBuckets.length" class="border-t border-border/70 py-1">
                 <button
-                  class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-muted"
-                  :class="entry.name === bucket ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
-                  @click="openBucket(entry.name)"
+                  type="button"
+                  class="flex w-full items-center gap-1 px-4 py-2 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+                  title="Per-run scratch buckets (ws-…) created by compute jobs"
+                  @click="workspacesOpen = !workspacesOpen"
                 >
-                  <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
-                  <span class="truncate">{{ entry.name }}</span>
+                  <ChevronRight :class="['h-3.5 w-3.5 shrink-0 transition-transform', workspacesOpen && 'rotate-90']" />
+                  System workspaces
+                  <Badge variant="outline" class="ml-auto">{{ workspaceBuckets.length }}</Badge>
                 </button>
-              </li>
-            </ul>
-            <p v-else class="px-4 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
+                <ul v-if="workspacesOpen" class="max-h-56 overflow-y-auto pb-1">
+                  <li v-for="entry in workspaceBuckets" :key="entry.name">
+                    <button
+                      class="flex w-full items-center gap-2 px-4 py-1.5 text-left text-xs hover:bg-muted"
+                      :class="entry.name === bucket ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
+                      @click="openBucket(entry.name)"
+                    >
+                      <Boxes class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span class="truncate font-mono">{{ entry.name }}</span>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </template>
             <footer class="space-y-2 border-t border-border p-3">
               <div class="flex gap-2">
                 <Input v-model="newBucketName" placeholder="new-bucket-name" class="h-8 font-mono text-xs" @keyup.enter="createBucket" />
@@ -659,8 +722,6 @@ const isEmpty = computed(
                   Staging
                   <Badge v-if="staging.runningCount.value" variant="secondary" class="ml-1">{{ staging.runningCount.value }}</Badge>
                 </Button>
-                <Button variant="outline" size="sm" @click="pickFiles"><Upload class="h-4 w-4" /> Upload</Button>
-                <Button v-if="builderOn" variant="outline" size="sm" @click="router.push({ name: 'bucket-builder', params: { bucketId: bucket }, query: prefix ? { prefix } : {} })"><Boxes class="h-4 w-4" /> Builder</Button>
                 <Button size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>
             </div>
@@ -787,7 +848,6 @@ const isEmpty = computed(
       :bucket="bucket"
       :prefix="s3Prefix"
       :group-id="activeGroupId"
-      @upload="(files) => void requestUpload(files)"
       @staged="() => void loadObjects()"
     />
 

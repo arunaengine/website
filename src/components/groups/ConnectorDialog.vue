@@ -10,10 +10,10 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import { computed, ref, useId, watch } from 'vue'
-import { Cable, ShieldAlert } from '@lucide/vue'
-import { useAruna } from '@/composables/useAruna'
+import { Cable, CheckCircle2, Loader2, PlugZap, ShieldAlert, XCircle } from '@lucide/vue'
+import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
-import type { SourceConnectorKind, SourceConnectorSummary } from '@/lib/api'
+import type { ConnectorCheckResponse, SourceConnectorKind, SourceConnectorSummary } from '@/lib/api'
 
 const props = defineProps<{
   open: boolean
@@ -25,7 +25,7 @@ const emit = defineEmits<{
   (e: 'saved', connector: SourceConnectorSummary): void
 }>()
 
-const { createGroupConnector, replaceGroupConnector, saving } = useAruna()
+const { createGroupConnector, replaceGroupConnector, checkConnectorConfig, saving } = useAruna()
 const { writesDisabled } = useConnectivity()
 const uid = useId()
 
@@ -137,6 +137,8 @@ watch(
     publicValues.value = { ...(source?.public_config ?? {}) }
     secretValues.value = {}
     submitError.value = null
+    testResult.value = null
+    testError.value = null
   },
 )
 
@@ -149,15 +151,52 @@ function pick(spec: FieldSpec[], values: Record<string, string>): Record<string,
   return config
 }
 
-async function submit() {
-  if (submitDisabled.value) return
-  submitError.value = null
-  const body = {
-    name: name.value.trim(),
+function requestBody() {
+  return {
+    name: name.value.trim() || 'connection-test',
     kind: kind.value,
     public_config: pick(schema.value.public, publicValues.value),
     secret_config: pick(schema.value.secret, secretValues.value),
   }
+}
+
+// "Test connection" runs the inline-config check BEFORE anything is saved
+// (agreed contract: POST /groups/{gid}/connectors/check with the current form
+// values, secrets included). Older nodes without the endpoint hide the button.
+const testing = ref(false)
+const testResult = ref<ConnectorCheckResponse | null>(null)
+const testError = ref<string | null>(null)
+const testUnsupported = ref(false)
+
+async function testConnection() {
+  if (testing.value || missingRequired.value) return
+  testing.value = true
+  testResult.value = null
+  testError.value = null
+  try {
+    testResult.value = await checkConnectorConfig(props.groupId, requestBody())
+  } catch (err) {
+    if (isUnsupportedEndpoint(err)) {
+      testUnsupported.value = true
+    } else {
+      testError.value = err instanceof Error ? err.message : String(err)
+    }
+  } finally {
+    testing.value = false
+  }
+}
+
+// A stale verdict is worse than none: editing any field clears the result.
+watch([kind, publicValues, secretValues], () => {
+  testResult.value = null
+  testError.value = null
+}, { deep: true })
+
+async function submit() {
+  if (submitDisabled.value) return
+  submitError.value = null
+  const body = requestBody()
+  body.name = name.value.trim()
   try {
     const saved = props.connector
       ? await replaceGroupConnector(props.groupId, props.connector.connector_id, body)
@@ -245,6 +284,28 @@ async function submit() {
             </div>
           </fieldset>
 
+          <!-- Inline-config connection test result (before saving). -->
+          <p
+            v-if="testResult && testResult.ok"
+            class="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300"
+          >
+            <CheckCircle2 class="h-3.5 w-3.5 shrink-0" />
+            Connection OK{{ testResult.latency_ms !== undefined ? ` — ${testResult.latency_ms} ms` : '' }}.
+          </p>
+          <p
+            v-else-if="testResult"
+            class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+          >
+            <XCircle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>Connection failed{{ testResult.error ? `: ${testResult.error}` : '.' }}</span>
+          </p>
+          <p v-else-if="testError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            Connection test failed: {{ testError }}
+          </p>
+          <p v-if="testUnsupported" class="text-[11px] text-muted-foreground">
+            Connection tests are not supported by this node yet.
+          </p>
+
           <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
             {{ submitError }}
           </p>
@@ -253,11 +314,26 @@ async function submit() {
           </div>
         </div>
 
-        <DialogFooter>
-          <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
-          <Button type="submit" :disabled="submitDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined">
-            {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Register connector' }}
+        <DialogFooter class="sm:justify-between">
+          <Button
+            v-if="!testUnsupported"
+            type="button"
+            variant="outline"
+            :disabled="testing || missingRequired || writesDisabled"
+            :title="writesDisabled ? OFFLINE_WRITE_HINT : 'Checks the connection with these settings before saving'"
+            @click="testConnection"
+          >
+            <Loader2 v-if="testing" class="h-3.5 w-3.5 animate-spin" />
+            <PlugZap v-else class="h-3.5 w-3.5" />
+            {{ testing ? 'Testing…' : 'Test connection' }}
           </Button>
+          <span v-else />
+          <div class="flex items-center gap-2">
+            <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
+            <Button type="submit" :disabled="submitDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined">
+              {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Register connector' }}
+            </Button>
+          </div>
         </DialogFooter>
       </form>
     </DialogContent>
