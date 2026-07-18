@@ -133,6 +133,9 @@ const connectorStrategy = ref<'snapshot' | 'reference'>('snapshot')
 // Set when the entries endpoint is absent on this node — the typed source path
 // stays available as the fallback.
 const entriesUnsupported = ref(false)
+// Set when the node answered but the source refused a listing (502/504); the
+// browser stays visible for retries and the typed path unlocks alongside it.
+const entriesListingFailed = ref(false)
 const connectorPath = ref('')
 
 watch(connectors, () => {
@@ -142,6 +145,7 @@ watch(connectors, () => {
 })
 watch(connectorSel, () => {
   entriesUnsupported.value = false
+  entriesListingFailed.value = false
 })
 
 const connectorPathError = computed(() => connectorPath.value.trim() !== '' && invalidSourcePath(connectorPath.value))
@@ -515,10 +519,11 @@ watch(
                 selectable
                 @add="addConnectorSelection"
                 @unsupported="entriesUnsupported = true"
+                @list-failed="entriesListingFailed = true"
               />
-              <div v-if="entriesUnsupported" class="space-y-2">
-                <p class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
-                  Browsing connector contents is not supported by this node yet — type the source path instead.
+              <div v-if="entriesUnsupported || entriesListingFailed" class="space-y-2">
+                <p v-if="entriesUnsupported" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+                  Browsing connector contents is not supported by this node yet. Type the source path instead.
                 </p>
                 <div>
                   <label class="text-xs font-medium text-foreground">Source path</label>

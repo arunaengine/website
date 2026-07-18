@@ -5,14 +5,16 @@ import Badge from '@/components/ui/Badge.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import type { ConnectorEntry } from '@/lib/api'
-import { ChevronRight, Folder, Loader2, RefreshCw } from '@lucide/vue'
+import { ApiError, type ConnectorEntry } from '@/lib/api'
+import { ChevronRight, Folder, Home, Loader2, RefreshCw } from '@lucide/vue'
 
 // Remote listing of a source connector's entries (agreed contract:
 // GET /groups/{gid}/connectors/{cid}/entries?path=&limit=). Optionally
 // multi-selectable — files and whole folders — for staged imports. On a node
 // without the endpoint it emits `unsupported` so the caller can fall back to a
-// typed source path.
+// typed source path; a 502/504 from the node (the source itself refused or
+// cannot serve a listing) emits `list-failed` instead, keeping the browser
+// visible for retries while the caller surfaces a manual path input.
 const props = defineProps<{
   groupId: string
   connectorId: string
@@ -22,6 +24,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'add', selection: { files: ConnectorEntry[]; dirs: ConnectorEntry[] }): void
   (e: 'unsupported'): void
+  (e: 'list-failed'): void
 }>()
 
 const { listConnectorEntries } = useAruna()
@@ -32,6 +35,7 @@ const truncated = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const unsupported = ref(false)
+const gatewayError = ref(false)
 const selected = ref<Map<string, ConnectorEntry>>(new Map())
 let seq = 0
 
@@ -40,6 +44,7 @@ async function load() {
   const mySeq = ++seq
   loading.value = true
   error.value = null
+  gatewayError.value = false
   try {
     const response = await listConnectorEntries(props.groupId, props.connectorId, path.value || undefined, 500)
     if (mySeq !== seq) return
@@ -53,6 +58,11 @@ async function load() {
     if (isUnsupportedEndpoint(err)) {
       unsupported.value = true
       emit('unsupported')
+    } else if (err instanceof ApiError && (err.status === 502 || err.status === 504)) {
+      // Bad gateway: the node reached out but the source did not answer with a
+      // listing (plain HTTP mirrors often serve no directory index).
+      gatewayError.value = true
+      emit('list-failed')
     } else {
       error.value = err instanceof Error ? err.message : String(err)
     }
@@ -72,9 +82,10 @@ watch(
 )
 watch(path, () => void load())
 
+// Path segments only; the root is the breadcrumb's home icon.
 const crumbs = computed(() => {
   const parts = path.value.split('/').filter(Boolean)
-  const out: Array<{ label: string; path: string }> = [{ label: 'root', path: '' }]
+  const out: Array<{ label: string; path: string }> = []
   let acc = ''
   for (const part of parts) {
     acc = acc ? `${acc}/${part}` : part
@@ -115,9 +126,19 @@ defineExpose({ reload: load })
     </div>
     <template v-else>
       <div class="flex items-center justify-between gap-2 pb-2">
-        <nav class="flex min-w-0 flex-wrap items-center gap-1 text-xs" aria-label="Connector path">
+        <nav class="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 text-xs" aria-label="Connector path">
+          <button
+            type="button"
+            class="rounded p-1 transition-colors hover:bg-muted"
+            :class="crumbs.length ? 'text-muted-foreground' : 'text-foreground'"
+            title="Connector root"
+            aria-label="Go to connector root"
+            @click="path = ''"
+          >
+            <Home class="h-3.5 w-3.5" />
+          </button>
           <template v-for="(crumb, index) in crumbs" :key="crumb.path">
-            <ChevronRight v-if="index > 0" class="h-3 w-3 shrink-0 text-muted-foreground" />
+            <ChevronRight class="h-3 w-3 shrink-0 text-muted-foreground" />
             <button
               type="button"
               class="max-w-[10rem] truncate rounded px-1 py-0.5 font-mono transition-colors hover:bg-muted"
@@ -135,6 +156,13 @@ defineExpose({ reload: load })
 
       <div class="overflow-hidden rounded-md border border-border">
         <p v-if="error" class="border-b border-border px-3 py-2 text-xs text-destructive">{{ error }}</p>
+        <div
+          v-if="gatewayError"
+          class="border-b border-border bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+        >
+          The node could not list this source. The source may not support directory listing (plain HTTP
+          mirrors often serve no index). You can still import from it by entering a path manually.
+        </div>
         <div class="max-h-[260px] overflow-y-auto">
           <div v-if="loading && !entries.length" class="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
             <Loader2 class="h-3.5 w-3.5 animate-spin" /> Listing…
@@ -171,7 +199,7 @@ defineExpose({ reload: load })
                   {{ entry.modified_ms ? relativeTime(new Date(entry.modified_ms).toISOString()) : '—' }}
                 </td>
               </tr>
-              <tr v-if="!loading && !entries.length">
+              <tr v-if="!loading && !entries.length && !gatewayError">
                 <td :colspan="selectable ? 4 : 3" class="px-3 py-6 text-center text-xs text-muted-foreground">This folder is empty.</td>
               </tr>
             </tbody>
