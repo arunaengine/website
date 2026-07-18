@@ -17,19 +17,23 @@ export function formatNumber(n: number): string {
   return new Intl.NumberFormat('en-US').format(n)
 }
 
-export function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const sec = Math.round(diff / 1000)
-  if (sec < 60) return `${sec}s ago`
+function timeSpan(sec: number): string {
+  if (sec < 60) return `${sec}s`
   const min = Math.round(sec / 60)
-  if (min < 60) return `${min}m ago`
+  if (min < 60) return `${min}m`
   const hr = Math.round(min / 60)
-  if (hr < 24) return `${hr}h ago`
+  if (hr < 24) return `${hr}h`
   const day = Math.round(hr / 24)
-  if (day < 30) return `${day}d ago`
+  if (day < 30) return `${day}d`
   const mo = Math.round(day / 30)
-  if (mo < 12) return `${mo}mo ago`
-  return `${Math.round(mo / 12)}y ago`
+  if (mo < 12) return `${mo}mo`
+  return `${Math.round(mo / 12)}y`
+}
+
+// Past timestamps read "5m ago", future ones "in 5m" (e.g. expiry columns).
+export function relativeTime(iso: string): string {
+  const sec = Math.round((Date.now() - new Date(iso).getTime()) / 1000)
+  return sec < 0 ? `in ${timeSpan(-sec)}` : `${timeSpan(sec)} ago`
 }
 
 // Compact elapsed-time label ("42s", "3m 10s", "2h 05m") for run durations.
