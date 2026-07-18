@@ -12,6 +12,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
+import Popover from '@/components/ui/Popover.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
@@ -32,7 +33,7 @@ import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3QuotaError,
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
-import { referenceSourceLabel } from '@/lib/references'
+import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
 import { parseArunaArn, prefixesOverlap } from '@/lib/sync'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
@@ -192,6 +193,25 @@ const references = useStagingReferences(
   bucket,
   computed(() => !remoteNodeId.value),
 )
+const referenceStats = computed(() => references.stats.value)
+// Header chip: total referenced count + bytes for the browsed bucket, with a
+// per-source popover breakdown. Hidden when the flag is off, the endpoint is
+// unsupported, the bucket is remote, or nothing is referenced.
+const showReferenceStats = computed(
+  () =>
+    references.enabled &&
+    references.supported.value &&
+    !remoteNodeId.value &&
+    referenceStats.value.count > 0,
+)
+
+// Breakdown row label; connector names resolve lazily via connectorsById.
+function referenceGroupLabel(group: ReferenceSourceGroup): string {
+  return referenceSourceName(
+    { kind: group.kind, originNodeId: group.originNodeId },
+    { connectorName: connectorName(group.connectorId), nodeLabel: realmNodes.displayName },
+  )
+}
 
 const buckets = ref<BucketEntry[]>([])
 const bucketsLoading = ref(false)
@@ -1020,6 +1040,43 @@ const isEmpty = computed(
                   <ArrowLeftRight class="h-4 w-4 text-primary" />
                   <Badge variant="secondary" class="ml-1">{{ bucketSyncCount }}</Badge>
                 </Button>
+                <Popover v-if="showReferenceStats">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    :title="`${referenceStats.count} referenced object${referenceStats.count === 1 ? '' : 's'} · ${formatBytes(referenceStats.bytes)} — open per-source breakdown`"
+                  >
+                    <Link2 class="h-4 w-4 text-primary" />
+                    <span class="font-mono text-xs">{{ formatBytes(referenceStats.bytes) }}</span>
+                    <Badge variant="secondary" class="ml-1">{{ referenceStats.count }}</Badge>
+                  </Button>
+                  <template #content>
+                    <div class="space-y-2">
+                      <div>
+                        <p class="text-sm font-semibold text-foreground">Referenced data</p>
+                        <p class="mt-0.5 text-xs text-muted-foreground">
+                          {{ referenceStats.count }} object{{ referenceStats.count === 1 ? '' : 's' }} in this
+                          bucket point{{ referenceStats.count === 1 ? 's' : '' }} at data held elsewhere ·
+                          {{ formatBytes(referenceStats.bytes) }} in total.
+                        </p>
+                      </div>
+                      <ul class="space-y-1 border-t border-border pt-2">
+                        <li
+                          v-for="group in referenceStats.groups"
+                          :key="group.key"
+                          class="flex items-center justify-between gap-3 text-xs"
+                        >
+                          <span class="min-w-0 truncate text-foreground" :title="referenceGroupLabel(group)">
+                            {{ referenceGroupLabel(group) }}
+                          </span>
+                          <span class="shrink-0 font-mono text-muted-foreground">
+                            {{ group.count }} · {{ formatBytes(group.bytes) }}
+                          </span>
+                        </li>
+                      </ul>
+                    </div>
+                  </template>
+                </Popover>
                 <Button v-if="!remoteBlocked" variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
                 <!-- Staging and the Add data pipeline always target the connected node. -->
                 <Button v-if="stagingJobsEnabled && !remoteNodeId" variant="outline" size="sm" @click="stagingPanelOpen = true">
