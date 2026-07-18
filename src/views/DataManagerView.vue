@@ -1180,12 +1180,17 @@ const isEmpty = computed(
                           class="h-3 w-3 shrink-0 text-primary/40"
                           aria-label="Covered by a sync relationship"
                         />
-                        <Link2
+                        <!-- Tooltip lives on a span: title on inline svg is unreliable. -->
+                        <span
                           v-if="references.prefixHasReferences(folder.prefix)"
-                          class="h-3 w-3 shrink-0 text-primary/40"
+                          class="shrink-0"
                           title="Contains objects referenced from an external source"
-                          aria-label="Contains objects referenced from an external source"
-                        />
+                        >
+                          <Link2
+                            class="h-3 w-3 text-primary/40"
+                            aria-label="Contains objects referenced from an external source"
+                          />
+                        </span>
                       </span>
                     </td>
                     <td class="px-4 py-2.5 text-right text-muted-foreground">—</td>
@@ -1207,12 +1212,16 @@ const isEmpty = computed(
                           class="h-3 w-3 shrink-0 text-primary/40"
                           aria-label="Covered by a sync relationship"
                         />
-                        <Link2
+                        <span
                           v-if="references.keyIsReferenced(object.key)"
-                          class="h-3 w-3 shrink-0 text-primary/40"
+                          class="shrink-0"
                           title="Referenced from an external source"
-                          aria-label="Referenced from an external source"
-                        />
+                        >
+                          <Link2
+                            class="h-3 w-3 text-primary/40"
+                            aria-label="Referenced from an external source"
+                          />
+                        </span>
                       </span>
                     </td>
                     <td class="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '—' }}</td>

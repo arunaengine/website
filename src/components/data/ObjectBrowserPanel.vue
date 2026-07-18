@@ -198,12 +198,17 @@ const isEmpty = computed(
                   <td class="px-3 py-2">
                     <span class="flex items-center gap-2 text-xs">
                       <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/
-                      <Link2
+<!-- Tooltip lives on a span: title on inline svg is unreliable. -->
+                      <span
                         v-if="references.prefixHasReferences(folder.prefix)"
-                        class="h-3 w-3 shrink-0 text-primary/40"
+                        class="shrink-0"
                         title="Contains objects referenced from an external source"
-                        aria-label="Contains objects referenced from an external source"
-                      />
+                      >
+                        <Link2
+                          class="h-3 w-3 text-primary/40"
+                          aria-label="Contains objects referenced from an external source"
+                        />
+                      </span>
                     </span>
                   </td>
                   <td class="px-3 py-2 text-right text-xs text-muted-foreground">—</td>
@@ -218,12 +223,16 @@ const isEmpty = computed(
                   <td class="px-3 py-2">
                     <span class="flex items-center gap-2 text-xs">
                       <ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span>
-                      <Link2
+<span
                         v-if="references.keyIsReferenced(object.key)"
-                        class="h-3 w-3 shrink-0 text-primary/40"
+                        class="shrink-0"
                         title="Referenced from an external source"
-                        aria-label="Referenced from an external source"
-                      />
+                      >
+                        <Link2
+                          class="h-3 w-3 text-primary/40"
+                          aria-label="Referenced from an external source"
+                        />
+                      </span>
                     </span>
                   </td>
                   <td class="px-3 py-2 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '—' }}</td>
