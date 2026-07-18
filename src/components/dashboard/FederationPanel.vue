@@ -47,7 +47,11 @@ const VW = 600
 const VH = 360
 const CX = VW / 2
 const CY = VH / 2
-const RADIUS = 118
+// Elliptical spread: a tighter horizontal and a taller vertical radius keep
+// the panel size but pull nodes toward the top/bottom, so hub connections run
+// steep instead of flat.
+const RADIUS_X = 92
+const RADIUS_Y = 132
 const RING = 13
 const TRIM = RING + 3
 const ARC_R = RING + 4
@@ -80,6 +84,11 @@ function nodeHash(id: string): number {
   return hash >>> 0
 }
 
+// Aperiodic slot stagger: uniform slots put opposite nodes exactly 180° apart,
+// which renders their hub connections as one straight line. A three-step
+// pattern keeps every pair of edges at a visibly distinct angle.
+const STAGGER_PATTERN = [-1, 0.5, 1]
+
 const placedSpokes = computed<Placed[]>(() => {
   const list = spokes.value
   const count = Math.max(list.length, 1)
@@ -87,9 +96,14 @@ const placedSpokes = computed<Placed[]>(() => {
   return list.map((node, i) => {
     const seed = nodeHash(node.node_id)
     const angleJitter = ((seed & 0xffff) / 0x10000 - 0.5) * Math.min(slot * 0.6, 26)
-    const radius = RADIUS * (0.8 + (((seed >>> 16) & 0xffff) / 0x10000) * 0.28)
-    const angle = (-90 + slot * i + angleJitter) * (Math.PI / 180)
-    return { node, cx: CX + Math.cos(angle) * radius, cy: CY + Math.sin(angle) * radius }
+    const stagger = Math.min(slot * 0.22, 16) * STAGGER_PATTERN[i % STAGGER_PATTERN.length]
+    const spread = 0.8 + (((seed >>> 16) & 0xffff) / 0x10000) * 0.28
+    const angle = (-90 + slot * i + stagger + angleJitter) * (Math.PI / 180)
+    return {
+      node,
+      cx: CX + Math.cos(angle) * RADIUS_X * spread,
+      cy: CY + Math.sin(angle) * RADIUS_Y * spread,
+    }
   })
 })
 
