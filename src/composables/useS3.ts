@@ -85,28 +85,43 @@ const endpoint = computed(
 
 const hasActiveKey = computed(() => activeKey.value !== null)
 
-let cached: { endpoint: string; key: S3Key; client: S3Client } | null = null
+// S3 credentials are realm-wide: a key issued on one node authenticates on
+// every node, so remote buckets are browsed with the same stored key against
+// the remote node's published S3 endpoint. One client per endpoint, all
+// invalidated together when the active key changes.
+const clientCache = new Map<string, { key: S3Key; client: S3Client }>()
 
-function client(): S3Client {
-  const url = endpoint.value
+// Resolves the S3 endpoint serving `nodeId`; null/the local peer id map to
+// the connected node's endpoint. Returns null when the node publishes none.
+function endpointForNode(nodeId?: string | null): string | null {
+  if (!nodeId || nodeId === nodeInfo.value?.node.peer_id) return endpoint.value
+  const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === nodeId)
+  return node?.info?.urls?.s3 ?? null
+}
+
+function client(nodeId?: string | null): S3Client {
+  const url = endpointForNode(nodeId)
   const key = activeKey.value
-  if (!url) throw new Error('The node does not advertise an S3 endpoint')
-  if (!key) throw new Error('No active S3 credentials')
-  if (!cached || cached.endpoint !== url || cached.key !== key) {
-    cached = {
-      endpoint: url,
-      key,
-      client: new S3Client({
-        endpoint: url,
-        region: 'us-east-1',
-        forcePathStyle: true,
-        credentials: { accessKeyId: key.accessKeyId, secretAccessKey: key.secretAccessKey },
-        requestChecksumCalculation: 'WHEN_REQUIRED',
-        responseChecksumValidation: 'WHEN_REQUIRED',
-      }),
-    }
+  if (!url) {
+    throw new Error(
+      nodeId && nodeId !== nodeInfo.value?.node.peer_id
+        ? 'This node does not publish an S3 endpoint'
+        : 'The node does not advertise an S3 endpoint',
+    )
   }
-  return cached.client
+  if (!key) throw new Error('No active S3 credentials')
+  const cached = clientCache.get(url)
+  if (cached && cached.key === key) return cached.client
+  const created = new S3Client({
+    endpoint: url,
+    region: 'us-east-1',
+    forcePathStyle: true,
+    credentials: { accessKeyId: key.accessKeyId, secretAccessKey: key.secretAccessKey },
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
+  })
+  clientCache.set(url, { key, client: created })
+  return created
 }
 
 function setActiveKey(key: S3Key) {
@@ -117,7 +132,7 @@ function setActiveKey(key: S3Key) {
     apiBase: apiBaseUrl.value,
   }
   activeKey.value = stored
-  cached = null
+  clientCache.clear()
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
     sessionStorage.removeItem(STORAGE_KEY)
@@ -128,7 +143,7 @@ function setActiveKey(key: S3Key) {
 
 function clearActiveKey() {
   activeKey.value = null
-  cached = null
+  clientCache.clear()
   try {
     sessionStorage.removeItem(STORAGE_KEY)
     localStorage.removeItem(STORAGE_KEY)
@@ -197,8 +212,13 @@ async function putTextObject(bucket: string, key: string, text: string, contentT
   )
 }
 
-async function listObjects(bucket: string, prefix: string, token?: string): Promise<ObjectPage> {
-  const response = await client().send(
+async function listObjects(
+  bucket: string,
+  prefix: string,
+  token?: string,
+  nodeId?: string | null,
+): Promise<ObjectPage> {
+  const response = await client(nodeId).send(
     new ListObjectsV2Command({
       Bucket: bucket,
       Prefix: prefix || undefined,
@@ -244,9 +264,10 @@ function uploadObject(
   key: string,
   file: File,
   onProgress?: (loaded: number, total: number) => void,
+  nodeId?: string | null,
 ): UploadHandle {
   const upload = new Upload({
-    client: client(),
+    client: client(nodeId),
     params: {
       Bucket: bucket,
       Key: key,
@@ -269,18 +290,23 @@ function uploadObject(
 }
 
 // S3 folder convention: a zero-byte object whose key ends in '/'.
-async function createFolder(bucket: string, prefix: string, name: string): Promise<void> {
-  await client().send(
+async function createFolder(
+  bucket: string,
+  prefix: string,
+  name: string,
+  nodeId?: string | null,
+): Promise<void> {
+  await client(nodeId).send(
     new PutObjectCommand({ Bucket: bucket, Key: `${prefix}${name}/`, Body: new Uint8Array(0) }),
   )
 }
 
-async function deleteObject(bucket: string, key: string): Promise<void> {
-  await client().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+async function deleteObject(bucket: string, key: string, nodeId?: string | null): Promise<void> {
+  await client(nodeId).send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
 }
 
-async function downloadUrl(bucket: string, key: string): Promise<string> {
-  return getSignedUrl(client(), new GetObjectCommand({ Bucket: bucket, Key: key }), {
+async function downloadUrl(bucket: string, key: string, nodeId?: string | null): Promise<string> {
+  return getSignedUrl(client(nodeId), new GetObjectCommand({ Bucket: bucket, Key: key }), {
     expiresIn: 900,
   })
 }
@@ -289,19 +315,19 @@ async function downloadUrl(bucket: string, key: string): Promise<string> {
 // previews can read content directly. A cross-origin fetch needs the bucket to
 // allow this portal's origin (CORS); when it does not the browser rejects with
 // a TypeError, which the caller treats as the known CORS gap.
-async function fetchObject(bucket: string, key: string): Promise<Response> {
-  const url = await downloadUrl(bucket, key)
+async function fetchObject(bucket: string, key: string, nodeId?: string | null): Promise<Response> {
+  const url = await downloadUrl(bucket, key, nodeId)
   const response = await fetch(url)
   if (!response.ok) throw new Error(`The object could not be fetched (HTTP ${response.status}).`)
   return response
 }
 
-async function getObjectText(bucket: string, key: string): Promise<string> {
-  return (await fetchObject(bucket, key)).text()
+async function getObjectText(bucket: string, key: string, nodeId?: string | null): Promise<string> {
+  return (await fetchObject(bucket, key, nodeId)).text()
 }
 
-async function getObjectBlob(bucket: string, key: string): Promise<Blob> {
-  return (await fetchObject(bucket, key)).blob()
+async function getObjectBlob(bucket: string, key: string, nodeId?: string | null): Promise<Blob> {
+  return (await fetchObject(bucket, key, nodeId)).blob()
 }
 
 export function s3ErrorMessage(err: unknown): string {
@@ -329,6 +355,21 @@ export function isS3QuotaError(err: unknown): boolean {
   return Boolean(err && typeof err === 'object' && (err as { name?: string }).name === 'QuotaExceeded')
 }
 
+// A request that never produced an HTTP response: the endpoint is unreachable
+// or the browser blocked it (CORS rejections surface as an opaque fetch
+// TypeError). Distinct from auth/quota errors, which prove the node answered —
+// remote browsing degrades to an info panel on this class of failure.
+export function isS3NetworkError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const error = err as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } }
+  if (error.$metadata?.httpStatusCode !== undefined) return false
+  if (error.name === 'TypeError' || error.name === 'NetworkError' || error.name === 'NetworkingError') {
+    return true
+  }
+  const message = error.message ?? ''
+  return /failed to fetch|networkerror|load failed|network request failed/i.test(message)
+}
+
 // A rejected, expired or revoked key surfaces as one of these SDK error names
 // or as a 401/403 from the node — distinct from a transient network or server
 // fault, so the UI can offer to mint a fresh key instead of just showing text.
@@ -349,6 +390,7 @@ export function useS3() {
     activeKey,
     hasActiveKey,
     endpoint,
+    endpointForNode,
     setActiveKey,
     clearActiveKey,
     listBuckets,
