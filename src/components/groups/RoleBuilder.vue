@@ -9,8 +9,8 @@ import { describeTarget } from './permission-paths'
 import { useAruna } from '@/composables/useAruna'
 import type { ApiRole, GroupDetailResponse, GroupPermissionLevel } from '@/lib/api'
 
-// Composes a role as a list of grants (path + level) and submits the whole
-// permission map at once. Editing recreates the role with the same name,
+// Composes a role as a list of access rules (path + level) and submits the
+// whole permission map at once. Editing recreates the role with the same name,
 // members and public flag, then removes the old one (there is no update API).
 const props = defineProps<{
   group: GroupDetailResponse
@@ -79,7 +79,7 @@ function addGrants(suffixes: string[], level: GroupPermissionLevel) {
     }
   }
   notice.value = updated.length
-    ? `Updated the existing grant for ${updated.join(' and ')} — a role holds one access level per path.`
+    ? `Updated the existing access rule for ${updated.join(' and ')} — a role holds one access level per path.`
     : null
 }
 
@@ -140,8 +140,8 @@ async function submit() {
           {{ role ? `Edit role "${role.name}"` : 'New role' }}
         </div>
         <p class="mt-0.5 text-xs text-muted-foreground">
-          A role is a named set of grants. Browse and select what it covers, choose an access level, and add
-          grants — members holding the role get exactly what its grants allow.
+          A role is a named set of access rules. Name it, select what it covers, choose an access level, and
+          add access rules — members holding the role get exactly what its rules allow.
         </p>
       </div>
       <Button variant="ghost" size="sm" class="shrink-0" @click="emit('cancel')"><X class="h-3.5 w-3.5" /> Close</Button>
@@ -149,7 +149,16 @@ async function submit() {
 
     <div class="grid gap-6 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
       <div class="min-w-0">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Add access</div>
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Name</div>
+        <div class="mt-1.5 max-w-sm">
+          <label class="sr-only" for="role-name">Role name</label>
+          <Input id="role-name" v-model="name" placeholder="e.g. curators" />
+          <p v-if="nameReserved" class="mt-1 text-[11px] text-destructive">
+            The names "admin" and "user" are reserved for built-in roles.
+          </p>
+        </div>
+
+        <div class="mt-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Add access</div>
         <PermissionPathPicker
           :group-id="group.group_id"
           :path-prefix="prefix"
@@ -169,24 +178,18 @@ async function submit() {
             {{ pending.length ? pendingPreview : 'Nothing selected yet — pick a scope or browse above.' }}
           </span>
           <Button variant="outline" size="sm" class="shrink-0" :disabled="!pending.length" @click="commitPending">
-            <Plus class="h-3.5 w-3.5" /> Add grant
+            <Plus class="h-3.5 w-3.5" /> Add access rule
           </Button>
         </div>
       </div>
 
       <div class="min-w-0 lg:sticky lg:top-20 lg:self-start">
         <div class="rounded-lg border border-border bg-muted/10 p-4">
-          <label class="text-[11px] font-medium text-muted-foreground" for="role-name">Role name</label>
-          <Input id="role-name" v-model="name" class="mt-1" placeholder="e.g. curators" />
-          <p v-if="nameReserved" class="mt-1 text-[11px] text-destructive">
-            The names "admin" and "user" are reserved for built-in roles.
-          </p>
-
-          <div class="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {{ role?.public ? 'Everyone — including anonymous visitors — can' : 'Members with this role can' }}
           </div>
           <p v-if="!grants.length" class="mt-1.5 text-xs text-muted-foreground">
-            Add your first grant — choose what members of this role can reach.
+            Add your first access rule — choose what members of this role can reach.
           </p>
           <ul v-else class="mt-1.5 space-y-1">
             <li v-for="(grant, index) in grants" :key="grant.suffix" class="flex items-center gap-2">
@@ -199,13 +202,13 @@ async function submit() {
               />
               <span class="min-w-0 flex-1 text-xs text-foreground" :title="`${prefix}${grant.suffix}`">
                 {{ describeTarget(grant.suffix) }}
-                <span v-if="grant.level === 'deny'" class="text-muted-foreground">(blocks any other grant)</span>
+                <span v-if="grant.level === 'deny'" class="text-muted-foreground">(blocks any other access rule)</span>
               </span>
               <Button
                 variant="ghost"
                 size="icon-sm"
                 class="shrink-0 text-muted-foreground"
-                :aria-label="`Remove grant for ${describeTarget(grant.suffix)}`"
+                :aria-label="`Remove access rule for ${describeTarget(grant.suffix)}`"
                 @click="removeGrant(index)"
               >
                 <X class="h-3.5 w-3.5" />

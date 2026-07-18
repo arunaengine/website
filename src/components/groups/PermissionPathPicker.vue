@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { Boxes, Globe, Layers, ListChecks, RefreshCw, ShieldCheck } from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
+import { Boxes, Globe, Layers, ListChecks, RefreshCw, ShieldCheck, SlidersHorizontal } from '@lucide/vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -38,6 +38,19 @@ function isActive(suffixes: string[]): boolean {
 }
 
 const activeScope = computed(() => SCOPES.find((scope) => isActive(scope.suffixes)) ?? null)
+
+// Progressive disclosure: quick scopes only by default; the detail browsers
+// appear behind the "Custom…" pill, one at a time (data or metadata).
+const customOpen = ref(false)
+const customMode = ref<'data' | 'meta'>('data')
+const customActive = computed(
+  () => customOpen.value || (!!props.selected?.length && !activeScope.value),
+)
+
+function selectScope(suffixes: string[]) {
+  customOpen.value = false
+  emit('select', suffixes)
+}
 
 const loading = ref(false)
 const loadError = ref<string | null>(null)
@@ -95,7 +108,13 @@ function selectTyped() {
   emit('select', [`data/${nodeChoice.value}/${cleaned}/**`])
 }
 
-onMounted(() => void load())
+// The metadata tree is only fetched once the metadata browser is revealed.
+watch(
+  () => customOpen.value && customMode.value === 'meta',
+  (visible) => {
+    if (visible && !tree.value && !loading.value) void load()
+  },
+)
 </script>
 
 <template>
@@ -113,18 +132,55 @@ onMounted(() => void load())
             : 'border-border text-foreground/80 hover:bg-muted',
         ]"
         :title="`${scope.hint} (${scope.suffixes.join(' + ')})`"
-        @click="emit('select', scope.suffixes)"
+        @click="selectScope(scope.suffixes)"
       >
         <component :is="scope.icon" class="h-3.5 w-3.5 text-primary" />
         {{ scope.title }}
       </button>
+      <button
+        type="button"
+        :class="[
+          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+          customActive
+            ? 'border-primary/50 bg-primary/[0.08] text-foreground'
+            : 'border-border text-foreground/80 hover:bg-muted',
+        ]"
+        title="Browse for a specific folder, document or file"
+        @click="customOpen = !customOpen"
+      >
+        <SlidersHorizontal class="h-3.5 w-3.5 text-primary" />
+        Custom…
+      </button>
     </div>
     <p class="mt-1.5 text-[11px] text-muted-foreground">
-      {{ activeScope ? activeScope.hint : 'Pick a quick scope, or browse below for something more specific.' }}
+      {{ activeScope ? activeScope.hint : customOpen ? 'Browse below and pick exactly what this rule covers.' : 'Pick a quick scope, or choose Custom… for something more specific.' }}
     </p>
 
-    <div class="mt-3 grid items-start gap-3 md:grid-cols-2">
-      <section class="rounded-lg border border-border bg-background">
+    <div v-if="customOpen" class="mt-3">
+      <div class="inline-flex rounded-md border border-border p-0.5">
+        <button
+          type="button"
+          :class="[
+            'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+            customMode === 'data' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+          ]"
+          @click="customMode = 'data'"
+        >
+          Data
+        </button>
+        <button
+          type="button"
+          :class="[
+            'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+            customMode === 'meta' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+          ]"
+          @click="customMode = 'meta'"
+        >
+          Metadata
+        </button>
+      </div>
+
+      <section v-if="customMode === 'meta'" class="mt-2 rounded-lg border border-border bg-background">
         <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
           <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Metadata documents</div>
           <Button variant="ghost" size="sm" class="h-6 px-1.5 text-[10px]" :disabled="loading" @click="load">
@@ -156,7 +212,7 @@ onMounted(() => void load())
         </div>
       </section>
 
-      <section class="rounded-lg border border-border bg-background">
+      <section v-else class="mt-2 rounded-lg border border-border bg-background">
         <div class="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-2">
           <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Files</div>
           <div class="flex min-w-0 items-center gap-1.5">
