@@ -134,8 +134,8 @@ async function submit() {
 
 <template>
   <div>
-    <div class="flex flex-wrap items-start justify-between gap-2 border-b border-border bg-muted/10 px-5 py-4">
-      <div class="min-w-0">
+    <div class="flex items-start justify-between gap-2 border-b border-border bg-muted/10 px-5 py-4">
+      <div class="min-w-0 flex-1">
         <div class="text-sm font-semibold text-foreground">
           {{ role ? `Edit role "${role.name}"` : 'New role' }}
         </div>
