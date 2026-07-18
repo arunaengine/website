@@ -810,8 +810,7 @@ async function searchUnified(
   })
 }
 
-// GET /search/buckets — federated bucket-name substring search. Older nodes
-// answer 404: callers degrade via isUnsupportedEndpoint. Auth required.
+// GET /search/buckets — federated bucket-name substring search. Auth required.
 async function searchBuckets(
   q: string,
   options: { limit?: number; signal?: AbortSignal } = {},

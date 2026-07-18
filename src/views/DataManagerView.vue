@@ -78,7 +78,6 @@ const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
 // param selects the hosting node (default: the connected node) so deep links
 // into remote buckets stay stable. S3 credentials are realm-wide, so the same
 // stored key signs requests against the remote node's published S3 endpoint.
-const bucketSearchEnabled = featureEnabled('federatedBucketSearch')
 const realmNodes = useRealmNodes()
 const shortcuts = useBucketShortcuts()
 
@@ -409,7 +408,7 @@ watch([bucket, prefix, remoteNodeId, effectiveEndpoint], () => {
 watch(
   [bucket, remoteNodeId],
   ([name]) => {
-    if (name && bucketSearchEnabled) shortcuts.recordRecent(name, remoteNodeId.value)
+    if (name) shortcuts.recordRecent(name, remoteNodeId.value)
   },
   { immediate: true },
 )
@@ -881,12 +880,12 @@ const isEmpty = computed(
 
       <section v-else class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside class="space-y-3">
-          <div v-if="bucketSearchEnabled" class="surface p-3">
+          <div class="surface p-3">
             <BucketSearchBox @open="openSearchHit" @sync="openSyncFromHit" />
           </div>
 
           <div
-            v-if="bucketSearchEnabled && (shortcuts.pinned.value.length || shortcuts.recent.value.length)"
+            v-if="shortcuts.pinned.value.length || shortcuts.recent.value.length"
             class="surface overflow-hidden"
           >
             <header class="border-b border-border px-4 py-2.5">

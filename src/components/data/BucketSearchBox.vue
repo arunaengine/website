@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import { useAruna, isUnsupportedEndpoint } from '@/composables/useAruna'
+import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { featureEnabled } from '@/lib/config'
@@ -55,8 +55,6 @@ const nodesFailed = ref(0)
 const searching = ref(false)
 const searched = ref(false)
 const error = ref<string | null>(null)
-// 404 from an older node: the endpoint does not exist there yet.
-const unsupported = ref(false)
 let seq = 0
 
 const MIN_CHARS = 2
@@ -73,7 +71,7 @@ const visibleHits = computed(() =>
 
 const runSearch = useDebounceFn(async (term: string) => {
   const mySeq = ++seq
-  if (term.length < MIN_CHARS || !authToken.value || unsupported.value) {
+  if (term.length < MIN_CHARS || !authToken.value) {
     hits.value = []
     searching.value = false
     searched.value = false
@@ -91,8 +89,7 @@ const runSearch = useDebounceFn(async (term: string) => {
   } catch (err) {
     if (mySeq !== seq) return
     hits.value = []
-    if (isUnsupportedEndpoint(err)) unsupported.value = true
-    else error.value = err instanceof Error ? err.message : String(err)
+    error.value = err instanceof Error ? err.message : String(err)
   } finally {
     if (mySeq === seq) searching.value = false
   }
@@ -149,11 +146,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
       </button>
     </div>
 
-    <p v-if="unsupported" class="rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-      Federated bucket search is not supported by this node yet.
-    </p>
-
-    <template v-else-if="active">
+    <template v-if="active">
       <div
         v-if="partial && searched"
         role="status"

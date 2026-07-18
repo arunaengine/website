@@ -15,7 +15,6 @@ import { useAruna } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useDebounceFn } from '@vueuse/core'
-import { featureEnabled } from '@/lib/config'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { conformsToWorkflowRun } from '@/lib/profiles/builtinProfiles'
@@ -192,16 +191,15 @@ const hiddenByProfile = computed(() =>
 )
 
 // Beyond metadata, an active query also discovers groups (client-side over the
-// loaded group lists, like the top bar), people (server /users/search) and —
-// behind the federatedBucketSearch flag — buckets across the realm's nodes
-// (the `buckets` section of the unified GET /search).
-const bucketSearchEnabled = featureEnabled('federatedBucketSearch')
+// loaded group lists, like the top bar), people (server /users/search) and
+// buckets across the realm's nodes (the `buckets` section of the unified
+// GET /search).
 type SearchKind = 'all' | 'datasets' | 'buckets' | 'groups' | 'people'
 const kindFilter = ref<SearchKind>('all')
 const KIND_OPTIONS: Array<{ id: SearchKind; label: string }> = [
   { id: 'all', label: 'All' },
   { id: 'datasets', label: 'Datasets' },
-  ...(bucketSearchEnabled ? [{ id: 'buckets' as const, label: 'Buckets' }] : []),
+  { id: 'buckets', label: 'Buckets' },
   { id: 'groups', label: 'Groups' },
   { id: 'people', label: 'People' },
 ]
@@ -229,24 +227,28 @@ const bucketResults = ref<BucketSearchHit[]>([])
 const bucketNodesQueried = ref(0)
 const bucketNodesFailed = ref(0)
 const bucketsSearching = ref(false)
+const bucketsError = ref<string | null>(null)
 let bucketSeq = 0
 const runBucketSearch = useDebounceFn(async (term: string) => {
   const seq = ++bucketSeq
-  if (!bucketSearchEnabled || term.length < 2 || !currentUser.value) {
+  if (term.length < 2 || !currentUser.value) {
     bucketResults.value = []
     bucketsSearching.value = false
+    bucketsError.value = null
     return
   }
   bucketsSearching.value = true
+  bucketsError.value = null
   try {
     const response = await searchUnified(term, { types: ['buckets'], limit: 10 })
     if (seq !== bucketSeq) return
     bucketResults.value = (response.buckets?.hits ?? []).filter((hit) => !isWorkspaceBucket(hit.bucket))
     bucketNodesQueried.value = response.buckets?.nodes_queried ?? 0
     bucketNodesFailed.value = response.buckets?.nodes_failed ?? 0
-  } catch {
-    // Absent endpoint (older node) and transient failures both hide the section.
-    if (seq === bucketSeq) bucketResults.value = []
+  } catch (err) {
+    if (seq !== bucketSeq) return
+    bucketResults.value = []
+    bucketsError.value = err instanceof Error ? err.message : String(err)
   } finally {
     if (seq === bucketSeq) bucketsSearching.value = false
   }
@@ -423,7 +425,7 @@ async function runQuery() {
             </div>
           </section>
 
-          <section v-if="bucketSearchEnabled && showKind('buckets') && (bucketResults.length || bucketsSearching)">
+          <section v-if="showKind('buckets') && (bucketResults.length || bucketsSearching || bucketsError)">
             <div class="mb-3 flex flex-wrap items-center gap-2">
               <Boxes class="h-4 w-4 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">Buckets</h2>
@@ -433,6 +435,7 @@ async function runQuery() {
                 {{ bucketNodesQueried - bucketNodesFailed }} of {{ bucketNodesQueried }} nodes answered
               </span>
             </div>
+            <p v-if="bucketsError" class="mb-3 text-xs text-destructive">{{ bucketsError }}</p>
             <div class="flex flex-wrap gap-2">
               <RouterLink
                 v-for="hit in bucketResults"
@@ -473,7 +476,7 @@ async function runQuery() {
           </section>
 
           <EmptyState
-            v-if="kindFilter === 'buckets' && !bucketsSearching && !bucketResults.length"
+            v-if="kindFilter === 'buckets' && !bucketsSearching && !bucketResults.length && !bucketsError"
             title="No matching buckets"
             :description="currentUser ? `No bucket on the realm's nodes matched “${q.trim()}”.` : 'Sign in to search for buckets.'"
           />
