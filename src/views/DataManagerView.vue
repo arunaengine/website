@@ -47,7 +47,6 @@ import {
   Download,
   Eye,
   FolderPlus,
-  History,
   KeyRound,
   Link2,
   Loader2,
@@ -209,6 +208,27 @@ const bucketsAuthError = ref(false)
 const regularBuckets = computed(() => buckets.value.filter((entry) => !isWorkspaceBucket(entry.name)))
 const workspaceBuckets = computed(() => buckets.value.filter((entry) => isWorkspaceBucket(entry.name)))
 const workspacesOpen = ref(false)
+
+// ONE flat sidebar list: pinned buckets first (any node, remote entries carry
+// a node annotation), then every local bucket that is not already pinned.
+interface SidebarBucketEntry {
+  bucket: string
+  /** Hosting node; null = the connected node. */
+  nodeId: string | null
+  pinned: boolean
+}
+const sidebarBuckets = computed<SidebarBucketEntry[]>(() => {
+  const pinned = shortcuts.pinned.value.map((entry) => ({
+    bucket: entry.bucket,
+    nodeId: entry.nodeId ?? null,
+    pinned: true,
+  }))
+  const pinnedLocal = new Set(pinned.filter((entry) => !entry.nodeId).map((entry) => entry.bucket))
+  const locals = regularBuckets.value
+    .filter((entry) => !pinnedLocal.has(entry.name))
+    .map((entry) => ({ bucket: entry.name, nodeId: null, pinned: false }))
+  return [...pinned, ...locals]
+})
 
 const folders = ref<FolderEntry[]>([])
 const objects = ref<ObjectEntry[]>([])
@@ -388,15 +408,6 @@ watch([bucket, prefix, remoteNodeId, effectiveEndpoint], () => {
   clearObjectListing()
   if (bucket.value) void loadObjects()
 })
-
-// Auto-recent: every opened bucket lands in the sidebar shortcuts (last 5).
-watch(
-  [bucket, remoteNodeId],
-  ([name]) => {
-    if (name) shortcuts.recordRecent(name, remoteNodeId.value)
-  },
-  { immediate: true },
-)
 
 watch(
   bucket,
@@ -867,54 +878,16 @@ const isEmpty = computed(
             <BucketSearchBox @open="openSearchHit" @sync="openSyncFromHit" />
           </div>
 
-          <div
-            v-if="shortcuts.pinned.value.length || shortcuts.recent.value.length"
-            class="surface overflow-hidden"
-          >
-            <header class="border-b border-border px-4 py-2.5">
-              <h2 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pinned &amp; recent</h2>
-            </header>
-            <ul class="max-h-56 overflow-y-auto py-1">
-              <li
-                v-for="entry in [...shortcuts.pinned.value.map((s) => ({ ...s, pinned: true })), ...shortcuts.recent.value.map((s) => ({ ...s, pinned: false }))]"
-                :key="`${entry.nodeId ?? 'local'}/${entry.bucket}/${entry.pinned}`"
-                class="group/shortcut flex items-center gap-1 pr-2"
-              >
-                <button
-                  class="flex min-w-0 flex-1 items-center gap-2 px-4 py-1.5 text-left text-xs hover:bg-muted"
-                  :class="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
-                  @click="openBucketOn(entry.bucket, entry.nodeId ?? null)"
-                >
-                  <component :is="entry.pinned ? Pin : History" class="h-3.5 w-3.5 shrink-0" :class="entry.pinned ? 'text-primary' : 'text-muted-foreground'" />
-                  <span class="truncate">{{ entry.bucket }}</span>
-                  <Badge v-if="entry.nodeId" variant="outline" class="ml-auto shrink-0 text-[10px]" :title="entry.nodeId">
-                    {{ realmNodes.displayName(entry.nodeId) }}
-                  </Badge>
-                </button>
-                <button
-                  type="button"
-                  class="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
-                  :class="entry.pinned ? '' : 'opacity-0 transition-opacity group-hover/shortcut:opacity-100 focus-visible:opacity-100'"
-                  :title="entry.pinned ? 'Unpin bucket' : 'Pin bucket'"
-                  :aria-label="entry.pinned ? `Unpin ${entry.bucket}` : `Pin ${entry.bucket}`"
-                  @click="shortcuts.togglePin(entry.bucket, entry.nodeId ?? null)"
-                >
-                  <Pin class="h-3 w-3" :fill="entry.pinned ? 'currentColor' : 'none'" />
-                </button>
-              </li>
-            </ul>
-          </div>
-
           <div class="surface overflow-hidden">
             <header class="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 class="text-sm font-semibold text-foreground">Buckets</h2>
-              <Badge variant="outline">{{ regularBuckets.length }}</Badge>
+              <Badge variant="outline">{{ sidebarBuckets.length }}</Badge>
             </header>
             <div v-if="bucketsLoading" class="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
               <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading buckets…
             </div>
             <div v-else-if="bucketsError && bucketsAuthError" class="m-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-              <p>Your S3 credentials were rejected — the key may be invalid, expired, or revoked.</p>
+              <p>Your S3 credentials were rejected: the key may be invalid, expired, or revoked.</p>
               <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ bucketsError }}</p>
               <div class="mt-2 flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="h-3.5 w-3.5" /> Create new credentials</Button>
@@ -923,20 +896,44 @@ const isEmpty = computed(
             </div>
             <p v-else-if="bucketsError" class="px-4 py-3 text-xs text-destructive">{{ bucketsError }}</p>
             <template v-else>
-              <ul v-if="regularBuckets.length" class="max-h-[420px] overflow-y-auto py-1">
-                <li v-for="entry in regularBuckets" :key="entry.name">
+              <ul v-if="sidebarBuckets.length" class="max-h-[420px] overflow-y-auto py-1">
+                <li
+                  v-for="entry in sidebarBuckets"
+                  :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
+                  class="group/bucket flex items-center gap-1 pr-2"
+                >
                   <button
-                    class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-muted"
-                    :class="entry.name === bucket && !remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
-                    @click="openBucket(entry.name)"
+                    class="flex min-w-0 flex-1 items-center gap-2 px-4 py-2 text-left text-sm hover:bg-muted"
+                    :class="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
+                    @click="openBucketOn(entry.bucket, entry.nodeId)"
                   >
                     <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span class="truncate">{{ entry.name }}</span>
-                    <ArrowLeftRight
-                      v-if="syncByBucket.has(entry.name)"
-                      class="ml-auto h-3 w-3 shrink-0 text-primary/60"
-                      aria-label="Sync relationships configured"
-                    />
+                    <span class="truncate">{{ entry.bucket }}</span>
+                    <span class="ml-auto flex shrink-0 items-center gap-1">
+                      <ArrowLeftRight
+                        v-if="!entry.nodeId && syncByBucket.has(entry.bucket)"
+                        class="h-3 w-3 shrink-0 text-primary/60"
+                        aria-label="Sync relationships configured"
+                      />
+                      <Badge
+                        v-if="entry.nodeId"
+                        variant="outline"
+                        class="shrink-0 text-[10px]"
+                        :title="`Stored on another node: ${entry.nodeId}`"
+                      >
+                        on {{ realmNodes.displayName(entry.nodeId) }}
+                      </Badge>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
+                    :class="entry.pinned ? 'text-primary' : 'opacity-0 transition-opacity group-hover/bucket:opacity-100 focus-visible:opacity-100'"
+                    :title="entry.pinned ? 'Unpin bucket' : 'Pin bucket'"
+                    :aria-label="entry.pinned ? `Unpin ${entry.bucket}` : `Pin ${entry.bucket}`"
+                    @click="shortcuts.togglePin(entry.bucket, entry.nodeId)"
+                  >
+                    <Pin class="h-3 w-3" :fill="entry.pinned ? 'currentColor' : 'none'" />
                   </button>
                 </li>
               </ul>
