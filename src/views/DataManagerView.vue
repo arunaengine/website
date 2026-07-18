@@ -372,7 +372,10 @@ async function loadObjects(more = false) {
 function refreshAll() {
   void refreshBuckets()
   void loadSyncOverview()
-  if (bucket.value) void loadObjects()
+  if (bucket.value) {
+    void loadObjects()
+    void references.reload()
+  }
 }
 
 // On a fresh page load the S3 endpoint arrives asynchronously (from the
@@ -1261,7 +1264,7 @@ const isEmpty = computed(
       :bucket="bucket"
       :prefix="s3Prefix"
       :group-id="activeGroupId"
-      @staged="() => void loadObjects()"
+      @staged="() => { void loadObjects(); void references.reload() }"
     />
 
     <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />
