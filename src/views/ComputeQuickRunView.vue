@@ -103,8 +103,11 @@ const RUNTIMES: Runtime[] = [
   },
 ]
 
-const WIZARD_STEPS = ['Runtime', 'Script', 'Data', 'Review']
-const REVIEW_STEP = 3
+// One combined "Script & data" step: the selected data references are listed
+// with their resolved /work/in|out mount paths right next to the editor, so
+// container paths are visible while the script is written.
+const WIZARD_STEPS = ['Runtime', 'Script & data', 'Review']
+const REVIEW_STEP = 2
 // The step lives in ?step=N so browser back/forward walks the wizard instead
 // of leaving it.
 const step = computed(() => {
@@ -281,9 +284,9 @@ const dataReady = computed(
 const canContinue = computed(() => {
   switch (step.value) {
     case 1:
-      return script.value.trim().length > 0
-    case 2:
-      return dataReady.value && outputsValid.value && workspaceValid.value
+      return (
+        script.value.trim().length > 0 && dataReady.value && outputsValid.value && workspaceValid.value
+      )
     default:
       return true
   }
@@ -406,23 +409,9 @@ function runAnother() {
           </p>
         </div>
 
-        <!-- Step 2: Script -->
-        <div v-else-if="step === 1" class="space-y-3">
-          <div class="flex items-center justify-between">
-            <label class="text-xs font-medium text-foreground">Script <span class="font-mono text-muted-foreground">({{ runtime.file }})</span></label>
-            <Button variant="ghost" size="sm" @click="script = runtime.template">Reset to template</Button>
-          </div>
-          <Suspense>
-            <ScriptEditor v-model="script" :language="runtime.lang" />
-            <template #fallback>
-              <div class="grid h-40 place-items-center rounded-md border border-input bg-field text-xs text-muted-foreground">Loading editor…</div>
-            </template>
-          </Suspense>
-          <p v-if="!script.trim()" class="text-[11px] text-destructive">The script cannot be empty.</p>
-        </div>
-
-        <!-- Step 3: Data -->
-        <div v-else-if="step === 2" class="space-y-6">
+        <!-- Step 2: Script & data — mounts sit next to the editor so container
+             paths are visible while the script is written. -->
+        <div v-else-if="step === 1" class="space-y-5">
           <!-- Credentials gate -->
           <div v-if="!s3.endpoint.value" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             This node does not advertise an S3 endpoint, so the portal cannot stage the script. Use the full task form to reference an existing script.
@@ -432,120 +421,135 @@ function runAnother() {
             <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="size-3.5" /> Create credentials</Button>
           </div>
 
-          <template v-else>
-            <div class="grid gap-3 sm:grid-cols-3">
-              <div>
-                <label class="text-xs font-medium text-foreground">Group</label>
-                <Select v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its Process Run crate.</p>
+          <div v-if="s3.endpoint.value && s3.hasActiveKey.value" class="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label class="text-xs font-medium text-foreground">Group</label>
+              <Select v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
+              <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its Process Run crate.</p>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Output bucket <span class="text-destructive">*</span></label>
+              <Select v-if="bucketOptions.length" v-model="outputBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
+              <Input
+                v-else
+                v-model="outputBucket"
+                class="mt-1 font-mono"
+                :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'"
+                :invalid="outputBucket.trim() && !bucketValid ? 'error' : undefined"
+              />
+              <p v-if="outputBucket.trim() && !bucketValid" class="mt-1 text-[11px] text-destructive">
+                This bucket does not exist. Results can only be written to one of your buckets.
+              </p>
+              <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
+                You have no buckets yet. Create one in Data first.
+              </p>
+              <p v-else class="mt-1 text-[11px] text-muted-foreground">Required, receives output files and the staged script.</p>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Output prefix</label>
+              <Input v-model="outputPrefix" class="mt-1 font-mono" placeholder="quickruns/" />
+              <p class="mt-1 text-[11px] text-muted-foreground">Everything this run writes lands under this prefix.</p>
+            </div>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+            <!-- Script editor -->
+            <div class="min-w-0 space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-medium text-foreground">Script <span class="font-mono text-muted-foreground">({{ runtime.file }})</span></label>
+                <Button variant="ghost" size="sm" @click="script = runtime.template">Reset to template</Button>
               </div>
-              <div>
-                <label class="text-xs font-medium text-foreground">Output bucket <span class="text-destructive">*</span></label>
-                <Select v-if="bucketOptions.length" v-model="outputBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
-                <Input
-                  v-else
-                  v-model="outputBucket"
-                  class="mt-1 font-mono"
-                  :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'"
-                  :invalid="outputBucket.trim() && !bucketValid ? 'error' : undefined"
-                />
-                <p v-if="outputBucket.trim() && !bucketValid" class="mt-1 text-[11px] text-destructive">
-                  This bucket does not exist — results can only be written to one of your buckets.
-                </p>
-                <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
-                  You have no buckets yet — create one in Data first.
-                </p>
-                <p v-else class="mt-1 text-[11px] text-muted-foreground">Required — receives output files and the staged script.</p>
-              </div>
-              <div>
-                <label class="text-xs font-medium text-foreground">Output prefix</label>
-                <Input v-model="outputPrefix" class="mt-1 font-mono" placeholder="quickruns/" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Everything this run writes lands under this prefix.</p>
-              </div>
+              <Suspense>
+                <ScriptEditor v-model="script" :language="runtime.lang" />
+                <template #fallback>
+                  <div class="grid h-40 place-items-center rounded-md border border-input bg-field text-xs text-muted-foreground">Loading editor…</div>
+                </template>
+              </Suspense>
+              <p v-if="!script.trim()" class="text-[11px] text-destructive">The script cannot be empty.</p>
+              <p class="text-[11px] text-muted-foreground">
+                Runs as <code class="rounded bg-muted px-1 font-mono">{{ runtime.interpreter }} {{ scriptContainerPath }}</code> in a fresh container.
+              </p>
             </div>
 
-            <div class="grid gap-4 lg:grid-cols-2">
-              <!-- Input data -->
-              <section class="surface-muted space-y-3 p-4">
+            <!-- Data references with their resolved container mount paths -->
+            <div class="min-w-0 space-y-4">
+              <section class="surface-muted space-y-2.5 p-3.5">
                 <div>
                   <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                     <ArrowDownToLine class="h-3.5 w-3.5 text-primary" /> Input data
                   </div>
                   <p class="mt-1 text-[11px] text-muted-foreground">
-                    Staged read-only into the container under <code class="rounded bg-muted px-1 font-mono">/work/in/</code> before the script starts.
+                    Staged read-only under <code class="rounded bg-muted px-1 font-mono">/work/in/</code> before the script starts.
                   </p>
                 </div>
-                <div v-if="inputs.length" class="space-y-2">
-                  <div v-for="(input, i) in inputs" :key="i" class="surface-inline flex items-center gap-3 p-2.5 text-xs">
+                <div v-if="inputs.length" class="space-y-1.5">
+                  <div v-for="(input, i) in inputs" :key="i" class="surface-inline flex items-start gap-2 p-2 text-xs">
                     <div class="min-w-0 flex-1 font-mono">
-                      <div class="truncate text-foreground" :title="input.url">{{ input.url }}</div>
-                      <div class="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <CornerDownRight class="h-3 w-3 shrink-0" /> /work/in/{{ input.name }}
-                      </div>
+                      <div class="truncate text-foreground" :title="`/work/in/${input.name}`">/work/in/{{ input.name }}</div>
+                      <div class="mt-0.5 truncate text-[10px] text-muted-foreground" :title="input.url">{{ input.url }}</div>
                     </div>
-                    <Button variant="ghost" size="icon-sm" aria-label="Remove input" @click="removeInput(i)"><X class="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
                   </div>
                 </div>
-                <p v-else class="text-[11px] text-muted-foreground">No input data — the script starts with an empty <code class="rounded bg-muted px-1 font-mono">/work/in/</code>.</p>
+                <p v-else class="text-[11px] text-muted-foreground">No input data. The script starts with an empty <code class="rounded bg-muted px-1 font-mono">/work/in/</code>.</p>
                 <Button variant="outline" size="sm" @click="inputDialogOpen = true"><ListPlus class="size-3.5" /> Add input</Button>
               </section>
 
-              <!-- Output data -->
-              <section class="surface-muted space-y-3 p-4">
+              <section class="surface-muted space-y-2.5 p-3.5">
                 <div>
                   <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                     <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Output data
                   </div>
                   <p class="mt-1 text-[11px] text-muted-foreground">
-                    Files the script writes to <code class="rounded bg-muted px-1 font-mono">/work/out/</code> are uploaded to the output bucket after the run. stdout and stderr are always captured.
+                    Files the script writes to <code class="rounded bg-muted px-1 font-mono">/work/out/</code> are uploaded after the run. stdout and stderr are always captured.
                   </p>
                 </div>
-                <div v-if="outputFiles.length" class="space-y-2">
-                  <div v-for="(row, i) in outputFiles" :key="i" class="surface-inline space-y-1 p-2.5 text-xs">
-                    <div class="flex items-center gap-2">
+                <div v-if="outputFiles.length" class="space-y-1.5">
+                  <div v-for="(row, i) in outputFiles" :key="i" class="surface-inline space-y-1 p-2 text-xs">
+                    <div class="flex items-center gap-1.5">
                       <span class="shrink-0 font-mono text-[11px] text-muted-foreground">/work/out/</span>
-                      <Input v-model="row.name" class="h-8 font-mono text-xs" placeholder="result.txt" />
-                      <Button variant="ghost" size="icon-sm" aria-label="Remove output" @click="removeOutput(i)"><X class="h-4 w-4" /></Button>
+                      <Input v-model="row.name" class="h-7 font-mono text-xs" placeholder="result.txt" />
+                      <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove output" @click="removeOutput(i)"><X class="size-3" /></Button>
                     </div>
-                    <div class="flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                    <div class="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground">
                       <CornerDownRight class="h-3 w-3 shrink-0" />
                       <span class="truncate" :title="outputDestination(row.name)">{{ outputDestination(row.name) }}</span>
                     </div>
                   </div>
                 </div>
-                <p v-else class="text-[11px] text-muted-foreground">No output files declared — only stdout and stderr are captured.</p>
+                <p v-else class="text-[11px] text-muted-foreground">No output files declared. Only stdout and stderr are captured.</p>
                 <p v-if="!outputsValid" class="text-[11px] text-destructive">Output names must be unique, non-empty single filenames (no slashes).</p>
                 <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output file</Button>
               </section>
             </div>
+          </div>
 
-            <!-- Workspace -->
-            <section class="space-y-2">
-              <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace <span class="text-destructive">*</span></div>
-              <p class="text-[11px] text-muted-foreground">Choose how the run's scratch storage is handled.</p>
-              <div class="grid gap-2 sm:grid-cols-3">
-                <button
-                  v-for="option in WORKSPACE_OPTIONS"
-                  :key="option.mode"
-                  type="button"
-                  class="rounded-lg border p-3 text-left transition-colors"
-                  :class="workspaceMode === option.mode ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-border hover:bg-muted/40'"
-                  @click="workspaceMode = option.mode"
-                >
-                  <div class="text-xs font-semibold text-foreground">{{ option.label }}</div>
-                  <div class="mt-0.5 text-[11px] text-muted-foreground">{{ option.hint }}</div>
-                </button>
-              </div>
-              <div v-if="workspaceMode === 'existing'" class="max-w-xs">
-                <label class="text-xs font-medium text-foreground">Workspace bucket</label>
-                <Select v-if="bucketOptions.length" v-model="workspaceBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
-                <Input v-else v-model="workspaceBucket" class="mt-1 font-mono" placeholder="my-workspace" />
-              </div>
-              <p v-if="!workspaceValid" class="text-[11px] text-destructive">
-                {{ workspaceMode === 'existing' ? 'Pick the bucket the run should work in.' : 'A workspace choice is required before submitting.' }}
-              </p>
-            </section>
-          </template>
+          <!-- Workspace -->
+          <section v-if="s3.endpoint.value && s3.hasActiveKey.value" class="space-y-2">
+            <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace <span class="text-destructive">*</span></div>
+            <p class="text-[11px] text-muted-foreground">Choose how the run's scratch storage is handled.</p>
+            <div class="grid gap-2 sm:grid-cols-3">
+              <button
+                v-for="option in WORKSPACE_OPTIONS"
+                :key="option.mode"
+                type="button"
+                class="rounded-lg border p-3 text-left transition-colors"
+                :class="workspaceMode === option.mode ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-border hover:bg-muted/40'"
+                @click="workspaceMode = option.mode"
+              >
+                <div class="text-xs font-semibold text-foreground">{{ option.label }}</div>
+                <div class="mt-0.5 text-[11px] text-muted-foreground">{{ option.hint }}</div>
+              </button>
+            </div>
+            <div v-if="workspaceMode === 'existing'" class="max-w-xs">
+              <label class="text-xs font-medium text-foreground">Workspace bucket</label>
+              <Select v-if="bucketOptions.length" v-model="workspaceBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
+              <Input v-else v-model="workspaceBucket" class="mt-1 font-mono" placeholder="my-workspace" />
+            </div>
+            <p v-if="!workspaceValid" class="text-[11px] text-destructive">
+              {{ workspaceMode === 'existing' ? 'Pick the bucket the run should work in.' : 'A workspace choice is required before submitting.' }}
+            </p>
+          </section>
         </div>
 
         <!-- Step 4: Review — mirrors the data step's in/out structure. -->
