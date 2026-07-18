@@ -16,6 +16,8 @@ import {
 } from '@/lib/profiles/entityTypes'
 import { isSchemaOrgUri } from '@/lib/profiles/propertyCatalog'
 import { isDatasetType, isValidClassName, normalizeTypeUri, termNameFromUri } from '@/lib/profiles/uri'
+import type { VocabTerm } from '@/lib/profiles/vocabulary'
+import VocabSuggestions from './VocabSuggestions.vue'
 import {
   PROPERTY_RULE_TEMPLATES,
   trimmed,
@@ -154,6 +156,15 @@ function commitCustomType() {
   if (/^https?:\/\//.test(normalized)) customTypes.value = saveCustomEntityType(normalized)
   customMode.value = false
 }
+
+// A bundled-vocabulary class pick (schema.org core / Dublin Core) — same commit
+// path as a typed custom URI, with the label filled when still empty.
+function applyVocabClass(term: VocabTerm) {
+  entity.value.type = term.uri
+  if (!trimmed(entity.value.label)) entity.value.label = term.label
+  if (/^https?:\/\//.test(term.uri) && !isSchemaOrgUri(term.uri)) customTypes.value = saveCustomEntityType(term.uri)
+  customMode.value = false
+}
 </script>
 
 <template>
@@ -222,7 +233,8 @@ function commitCustomType() {
           @update:model-value="onTypeSelect"
         />
         <div v-if="customMode" class="mt-1.5">
-          <Input v-model="entity.type" placeholder="https://schema.org/Thing or Dataset" @blur="commitCustomType" @keydown.enter="commitCustomType" />
+          <Input v-model="entity.type" placeholder="Search the vocabulary, or paste a type URI" @blur="commitCustomType" @keydown.enter="commitCustomType" />
+          <VocabSuggestions :query="entity.type" kind="class" @pick="applyVocabClass" />
           <p class="mt-1 text-[11px] text-muted-foreground">Plain names map to schema.org: resolves to <code>{{ normalizeTypeUri(entity.type) || 'http://schema.org/…' }}</code></p>
         </div>
       </div>

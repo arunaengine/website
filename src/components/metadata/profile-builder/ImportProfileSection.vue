@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
-import { Upload, Globe, FileJson, CheckCircle2, AlertTriangle, Loader2 } from '@lucide/vue'
+import Select from '@/components/ui/Select.vue'
+import { Upload, Globe, FileJson, CheckCircle2, AlertTriangle, Loader2, ListChecks } from '@lucide/vue'
 import { isModeFile, MODELED_MODE_KEYS, modeBasics, modeToEntityRules } from '@/lib/profiles/mode'
 import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
 import { isRecord } from '@/lib/profiles/uri'
+import { useAruna } from '@/composables/useAruna'
 import type { ProfileBasics } from '@/lib/profiles/types'
 import type { ProfileBuilder, ProfileImportResult } from './useProfileBuilder'
 
@@ -20,6 +22,52 @@ const error = ref('')
 // A parsed import held back because the builder already has edits; applied only
 // after the author confirms the replacement.
 const pendingImport = ref<ProfileImportResult | null>(null)
+
+// "Start from an existing profile": prefill the builder from any stored or
+// built-in profile on this node — the same ingest path as an uploaded crate.
+const { profiles, loadRoCrate } = useAruna()
+const storedId = ref('')
+const storedBusy = ref(false)
+const storedOptions = computed(() =>
+  profiles.value.map((profile) => ({
+    value: profile.id,
+    label: `${profile.name}${profile.builtIn ? ' (built-in)' : ''}`,
+  })),
+)
+
+async function fromStored() {
+  const profile = profiles.value.find((item) => item.id === storedId.value)
+  if (!profile) return
+  storedBusy.value = true
+  error.value = ''
+  try {
+    if (profile.documentId) {
+      await ingest(await loadRoCrate(profile.documentId))
+      return
+    }
+    // Built-in profiles carry their parsed rules directly; no document to load.
+    const result: ProfileImportResult = {
+      basics: {
+        name: profile.name,
+        description: profile.description,
+        version: profile.version,
+      },
+      entityRules: profile.entityRules,
+      mode: profile.mode ?? null,
+      kind: 'crate',
+      preservedKeys: preservedKeys(profile.mode),
+    }
+    if (props.builder.hasEdits) {
+      pendingImport.value = result
+      return
+    }
+    apply(result)
+  } catch (err) {
+    fail(err)
+  } finally {
+    storedBusy.value = false
+  }
+}
 
 // Detect a Describo/Crate-O mode file or an RO-Crate profile crate, map it into
 // the builder, and remember the raw mode for verbatim re-export. The success
@@ -133,6 +181,18 @@ async function fromUrl() {
       <p class="mt-1 text-xs text-muted-foreground">
         Start from a Describo/Crate-O mode file or an RO-Crate profile crate. Rules we recognize become editable here; everything else in the file is kept unchanged and written back on export.
       </p>
+    </div>
+
+    <!-- Start from a profile already on this node (stored or built-in). -->
+    <div v-if="storedOptions.length" class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
+      <span class="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+        <ListChecks class="h-3.5 w-3.5 text-primary" /> Start from an existing profile
+      </span>
+      <Select v-model="storedId" :options="storedOptions" placeholder="Choose a profile" class="h-8 min-w-[200px] flex-1 text-xs" />
+      <Button type="button" variant="outline" size="sm" :disabled="storedBusy || !storedId" @click="fromStored">
+        <Loader2 v-if="storedBusy" class="size-3.5 animate-spin" />
+        <template v-else>Use as starting point</template>
+      </Button>
     </div>
 
     <div class="flex flex-wrap items-center gap-2">

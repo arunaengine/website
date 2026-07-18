@@ -15,8 +15,10 @@ import { useAruna } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
 import { useDebounceFn } from '@vueuse/core'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
-import { Search, FileJson2, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound } from '@lucide/vue'
-import type { SparqlResult } from '@/data/types'
+import { conformsToWorkflowRun } from '@/lib/profiles/builtinProfiles'
+import { parseRunCrate } from '@/lib/runCrate'
+import { Search, FileJson2, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound, Workflow } from '@lucide/vue'
+import type { MetadataDoc, SparqlResult } from '@/data/types'
 import type { UserSearchHit } from '@/lib/api'
 
 const route = useRoute()
@@ -127,7 +129,25 @@ const hits = computed(() =>
     return true
   }),
 )
-const paged = computed(() => hits.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
+// Workflow runs are their own Discover section: a document counts as a run
+// crate when its conformance ids match the Workflow Run Crate profiles
+// (w3id.org/ro/wfrun, or the bundled built-in) or when it parses as run
+// provenance the way the run panels do.
+function isRunCrateDoc(doc: MetadataDoc): boolean {
+  if (conformsToWorkflowRun(doc.conformsToIds)) return true
+  try {
+    return parseRunCrate(doc.roCrate, '') !== null
+  } catch {
+    return false
+  }
+}
+const catalogSplit = computed(() => {
+  const runs: MetadataDoc[] = []
+  const datasets: MetadataDoc[] = []
+  for (const doc of hits.value) (isRunCrateDoc(doc) ? runs : datasets).push(doc)
+  return { runs, datasets }
+})
+const paged = computed(() => catalogSplit.value.datasets.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
 
 // Group labels: names for groups the caller can see, honest truncated id otherwise.
 const groupNames = computed(() => {
@@ -479,27 +499,50 @@ async function runQuery() {
 
           <ErrorPanel v-else-if="error" :message="error" @retry="refresh" />
 
-          <section v-else-if="hits.length">
-            <div class="mb-3 flex items-center gap-2">
-              <FileJson2 class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ filtering ? 'Matching metadata' : 'Catalog' }}</h2>
-              <span class="text-xs text-muted-foreground">{{ hits.length }}</span>
-            </div>
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <CatalogCard
-                v-for="doc in paged"
-                :key="doc.ulid"
-                :doc="doc"
-                :favourite="isFavourite(doc.ulid)"
-                :can-favourite="Boolean(currentUser)"
-                :favourite-busy="favBusy.has(doc.ulid)"
-                @toggle-favourite="toggleFav"
-              />
-            </div>
-            <div v-if="hits.length > PAGE_SIZE" class="surface mt-4 overflow-hidden">
-              <Pagination v-model:page="page" :page-size="PAGE_SIZE" :total="hits.length" label="metadata documents" />
-            </div>
-          </section>
+          <template v-else-if="hits.length">
+            <section v-if="catalogSplit.datasets.length">
+              <div class="mb-3 flex items-center gap-2">
+                <FileJson2 class="h-4 w-4 text-primary" />
+                <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ filtering ? 'Matching metadata' : 'Catalog' }}</h2>
+                <span class="text-xs text-muted-foreground">{{ catalogSplit.datasets.length }}</span>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <CatalogCard
+                  v-for="doc in paged"
+                  :key="doc.ulid"
+                  :doc="doc"
+                  :favourite="isFavourite(doc.ulid)"
+                  :can-favourite="Boolean(currentUser)"
+                  :favourite-busy="favBusy.has(doc.ulid)"
+                  @toggle-favourite="toggleFav"
+                />
+              </div>
+              <div v-if="catalogSplit.datasets.length > PAGE_SIZE" class="surface mt-4 overflow-hidden">
+                <Pagination v-model:page="page" :page-size="PAGE_SIZE" :total="catalogSplit.datasets.length" label="metadata documents" />
+              </div>
+            </section>
+
+            <!-- Run crates (Workflow Run RO-Crate / run provenance) get their own
+                 section so compute runs never mix with ordinary datasets. -->
+            <section v-if="catalogSplit.runs.length">
+              <div class="mb-3 flex items-center gap-2">
+                <Workflow class="h-4 w-4 text-primary" />
+                <h2 class="font-display text-sm font-semibold text-aruna-navy">Workflow runs</h2>
+                <span class="text-xs text-muted-foreground">{{ catalogSplit.runs.length }}</span>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <CatalogCard
+                  v-for="doc in catalogSplit.runs"
+                  :key="doc.ulid"
+                  :doc="doc"
+                  :favourite="isFavourite(doc.ulid)"
+                  :can-favourite="Boolean(currentUser)"
+                  :favourite-busy="favBusy.has(doc.ulid)"
+                  @toggle-favourite="toggleFav"
+                />
+              </div>
+            </section>
+          </template>
 
           <EmptyState
             v-else-if="filtering"

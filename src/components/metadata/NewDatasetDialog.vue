@@ -12,6 +12,7 @@ import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import DatasetFilesEditor from '@/components/metadata/DatasetFilesEditor.vue'
 import DatasetEntityInstances from '@/components/metadata/DatasetEntityInstances.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
@@ -100,6 +101,13 @@ const entityInstances = ref<Record<string, Array<Record<string, unknown>>>>({})
 const entityRefValues = ref<Record<string, unknown>>({})
 const profileLoading = ref(false)
 const profileLoadError = ref<string | null>(null)
+// True when the full-crate load (or its S3 artifact resolution) FAILED — as
+// opposed to the informational "profile has no machine-readable rules" case.
+// The initial summary parse structurally contains zero profile rules (the
+// backend summary strips File entities), so a failed refinement means the form
+// is silently missing fields; that state blocks the generated section AND
+// submission until a retry succeeds or the profile is deselected.
+const profileLoadFailed = ref(false)
 let profileLoadToken = 0
 
 const builtInDatasetKeys = new Set(['name', 'description', 'datePublished', 'license'])
@@ -460,6 +468,7 @@ const canSubmit = computed(() => Boolean(
     && dataRefsValid.value
     && roCrateRootValid.value
     && !profileLoading.value
+    && !profileLoadFailed.value
     && !profileCollisionKeys.value.length
     && !hasPartScalarCollisionKeys.value.length
     && !profileViolations.value.some((violation) => violation.severity === 'error')
@@ -518,8 +527,20 @@ const submitBlockerSummary = computed<string[]>(() => {
     + dataRefs.value.filter(dataRefUrlError).length
   if (fieldErrorCount) parts.push(`${fieldErrorCount} ${fieldErrorCount === 1 ? 'field needs' : 'fields need'} attention (marked at the inputs).`)
   if (profileLoading.value) parts.push('Waiting for the profile rules to finish loading.')
+  if (profileLoadFailed.value) parts.push('The profile rules could not be loaded — retry above or choose "No profile reference".')
   return parts
 })
+
+// Authored profile fields whose valueName collides with a built-in scaffold key:
+// the scaffold input claims the value, so the author's label, input kind and
+// constraints are partially dropped. Surfaced as a visible warning. The license
+// enum/select-url case is handled properly (licenseControl) and excluded.
+const scaffoldClaimedKeys = computed(() =>
+  profileControls.value
+    .map((control) => control.property)
+    .filter((property) => builtInDatasetKeys.has(property))
+    .filter((property) => !(property === 'license' && licenseControl.value)),
+)
 
 watch(
   () => props.open,
@@ -565,6 +586,7 @@ async function loadSelectedProfileSchema() {
 
   profileLoading.value = true
   profileLoadError.value = null
+  profileLoadFailed.value = false
   try {
     const rocrate = await loadRoCrate(profile.documentId)
     if (token !== profileLoadToken) return
@@ -574,6 +596,7 @@ async function loadSelectedProfileSchema() {
   } catch (err) {
     if (token !== profileLoadToken) return
     profileLoadError.value = err instanceof Error ? err.message : String(err)
+    profileLoadFailed.value = true
   } finally {
     if (token === profileLoadToken) profileLoading.value = false
   }
@@ -589,6 +612,7 @@ function resetGeneratedProfileFields() {
   entityInstances.value = {}
   entityRefValues.value = {}
   profileLoadError.value = null
+  profileLoadFailed.value = false
   // Clear the in-flight flag too, so switching to "No profile reference" mid-load
   // never leaves the Create button stuck behind a phantom loading state.
   profileLoading.value = false
@@ -968,14 +992,14 @@ async function submit() {
           </div>
         </div>
 
-        <div v-if="profileId && profileLoadError" class="flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          <span>
-            Profile inputs can't be generated or validated ({{ profileLoadError }}). You can still create the dataset — it will reference this profile via <code>conformsTo</code> when a profile URI is available.
-          </span>
-          <Button variant="outline" size="sm" class="shrink-0" @click="loadSelectedProfileSchema">Try again</Button>
+        <div v-if="profileId && profileLoadError && !profileLoadFailed" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          {{ profileLoadError }} You can still create the dataset — it will reference this profile via <code>conformsTo</code> when a profile URI is available.
         </div>
         <div v-if="profileCollisionKeys.length" class="text-xs text-destructive">
           Profile field target collides with built-in dataset fields: {{ profileCollisionKeys.join(', ') }}.
+        </div>
+        <div v-if="scaffoldClaimedKeys.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          This profile defines {{ scaffoldClaimedKeys.join(', ') }} — those values come from the built-in inputs above, so the profile's own label, input kind and constraints for them are partially ignored.
         </div>
         <div v-if="hasPartScalarCollisionKeys.length" class="text-xs text-destructive">
           A hasPart rule must be an entity reference so it can bind to the Data references section. These hasPart rules use a scalar value and can't be applied: {{ hasPartScalarCollisionKeys.join(', ') }}.
@@ -1049,39 +1073,61 @@ async function submit() {
           </div>
         </div>
 
-        <div v-if="generatedScalarControls.length" class="grid gap-4 sm:grid-cols-2">
-          <ProfileControlField
-            v-for="control in generatedScalarControls"
-            :key="control.property"
-            :control="control"
-            :model-value="generatedValues[control.property]"
-            :violations="profileViolations.filter((item) => item.fieldId === control.property)"
-            :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
-            @update:model-value="(value: unknown) => setGeneratedValue(control.property, value)"
-          />
+        <!-- Generated profile section. The summary parse structurally carries ZERO
+             profile rules, so until the full crate refines them the form would be
+             silently missing fields: show a skeleton while loading and a BLOCKING
+             error panel (with Retry) when the full-crate load failed — never a
+             silently-degraded form. -->
+        <div v-if="profileId && profileLoading" class="rounded-md border border-border p-3">
+          <p class="text-[11px] text-muted-foreground">Loading the profile's fields…</p>
+          <div class="mt-2 grid gap-3 sm:grid-cols-2">
+            <Skeleton v-for="n in 4" :key="n" class="h-14" />
+          </div>
         </div>
-        <div v-for="control in inlineEntityControls" :key="control.property">
-          <DatasetEntityInstances
-            :control="control"
-            :sub-controls="entitySubControls[control.property] ?? []"
-            :instances="entityInstances[control.property] ?? []"
-            :instance-violations="entityInstanceViolations[control.property] ?? []"
-            :presence-violations="profileViolations.filter((item) => item.fieldId === control.property)"
-            :type-label="entityTypeLabelFor(control)"
-            @add="addEntityInstance(control)"
-            @remove="(index: number) => removeEntityInstance(control.property, index)"
-            @update="(index: number, subProperty: string, value: unknown) => setEntityInstanceValue(control.property, index, subProperty, value)"
-          />
+        <div v-else-if="profileLoadFailed" class="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+          <p class="text-xs font-medium text-destructive">The profile's fields could not be loaded.</p>
+          <p class="mt-1 text-[11px] text-destructive/90">{{ profileLoadError }}</p>
+          <p class="mt-1 text-[11px] text-muted-foreground">
+            Without these rules the form would be missing the profile's required fields, so creation is blocked.
+            Retry, or switch to "No profile reference" to continue without them.
+          </p>
+          <Button variant="outline" size="sm" class="mt-2" @click="loadSelectedProfileSchema">Retry</Button>
         </div>
-        <div v-for="control in referenceEntityControls" :key="control.property">
-          <ProfileControlField
-            :control="control"
-            :model-value="entityRefValues[control.property]"
-            :violations="referenceControlViolations(control)"
-            :crate-options="control.referenceMode === 'crate' ? crateOptions : undefined"
-            @update:model-value="(value: unknown) => setEntityRefValue(control.property, value)"
-          />
-        </div>
+        <template v-else>
+          <div v-if="generatedScalarControls.length" class="grid gap-4 sm:grid-cols-2">
+            <ProfileControlField
+              v-for="control in generatedScalarControls"
+              :key="control.property"
+              :control="control"
+              :model-value="generatedValues[control.property]"
+              :violations="profileViolations.filter((item) => item.fieldId === control.property)"
+              :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
+              @update:model-value="(value: unknown) => setGeneratedValue(control.property, value)"
+            />
+          </div>
+          <div v-for="control in inlineEntityControls" :key="control.property">
+            <DatasetEntityInstances
+              :control="control"
+              :sub-controls="entitySubControls[control.property] ?? []"
+              :instances="entityInstances[control.property] ?? []"
+              :instance-violations="entityInstanceViolations[control.property] ?? []"
+              :presence-violations="profileViolations.filter((item) => item.fieldId === control.property)"
+              :type-label="entityTypeLabelFor(control)"
+              @add="addEntityInstance(control)"
+              @remove="(index: number) => removeEntityInstance(control.property, index)"
+              @update="(index: number, subProperty: string, value: unknown) => setEntityInstanceValue(control.property, index, subProperty, value)"
+            />
+          </div>
+          <div v-for="control in referenceEntityControls" :key="control.property">
+            <ProfileControlField
+              :control="control"
+              :model-value="entityRefValues[control.property]"
+              :violations="referenceControlViolations(control)"
+              :crate-options="control.referenceMode === 'crate' ? crateOptions : undefined"
+              @update:model-value="(value: unknown) => setEntityRefValue(control.property, value)"
+            />
+          </div>
+        </template>
 
         <div v-if="showKeywordsScaffold || showIdentifierScaffold" class="grid gap-4 sm:grid-cols-2">
           <div v-if="showKeywordsScaffold">

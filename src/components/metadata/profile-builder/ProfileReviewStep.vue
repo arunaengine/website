@@ -9,6 +9,7 @@ import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
 import { CheckCircle2, AlertTriangle, Lightbulb } from '@lucide/vue'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
 import { entityRulesToMode } from '@/lib/profiles/mode'
+import { parseProfileCrate } from '@/lib/profiles/rocrate'
 import { validateProfileData } from '@/lib/profiles/validate'
 import { obligationBadgeVariant, PROFILE_OBLIGATION_LABELS, PROFILE_REFERENCE_MODE_LABELS } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
@@ -55,13 +56,25 @@ const constraintSummary = computed(() =>
     .filter((entity) => entity.rules.length),
 )
 
-// The preview compiles the Dataset entity's rules through the same controls
-// pipeline dataset creation uses, so authors see exactly what people filling the
-// profile will see and how validation reacts. Entity-reference rules resolve
-// their sub-form against every entity rule.
-const controls = computed(() =>
-  controlsFromRules(builder.datasetEntity?.propertyRules ?? [], builder.normalizedEntities),
-)
+// Preview honesty: the form preview is built from the ROUND-TRIPPED parse —
+// the emitted crate (buildProfileCrate) parsed back the way the dataset dialog
+// will parse it — not from the in-memory rules. The round-trip is lossy by
+// design in documented spots (e.g. a text rule with multiple values flattens to
+// a keyword list); the preview showing that loss is the point.
+const roundTrip = computed<{ parsed: ReturnType<typeof parseProfileCrate> | null; error: string | null }>(() => {
+  try {
+    return { parsed: parseProfileCrate(builder.generatedCrate), error: null }
+  } catch (err) {
+    return { parsed: null, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+const controls = computed(() => {
+  const parsed = roundTrip.value.parsed
+  if (!parsed) return controlsFromRules(builder.datasetEntity?.propertyRules ?? [], builder.normalizedEntities)
+  return controlsFromRules(parsed.datasetPropertyRules, parsed.entityRules)
+})
+// Validate against the round-tripped schema too, so warnings match the real form.
+const previewSchema = computed(() => roundTrip.value.parsed?.schema ?? builder.generatedSchema)
 const values = ref<Record<string, unknown>>({})
 watch(controls, (list) => { values.value = defaultControlValues(list) }, { immediate: true })
 
@@ -76,7 +89,7 @@ const modeText = computed(() =>
 )
 
 const normalizedValues = computed(() => normalizeProfileValues(values.value, controls.value))
-const violations = computed(() => validateProfileData(builder.generatedSchema, normalizedValues.value))
+const violations = computed(() => validateProfileData(previewSchema.value, normalizedValues.value))
 
 function violationsFor(property: string) {
   return violations.value.filter((violation) => violation.fieldId === property)
@@ -149,8 +162,13 @@ function violationsFor(property: string) {
       <TabsContent value="preview">
         <div class="rounded-lg border border-border p-4">
           <p class="text-xs text-muted-foreground">
-            A read-only preview of the form people see when they create a Dataset with this profile.
+            A read-only preview of the form people see when they create a Dataset with this profile — built by
+            saving your rules into the Profile Crate and reading them back, so it shows exactly what survives
+            (including any documented round-trip simplifications).
             Required (MUST) values that are empty show an error, recommended (SHOULD) values show an amber warning.
+          </p>
+          <p v-if="roundTrip.error" class="mt-2 text-[11px] text-destructive">
+            The emitted crate could not be parsed back ({{ roundTrip.error }}) — the preview below falls back to the in-memory rules.
           </p>
           <div v-if="!controls.length" class="mt-3 text-xs text-muted-foreground">
             The Dataset entity has no property rules yet, so no inputs are generated.

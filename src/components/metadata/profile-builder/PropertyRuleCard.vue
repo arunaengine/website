@@ -26,6 +26,8 @@ import {
 import { CURATED_ENTITY_TYPES, entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { isAbsoluteUri, isValidPropertyTermName, normalizeTypeUri, sameSchemaOrgType, SCHEMA_ORG } from '@/lib/profiles/uri'
 import { isHasPartUri } from '@/lib/profiles/emit'
+import { vocabKind, type VocabTerm } from '@/lib/profiles/vocabulary'
+import VocabSuggestions from './VocabSuggestions.vue'
 import type { ProfileReferenceMode } from '@/lib/profiles/types'
 import {
   OBLIGATION_OPTIONS,
@@ -369,10 +371,12 @@ function onTermSelect(value: string) {
 }
 
 // Remember a pasted external URI so it shows as a normal option next time.
+// Only an absolute URI commits — search text typed to drive the vocabulary
+// suggestions below must never be saved as a bogus custom term.
 function commitExternalUri() {
   const uri = trimmed(property.value.propertyUri)
+  if (!uri || !isAbsoluteUri(uri)) return
   externalMode.value = false
-  if (!uri) return
   const name = trimmed(property.value.valueName) || termNameFromUri(uri)
   customTerms.value = saveCustomPropertyTerm({
     uri,
@@ -381,6 +385,41 @@ function commitExternalUri() {
     description: trimmed(property.value.description),
   })
 }
+
+// ---------------------------------------------------------------------------
+// Bundled-vocabulary autocomplete (schema.org core + Dublin Core) and the
+// mint-discouragement suggestions: reusing an existing term beats minting one.
+// ---------------------------------------------------------------------------
+// True when this rule would mint a portal-hosted term (empty explicit URI).
+const isMintedTerm = computed(() => !externalMode.value && !trimmed(property.value.propertyUri))
+const mintQuery = computed(() => trimmed(property.value.label) || trimmed(property.value.valueName))
+
+function applyVocabTerm(term: VocabTerm) {
+  externalMode.value = false
+  property.value.propertyUri = term.uri
+  const name = isValidPropertyTermName(term.name) ? term.name : propertyName(term.label)
+  if (name) property.value.valueName = name
+  if (!trimmed(property.value.label)) property.value.label = term.label
+  if (!trimmed(property.value.description) && term.description) property.value.description = term.description
+  // Apply the term's suggested kind / targets as defaults only while the rule
+  // still sits on the factory defaults — never overwrite a deliberate choice.
+  const suggested = vocabKind(term)
+  if (suggested && suggested !== 'text' && property.value.kind === 'text') property.value.kind = suggested
+  if (term.targets?.length && property.value.kind === 'entity' && !property.value.entityTypes.length) {
+    property.value.entityTypes = term.targets.map((target) => normalizeTypeUri(target)).filter(Boolean)
+  }
+}
+
+// Technical identifiers (property name, term URI) live behind a per-card
+// disclosure (RoleBuilder's showRaw pattern); it opens itself when something
+// in it needs attention.
+const showTech = ref(false)
+watch(
+  () => Boolean(valueNameError.value) || externalMode.value,
+  (needsAttention) => {
+    if (needsAttention) showTech.value = true
+  },
+)
 
 // ---------------------------------------------------------------------------
 // Entity-reference target types (kind === 'entity'), grouped so the profile's
@@ -508,16 +547,12 @@ function createEntityRule(uri: string) {
     </template>
 
     <template v-else>
-    <!-- Always-visible core row -->
-    <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+    <!-- Always-visible core row: plain-language fields only. The technical
+         identifiers (property name, term URI) live in the disclosure below. -->
+    <div class="mt-2 grid gap-2 sm:grid-cols-3">
       <div>
         <label class="text-[11px] font-medium text-muted-foreground">Label</label>
         <Input v-model="property.label" class="mt-0.5" placeholder="License" :disabled="anyLock" @blur="autofillName" />
-      </div>
-      <div>
-        <label class="text-[11px] font-medium text-muted-foreground">Property name</label>
-        <Input v-model="property.valueName" class="mt-0.5" placeholder="license" :disabled="anyLock" />
-        <p v-if="valueNameError" class="mt-0.5 text-[11px] text-destructive">{{ valueNameError }}</p>
       </div>
       <div>
         <label class="text-[11px] font-medium text-muted-foreground">Value type</label>
@@ -528,6 +563,16 @@ function createEntityRule(uri: string) {
         <Select v-model="property.obligation" :options="obligationOptions" class="mt-0.5" :disabled="obligationDisabled" />
       </div>
     </div>
+
+    <!-- Discourage minting: while this rule would mint a portal-hosted term,
+         surface matching existing vocabulary for the typed label right here. -->
+    <VocabSuggestions
+      v-if="!anyLock && isMintedTerm"
+      :query="mintQuery"
+      kind="property"
+      heading="Consider an existing term instead of minting one:"
+      @pick="applyVocabTerm"
+    />
 
     <!-- M5: hasPart must be an entity reference or the dataset dialog cannot bind it. -->
     <p v-if="hasPartKindError" class="mt-2 text-[11px] text-destructive">{{ hasPartKindError }}</p>
@@ -598,27 +643,51 @@ function createEntityRule(uri: string) {
       </template>
     </div>
 
-    <!-- Property term picker -->
+    <!-- Technical details: the machine identifiers behind this rule (RO-Crate
+         property name and ontology term URI). Opens itself when something in it
+         needs attention (a name error, or the external-URI input). -->
     <div class="mt-2">
-      <label class="text-[11px] font-medium text-muted-foreground">Property term</label>
-      <Select
-        :model-value="pickerValue"
-        :options="termOptions"
-        class="mt-0.5"
-        :disabled="anyLock"
-        @update:model-value="onTermSelect"
-      />
-      <div v-if="externalMode" class="mt-1.5">
-        <Input
-          v-model="property.propertyUri"
-          placeholder="https://example.org/ns#term"
-          :disabled="anyLock"
-          @blur="commitExternalUri"
-          @keydown.enter="commitExternalUri"
-        />
-        <p class="mt-0.5 text-[11px] text-muted-foreground">Paste an absolute term URI from an existing ontology.</p>
+      <button
+        type="button"
+        class="inline-flex max-w-full items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+        @click="showTech = !showTech"
+      >
+        <component :is="showTech ? ChevronDown : ChevronRight" class="h-3.5 w-3.5 shrink-0" />
+        Technical details
+        <span class="min-w-0 truncate font-mono text-[10px] font-normal text-muted-foreground/80">{{ resolvedUri }}</span>
+      </button>
+      <div v-if="showTech" class="mt-1.5 grid gap-2 rounded-md border border-border p-3 sm:grid-cols-2">
+        <div>
+          <label class="text-[11px] font-medium text-muted-foreground">Property name</label>
+          <Input v-model="property.valueName" class="mt-0.5" placeholder="license" :disabled="anyLock" />
+          <p v-if="valueNameError" class="mt-0.5 text-[11px] text-destructive">{{ valueNameError }}</p>
+          <p v-else class="mt-0.5 text-[11px] text-muted-foreground">The compact JSON key in the crate.</p>
+        </div>
+        <div>
+          <label class="text-[11px] font-medium text-muted-foreground">Property term</label>
+          <Select
+            :model-value="pickerValue"
+            :options="termOptions"
+            class="mt-0.5"
+            :disabled="anyLock"
+            @update:model-value="onTermSelect"
+          />
+          <div v-if="externalMode" class="mt-1.5">
+            <Input
+              v-model="property.propertyUri"
+              placeholder="Search the vocabulary, or paste a term URI"
+              :disabled="anyLock"
+              @blur="commitExternalUri"
+              @keydown.enter="commitExternalUri"
+            />
+            <VocabSuggestions :query="String(property.propertyUri ?? '')" kind="property" @pick="applyVocabTerm" />
+            <p class="mt-0.5 text-[11px] text-muted-foreground">
+              Type to search schema.org and Dublin Core, or paste any absolute term URI from an existing ontology.
+            </p>
+          </div>
+        </div>
+        <p class="break-all font-mono text-[11px] text-muted-foreground sm:col-span-2">{{ resolvedUri }}</p>
       </div>
-      <p class="mt-1 break-all font-mono text-[11px] text-muted-foreground">{{ resolvedUri }}</p>
     </div>
 
     <!-- Entity-reference block: how the reference is realised (WS4), which types it

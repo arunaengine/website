@@ -134,9 +134,76 @@ const inputType = computed(() => {
   return control
 })
 
-const showDescription = computed(() =>
-  Boolean(props.control.description) && props.control.control !== 'checkbox' && props.control.control !== 'entity',
-)
+// True multi-value rendering for scalar kinds: repeatable rows editing a real
+// string array. Selects/tags/entity handle `multiple` themselves; everything
+// else multi-valued lands here instead of a single native input.
+const SCALAR_MULTI_CONTROLS = new Set(['text', 'textarea', 'url', 'email', 'date', 'datetime-local', 'number', 'integer'])
+const isScalarMulti = computed(() => props.control.multiple && SCALAR_MULTI_CONTROLS.has(props.control.control))
+const scalarRows = computed<string[]>(() => {
+  const value = props.modelValue
+  if (Array.isArray(value)) return value.map(String)
+  // Legacy comma-joined defaults predate the array shape; split once.
+  if (typeof value === 'string' && value.trim()) return value.split(',').map((entry) => entry.trim()).filter(Boolean)
+  return []
+})
+function addScalarRow() {
+  update([...scalarRows.value, ''])
+}
+function updateScalarRow(index: number, value: string) {
+  const rows = [...scalarRows.value]
+  rows[index] = value
+  update(rows)
+}
+function removeScalarRow(index: number) {
+  const rows = [...scalarRows.value]
+  rows.splice(index, 1)
+  update(rows)
+}
+
+// Authored constraints as native input attributes (pattern/minlength/maxlength/
+// min/max/step) so the browser enforces what validate.ts checks. For a
+// multi-valued control the scalar constraints live on the array's items schema.
+const constraintAttrs = computed<Record<string, string | number>>(() => {
+  const schema = props.control.schema
+  const target = schema.type === 'array' ? (schema.items ?? {}) : schema
+  const attrs: Record<string, string | number> = {}
+  if (target.pattern) attrs.pattern = target.pattern
+  if (target.minLength !== undefined) attrs.minlength = target.minLength
+  if (target.maxLength !== undefined) attrs.maxlength = target.maxLength
+  if (target.minimum !== undefined) attrs.min = target.minimum
+  if (target.maximum !== undefined) attrs.max = target.maximum
+  if (target.multipleOf !== undefined) attrs.step = target.multipleOf
+  return attrs
+})
+
+// One hint line naming every authored constraint, so limits are visible before
+// a violation fires. Controls whose input carries no placeholder (selects,
+// checkboxes, crate picks) also get the example here.
+const constraintHint = computed<string | undefined>(() => {
+  const schema = props.control.schema
+  const target = schema.type === 'array' ? (schema.items ?? {}) : schema
+  const parts: string[] = []
+  if (target.minLength !== undefined && target.maxLength !== undefined) parts.push(`${target.minLength}–${target.maxLength} characters`)
+  else if (target.minLength !== undefined) parts.push(`at least ${target.minLength} characters`)
+  else if (target.maxLength !== undefined) parts.push(`at most ${target.maxLength} characters`)
+  if (target.minimum !== undefined) parts.push(`minimum ${target.minimum}`)
+  if (target.maximum !== undefined) parts.push(`maximum ${target.maximum}`)
+  if (target.multipleOf !== undefined) parts.push(`in steps of ${target.multipleOf}`)
+  if (target.pattern) parts.push(`must match ${target.pattern}`)
+  const minItems = schema.minItems ?? props.control.minItems
+  const maxItems = schema.maxItems ?? props.control.maxItems
+  if (minItems !== undefined && maxItems !== undefined) parts.push(`${minItems}–${maxItems} entries`)
+  else if (minItems !== undefined) parts.push(`at least ${minItems} ${minItems === 1 ? 'entry' : 'entries'}`)
+  else if (maxItems !== undefined) parts.push(`at most ${maxItems} ${maxItems === 1 ? 'entry' : 'entries'}`)
+  const placeholderCapable = !['select', 'select-object', 'checkbox'].includes(props.control.control)
+  const example = props.control.schema.examples?.[0]
+  if (!placeholderCapable && example !== undefined && example !== null && example !== '') {
+    parts.push(`example: ${String(example)}`)
+  }
+  return parts.length ? `${parts.join(' · ')}.` : undefined
+})
+
+const showDescription = computed(() => Boolean(props.control.description) && props.control.control !== 'checkbox')
 
 // Strongest violation severity, mirrored onto the input's border/ring so the
 // box itself is flagged, not just the text below it.
@@ -166,14 +233,48 @@ function update(value: unknown) {
     <label class="text-xs font-medium text-foreground">
       {{ control.label }} <span v-if="control.required" class="text-destructive">*</span>
     </label>
+    <!-- Multi-valued scalar kinds: repeatable rows over a real string array. -->
+    <template v-if="isScalarMulti">
+      <div v-for="(row, index) in scalarRows" :key="index" class="mt-1 flex items-start gap-2">
+        <Textarea
+          v-if="control.control === 'textarea'"
+          :model-value="row"
+          class="flex-1"
+          rows="2"
+          :disabled="disabled"
+          :invalid="invalidState"
+          :placeholder="examplePlaceholder"
+          @update:model-value="(value: string) => updateScalarRow(index, value)"
+        />
+        <Input
+          v-else
+          :model-value="row"
+          :type="inputType"
+          class="flex-1"
+          :disabled="disabled"
+          :invalid="invalidState"
+          :placeholder="examplePlaceholder"
+          v-bind="constraintAttrs"
+          @update:model-value="(value: string | number) => updateScalarRow(index, String(value))"
+        />
+        <Button variant="ghost" size="icon" :aria-label="`Remove ${control.label} value`" :disabled="disabled" @click="removeScalarRow(index)">
+          <X />
+        </Button>
+      </div>
+      <p v-if="!scalarRows.length" class="mt-1 text-[11px] text-muted-foreground">No values yet.</p>
+      <Button variant="outline" size="sm" class="mt-1" :disabled="disabled" @click="addScalarRow">
+        <Plus class="size-3.5" /> Add value
+      </Button>
+    </template>
     <Textarea
-      v-if="control.control === 'textarea'"
+      v-else-if="control.control === 'textarea'"
       :model-value="displayValue"
       class="mt-1"
       rows="3"
       :disabled="disabled"
       :invalid="invalidState"
       :placeholder="examplePlaceholder"
+      v-bind="constraintAttrs"
       @update:model-value="(value: string) => update(value)"
     />
     <!-- A `multiple` select / select-object is a checkbox list over the same
@@ -287,7 +388,6 @@ function update(value: unknown) {
         :placeholder="entityPlaceholder"
         @update:model-value="(value: string | number) => update(value)"
       />
-      <p v-if="control.description" class="mt-1 text-[11px] text-muted-foreground">{{ control.description }}</p>
     </template>
     <Input
       v-else
@@ -297,9 +397,11 @@ function update(value: unknown) {
       :disabled="disabled"
       :invalid="invalidState"
       :placeholder="inputPlaceholder"
+      v-bind="constraintAttrs"
       @update:model-value="(value: string | number) => update(value)"
     />
     <p v-if="showDescription" class="mt-1 text-[11px] text-muted-foreground">{{ control.description }}</p>
+    <p v-if="constraintHint" class="mt-1 text-[11px] text-muted-foreground">{{ constraintHint }}</p>
     <template v-for="violation in violations ?? []" :key="violation.ruleId + violation.pointer">
       <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
         {{ violation.message }}

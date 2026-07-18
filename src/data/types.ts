@@ -208,6 +208,8 @@ export interface MetadataProfile {
   suggestedKeywords: string[]
   // Whether this profile is editable by the current user (some are realm-managed templates)
   managed: boolean
+  // Bundled with the portal (e.g. Workflow Run Crate): read-only, no stored document.
+  builtIn?: boolean
   // Derived count used for sorting/popularity.
   usedCount: number
 }

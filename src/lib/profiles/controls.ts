@@ -57,6 +57,15 @@ export function defaultControlValues(controls: ProfileControl[]): Record<string,
       // A multi-valued select holds its chosen options as a real array (the
       // checkbox-list UI edits it in place), not a comma-joined display string.
       values[control.property] = Array.isArray(control.defaultValue) ? [...control.defaultValue] : []
+    } else if (control.multiple && control.control !== 'tags' && control.control !== 'checkbox') {
+      // Multi-valued scalar kinds render as repeatable rows over a real array
+      // (ProfileControlField); a scalar default seeds the first row. The tags
+      // control keeps its comma-separated single input.
+      values[control.property] = Array.isArray(control.defaultValue)
+        ? [...control.defaultValue]
+        : control.defaultValue !== undefined && control.defaultValue !== ''
+          ? [String(control.defaultValue)]
+          : []
     } else if (control.defaultValue !== undefined) {
       values[control.property] = Array.isArray(control.defaultValue)
         ? control.defaultValue.join(', ')
