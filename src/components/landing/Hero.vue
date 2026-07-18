@@ -82,12 +82,8 @@ const wordmark = computed(() =>
         <div
           class="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground"
         >
-          <span
-            class="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-primary"
-          >
-            Upcoming
-          </span>
-          Compute next to your data
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Federated compute next to your data
         </div>
       </div>
     </div>

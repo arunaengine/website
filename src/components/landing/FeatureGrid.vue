@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   Boxes,
+  Cpu,
   FileJson2,
   KeyRound,
   Share2,
@@ -31,6 +32,12 @@ const features = [
     icon: KeyRound,
     tone: 'bg-aruna-tagline/15 text-aruna-tagline',
   },
+  {
+    title: 'Federated compute',
+    desc: 'Submit GA4GH TES tasks from the portal — a quick-run wizard, workspace lifecycle choices, and tasks that run next to the data on any realm node.',
+    icon: Cpu,
+    tone: 'bg-aruna-indigo/15 text-aruna-indigo dark:text-aruna-tagline',
+  },
 ]
 </script>
 
@@ -46,11 +53,11 @@ const features = [
         </h2>
         <p class="mt-3 text-sm text-muted-foreground">
           Every node serves the S3 API, the REST API and this portal. These
-          four parts do the daily work.
+          five parts do the daily work.
         </p>
       </div>
 
-      <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div
           v-for="f in features"
           :key="f.title"
