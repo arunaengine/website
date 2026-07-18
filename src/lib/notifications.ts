@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import { AlertTriangle, Ban, Bell, Check, FileJson2, HardDrive, Inbox, Upload, UserMinus, UserPlus, Users } from '@lucide/vue'
+import { AlertTriangle, ArrowLeftRight, Ban, Bell, Check, FileJson2, HardDrive, Inbox, Upload, UserMinus, UserPlus, Users } from '@lucide/vue'
 import type { ApiNotification } from '@/lib/api'
 import { formatBytes, truncateMiddle } from '@/lib/utils'
 
@@ -79,6 +79,33 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
       const prefix = n.key ? keyPrefix(n.key) : ''
       return { name: 'bucket', params: { bucketId: n.bucket }, query: prefix ? { prefix } : {} }
     },
+  },
+  // ── Bucket sync (aruna feat/portal_extensions) ─────────────────────────────
+  // Emitted for s3-namespace watches when a sync relationship finishes a run
+  // (sync_completed with versions_synced) or records a failure (sync_failed
+  // with the error text). Both carry bucket + node_id; the deep link opens the
+  // bucket on its hosting node (the Data manager treats the local node id in
+  // ?node= as the connected node).
+  sync_completed: {
+    icon: ArrowLeftRight,
+    title: (n) => (n.bucket ? `Bucket sync completed for ${n.bucket}` : 'Bucket sync completed'),
+    detail: (n) =>
+      typeof n.versions_synced === 'number'
+        ? `${n.versions_synced} version${n.versions_synced === 1 ? '' : 's'} synced`
+        : n.path,
+    link: (n) =>
+      n.bucket
+        ? { name: 'bucket', params: { bucketId: n.bucket }, query: n.node_id ? { node: n.node_id } : {} }
+        : null,
+  },
+  sync_failed: {
+    icon: AlertTriangle,
+    title: (n) => (n.bucket ? `Bucket sync failed for ${n.bucket}` : 'Bucket sync failed'),
+    detail: (n) => n.error ?? n.path,
+    link: (n) =>
+      n.bucket
+        ? { name: 'bucket', params: { bucketId: n.bucket }, query: n.node_id ? { node: n.node_id } : {} }
+        : null,
   },
   // ── Join requests (aruna#248) ──────────────────────────────────────────────
   // NOT emitted by any backend yet. Names follow the backend's snake_case
