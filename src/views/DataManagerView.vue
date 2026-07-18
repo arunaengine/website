@@ -14,18 +14,21 @@ import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
+import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStaging } from '@/composables/useStaging'
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import { featureEnabled } from '@/lib/config'
-import { useS3, s3ErrorMessage, isS3AuthError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type S3Key, type UploadHandle } from '@/composables/useS3'
+import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3QuotaError, type BucketEntry, type FolderEntry, type ObjectEntry, type S3Key, type UploadHandle } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
-import type { UsageResponse } from '@/lib/api'
+import type { BucketSearchHit, UsageResponse } from '@/lib/api'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -33,12 +36,15 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   Boxes,
   ChevronRight,
+  CloudOff,
   Download,
   Eye,
   FolderPlus,
+  History,
   KeyRound,
   Loader2,
   LogIn,
+  Pin,
   Plus,
   RefreshCw,
   ShieldAlert,
@@ -59,6 +65,27 @@ function routeString(value: unknown): string {
 const bucket = computed(() => routeString(route.params.bucketId))
 const prefix = computed(() => routeString(route.query.prefix))
 const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
+
+// Federated bucket search + cross-node browsing. The optional ?node=<id> route
+// param selects the hosting node (default: the connected node) so deep links
+// into remote buckets stay stable. S3 credentials are realm-wide, so the same
+// stored key signs requests against the remote node's published S3 endpoint.
+const bucketSearchEnabled = featureEnabled('federatedBucketSearch')
+const realmNodes = useRealmNodes()
+const shortcuts = useBucketShortcuts()
+
+const remoteNodeId = computed(() => {
+  const nodeId = routeString(route.query.node)
+  if (!nodeId || realmNodes.isLocalNode(nodeId)) return null
+  return nodeId
+})
+// The endpoint actually serving the browsed bucket (local or remote).
+const effectiveEndpoint = computed(() => s3.endpointForNode(remoteNodeId.value))
+// Remote node without a published S3 endpoint: honest info panel, never a
+// broken view. CORS/unreachable failures flip remoteBrowseBlocked instead.
+const remoteEndpointMissing = computed(() => Boolean(remoteNodeId.value) && !effectiveEndpoint.value)
+const remoteBrowseBlocked = ref(false)
+const remoteBlocked = computed(() => remoteEndpointMissing.value || remoteBrowseBlocked.value)
 
 const buckets = ref<BucketEntry[]>([])
 const bucketsLoading = ref(false)
@@ -117,7 +144,8 @@ const stagingPanelOpen = ref(false)
 // one completes into the open bucket, refresh the listing.
 const uploadQueue = useUploadQueue()
 watch(uploadQueue.lastCompleted, (completed) => {
-  if (completed && completed.bucket === bucket.value) void loadObjects()
+  // Queue uploads always target the connected node.
+  if (completed && completed.bucket === bucket.value && !remoteNodeId.value) void loadObjects()
 })
 
 // The retired bucket-builder route redirects here with ?addData=1 so old links
@@ -133,7 +161,7 @@ watch(
   { immediate: true },
 )
 
-const deleteTarget = ref<{ bucket: string; object: ObjectEntry } | null>(null)
+const deleteTarget = ref<{ bucket: string; object: ObjectEntry; nodeId: string | null } | null>(null)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 
@@ -157,6 +185,7 @@ function clearObjectListing() {
   listLoading.value = false
   listError.value = null
   listAuthError.value = false
+  remoteBrowseBlocked.value = false
   deleteTarget.value = null
 }
 
@@ -182,24 +211,32 @@ async function refreshBuckets() {
 }
 
 async function loadObjects(more = false) {
-  if (!s3.hasActiveKey.value || !s3.endpoint.value || !bucket.value) return
+  if (!s3.hasActiveKey.value || !effectiveEndpoint.value || !bucket.value) return
   const requestId = ++listRequestId
   const targetBucket = bucket.value
   const targetPrefix = s3Prefix.value
+  const targetNode = remoteNodeId.value
   const continuation = more ? nextToken.value : undefined
   listLoading.value = true
   listError.value = null
   listAuthError.value = false
+  remoteBrowseBlocked.value = false
   try {
-    const page = await s3.listObjects(targetBucket, targetPrefix, continuation)
+    const page = await s3.listObjects(targetBucket, targetPrefix, continuation, targetNode)
     if (requestId !== listRequestId) return
     folders.value = more ? [...folders.value, ...page.folders] : page.folders
     objects.value = more ? [...objects.value, ...page.objects] : page.objects
     nextToken.value = page.nextToken
   } catch (err) {
     if (requestId === listRequestId) {
-      listError.value = s3ErrorMessage(err)
-      listAuthError.value = isS3AuthError(err)
+      // A remote endpoint the browser cannot reach (CORS rejection or the node
+      // being down) degrades to the hosted-elsewhere panel, never a raw error.
+      if (targetNode && isS3NetworkError(err)) {
+        remoteBrowseBlocked.value = true
+      } else {
+        listError.value = s3ErrorMessage(err)
+        listAuthError.value = isS3AuthError(err)
+      }
     }
   } finally {
     if (requestId === listRequestId) listLoading.value = false
@@ -231,10 +268,21 @@ watch(
   { immediate: true },
 )
 
-watch([bucket, prefix], () => {
+// effectiveEndpoint is included so a remote deep link starts listing once the
+// realm document (with the remote node's published S3 URL) arrives.
+watch([bucket, prefix, remoteNodeId, effectiveEndpoint], () => {
   clearObjectListing()
   if (bucket.value) void loadObjects()
 })
+
+// Auto-recent: every opened bucket lands in the sidebar shortcuts (last 5).
+watch(
+  [bucket, remoteNodeId],
+  ([name]) => {
+    if (name && bucketSearchEnabled) shortcuts.recordRecent(name, remoteNodeId.value)
+  },
+  { immediate: true },
+)
 
 watch(
   bucket,
@@ -254,12 +302,24 @@ function activateManualKey() {
 // Navigating to the current location must reload, not clear: a push to an
 // identical route never fires the [bucket, prefix] watch, so a pre-cleared
 // listing would stay empty (the "home shows an empty bucket" bug).
-function openBucket(name: string) {
-  if (name === bucket.value && !prefix.value) {
+function openBucketOn(name: string, nodeId: string | null) {
+  if (name === bucket.value && !prefix.value && nodeId === remoteNodeId.value) {
     void loadObjects()
     return
   }
-  void router.push({ name: 'bucket', params: { bucketId: name } })
+  void router.push({
+    name: 'bucket',
+    params: { bucketId: name },
+    query: nodeId ? { node: nodeId } : {},
+  })
+}
+
+function openBucket(name: string) {
+  openBucketOn(name, null)
+}
+
+function openSearchHit(hit: BucketSearchHit) {
+  openBucketOn(hit.bucket, realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
 }
 
 function navigateTo(path: string) {
@@ -270,7 +330,10 @@ function navigateTo(path: string) {
   void router.push({
     name: 'bucket',
     params: { bucketId: bucket.value },
-    query: path ? { prefix: path } : {},
+    query: {
+      ...(path ? { prefix: path } : {}),
+      ...(remoteNodeId.value ? { node: remoteNodeId.value } : {}),
+    },
   })
 }
 
@@ -308,7 +371,7 @@ async function createFolder() {
   const targetBucket = bucket.value
   const targetPrefix = s3Prefix.value
   try {
-    await s3.createFolder(targetBucket, targetPrefix, newFolderName.value.trim())
+    await s3.createFolder(targetBucket, targetPrefix, newFolderName.value.trim(), remoteNodeId.value)
     newFolderOpen.value = false
     if (targetBucket === bucket.value && targetPrefix === s3Prefix.value) await loadObjects()
   } catch (err) {
@@ -351,14 +414,17 @@ const activeGroupId = computed(
 // credential's group (manual keys outside the caller's credential list cannot
 // resolve one) and the id of the node SERVING the S3 endpoint — uploads emit
 // under that node, so watching the wrong node id would never fire.
-const watchNodeId = computed(() =>
-  s3EndpointNodeId(
-    s3.endpoint.value,
-    nodeInfo.value
-      ? { nodeId: nodeInfo.value.node.peer_id, s3Url: nodeInfo.value.services?.interfaces?.s3?.url }
-      : null,
-    (realmInfo.value?.nodes ?? []).map((node) => ({ nodeId: node.node_id, s3Url: node.info?.urls?.s3 })),
-  ),
+const watchNodeId = computed(
+  () =>
+    // Browsing a remote node: uploads there emit under that node's id.
+    remoteNodeId.value ??
+    s3EndpointNodeId(
+      s3.endpoint.value,
+      nodeInfo.value
+        ? { nodeId: nodeInfo.value.node.peer_id, s3Url: nodeInfo.value.services?.interfaces?.s3?.url }
+        : null,
+      (realmInfo.value?.nodes ?? []).map((node) => ({ nodeId: node.node_id, s3Url: node.info?.urls?.s3 })),
+    ),
 )
 const watchPathPrefix = computed(() => {
   const groupId = activeGroupId.value
@@ -395,19 +461,21 @@ interface UploadContext {
   bucket: string
   prefix: string
   endpoint: string
+  nodeId: string | null
   key: S3Key
   groupId: string | null
 }
 
 function captureUploadContext(files: File[]): UploadContext | null {
   const key = s3.activeKey.value
-  const endpoint = s3.endpoint.value
+  const endpoint = effectiveEndpoint.value
   if (!key || !endpoint || !bucket.value) return null
   return {
     files,
     bucket: bucket.value,
     prefix: s3Prefix.value,
     endpoint,
+    nodeId: remoteNodeId.value,
     key,
     groupId: activeGroupId.value,
   }
@@ -418,7 +486,7 @@ function sameS3Session(context: UploadContext): boolean {
   return Boolean(
     !disposed &&
       key &&
-      s3.endpoint.value === context.endpoint &&
+      s3.endpointForNode(context.nodeId) === context.endpoint &&
       key.accessKeyId === context.key.accessKeyId &&
       key.secretAccessKey === context.key.secretAccessKey,
   )
@@ -460,10 +528,16 @@ async function uploadFiles(context: UploadContext) {
     }
     const item: UploadItem = { id: ++uploadCounter, name: file.name, state: 'uploading', progress: 0 }
     uploads.value = [...uploads.value, item]
-    const handle = s3.uploadObject(context.bucket, `${context.prefix}${file.name}`, file, (loaded, total) => {
-      item.progress = total ? Math.round((loaded / total) * 100) : 0
-      uploads.value = [...uploads.value]
-    })
+    const handle = s3.uploadObject(
+      context.bucket,
+      `${context.prefix}${file.name}`,
+      file,
+      (loaded, total) => {
+        item.progress = total ? Math.round((loaded / total) * 100) : 0
+        uploads.value = [...uploads.value]
+      },
+      context.nodeId,
+    )
     uploadHandles.set(item.id, handle)
     try {
       await handle.promise
@@ -533,7 +607,7 @@ function openPreview(object: ObjectEntry) {
 async function download(object: ObjectEntry) {
   const sourceBucket = bucket.value
   try {
-    const url = await s3.downloadUrl(sourceBucket, object.key)
+    const url = await s3.downloadUrl(sourceBucket, object.key, remoteNodeId.value)
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = object.name
@@ -551,7 +625,7 @@ async function confirmDelete() {
   deleteBusy.value = true
   deleteError.value = null
   try {
-    await s3.deleteObject(target.bucket, target.object.key)
+    await s3.deleteObject(target.bucket, target.object.key, target.nodeId)
     deleteTarget.value = null
     if (target.bucket === bucket.value) await loadObjects()
   } catch (err) {
@@ -629,6 +703,48 @@ const isEmpty = computed(
 
       <section v-else class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside class="space-y-3">
+          <div v-if="bucketSearchEnabled" class="surface p-3">
+            <BucketSearchBox @open="openSearchHit" />
+          </div>
+
+          <div
+            v-if="bucketSearchEnabled && (shortcuts.pinned.value.length || shortcuts.recent.value.length)"
+            class="surface overflow-hidden"
+          >
+            <header class="border-b border-border px-4 py-2.5">
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pinned &amp; recent</h2>
+            </header>
+            <ul class="max-h-56 overflow-y-auto py-1">
+              <li
+                v-for="entry in [...shortcuts.pinned.value.map((s) => ({ ...s, pinned: true })), ...shortcuts.recent.value.map((s) => ({ ...s, pinned: false }))]"
+                :key="`${entry.nodeId ?? 'local'}/${entry.bucket}/${entry.pinned}`"
+                class="group/shortcut flex items-center gap-1 pr-2"
+              >
+                <button
+                  class="flex min-w-0 flex-1 items-center gap-2 px-4 py-1.5 text-left text-xs hover:bg-muted"
+                  :class="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
+                  @click="openBucketOn(entry.bucket, entry.nodeId ?? null)"
+                >
+                  <component :is="entry.pinned ? Pin : History" class="h-3.5 w-3.5 shrink-0" :class="entry.pinned ? 'text-primary' : 'text-muted-foreground'" />
+                  <span class="truncate">{{ entry.bucket }}</span>
+                  <Badge v-if="entry.nodeId" variant="outline" class="ml-auto shrink-0 text-[10px]" :title="entry.nodeId">
+                    {{ realmNodes.displayName(entry.nodeId) }}
+                  </Badge>
+                </button>
+                <button
+                  type="button"
+                  class="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
+                  :class="entry.pinned ? '' : 'opacity-0 transition-opacity group-hover/shortcut:opacity-100 focus-visible:opacity-100'"
+                  :title="entry.pinned ? 'Unpin bucket' : 'Pin bucket'"
+                  :aria-label="entry.pinned ? `Unpin ${entry.bucket}` : `Pin ${entry.bucket}`"
+                  @click="shortcuts.togglePin(entry.bucket, entry.nodeId ?? null)"
+                >
+                  <Pin class="h-3 w-3" :fill="entry.pinned ? 'currentColor' : 'none'" />
+                </button>
+              </li>
+            </ul>
+          </div>
+
           <div class="surface overflow-hidden">
             <header class="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 class="text-sm font-semibold text-foreground">Buckets</h2>
@@ -651,7 +767,7 @@ const isEmpty = computed(
                 <li v-for="entry in regularBuckets" :key="entry.name">
                   <button
                     class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-muted"
-                    :class="entry.name === bucket ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
+                    :class="entry.name === bucket && !remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
                     @click="openBucket(entry.name)"
                   >
                     <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
@@ -675,7 +791,7 @@ const isEmpty = computed(
                   <li v-for="entry in workspaceBuckets" :key="entry.name">
                     <button
                       class="flex w-full items-center gap-2 px-4 py-1.5 text-left text-xs hover:bg-muted"
-                      :class="entry.name === bucket ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
+                      :class="entry.name === bucket && !remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
                       @click="openBucket(entry.name)"
                     >
                       <Boxes class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -706,6 +822,14 @@ const isEmpty = computed(
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="flex min-w-0 items-center gap-2">
                 <Breadcrumbs :bucket="bucket" :path="prefix" @navigate="navigateTo" />
+                <Badge
+                  v-if="remoteNodeId"
+                  variant="outline"
+                  class="shrink-0 text-[10px]"
+                  :title="remoteNodeId"
+                >
+                  on {{ realmNodes.displayName(remoteNodeId) }}
+                </Badge>
                 <Loader2 v-if="listLoading" class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
               </div>
               <div class="flex items-center gap-2">
@@ -717,15 +841,38 @@ const isEmpty = computed(
                   :resource-label="`${bucket}/${s3Prefix}`"
                   size="sm"
                 />
-                <Button variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
-                <Button v-if="stagingJobsEnabled" variant="outline" size="sm" @click="stagingPanelOpen = true">
+                <Button v-if="!remoteBlocked" variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
+                <!-- Staging and the Add data pipeline always target the connected node. -->
+                <Button v-if="stagingJobsEnabled && !remoteNodeId" variant="outline" size="sm" @click="stagingPanelOpen = true">
                   Staging
                   <Badge v-if="staging.runningCount.value" variant="secondary" class="ml-1">{{ staging.runningCount.value }}</Badge>
                 </Button>
-                <Button size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
+                <Button v-if="!remoteNodeId" size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>
             </div>
 
+            <!-- Remote bucket whose endpoint the browser cannot use: an honest
+                 info panel instead of a broken listing. -->
+            <div v-if="remoteBlocked" class="surface p-8 text-center">
+              <CloudOff class="mx-auto h-6 w-6 text-muted-foreground" />
+              <p class="mt-3 text-sm font-medium text-foreground">
+                Hosted on {{ realmNodes.displayName(remoteNodeId) }} — browsing is unavailable from this origin.
+              </p>
+              <p class="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+                {{
+                  remoteEndpointMissing
+                    ? 'The node does not publish an S3 endpoint, so its objects cannot be listed here.'
+                    : 'The node’s S3 endpoint did not answer this browser — it may be unreachable or not allow cross-origin browsing.'
+                }}
+              </p>
+              <div class="mt-4 flex justify-center gap-2">
+                <Button v-if="!remoteEndpointMissing" variant="outline" size="sm" @click="loadObjects()">
+                  <RefreshCw class="h-3.5 w-3.5" /> Try again
+                </Button>
+              </div>
+            </div>
+
+            <template v-else>
             <div v-if="uploads.length" class="surface space-y-1 p-3">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Uploads</span>
@@ -806,7 +953,7 @@ const isEmpty = computed(
                       <div class="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon-sm" aria-label="Preview" @click.stop="openPreview(object)"><Eye class="size-3.5" /></Button>
                         <Button variant="ghost" size="icon-sm" aria-label="Download" @click.stop="download(object)"><Download class="size-3.5" /></Button>
-                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click.stop="deleteTarget = { bucket, object }; deleteError = null"><Trash2 class="size-3.5" /></Button>
+                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click.stop="deleteTarget = { bucket, object, nodeId: remoteNodeId }; deleteError = null"><Trash2 class="size-3.5" /></Button>
                       </div>
                     </td>
                   </tr>
@@ -836,6 +983,7 @@ const isEmpty = computed(
               <Upload class="h-4 w-4" />
               <span>Drop files here to upload to <span class="font-mono">{{ bucket }}/{{ s3Prefix }}</span></span>
             </button>
+            </template>
           </template>
         </div>
       </section>
@@ -859,6 +1007,7 @@ const isEmpty = computed(
       :object-key="previewObject?.key ?? ''"
       :name="previewObject?.name ?? ''"
       :size="previewObject?.size"
+      :node-id="remoteNodeId"
     />
 
     <Dialog :open="newFolderOpen" @update:open="(v: boolean) => (newFolderOpen = v)">

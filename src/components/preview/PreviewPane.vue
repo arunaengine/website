@@ -17,6 +17,8 @@ const props = defineProps<{
   name: string
   size?: number
   contentType?: string
+  /** Node hosting the bucket; null/absent = the connected node. */
+  nodeId?: string | null
 }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
@@ -40,6 +42,7 @@ function reload() {
     key: props.objectKey,
     size: props.size,
     contentType: props.contentType,
+    nodeId: props.nodeId,
   })
 }
 
@@ -55,7 +58,7 @@ watch(
 async function download() {
   if (!props.objectKey) return
   try {
-    const url = preview.directUrl.value ?? (await s3.downloadUrl(props.bucket, props.objectKey))
+    const url = preview.directUrl.value ?? (await s3.downloadUrl(props.bucket, props.objectKey, props.nodeId))
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = props.name

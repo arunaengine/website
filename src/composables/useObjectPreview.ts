@@ -10,6 +10,8 @@ export interface PreviewTarget {
   key: string
   size?: number
   contentType?: string
+  /** Node hosting the bucket; null/absent = the connected node. */
+  nodeId?: string | null
 }
 
 // Caps applied before any bytes leave the node: an object larger than its
@@ -111,7 +113,7 @@ export function useObjectPreview() {
     kind.value = 'download'
     sizeNote.value = `This file is ${formatBytes(actual)}, above the ${formatBytes(cap)} preview limit.`
     try {
-      directUrl.value = await s3.downloadUrl(target.bucket, target.key)
+      directUrl.value = await s3.downloadUrl(target.bucket, target.key, target.nodeId)
       status.value = 'ready'
     } catch (err) {
       errorMessage.value = s3ErrorMessage(err)
@@ -128,7 +130,7 @@ export function useObjectPreview() {
     try {
       if (classified.kind === 'media' || classified.kind === 'pdf' || classified.kind === 'download') {
         if (classified.kind === 'media') mediaKind.value = mediaSubtype(target)
-        directUrl.value = await s3.downloadUrl(target.bucket, target.key)
+        directUrl.value = await s3.downloadUrl(target.bucket, target.key, target.nodeId)
         status.value = 'ready'
         return
       }
@@ -140,14 +142,14 @@ export function useObjectPreview() {
       }
 
       if (classified.kind === 'image') {
-        const blob = await s3.getObjectBlob(target.bucket, target.key)
+        const blob = await s3.getObjectBlob(target.bucket, target.key, target.nodeId)
         if (blob.size > cap) {
           await fallbackDownload(target, cap, blob.size)
           return
         }
         objectUrl.value = URL.createObjectURL(blob)
       } else {
-        const content = await s3.getObjectText(target.bucket, target.key)
+        const content = await s3.getObjectText(target.bucket, target.key, target.nodeId)
         // Coarse guard for objects whose size was not listed up front.
         if (content.length > cap) {
           await fallbackDownload(target, cap, content.length)
@@ -163,7 +165,7 @@ export function useObjectPreview() {
       if (err instanceof TypeError) corsBlocked.value = true
       else errorMessage.value = s3ErrorMessage(err)
       try {
-        directUrl.value = await s3.downloadUrl(target.bucket, target.key)
+        directUrl.value = await s3.downloadUrl(target.bucket, target.key, target.nodeId)
       } catch {
         // Leave directUrl null; the pane still offers its own download button.
       }
