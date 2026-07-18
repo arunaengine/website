@@ -2,6 +2,7 @@
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import RoleBuilder from './RoleBuilder.vue'
+import { describeTarget } from './permission-paths'
 import { computed, ref } from 'vue'
 import { Lock, Pencil, Plus, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
@@ -43,7 +44,7 @@ function scopeLabel(path: string): string {
     case 'data/**':
       return 'data'
     default:
-      return suffix
+      return describeTarget(suffix)
   }
 }
 
