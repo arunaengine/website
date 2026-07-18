@@ -5,28 +5,42 @@
 // gated behind `features` flags (off by default).
 import { fetchWithTimeout } from './fetch'
 
+export interface TerminologyConfig {
+  // Base URL of the TS4NFDI federated terminology gateway (no trailing slash).
+  gatewayUrl: string
+}
+
 export interface PortalRuntimeConfig {
   apiBaseUrl: string
   features: Record<string, boolean>
+  terminology: TerminologyConfig
 }
 
 export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
   apiBaseUrl: '/api/v1',
   features: {},
+  terminology: { gatewayUrl: 'https://terminology.services.base4nfdi.de/api-gateway' },
 }
 
 // Per-flag defaults are layered under the served `features` map, so deployments
 // can still explicitly disable a surface. The backend serves placement, durable
 // jobs, cursor-paged search and the GA4GH TES facade; the Compute surface
 // degrades to an honest panel on nodes without a compute backend.
+// `terminologyGateway` (remote term suggestions via the TS4NFDI gateway) is off
+// by default: published profiles never depend on it, so it is pure opt-in.
 const DEFAULT_FEATURES: Record<string, boolean> = {
   jobs: true,
   placementAdmin: true,
   searchCursor: true,
+  terminologyGateway: false,
   tes: true,
 }
 
-let current: PortalRuntimeConfig = { ...DEFAULT_PORTAL_CONFIG, features: { ...DEFAULT_FEATURES } }
+let current: PortalRuntimeConfig = {
+  ...DEFAULT_PORTAL_CONFIG,
+  features: { ...DEFAULT_FEATURES },
+  terminology: { ...DEFAULT_PORTAL_CONFIG.terminology },
+}
 
 export function portalConfig(): PortalRuntimeConfig {
   return current
@@ -55,11 +69,21 @@ export async function loadPortalConfig(): Promise<PortalRuntimeConfig> {
 }
 
 function mergeConfig(raw: Record<string, unknown>): PortalRuntimeConfig {
-  const merged: PortalRuntimeConfig = { ...DEFAULT_PORTAL_CONFIG, features: { ...DEFAULT_FEATURES } }
+  const merged: PortalRuntimeConfig = {
+    ...DEFAULT_PORTAL_CONFIG,
+    features: { ...DEFAULT_FEATURES },
+    terminology: { ...DEFAULT_PORTAL_CONFIG.terminology },
+  }
   if (typeof raw.apiBaseUrl === 'string' && raw.apiBaseUrl.trim()) merged.apiBaseUrl = raw.apiBaseUrl.trim()
   if (raw.features && typeof raw.features === 'object' && !Array.isArray(raw.features)) {
     for (const [key, value] of Object.entries(raw.features as Record<string, unknown>)) {
       if (typeof value === 'boolean') merged.features[key] = value
+    }
+  }
+  if (raw.terminology && typeof raw.terminology === 'object' && !Array.isArray(raw.terminology)) {
+    const terminology = raw.terminology as Record<string, unknown>
+    if (typeof terminology.gatewayUrl === 'string' && terminology.gatewayUrl.trim()) {
+      merged.terminology.gatewayUrl = terminology.gatewayUrl.trim().replace(/\/+$/, '')
     }
   }
   return merged
