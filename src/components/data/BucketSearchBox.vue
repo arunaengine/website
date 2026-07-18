@@ -4,7 +4,6 @@ import Button from '@/components/ui/Button.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
-import { featureEnabled } from '@/lib/config'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
 import { truncateMiddle } from '@/lib/utils'
@@ -39,7 +38,6 @@ const emit = defineEmits<{
 const { authToken, searchBuckets } = useAruna()
 const { displayName, isLocalNode } = useRealmNodes()
 const shortcuts = useBucketShortcuts()
-const syncEnabled = featureEnabled('bucketSync')
 
 const query = ref(props.modelValue ?? '')
 watch(
@@ -185,7 +183,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
           </button>
           <template v-if="mode === 'browse'">
             <Button
-              v-if="syncEnabled && !isLocalNode(hit.node_id)"
+              v-if="!isLocalNode(hit.node_id)"
               variant="ghost"
               size="icon-sm"
               class="shrink-0 opacity-0 transition-opacity group-hover/hit:opacity-100 focus-visible:opacity-100"

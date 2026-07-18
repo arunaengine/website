@@ -22,7 +22,7 @@ import SyncStatusPanel from '@/components/data/SyncStatusPanel.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import Progress from '@/components/ui/Progress.vue'
-import { useAruna, isUnsupportedEndpoint } from '@/composables/useAruna'
+import { useAruna } from '@/composables/useAruna'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStaging } from '@/composables/useStaging'
@@ -94,8 +94,7 @@ const remoteEndpointMissing = computed(() => Boolean(remoteNodeId.value) && !eff
 const remoteBrowseBlocked = ref(false)
 const remoteBlocked = computed(() => remoteEndpointMissing.value || remoteBrowseBlocked.value)
 
-// ── Bucket sync (flag-gated) ────────────────────────────────────────────────
-const syncEnabled = featureEnabled('bucketSync')
+// ── Bucket sync ─────────────────────────────────────────────────────────────
 const syncDialogOpen = ref(false)
 const syncSource = ref<{ bucket: string; prefix: string; nodeId: string | null }>({
   bucket: '',
@@ -113,11 +112,10 @@ interface BucketSyncInfo {
 // Local bucket name → relationship summary, from ONE batched direction=both
 // listing on bucket-list load (sidebar badges + row indicators).
 const syncByBucket = ref<Map<string, BucketSyncInfo>>(new Map())
-const syncSupported = ref(true)
 let syncOverviewRequestId = 0
 
 async function loadSyncOverview() {
-  if (!syncEnabled || !syncSupported.value || !authToken.value) return
+  if (!authToken.value) return
   const requestId = ++syncOverviewRequestId
   try {
     const response = await listSyncRelationships({ direction: 'both' })
@@ -135,11 +133,9 @@ async function loadSyncOverview() {
     for (const relationship of response.outgoing) add(relationship.source, 'outgoing')
     for (const relationship of response.incoming) add(relationship.target, 'incoming')
     syncByBucket.value = map
-  } catch (err) {
-    if (requestId !== syncOverviewRequestId) return
-    // Badges are a progressive enhancement: an older node without the routes
-    // disables them quietly; transient failures keep the previous state.
-    if (isUnsupportedEndpoint(err)) syncSupported.value = false
+  } catch {
+    // Badges are a progressive enhancement: a transient failure keeps the
+    // previous state instead of tearing the indicators down.
   }
 }
 
@@ -158,12 +154,7 @@ function keyIsSynced(key: string): boolean {
 }
 
 const showSyncButton = computed(
-  () =>
-    syncEnabled &&
-    syncSupported.value &&
-    Boolean(bucket.value) &&
-    !isWorkspaceBucket(bucket.value) &&
-    Boolean(authToken.value),
+  () => Boolean(bucket.value) && !isWorkspaceBucket(bucket.value) && Boolean(authToken.value),
 )
 
 function openSyncDialog() {
@@ -1033,7 +1024,7 @@ const isEmpty = computed(
                   <ArrowLeftRight class="h-4 w-4" /> Sync
                 </Button>
                 <Button
-                  v-if="syncEnabled && bucketSyncCount"
+                  v-if="bucketSyncCount"
                   variant="outline"
                   size="sm"
                   :title="`${bucketSyncCount} sync relationship${bucketSyncCount === 1 ? '' : 's'} — open sync status`"
@@ -1286,7 +1277,6 @@ const isEmpty = computed(
     />
 
     <SyncStatusPanel
-      v-if="syncEnabled"
       v-model:open="syncPanelOpen"
       :bucket="bucket"
       @changed="onSyncChanged"

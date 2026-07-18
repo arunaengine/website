@@ -824,7 +824,7 @@ async function searchBuckets(
 
 // ── Bucket sync relationships (aruna feat/portal_extensions) ────────────────
 // Only relationships created by the caller are listed; run/delete are
-// creator-only too. Older nodes answer 404 → isUnsupportedEndpoint.
+// creator-only too.
 
 async function listSyncRelationships(
   query: SyncRelationshipListQuery = {},

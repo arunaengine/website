@@ -28,11 +28,9 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
 // degrades to an honest panel on nodes without a compute backend.
 // `terminologyGateway` (remote term suggestions via the TS4NFDI gateway) is off
 // by default: published profiles never depend on it, so it is pure opt-in.
-// `bucketSync` (/data/sync-relationships) and `referenceVisibility`
-// (GET /staging/references) ship off until the realm's nodes run a backend
-// with the portal_extensions routes.
+// `referenceVisibility` (GET /staging/references) ships off until the realm's
+// nodes run a backend with the portal_extensions routes.
 const DEFAULT_FEATURES: Record<string, boolean> = {
-  bucketSync: false,
   jobs: true,
   placementAdmin: true,
   referenceVisibility: false,

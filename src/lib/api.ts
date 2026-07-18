@@ -782,8 +782,7 @@ export interface StagingReferencesResponse {
 //   POST   /data/sync-relationships/{id}/run 202 (re-run once / backfill continuous)
 //   DELETE /data/sync-relationships/{id}     204 (synced data is retained)
 // Listing and detail only surface relationships CREATED BY the caller; run and
-// delete are creator-only too (403 otherwise). Older nodes without the routes
-// answer 404 — callers degrade via isUnsupportedEndpoint.
+// delete are creator-only too (403 otherwise).
 // ---------------------------------------------------------------------------
 export type SyncMode = 'once' | 'reference' | 'continuous'
 

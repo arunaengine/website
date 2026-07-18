@@ -7,7 +7,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
-import { useAruna, isUnsupportedEndpoint } from '@/composables/useAruna'
+import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { type SyncRelationship, type SyncRelationshipDetail } from '@/lib/api'
 import { arnLocationLabel, parseArunaArn, syncModeLabel, syncStateVariant } from '@/lib/sync'
@@ -34,7 +34,6 @@ const incoming = ref<SyncRelationship[]>([])
 const details = ref<Record<string, SyncRelationshipDetail>>({})
 const loading = ref(false)
 const error = ref<string | null>(null)
-const unsupported = ref(false)
 const rowError = ref<Record<string, string>>({})
 const busyId = ref<string | null>(null)
 const confirmingId = ref<string | null>(null)
@@ -44,7 +43,6 @@ async function load() {
   const myRequest = ++requestId
   loading.value = true
   error.value = null
-  unsupported.value = false
   confirmingId.value = null
   rowError.value = {}
   try {
@@ -64,8 +62,7 @@ async function load() {
     details.value = map
   } catch (err) {
     if (myRequest !== requestId) return
-    if (isUnsupportedEndpoint(err)) unsupported.value = true
-    else error.value = err instanceof Error ? err.message : String(err)
+    error.value = err instanceof Error ? err.message : String(err)
   } finally {
     if (myRequest === requestId) loading.value = false
   }
@@ -171,12 +168,6 @@ async function remove(row: Row) {
           <Skeleton class="h-16 w-full" />
           <Skeleton class="h-16 w-full" />
         </div>
-        <p
-          v-else-if="unsupported"
-          class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
-        >
-          Bucket sync is not supported by this node yet.
-        </p>
         <ErrorPanel v-else-if="error" :message="error" @retry="load" />
         <EmptyState v-else-if="!rows.length" title="No sync relationships" description="This bucket is not part of any sync you created." />
         <div v-else class="space-y-2">
