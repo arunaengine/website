@@ -7,7 +7,6 @@
 // (stale-while-revalidate) and short negative caching of failures; per-provider
 // status is tracked so the UI can show an honest degradation hint. Free text /
 // minting is a consumer concern and stays possible regardless of any status.
-import { featureEnabled } from '../config'
 import {
   clearProviderFailure,
   noteProviderFailure,
@@ -23,8 +22,6 @@ export { BUNDLED_PROVIDER_ID } from './providers/bundled'
 
 interface ProviderRegistration {
   provider: TerminologyProvider
-  // Feature gate, evaluated per search; absent means always available.
-  enabled?: () => boolean
   // Remote providers go through the cache and failure tiers.
   remote?: boolean
 }
@@ -33,14 +30,8 @@ interface ProviderRegistration {
 // vocabulary always beats a remote duplicate of the same IRI.
 const registrations: ProviderRegistration[] = [
   { provider: bundledProvider },
-  { provider: ts4nfdiProvider, enabled: () => featureEnabled('terminologyGateway'), remote: true },
+  { provider: ts4nfdiProvider, remote: true },
 ]
-
-// True when at least one remote provider is currently enabled — lets the UI
-// decide whether a "more from terminology services" section can ever appear.
-export function remoteProvidersEnabled(): boolean {
-  return registrations.some((registration) => registration.remote && registration.enabled?.() !== false)
-}
 
 // Last observed status per provider (survives across searches so the UI can
 // show a degradation dot before the next search resolves).
@@ -165,11 +156,6 @@ async function searchRemote(
   dedupe: (providerId: string, hits: TermHit[]) => TermHit[],
 ): Promise<void> {
   const { provider } = registration
-  if (registration.enabled?.() === false) {
-    deliver(registration, 'disabled', [])
-    return
-  }
-
   const filter = (hits: TermHit[]) => hits.filter((hit) => matchesKinds(hit, opts.kinds)).slice(0, opts.limit)
 
   // Cache first (stale-while-revalidate): cached hits render immediately; a

@@ -46,7 +46,6 @@ export interface TerminologyProvider {
   search(query: string, opts: TerminologySearchOptions): Promise<TermHit[]>
 }
 
-// Per-provider outcome of the latest search: 'disabled' means the provider is
-// feature-gated off, 'timeout'/'error' mean degraded (bundled results still
-// flow — a provider failure is NEVER a hard failure).
-export type ProviderStatus = 'ok' | 'timeout' | 'error' | 'disabled'
+// Per-provider outcome of the latest search: 'timeout'/'error' mean degraded
+// (bundled results still flow — a provider failure is NEVER a hard failure).
+export type ProviderStatus = 'ok' | 'timeout' | 'error'

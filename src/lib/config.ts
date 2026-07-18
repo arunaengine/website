@@ -1,8 +1,8 @@
 // Runtime configuration served by the hosting node at /portal-config.json.
 // Today the backend returns only { "apiBaseUrl": "/api/v1" }; the file is
 // forward-extensible, so unknown fields are ignored and missing fields fall
-// back to the typed defaults. Later features that lack backend endpoints are
-// gated behind `features` flags (off by default).
+// back to the typed defaults. Optional surfaces can be switched off per
+// deployment via the `features` map.
 import { fetchWithTimeout } from './fetch'
 
 export interface TerminologyConfig {
@@ -26,13 +26,10 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
 // can still explicitly disable a surface. The backend serves placement, durable
 // jobs, cursor-paged search and the GA4GH TES facade; the Compute surface
 // degrades to an honest panel on nodes without a compute backend.
-// `terminologyGateway` (remote term suggestions via the TS4NFDI gateway) is off
-// by default: published profiles never depend on it, so it is pure opt-in.
 const DEFAULT_FEATURES: Record<string, boolean> = {
   jobs: true,
   placementAdmin: true,
   searchCursor: true,
-  terminologyGateway: false,
   tes: true,
 }
 

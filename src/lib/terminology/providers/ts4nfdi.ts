@@ -1,9 +1,9 @@
 // TS4NFDI federated terminology gateway provider.
 //
 // Endpoint: GET <gatewayUrl>/search?query=…&targetDbSchema=ols&omitArtefactsWithoutIri=true
-// The gateway URL comes from portal runtime config (terminology.gatewayUrl) and
-// the provider is gated behind the default-off `terminologyGateway` feature
-// flag — the portal never depends on the service being reachable.
+// The gateway URL comes from portal runtime config (terminology.gatewayUrl).
+// The portal never depends on the service being reachable — the bundled
+// vocabulary always stands on its own when the gateway is offline.
 //
 // The response shape is loosely typed across gateway backends, so every hit is
 // runtime-validated and malformed hits are dropped silently. Verified live

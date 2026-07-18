@@ -17,13 +17,13 @@ import {
   type VocabTerm,
 } from '@/lib/profiles/vocabulary'
 import { termNameFromUri } from '@/lib/profiles/uri'
-import { BUNDLED_PROVIDER_ID, remoteProvidersEnabled, searchAll } from '@/lib/terminology/registry'
+import { BUNDLED_PROVIDER_ID, searchAll } from '@/lib/terminology/registry'
 import type { ProviderStatus, TermHit } from '@/lib/terminology/types'
 
 // Inline vocabulary suggestions under a term/class input. Section 1 searches
 // the bundled schema.org + Dublin Core vocabulary (instant, always available,
 // offline); section 2 streams additional hits from remote terminology services
-// (TS4NFDI gateway, feature-gated) as they land. Renders nothing while empty —
+// (TS4NFDI gateway) as they land. Renders nothing while empty —
 // free text always stays possible; this only makes reuse easier than minting.
 // Remote degradation is soft by design: bundled results always stand, remote
 // failures surface as a dismissible hint plus a status dot, never an error.
@@ -90,14 +90,14 @@ function runRemoteSearch(query: string) {
   remotePending.value = false
   const trimmed = query.trim()
   // Remote lookups need a real word: skip empty/1-char queries and pasted URIs.
-  if (!remoteProvidersEnabled() || trimmed.length < 2 || /^https?:/i.test(trimmed)) return
+  if (trimmed.length < 2 || /^https?:/i.test(trimmed)) return
   const controller = new AbortController()
   searchAbort = controller
   remotePending.value = true
   void searchAll(
     trimmed,
     (update) => {
-      if (seq !== searchSeq || update.providerId === BUNDLED_PROVIDER_ID || update.status === 'disabled') return
+      if (seq !== searchSeq || update.providerId === BUNDLED_PROVIDER_ID) return
       remoteResults.value = {
         ...remoteResults.value,
         [update.providerId]: { label: update.providerLabel, status: update.status, hits: update.hits },
