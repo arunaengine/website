@@ -114,9 +114,10 @@ export function useObjectPreview() {
     ++referenceProbeId
   }
 
-  // Zero-backend reference marker: on nodes without the /staging/references
-  // listing, a single HeadObject on the previewed object reveals the aruna-*
-  // reference metadata. Never throws — the marker simply stays off.
+  // Reference marker for buckets the connected node's /staging/references
+  // listing does not cover (remote-node buckets): a single HeadObject on the
+  // previewed object reveals the aruna-* reference metadata. Never throws —
+  // the marker simply stays off.
   async function probeReferenced(target: PreviewTarget) {
     const probeId = ++referenceProbeId
     referenced.value = false

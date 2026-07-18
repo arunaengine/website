@@ -650,8 +650,7 @@ async function listStagingJobs(): Promise<ListStagingJobsResponse> {
 const STAGING_REFERENCES_CAP = 2000
 
 // Reference-backed keys of a bucket (agreed contract, see api.ts). Follows
-// next_cursor until the listing is exhausted or the cap is reached. Older
-// nodes answer 404/501 — callers degrade via isUnsupportedEndpoint.
+// next_cursor until the listing is exhausted or the cap is reached.
 async function listStagingReferences(
   bucket: string,
   prefix?: string,

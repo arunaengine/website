@@ -176,7 +176,7 @@ function onSyncChanged() {
   void loadSyncOverview()
 }
 
-// ── Reference visibility (flag-gated) ───────────────────────────────────────
+// ── Reference visibility ────────────────────────────────────────────────────
 // One /staging/references load per opened LOCAL bucket (staging references
 // live on the connected node); remote browsing skips the listing entirely.
 const references = useStagingReferences(
@@ -185,15 +185,9 @@ const references = useStagingReferences(
 )
 const referenceStats = computed(() => references.stats.value)
 // Header chip: total referenced count + bytes for the browsed bucket, with a
-// per-source popover breakdown. Hidden when the flag is off, the endpoint is
-// unsupported, the bucket is remote, or nothing is referenced.
-const showReferenceStats = computed(
-  () =>
-    references.enabled &&
-    references.supported.value &&
-    !remoteNodeId.value &&
-    referenceStats.value.count > 0,
-)
+// per-source popover breakdown. Hidden when the bucket is remote or nothing
+// is referenced.
+const showReferenceStats = computed(() => !remoteNodeId.value && referenceStats.value.count > 0)
 
 // Breakdown row label; connector names resolve lazily via connectorsById.
 function referenceGroupLabel(group: ReferenceSourceGroup): string {
@@ -766,11 +760,9 @@ const previewReferencedFrom = computed(() => {
     nodeLabel: realmNodes.displayName,
   })
 })
-// HEAD fallback: flag on but no listing to consult — the endpoint is absent,
-// or the bucket is remote (the connected node's listing does not cover it).
-const previewProbeReference = computed(
-  () => references.enabled && (remoteNodeId.value ? true : !references.supported.value),
-)
+// HEAD fallback for remote buckets: the connected node's /staging/references
+// listing does not cover them, so probe the single previewed object instead.
+const previewProbeReference = computed(() => Boolean(remoteNodeId.value))
 
 async function download(object: ObjectEntry) {
   const sourceBucket = bucket.value

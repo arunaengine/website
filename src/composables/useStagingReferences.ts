@@ -1,19 +1,12 @@
 // Per-bucket reference visibility shared by the data manager and the object
 // picker: ONE cursor-following /staging/references load per opened bucket
 // feeds the row indicators, the preview origin line and the header stats.
-// Gated on featureEnabled('referenceVisibility'); the first 404/501 marks the
-// endpoint unsupported for the whole session so no consumer keeps probing.
 import { computed, ref, watch, type Ref } from 'vue'
-import { isUnsupportedEndpoint, useAruna } from './useAruna'
-import { featureEnabled } from '@/lib/config'
+import { useAruna } from './useAruna'
 import { aggregateReferences } from '@/lib/references'
 import type { StagingReferenceEntry } from '@/lib/api'
 
-// Module-level: shared verdict across every consumer of this session.
-const supported = ref(true)
-
 export function useStagingReferences(bucket: Ref<string>, active?: Ref<boolean>) {
-  const enabled = featureEnabled('referenceVisibility')
   const { authToken, listStagingReferences } = useAruna()
 
   const entries = ref<StagingReferenceEntry[]>([])
@@ -23,18 +16,16 @@ export function useStagingReferences(bucket: Ref<string>, active?: Ref<boolean>)
   async function load() {
     const id = ++requestId
     entries.value = []
-    if (!enabled || !supported.value || !bucket.value || !authToken.value) return
+    if (!bucket.value || !authToken.value) return
     if (active && !active.value) return
     loading.value = true
     try {
       const result = await listStagingReferences(bucket.value)
       if (id !== requestId) return
       entries.value = result
-    } catch (err) {
-      if (id !== requestId) return
-      // Indicators are a progressive enhancement: a node without the endpoint
-      // disables them quietly, transient failures just leave the bucket bare.
-      if (isUnsupportedEndpoint(err)) supported.value = false
+    } catch {
+      // Indicators are a progressive enhancement: a transient failure just
+      // leaves the bucket bare instead of blocking the listing.
     } finally {
       if (id === requestId) loading.value = false
     }
@@ -65,8 +56,6 @@ export function useStagingReferences(bucket: Ref<string>, active?: Ref<boolean>)
   const stats = computed(() => aggregateReferences(entries.value))
 
   return {
-    enabled,
-    supported,
     loading,
     entries,
     referencedByKey,

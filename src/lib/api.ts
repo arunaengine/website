@@ -747,9 +747,7 @@ export interface ListStagingJobsResponse {
 // reports which keys in a bucket are backed by a reference — an external
 // connector source or another Aruna node — instead of node-local bytes. The
 // listing MAY include non-referenced entries (referenced: false); consumers
-// aggregate client-side on `referenced`. The endpoint is new: older nodes
-// answer 404/501 and EVERY consumer degrades via isUnsupportedEndpoint. The
-// whole surface additionally gates on featureEnabled('referenceVisibility').
+// aggregate client-side on `referenced`.
 // ---------------------------------------------------------------------------
 export interface StagingReferenceEntry {
   key: string
