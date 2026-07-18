@@ -11,8 +11,12 @@ import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
 import JoinRequestsInbox from '@/components/groups/JoinRequestsInbox.vue'
 import UsageHistoryChart from '@/components/groups/UsageHistoryChart.vue'
+import Tabs from '@/components/ui/Tabs.vue'
+import TabsList from '@/components/ui/TabsList.vue'
+import TabsTrigger from '@/components/ui/TabsTrigger.vue'
+import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Cable, ChartArea, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
@@ -34,6 +38,7 @@ const emit = defineEmits<{ (e: 'left'): void }>()
 const { getGroup, getGroupUsage, getGroupUsageHistory, listGroupMembers, listGroupMetadata, leaveGroup, saving, currentUser } = useAruna()
 const { joinRequestsEnabled } = useJoinRequests()
 const route = useRoute()
+const router = useRouter()
 
 // One-shot deep-link scroll to the storage section. Set per navigation (in the
 // groupId watch) and consumed after the first successful reload, so @changed
@@ -131,6 +136,20 @@ const canWriteData = computed(() => {
   })
 })
 
+// Route-driven tab state (?tab=…) so sections deep-link like ComputeView.
+const TAB_NAMES = ['stats', 'members', 'roles', 'sources']
+const tab = computed(() => {
+  const value = typeof route.query.tab === 'string' ? route.query.tab : ''
+  if (value === 'sources' && !isMember.value) return 'stats'
+  return TAB_NAMES.includes(value) ? value : 'stats'
+})
+function setTab(next: string) {
+  const query = { ...route.query }
+  if (next === 'stats') delete query.tab
+  else query.tab = next
+  void router.replace({ query })
+}
+
 async function reload() {
   loadingDetail.value = true
   loadError.value = null
@@ -184,6 +203,7 @@ watch(
   () => {
     leaveError.value = null
     connectorCount.value = null
+    joinRequestCount.value = 0
     storageAnchorPending = true
     void reload()
   },
@@ -223,6 +243,27 @@ async function leave() {
       </header>
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
 
+      <Tabs :model-value="tab" @update:model-value="setTab">
+        <div class="border-b border-border px-5 py-2">
+          <TabsList class="h-auto flex-wrap">
+            <TabsTrigger value="stats" class="gap-1.5"><ChartArea class="h-3.5 w-3.5" /> Stats</TabsTrigger>
+            <TabsTrigger value="members" class="gap-1.5">
+              <Users class="h-3.5 w-3.5" /> Members
+              <Badge v-if="!membersHidden" variant="outline" class="tabular-nums">{{ members.length }}</Badge>
+              <Badge v-if="joinRequestCount > 0" variant="warn" class="tabular-nums" title="Pending join requests">{{ joinRequestCount }}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="roles" class="gap-1.5">
+              <ShieldCheck class="h-3.5 w-3.5" /> Roles
+              <Badge variant="outline" class="tabular-nums">{{ group.roles.length }}</Badge>
+            </TabsTrigger>
+            <TabsTrigger v-if="isMember" value="sources" class="gap-1.5">
+              <Cable class="h-3.5 w-3.5" /> Data sources
+              <Badge v-if="connectorCount !== null" variant="outline" class="tabular-nums">{{ connectorCount }}</Badge>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="stats" class="mt-0">
       <div v-if="usage" id="storage" class="scroll-mt-24 border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <HardDrive class="h-3.5 w-3.5 text-primary" />
@@ -306,7 +347,7 @@ async function leave() {
         </div>
       </div>
 
-      <div class="border-b border-border">
+      <div>
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <FileJson2 class="h-3.5 w-3.5 text-primary" />
           <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Documents</span>
@@ -334,62 +375,51 @@ async function leave() {
           </RouterLink>
         </div>
       </div>
+        </TabsContent>
 
-      <div v-if="isMember" id="connectors" class="scroll-mt-24 border-b border-border">
-        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
-          <Cable class="h-3.5 w-3.5 text-primary" />
-          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Source connectors</span>
-          <Badge v-if="connectorCount !== null" variant="outline" class="tabular-nums">{{ connectorCount }}</Badge>
-        </div>
-        <ConnectorsSection
-          :group-id="group.group_id"
-          :can-write="canWriteData"
-          @count="connectorCount = $event"
-        />
-      </div>
+        <TabsContent value="members" class="mt-0">
+          <div :class="canManage && joinRequestsEnabled ? 'border-b border-border' : ''">
+            <div v-if="membersHidden" class="px-5 py-4 text-xs text-muted-foreground">
+              The member list is only visible to group members.
+            </div>
+            <GroupMembers
+              v-else
+              :group-id="group.group_id"
+              :members="members"
+              :roles="group.roles"
+              :can-manage="canManage"
+              @changed="reload"
+            />
+          </div>
 
-      <div class="border-b border-border">
-        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
-          <Users class="h-3.5 w-3.5 text-primary" />
-          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Members</span>
-          <Badge v-if="!membersHidden" variant="outline" class="tabular-nums">{{ members.length }}</Badge>
-        </div>
-        <div v-if="membersHidden" class="px-5 py-4 text-xs text-muted-foreground">
-          The member list is only visible to group members.
-        </div>
-        <GroupMembers
-          v-else
-          :group-id="group.group_id"
-          :members="members"
-          :roles="group.roles"
-          :can-manage="canManage"
-          @changed="reload"
-        />
-      </div>
+          <div v-if="canManage && joinRequestsEnabled">
+            <div class="flex items-center gap-2 px-5 pb-1 pt-4">
+              <Inbox class="h-3.5 w-3.5 text-primary" />
+              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Join requests</span>
+              <Badge v-if="joinRequestCount > 0" variant="warn" class="tabular-nums">{{ joinRequestCount }}</Badge>
+              <Badge v-else variant="outline" class="tabular-nums">0</Badge>
+            </div>
+            <JoinRequestsInbox
+              :group-id="group.group_id"
+              :roles="group.roles"
+              @changed="reload"
+              @count="joinRequestCount = $event"
+            />
+          </div>
+        </TabsContent>
 
-      <div v-if="canManage && joinRequestsEnabled" class="border-b border-border">
-        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
-          <Inbox class="h-3.5 w-3.5 text-primary" />
-          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Join requests</span>
-          <Badge v-if="joinRequestCount > 0" variant="warn" class="tabular-nums">{{ joinRequestCount }}</Badge>
-          <Badge v-else variant="outline" class="tabular-nums">0</Badge>
-        </div>
-        <JoinRequestsInbox
-          :group-id="group.group_id"
-          :roles="group.roles"
-          @changed="reload"
-          @count="joinRequestCount = $event"
-        />
-      </div>
+        <TabsContent value="roles" class="mt-0">
+          <GroupRoles :group="group" :can-manage="canManage" @changed="reload" />
+        </TabsContent>
 
-      <div>
-        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
-          <ShieldCheck class="h-3.5 w-3.5 text-primary" />
-          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Roles &amp; permissions</span>
-          <Badge variant="outline" class="tabular-nums">{{ group.roles.length }}</Badge>
-        </div>
-        <GroupRoles :group="group" :can-manage="canManage" @changed="reload" />
-      </div>
+        <TabsContent v-if="isMember" value="sources" class="mt-0">
+          <ConnectorsSection
+            :group-id="group.group_id"
+            :can-write="canWriteData"
+            @count="connectorCount = $event"
+          />
+        </TabsContent>
+      </Tabs>
     </template>
   </div>
 </template>
