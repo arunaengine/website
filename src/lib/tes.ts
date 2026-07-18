@@ -1,4 +1,5 @@
 import type { BadgeVariant } from '@/components/nodes/node-display'
+import type { WorkspaceChoice } from '@/lib/workspaces'
 
 // ── GA4GH TES v1.1 ───────────────────────────────────────────────────────────
 // Verified against the Aruna TES facade (api/src/routes/tes.rs, aruna #425).
@@ -90,6 +91,9 @@ export interface TesTask {
   tags?: Record<string, string>
   logs?: TesTaskLog[] // output only
   creation_time?: string // output only, RFC3339
+  // Aruna extension (not GA4GH): per-run workspace handling. Older backends
+  // ignore or reject the field; useTes.createTask degrades gracefully then.
+  workspace?: WorkspaceChoice
 }
 
 export interface TesCreateTaskResponse {
@@ -309,5 +313,12 @@ export function pruneTesTask(task: TesTask): TesTask {
   if (task.volumes?.length) out.volumes = task.volumes.filter((v) => v.trim())
   const tags = pruneRecord(task.tags)
   if (tags) out.tags = tags
+  if (task.workspace) {
+    const bucket = trimmed(task.workspace.bucket)
+    out.workspace =
+      task.workspace.mode === 'existing' && bucket
+        ? { mode: 'existing', bucket }
+        : { mode: task.workspace.mode }
+  }
   return out
 }

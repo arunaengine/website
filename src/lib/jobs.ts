@@ -46,6 +46,9 @@ export interface JobStatusResponse {
   // JobResultPayload::to_public_json() — payload-specific projection.
   result?: unknown
   workspace_bucket?: string
+  // Agreed contract addition: how the run's workspace is handled
+  // ("temporary" | "kept" | "existing"); kept open for older/newer backends.
+  workspace_mode?: string
   run_crate?: unknown
 }
 

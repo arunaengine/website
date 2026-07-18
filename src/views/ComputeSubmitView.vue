@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
@@ -15,6 +15,7 @@ import TesInputsEditor from '@/components/compute/TesInputsEditor.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useS3 } from '@/composables/useS3'
 import {
   TES_GROUP_TAG,
   pruneTesTask,
@@ -24,7 +25,8 @@ import {
   type TesResources,
   type TesTask,
 } from '@/lib/tes'
-import { ArrowLeft, Cpu, ListPlus, LogIn, Plus, X } from '@lucide/vue'
+import { isWorkspaceBucket, type WorkspaceMode } from '@/lib/workspaces'
+import { ArrowLeft, ArrowRight, Cpu, ListPlus, LogIn, Plus, X } from '@lucide/vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -67,6 +69,37 @@ const ramGb = ref('')
 const diskGb = ref('')
 const preemptible = ref(false)
 
+// Workspace handling for the run's scratch storage — an explicit, required
+// choice (agreed contract; a node that predates it ignores the field and the
+// submit path reports that).
+const WORKSPACE_OPTIONS: { mode: WorkspaceMode; label: string; hint: string }[] = [
+  { mode: 'temporary', label: 'Temporary workspace', hint: 'Scratch bucket for this run, deleted after it succeeds.' },
+  { mode: 'kept', label: 'Keep workspace', hint: 'The run’s ws-… bucket stays for inspection after completion.' },
+  { mode: 'existing', label: 'Use existing bucket…', hint: 'The run works inside a bucket you pick.' },
+]
+const workspaceMode = ref<WorkspaceMode | ''>('')
+const workspaceBucket = ref('')
+const workspaceValid = computed(() => {
+  if (workspaceMode.value === 'temporary' || workspaceMode.value === 'kept') return true
+  return workspaceMode.value === 'existing' && !!workspaceBucket.value.trim()
+})
+
+// Bucket options for the "existing" choice — best effort via the browser's S3
+// session; without credentials the field falls back to free text.
+const s3 = useS3()
+const workspaceBucketOptions = ref<{ value: string; label: string }[]>([])
+onMounted(async () => {
+  if (!s3.hasActiveKey.value || !s3.endpoint.value) return
+  try {
+    workspaceBucketOptions.value = (await s3.listBuckets())
+      .map((b) => b.name)
+      .filter((name) => !isWorkspaceBucket(name))
+      .map((name) => ({ value: name, label: name }))
+  } catch {
+    workspaceBucketOptions.value = []
+  }
+})
+
 const groupOptions = computed(() => myGroups.value.map((g) => ({ value: g.id, label: g.name })))
 function basename(path: string): string {
   return path.split('/').filter(Boolean).pop() || ''
@@ -100,6 +133,9 @@ const task = computed<TesTask>(() =>
     resources: resources.value,
     executors: executors.value,
     tags: { [TES_GROUP_TAG]: groupId.value },
+    workspace: workspaceMode.value
+      ? { mode: workspaceMode.value, bucket: workspaceMode.value === 'existing' ? workspaceBucket.value.trim() : undefined }
+      : undefined,
   }),
 )
 
@@ -121,7 +157,7 @@ const canContinue = computed(() => {
     case 2:
       return executorsValid.value
     case 3:
-      return outputsValid.value
+      return outputsValid.value && workspaceValid.value
     default:
       return true
   }
@@ -145,11 +181,18 @@ function removeOutputRow(i: number) {
 
 // ── Submit ───────────────────────────────────────────────────────────────────
 const submitError = ref<string | null>(null)
+// Set instead of navigating away when the node dropped the workspace choice,
+// so the hint is actually seen; the task itself was submitted fine.
+const submittedWithoutWorkspace = ref<string | null>(null)
 async function submit() {
   submitError.value = null
   try {
-    const { id } = await createTask(task.value)
-    void router.push({ name: 'compute-task', params: { taskId: id } })
+    const created = await createTask(task.value)
+    if (created.workspaceIgnored) {
+      submittedWithoutWorkspace.value = created.id
+      return
+    }
+    void router.push({ name: 'compute-task', params: { taskId: created.id } })
   } catch (err) {
     submitError.value = isTesUnsupported(err)
       ? `This node does not expose the TES endpoint. ${errorMessage(err)}`
@@ -272,12 +315,52 @@ async function submit() {
             </label>
             <p class="text-[11px] text-muted-foreground">Allows the backend to run this on capacity that may be reclaimed (state <code class="rounded bg-muted px-1">PREEMPTED</code>).</p>
           </div>
+
+          <div class="space-y-3">
+            <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace</div>
+            <p class="text-[11px] text-muted-foreground">Choose how the run's scratch storage is handled.</p>
+            <div class="grid gap-2 sm:grid-cols-3">
+              <button
+                v-for="option in WORKSPACE_OPTIONS"
+                :key="option.mode"
+                type="button"
+                class="rounded-lg border p-3 text-left transition-colors"
+                :class="workspaceMode === option.mode ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-border hover:bg-muted/40'"
+                @click="workspaceMode = option.mode"
+              >
+                <div class="text-xs font-semibold text-foreground">{{ option.label }}</div>
+                <div class="mt-0.5 text-[11px] text-muted-foreground">{{ option.hint }}</div>
+              </button>
+            </div>
+            <div v-if="workspaceMode === 'existing'" class="max-w-xs">
+              <label class="text-xs font-medium text-foreground">Workspace bucket</label>
+              <Select v-if="workspaceBucketOptions.length" v-model="workspaceBucket" :options="workspaceBucketOptions" placeholder="Select a bucket" class="mt-1" />
+              <Input v-else v-model="workspaceBucket" class="mt-1 font-mono" placeholder="my-workspace" />
+            </div>
+            <p v-if="!workspaceValid" class="text-[11px] text-destructive">
+              {{ workspaceMode === 'existing' ? 'Pick the bucket the run should work in.' : 'A workspace choice is required before submitting.' }}
+            </p>
+          </div>
         </div>
 
         <!-- Step 5: Review -->
         <div v-else class="space-y-3">
           <CodeSnippet title="TES task (POST /ga4gh/tes/v1/tasks)" :code="JSON.stringify(task, null, 2)" />
           <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ submitError }}</p>
+          <div
+            v-if="submittedWithoutWorkspace"
+            class="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+          >
+            <span>The task was submitted, but workspace choices are not supported by this node yet — it runs without one.</span>
+            <Button
+              variant="outline"
+              size="sm"
+              class="shrink-0"
+              @click="router.push({ name: 'compute-task', params: { taskId: submittedWithoutWorkspace } })"
+            >
+              View task <ArrowRight class="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -286,7 +369,7 @@ async function submit() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
+        <Button v-else size="sm" :disabled="busy || !workspaceValid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
       </div>
     </div>
   </div>

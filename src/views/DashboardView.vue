@@ -157,6 +157,7 @@ const pageDescription = computed(() =>
           label="Buckets"
           :value="formatNumber(usageInfo.buckets)"
           :icon="FolderOpen"
+          hint="Node-reported total; may include per-run system workspaces (ws-…)"
         />
       </section>
 

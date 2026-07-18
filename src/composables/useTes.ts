@@ -78,10 +78,16 @@ async function getTask(id: string, view: TesView = 'FULL'): Promise<TesTask> {
   return request<TesTask>(`/ga4gh/tes/v1/tasks/${encodeURIComponent(id)}`, { query: { view } })
 }
 
+// createTask result: `workspaceIgnored` is set when the node rejected the
+// (non-GA4GH) workspace field and the task was resubmitted without it.
+export interface TesCreateTaskResult extends TesCreateTaskResponse {
+  workspaceIgnored?: boolean
+}
+
 // POST /ga4gh/tes/v1/tasks (api/src/routes/tes.rs create_task). Under the
 // portal's bearer auth the backend requires the owning-group tag, so it is
 // validated here before the request leaves the browser.
-async function createTask(task: TesTask): Promise<TesCreateTaskResponse> {
+async function createTask(task: TesTask): Promise<TesCreateTaskResult> {
   assertEnabled()
   if (!task.tags?.[TES_GROUP_TAG]) {
     throw new Error(`A task must carry the owning group tag (${TES_GROUP_TAG}).`)
@@ -91,10 +97,30 @@ async function createTask(task: TesTask): Promise<TesCreateTaskResponse> {
   }
   busy.value = true
   try {
-    return await request<TesCreateTaskResponse>('/ga4gh/tes/v1/tasks', {
-      method: 'POST',
-      body: JSON.stringify(task),
-    })
+    try {
+      return await request<TesCreateTaskResponse>('/ga4gh/tes/v1/tasks', {
+        method: 'POST',
+        body: JSON.stringify(task),
+      })
+    } catch (err) {
+      // Workspace choice is an Aruna extension: a node that predates it may
+      // reject the unknown field with 400/422. Retry once without it; if the
+      // retry succeeds the workspace field was the problem, otherwise the
+      // original error stands.
+      if (task.workspace && err instanceof ApiError && (err.status === 400 || err.status === 422)) {
+        const { workspace: _workspace, ...rest } = task
+        try {
+          const created = await request<TesCreateTaskResponse>('/ga4gh/tes/v1/tasks', {
+            method: 'POST',
+            body: JSON.stringify(rest),
+          })
+          return { ...created, workspaceIgnored: true }
+        } catch {
+          throw err
+        }
+      }
+      throw err
+    }
   } finally {
     busy.value = false
   }

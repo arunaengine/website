@@ -24,6 +24,7 @@ import {
   type TesOutput,
   type TesTask,
 } from '@/lib/tes'
+import { isWorkspaceBucket, type WorkspaceMode } from '@/lib/workspaces'
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -127,6 +128,22 @@ const outputFiles = ref<{ name: string }[]>([])
 const inputDialogOpen = ref(false)
 const credentialDialogOpen = ref(false)
 
+// Workspace handling for the run's scratch storage — an explicit, required
+// choice (agreed contract; a node that predates it ignores the field and the
+// submit path reports that).
+const WORKSPACE_OPTIONS: { mode: WorkspaceMode; label: string; hint: string }[] = [
+  { mode: 'temporary', label: 'Temporary workspace', hint: 'Scratch bucket for this run, deleted after it succeeds.' },
+  { mode: 'kept', label: 'Keep workspace', hint: 'The run’s ws-… bucket stays for inspection after completion.' },
+  { mode: 'existing', label: 'Use existing bucket…', hint: 'The run works inside a bucket you pick.' },
+]
+const workspaceMode = ref<WorkspaceMode | ''>('')
+const workspaceBucket = ref('')
+const workspaceValid = computed(() => {
+  if (workspaceMode.value === 'temporary' || workspaceMode.value === 'kept') return true
+  return workspaceMode.value === 'existing' && !!workspaceBucket.value.trim()
+})
+const workspaceNotice = ref<string | null>(null)
+
 // A fresh id per submit attempt keys the uploaded script and the idempotency tag.
 const runId = ref(crypto.randomUUID())
 
@@ -183,6 +200,9 @@ const task = computed<TesTask>(() =>
       { image: runtime.value.image, command: [runtime.value.interpreter, scriptContainerPath.value], workdir: '/work' },
     ],
     tags: { [TES_GROUP_TAG]: groupId.value, [TES_IDEMPOTENCY_TAG]: runId.value },
+    workspace: workspaceMode.value
+      ? { mode: workspaceMode.value, bucket: workspaceMode.value === 'existing' ? workspaceBucket.value.trim() : undefined }
+      : undefined,
   }),
 )
 
@@ -222,7 +242,8 @@ async function loadBuckets() {
   if (!s3.hasActiveKey.value || !s3.endpoint.value) return
   bucketsLoading.value = true
   try {
-    buckets.value = (await s3.listBuckets()).map((b) => b.name)
+    // Per-run ws-… scratch buckets are system-managed and never run targets.
+    buckets.value = (await s3.listBuckets()).map((b) => b.name).filter((name) => !isWorkspaceBucket(name))
     bucketsLoaded.value = true
     if (!outputBucket.value && buckets.value.length) outputBucket.value = buckets.value[0]
   } catch {
@@ -262,7 +283,7 @@ const canContinue = computed(() => {
     case 1:
       return script.value.trim().length > 0
     case 2:
-      return dataReady.value && outputsValid.value
+      return dataReady.value && outputsValid.value && workspaceValid.value
     default:
       return true
   }
@@ -283,11 +304,16 @@ const submittedTaskId = ref<string | null>(null)
 
 async function submit() {
   submitError.value = null
+  workspaceNotice.value = null
   submitting.value = true
   try {
     await s3.putTextObject(outputBucket.value.trim(), scriptKey.value, script.value, runtime.value.contentType)
-    const { id } = await createTask(task.value)
-    submittedTaskId.value = id
+    const created = await createTask(task.value)
+    submittedTaskId.value = created.id
+    if (created.workspaceIgnored) {
+      workspaceNotice.value =
+        'Workspace choices are not supported by this node yet — the run was submitted without one.'
+    }
   } catch (err) {
     submitError.value = isTesUnsupported(err)
       ? `This node does not expose the TES endpoint. ${errorMessage(err)}`
@@ -299,6 +325,7 @@ async function submit() {
 function runAnother() {
   submittedTaskId.value = null
   submitError.value = null
+  workspaceNotice.value = null
   goStep(0)
   runId.value = crypto.randomUUID()
 }
@@ -347,6 +374,9 @@ function runAnother() {
           </Button>
         </div>
       </div>
+      <p v-if="workspaceNotice" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+        {{ workspaceNotice }}
+      </p>
       <QuickRunResult :task-id="submittedTaskId" :output-bucket="outputBucket.trim()" :output-prefix="normalizedPrefix" />
     </div>
 
@@ -488,6 +518,33 @@ function runAnother() {
                 <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output file</Button>
               </section>
             </div>
+
+            <!-- Workspace -->
+            <section class="space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace <span class="text-destructive">*</span></div>
+              <p class="text-[11px] text-muted-foreground">Choose how the run's scratch storage is handled.</p>
+              <div class="grid gap-2 sm:grid-cols-3">
+                <button
+                  v-for="option in WORKSPACE_OPTIONS"
+                  :key="option.mode"
+                  type="button"
+                  class="rounded-lg border p-3 text-left transition-colors"
+                  :class="workspaceMode === option.mode ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-border hover:bg-muted/40'"
+                  @click="workspaceMode = option.mode"
+                >
+                  <div class="text-xs font-semibold text-foreground">{{ option.label }}</div>
+                  <div class="mt-0.5 text-[11px] text-muted-foreground">{{ option.hint }}</div>
+                </button>
+              </div>
+              <div v-if="workspaceMode === 'existing'" class="max-w-xs">
+                <label class="text-xs font-medium text-foreground">Workspace bucket</label>
+                <Select v-if="bucketOptions.length" v-model="workspaceBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
+                <Input v-else v-model="workspaceBucket" class="mt-1 font-mono" placeholder="my-workspace" />
+              </div>
+              <p v-if="!workspaceValid" class="text-[11px] text-destructive">
+                {{ workspaceMode === 'existing' ? 'Pick the bucket the run should work in.' : 'A workspace choice is required before submitting.' }}
+              </p>
+            </section>
           </template>
         </div>
 
@@ -539,7 +596,7 @@ function runAnother() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || submitting || !dataReady" @click="submit">
+        <Button v-else size="sm" :disabled="busy || submitting || !dataReady || !workspaceValid" @click="submit">
           <ListPlus class="h-4 w-4" /> {{ submitting ? 'Submitting…' : 'Submit run' }}
         </Button>
       </div>

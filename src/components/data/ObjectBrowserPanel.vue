@@ -5,6 +5,7 @@ import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import { useS3, s3ErrorMessage, isS3AuthError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { formatBytes, relativeTime } from '@/lib/utils'
+import { isWorkspaceBucket } from '@/lib/workspaces'
 import { computed, ref, watch } from 'vue'
 import { Boxes, Loader2 } from '@lucide/vue'
 
@@ -25,6 +26,9 @@ const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
 const buckets = ref<BucketEntry[]>([])
 const bucketsLoading = ref(false)
 const bucketsError = ref<string | null>(null)
+
+// Pickers never offer per-run ws-<jobId> scratch buckets.
+const visibleBuckets = computed(() => buckets.value.filter((entry) => !isWorkspaceBucket(entry.name)))
 
 const folders = ref<FolderEntry[]>([])
 const objects = ref<ObjectEntry[]>([])
@@ -137,14 +141,14 @@ const isEmpty = computed(
     <aside class="overflow-hidden rounded-md border border-border">
       <header class="flex items-center justify-between border-b border-border px-3 py-2">
         <span class="text-xs font-semibold text-foreground">Buckets</span>
-        <Badge variant="outline">{{ buckets.length }}</Badge>
+        <Badge variant="outline">{{ visibleBuckets.length }}</Badge>
       </header>
       <div v-if="bucketsLoading" class="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
         <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading…
       </div>
       <p v-else-if="bucketsError" class="px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
-      <ul v-else-if="buckets.length" class="max-h-[260px] overflow-y-auto py-1">
-        <li v-for="entry in buckets" :key="entry.name">
+      <ul v-else-if="visibleBuckets.length" class="max-h-[260px] overflow-y-auto py-1">
+        <li v-for="entry in visibleBuckets" :key="entry.name">
           <button
             type="button"
             class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted"
