@@ -23,9 +23,15 @@ const props = defineProps<{
   /**
    * Resolved reference origin ("connector <name> on node <label> · <path>",
    * "node <label>"). connectorId + groupId make the label a deep link into
-   * the owning group's Data sources tab.
+   * the owning group's Data sources tab; a bare originNodeId (native
+   * references carry no connector) links to the node's Status detail instead.
    */
-  referencedFrom?: { label: string; connectorId?: string | null; groupId?: string | null } | null
+  referencedFrom?: {
+    label: string
+    connectorId?: string | null
+    groupId?: string | null
+    originNodeId?: string | null
+  } | null
   /**
    * HeadObject fallback when no listing resolves the origin: probe the single
    * previewed object for reference metadata and show a source-less marker.
@@ -109,6 +115,14 @@ async function download() {
                 :to="{ name: 'groups', params: { id: props.referencedFrom.groupId }, query: { tab: 'sources', connector: props.referencedFrom.connectorId } }"
                 class="text-primary hover:underline"
                 title="Open the connector in its group"
+              >
+                {{ props.referencedFrom.label }}
+              </RouterLink>
+              <RouterLink
+                v-else-if="props.referencedFrom.originNodeId"
+                :to="{ name: 'status', query: { node: props.referencedFrom.originNodeId } }"
+                class="text-primary hover:underline"
+                title="Open the node on the Status page"
               >
                 {{ props.referencedFrom.label }}
               </RouterLink>

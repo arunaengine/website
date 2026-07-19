@@ -35,7 +35,7 @@ import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quot
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
-import { parseArunaArn, prefixesOverlap } from '@/lib/sync'
+import { parseArunaArn, prefixesOverlap, syncBucketKey } from '@/lib/sync'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
 import { computed, ref, watch } from 'vue'
@@ -110,10 +110,18 @@ interface BucketSyncInfo {
   /** Local-side key prefixes ('' = whole bucket) for row indicators. */
   prefixes: string[]
 }
-// Local bucket name → relationship summary, from ONE batched direction=both
-// listing on bucket-list load (sidebar badges + row indicators).
+// (nodeId, bucket) → relationship summary, from ONE batched direction=both
+// listing on bucket-list load (sidebar badges + row indicators). BOTH sides
+// of every relationship register, so remote buckets browsed here surface the
+// sync info the connected node's listing already carries.
 const syncByBucket = ref<Map<string, BucketSyncInfo>>(new Map())
 let syncOverviewRequestId = 0
+
+// A missing/self node id in an ARN means the connected node.
+function syncKeyFor(nodeId: string | null | undefined, bucketName: string): string {
+  const node = !nodeId || realmNodes.isLocalNode(nodeId) ? (realmNodes.localNodeId.value ?? '') : nodeId
+  return syncBucketKey(node, bucketName)
+}
 
 async function loadSyncOverview() {
   if (!authToken.value) return
@@ -125,14 +133,22 @@ async function loadSyncOverview() {
     const add = (arn: string, direction: 'outgoing' | 'incoming') => {
       const parsed = parseArunaArn(arn)
       if (!parsed) return
-      const info = map.get(parsed.bucket) ?? { outgoing: 0, incoming: 0, prefixes: [] }
+      const key = syncKeyFor(parsed.nodeId, parsed.bucket)
+      const info = map.get(key) ?? { outgoing: 0, incoming: 0, prefixes: [] }
       info[direction]++
       info.prefixes.push(parsed.prefix)
-      map.set(parsed.bucket, info)
+      map.set(key, info)
     }
-    // The local side is the source of outgoing and the target of incoming rows.
-    for (const relationship of response.outgoing) add(relationship.source, 'outgoing')
-    for (const relationship of response.incoming) add(relationship.target, 'incoming')
+    // Each relationship touches two buckets: its source has an outgoing sync,
+    // its target an incoming one. Dedupe: a same-node relationship appears in
+    // both response lists.
+    const seen = new Set<string>()
+    for (const relationship of [...response.outgoing, ...response.incoming]) {
+      if (seen.has(relationship.id)) continue
+      seen.add(relationship.id)
+      add(relationship.source, 'outgoing')
+      add(relationship.target, 'incoming')
+    }
     syncByBucket.value = map
   } catch {
     // Badges are a progressive enhancement: a transient failure keeps the
@@ -140,8 +156,8 @@ async function loadSyncOverview() {
   }
 }
 
-const bucketSyncInfo = computed(() =>
-  remoteNodeId.value ? null : (syncByBucket.value.get(bucket.value) ?? null),
+const bucketSyncInfo = computed(
+  () => syncByBucket.value.get(syncKeyFor(remoteNodeId.value, bucket.value)) ?? null,
 )
 const bucketSyncCount = computed(() =>
   bucketSyncInfo.value ? bucketSyncInfo.value.outgoing + bucketSyncInfo.value.incoming : 0,
@@ -777,6 +793,9 @@ const previewReferencedFrom = computed(() => {
     }),
     connectorId: entry.connector_id ?? null,
     groupId: entry.connector_id ? activeGroupId.value : null,
+    // Native references have no connector; link their provenance to the
+    // origin node's detail surface on the Status page instead.
+    originNodeId: entry.origin_node_id ?? null,
   }
 })
 // HEAD fallback for remote buckets: the connected node's /staging/references
@@ -980,7 +999,7 @@ const isEmpty = computed(
                     :bucket="entry.bucket"
                     :node-id="entry.nodeId"
                     :pinned="entry.pinned"
-                    :synced="!entry.nodeId && syncByBucket.has(entry.bucket)"
+                    :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
                     :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
                     @open="openBucketOn(entry.bucket, entry.nodeId)"
                     @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
@@ -999,7 +1018,7 @@ const isEmpty = computed(
                       :bucket="entry.bucket"
                       :node-id="entry.nodeId"
                       :pinned="false"
-                      :synced="!entry.nodeId && syncByBucket.has(entry.bucket)"
+                      :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
                       :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
                       @open="openBucketOn(entry.bucket, entry.nodeId)"
                       @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
@@ -1114,6 +1133,14 @@ const isEmpty = computed(
                               :to="{ name: 'groups', params: { id: activeGroupId }, query: { tab: 'sources', connector: group.connectorId } }"
                               class="block truncate text-primary hover:underline"
                               :title="`${referenceGroupLabel(group)}, open the connector`"
+                            >
+                              {{ referenceGroupLabel(group) }}
+                            </RouterLink>
+                            <RouterLink
+                              v-else-if="group.originNodeId"
+                              :to="{ name: 'status', query: { node: group.originNodeId } }"
+                              class="block truncate text-primary hover:underline"
+                              :title="`${referenceGroupLabel(group)}, open the node on the Status page`"
                             >
                               {{ referenceGroupLabel(group) }}
                             </RouterLink>
@@ -1309,6 +1336,7 @@ const isEmpty = computed(
     <SyncStatusPanel
       v-model:open="syncPanelOpen"
       :bucket="bucket"
+      :node-id="remoteNodeId"
       @changed="onSyncChanged"
       @new-sync="onNewSyncRequested"
     />

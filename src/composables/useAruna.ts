@@ -831,18 +831,41 @@ async function searchBuckets(
 
 // ── Bucket sync relationships (aruna feat/portal_extensions) ────────────────
 // Only relationships created by the caller are listed; run/delete are
-// creator-only too.
+// creator-only too. Relationships live on their source node, so every call
+// takes an optional baseUrl to address another realm node's API (the bearer
+// token is realm-wide, like the S3 credentials).
+
+async function syncRequest<T>(path: string, options: object, baseUrl?: string): Promise<T> {
+  const context = refreshContext()
+  const response = await apiRequest<T>(
+    path,
+    options,
+    baseUrl ? { ...context.client, baseUrl } : context.client,
+  )
+  assertCurrentSession(context.epoch)
+  return response
+}
 
 async function listSyncRelationships(
   query: SyncRelationshipListQuery = {},
+  opts: { baseUrl?: string } = {},
 ): Promise<SyncRelationshipListResponse> {
-  return request<SyncRelationshipListResponse>('/data/sync-relationships', {
-    query: { bucket: query.bucket, prefix: query.prefix, direction: query.direction },
-  })
+  return syncRequest<SyncRelationshipListResponse>(
+    '/data/sync-relationships',
+    { query: { bucket: query.bucket, prefix: query.prefix, direction: query.direction } },
+    opts.baseUrl,
+  )
 }
 
-async function getSyncRelationship(id: string): Promise<SyncRelationshipDetail> {
-  return request<SyncRelationshipDetail>(`/data/sync-relationships/${encodeURIComponent(id)}`)
+async function getSyncRelationship(
+  id: string,
+  opts: { baseUrl?: string } = {},
+): Promise<SyncRelationshipDetail> {
+  return syncRequest<SyncRelationshipDetail>(
+    `/data/sync-relationships/${encodeURIComponent(id)}`,
+    {},
+    opts.baseUrl,
+  )
 }
 
 // The source endpoint is always the node that receives the POST (the request
@@ -871,24 +894,35 @@ async function createSyncRelationship(
 
 // 202: re-runs a "once" relationship / backfills a continuous one; also
 // re-enables a failed relationship before queueing.
-async function runSyncRelationship(id: string): Promise<SyncRunResponse> {
-  return request<SyncRunResponse>(`/data/sync-relationships/${encodeURIComponent(id)}/run`, {
-    method: 'POST',
-  })
+async function runSyncRelationship(
+  id: string,
+  opts: { baseUrl?: string } = {},
+): Promise<SyncRunResponse> {
+  return syncRequest<SyncRunResponse>(
+    `/data/sync-relationships/${encodeURIComponent(id)}/run`,
+    { method: 'POST' },
+    opts.baseUrl,
+  )
 }
 
 async function updateSyncReferenceHandling(
   id: string,
   referenceHandling: SyncReferenceHandling,
+  opts: { baseUrl?: string } = {},
 ): Promise<SyncRelationship> {
-  return request<SyncRelationship>(`/data/sync-relationships/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ reference_handling: referenceHandling }),
-  })
+  return syncRequest<SyncRelationship>(
+    `/data/sync-relationships/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify({ reference_handling: referenceHandling }) },
+    opts.baseUrl,
+  )
 }
 
-async function deleteSyncRelationship(id: string): Promise<void> {
-  return request<void>(`/data/sync-relationships/${encodeURIComponent(id)}`, { method: 'DELETE' })
+async function deleteSyncRelationship(id: string, opts: { baseUrl?: string } = {}): Promise<void> {
+  return syncRequest<void>(
+    `/data/sync-relationships/${encodeURIComponent(id)}`,
+    { method: 'DELETE' },
+    opts.baseUrl,
+  )
 }
 
 async function resolveUsers(userIds: string[]): Promise<ResolveUserResult[]> {

@@ -18,11 +18,17 @@ import { formatBytes, formatDuration, relativeTime } from '@/lib/utils'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ArrowLeftRight, ArrowLeft, ArrowRight, Loader2, Play, Plus, RefreshCw, Trash2 } from '@lucide/vue'
 
-// Sync relationships touching one bucket on the connected node, outgoing and
-// incoming, presented as a centered dialog opened from the sync chip. The
-// backend only lists relationships created by the caller; run/delete are
-// creator-only as well.
-const props = defineProps<{ open: boolean; bucket: string }>()
+// Sync relationships touching one bucket, outgoing and incoming, presented as
+// a centered dialog opened from the sync chip. The backend only lists
+// relationships created by the caller; run/delete are creator-only as well.
+// For a bucket hosted on another node (nodeId set) that node's own API is
+// queried too, because relationships live on their source node.
+const props = defineProps<{
+  open: boolean
+  bucket: string
+  /** Node hosting the browsed bucket; null/absent = the connected node. */
+  nodeId?: string | null
+}>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   // Fired after a delete or re-run so the parent can refresh its badges.
@@ -35,12 +41,22 @@ const { listSyncRelationships, getSyncRelationship, runSyncRelationship, updateS
   useAruna()
 const realmNodes = useRealmNodes()
 
+// Resolved like the create flow resolves remote-source POSTs: the node's
+// published REST base from the realm document.
+const remoteApiBase = computed(() =>
+  props.nodeId ? (realmNodes.nodeById(props.nodeId)?.apiBase ?? null) : null,
+)
+
 const outgoing = ref<SyncRelationship[]>([])
 const incoming = ref<SyncRelationship[]>([])
+// Relationship id → hosting node id, for rows only the remote node's listing
+// returned. Their detail/run/delete calls address that node too.
+const hostedOn = ref<Record<string, string>>({})
 const details = ref<Record<string, SyncRelationshipDetail>>({})
 const detailRetryNeeded = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const remoteQueryError = ref<string | null>(null)
 const rowError = ref<Record<string, string>>({})
 const busyId = ref<string | null>(null)
 const confirmingId = ref<string | null>(null)
@@ -75,12 +91,51 @@ async function load(silent = false) {
   try {
     const response = await listSyncRelationships({ bucket: props.bucket, direction: 'both' })
     if (myRequest !== requestId) return
-    outgoing.value = response.outgoing
-    incoming.value = response.incoming
-    // Lag and queue depth live on the detail endpoint; fetch per row and
-    // tolerate individual failures (the snapshot row still renders).
-    const all = [...response.outgoing, ...response.incoming]
-    const settled = await Promise.allSettled(all.map((entry) => getSyncRelationship(entry.id)))
+    let mergedOutgoing = response.outgoing
+    let mergedIncoming = response.incoming
+    const hosts: Record<string, string> = {}
+    // Remote-hosted bucket: relationships whose source is that node exist only
+    // in its own listing, so query it as well and merge (dedupe by id). A
+    // failure degrades to an inline notice, never blocking the local results.
+    if (props.nodeId) {
+      try {
+        if (!remoteApiBase.value) throw new Error('no published API base')
+        const remote = await listSyncRelationships(
+          { bucket: props.bucket, direction: 'both' },
+          { baseUrl: remoteApiBase.value },
+        )
+        if (myRequest !== requestId) return
+        const known = new Set([...mergedOutgoing, ...mergedIncoming].map((entry) => entry.id))
+        for (const entry of remote.outgoing) {
+          if (known.has(entry.id)) continue
+          hosts[entry.id] = props.nodeId
+          mergedOutgoing = [...mergedOutgoing, entry]
+        }
+        for (const entry of remote.incoming) {
+          if (known.has(entry.id)) continue
+          hosts[entry.id] = props.nodeId
+          mergedIncoming = [...mergedIncoming, entry]
+        }
+        remoteQueryError.value = null
+      } catch (remoteErr) {
+        if (myRequest !== requestId) return
+        // "The API session changed" aborts the whole load, not just this leg.
+        if (remoteErr instanceof DOMException && remoteErr.name === 'AbortError') throw remoteErr
+        remoteQueryError.value = `Could not query node ${realmNodes.displayName(props.nodeId)} for its sync relationships`
+      }
+    } else {
+      remoteQueryError.value = null
+    }
+    outgoing.value = mergedOutgoing
+    incoming.value = mergedIncoming
+    hostedOn.value = hosts
+    // Lag and queue depth live on the detail endpoint; fetch per row (from the
+    // hosting node) and tolerate individual failures (the snapshot row still
+    // renders).
+    const all = [...mergedOutgoing, ...mergedIncoming]
+    const settled = await Promise.allSettled(
+      all.map((entry) => getSyncRelationship(entry.id, hostOpts(entry.id))),
+    )
     if (myRequest !== requestId) return
     const map: Record<string, SyncRelationshipDetail> = {}
     settled.forEach((result, index) => {
@@ -101,7 +156,7 @@ async function load(silent = false) {
 }
 
 watch(
-  () => [props.open, props.bucket] as const,
+  () => [props.open, props.bucket, props.nodeId] as const,
   ([open]) => {
     if (open) void load()
     else {
@@ -131,6 +186,14 @@ const REFERENCE_HANDLING_OPTIONS = [
   { value: 'skip', label: 'Skip refs' },
 ]
 
+// Base-URL override for rows hosted on the remote node; their detail, run,
+// reference-handling and delete endpoints live there, not on the connected node.
+function hostOpts(relationshipId: string): { baseUrl?: string } {
+  return hostedOn.value[relationshipId] && remoteApiBase.value
+    ? { baseUrl: remoteApiBase.value }
+    : {}
+}
+
 // The "other side" of the relationship, seen from this bucket.
 function counterpart(row: Row): { nodeId: string | null; label: string } {
   const arn = row.direction === 'outgoing' ? row.relationship.target : row.relationship.source
@@ -159,7 +222,7 @@ async function rerun(row: Row) {
   busyId.value = row.relationship.id
   rowError.value = { ...rowError.value, [row.relationship.id]: '' }
   try {
-    await runSyncRelationship(row.relationship.id)
+    await runSyncRelationship(row.relationship.id, hostOpts(row.relationship.id))
     emit('changed')
     await load()
   } catch (err) {
@@ -177,7 +240,11 @@ async function setReferenceHandling(row: Row, value: string) {
   busyId.value = row.relationship.id
   rowError.value = { ...rowError.value, [row.relationship.id]: '' }
   try {
-    await updateSyncReferenceHandling(row.relationship.id, value as SyncReferenceHandling)
+    await updateSyncReferenceHandling(
+      row.relationship.id,
+      value as SyncReferenceHandling,
+      hostOpts(row.relationship.id),
+    )
     emit('changed')
     await load(true)
   } catch (err) {
@@ -195,7 +262,7 @@ async function remove(row: Row) {
   busyId.value = row.relationship.id
   rowError.value = { ...rowError.value, [row.relationship.id]: '' }
   try {
-    await deleteSyncRelationship(row.relationship.id)
+    await deleteSyncRelationship(row.relationship.id, hostOpts(row.relationship.id))
     confirmingId.value = null
     emit('changed')
     await load()
@@ -212,7 +279,7 @@ async function remove(row: Row) {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="flex max-h-[85vh] max-w-xl flex-col">
+    <DialogContent class="flex max-h-[85vh] max-w-3xl flex-col">
       <DialogHeader>
         <div class="flex items-center justify-between gap-2 pr-8">
           <DialogTitle class="flex min-w-0 items-center gap-2">
@@ -234,6 +301,12 @@ async function remove(row: Row) {
       </DialogHeader>
 
       <section class="scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto">
+        <p
+          v-if="remoteQueryError"
+          class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-900 dark:text-amber-200"
+        >
+          {{ remoteQueryError }}
+        </p>
         <div v-if="loading && !rows.length" class="space-y-2">
           <Skeleton class="h-16 w-full" />
           <Skeleton class="h-16 w-full" />
@@ -246,8 +319,9 @@ async function remove(row: Row) {
           <div
             v-for="row in rows"
             :key="row.relationship.id"
-            class="space-y-1 rounded-md border border-border px-3 py-2"
+            class="rounded-md border border-border px-4 py-3"
           >
+            <!-- Line 1: identity (flexible, truncating) + metrics right-aligned. -->
             <div class="flex items-center gap-2 text-xs">
               <span
                 class="h-2 w-2 shrink-0 rounded-full"
@@ -264,50 +338,37 @@ async function remove(row: Row) {
                 {{ realmNodes.displayName(counterpart(row).nodeId) }}
               </Badge>
               <span class="min-w-0 flex-1 truncate font-mono" :title="counterpart(row).label">{{ counterpart(row).label }}</span>
+              <span class="flex shrink-0 items-center gap-3 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+                <span v-if="details[row.relationship.id]">
+                  {{ details[row.relationship.id].pending_jobs }} pending
+                </span>
+                <span v-if="details[row.relationship.id]?.oldest_lag_ms != null">
+                  lag {{ formatDuration(details[row.relationship.id].oldest_lag_ms ?? 0) }}
+                </span>
+                <span v-if="row.relationship.status.last_synced_at">
+                  synced {{ relativeTime(row.relationship.status.last_synced_at) }}
+                </span>
+                <span v-if="row.relationship.status.counters.versions_synced">
+                  {{ row.relationship.status.counters.versions_synced }} versions ({{ formatBytes(row.relationship.status.counters.bytes_synced) }})
+                </span>
+              </span>
             </div>
 
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-              <span v-if="details[row.relationship.id]">
-                {{ details[row.relationship.id].pending_jobs }} pending
+            <!-- Line 2: traits left, reference handling + actions right. -->
+            <div class="mt-2 flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+              <span class="mr-auto flex items-center gap-2 text-[11px] text-muted-foreground">
+                <Badge
+                  v-if="hostedOn[row.relationship.id]"
+                  variant="secondary"
+                  class="text-[10px]"
+                  :title="`Listed by node ${hostedOn[row.relationship.id]}`"
+                >
+                  on {{ realmNodes.displayName(hostedOn[row.relationship.id]) }}
+                </Badge>
+                <span v-if="row.relationship.replicate_deletes">replicates deletes</span>
               </span>
-              <span v-if="details[row.relationship.id]?.oldest_lag_ms != null">
-                · lag {{ formatDuration(details[row.relationship.id].oldest_lag_ms ?? 0) }}
-              </span>
-              <span v-if="row.relationship.status.last_synced_at">
-                · synced {{ relativeTime(row.relationship.status.last_synced_at) }}
-              </span>
-              <span v-if="row.relationship.status.counters.versions_synced">
-                · {{ row.relationship.status.counters.versions_synced }} versions ({{ formatBytes(row.relationship.status.counters.bytes_synced) }})
-              </span>
-              <span v-if="row.relationship.replicate_deletes">· replicates deletes</span>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <span class="text-[11px] text-muted-foreground">Source references</span>
-              <Select
-                v-if="row.direction === 'outgoing' && row.relationship.mode !== 'reference'"
-                :model-value="row.relationship.reference_handling"
-                :options="REFERENCE_HANDLING_OPTIONS"
-                class="h-7 w-40 text-[11px]"
-                aria-label="Source reference handling"
-                :disabled="busyId !== null"
-                @update:model-value="(value: string) => setReferenceHandling(row, value)"
-              />
-              <Badge v-else variant="outline" class="text-[10px]">{{ row.relationship.reference_handling }}</Badge>
-            </div>
-            <p
-              v-if="details[row.relationship.id]?.pending_jobs && row.relationship.reference_handling === 'materialize'"
-              class="text-[11px] text-muted-foreground"
-            >
-              Referenced objects are fetched from their original connector before transfer. Large sources can remain queued or transferring for a while; this status refreshes automatically.
-            </p>
-
-            <p v-if="lastError(row)" class="break-all text-[11px] text-destructive">{{ lastError(row) }}</p>
-            <p v-if="rowError[row.relationship.id]" class="break-all text-[11px] text-destructive">{{ rowError[row.relationship.id] }}</p>
-
-            <div class="flex items-center justify-end gap-1 pt-0.5">
               <template v-if="confirmingId === row.relationship.id">
-                <span class="mr-auto text-[11px] text-muted-foreground">Remove this sync? Already synced data is kept.</span>
+                <span class="text-[11px] text-muted-foreground">Remove this sync? Already synced data is kept.</span>
                 <Button variant="outline" size="sm" class="h-6 px-2 text-[11px]" @click="confirmingId = null">Cancel</Button>
                 <Button
                   variant="destructive"
@@ -320,6 +381,17 @@ async function remove(row: Row) {
                 </Button>
               </template>
               <template v-else>
+                <span class="text-[11px] text-muted-foreground">Source references</span>
+                <Select
+                  v-if="row.direction === 'outgoing' && row.relationship.mode !== 'reference'"
+                  :model-value="row.relationship.reference_handling"
+                  :options="REFERENCE_HANDLING_OPTIONS"
+                  class="h-7 w-40 text-[11px]"
+                  aria-label="Source reference handling"
+                  :disabled="busyId !== null"
+                  @update:model-value="(value: string) => setReferenceHandling(row, value)"
+                />
+                <Badge v-else variant="outline" class="text-[10px]">{{ row.relationship.reference_handling }}</Badge>
                 <Loader2 v-if="busyId === row.relationship.id" class="h-3.5 w-3.5 animate-spin text-primary" />
                 <Button
                   v-if="row.direction === 'outgoing'"
@@ -345,6 +417,15 @@ async function remove(row: Row) {
                 </Button>
               </template>
             </div>
+
+            <p
+              v-if="details[row.relationship.id]?.pending_jobs && row.relationship.reference_handling === 'materialize'"
+              class="mt-1 text-[11px] text-muted-foreground"
+            >
+              Referenced objects are fetched from their original connector before transfer. Large sources can remain queued or transferring for a while; this status refreshes automatically.
+            </p>
+            <p v-if="lastError(row)" class="mt-1 break-all text-[11px] text-destructive">{{ lastError(row) }}</p>
+            <p v-if="rowError[row.relationship.id]" class="mt-1 break-all text-[11px] text-destructive">{{ rowError[row.relationship.id] }}</p>
           </div>
         </div>
       </section>

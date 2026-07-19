@@ -66,3 +66,10 @@ export function syncStateVariant(state: SyncRelationshipState): SyncStateVariant
 export function prefixesOverlap(a: string, b: string): boolean {
   return a.startsWith(b) || b.startsWith(a)
 }
+
+// Map key for (hosting node, bucket) sync summaries. `nodeId` must already be
+// normalized (missing/self ids resolved to the connected node's id); bucket
+// names cannot contain spaces, so the pair is unambiguous.
+export function syncBucketKey(nodeId: string, bucket: string): string {
+  return `${nodeId} ${bucket}`
+}

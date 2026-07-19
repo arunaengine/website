@@ -4,6 +4,7 @@ import BucketRow from '@/components/data/BucketRow.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
+import { syncBucketKey } from '@/lib/sync'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
@@ -29,7 +30,7 @@ const props = withDefaults(
     /** Picker: explain that an unmatched value may create a new bucket. */
     allowNew?: boolean
     placeholder?: string
-    /** Local buckets with sync relationships (name-keyed); hits show the sync glyph. */
+    /** Buckets with sync relationships, keyed by lib/sync syncBucketKey; hits show the sync glyph. */
     syncByBucket?: ReadonlyMap<string, unknown> | null
   }>(),
   {
@@ -51,7 +52,14 @@ const emit = defineEmits<{
 }>()
 
 const { authToken, searchBuckets } = useAruna()
-const { displayName, isLocalNode } = useRealmNodes()
+const { displayName, isLocalNode, localNodeId } = useRealmNodes()
+
+// Same (node, bucket) key the Data manager builds its overview map with.
+function hitSynced(hit: BucketSearchHit): boolean {
+  if (!props.syncByBucket) return false
+  const nodeId = isLocalNode(hit.node_id) ? (localNodeId.value ?? '') : hit.node_id
+  return props.syncByBucket.has(syncBucketKey(nodeId, hit.bucket))
+}
 const shortcuts = useBucketShortcuts()
 
 const listId = `bucket-search-results-${useId()}`
@@ -234,7 +242,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
             :bucket="hit.bucket"
             :node-id="pinNodeId(hit)"
             :pinned="shortcuts.isPinned(hit.bucket, pinNodeId(hit))"
-            :synced="Boolean(syncByBucket?.has(hit.bucket))"
+            :synced="hitSynced(hit)"
             :subtitle="hit.group_name || null"
             :highlighted="index === activeIndex"
             option
