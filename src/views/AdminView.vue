@@ -10,6 +10,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { featureEnabled } from '@/lib/config'
+import { storedReferencedHint } from '@/lib/quota'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { ApiError, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
@@ -353,7 +354,7 @@ async function save() {
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Realm usage</h3>
           </header>
           <div v-if="usageInfo?.realm" class="grid gap-3.5 p-5 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Objects" :value="formatNumber(usageInfo.realm.objects)" :icon="Database" :hint="`${formatNumber(usageInfo.realm.stored_blobs)} stored blobs`" />
+            <StatCard label="Objects" :value="formatNumber(usageInfo.realm.objects)" :icon="Database" :hint="storedReferencedHint(usageInfo.realm)" />
             <StatCard label="Stored data" :value="formatBytes(usageInfo.realm.stored_bytes)" :icon="HardDrive" hint="Physical blob storage" />
             <StatCard label="Logical data" :value="formatBytes(usageInfo.realm.logical_bytes)" :icon="Layers" hint="Counts against quotas" />
             <StatCard label="Referenced data" :value="formatBytes(usageInfo.realm.referenced_bytes)" :icon="Link2" hint="Does not count against quotas" />

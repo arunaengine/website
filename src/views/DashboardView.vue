@@ -13,6 +13,7 @@ import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useNotifications } from '@/composables/useNotifications'
+import { storedReferencedHint } from '@/lib/quota'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
@@ -145,7 +146,7 @@ const pageDescription = computed(() =>
           label="Objects"
           :value="formatNumber(usageInfo.objects)"
           :icon="Files"
-          :hint="`${formatNumber(usageInfo.stored_blobs)} stored blobs`"
+          :hint="storedReferencedHint(usageInfo)"
         />
         <StatCard
           label="Stored data"

@@ -6,6 +6,7 @@
 // logical_bytes, so quotaCountedBytes() must be the only way callers pick
 // the counter.
 import type { GroupQuotaStatus, UsageResponse } from './api'
+import { formatNumber } from './utils'
 
 export type QuotaState =
   | 'no-policy' // usage response carried no quota block (old backend)
@@ -33,6 +34,21 @@ export function quotaCountedBytes(usage: UsageResponse): number {
 
 export function referencedBytes(usage: UsageResponse): number {
   return usage.realm?.referenced_bytes ?? usage.referenced_bytes
+}
+
+// `objects` counts every object including reference-backed ones; stored_blobs
+// is the locally stored subset. There is no wire field for the referenced
+// count, it is always derived.
+export function referencedObjectCount(usage: Pick<UsageResponse, 'objects' | 'stored_blobs'>): number {
+  return Math.max(0, usage.objects - usage.stored_blobs)
+}
+
+// Shared "<stored> stored · <referenced> referenced" hint for object-count
+// surfaces; the referenced part is omitted when nothing is referenced.
+export function storedReferencedHint(usage: Pick<UsageResponse, 'objects' | 'stored_blobs'>): string {
+  const referenced = referencedObjectCount(usage)
+  const stored = `${formatNumber(usage.stored_blobs)} stored`
+  return referenced > 0 ? `${stored} · ${formatNumber(referenced)} referenced` : stored
 }
 
 export function assessQuota(

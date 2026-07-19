@@ -5,6 +5,7 @@ import LocalNodeDetails from './LocalNodeDetails.vue'
 import { connectionLabel, connectionVariant, kindVariant, statusVariant } from './node-display'
 import type { NodeProbe } from './node-probe'
 import type { RealmNodeInfo } from '@/lib/api'
+import { storedReferencedHint } from '@/lib/quota'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { TriangleAlert } from '@lucide/vue'
 
@@ -77,18 +78,16 @@ defineProps<{
 
     <div v-if="probe?.usage" class="border-t border-border/70 pt-3">
       <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Storage usage</div>
-      <dl class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+      <dl class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Objects</dt>
           <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatNumber(probe.usage.objects) }}</dd>
+          <!-- The stored/referenced split folds the former Blobs row in. -->
+          <dd class="mt-0.5 text-[11px] text-muted-foreground">{{ storedReferencedHint(probe.usage) }}</dd>
         </div>
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stored</dt>
           <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatBytes(probe.usage.stored_bytes) }}</dd>
-        </div>
-        <div>
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Blobs</dt>
-          <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatNumber(probe.usage.stored_blobs) }}</dd>
         </div>
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Buckets</dt>

@@ -20,9 +20,9 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Cable, ChartArea, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
-import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
+import { assessQuota, quotaCountedBytes, referencedBytes, storedReferencedHint, QUOTA_STATE_BADGES } from '@/lib/quota'
 import { featureEnabled } from '@/lib/config'
-import { formatBytes, relativeTime } from '@/lib/utils'
+import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 import {
   ApiError,
   type GroupDetailResponse,
@@ -65,6 +65,14 @@ const usedBytes = computed(() => (usage.value ? quotaCountedBytes(usage.value) :
 const referenceBytes = computed(() => (usage.value ? referencedBytes(usage.value) : 0))
 const quotaAssessment = computed(() => assessQuota(quotaStatus.value, usedBytes.value))
 const quotaBadge = computed(() => QUOTA_STATE_BADGES[quotaAssessment.value.state])
+// objects/stored_blobs exist at group scope on quota-aware backends; the type
+// declares them non-optional, but older responses may omit them, so guard at
+// runtime and hide the line instead of rendering NaN.
+const objectCounts = computed(() => {
+  const value = usage.value
+  if (!value || typeof value.objects !== 'number' || typeof value.stored_blobs !== 'number') return null
+  return { total: value.objects, split: storedReferencedHint(value) }
+})
 
 // Usage history is gated off by default: the backend endpoint does not exist
 // yet (aruna#250). With the flag off, loadHistory() short-circuits before any
@@ -300,6 +308,9 @@ async function leave() {
             :warn="quotaStatus.warning"
             label="Group storage"
           />
+          <p v-if="objectCounts" class="mt-1 text-[11px] tabular-nums text-muted-foreground">
+            Objects: {{ formatNumber(objectCounts.total) }} total · {{ objectCounts.split }}
+          </p>
           <p v-if="quotaStatus && quotaStatus.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
             Hard cap {{ formatBytes(quotaStatus.ceiling_bytes) }}.
           </p>
