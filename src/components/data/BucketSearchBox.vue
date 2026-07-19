@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
@@ -209,7 +210,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
     <div
       v-if="dropdownVisible"
       :id="listId"
-      class="absolute left-0 right-0 top-9 z-40 overflow-hidden rounded-md border border-border bg-popover shadow-xl"
+      class="absolute left-0 right-0 top-9 z-40 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
     >
       <div
         v-if="partial && searched"
@@ -226,31 +227,31 @@ function pinNodeId(hit: BucketSearchHit): string | null {
         <Loader2 class="h-3 w-3 animate-spin" /> Searching buckets…
       </div>
 
-      <ul v-else-if="visibleHits.length" role="listbox" class="max-h-64 overflow-y-auto py-1">
-        <li v-for="(hit, index) in visibleHits" :key="hit.arn" class="group/hit flex items-center gap-1 pr-1">
-          <button
-            type="button"
-            role="option"
-            :aria-selected="index === activeIndex"
-            class="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted"
-            :class="index === activeIndex ? 'bg-muted' : ''"
-            @mousedown.prevent="pick(hit)"
-          >
-            <span class="truncate font-mono text-xs text-foreground">{{ hit.bucket }}</span>
-            <span class="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
-              <span class="max-w-24 truncate text-[10px] text-muted-foreground" :title="hit.group_id">
-                Group: {{ hit.group_name || truncateMiddle(hit.group_id) }}
-              </span>
-              <Badge
-                v-if="!isLocalNode(hit.node_id)"
-                variant="outline"
-                class="shrink-0 text-[10px]"
-                :title="hit.node_id"
-              >
-                on {{ displayName(hit.node_id) }}
+      <ul v-else-if="visibleHits.length" role="listbox" class="max-h-64 overflow-y-auto p-1">
+        <li v-for="(hit, index) in visibleHits" :key="hit.arn" class="group/hit flex items-center gap-1 rounded-sm">
+          <Tooltip side="right">
+            <button
+              type="button"
+              role="option"
+              :aria-selected="index === activeIndex"
+              class="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-2 py-1.5 text-left outline-none hover:bg-muted focus-visible:bg-muted"
+              :class="index === activeIndex ? 'bg-muted' : ''"
+              @mousedown.prevent="pick(hit)"
+            >
+              <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{{ hit.bucket }}</span>
+              <Badge variant="outline" class="shrink-0 font-mono text-[10px]" :aria-label="`Hosted on node ${hit.node_id}`">
+                #{{ truncateMiddle(hit.node_id, 4, 4) }}
               </Badge>
-            </span>
-          </button>
+            </button>
+            <template #content>
+              <dl class="grid max-w-72 grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
+                <dt class="text-muted-foreground">Node</dt>
+                <dd class="min-w-0 break-all"><span class="font-medium">{{ displayName(hit.node_id) }}</span><br><span class="font-mono text-[10px]">{{ hit.node_id }}</span></dd>
+                <dt class="text-muted-foreground">Group</dt>
+                <dd class="min-w-0 break-all"><span class="font-medium">{{ hit.group_name || 'Unnamed group' }}</span><br><span class="font-mono text-[10px]">{{ hit.group_id }}</span></dd>
+              </dl>
+            </template>
+          </Tooltip>
           <template v-if="mode === 'browse'">
             <Button
               v-if="!isLocalNode(hit.node_id)"
