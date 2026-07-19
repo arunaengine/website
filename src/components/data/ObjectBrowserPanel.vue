@@ -33,6 +33,8 @@ const emit = defineEmits<{
   (e: 'select', entry: { bucket: string; key: string; name: string; size?: number }): void
   (e: 'add', selection: { objects: ObjectEntry[]; folders: FolderEntry[] }): void
   (e: 'auth-error'): void
+  /** Fires on every location change; empty bucket = the bucket overview. */
+  (e: 'navigate', location: { bucket: string; prefix: string }): void
 }>()
 
 const s3 = useS3()
@@ -76,6 +78,13 @@ const selected = ref<Map<string, SelectionEntry>>(new Map())
 // Stale responses are dropped via a request id (same pattern as DataManagerView).
 let bucketRequestId = 0
 let listRequestId = 0
+
+// Folder-level pickers need the browsed location, not just picked files.
+watch(
+  [activeBucket, s3Prefix],
+  ([bucket, prefix]) => emit('navigate', { bucket, prefix }),
+  { immediate: true },
+)
 
 function clearObjects() {
   ++listRequestId

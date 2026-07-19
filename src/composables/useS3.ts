@@ -259,6 +259,43 @@ async function listObjects(
   }
 }
 
+// Flat (no-delimiter) walk of everything under a prefix, for folder-level
+// staging. Returns at most `max` objects plus a truncation marker so callers
+// can refuse oversized folders instead of silently dropping files.
+async function listObjectsRecursive(
+  bucket: string,
+  prefix: string,
+  max: number,
+  nodeId?: string | null,
+): Promise<{ objects: ObjectEntry[]; truncated: boolean }> {
+  const objects: ObjectEntry[] = []
+  let token: string | undefined
+  for (;;) {
+    const response = await client(nodeId).send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix || undefined,
+        ContinuationToken: token,
+        MaxKeys: Math.min(1000, max + 1 - objects.length),
+      }),
+    )
+    for (const entry of response.Contents ?? []) {
+      // Zero-byte folder markers are plumbing, not stageable files.
+      if (!entry.Key || entry.Key.endsWith('/')) continue
+      if (objects.length === max) return { objects, truncated: true }
+      objects.push({
+        key: entry.Key,
+        name: entry.Key.slice(prefix.length),
+        size: entry.Size,
+        lastModified: entry.LastModified,
+        etag: entry.ETag?.replaceAll('"', ''),
+      })
+    }
+    if (!response.IsTruncated || !response.NextContinuationToken) return { objects, truncated: false }
+    token = response.NextContinuationToken
+  }
+}
+
 export interface UploadHandle {
   promise: Promise<void>
   abort: () => Promise<void>
@@ -421,6 +458,7 @@ export function useS3() {
     allowPublicReadCors,
     putTextObject,
     listObjects,
+    listObjectsRecursive,
     createFolder,
     uploadObject,
     deleteObject,
