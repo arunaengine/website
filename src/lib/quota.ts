@@ -74,6 +74,15 @@ export function assessQuota(
   return { state, usedBytes, quotaBytes, ceilingBytes, remainingToQuota, remainingToCeiling }
 }
 
+// Single source of truth for the quota bar segment tones so callers and the
+// bar never scatter hex literals.
+export const QUOTA_BAR_COLORS = {
+  counted: '#335DC6',
+  referenced: '#24A9E6',
+  warn: '#D97706',
+  danger: '#DC2626',
+} as const
+
 // One badge vocabulary for every quota surface.
 export const QUOTA_STATE_BADGES: Record<
   QuotaState,

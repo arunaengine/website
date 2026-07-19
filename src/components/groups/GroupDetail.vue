@@ -2,7 +2,6 @@
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
-import ReferencedUsageBar from '@/components/ui/ReferencedUsageBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -276,12 +275,15 @@ async function leave() {
           <!-- Old backend: usage but no quota block. Do NOT claim unlimited. -->
           <div v-if="!quotaStatus" class="flex items-center justify-between text-[11px]">
             <span class="font-medium text-muted-foreground">Group storage</span>
-            <span class="tabular-nums text-foreground/80">{{ formatBytes(usedBytes) }}</span>
+            <span class="tabular-nums text-foreground/80">
+              {{ formatBytes(usedBytes) }}<template v-if="referenceBytes"> · {{ formatBytes(referenceBytes) }} referenced (not counted)</template>
+            </span>
           </div>
           <QuotaBar
             v-else-if="quotaStatus.quota_bytes == null"
             :used="usedBytes"
             :quota="null"
+            :referenced="referenceBytes"
             label="Group storage"
           />
           <QuotaBar
@@ -289,18 +291,13 @@ async function leave() {
             :used="usedBytes"
             :quota="quotaStatus.quota_bytes"
             :ceiling="quotaStatus.ceiling_bytes"
+            :referenced="referenceBytes"
             :warn="quotaStatus.warning"
             label="Group storage"
           />
           <p v-if="quotaStatus && quotaStatus.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
             Hard cap {{ formatBytes(quotaStatus.ceiling_bytes) }}.
           </p>
-          <ReferencedUsageBar
-            v-if="referenceBytes"
-            class="mt-3"
-            :referenced="referenceBytes"
-            :stored="usedBytes"
-          />
           <p v-if="quotaAssessment.state === 'over-quota'" class="mt-1 text-[11px] text-muted-foreground">
             Writes are accepted until the hard cap; above it the node rejects uploads (QuotaExceeded).
           </p>

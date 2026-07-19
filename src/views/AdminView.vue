@@ -14,7 +14,7 @@ import { formatBytes, formatNumber } from '@/lib/utils'
 import { ApiError, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
-import { Database, HardDrive, Layers, Boxes, RefreshCw, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
+import { Database, HardDrive, Layers, Link2, Boxes, RefreshCw, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
 
 const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, isManagementNode, nodeInfo, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
 const { isAuthenticated } = useAuth()
@@ -356,6 +356,7 @@ async function save() {
             <StatCard label="Objects" :value="formatNumber(usageInfo.realm.objects)" :icon="Database" :hint="`${formatNumber(usageInfo.realm.stored_blobs)} stored blobs`" />
             <StatCard label="Stored data" :value="formatBytes(usageInfo.realm.stored_bytes)" :icon="HardDrive" hint="Physical blob storage" />
             <StatCard label="Logical data" :value="formatBytes(usageInfo.realm.logical_bytes)" :icon="Layers" hint="Counts against quotas" />
+            <StatCard label="Referenced data" :value="formatBytes(usageInfo.realm.referenced_bytes)" :icon="Link2" hint="Does not count against quotas" />
             <StatCard label="Buckets" :value="formatNumber(usageInfo.realm.buckets)" :icon="Boxes" />
           </div>
           <p v-else class="px-5 py-4 text-sm text-muted-foreground">Realm-wide totals need an authenticated session on a quota-aware backend.</p>
