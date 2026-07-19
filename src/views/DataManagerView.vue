@@ -46,6 +46,7 @@ import {
   Download,
   Eye,
   FolderPlus,
+  History,
   KeyRound,
   Link2,
   Loader2,
@@ -229,6 +230,19 @@ const sidebarBuckets = computed<SidebarBucketEntry[]>(() => {
   return [...pinned, ...locals]
 })
 
+// "Recently browsed" only surfaces targets the list above does not already
+// show (pins are filtered in the store, listed local buckets here), so the
+// section stays non-redundant; in practice it holds remote buckets opened
+// via search without pinning them.
+const recentBuckets = computed(() => {
+  const visible = new Set(
+    sidebarBuckets.value.map((entry) => `${entry.nodeId ?? ''}/${entry.bucket}`),
+  )
+  return shortcuts.recent.value.filter(
+    (entry) => !visible.has(`${entry.nodeId ?? ''}/${entry.bucket}`),
+  )
+})
+
 const folders = ref<FolderEntry[]>([])
 const objects = ref<ObjectEntry[]>([])
 const nextToken = ref<string | undefined>(undefined)
@@ -405,6 +419,16 @@ watch(
   bucket,
   (name) => {
     if (name && isWorkspaceBucket(name)) workspacesOpen.value = true
+  },
+  { immediate: true },
+)
+
+// Every opened bucket (sidebar click, search hit, or deep link) lands in
+// "Recently browsed"; the shortcut store drops ws- scratch buckets itself.
+watch(
+  [bucket, remoteNodeId],
+  ([name, nodeId]) => {
+    if (name) shortcuts.recordRecent(name, nodeId)
   },
   { immediate: true },
 )
@@ -854,6 +878,32 @@ const isEmpty = computed(
                 </li>
               </ul>
               <p v-else class="px-4 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
+              <div v-if="recentBuckets.length" class="border-t border-border/70 py-1">
+                <p class="flex items-center gap-1.5 px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+                  <History class="h-3.5 w-3.5 shrink-0" />
+                  Recently browsed
+                </p>
+                <ul class="pb-1">
+                  <li v-for="entry in recentBuckets" :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`">
+                    <button
+                      class="flex w-full items-center gap-2 px-4 py-1.5 text-left text-xs hover:bg-muted"
+                      :class="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
+                      @click="openBucketOn(entry.bucket, entry.nodeId)"
+                    >
+                      <Boxes class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span class="truncate">{{ entry.bucket }}</span>
+                      <Badge
+                        v-if="entry.nodeId"
+                        variant="outline"
+                        class="ml-auto shrink-0 text-[10px]"
+                        :title="`Stored on another node: ${entry.nodeId}`"
+                      >
+                        on {{ realmNodes.displayName(entry.nodeId) }}
+                      </Badge>
+                    </button>
+                  </li>
+                </ul>
+              </div>
               <div v-if="workspaceBuckets.length" class="border-t border-border/70 py-1">
                 <button
                   type="button"

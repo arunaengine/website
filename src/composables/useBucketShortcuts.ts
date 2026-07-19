@@ -1,7 +1,8 @@
-// Pinned buckets for the Data manager sidebar. Stored in localStorage, scoped
-// per connection AND account (the StoredS3Key pattern): entries recorded
-// against one API base or user are never shown to another.
+// Pinned and recently browsed buckets for the Data manager sidebar. Stored in
+// localStorage, scoped per connection AND account (the StoredS3Key pattern):
+// entries recorded against one API base or user are never shown to another.
 import { computed, ref } from 'vue'
+import { isWorkspaceBucket } from '@/lib/workspaces'
 import { useAruna } from './useAruna'
 
 export interface BucketShortcut {
@@ -12,9 +13,11 @@ export interface BucketShortcut {
 
 interface ShortcutScope {
   pinned: BucketShortcut[]
+  recent: BucketShortcut[]
 }
 
 const STORAGE_KEY = 'aruna.bucketShortcuts'
+const RECENT_LIMIT = 5
 
 type ShortcutStore = Record<string, ShortcutScope>
 
@@ -40,8 +43,10 @@ function loadStore(): ShortcutStore {
     const store: ShortcutStore = {}
     for (const [scope, value] of Object.entries(parsed as Record<string, unknown>)) {
       if (!value || typeof value !== 'object') continue
-      // Older stores also carried a `recent` list; only pins survive.
-      store[scope] = { pinned: sanitizeList((value as { pinned?: unknown }).pinned) }
+      store[scope] = {
+        pinned: sanitizeList((value as { pinned?: unknown }).pinned),
+        recent: sanitizeList((value as { recent?: unknown }).recent).slice(0, RECENT_LIMIT),
+      }
     }
     return store
   } catch {
@@ -68,7 +73,9 @@ export function useBucketShortcuts() {
 
   const scopeKey = computed(() => `${apiBaseUrl.value}|${currentUser.value?.id ?? 'anon'}`)
 
-  const scope = computed<ShortcutScope>(() => store.value[scopeKey.value] ?? { pinned: [] })
+  const scope = computed<ShortcutScope>(
+    () => store.value[scopeKey.value] ?? { pinned: [], recent: [] },
+  )
 
   function update(mutate: (scope: ShortcutScope) => ShortcutScope) {
     store.value = { ...store.value, [scopeKey.value]: mutate(scope.value) }
@@ -76,6 +83,13 @@ export function useBucketShortcuts() {
   }
 
   const pinned = computed(() => scope.value.pinned)
+
+  // Pins own their sidebar rows already; recents only surface the rest.
+  const recent = computed(() =>
+    scope.value.recent.filter(
+      (entry) => !scope.value.pinned.some((pin) => sameShortcut(pin, entry)),
+    ),
+  )
 
   function isPinned(bucket: string, nodeId: string | null = null): boolean {
     return scope.value.pinned.some((pin) => sameShortcut(pin, { bucket, nodeId }))
@@ -91,5 +105,19 @@ export function useBucketShortcuts() {
     }))
   }
 
-  return { pinned, isPinned, togglePin }
+  // Newest first, deduplicated, capped. Per-run ws- scratch buckets are
+  // plumbing and never become shortcuts.
+  function recordRecent(bucket: string, nodeId: string | null = null) {
+    if (!bucket || isWorkspaceBucket(bucket)) return
+    const entry: BucketShortcut = { bucket, nodeId }
+    update((current) => ({
+      ...current,
+      recent: [entry, ...current.recent.filter((item) => !sameShortcut(item, entry))].slice(
+        0,
+        RECENT_LIMIT,
+      ),
+    }))
+  }
+
+  return { pinned, recent, isPinned, togglePin, recordRecent }
 }
