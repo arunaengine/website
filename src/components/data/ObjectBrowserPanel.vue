@@ -32,6 +32,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'select', entry: { bucket: string; key: string; name: string; size?: number }): void
   (e: 'add', selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }): void
+  /** Selectable mode only: fires on every checkbox change (live previews). */
+  (e: 'selection-change', selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }): void
   (e: 'auth-error'): void
   /** Fires on every location change; empty bucket = the bucket overview. */
   (e: 'navigate', location: { bucket: string; prefix: string }): void
@@ -221,15 +223,26 @@ const selectedFolderCount = computed(
   () => selectedList.value.filter((entry) => entry.kind === 'folder').length,
 )
 
+function selectionSnapshot(): { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] } {
+  return {
+    bucket: activeBucket.value,
+    objects: selectedList.value
+      .filter((entry): entry is Extract<SelectionEntry, { kind: 'object' }> => entry.kind === 'object')
+      .map((entry) => entry.object),
+    folders: selectedList.value
+      .filter((entry): entry is Extract<SelectionEntry, { kind: 'folder' }> => entry.kind === 'folder')
+      .map((entry) => entry.folder),
+  }
+}
+
+watch(selected, () => {
+  if (props.selectable) emit('selection-change', selectionSnapshot())
+})
+
 function addSelected() {
-  const objectEntries = selectedList.value
-    .filter((entry): entry is Extract<SelectionEntry, { kind: 'object' }> => entry.kind === 'object')
-    .map((entry) => entry.object)
-  const folderEntries = selectedList.value
-    .filter((entry): entry is Extract<SelectionEntry, { kind: 'folder' }> => entry.kind === 'folder')
-    .map((entry) => entry.folder)
-  if (!objectEntries.length && !folderEntries.length) return
-  emit('add', { bucket: activeBucket.value, objects: objectEntries, folders: folderEntries })
+  const snapshot = selectionSnapshot()
+  if (!snapshot.objects.length && !snapshot.folders.length) return
+  emit('add', snapshot)
   selected.value = new Map()
 }
 

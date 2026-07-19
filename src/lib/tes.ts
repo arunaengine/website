@@ -232,6 +232,66 @@ export function drsDownloadHref(apiBase: string, id: string): string {
   return `${apiBase.replace(/\/+$/, '')}/ga4gh/drs/v1/download?object_id=${encodeURIComponent(id)}`
 }
 
+// ── Container path validation ────────────────────────────────────────────────
+
+// Absolute canonical container FILE path: /a/b.txt, no trailing slash, no
+// empty, '.' or '..' segments.
+export function validContainerFilePath(path: string): boolean {
+  return (
+    path.startsWith('/') &&
+    path !== '/' &&
+    !path.split('/').slice(1).some((component) => !component || component === '.' || component === '..')
+  )
+}
+
+// Absolute canonical container DIRECTORY path (mount points, folder capture
+// bases). A missing trailing slash is tolerated; '/' itself is a valid mount
+// root. Normalize with normalizeContainerDir before building paths on top.
+export function validContainerDir(path: string): boolean {
+  const value = path.trim()
+  if (!value.startsWith('/')) return false
+  if (value === '/') return true
+  const segments = value.replace(/\/$/, '').split('/').slice(1)
+  return segments.every((segment) => segment && segment !== '.' && segment !== '..')
+}
+
+export function normalizeContainerDir(path: string): string {
+  const value = path.trim()
+  return value.endsWith('/') ? value : `${value}/`
+}
+
+// ── Compute input picker entries ─────────────────────────────────────────────
+// Discriminated union the TesDataRefDialog emits and the input editors store:
+// files map 1:1 to TES inputs; a folder pick is expanded at add time (for
+// validation and the file cap) but carried as ONE entry with its file list so
+// editors render a summary row. The facade accepts type FILE inputs only, so
+// folders MUST be expanded to per-file inputs at task assembly.
+export type TesDataRefEntry =
+  | { kind: 'file'; url: string; path: string; name: string }
+  | {
+      kind: 'folder'
+      bucket: string
+      prefix: string
+      name: string
+      /** Container directory the folder's files mount under; absolute, trailing slash. */
+      basePath: string
+      files: Array<{ key: string; /** Path relative to the folder prefix (may contain '/'). */ name: string }>
+    }
+
+// Expands one picker entry into its TES FILE inputs (folders: one per file).
+export function expandDataRefEntry(entry: TesDataRefEntry): TesInput[] {
+  if (entry.kind === 'file') {
+    return [{ name: entry.name, url: entry.url, path: entry.path.trim(), type: 'FILE' }]
+  }
+  const base = normalizeContainerDir(entry.basePath)
+  return entry.files.map((file) => ({
+    name: `${entry.name}/${file.name}`,
+    url: `s3://${entry.bucket}/${file.key}`,
+    path: `${base}${file.name}`,
+    type: 'FILE',
+  }))
+}
+
 // ── Task pruning ─────────────────────────────────────────────────────────────
 
 function trimmed(value: string | undefined): string | undefined {

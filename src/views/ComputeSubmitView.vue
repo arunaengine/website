@@ -18,9 +18,10 @@ import { useAuth } from '@/composables/useAuth'
 import { useS3 } from '@/composables/useS3'
 import {
   TES_GROUP_TAG,
+  expandDataRefEntry,
   pruneTesTask,
+  type TesDataRefEntry,
   type TesExecutor,
-  type TesInput,
   type TesOutput,
   type TesResources,
   type TesTask,
@@ -57,7 +58,9 @@ function goStep(target: number) {
 const name = ref('')
 const description = ref('')
 const groupId = ref('')
-const inputs = ref<TesInput[]>([])
+// Files and folder summaries from the picker; folders expand to per-file
+// FILE inputs at task assembly (the facade accepts FILE inputs only).
+const inputs = ref<TesDataRefEntry[]>([])
 const executors = ref<TesExecutor[]>([{ image: '', command: [''] }])
 
 // Free-form outputs: each row names the container file and its own
@@ -122,7 +125,7 @@ const task = computed<TesTask>(() =>
   pruneTesTask({
     name: name.value,
     description: description.value,
-    inputs: inputs.value,
+    inputs: inputs.value.flatMap(expandDataRefEntry),
     outputs: outputs.value,
     resources: resources.value,
     executors: executors.value,

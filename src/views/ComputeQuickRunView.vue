@@ -24,7 +24,11 @@ import { useS3 } from '@/composables/useS3'
 import {
   TES_GROUP_TAG,
   TES_IDEMPOTENCY_TAG,
+  expandDataRefEntry,
   pruneTesTask,
+  validContainerDir,
+  validContainerFilePath as validContainerPath,
+  type TesDataRefEntry,
   type TesInput,
   type TesOutput,
   type TesTask,
@@ -37,6 +41,7 @@ import {
   ArrowUpFromLine,
   CornerDownRight,
   Cpu,
+  Folder,
   KeyRound,
   ListPlus,
   LogIn,
@@ -144,7 +149,9 @@ const dependencies = ref<string[]>([])
 const dependencyDraft = ref('')
 const taskName = ref('quick-run')
 const groupId = ref('')
-const inputs = ref<{ url: string; name: string; path: string }[]>([])
+// Files and folder summaries from the picker; folders expand to per-file
+// FILE inputs only at task assembly (the facade accepts FILE inputs only).
+const inputs = ref<TesDataRefEntry[]>([])
 // The script needs an S3 home before the run starts; outputs pick their own
 // bucket and key per row. containerPath defaults to /work/out/<basename> and
 // tracks the key until the user edits it directly.
@@ -236,9 +243,7 @@ const dependencyInput = computed<TesInput | null>(() =>
       }
     : null,
 )
-const dataInputs = computed<TesInput[]>(() =>
-  inputs.value.map((i) => ({ name: i.name, url: i.url, path: i.path.trim(), type: 'FILE' })),
-)
+const dataInputs = computed<TesInput[]>(() => inputs.value.flatMap(expandDataRefEntry))
 
 function normalizedOutputKey(path: string): string {
   return path.trim().replace(/^\/+/, '')
@@ -412,20 +417,24 @@ function uniqueInputName(base: string): string {
   while (taken.has(`${stem}-${n}${ext}`)) n++
   return `${stem}-${n}${ext}`
 }
-function validContainerPath(path: string): boolean {
-  return (
-    path.startsWith('/') &&
-    path !== '/' &&
-    !path.split('/').slice(1).some((component) => !component || component === '.' || component === '..')
-  )
-}
-function addInput(entry: { url: string; path: string; name?: string }) {
-  const base = (entry.name || entry.url.split('/').filter(Boolean).pop() || 'input').trim()
+// The dialog already mounts picks under the chosen directory (Quick Run
+// passes /work/in/ as the default); only name collisions are fixed up here,
+// keeping the mount aligned with the renamed entry.
+function addInput(entry: TesDataRefEntry) {
+  const base =
+    (entry.name || (entry.kind === 'file' ? entry.url.split('/').filter(Boolean).pop() : '') || 'input').trim()
   const name = uniqueInputName(base)
-  // The picker emits a generic /inputs/… path; quick runs default to /work/in
-  // instead. A specific absolute path is kept verbatim.
-  const generic = !entry.path.trim() || entry.path.trim().startsWith('/inputs/')
-  inputs.value.push({ url: entry.url, name, path: generic ? `/work/in/${name}` : entry.path.trim() })
+  if (entry.kind === 'folder') {
+    const basePath = entry.basePath.endsWith(`${entry.name}/`)
+      ? `${entry.basePath.slice(0, entry.basePath.length - entry.name.length - 1)}${name}/`
+      : entry.basePath
+    inputs.value.push({ ...entry, name, basePath })
+    return
+  }
+  const path = entry.path.endsWith(entry.name)
+    ? `${entry.path.slice(0, entry.path.length - entry.name.length)}${name}`
+    : entry.path
+  inputs.value.push({ kind: 'file', url: entry.url, name, path })
 }
 function removeInput(i: number) {
   inputs.value.splice(i, 1)
@@ -496,8 +505,13 @@ watch([currentUser, () => s3.hasActiveKey.value, myGroups], initDefaults)
 
 // ── Validity ─────────────────────────────────────────────────────────────────
 const inputsValid = computed(() => {
-  const paths = inputs.value.map((input) => input.path.trim())
-  return paths.every(validContainerPath) && new Set(paths).size === paths.length
+  for (const entry of inputs.value) {
+    if (entry.kind === 'file' && !validContainerPath(entry.path.trim())) return false
+    if (entry.kind === 'folder' && !validContainerDir(entry.basePath)) return false
+  }
+  // Uniqueness across all EXPANDED container paths (folders count per file).
+  const paths = dataInputs.value.map((input) => input.path)
+  return new Set(paths).size === paths.length
 })
 const outputsValid = computed(() => {
   const rows = outputRows.value
@@ -739,19 +753,36 @@ function runAnother() {
                 </div>
                 <div v-if="inputs.length" class="space-y-1.5">
                   <div v-for="(input, i) in inputs" :key="i" class="surface-inline space-y-1 p-2 text-xs">
-                    <div class="flex items-center gap-1.5">
-                      <Input
-                        v-model="input.path"
-                        class="h-7 font-mono text-xs"
-                        aria-label="Container path"
-                        :invalid="!validContainerPath(input.path.trim()) ? 'error' : undefined"
-                      />
-                      <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
-                    </div>
-                    <div class="truncate font-mono text-[10px] text-muted-foreground" :title="input.url">{{ input.url }}</div>
+                    <template v-if="input.kind === 'folder'">
+                      <div class="flex items-center gap-1.5">
+                        <Input
+                          v-model="input.basePath"
+                          class="h-7 font-mono text-xs"
+                          aria-label="Container base path"
+                          :invalid="!validContainerDir(input.basePath) ? 'error' : undefined"
+                        />
+                        <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
+                      </div>
+                      <div class="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground" :title="`s3://${input.bucket}/${input.prefix}`">
+                        <Folder class="h-3 w-3 shrink-0 text-primary/70" />
+                        <span class="truncate">{{ input.name }}/ · {{ input.files.length }} file{{ input.files.length === 1 ? '' : 's' }} · s3://{{ input.bucket }}/{{ input.prefix }}</span>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <div class="flex items-center gap-1.5">
+                        <Input
+                          v-model="input.path"
+                          class="h-7 font-mono text-xs"
+                          aria-label="Container path"
+                          :invalid="!validContainerPath(input.path.trim()) ? 'error' : undefined"
+                        />
+                        <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
+                      </div>
+                      <div class="truncate font-mono text-[10px] text-muted-foreground" :title="input.url">{{ input.url }}</div>
+                    </template>
                   </div>
                   <p v-if="!inputsValid" class="text-[11px] text-destructive">
-                    Each input needs a unique absolute canonical container path.
+                    Each input needs an absolute canonical container path (folders a base directory), unique across all staged files.
                   </p>
                 </div>
                 <p v-else class="text-[11px] text-muted-foreground">No input data. Added files are staged into the container, by default under <code class="rounded bg-muted px-1 font-mono">/work/in/</code>.</p>
@@ -889,8 +920,16 @@ function runAnother() {
                   <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ dependencyConfigPath }}</div>
                 </li>
                 <li v-for="(input, i) in inputs" :key="i">
-                  <div class="truncate text-foreground" :title="input.url">{{ input.url }}</div>
-                  <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ input.path }}</div>
+                  <template v-if="input.kind === 'folder'">
+                    <div class="truncate text-foreground" :title="`s3://${input.bucket}/${input.prefix}`">
+                      s3://{{ input.bucket }}/{{ input.prefix }} <span class="font-sans text-muted-foreground">({{ input.files.length }} file{{ input.files.length === 1 ? '' : 's' }})</span>
+                    </div>
+                    <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ input.basePath }}</div>
+                  </template>
+                  <template v-else>
+                    <div class="truncate text-foreground" :title="input.url">{{ input.url }}</div>
+                    <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ input.path }}</div>
+                  </template>
                 </li>
               </ul>
             </section>
@@ -930,7 +969,7 @@ function runAnother() {
       </div>
     </div>
 
-    <TesDataRefDialog v-model:open="inputDialogOpen" mode="input" @add="addInput" />
+    <TesDataRefDialog v-model:open="inputDialogOpen" mode="input" mount-default="/work/in/" @add="addInput" />
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />
   </div>
 </template>

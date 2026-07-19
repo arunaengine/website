@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
@@ -9,67 +9,123 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { useAruna } from '@/composables/useAruna'
+import {
+  normalizeContainerDir,
+  validContainerDir,
+  type TesDataRefEntry,
+} from '@/lib/tes'
 import { Database, KeyRound, LogIn, Plus, ShieldAlert } from '@lucide/vue'
 
-const props = defineProps<{ open: boolean; mode: 'input' }>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    mode: 'input'
+    /** Default container directory the picks mount under. */
+    mountDefault?: string
+  }>(),
+  { mountDefault: '/inputs/' },
+)
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
-  (e: 'add', entry: { url: string; path: string; name?: string }): void
+  (e: 'add', entry: TesDataRefEntry): void
 }>()
 
 const s3 = useS3()
 const { currentUser } = useAruna()
 const credentialDialogOpen = ref(false)
 
-// Folder staging: the TES facade stages FILE inputs only, so a folder pick is
-// expanded client-side into one input per object under the browsed prefix.
+// Folder handling: the TES facade stages FILE inputs only, so a folder pick is
+// expanded here (for validation and the file cap) but emitted as ONE folder
+// entry carrying its file list; consumers expand it again at task assembly.
 const MAX_FOLDER_FILES = 200
 const folderBusy = ref(false)
 const folderError = ref<string | null>(null)
 
-async function addSelection(selection: {
-  bucket: string
-  objects: ObjectEntry[]
-  folders: FolderEntry[]
-}) {
+// "Mount under": the container directory every pick is staged below. Folders
+// keep their name as a subdirectory of it.
+const mountDir = ref(props.mountDefault)
+const mountDirValid = computed(() => validContainerDir(mountDir.value))
+const mountDirNormalized = computed(() => normalizeContainerDir(mountDir.value))
+
+type Selection = { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }
+const pendingSelection = ref<Selection | null>(null)
+
+// Directly selected objects that also sit under a selected folder ride along
+// with the folder entry instead of doubling up.
+function coveredByFolder(key: string, folders: FolderEntry[]): boolean {
+  return folders.some((folder) => key.startsWith(folder.prefix))
+}
+
+const PREVIEW_LIMIT = 6
+// Live preview of the container paths the current selection resolves to.
+const previewPaths = computed<string[]>(() => {
+  const selection = pendingSelection.value
+  if (!selection || !mountDirValid.value) return []
+  const mount = mountDirNormalized.value
+  const lines: string[] = []
+  for (const folder of selection.folders) lines.push(`${mount}${folder.name}/ (all files below)`)
+  for (const object of selection.objects) {
+    if (!coveredByFolder(object.key, selection.folders)) lines.push(`${mount}${object.name}`)
+  }
+  return lines
+})
+
+async function addSelection(selection: Selection) {
   if (!selection.bucket || folderBusy.value) return
+  if (!mountDirValid.value) {
+    folderError.value = 'Enter a valid absolute mount directory first, for example /work/in/.'
+    return
+  }
   folderBusy.value = true
   folderError.value = null
   try {
-    const files = new Map(
-      selection.objects.map((object) => [object.key, { key: object.key, name: object.name }]),
-    )
+    const mount = mountDirNormalized.value
+    const entries: TesDataRefEntry[] = []
+    let total = 0
+    for (const object of selection.objects) {
+      if (coveredByFolder(object.key, selection.folders)) continue
+      entries.push({
+        kind: 'file',
+        url: `s3://${selection.bucket}/${object.key}`,
+        path: `${mount}${object.name}`,
+        name: object.name,
+      })
+      total++
+    }
     for (const folder of selection.folders) {
       const result = await s3.listObjectsRecursive(selection.bucket, folder.prefix, MAX_FOLDER_FILES)
       if (result.truncated) {
         folderError.value = `A selected folder holds more than ${MAX_FOLDER_FILES} files. Select a smaller folder.`
         return
       }
-      for (const object of result.objects) {
-        if (!files.has(object.key)) {
-          files.set(object.key, { key: object.key, name: `${folder.name}/${object.name}` })
-        }
+      if (!result.objects.length) {
+        folderError.value = `The folder ${folder.name}/ contains no files.`
+        return
       }
+      total += result.objects.length
+      entries.push({
+        kind: 'folder',
+        bucket: selection.bucket,
+        prefix: folder.prefix,
+        name: folder.name,
+        basePath: `${mount}${folder.name}/`,
+        files: result.objects.map((object) => ({ key: object.key, name: object.name })),
+      })
     }
-    if (files.size > MAX_FOLDER_FILES) {
+    if (total > MAX_FOLDER_FILES) {
       folderError.value = `Select at most ${MAX_FOLDER_FILES} files in one batch.`
       return
     }
-    if (!files.size) {
+    if (!entries.length) {
       folderError.value = 'The selection contains no files.'
       return
     }
-    for (const file of files.values()) {
-      emit('add', {
-        url: `s3://${selection.bucket}/${file.key}`,
-        path: `/inputs/${file.name}`,
-        name: file.name,
-      })
-    }
+    for (const entry of entries) emit('add', entry)
     emit('update:open', false)
   } catch (err) {
     folderError.value = err instanceof Error ? err.message : String(err)
@@ -84,6 +140,8 @@ watch(
     if (!open) return
     folderBusy.value = false
     folderError.value = null
+    mountDir.value = props.mountDefault
+    pendingSelection.value = null
   },
   { immediate: true },
 )
@@ -113,7 +171,30 @@ watch(
         <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
       </div>
       <template v-else>
-        <ObjectBrowserPanel selectable @add="addSelection" />
+        <div class="max-w-sm">
+          <label class="text-xs font-medium text-foreground">Mount under</label>
+          <Input
+            v-model="mountDir"
+            class="mt-1 h-8 font-mono text-xs"
+            placeholder="/work/in/"
+            aria-label="Container mount directory"
+            :invalid="!mountDirValid ? 'error' : undefined"
+          />
+          <p v-if="!mountDirValid" class="mt-1 text-[11px] text-destructive">
+            Use an absolute directory path such as /work/in/.
+          </p>
+          <p v-else class="mt-1 text-[11px] text-muted-foreground">
+            Selected files are staged below this container directory; folders keep their name as a subdirectory.
+          </p>
+        </div>
+        <ObjectBrowserPanel selectable @add="addSelection" @selection-change="pendingSelection = $event" />
+        <div v-if="previewPaths.length" class="rounded-md border border-border bg-muted/20 px-3 py-2">
+          <p class="text-[11px] font-medium text-foreground">Will be staged as</p>
+          <ul class="mt-1 space-y-0.5 font-mono text-[11px] text-muted-foreground">
+            <li v-for="line in previewPaths.slice(0, PREVIEW_LIMIT)" :key="line" class="truncate" :title="line">{{ line }}</li>
+            <li v-if="previewPaths.length > PREVIEW_LIMIT" class="font-sans">and {{ previewPaths.length - PREVIEW_LIMIT }} more</li>
+          </ul>
+        </div>
         <p v-if="folderBusy" class="mt-2 text-[11px] text-muted-foreground">Expanding selected folders…</p>
         <p v-if="folderError" class="mt-2 text-[11px] text-destructive">{{ folderError }}</p>
       </template>
