@@ -13,6 +13,14 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import CodeSnippet from '@/components/onboarding/CodeSnippet.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogClose from '@/components/ui/DialogClose.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogFooter from '@/components/ui/DialogFooter.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import QuickRunResult from '@/components/compute/QuickRunResult.vue'
@@ -42,6 +50,7 @@ import {
   CornerDownRight,
   Cpu,
   Folder,
+  FolderOpen,
   KeyRound,
   ListPlus,
   LogIn,
@@ -156,6 +165,10 @@ const inputs = ref<TesDataRefEntry[]>([])
 // bucket and key per row. containerPath defaults to /work/out/<basename> and
 // tracks the key until the user edits it directly.
 const stagingBucket = ref('')
+// Editable key prefix of the script location; the per-run id segment is always
+// appended so submits never overwrite each other.
+const SCRIPT_PREFIX_DEFAULT = '.aruna/scripts/'
+const scriptPrefix = ref(SCRIPT_PREFIX_DEFAULT)
 const outputRows = ref<{ bucket: string; path: string; containerPath: string; containerPathTouched: boolean }[]>([])
 const inputDialogOpen = ref(false)
 const credentialDialogOpen = ref(false)
@@ -183,10 +196,23 @@ const groupOptions = computed(() => myGroups.value.map((g) => ({ value: g.id, la
 const bucketOptions = computed(() => buckets.value.map((b) => ({ value: b, label: b })))
 
 const scriptContainerPath = computed(() => `/work/${runtime.value.file}`)
-const scriptKey = computed(() => `.aruna/scripts/${runId.value}/${runtime.value.file}`)
+// Empty prefix allowed (scripts land at <runId>/<file>); a trailing slash is
+// normalized on, a leading slash is invalid (S3 keys never start with one).
+const normalizedScriptPrefix = computed(() => {
+  const value = scriptPrefix.value.trim()
+  if (!value) return ''
+  return value.endsWith('/') ? value : `${value}/`
+})
+const scriptPrefixValid = computed(() => {
+  const value = normalizedScriptPrefix.value
+  if (!value) return true
+  if (value.startsWith('/')) return false
+  return value.slice(0, -1).split('/').every((segment) => segment && segment !== '.' && segment !== '..')
+})
+const scriptKey = computed(() => `${normalizedScriptPrefix.value}${runId.value}/${runtime.value.file}`)
 const scriptUrl = computed(() => `s3://${stagingBucket.value.trim()}/${scriptKey.value}`)
 const dependencyConfigPath = '/work/deno.json'
-const dependencyConfigKey = computed(() => `.aruna/scripts/${runId.value}/deno.json`)
+const dependencyConfigKey = computed(() => `${normalizedScriptPrefix.value}${runId.value}/deno.json`)
 const dependencyConfigUrl = computed(
   () => `s3://${stagingBucket.value.trim()}/${dependencyConfigKey.value}`,
 )
@@ -464,6 +490,62 @@ function removeOutput(i: number) {
   outputRows.value.splice(i, 1)
 }
 
+// ── Load existing script ─────────────────────────────────────────────────────
+// Reuses a script object from any bucket: its text is fetched into the editor
+// (the submit path still uploads the canonical per-run copy). Single-object
+// pick via the browser panel's default select mode; folders only navigate.
+const loadScriptOpen = ref(false)
+const loadScriptBusy = ref(false)
+const loadScriptError = ref<string | null>(null)
+const pendingScriptPick = ref<{ bucket: string; key: string; name: string } | null>(null)
+
+// Any non-empty content that is not a pristine runtime template is guarded by
+// an explicit confirm before it gets replaced.
+const editorHasCustomContent = computed(
+  () => script.value.trim().length > 0 && !RUNTIMES.some((rt) => script.value === rt.template),
+)
+
+function inferRuntimeId(name: string): Runtime['id'] | null {
+  if (name.endsWith('.py')) return 'python-uv'
+  if (name.endsWith('.ts') || name.endsWith('.js')) return 'deno'
+  if (name.endsWith('.sh')) return 'bash'
+  return null
+}
+
+function onScriptPick(entry: { bucket: string; key: string; name: string }) {
+  pendingScriptPick.value = entry
+  loadScriptError.value = null
+  if (!editorHasCustomContent.value) void applyScriptPick()
+}
+
+async function applyScriptPick() {
+  const pick = pendingScriptPick.value
+  if (!pick || loadScriptBusy.value) return
+  loadScriptBusy.value = true
+  loadScriptError.value = null
+  try {
+    const text = await s3.getObjectText(pick.bucket, pick.key)
+    // Runtime first: its watcher only swaps pristine templates and resets the
+    // dependency list, then the fetched text lands in the editor.
+    const inferred = inferRuntimeId(pick.name)
+    if (inferred) runtimeId.value = inferred
+    script.value = text
+    pendingScriptPick.value = null
+    loadScriptOpen.value = false
+  } catch (err) {
+    loadScriptError.value = errorMessage(err)
+  } finally {
+    loadScriptBusy.value = false
+  }
+}
+
+watch(loadScriptOpen, (open) => {
+  if (!open) return
+  pendingScriptPick.value = null
+  loadScriptError.value = null
+  loadScriptBusy.value = false
+})
+
 // ── Buckets ──────────────────────────────────────────────────────────────────
 const buckets = ref<string[]>([])
 const bucketsLoading = ref(false)
@@ -533,7 +615,12 @@ const outputsValid = computed(() => {
   )
 })
 const dataReady = computed(
-  () => !!s3.endpoint.value && s3.hasActiveKey.value && groupId.value.length > 0 && stagingBucketValid.value,
+  () =>
+    !!s3.endpoint.value &&
+    s3.hasActiveKey.value &&
+    groupId.value.length > 0 &&
+    stagingBucketValid.value &&
+    scriptPrefixValid.value,
 )
 const canContinue = computed(() => {
   switch (step.value) {
@@ -693,23 +780,36 @@ function runAnother() {
               <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its Process Run crate.</p>
             </div>
             <div>
-              <label class="text-xs font-medium text-foreground">Script bucket <span class="text-destructive">*</span></label>
-              <Select v-if="bucketOptions.length" v-model="stagingBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
-              <Input
-                v-else
-                v-model="stagingBucket"
-                class="mt-1 font-mono"
-                :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'"
-                :invalid="stagingBucket.trim() && !stagingBucketValid ? 'error' : undefined"
-              />
+              <label class="text-xs font-medium text-foreground">Script location <span class="text-destructive">*</span></label>
+              <div class="mt-1 flex items-center gap-2">
+                <Select v-if="bucketOptions.length" v-model="stagingBucket" :options="bucketOptions" placeholder="Select a bucket" class="w-40 shrink-0" />
+                <Input
+                  v-else
+                  v-model="stagingBucket"
+                  class="w-40 shrink-0 font-mono"
+                  :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'"
+                  :invalid="stagingBucket.trim() && !stagingBucketValid ? 'error' : undefined"
+                />
+                <Input
+                  v-model="scriptPrefix"
+                  class="min-w-0 flex-1 font-mono"
+                  placeholder=".aruna/scripts/"
+                  aria-label="Script key prefix"
+                  :invalid="!scriptPrefixValid ? 'error' : undefined"
+                />
+              </div>
               <p v-if="stagingBucket.trim() && !stagingBucketValid" class="mt-1 text-[11px] text-destructive">
                 This bucket does not exist. The script can only be staged into one of your buckets.
               </p>
               <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
                 You have no buckets yet. Create one in Data first.
               </p>
-              <p v-else class="mt-1 text-[11px] text-muted-foreground">
-                The script is uploaded under <code class="rounded bg-muted px-1 font-mono">.aruna/scripts/</code> here before the run.
+              <p v-else-if="!scriptPrefixValid" class="mt-1 text-[11px] text-destructive">
+                Use a key prefix without a leading slash, for example .aruna/scripts/.
+              </p>
+              <p v-else class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="scriptUrl">{{ scriptUrl }}</p>
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                The script is copied under the run's script location on submit so runs stay reproducible.
               </p>
             </div>
           </div>
@@ -724,9 +824,14 @@ function runAnother() {
               <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
             <!-- Script editor -->
             <div class="min-w-0 space-y-2">
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between gap-2">
                 <label class="text-xs font-medium text-foreground">Script <span class="font-mono text-muted-foreground">({{ runtime.file }})</span></label>
-                <Button variant="ghost" size="sm" @click="script = runtime.template">Reset to template</Button>
+                <div class="flex items-center gap-1.5">
+                  <Button variant="outline" size="sm" @click="loadScriptOpen = true">
+                    <FolderOpen class="h-3.5 w-3.5" /> Load existing script
+                  </Button>
+                  <Button variant="ghost" size="sm" @click="script = runtime.template">Reset to template</Button>
+                </div>
               </div>
               <Suspense>
                 <ScriptEditor v-model="script" :language="runtime.lang" />
@@ -971,5 +1076,39 @@ function runAnother() {
 
     <TesDataRefDialog v-model:open="inputDialogOpen" mode="input" mount-default="/work/in/" @add="addInput" />
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />
+
+    <Dialog :open="loadScriptOpen" @update:open="(v: boolean) => (loadScriptOpen = v)">
+      <DialogContent class="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2"><FolderOpen class="h-4 w-4 text-primary" /> Load existing script</DialogTitle>
+          <DialogDescription>
+            Pick a script object to load its content into the editor. Submitting still uploads a fresh copy under the run's script location so runs stay reproducible.
+          </DialogDescription>
+        </DialogHeader>
+        <div
+          v-if="pendingScriptPick && editorHasCustomContent"
+          class="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-900 dark:text-amber-200"
+        >
+          <p>
+            Replace the current editor content with
+            <span class="font-mono">{{ pendingScriptPick.name }}</span>? Unsaved changes are lost.
+          </p>
+          <div class="flex gap-2">
+            <Button size="sm" :disabled="loadScriptBusy" @click="applyScriptPick">
+              {{ loadScriptBusy ? 'Loading…' : 'Replace script' }}
+            </Button>
+            <Button variant="outline" size="sm" :disabled="loadScriptBusy" @click="pendingScriptPick = null">Cancel</Button>
+          </div>
+        </div>
+        <ObjectBrowserPanel v-else @select="onScriptPick" />
+        <p v-if="loadScriptBusy && !(pendingScriptPick && editorHasCustomContent)" class="text-[11px] text-muted-foreground">
+          Loading script…
+        </p>
+        <p v-if="loadScriptError" class="text-[11px] text-destructive">{{ loadScriptError }}</p>
+        <DialogFooter>
+          <DialogClose><Button variant="outline">Close</Button></DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
