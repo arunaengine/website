@@ -104,6 +104,7 @@ const RUNTIMES: Runtime[] = [
     template: 'console.log("hello from aruna");\n',
   },
 ]
+const TES_NETWORK_TAG = 'aruna-engine.org/network'
 
 // One combined "Script & data" step: the selected data references are listed
 // with their resolved /work/in|out mount paths right next to the editor, so
@@ -249,7 +250,11 @@ const task = computed<TesTask>(() =>
         env: runtime.value.env,
       },
     ],
-    tags: { [TES_GROUP_TAG]: groupId.value, [TES_IDEMPOTENCY_TAG]: runId.value },
+    tags: {
+      [TES_GROUP_TAG]: groupId.value,
+      [TES_IDEMPOTENCY_TAG]: runId.value,
+      ...(dependencies.value.length ? { [TES_NETWORK_TAG]: 'open' } : {}),
+    },
   }),
 )
 
