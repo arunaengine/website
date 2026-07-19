@@ -49,6 +49,7 @@ import {
   ArrowUpFromLine,
   CornerDownRight,
   Cpu,
+  FileText,
   Folder,
   FolderOpen,
   KeyRound,
@@ -162,14 +163,14 @@ const groupId = ref('')
 // FILE inputs only at task assembly (the facade accepts FILE inputs only).
 const inputs = ref<TesDataRefEntry[]>([])
 // The script needs an S3 home before the run starts; outputs pick their own
-// bucket and key per row. containerPath defaults to /work/out/<basename> and
-// tracks the key until the user edits it directly.
+// bucket and key per row. The destination key defaults to quickruns/<basename>
+// and tracks the captured container path until the key is edited directly.
 const stagingBucket = ref('')
 // Editable key prefix of the script location; the per-run id segment is always
 // appended so submits never overwrite each other.
 const SCRIPT_PREFIX_DEFAULT = '.aruna/scripts/'
 const scriptPrefix = ref(SCRIPT_PREFIX_DEFAULT)
-const outputRows = ref<{ bucket: string; path: string; containerPath: string; containerPathTouched: boolean }[]>([])
+const outputRows = ref<{ bucket: string; path: string; containerPath: string; keyTouched: boolean }[]>([])
 const inputDialogOpen = ref(false)
 const credentialDialogOpen = ref(false)
 
@@ -277,13 +278,18 @@ function normalizedOutputKey(path: string): string {
 function outputBasename(path: string): string {
   return normalizedOutputKey(path).split('/').filter(Boolean).pop() ?? ''
 }
+// A captured container path ending in '/' means a DIRECTORY output: the run
+// uploads everything the script wrote below it, to a destination key prefix.
+function isDirCapture(path: string): boolean {
+  return path.trim().endsWith('/')
+}
 const declaredOutputs = computed<TesOutput[]>(() =>
   outputRows.value
     .filter((row) => row.bucket.trim() && outputBasename(row.path) && row.containerPath.trim())
     .map((row) => ({
       url: `s3://${row.bucket.trim()}/${normalizedOutputKey(row.path)}`,
       path: row.containerPath.trim(),
-      type: 'FILE',
+      type: isDirCapture(row.containerPath) ? ('DIRECTORY' as const) : ('FILE' as const),
     })),
 )
 
@@ -466,22 +472,44 @@ function removeInput(i: number) {
   inputs.value.splice(i, 1)
 }
 function addOutput() {
-  const path = 'quickruns/result.txt'
+  const containerPath = '/work/out/result.txt'
   outputRows.value.push({
     bucket: outputRows.value.at(-1)?.bucket || stagingBucket.value.trim() || buckets.value[0] || '',
-    path,
-    containerPath: `/work/out/${outputBasename(path)}`,
-    containerPathTouched: false,
+    containerPath,
+    path: `quickruns/${outputBasename(containerPath)}`,
+    keyTouched: false,
   })
 }
-type OutputRow = { bucket: string; path: string; containerPath: string; containerPathTouched: boolean }
-function setOutputPath(row: OutputRow, value: string) {
-  row.path = value
-  if (!row.containerPathTouched) row.containerPath = `/work/out/${outputBasename(value)}`
+type OutputRow = { bucket: string; path: string; containerPath: string; keyTouched: boolean }
+// A file capture needs a plain container file path; a folder capture (trailing
+// slash) an absolute directory path other than '/'.
+function validOutputContainerPath(path: string): boolean {
+  const value = path.trim()
+  if (value.endsWith('/')) return value !== '/' && validContainerDir(value)
+  return validContainerPath(value)
 }
+function keyDirOf(key: string): string {
+  const trimmed = normalizedOutputKey(key).replace(/\/+$/, '')
+  const index = trimmed.lastIndexOf('/')
+  return index === -1 ? '' : trimmed.slice(0, index + 1)
+}
+// The destination key tracks the captured path's basename (and folder shape)
+// until the user edits the key directly.
 function setOutputContainerPath(row: OutputRow, value: string) {
   row.containerPath = value
-  row.containerPathTouched = true
+  if (row.keyTouched) return
+  const base = outputBasename(value)
+  row.path = `${keyDirOf(row.path)}${base}${isDirCapture(value) && base ? '/' : ''}`
+}
+function setOutputKey(row: OutputRow, value: string) {
+  row.path = value
+  row.keyTouched = true
+}
+// Folder captures write to a key prefix; a missing trailing slash is appended
+// rather than rejected.
+function onOutputKeyBlur(row: OutputRow) {
+  const key = row.path.trim()
+  if (isDirCapture(row.containerPath) && key && !key.endsWith('/')) row.path = `${key}/`
 }
 function outputDestination(row: { bucket: string; path: string }): string {
   return `s3://${row.bucket.trim() || '<bucket>'}/${normalizedOutputKey(row.path) || '<path>'}`
@@ -599,13 +627,18 @@ const outputsValid = computed(() => {
   const rows = outputRows.value
   const validRow = (row: { bucket: string; path: string; containerPath: string }) => {
     if (!knownBucket(row.bucket.trim())) return false
-    if (!validContainerPath(row.containerPath.trim())) return false
+    if (!validOutputContainerPath(row.containerPath)) return false
     const key = normalizedOutputKey(row.path)
-    if (!key || key.endsWith('/')) return false
-    return key.split('/').every((segment) => segment && segment !== '.' && segment !== '..')
+    if (!key) return false
+    // Folder captures need a key prefix (trailing slash), file captures a
+    // plain object key.
+    const dir = isDirCapture(row.containerPath)
+    if (dir !== key.endsWith('/')) return false
+    const segments = (dir ? key.slice(0, -1) : key).split('/')
+    return segments.every((segment) => segment && segment !== '.' && segment !== '..')
   }
   // The backend rejects duplicate container paths and destinations; block
-  // collisions on both sides here.
+  // collisions on both sides here (normalized values).
   const containerPaths = rows.map((row) => row.containerPath.trim())
   const destinations = rows.map((row) => `${row.bucket.trim()}/${normalizedOutputKey(row.path)}`)
   return (
@@ -900,47 +933,60 @@ function runAnother() {
                     <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Output data
                   </div>
                   <p class="mt-1 text-[11px] text-muted-foreground">
-                    Declared files the script writes, by default under <code class="rounded bg-muted px-1 font-mono">/work/out/</code>, are uploaded after the run. stdout and stderr are always captured.
+                    Captures files or folders the script writes, by default under <code class="rounded bg-muted px-1 font-mono">/work/out/</code>, into a bucket after the run. A container path ending in / captures everything below it. stdout and stderr are always captured.
                   </p>
                 </div>
                 <div v-if="outputRows.length" class="space-y-1.5">
-                  <div v-for="(row, i) in outputRows" :key="i" class="surface-inline space-y-1 p-2 text-xs">
-                    <div class="flex items-center gap-1.5">
-                      <Select
-                        v-if="bucketOptions.length"
-                        v-model="row.bucket"
-                        :options="bucketOptions"
-                        placeholder="Bucket"
-                        class="h-7 w-32 shrink-0 text-xs"
-                      />
-                      <Input v-else v-model="row.bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" />
-                      <Input
-                        :model-value="row.path"
-                        class="h-7 font-mono text-xs"
-                        placeholder="results/output.txt"
-                        @update:model-value="setOutputPath(row, String($event))"
-                      />
-                      <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove output" @click="removeOutput(i)"><X class="size-3" /></Button>
+                  <div v-for="(row, i) in outputRows" :key="i" class="surface-inline space-y-1.5 p-2 text-xs">
+                    <div>
+                      <label class="text-[10px] font-medium text-muted-foreground">Capture</label>
+                      <div class="mt-0.5 flex items-center gap-1.5">
+                        <Input
+                          :model-value="row.containerPath"
+                          class="h-7 font-mono text-xs"
+                          placeholder="/work/out/result.txt"
+                          aria-label="Container path to capture"
+                          :invalid="!validOutputContainerPath(row.containerPath) ? 'error' : undefined"
+                          @update:model-value="setOutputContainerPath(row, String($event))"
+                        />
+                        <Badge variant="outline" class="shrink-0 gap-1 text-[10px]">
+                          <component :is="isDirCapture(row.containerPath) ? Folder : FileText" class="h-3 w-3" />
+                          {{ isDirCapture(row.containerPath) ? 'Folder' : 'File' }}
+                        </Badge>
+                        <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove output" @click="removeOutput(i)"><X class="size-3" /></Button>
+                      </div>
                     </div>
-                    <div class="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground">
-                      <CornerDownRight class="h-3 w-3 shrink-0" />
-                      <Input
-                        :model-value="row.containerPath"
-                        class="h-6 w-48 shrink-0 font-mono text-[10px]"
-                        aria-label="Container path"
-                        :invalid="!validContainerPath(row.containerPath.trim()) ? 'error' : undefined"
-                        @update:model-value="setOutputContainerPath(row, String($event))"
-                      />
-                      <span class="shrink-0">→</span>
-                      <span class="truncate" :title="outputDestination(row)">{{ outputDestination(row) }}</span>
+                    <div>
+                      <label class="text-[10px] font-medium text-muted-foreground">into</label>
+                      <div class="mt-0.5 flex items-center gap-1.5">
+                        <Select
+                          v-if="bucketOptions.length"
+                          v-model="row.bucket"
+                          :options="bucketOptions"
+                          placeholder="Bucket"
+                          class="h-7 w-32 shrink-0 text-xs"
+                          aria-label="Destination bucket"
+                        />
+                        <Input v-else v-model="row.bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" aria-label="Destination bucket" />
+                        <span class="shrink-0 text-muted-foreground">/</span>
+                        <Input
+                          :model-value="row.path"
+                          class="h-7 font-mono text-xs"
+                          placeholder="results/output.txt"
+                          aria-label="Destination key"
+                          @update:model-value="setOutputKey(row, String($event))"
+                          @blur="onOutputKeyBlur(row)"
+                        />
+                      </div>
                     </div>
+                    <div class="truncate font-mono text-[10px] text-muted-foreground" :title="outputDestination(row)">{{ outputDestination(row) }}</div>
                   </div>
                 </div>
-                <p v-else class="text-[11px] text-muted-foreground">No output files declared. Only stdout and stderr are captured.</p>
+                <p v-else class="text-[11px] text-muted-foreground">Nothing captured yet; only stdout and stderr are collected after the run.</p>
                 <p v-if="!outputsValid" class="text-[11px] text-destructive">
-                  Each output needs one of your buckets, a canonical key and an absolute container path; container paths and destinations must be unique.
+                  Each capture needs one of your buckets, a canonical key and an absolute container path; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
                 </p>
-                <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output file</Button>
+                <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output</Button>
               </section>
             </div>
               </div>

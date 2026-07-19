@@ -20,6 +20,8 @@ import {
   TES_GROUP_TAG,
   expandDataRefEntry,
   pruneTesTask,
+  validContainerDir,
+  validContainerFilePath,
   type TesDataRefEntry,
   type TesExecutor,
   type TesOutput,
@@ -27,7 +29,8 @@ import {
   type TesTask,
 } from '@/lib/tes'
 import { isWorkspaceBucket, type WorkspaceMode } from '@/lib/workspaces'
-import { ArrowLeft, ArrowRight, Cpu, ListPlus, LogIn, Plus, X } from '@lucide/vue'
+import Badge from '@/components/ui/Badge.vue'
+import { ArrowLeft, ArrowRight, Cpu, FileText, Folder, ListPlus, LogIn, Plus, X } from '@lucide/vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -63,9 +66,29 @@ const groupId = ref('')
 const inputs = ref<TesDataRefEntry[]>([])
 const executors = ref<TesExecutor[]>([{ image: '', command: [''] }])
 
-// Free-form outputs: each row names the container file and its own
-// s3://bucket/key destination; no shared bucket or prefix.
-const outputRows = ref<{ path: string; url: string }[]>([{ path: '/outputs/result.txt', url: '' }])
+// Capture-into outputs: each row captures one container path (a file, or a
+// folder when the path ends in '/') into its own bucket + key destination.
+const outputRows = ref<{ path: string; bucket: string; key: string }[]>([
+  { path: '/outputs/result.txt', bucket: '', key: '' },
+])
+
+// A container path ending in '/' is a DIRECTORY output: everything the task
+// wrote below it is uploaded under the destination key prefix after the run.
+function isDirCapture(path: string): boolean {
+  return path.trim().endsWith('/')
+}
+function normalizedOutputKey(key: string): string {
+  return key.trim().replace(/^\/+/, '')
+}
+// Folder captures write to a key prefix; append the missing trailing slash on
+// blur instead of rejecting it.
+function onOutputKeyBlur(row: { path: string; key: string }) {
+  const key = row.key.trim()
+  if (isDirCapture(row.path) && key && !key.endsWith('/')) row.key = `${key}/`
+}
+function outputDestination(row: { bucket: string; key: string }): string {
+  return `s3://${row.bucket.trim() || '<bucket>'}/${normalizedOutputKey(row.key) || '<key>'}`
+}
 
 const cpuCores = ref('')
 const ramGb = ref('')
@@ -87,8 +110,9 @@ const workspaceValid = computed(() => {
   return workspaceMode.value === 'existing' && !!workspaceBucket.value.trim()
 })
 
-// Bucket options for the "existing" choice — best effort via the browser's S3
-// session; without credentials the field falls back to free text.
+// Bucket options for the workspace "existing" choice and the output
+// destinations, best effort via the browser's S3 session; without credentials
+// the fields fall back to free text.
 const s3 = useS3()
 const workspaceBucketOptions = ref<{ value: string; label: string }[]>([])
 onMounted(async () => {
@@ -106,7 +130,11 @@ onMounted(async () => {
 const groupOptions = computed(() => myGroups.value.map((g) => ({ value: g.id, label: g.name })))
 
 const outputs = computed<TesOutput[]>(() =>
-  outputRows.value.map((row) => ({ url: row.url.trim(), path: row.path.trim(), type: 'FILE' })),
+  outputRows.value.map((row) => ({
+    url: `s3://${row.bucket.trim()}/${normalizedOutputKey(row.key)}`,
+    path: row.path.trim(),
+    type: isDirCapture(row.path) ? ('DIRECTORY' as const) : ('FILE' as const),
+  })),
 )
 
 const resources = computed<TesResources>(() => {
@@ -143,11 +171,30 @@ const executorsValid = computed(
     executors.value[0].image.trim().length > 0 &&
     executors.value[0].command.some((argument) => argument.trim()),
 )
-const outputsValid = computed(() =>
-  outputRows.value.every(
-    (row) => row.path.trim().startsWith('/') && /^s3:\/\/[^/]+\/.+/.test(row.url.trim()),
-  ),
-)
+const outputsValid = computed(() => {
+  const rows = outputRows.value
+  const validRow = (row: { path: string; bucket: string; key: string }) => {
+    const path = row.path.trim()
+    if (isDirCapture(path) ? path === '/' || !validContainerDir(path) : !validContainerFilePath(path)) {
+      return false
+    }
+    const bucket = row.bucket.trim()
+    if (!bucket || bucket.includes('/')) return false
+    const key = normalizedOutputKey(row.key)
+    if (!key) return false
+    // Folder captures need a key prefix (trailing slash), files a plain key.
+    if (isDirCapture(path) !== key.endsWith('/')) return false
+    const segments = (key.endsWith('/') ? key.slice(0, -1) : key).split('/')
+    return segments.every((segment) => segment && segment !== '.' && segment !== '..')
+  }
+  const containerPaths = rows.map((row) => row.path.trim())
+  const destinations = rows.map((row) => `${row.bucket.trim()}/${normalizedOutputKey(row.key)}`)
+  return (
+    rows.every(validRow) &&
+    new Set(containerPaths).size === containerPaths.length &&
+    new Set(destinations).size === destinations.length
+  )
+})
 const canContinue = computed(() => {
   switch (step.value) {
     case 0:
@@ -171,7 +218,7 @@ function back() {
 }
 
 function addOutputRow() {
-  outputRows.value.push({ path: '/outputs/result.txt', url: '' })
+  outputRows.value.push({ path: '/outputs/result.txt', bucket: outputRows.value.at(-1)?.bucket ?? '', key: '' })
 }
 function removeOutputRow(i: number) {
   outputRows.value.splice(i, 1)
@@ -268,21 +315,36 @@ async function submit() {
           <div class="space-y-3">
             <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Outputs</div>
             <div v-for="(row, i) in outputRows" :key="i" class="surface-inline space-y-2 p-3">
-              <div class="flex items-end gap-3">
+              <div class="flex flex-wrap items-end gap-3">
                 <div class="min-w-0 flex-1">
-                  <label class="text-xs font-medium text-foreground">Container path</label>
-                  <Input v-model="row.path" class="mt-1 font-mono" placeholder="/outputs/result.txt" />
+                  <label class="text-xs font-medium text-foreground">Capture <span class="text-muted-foreground">(container path)</span></label>
+                  <Input v-model="row.path" class="mt-1 font-mono" placeholder="/outputs/result.txt" aria-label="Container path to capture" />
+                </div>
+                <span class="pb-2.5 text-xs text-muted-foreground">into</span>
+                <div class="w-44">
+                  <label class="text-xs font-medium text-foreground">Bucket</label>
+                  <Select v-if="workspaceBucketOptions.length" v-model="row.bucket" :options="workspaceBucketOptions" placeholder="Bucket" class="mt-1" aria-label="Destination bucket" />
+                  <Input v-else v-model="row.bucket" class="mt-1 font-mono" placeholder="my-results" aria-label="Destination bucket" />
                 </div>
                 <div class="min-w-0 flex-1">
-                  <label class="text-xs font-medium text-foreground">Destination</label>
-                  <Input v-model="row.url" class="mt-1 font-mono" placeholder="s3://my-results/runs/result.txt" />
+                  <label class="text-xs font-medium text-foreground">Key</label>
+                  <Input v-model="row.key" class="mt-1 font-mono" placeholder="runs/result.txt" aria-label="Destination key" @blur="onOutputKeyBlur(row)" />
                 </div>
                 <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Remove output" @click="removeOutputRow(i)"><X class="h-4 w-4" /></Button>
               </div>
+              <div class="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                <Badge variant="outline" class="shrink-0 gap-1 font-sans text-[10px]">
+                  <component :is="isDirCapture(row.path) ? Folder : FileText" class="h-3 w-3" />
+                  {{ isDirCapture(row.path) ? 'Folder' : 'File' }}
+                </Badge>
+                <span class="truncate" :title="outputDestination(row)">{{ outputDestination(row) }}</span>
+              </div>
             </div>
             <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
-            <p class="text-[11px] text-muted-foreground">The current TES facade captures individual files; directory outputs are not supported.</p>
-            <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">Every output needs an absolute container path (starts with /) and an s3://bucket/key destination.</p>
+            <p class="text-[11px] text-muted-foreground">A folder capture (container path ending in /) uploads everything the task wrote under that path after the run.</p>
+            <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
+              Every capture needs an absolute container path, one bucket and a canonical key; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
+            </p>
           </div>
 
           <div class="space-y-3">
