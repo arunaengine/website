@@ -141,11 +141,16 @@ const canWriteData = computed(() => {
 const TAB_NAMES = ['stats', 'members', 'roles', 'sources']
 const tab = computed(() => {
   const value = typeof route.query.tab === 'string' ? route.query.tab : ''
+  // Bare ?connector=<id> deep links land on the Data sources tab.
+  if (!value && typeof route.query.connector === 'string' && isMember.value) return 'sources'
   if (value === 'sources' && !isMember.value) return 'stats'
   return TAB_NAMES.includes(value) ? value : 'stats'
 })
 function setTab(next: string) {
   const query = { ...route.query }
+  // The connector deep-link marker is one-shot; switching tabs clears it so
+  // the stats tab does not bounce back to sources.
+  delete query.connector
   if (next === 'stats') delete query.tab
   else query.tab = next
   void router.replace({ query })

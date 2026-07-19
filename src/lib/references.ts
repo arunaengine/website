@@ -76,10 +76,17 @@ export interface ReferenceLabelOptions {
   connectorName?: string | null
   /** Node id → human label (useRealmNodes displayName). */
   nodeLabel?: (nodeId: string) => string
+  /**
+   * Label of the node hosting the browsed bucket (frontend-resolved by the
+   * caller): connectors are registered on that node, so it anchors
+   * "connector <name> on node <label>" for external kinds.
+   */
+  hostingNodeLabel?: string | null
 }
 
-// Source name without the path — "node <label>" for aruna_native, else the
-// connector name, degrading to the kind label when the id cannot be resolved.
+// Source name without the path: "node <label>" for aruna_native, else
+// "connector <name> on node <label>" when both resolve, degrading through
+// "connector <name>", "node <label>" and the kind label.
 export function referenceSourceName(
   source: { kind?: SourceConnectorKind; originNodeId?: string },
   options: ReferenceLabelOptions = {},
@@ -88,7 +95,12 @@ export function referenceSourceName(
     const nodeId = source.originNodeId ?? ''
     return `node ${options.nodeLabel?.(nodeId) ?? (nodeId || 'unknown')}`
   }
-  if (options.connectorName) return options.connectorName
+  if (options.connectorName) {
+    return options.hostingNodeLabel
+      ? `connector ${options.connectorName} on node ${options.hostingNodeLabel}`
+      : `connector ${options.connectorName}`
+  }
+  if (options.hostingNodeLabel) return `node ${options.hostingNodeLabel}`
   if (source.kind) return REFERENCE_KIND_LABELS[source.kind] ?? source.kind
   return 'external source'
 }

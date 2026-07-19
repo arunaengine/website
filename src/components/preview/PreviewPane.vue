@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { defineAsyncComponent, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
@@ -19,8 +20,12 @@ const props = defineProps<{
   contentType?: string
   /** Node hosting the bucket; null/absent = the connected node. */
   nodeId?: string | null
-  /** Resolved reference origin ("<connector> · <path>", "node <label>"). */
-  referencedFrom?: string | null
+  /**
+   * Resolved reference origin ("connector <name> on node <label> · <path>",
+   * "node <label>"). connectorId + groupId make the label a deep link into
+   * the owning group's Data sources tab.
+   */
+  referencedFrom?: { label: string; connectorId?: string | null; groupId?: string | null } | null
   /**
    * HeadObject fallback when no listing resolves the origin: probe the single
    * previewed object for reference metadata and show a source-less marker.
@@ -97,8 +102,17 @@ async function download() {
             class="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground"
           >
             <Link2 class="h-3 w-3 shrink-0 text-primary/70" />
-            <span v-if="props.referencedFrom" class="truncate" :title="`Referenced from ${props.referencedFrom}`">
-              Referenced from {{ props.referencedFrom }}
+            <span v-if="props.referencedFrom" class="truncate" :title="`Referenced from ${props.referencedFrom.label}`">
+              Referenced from
+              <RouterLink
+                v-if="props.referencedFrom.connectorId && props.referencedFrom.groupId"
+                :to="{ name: 'groups', params: { id: props.referencedFrom.groupId }, query: { tab: 'sources', connector: props.referencedFrom.connectorId } }"
+                class="text-primary hover:underline"
+                title="Open the connector in its group"
+              >
+                {{ props.referencedFrom.label }}
+              </RouterLink>
+              <template v-else>{{ props.referencedFrom.label }}</template>
             </span>
             <span v-else>Referenced (external source)</span>
           </p>

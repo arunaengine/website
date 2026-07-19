@@ -11,7 +11,8 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import ConnectorDialog from '@/components/groups/ConnectorDialog.vue'
 import ConnectorEntriesBrowser from '@/components/data/ConnectorEntriesBrowser.vue'
-import { ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { FolderSearch, KeyRound, Loader2, Pencil, PlugZap, Plus, Trash2 } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
@@ -128,6 +129,34 @@ async function testConnector(connector: SourceConnectorSummary) {
 // Entries browser dialog (read-only; reuses the Add data browser component).
 const browseTarget = ref<SourceConnectorSummary | null>(null)
 const browseUnsupported = ref(false)
+
+// Deep link /app/groups/:id?connector=<connector_id> (e.g. from the Data
+// manager's provenance links): scroll the named connector into view and flash
+// a short-lived highlight ring once it is listed.
+const route = useRoute()
+const highlightedId = ref<string | null>(null)
+let highlightTimer: number | undefined
+
+function focusConnectorFromQuery() {
+  const target = typeof route.query.connector === 'string' ? route.query.connector : ''
+  if (!target || highlightedId.value === target) return
+  if (!connectors.value?.some((connector) => connector.connector_id === target)) return
+  highlightedId.value = target
+  void nextTick(() => {
+    document
+      .getElementById(`connector-${target}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+  if (highlightTimer !== undefined) window.clearTimeout(highlightTimer)
+  highlightTimer = window.setTimeout(() => (highlightedId.value = null), 2_500)
+}
+
+watch([() => route.query.connector, connectors], () => focusConnectorFromQuery(), {
+  immediate: true,
+})
+onBeforeUnmount(() => {
+  if (highlightTimer !== undefined) window.clearTimeout(highlightTimer)
+})
 </script>
 
 <template>
@@ -156,8 +185,10 @@ const browseUnsupported = ref(false)
       <ul class="space-y-1">
         <li
           v-for="connector in connectors"
+          :id="`connector-${connector.connector_id}`"
           :key="connector.connector_id"
-          class="flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
+          class="flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 transition-shadow hover:bg-muted/50"
+          :class="highlightedId === connector.connector_id ? 'bg-primary/5 ring-2 ring-primary/50' : ''"
         >
           <span class="text-sm font-medium text-foreground">{{ connector.name }}</span>
           <Badge variant="secondary" class="text-[10px] uppercase">{{ connector.kind }}</Badge>

@@ -39,7 +39,7 @@ import { parseArunaArn, prefixesOverlap } from '@/lib/sync'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
 import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeftRight,
   Boxes,
@@ -198,11 +198,22 @@ const referenceStats = computed(() => references.stats.value)
 // is referenced.
 const showReferenceStats = computed(() => !remoteNodeId.value && referenceStats.value.count > 0)
 
+// Frontend-resolved provenance anchor: staging references live on the node
+// hosting the browsed bucket, so its label anchors "connector X on node Y".
+const hostingNodeLabel = computed(() => {
+  const nodeId = remoteNodeId.value ?? realmNodes.localNodeId.value
+  return nodeId ? realmNodes.displayName(nodeId) : null
+})
+
 // Breakdown row label; connector names resolve lazily via connectorsById.
 function referenceGroupLabel(group: ReferenceSourceGroup): string {
   return referenceSourceName(
     { kind: group.kind, originNodeId: group.originNodeId },
-    { connectorName: connectorName(group.connectorId), nodeLabel: realmNodes.displayName },
+    {
+      connectorName: connectorName(group.connectorId),
+      nodeLabel: realmNodes.displayName,
+      hostingNodeLabel: hostingNodeLabel.value,
+    },
   )
 }
 
@@ -725,6 +736,7 @@ function referencedFrom(key: string): string {
   return `Referenced from ${referenceSourceLabel(entry, {
     connectorName: connectorName(entry.connector_id),
     nodeLabel: realmNodes.displayName,
+    hostingNodeLabel: hostingNodeLabel.value,
   })}`
 }
 
@@ -736,7 +748,11 @@ function prefixReferenceSummary(folderPrefix: string): string {
     entries.map((entry) =>
       referenceSourceName(
         { kind: entry.kind, originNodeId: entry.origin_node_id },
-        { connectorName: connectorName(entry.connector_id), nodeLabel: realmNodes.displayName },
+        {
+          connectorName: connectorName(entry.connector_id),
+          nodeLabel: realmNodes.displayName,
+          hostingNodeLabel: hostingNodeLabel.value,
+        },
       ),
     ),
   )
@@ -748,13 +764,20 @@ const previewReference = computed(() =>
     ? (references.referencedByKey.value.get(previewObject.value.key) ?? null)
     : null,
 )
+// Structured provenance so the preview pane can render a real connector link
+// (group-scoped deep link) instead of plain text.
 const previewReferencedFrom = computed(() => {
   const entry = previewReference.value
   if (!entry) return null
-  return referenceSourceLabel(entry, {
-    connectorName: connectorName(entry.connector_id),
-    nodeLabel: realmNodes.displayName,
-  })
+  return {
+    label: referenceSourceLabel(entry, {
+      connectorName: connectorName(entry.connector_id),
+      nodeLabel: realmNodes.displayName,
+      hostingNodeLabel: hostingNodeLabel.value,
+    }),
+    connectorId: entry.connector_id ?? null,
+    groupId: entry.connector_id ? activeGroupId.value : null,
+  }
 })
 // HEAD fallback for remote buckets: the connected node's /staging/references
 // listing does not cover them, so probe the single previewed object instead.
@@ -1081,7 +1104,15 @@ const isEmpty = computed(
                           class="flex items-start justify-between gap-3 text-xs"
                         >
                           <span class="min-w-0 text-foreground">
-                            <span class="block truncate" :title="referenceGroupLabel(group)">{{ referenceGroupLabel(group) }}</span>
+                            <RouterLink
+                              v-if="group.connectorId && activeGroupId"
+                              :to="{ name: 'groups', params: { id: activeGroupId }, query: { tab: 'sources', connector: group.connectorId } }"
+                              class="block truncate text-primary hover:underline"
+                              :title="`${referenceGroupLabel(group)}, open the connector`"
+                            >
+                              {{ referenceGroupLabel(group) }}
+                            </RouterLink>
+                            <span v-else class="block truncate" :title="referenceGroupLabel(group)">{{ referenceGroupLabel(group) }}</span>
                             <span v-if="group.sourcePaths.length" class="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground" :title="group.sourcePaths.join('\n')">
                               {{ group.sourcePaths.join(', ') }}<template v-if="group.count > group.sourcePaths.length">, …</template>
                             </span>
