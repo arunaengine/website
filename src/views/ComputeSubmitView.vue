@@ -9,7 +9,7 @@ import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
-import CodeSnippet from '@/components/onboarding/CodeSnippet.vue'
+import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
 import ExecutorStepsEditor from '@/components/compute/ExecutorStepsEditor.vue'
 import TesInputsEditor from '@/components/compute/TesInputsEditor.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
@@ -403,7 +403,7 @@ async function submit() {
 
         <!-- Step 5: Review -->
         <div v-else class="space-y-3">
-          <CodeSnippet title="TES task (POST /ga4gh/tes/v1/tasks)" :code="JSON.stringify(task, null, 2)" />
+          <TaskJsonPreview title="TES task (POST /ga4gh/tes/v1/tasks)" :task="task" />
           <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ submitError }}</p>
           <div
             v-if="submittedWithoutWorkspace"

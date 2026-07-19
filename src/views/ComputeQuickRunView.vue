@@ -12,7 +12,7 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
-import CodeSnippet from '@/components/onboarding/CodeSnippet.vue'
+import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -1121,7 +1121,7 @@ function runAnother() {
             Runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in
             <code class="rounded bg-muted px-1 font-mono">{{ runtime.image }}</code>; the script is uploaded on submit (the backend does not accept inline script content).
           </p>
-          <CodeSnippet title="TES task (POST /ga4gh/tes/v1/tasks)" :code="JSON.stringify(task, null, 2)" />
+          <TaskJsonPreview title="TES task (POST /ga4gh/tes/v1/tasks)" :task="task" />
           <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ submitError }}</p>
         </div>
       </section>
