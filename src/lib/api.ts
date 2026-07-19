@@ -777,9 +777,17 @@ export interface StagingReferenceEntry {
   kind?: SourceConnectorKind
   /** Path/URL of the object at its source, in the connector's namespace. */
   source_path?: string
-  /** Connector the reference was staged through (non-native kinds). */
+  /**
+   * Connector the reference was staged through (non-native kinds). NOT
+   * mutually exclusive with origin_node_id: external-kind entries may carry
+   * both, the backend populates the hosting node alongside the connector.
+   */
   connector_id?: string
-  /** aruna_native only: the realm node actually holding the bytes. */
+  /**
+   * Realm node actually holding the bytes. Always set for aruna_native
+   * (which never has a connector_id); external-kind entries may carry it
+   * together with connector_id.
+   */
   origin_node_id?: string
 }
 

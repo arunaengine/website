@@ -84,21 +84,29 @@ export interface ReferenceLabelOptions {
   hostingNodeLabel?: string | null
 }
 
-// Source name without the path: "node <label>" for aruna_native, else
-// "connector <name> on node <label>" when both resolve, degrading through
-// "connector <name>", "node <label>" and the kind label.
+// Source name without the path: "connector <name> on node <label>" whenever a
+// connector name resolves (external-kind entries may carry BOTH connector_id
+// and origin_node_id, and the connector is the actual source), else
+// "node <label>" for aruna_native / bare origin nodes, degrading through the
+// hosting node, the kind label and "external source". While the connector
+// listing has not loaded yet the name is unresolved and the label degrades to
+// the node fallback, improving reactively once it resolves.
 export function referenceSourceName(
-  source: { kind?: SourceConnectorKind; originNodeId?: string },
+  source: { kind?: SourceConnectorKind; originNodeId?: string; connectorId?: string },
   options: ReferenceLabelOptions = {},
 ): string {
+  if (options.connectorName) {
+    // origin_node_id is the authoritative hosting node when present.
+    const nodeLabel =
+      (source.originNodeId ? options.nodeLabel?.(source.originNodeId) : undefined) ??
+      options.hostingNodeLabel
+    return nodeLabel
+      ? `connector ${options.connectorName} on node ${nodeLabel}`
+      : `connector ${options.connectorName}`
+  }
   if (source.kind === 'aruna_native' || source.originNodeId) {
     const nodeId = source.originNodeId ?? ''
     return `node ${options.nodeLabel?.(nodeId) ?? (nodeId || 'unknown')}`
-  }
-  if (options.connectorName) {
-    return options.hostingNodeLabel
-      ? `connector ${options.connectorName} on node ${options.hostingNodeLabel}`
-      : `connector ${options.connectorName}`
   }
   if (options.hostingNodeLabel) return `node ${options.hostingNodeLabel}`
   if (source.kind) return REFERENCE_KIND_LABELS[source.kind] ?? source.kind
@@ -111,7 +119,7 @@ export function referenceSourceLabel(
   options: ReferenceLabelOptions = {},
 ): string {
   const name = referenceSourceName(
-    { kind: entry.kind, originNodeId: entry.origin_node_id },
+    { kind: entry.kind, originNodeId: entry.origin_node_id, connectorId: entry.connector_id },
     options,
   )
   return entry.source_path ? `${name} · ${entry.source_path}` : name

@@ -224,7 +224,7 @@ const hostingNodeLabel = computed(() => {
 // Breakdown row label; connector names resolve lazily via connectorsById.
 function referenceGroupLabel(group: ReferenceSourceGroup): string {
   return referenceSourceName(
-    { kind: group.kind, originNodeId: group.originNodeId },
+    { kind: group.kind, originNodeId: group.originNodeId, connectorId: group.connectorId },
     {
       connectorName: connectorName(group.connectorId),
       nodeLabel: realmNodes.displayName,
@@ -763,7 +763,7 @@ function prefixReferenceSummary(folderPrefix: string): string {
   const sources = new Set(
     entries.map((entry) =>
       referenceSourceName(
-        { kind: entry.kind, originNodeId: entry.origin_node_id },
+        { kind: entry.kind, originNodeId: entry.origin_node_id, connectorId: entry.connector_id },
         {
           connectorName: connectorName(entry.connector_id),
           nodeLabel: realmNodes.displayName,
