@@ -890,34 +890,32 @@ function runAnother() {
                   </p>
                 </div>
                 <div v-if="inputs.length" class="space-y-1.5">
-                  <div v-for="(input, i) in inputs" :key="i" class="surface-inline space-y-1 p-2 text-xs">
-                    <template v-if="input.kind === 'folder'">
-                      <div class="flex items-center gap-1.5">
-                        <Input
-                          v-model="input.basePath"
-                          class="h-7 font-mono text-xs"
-                          aria-label="Container base path"
-                          :invalid="!validContainerDir(input.basePath) ? 'error' : undefined"
-                        />
-                        <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
-                      </div>
+                  <!-- Shared row grid with the output section: flexible content
+                       column plus a fixed 1.25rem action column so control
+                       right edges and remove buttons line up across both. -->
+                  <div v-for="(input, i) in inputs" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.25rem] gap-x-1.5 p-2 text-xs">
+                    <div v-if="input.kind === 'folder'" class="min-w-0 space-y-1">
+                      <Input
+                        v-model="input.basePath"
+                        class="h-7 font-mono text-xs"
+                        aria-label="Container base path"
+                        :invalid="!validContainerDir(input.basePath) ? 'error' : undefined"
+                      />
                       <div class="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground" :title="`s3://${input.bucket}/${input.prefix}`">
                         <Folder class="h-3 w-3 shrink-0 text-primary/70" />
                         <span class="truncate">{{ input.name }}/ · {{ input.files.length }} file{{ input.files.length === 1 ? '' : 's' }} · s3://{{ input.bucket }}/{{ input.prefix }}</span>
                       </div>
-                    </template>
-                    <template v-else>
-                      <div class="flex items-center gap-1.5">
-                        <Input
-                          v-model="input.path"
-                          class="h-7 font-mono text-xs"
-                          aria-label="Container path"
-                          :invalid="!validContainerPath(input.path.trim()) ? 'error' : undefined"
-                        />
-                        <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
-                      </div>
+                    </div>
+                    <div v-else class="min-w-0 space-y-1">
+                      <Input
+                        v-model="input.path"
+                        class="h-7 font-mono text-xs"
+                        aria-label="Container path"
+                        :invalid="!validContainerPath(input.path.trim()) ? 'error' : undefined"
+                      />
                       <div class="truncate font-mono text-[10px] text-muted-foreground" :title="input.url">{{ input.url }}</div>
-                    </template>
+                    </div>
+                    <Button variant="ghost" size="icon-sm" class="mt-1 h-5 w-5 self-start" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
                   </div>
                   <p v-if="!inputsValid" class="text-[11px] text-destructive">
                     Each input needs an absolute canonical container path (folders a base directory), unique across all staged files.
@@ -937,49 +935,53 @@ function runAnother() {
                   </p>
                 </div>
                 <div v-if="outputRows.length" class="space-y-1.5">
-                  <div v-for="(row, i) in outputRows" :key="i" class="surface-inline space-y-1.5 p-2 text-xs">
-                    <div>
-                      <label class="text-[10px] font-medium text-muted-foreground">Capture</label>
-                      <div class="mt-0.5 flex items-center gap-1.5">
-                        <Input
-                          :model-value="row.containerPath"
-                          class="h-7 font-mono text-xs"
-                          placeholder="/work/out/result.txt"
-                          aria-label="Container path to capture"
-                          :invalid="!validOutputContainerPath(row.containerPath) ? 'error' : undefined"
-                          @update:model-value="setOutputContainerPath(row, String($event))"
-                        />
-                        <Badge variant="outline" class="shrink-0 gap-1 text-[10px]">
-                          <component :is="isDirCapture(row.containerPath) ? Folder : FileText" class="h-3 w-3" />
-                          {{ isDirCapture(row.containerPath) ? 'Folder' : 'File' }}
-                        </Badge>
-                        <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove output" @click="removeOutput(i)"><X class="size-3" /></Button>
+                  <!-- Same row grid as the input section above; every control
+                       line ends at the shared content-column edge. -->
+                  <div v-for="(row, i) in outputRows" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.25rem] gap-x-1.5 p-2 text-xs">
+                    <div class="min-w-0 space-y-1.5">
+                      <div>
+                        <label class="text-[10px] font-medium text-muted-foreground">Capture</label>
+                        <div class="mt-0.5 flex items-center gap-1.5">
+                          <Input
+                            :model-value="row.containerPath"
+                            class="h-7 min-w-0 flex-1 font-mono text-xs"
+                            placeholder="/work/out/result.txt"
+                            aria-label="Container path to capture"
+                            :invalid="!validOutputContainerPath(row.containerPath) ? 'error' : undefined"
+                            @update:model-value="setOutputContainerPath(row, String($event))"
+                          />
+                          <Badge variant="outline" class="shrink-0 gap-1 text-[10px]">
+                            <component :is="isDirCapture(row.containerPath) ? Folder : FileText" class="h-3 w-3" />
+                            {{ isDirCapture(row.containerPath) ? 'Folder' : 'File' }}
+                          </Badge>
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <label class="text-[10px] font-medium text-muted-foreground">into</label>
-                      <div class="mt-0.5 flex items-center gap-1.5">
-                        <Select
-                          v-if="bucketOptions.length"
-                          v-model="row.bucket"
-                          :options="bucketOptions"
-                          placeholder="Bucket"
-                          class="h-7 w-32 shrink-0 text-xs"
-                          aria-label="Destination bucket"
-                        />
-                        <Input v-else v-model="row.bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" aria-label="Destination bucket" />
-                        <span class="shrink-0 text-muted-foreground">/</span>
-                        <Input
-                          :model-value="row.path"
-                          class="h-7 font-mono text-xs"
-                          placeholder="results/output.txt"
-                          aria-label="Destination key"
-                          @update:model-value="setOutputKey(row, String($event))"
-                          @blur="onOutputKeyBlur(row)"
-                        />
+                      <div>
+                        <label class="text-[10px] font-medium text-muted-foreground">into</label>
+                        <div class="mt-0.5 flex items-center gap-1.5">
+                          <Select
+                            v-if="bucketOptions.length"
+                            v-model="row.bucket"
+                            :options="bucketOptions"
+                            placeholder="Bucket"
+                            class="h-7 w-32 shrink-0 text-xs"
+                            aria-label="Destination bucket"
+                          />
+                          <Input v-else v-model="row.bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" aria-label="Destination bucket" />
+                          <span class="shrink-0 text-muted-foreground">/</span>
+                          <Input
+                            :model-value="row.path"
+                            class="h-7 min-w-0 flex-1 font-mono text-xs"
+                            placeholder="results/output.txt"
+                            aria-label="Destination key"
+                            @update:model-value="setOutputKey(row, String($event))"
+                            @blur="onOutputKeyBlur(row)"
+                          />
+                        </div>
                       </div>
+                      <div class="truncate font-mono text-[10px] text-muted-foreground" :title="outputDestination(row)">{{ outputDestination(row) }}</div>
                     </div>
-                    <div class="truncate font-mono text-[10px] text-muted-foreground" :title="outputDestination(row)">{{ outputDestination(row) }}</div>
+                    <Button variant="ghost" size="icon-sm" class="mt-1 h-5 w-5 self-start" aria-label="Remove output" @click="removeOutput(i)"><X class="size-3" /></Button>
                   </div>
                 </div>
                 <p v-else class="text-[11px] text-muted-foreground">Nothing captured yet; only stdout and stderr are collected after the run.</p>

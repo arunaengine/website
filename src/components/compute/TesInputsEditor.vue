@@ -44,42 +44,47 @@ function remove(i: number) {
       No inputs, the task starts with an empty working directory.
     </p>
     <div v-else class="space-y-2">
-      <div v-for="(entry, i) in modelValue" :key="i" class="surface-inline flex flex-wrap items-center gap-3 p-3">
-        <template v-if="entry.kind === 'folder'">
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5 truncate text-[11px] text-foreground" :title="`s3://${entry.bucket}/${entry.prefix}`">
-              <Folder class="h-3.5 w-3.5 shrink-0 text-primary" />
-              <span class="truncate font-mono">{{ entry.name }}/</span>
-              <span class="shrink-0 text-muted-foreground">{{ entry.files.length }} file{{ entry.files.length === 1 ? '' : 's' }}</span>
+      <!-- Shared row grid with the outputs step (ComputeSubmitView): flexible
+           content column plus a fixed 1.75rem action column so control right
+           edges and remove buttons line up across both editors. -->
+      <div v-for="(entry, i) in modelValue" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.75rem] gap-x-2 p-3">
+        <div class="flex min-w-0 flex-wrap items-center gap-3">
+          <template v-if="entry.kind === 'folder'">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 truncate text-[11px] text-foreground" :title="`s3://${entry.bucket}/${entry.prefix}`">
+                <Folder class="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span class="truncate font-mono">{{ entry.name }}/</span>
+                <span class="shrink-0 text-muted-foreground">{{ entry.files.length }} file{{ entry.files.length === 1 ? '' : 's' }}</span>
+              </div>
             </div>
-          </div>
-          <Badge variant="outline">FOLDER</Badge>
-          <div class="w-full sm:w-64">
-            <Input
-              :model-value="entry.basePath"
-              class="font-mono"
-              :disabled="disabled"
-              aria-label="Container base path"
-              @update:model-value="patchPath(i, String($event))"
-            />
-          </div>
-        </template>
-        <template v-else>
-          <div class="min-w-0 flex-1">
-            <div class="truncate font-mono text-[11px] text-foreground" :title="entry.url">{{ truncateMiddle(entry.url || '', 20, 16) }}</div>
-          </div>
-          <Badge variant="outline">FILE</Badge>
-          <div class="w-full sm:w-64">
-            <Input
-              :model-value="entry.path"
-              class="font-mono"
-              :disabled="disabled"
-              aria-label="Container path"
-              @update:model-value="patchPath(i, String($event))"
-            />
-          </div>
-        </template>
-        <Button variant="ghost" size="icon-sm" :disabled="disabled" aria-label="Remove input" @click="remove(i)"><X class="h-4 w-4" /></Button>
+            <Badge variant="outline">FOLDER</Badge>
+            <div class="w-full sm:w-64">
+              <Input
+                :model-value="entry.basePath"
+                class="font-mono"
+                :disabled="disabled"
+                aria-label="Container base path"
+                @update:model-value="patchPath(i, String($event))"
+              />
+            </div>
+          </template>
+          <template v-else>
+            <div class="min-w-0 flex-1">
+              <div class="truncate font-mono text-[11px] text-foreground" :title="entry.url">{{ truncateMiddle(entry.url || '', 20, 16) }}</div>
+            </div>
+            <Badge variant="outline">FILE</Badge>
+            <div class="w-full sm:w-64">
+              <Input
+                :model-value="entry.path"
+                class="font-mono"
+                :disabled="disabled"
+                aria-label="Container path"
+                @update:model-value="patchPath(i, String($event))"
+              />
+            </div>
+          </template>
+        </div>
+        <Button variant="ghost" size="icon-sm" class="self-center" :disabled="disabled" aria-label="Remove input" @click="remove(i)"><X class="h-4 w-4" /></Button>
       </div>
     </div>
 

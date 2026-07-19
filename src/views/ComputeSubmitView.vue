@@ -314,31 +314,36 @@ async function submit() {
         <div v-else-if="step === 3" class="space-y-6">
           <div class="space-y-3">
             <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Outputs</div>
-            <div v-for="(row, i) in outputRows" :key="i" class="surface-inline space-y-2 p-3">
-              <div class="flex flex-wrap items-end gap-3">
-                <div class="min-w-0 flex-1">
-                  <label class="text-xs font-medium text-foreground">Capture <span class="text-muted-foreground">(container path)</span></label>
-                  <Input v-model="row.path" class="mt-1 font-mono" placeholder="/outputs/result.txt" aria-label="Container path to capture" />
+            <!-- Same row grid as TesInputsEditor: flexible content column plus
+                 a fixed 1.75rem action column so both editors share one right
+                 edge for controls and remove buttons. -->
+            <div v-for="(row, i) in outputRows" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.75rem] gap-x-2 p-3">
+              <div class="min-w-0 space-y-2">
+                <div class="flex flex-wrap items-end gap-3">
+                  <div class="min-w-0 flex-1">
+                    <label class="text-xs font-medium text-foreground">Capture <span class="text-muted-foreground">(container path)</span></label>
+                    <Input v-model="row.path" class="mt-1 font-mono" placeholder="/outputs/result.txt" aria-label="Container path to capture" />
+                  </div>
+                  <span class="pb-2.5 text-xs text-muted-foreground">into</span>
+                  <div class="w-44">
+                    <label class="text-xs font-medium text-foreground">Bucket</label>
+                    <Select v-if="workspaceBucketOptions.length" v-model="row.bucket" :options="workspaceBucketOptions" placeholder="Bucket" class="mt-1" aria-label="Destination bucket" />
+                    <Input v-else v-model="row.bucket" class="mt-1 font-mono" placeholder="my-results" aria-label="Destination bucket" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <label class="text-xs font-medium text-foreground">Key</label>
+                    <Input v-model="row.key" class="mt-1 font-mono" placeholder="runs/result.txt" aria-label="Destination key" @blur="onOutputKeyBlur(row)" />
+                  </div>
                 </div>
-                <span class="pb-2.5 text-xs text-muted-foreground">into</span>
-                <div class="w-44">
-                  <label class="text-xs font-medium text-foreground">Bucket</label>
-                  <Select v-if="workspaceBucketOptions.length" v-model="row.bucket" :options="workspaceBucketOptions" placeholder="Bucket" class="mt-1" aria-label="Destination bucket" />
-                  <Input v-else v-model="row.bucket" class="mt-1 font-mono" placeholder="my-results" aria-label="Destination bucket" />
+                <div class="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                  <Badge variant="outline" class="shrink-0 gap-1 font-sans text-[10px]">
+                    <component :is="isDirCapture(row.path) ? Folder : FileText" class="h-3 w-3" />
+                    {{ isDirCapture(row.path) ? 'Folder' : 'File' }}
+                  </Badge>
+                  <span class="truncate" :title="outputDestination(row)">{{ outputDestination(row) }}</span>
                 </div>
-                <div class="min-w-0 flex-1">
-                  <label class="text-xs font-medium text-foreground">Key</label>
-                  <Input v-model="row.key" class="mt-1 font-mono" placeholder="runs/result.txt" aria-label="Destination key" @blur="onOutputKeyBlur(row)" />
-                </div>
-                <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Remove output" @click="removeOutputRow(i)"><X class="h-4 w-4" /></Button>
               </div>
-              <div class="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                <Badge variant="outline" class="shrink-0 gap-1 font-sans text-[10px]">
-                  <component :is="isDirCapture(row.path) ? Folder : FileText" class="h-3 w-3" />
-                  {{ isDirCapture(row.path) ? 'Folder' : 'File' }}
-                </Badge>
-                <span class="truncate" :title="outputDestination(row)">{{ outputDestination(row) }}</span>
-              </div>
+              <Button variant="ghost" size="icon-sm" class="self-center text-destructive hover:text-destructive" aria-label="Remove output" @click="removeOutputRow(i)"><X class="h-4 w-4" /></Button>
             </div>
             <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
             <p class="text-[11px] text-muted-foreground">A folder capture (container path ending in /) uploads everything the task wrote under that path after the run.</p>
