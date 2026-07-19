@@ -896,6 +896,11 @@ const isEmpty = computed(
             <KeyRound class="h-3 w-3" /> …{{ keyTail }}
           </span>
           <Button variant="outline" size="sm" @click="refreshAll"><RefreshCw class="h-4 w-4" /> Refresh</Button>
+          <!-- Staging jobs are connected-node global, not per bucket. -->
+          <Button v-if="stagingJobsEnabled" variant="outline" size="sm" @click="stagingPanelOpen = true">
+            <HardDriveDownload class="h-4 w-4" /> Staging
+            <Badge v-if="staging.runningCount.value" variant="secondary" class="ml-1">{{ staging.runningCount.value }}</Badge>
+          </Button>
         </template>
       </template>
     </PageHeader>
@@ -1125,11 +1130,7 @@ const isEmpty = computed(
                     </div>
                   </template>
                 </Popover>
-                <!-- Staging and the Add data pipeline always target the connected node. -->
-                <Button v-if="stagingJobsEnabled && !remoteNodeId" variant="outline" size="sm" @click="stagingPanelOpen = true">
-                  <HardDriveDownload class="h-4 w-4" /> Staging
-                  <Badge v-if="staging.runningCount.value" variant="secondary" class="ml-1">{{ staging.runningCount.value }}</Badge>
-                </Button>
+                <!-- The Add data pipeline always targets the connected node. -->
                 <Button v-if="!remoteBlocked" variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
                 <Button v-if="!remoteNodeId" size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>

@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import Badge from '@/components/ui/Badge.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { ArrowLeftRight, Boxes, Pin } from '@lucide/vue'
+import { ArrowLeftRight, Boxes, Pin, Server } from '@lucide/vue'
 
 // One shared row for every bucket list surface (sidebar pins/locals, recently
 // browsed, federated search hits): text-sm, py-2, primary Boxes icon, optional
-// "on <node>" badge, optional sync glyph, and an always-visible pin toggle.
+// remote-node Server icon, optional sync glyph, and an always-visible pin toggle.
 const props = withDefaults(
   defineProps<{
     bucket: string
@@ -78,14 +77,16 @@ function onClick() {
             class="h-3 w-3 shrink-0 text-primary/60"
             aria-label="Sync relationships configured"
           />
-          <Badge
-            v-if="nodeId"
-            variant="outline"
-            class="shrink-0 text-[10px]"
-            :title="`Stored on another node: ${nodeId}`"
-          >
-            on {{ realmNodes.displayName(nodeId) }}
-          </Badge>
+          <Tooltip v-if="nodeId" side="right">
+            <span class="inline-flex shrink-0" aria-label="Stored on another node">
+              <Server class="h-3.5 w-3.5 text-muted-foreground" />
+            </span>
+            <template #content>
+              <span class="block font-medium">Stored on another node</span>
+              <span class="block">{{ realmNodes.displayName(nodeId) }}</span>
+              <span class="block text-muted-foreground">{{ nodeId }}</span>
+            </template>
+          </Tooltip>
         </span>
       </button>
       <template #content><slot name="tooltip" /></template>
@@ -111,14 +112,16 @@ function onClick() {
           class="h-3 w-3 shrink-0 text-primary/60"
           aria-label="Sync relationships configured"
         />
-        <Badge
-          v-if="nodeId"
-          variant="outline"
-          class="shrink-0 text-[10px]"
-          :title="`Stored on another node: ${nodeId}`"
-        >
-          on {{ realmNodes.displayName(nodeId) }}
-        </Badge>
+        <Tooltip v-if="nodeId" side="right">
+          <span class="inline-flex shrink-0" aria-label="Stored on another node">
+            <Server class="h-3.5 w-3.5 text-muted-foreground" />
+          </span>
+          <template #content>
+            <span class="block font-medium">Stored on another node</span>
+            <span class="block">{{ realmNodes.displayName(nodeId) }}</span>
+            <span class="block text-muted-foreground">{{ nodeId }}</span>
+          </template>
+        </Tooltip>
       </span>
     </button>
 
