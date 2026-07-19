@@ -16,6 +16,7 @@ import Popover from '@/components/ui/Popover.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
+import BucketRow from '@/components/data/BucketRow.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
@@ -52,7 +53,6 @@ import {
   Link2,
   Loader2,
   LogIn,
-  Pin,
   Plus,
   RefreshCw,
   ShieldAlert,
@@ -175,6 +175,13 @@ function openSyncFromHit(hit: BucketSearchHit) {
 function onSyncChanged() {
   void refreshBuckets()
   void loadSyncOverview()
+}
+
+// "New sync" inside the status panel: swap the centered dialogs instead of
+// stacking them.
+function onNewSyncRequested() {
+  syncPanelOpen.value = false
+  openSyncDialog()
 }
 
 // ── Reference visibility ────────────────────────────────────────────────────
@@ -841,7 +848,7 @@ const isEmpty = computed(
       <section v-else class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside class="space-y-3">
           <div class="surface p-3">
-            <BucketSearchBox @open="openSearchHit" @sync="openSyncFromHit" />
+            <BucketSearchBox :sync-by-bucket="syncByBucket" @open="openSearchHit" @sync="openSyncFromHit" />
           </div>
 
           <div class="surface overflow-hidden">
@@ -866,41 +873,16 @@ const isEmpty = computed(
                 <li
                   v-for="entry in sidebarBuckets"
                   :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
-                  class="group/bucket flex items-center gap-1 pr-2"
                 >
-                  <button
-                    class="flex min-w-0 flex-1 items-center gap-2 px-4 py-2 text-left text-sm hover:bg-muted"
-                    :class="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
-                    @click="openBucketOn(entry.bucket, entry.nodeId)"
-                  >
-                    <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span class="truncate">{{ entry.bucket }}</span>
-                    <span class="ml-auto flex shrink-0 items-center gap-1">
-                      <ArrowLeftRight
-                        v-if="!entry.nodeId && syncByBucket.has(entry.bucket)"
-                        class="h-3 w-3 shrink-0 text-primary/60"
-                        aria-label="Sync relationships configured"
-                      />
-                      <Badge
-                        v-if="entry.nodeId"
-                        variant="outline"
-                        class="shrink-0 text-[10px]"
-                        :title="`Stored on another node: ${entry.nodeId}`"
-                      >
-                        on {{ realmNodes.displayName(entry.nodeId) }}
-                      </Badge>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    class="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
-                    :class="entry.pinned ? 'text-primary' : 'opacity-0 transition-opacity group-hover/bucket:opacity-100 focus-visible:opacity-100'"
-                    :title="entry.pinned ? 'Unpin bucket' : 'Pin bucket'"
-                    :aria-label="entry.pinned ? `Unpin ${entry.bucket}` : `Pin ${entry.bucket}`"
-                    @click="shortcuts.togglePin(entry.bucket, entry.nodeId)"
-                  >
-                    <Pin class="h-3 w-3" :fill="entry.pinned ? 'currentColor' : 'none'" />
-                  </button>
+                  <BucketRow
+                    :bucket="entry.bucket"
+                    :node-id="entry.nodeId"
+                    :pinned="entry.pinned"
+                    :synced="!entry.nodeId && syncByBucket.has(entry.bucket)"
+                    :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
+                    @open="openBucketOn(entry.bucket, entry.nodeId)"
+                    @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
+                  />
                 </li>
               </ul>
               <p v-else class="px-4 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
@@ -911,22 +893,15 @@ const isEmpty = computed(
                 </p>
                 <ul class="pb-1">
                   <li v-for="entry in recentBuckets" :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`">
-                    <button
-                      class="flex w-full items-center gap-2 px-4 py-1.5 text-left text-xs hover:bg-muted"
-                      :class="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
-                      @click="openBucketOn(entry.bucket, entry.nodeId)"
-                    >
-                      <Boxes class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <span class="truncate">{{ entry.bucket }}</span>
-                      <Badge
-                        v-if="entry.nodeId"
-                        variant="outline"
-                        class="ml-auto shrink-0 text-[10px]"
-                        :title="`Stored on another node: ${entry.nodeId}`"
-                      >
-                        on {{ realmNodes.displayName(entry.nodeId) }}
-                      </Badge>
-                    </button>
+                    <BucketRow
+                      :bucket="entry.bucket"
+                      :node-id="entry.nodeId"
+                      :pinned="false"
+                      :synced="!entry.nodeId && syncByBucket.has(entry.bucket)"
+                      :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
+                      @open="openBucketOn(entry.bucket, entry.nodeId)"
+                      @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
+                    />
                   </li>
                 </ul>
               </div>
@@ -999,20 +974,11 @@ const isEmpty = computed(
                   v-if="showSyncButton"
                   variant="outline"
                   size="sm"
-                  :title="remoteNodeId ? 'Sync this remote bucket to the connected node' : 'Replicate this bucket to another node'"
-                  @click="openSyncDialog"
-                >
-                  <ArrowLeftRight class="h-4 w-4" /> Sync
-                </Button>
-                <Button
-                  v-if="bucketSyncCount"
-                  variant="outline"
-                  size="sm"
-                  :title="`${bucketSyncCount} sync relationship${bucketSyncCount === 1 ? '' : 's'}, open sync status`"
+                  :title="bucketSyncCount ? `${bucketSyncCount} sync relationship${bucketSyncCount === 1 ? '' : 's'}, open sync status` : 'Sync relationships for this bucket'"
                   @click="syncPanelOpen = true"
                 >
-                  <ArrowLeftRight class="h-4 w-4 text-primary" />
-                  <Badge variant="secondary" class="ml-1">{{ bucketSyncCount }}</Badge>
+                  <ArrowLeftRight class="h-4 w-4" :class="bucketSyncCount ? 'text-primary' : ''" /> Syncs
+                  <Badge v-if="bucketSyncCount" variant="secondary" class="ml-1">{{ bucketSyncCount }}</Badge>
                 </Button>
                 <Popover v-if="showReferenceStats">
                   <Button
@@ -1234,6 +1200,7 @@ const isEmpty = computed(
       v-model:open="syncPanelOpen"
       :bucket="bucket"
       @changed="onSyncChanged"
+      @new-sync="onNewSyncRequested"
     />
 
     <PreviewPane

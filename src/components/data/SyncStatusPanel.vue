@@ -16,7 +16,7 @@ import { type SyncReferenceHandling, type SyncRelationship, type SyncRelationshi
 import { arnLocationLabel, parseArunaArn, syncModeLabel, syncStateVariant } from '@/lib/sync'
 import { formatBytes, formatDuration, relativeTime } from '@/lib/utils'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ArrowLeftRight, ArrowLeft, ArrowRight, Loader2, Play, RefreshCw, Trash2 } from '@lucide/vue'
+import { ArrowLeftRight, ArrowLeft, ArrowRight, Loader2, Play, Plus, RefreshCw, Trash2 } from '@lucide/vue'
 
 // Sync relationships touching one bucket on the connected node, outgoing and
 // incoming, presented as a centered dialog opened from the sync chip. The
@@ -27,6 +27,8 @@ const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   // Fired after a delete or re-run so the parent can refresh its badges.
   (e: 'changed'): void
+  // Asks the parent to open the create-sync dialog (the parent owns it).
+  (e: 'new-sync'): void
 }>()
 
 const { listSyncRelationships, getSyncRelationship, runSyncRelationship, updateSyncReferenceHandling, deleteSyncRelationship } =
@@ -217,9 +219,14 @@ async function remove(row: Row) {
             <ArrowLeftRight class="h-4 w-4 shrink-0 text-primary" />
             <span class="truncate">Sync status: <span class="font-mono text-sm">{{ props.bucket }}</span></span>
           </DialogTitle>
-          <Button variant="ghost" size="icon-sm" aria-label="Reload" :disabled="loading" @click="() => load()">
-            <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" />
-          </Button>
+          <div class="flex shrink-0 items-center gap-1">
+            <Button variant="outline" size="sm" @click="emit('new-sync')">
+              <Plus class="h-3.5 w-3.5" /> New sync
+            </Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Reload" :disabled="loading" @click="() => load()">
+              <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" />
+            </Button>
+          </div>
         </div>
         <DialogDescription>
           Your sync relationships where this bucket is the source (outgoing) or the target (incoming).
@@ -232,7 +239,9 @@ async function remove(row: Row) {
           <Skeleton class="h-16 w-full" />
         </div>
         <ErrorPanel v-else-if="error" :message="error" @retry="load" />
-        <EmptyState v-else-if="!rows.length" title="No sync relationships" description="This bucket is not part of any sync you created." />
+        <EmptyState v-else-if="!rows.length" title="No sync relationships" description="This bucket is not part of any sync you created. Replicate it to another node with a new sync.">
+          <Button size="sm" @click="emit('new-sync')"><Plus class="h-3.5 w-3.5" /> New sync</Button>
+        </EmptyState>
         <div v-else class="space-y-2">
           <div
             v-for="row in rows"

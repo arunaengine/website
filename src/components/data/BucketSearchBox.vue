@@ -1,16 +1,14 @@
 <script setup lang="ts">
-import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import Tooltip from '@/components/ui/Tooltip.vue'
+import BucketRow from '@/components/data/BucketRow.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
-import { truncateMiddle } from '@/lib/utils'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, useId, watch } from 'vue'
-import { AlertTriangle, ArrowLeftRight, Loader2, Pin, Search, X } from '@lucide/vue'
+import { AlertTriangle, ArrowLeftRight, Loader2, Search, X } from '@lucide/vue'
 
 // Federated bucket search over GET /search/buckets, rendered as a compact
 // combobox: one input, results in a dropdown overlay. Local and remote hits
@@ -31,6 +29,8 @@ const props = withDefaults(
     /** Picker: explain that an unmatched value may create a new bucket. */
     allowNew?: boolean
     placeholder?: string
+    /** Local buckets with sync relationships (name-keyed); hits show the sync glyph. */
+    syncByBucket?: ReadonlyMap<string, unknown> | null
   }>(),
   {
     modelValue: undefined,
@@ -39,6 +39,7 @@ const props = withDefaults(
     excludeLocalBucket: undefined,
     allowNew: false,
     placeholder: 'Find buckets across nodes…',
+    syncByBucket: null,
   },
 )
 
@@ -228,22 +229,21 @@ function pinNodeId(hit: BucketSearchHit): string | null {
       </div>
 
       <ul v-else-if="visibleHits.length" role="listbox" class="max-h-64 overflow-y-auto p-1">
-        <li v-for="(hit, index) in visibleHits" :key="hit.arn" class="group/hit flex items-center gap-1 rounded-sm">
-          <Tooltip side="right">
-            <button
-              type="button"
-              role="option"
-              :aria-selected="index === activeIndex"
-              class="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-2 py-1.5 text-left outline-none hover:bg-muted focus-visible:bg-muted"
-              :class="index === activeIndex ? 'bg-muted' : ''"
-              @mousedown.prevent="pick(hit)"
-            >
-              <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{{ hit.bucket }}</span>
-              <Badge variant="outline" class="shrink-0 font-mono text-[10px]" :aria-label="`Hosted on node ${hit.node_id}`">
-                #{{ truncateMiddle(hit.node_id, 4, 4) }}
-              </Badge>
-            </button>
-            <template #content>
+        <li v-for="(hit, index) in visibleHits" :key="hit.arn">
+          <BucketRow
+            :bucket="hit.bucket"
+            :node-id="pinNodeId(hit)"
+            :pinned="shortcuts.isPinned(hit.bucket, pinNodeId(hit))"
+            :synced="Boolean(syncByBucket?.has(hit.bucket))"
+            :subtitle="hit.group_name || null"
+            :highlighted="index === activeIndex"
+            option
+            open-on-mousedown
+            :pinnable="mode === 'browse'"
+            @open="pick(hit)"
+            @toggle-pin="shortcuts.togglePin(hit.bucket, pinNodeId(hit))"
+          >
+            <template #tooltip>
               <dl class="grid max-w-72 grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
                 <dt class="text-muted-foreground">Node</dt>
                 <dd class="min-w-0 break-all"><span class="font-medium">{{ displayName(hit.node_id) }}</span><br><span class="font-mono text-[10px]">{{ hit.node_id }}</span></dd>
@@ -251,32 +251,19 @@ function pinNodeId(hit: BucketSearchHit): string | null {
                 <dd class="min-w-0 break-all"><span class="font-medium">{{ hit.group_name || 'Unnamed group' }}</span><br><span class="font-mono text-[10px]">{{ hit.group_id }}</span></dd>
               </dl>
             </template>
-          </Tooltip>
-          <template v-if="mode === 'browse'">
-            <Button
-              v-if="!isLocalNode(hit.node_id)"
-              variant="ghost"
-              size="icon-sm"
-              class="shrink-0 opacity-0 transition-opacity group-hover/hit:opacity-100 focus-visible:opacity-100"
-              :title="`Sync ${hit.bucket} from ${displayName(hit.node_id)} to this node…`"
-              :aria-label="`Sync ${hit.bucket} to this node`"
-              @mousedown.prevent="syncHit(hit)"
-            >
-              <ArrowLeftRight class="size-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              class="shrink-0"
-              :class="shortcuts.isPinned(hit.bucket, pinNodeId(hit)) ? 'text-primary' : 'text-muted-foreground opacity-0 transition-opacity group-hover/hit:opacity-100 focus-visible:opacity-100'"
-              :title="shortcuts.isPinned(hit.bucket, pinNodeId(hit)) ? 'Unpin bucket' : 'Pin bucket'"
-              :aria-label="shortcuts.isPinned(hit.bucket, pinNodeId(hit)) ? `Unpin ${hit.bucket}` : `Pin ${hit.bucket}`"
-              @mousedown.prevent
-              @click="shortcuts.togglePin(hit.bucket, pinNodeId(hit))"
-            >
-              <Pin class="size-3.5" :fill="shortcuts.isPinned(hit.bucket, pinNodeId(hit)) ? 'currentColor' : 'none'" />
-            </Button>
-          </template>
+            <template v-if="mode === 'browse' && !isLocalNode(hit.node_id)" #actions>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                class="shrink-0 text-muted-foreground hover:text-foreground"
+                :title="`Sync ${hit.bucket} from ${displayName(hit.node_id)} to this node…`"
+                :aria-label="`Sync ${hit.bucket} to this node`"
+                @mousedown.prevent="syncHit(hit)"
+              >
+                <ArrowLeftRight class="size-3.5" />
+              </Button>
+            </template>
+          </BucketRow>
         </li>
       </ul>
 
