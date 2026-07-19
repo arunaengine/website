@@ -31,6 +31,8 @@ export interface ReferenceSourceGroup {
   originNodeId?: string
   count: number
   bytes: number
+  /** Up to three representative source paths for honest aggregate UI detail. */
+  sourcePaths: string[]
 }
 
 export interface ReferenceStats {
@@ -57,9 +59,13 @@ export function aggregateReferences(entries: StagingReferenceEntry[]): Reference
       originNodeId: entry.origin_node_id,
       count: 0,
       bytes: 0,
+      sourcePaths: [],
     }
     group.count++
     group.bytes += entry.size
+    if (entry.source_path && group.sourcePaths.length < 3 && !group.sourcePaths.includes(entry.source_path)) {
+      group.sourcePaths.push(entry.source_path)
+    }
     groups.set(key, group)
   }
   return { count, bytes, groups: [...groups.values()].sort((a, b) => b.bytes - a.bytes) }

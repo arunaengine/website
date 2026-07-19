@@ -2,6 +2,7 @@
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
+import ReferencedUsageBar from '@/components/ui/ReferencedUsageBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -20,7 +21,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Cable, ChartArea, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
-import { assessQuota, quotaCountedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
+import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
 import { featureEnabled } from '@/lib/config'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import {
@@ -62,6 +63,7 @@ const docsLoading = ref(false)
 const quotaStatus = computed(() => usage.value?.quota ?? null)
 // The counter the backend QuotaGate enforces against (realm-wide logical bytes).
 const usedBytes = computed(() => (usage.value ? quotaCountedBytes(usage.value) : 0))
+const referenceBytes = computed(() => (usage.value ? referencedBytes(usage.value) : 0))
 const quotaAssessment = computed(() => assessQuota(quotaStatus.value, usedBytes.value))
 const quotaBadge = computed(() => QUOTA_STATE_BADGES[quotaAssessment.value.state])
 
@@ -293,6 +295,12 @@ async function leave() {
           <p v-if="quotaStatus && quotaStatus.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
             Hard cap {{ formatBytes(quotaStatus.ceiling_bytes) }}.
           </p>
+          <ReferencedUsageBar
+            v-if="referenceBytes"
+            class="mt-3"
+            :referenced="referenceBytes"
+            :stored="usedBytes"
+          />
           <p v-if="quotaAssessment.state === 'over-quota'" class="mt-1 text-[11px] text-muted-foreground">
             Writes are accepted until the hard cap; above it the node rejects uploads (QuotaExceeded).
           </p>

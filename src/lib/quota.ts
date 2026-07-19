@@ -31,6 +31,10 @@ export function quotaCountedBytes(usage: UsageResponse): number {
   return usage.realm?.logical_bytes ?? usage.logical_bytes ?? 0
 }
 
+export function referencedBytes(usage: UsageResponse): number {
+  return usage.realm?.referenced_bytes ?? usage.referenced_bytes
+}
+
 export function assessQuota(
   quota: GroupQuotaStatus | null | undefined,
   usedBytes: number,

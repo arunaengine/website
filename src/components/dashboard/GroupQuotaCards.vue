@@ -5,10 +5,11 @@ import { HardDrive, RefreshCw } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
+import ReferencedUsageBar from '@/components/ui/ReferencedUsageBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import { useAruna } from '@/composables/useAruna'
-import { assessQuota, quotaCountedBytes, QUOTA_STATE_BADGES, type QuotaState } from '@/lib/quota'
+import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES, type QuotaState } from '@/lib/quota'
 import { formatBytes } from '@/lib/utils'
 import type { GroupQuotaStatus } from '@/lib/api'
 
@@ -22,6 +23,7 @@ interface CardEntry {
   error?: string
   quota?: GroupQuotaStatus | null
   usedBytes?: number
+  referencedBytes?: number
 }
 
 // Cap the fetched cards so a user in dozens of groups does not fan out dozens
@@ -63,6 +65,7 @@ async function fetchEntry(entry: CardEntry, seq: number) {
     const usage = await getGroupUsage(entry.groupId)
     if (seq !== loadSeq) return
     entry.usedBytes = quotaCountedBytes(usage)
+    entry.referencedBytes = referencedBytes(usage)
     entry.quota = usage.quota ?? null
     entry.status = 'ready'
   } catch (err) {
@@ -174,6 +177,13 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
           <p v-else class="mt-2 text-[11px] text-muted-foreground">
             {{ formatBytes(entry.usedBytes ?? 0) }} · no quota policy reported
           </p>
+          <ReferencedUsageBar
+            v-if="entry.referencedBytes"
+            class="mt-2"
+            :referenced="entry.referencedBytes"
+            :stored="entry.usedBytes ?? 0"
+            compact
+          />
         </template>
       </div>
     </div>

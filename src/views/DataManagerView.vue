@@ -13,6 +13,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import Popover from '@/components/ui/Popover.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
@@ -699,6 +700,30 @@ function connectorName(connectorId: string | undefined): string | null {
   return connectorsById.value.get(connectorId)?.name ?? null
 }
 
+function referencedFrom(key: string): string {
+  const entry = references.referencedByKey.value.get(key)
+  if (!entry) return 'Referenced from an external source'
+  return `Referenced from ${referenceSourceLabel(entry, {
+    connectorName: connectorName(entry.connector_id),
+    nodeLabel: realmNodes.displayName,
+  })}`
+}
+
+function prefixReferenceSummary(folderPrefix: string): string {
+  const entries = references.entries.value.filter(
+    (entry) => entry.referenced && entry.key.startsWith(folderPrefix),
+  )
+  const sources = new Set(
+    entries.map((entry) =>
+      referenceSourceName(
+        { kind: entry.kind, originNodeId: entry.origin_node_id },
+        { connectorName: connectorName(entry.connector_id), nodeLabel: realmNodes.displayName },
+      ),
+    ),
+  )
+  return `Contains ${entries.length} referenced object${entries.length === 1 ? '' : 's'} from ${[...sources].join(', ') || 'external sources'}. Open the folder for exact source paths.`
+}
+
 const previewReference = computed(() =>
   previewObject.value
     ? (references.referencedByKey.value.get(previewObject.value.key) ?? null)
@@ -1013,10 +1038,13 @@ const isEmpty = computed(
                         <li
                           v-for="group in referenceStats.groups"
                           :key="group.key"
-                          class="flex items-center justify-between gap-3 text-xs"
+                          class="flex items-start justify-between gap-3 text-xs"
                         >
-                          <span class="min-w-0 truncate text-foreground" :title="referenceGroupLabel(group)">
-                            {{ referenceGroupLabel(group) }}
+                          <span class="min-w-0 text-foreground">
+                            <span class="block truncate" :title="referenceGroupLabel(group)">{{ referenceGroupLabel(group) }}</span>
+                            <span v-if="group.sourcePaths.length" class="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground" :title="group.sourcePaths.join('\n')">
+                              {{ group.sourcePaths.join(', ') }}<template v-if="group.count > group.sourcePaths.length">, …</template>
+                            </span>
                           </span>
                           <span class="shrink-0 font-mono text-muted-foreground">
                             {{ group.count }} · {{ formatBytes(group.bytes) }}
@@ -1102,16 +1130,12 @@ const isEmpty = computed(
                           aria-label="Covered by a sync relationship"
                         />
                         <!-- Tooltip lives on a span: title on inline svg is unreliable. -->
-                        <span
-                          v-if="references.prefixHasReferences(folder.prefix)"
-                          class="shrink-0"
-                          title="Contains objects referenced from an external source"
-                        >
-                          <Link2
-                            class="h-3 w-3 text-primary/40"
-                            aria-label="Contains objects referenced from an external source"
-                          />
-                        </span>
+                        <Tooltip v-if="references.prefixHasReferences(folder.prefix)">
+                          <span class="shrink-0" tabindex="0">
+                            <Link2 class="h-3 w-3 text-primary/40" aria-label="Contains referenced objects" />
+                          </span>
+                          <template #content>{{ prefixReferenceSummary(folder.prefix) }}</template>
+                        </Tooltip>
                       </span>
                     </td>
                     <td class="px-4 py-2.5 text-right text-muted-foreground">-</td>
@@ -1133,16 +1157,12 @@ const isEmpty = computed(
                           class="h-3 w-3 shrink-0 text-primary/40"
                           aria-label="Covered by a sync relationship"
                         />
-                        <span
-                          v-if="references.keyIsReferenced(object.key)"
-                          class="shrink-0"
-                          title="Referenced from an external source"
-                        >
-                          <Link2
-                            class="h-3 w-3 text-primary/40"
-                            aria-label="Referenced from an external source"
-                          />
-                        </span>
+                        <Tooltip v-if="references.keyIsReferenced(object.key)">
+                          <span class="shrink-0" tabindex="0">
+                            <Link2 class="h-3 w-3 text-primary/40" :aria-label="referencedFrom(object.key)" />
+                          </span>
+                          <template #content>{{ referencedFrom(object.key) }}</template>
+                        </Tooltip>
                       </span>
                     </td>
                     <td class="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
@@ -1195,6 +1215,7 @@ const isEmpty = computed(
       :prefix="s3Prefix"
       :group-id="activeGroupId"
       :existing-keys="listedKeys"
+      :existing-references="references.entries.value"
       @staged="() => { void loadObjects(); void references.reload() }"
       @sync-created="onSyncChanged"
     />
