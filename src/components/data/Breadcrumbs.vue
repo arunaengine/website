@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ChevronRight, FolderOpenDot, Home } from '@lucide/vue'
+import { ChevronRight, Home } from '@lucide/vue'
 
 const props = defineProps<{ path: string; bucket: string }>()
 const emit = defineEmits<{
@@ -29,8 +29,5 @@ const parts = computed(() => (props.path ? props.path.split('/') : []))
         {{ p }}
       </button>
     </template>
-    <span v-if="!parts.length" class="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground/70">
-      <FolderOpenDot class="h-3 w-3" /> root
-    </span>
   </nav>
 </template>

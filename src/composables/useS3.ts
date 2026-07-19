@@ -6,6 +6,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   ListBucketsCommand,
+  ListObjectVersionsCommand,
   ListObjectsV2Command,
   PutBucketCorsCommand,
   PutObjectCommand,
@@ -370,6 +371,33 @@ async function deletePrefix(
   const s3 = client(nodeId)
   let deleted = 0
   const errors: DeletePrefixResult['errors'] = []
+  // The zero-byte "folder/" marker object is deleted explicitly even when the
+  // listing never returns it (some stores fold it into CommonPrefixes only).
+  // Only trailing-slash prefixes have a marker; a bare prefix must never make
+  // us delete a real object that merely shares the name.
+  const markerKey = prefix.endsWith('/') ? prefix : null
+  let markerBatched = false
+
+  const deleteBatch = async (keys: string[]) => {
+    const response = await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: keys.map((key) => ({ Key: key })), Quiet: false },
+      }),
+    )
+    const failed = response.Errors ?? []
+    deleted += keys.length - failed.length
+    for (const failure of failed) {
+      // The marker often does not exist as a real object; a failed delete for
+      // that specific key must not fail the whole folder delete.
+      if (markerKey && failure.Key === markerKey) continue
+      errors.push({
+        key: failure.Key ?? '(unknown key)',
+        message: failure.Message ?? failure.Code ?? 'delete failed',
+      })
+    }
+  }
+
   let token: string | undefined
   for (;;) {
     const page = await s3.send(
@@ -380,28 +408,48 @@ async function deletePrefix(
         MaxKeys: 1000,
       }),
     )
-    const keys = (page.Contents ?? [])
-      .map((entry) => entry.Key)
-      .filter((key): key is string => Boolean(key))
-    if (keys.length) {
-      const response = await s3.send(
-        new DeleteObjectsCommand({
-          Bucket: bucket,
-          Delete: { Objects: keys.map((key) => ({ Key: key })), Quiet: false },
-        }),
-      )
-      const failed = response.Errors ?? []
-      deleted += keys.length - failed.length
-      for (const failure of failed) {
-        errors.push({
-          key: failure.Key ?? '(unknown key)',
-          message: failure.Message ?? failure.Code ?? 'delete failed',
-        })
-      }
+    const keys = new Set(
+      (page.Contents ?? [])
+        .map((entry) => entry.Key)
+        .filter((key): key is string => Boolean(key)),
+    )
+    const lastPage = !page.IsTruncated || !page.NextContinuationToken
+    if (markerKey && !markerBatched && (keys.has(markerKey) || lastPage)) {
+      keys.add(markerKey)
+      markerBatched = true
     }
-    if (!page.IsTruncated || !page.NextContinuationToken) return { deleted, errors }
+    if (keys.size) await deleteBatch([...keys])
+    if (lastPage) break
     token = page.NextContinuationToken
   }
+
+  // Verify the marker is really gone. A versioned store can keep the folder
+  // visible behind a delete marker; best-effort purge every version of the
+  // marker key. All of this is non-fatal: stores without versioning support
+  // reject the calls and the bulk delete above already did the real work.
+  if (markerKey) {
+    try {
+      const check = await s3.send(
+        new ListObjectsV2Command({ Bucket: bucket, Prefix: markerKey, MaxKeys: 1 }),
+      )
+      if ((check.KeyCount ?? check.Contents?.length ?? 0) > 0) {
+        const versions = await s3.send(
+          new ListObjectVersionsCommand({ Bucket: bucket, Prefix: markerKey, MaxKeys: 1000 }),
+        )
+        const stale = [...(versions.Versions ?? []), ...(versions.DeleteMarkers ?? [])]
+          .filter((entry) => entry.Key === markerKey && entry.VersionId)
+          .map((entry) => ({ Key: entry.Key as string, VersionId: entry.VersionId as string }))
+        if (stale.length) {
+          await s3.send(
+            new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: stale, Quiet: true } }),
+          )
+        }
+      }
+    } catch {
+      // Version purge unsupported or forbidden here; nothing more we can do.
+    }
+  }
+  return { deleted, errors }
 }
 
 // Single-object HEAD, mainly for the user metadata: reference-backed objects
