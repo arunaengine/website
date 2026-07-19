@@ -6,7 +6,6 @@ import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
-import Switch from '@/components/ui/Switch.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -121,8 +120,9 @@ const RUNTIMES: Runtime[] = [
 const TES_NETWORK_TAG = 'aruna-engine.org/network'
 
 // One combined "Script & data" step: the selected data references are listed
-// with their resolved /work/in|out mount paths right next to the editor, so
-// container paths are visible while the script is written.
+// with their editable container mount paths (defaulting to /work/in and
+// /work/out) right next to the editor, so container paths are visible while
+// the script is written.
 const WIZARD_STEPS = ['Runtime', 'Script & data', 'Review']
 const REVIEW_STEP = 2
 // The step lives in ?step=N so browser back/forward walks the wizard instead
@@ -144,11 +144,12 @@ const dependencies = ref<string[]>([])
 const dependencyDraft = ref('')
 const taskName = ref('quick-run')
 const groupId = ref('')
-const inputs = ref<{ url: string; name: string }[]>([])
+const inputs = ref<{ url: string; name: string; path: string }[]>([])
 // The script needs an S3 home before the run starts; outputs pick their own
-// bucket and key per row.
+// bucket and key per row. containerPath defaults to /work/out/<basename> and
+// tracks the key until the user edits it directly.
 const stagingBucket = ref('')
-const outputRows = ref<{ bucket: string; path: string }[]>([])
+const outputRows = ref<{ bucket: string; path: string; containerPath: string; containerPathTouched: boolean }[]>([])
 const inputDialogOpen = ref(false)
 const credentialDialogOpen = ref(false)
 
@@ -236,7 +237,7 @@ const dependencyInput = computed<TesInput | null>(() =>
     : null,
 )
 const dataInputs = computed<TesInput[]>(() =>
-  inputs.value.map((i) => ({ name: i.name, url: i.url, path: `/work/in/${i.name}`, type: 'FILE' })),
+  inputs.value.map((i) => ({ name: i.name, url: i.url, path: i.path.trim(), type: 'FILE' })),
 )
 
 function normalizedOutputKey(path: string): string {
@@ -247,10 +248,10 @@ function outputBasename(path: string): string {
 }
 const declaredOutputs = computed<TesOutput[]>(() =>
   outputRows.value
-    .filter((row) => row.bucket.trim() && outputBasename(row.path))
+    .filter((row) => row.bucket.trim() && outputBasename(row.path) && row.containerPath.trim())
     .map((row) => ({
       url: `s3://${row.bucket.trim()}/${normalizedOutputKey(row.path)}`,
-      path: `/work/out/${outputBasename(row.path)}`,
+      path: row.containerPath.trim(),
       type: 'FILE',
     })),
 )
@@ -311,7 +312,6 @@ interface DependencyVerificationResult {
   state: DependencyVerification
   detail: string
 }
-const verifyDependencies = ref(false)
 const dependencyVerification = ref<Record<string, DependencyVerificationResult>>({})
 
 function pythonPackage(spec: string): { name: string; constraint: string } | null {
@@ -380,24 +380,16 @@ async function verifyDependency(dependency: string): Promise<void> {
       detail: err instanceof Error ? `Registry check unavailable: ${err.message}` : 'Registry check unavailable.',
     }
   }
-  if (!verifyDependencies.value || runtimeId.value !== checkedRuntime || !dependencies.value.includes(dependency)) return
+  if (runtimeId.value !== checkedRuntime || !dependencies.value.includes(dependency)) return
   dependencyVerification.value = { ...dependencyVerification.value, [dependency]: result }
 }
-
-watch(verifyDependencies, (enabled) => {
-  if (!enabled) {
-    dependencyVerification.value = {}
-    return
-  }
-  for (const dependency of dependencies.value) void verifyDependency(dependency)
-})
 
 function addDependency() {
   const dependency = dependencyDraft.value.trim()
   if (!dependency || dependencyError.value) return
   dependencies.value.push(dependency)
   dependencyDraft.value = ''
-  if (verifyDependencies.value) void verifyDependency(dependency)
+  void verifyDependency(dependency)
 }
 
 function removeDependency(index: number) {
@@ -420,18 +412,41 @@ function uniqueInputName(base: string): string {
   while (taken.has(`${stem}-${n}${ext}`)) n++
   return `${stem}-${n}${ext}`
 }
+function validContainerPath(path: string): boolean {
+  return (
+    path.startsWith('/') &&
+    path !== '/' &&
+    !path.split('/').slice(1).some((component) => !component || component === '.' || component === '..')
+  )
+}
 function addInput(entry: { url: string; path: string; name?: string }) {
   const base = (entry.name || entry.url.split('/').filter(Boolean).pop() || 'input').trim()
-  inputs.value.push({ url: entry.url, name: uniqueInputName(base) })
+  const name = uniqueInputName(base)
+  // The picker emits a generic /inputs/… path; quick runs default to /work/in
+  // instead. A specific absolute path is kept verbatim.
+  const generic = !entry.path.trim() || entry.path.trim().startsWith('/inputs/')
+  inputs.value.push({ url: entry.url, name, path: generic ? `/work/in/${name}` : entry.path.trim() })
 }
 function removeInput(i: number) {
   inputs.value.splice(i, 1)
 }
 function addOutput() {
+  const path = 'quickruns/result.txt'
   outputRows.value.push({
     bucket: outputRows.value.at(-1)?.bucket || stagingBucket.value.trim() || buckets.value[0] || '',
-    path: 'quickruns/result.txt',
+    path,
+    containerPath: `/work/out/${outputBasename(path)}`,
+    containerPathTouched: false,
   })
+}
+type OutputRow = { bucket: string; path: string; containerPath: string; containerPathTouched: boolean }
+function setOutputPath(row: OutputRow, value: string) {
+  row.path = value
+  if (!row.containerPathTouched) row.containerPath = `/work/out/${outputBasename(value)}`
+}
+function setOutputContainerPath(row: OutputRow, value: string) {
+  row.containerPath = value
+  row.containerPathTouched = true
 }
 function outputDestination(row: { bucket: string; path: string }): string {
   return `s3://${row.bucket.trim() || '<bucket>'}/${normalizedOutputKey(row.path) || '<path>'}`
@@ -472,25 +487,34 @@ function initDefaults() {
   if (!groupId.value && myGroups.value.length) groupId.value = myGroups.value[0].id
   void loadBuckets()
 }
-onMounted(initDefaults)
+onMounted(() => {
+  initDefaults()
+  // Existing dependencies (e.g. after "Run again") are re-checked automatically.
+  for (const dependency of dependencies.value) void verifyDependency(dependency)
+})
 watch([currentUser, () => s3.hasActiveKey.value, myGroups], initDefaults)
 
 // ── Validity ─────────────────────────────────────────────────────────────────
+const inputsValid = computed(() => {
+  const paths = inputs.value.map((input) => input.path.trim())
+  return paths.every(validContainerPath) && new Set(paths).size === paths.length
+})
 const outputsValid = computed(() => {
   const rows = outputRows.value
-  const validRow = (row: { bucket: string; path: string }) => {
+  const validRow = (row: { bucket: string; path: string; containerPath: string }) => {
     if (!knownBucket(row.bucket.trim())) return false
+    if (!validContainerPath(row.containerPath.trim())) return false
     const key = normalizedOutputKey(row.path)
     if (!key || key.endsWith('/')) return false
     return key.split('/').every((segment) => segment && segment !== '.' && segment !== '..')
   }
-  // The container writes flat files into /work/out/, and the backend rejects
-  // duplicate paths and destinations; block collisions on both sides here.
-  const basenames = rows.map((row) => outputBasename(row.path))
+  // The backend rejects duplicate container paths and destinations; block
+  // collisions on both sides here.
+  const containerPaths = rows.map((row) => row.containerPath.trim())
   const destinations = rows.map((row) => `${row.bucket.trim()}/${normalizedOutputKey(row.path)}`)
   return (
     rows.every(validRow) &&
-    new Set(basenames).size === basenames.length &&
+    new Set(containerPaths).size === containerPaths.length &&
     new Set(destinations).size === destinations.length
   )
 })
@@ -500,7 +524,7 @@ const dataReady = computed(
 const canContinue = computed(() => {
   switch (step.value) {
     case 1:
-      return script.value.trim().length > 0 && dataReady.value && outputsValid.value
+      return script.value.trim().length > 0 && dataReady.value && inputsValid.value && outputsValid.value
     default:
       return true
   }
@@ -543,7 +567,7 @@ async function submit() {
     submittedOutputs.value = outputRows.value.map((row) => ({
       bucket: row.bucket.trim(),
       key: normalizedOutputKey(row.path),
-      path: `/work/out/${outputBasename(row.path)}`,
+      path: row.containerPath.trim(),
     }))
     submittedTaskId.value = created.id
   } catch (err) {
@@ -710,19 +734,27 @@ function runAnother() {
                     <ArrowDownToLine class="h-3.5 w-3.5 text-primary" /> Input data
                   </div>
                   <p class="mt-1 text-[11px] text-muted-foreground">
-                    Staged read-only under <code class="rounded bg-muted px-1 font-mono">/work/in/</code> before the script starts.
+                    Staged read-only before the script starts, by default under <code class="rounded bg-muted px-1 font-mono">/work/in/</code>. Paths are editable.
                   </p>
                 </div>
                 <div v-if="inputs.length" class="space-y-1.5">
-                  <div v-for="(input, i) in inputs" :key="i" class="surface-inline flex items-start gap-2 p-2 text-xs">
-                    <div class="min-w-0 flex-1 font-mono">
-                      <div class="truncate text-foreground" :title="`/work/in/${input.name}`">/work/in/{{ input.name }}</div>
-                      <div class="mt-0.5 truncate text-[10px] text-muted-foreground" :title="input.url">{{ input.url }}</div>
+                  <div v-for="(input, i) in inputs" :key="i" class="surface-inline space-y-1 p-2 text-xs">
+                    <div class="flex items-center gap-1.5">
+                      <Input
+                        v-model="input.path"
+                        class="h-7 font-mono text-xs"
+                        aria-label="Container path"
+                        :invalid="!validContainerPath(input.path.trim()) ? 'error' : undefined"
+                      />
+                      <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
                     </div>
-                    <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
+                    <div class="truncate font-mono text-[10px] text-muted-foreground" :title="input.url">{{ input.url }}</div>
                   </div>
+                  <p v-if="!inputsValid" class="text-[11px] text-destructive">
+                    Each input needs a unique absolute canonical container path.
+                  </p>
                 </div>
-                <p v-else class="text-[11px] text-muted-foreground">No input data. The script starts with an empty <code class="rounded bg-muted px-1 font-mono">/work/in/</code>.</p>
+                <p v-else class="text-[11px] text-muted-foreground">No input data. Added files are staged into the container, by default under <code class="rounded bg-muted px-1 font-mono">/work/in/</code>.</p>
                 <Button variant="outline" size="sm" @click="inputDialogOpen = true"><ListPlus class="size-3.5" /> Add input</Button>
               </section>
 
@@ -732,7 +764,7 @@ function runAnother() {
                     <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Output data
                   </div>
                   <p class="mt-1 text-[11px] text-muted-foreground">
-                    Files the script writes to <code class="rounded bg-muted px-1 font-mono">/work/out/</code> are uploaded after the run. stdout and stderr are always captured.
+                    Declared files the script writes, by default under <code class="rounded bg-muted px-1 font-mono">/work/out/</code>, are uploaded after the run. stdout and stderr are always captured.
                   </p>
                 </div>
                 <div v-if="outputRows.length" class="space-y-1.5">
@@ -746,20 +778,31 @@ function runAnother() {
                         class="h-7 w-32 shrink-0 text-xs"
                       />
                       <Input v-else v-model="row.bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" />
-                      <Input v-model="row.path" class="h-7 font-mono text-xs" placeholder="results/output.txt" />
+                      <Input
+                        :model-value="row.path"
+                        class="h-7 font-mono text-xs"
+                        placeholder="results/output.txt"
+                        @update:model-value="setOutputPath(row, String($event))"
+                      />
                       <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove output" @click="removeOutput(i)"><X class="size-3" /></Button>
                     </div>
                     <div class="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground">
                       <CornerDownRight class="h-3 w-3 shrink-0" />
-                      <span class="truncate" :title="`/work/out/${outputBasename(row.path) || '<file>'} uploads to ${outputDestination(row)}`">
-                        /work/out/{{ outputBasename(row.path) || '&lt;file&gt;' }} → {{ outputDestination(row) }}
-                      </span>
+                      <Input
+                        :model-value="row.containerPath"
+                        class="h-6 w-48 shrink-0 font-mono text-[10px]"
+                        aria-label="Container path"
+                        :invalid="!validContainerPath(row.containerPath.trim()) ? 'error' : undefined"
+                        @update:model-value="setOutputContainerPath(row, String($event))"
+                      />
+                      <span class="shrink-0">→</span>
+                      <span class="truncate" :title="outputDestination(row)">{{ outputDestination(row) }}</span>
                     </div>
                   </div>
                 </div>
                 <p v-else class="text-[11px] text-muted-foreground">No output files declared. Only stdout and stderr are captured.</p>
                 <p v-if="!outputsValid" class="text-[11px] text-destructive">
-                  Each output needs one of your buckets and a canonical key; container file names and destinations must be unique.
+                  Each output needs one of your buckets, a canonical key and an absolute container path; container paths and destinations must be unique.
                 </p>
                 <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output file</Button>
               </section>
@@ -768,13 +811,9 @@ function runAnother() {
             </TabsContent>
 
             <TabsContent value="dependencies" class="mt-4 space-y-4">
-              <label class="flex max-w-2xl items-center justify-between gap-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs">
-                <span>
-                  <span class="font-medium text-foreground">Verify direct dependencies</span>
-                  <span class="block text-[11px] text-muted-foreground">Optional browser-only registry check. No task is created; uv or Deno still performs the authoritative resolution when the run starts.</span>
-                </span>
-                <Switch :checked="verifyDependencies" @update:checked="(value: boolean) => (verifyDependencies = value)" />
-              </label>
+              <p class="max-w-2xl rounded-md border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+                Added dependencies are checked against the registry automatically (browser-only, no task is created); uv or Deno still performs the authoritative resolution when the run starts.
+              </p>
               <div class="max-w-2xl space-y-2">
                 <label class="text-xs font-medium text-foreground">
                   {{ runtimeId === 'python-uv' ? 'PyPI requirement' : 'npm package' }}
@@ -851,7 +890,7 @@ function runAnother() {
                 </li>
                 <li v-for="(input, i) in inputs" :key="i">
                   <div class="truncate text-foreground" :title="input.url">{{ input.url }}</div>
-                  <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> /work/in/{{ input.name }}</div>
+                  <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ input.path }}</div>
                 </li>
               </ul>
             </section>
@@ -885,7 +924,7 @@ function runAnother() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || submitting || !dataReady || !outputsValid" @click="submit">
+        <Button v-else size="sm" :disabled="busy || submitting || !dataReady || !inputsValid || !outputsValid" @click="submit">
           <ListPlus class="h-4 w-4" /> {{ submitting ? 'Submitting…' : 'Submit run' }}
         </Button>
       </div>
