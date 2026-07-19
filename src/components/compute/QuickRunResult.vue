@@ -11,7 +11,11 @@ import { isTerminalTesState, type TesTask } from '@/lib/tes'
 import { formatBytes, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import { ArrowDownToLine, ArrowUpFromLine, CornerDownRight, Download, ExternalLink, FolderOpen, RefreshCw } from '@lucide/vue'
 
-const props = defineProps<{ taskId: string; outputBucket: string; outputPrefix: string }>()
+const props = defineProps<{
+  taskId: string
+  /** Declared output destinations, resolved to download links on completion. */
+  outputs: { bucket: string; key: string; path: string }[]
+}>()
 
 const { getTask } = useTes()
 const s3 = useS3()
@@ -85,34 +89,39 @@ const duration = computed(() => {
   return log.end_time ? label : `${label} so far`
 })
 
-// ── Output prefix listing (useS3) ────────────────────────────────────────────
+// ── Declared output resolution (useS3) ───────────────────────────────────────
 interface OutputFile {
-  name: string
+  bucket: string
   key: string
   size?: number
-  href: string
+  href?: string
+  missing: boolean
 }
-const outputs = ref<OutputFile[]>([])
+const resolvedOutputs = ref<OutputFile[]>([])
 const outputsState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
 const outputsError = ref<string | null>(null)
 
 async function listOutputs() {
-  if (!s3.hasActiveKey.value || !s3.endpoint.value || !props.outputBucket) return
+  if (!s3.hasActiveKey.value || !s3.endpoint.value || !props.outputs.length) return
   outputsState.value = 'loading'
   outputsError.value = null
   try {
-    const page = await s3.listObjects(props.outputBucket, props.outputPrefix)
-    // Immediate files only; the uploaded script lives under the .aruna/ folder,
-    // which the delimiter keeps out of this listing.
-    outputs.value = await Promise.all(
-      page.objects
-        .filter((o) => o.name && !o.name.startsWith('.aruna/'))
-        .map(async (o) => ({
-          name: o.name,
-          key: o.key,
-          size: o.size,
-          href: await s3.downloadUrl(props.outputBucket, o.key),
-        })),
+    resolvedOutputs.value = await Promise.all(
+      props.outputs.map(async (declared) => {
+        try {
+          const head = await s3.headObject(declared.bucket, declared.key)
+          return {
+            bucket: declared.bucket,
+            key: declared.key,
+            size: head.size,
+            href: await s3.downloadUrl(declared.bucket, declared.key),
+            missing: false,
+          }
+        } catch {
+          // A missing object is a per-file outcome, not a listing failure.
+          return { bucket: declared.bucket, key: declared.key, missing: true }
+        }
+      }),
     )
     outputsState.value = 'ready'
   } catch (err) {
@@ -121,7 +130,8 @@ async function listOutputs() {
   }
 }
 
-const bucketPrefixQuery = computed(() => props.outputPrefix.replace(/\/$/, ''))
+const multiBucket = computed(() => new Set(props.outputs.map((output) => output.bucket)).size > 1)
+const firstBucket = computed(() => props.outputs[0]?.bucket ?? '')
 </script>
 
 <template>
@@ -185,25 +195,29 @@ const bucketPrefixQuery = computed(() => props.outputPrefix.replace(/\/$/, ''))
               <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Out of the container
             </div>
             <RouterLink
+              v-if="firstBucket"
               class="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-              :to="{ name: 'bucket', params: { bucketId: outputBucket }, query: bucketPrefixQuery ? { prefix: bucketPrefixQuery } : {} }"
+              :to="{ name: 'bucket', params: { bucketId: firstBucket } }"
             >
-              <FolderOpen class="h-3.5 w-3.5" /> Browse prefix
+              <FolderOpen class="h-3.5 w-3.5" /> Open in Data
             </RouterLink>
           </div>
-          <p v-if="!isTerminal" class="text-[11px] text-muted-foreground">
-            Declared output files are uploaded to the bucket when the run finishes.
+          <p v-if="!outputs.length" class="text-[11px] text-muted-foreground">
+            No output files were declared; stdout and stderr live in the streams below.
           </p>
-          <div v-else-if="outputsState === 'loading'" class="text-[11px] text-muted-foreground">Listing the output prefix…</div>
+          <p v-else-if="!isTerminal" class="text-[11px] text-muted-foreground">
+            Declared output files are uploaded to their destinations when the run finishes.
+          </p>
+          <div v-else-if="outputsState === 'loading'" class="text-[11px] text-muted-foreground">Checking the declared outputs…</div>
           <p v-else-if="outputsState === 'error'" class="text-[11px] text-destructive">{{ outputsError }}</p>
-          <p v-else-if="!outputs.length" class="text-[11px] text-muted-foreground">
-            No files under <code class="rounded bg-muted px-1 font-mono">{{ outputPrefix || '/' }}</code>, stdout and stderr live in the streams below.
-          </p>
           <ul v-else class="divide-y divide-border/70 overflow-hidden rounded-md border border-border/70 bg-card">
-            <li v-for="file in outputs" :key="file.key" class="flex items-center gap-3 px-3 py-2 text-xs">
-              <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ file.name }}</span>
+            <li v-for="file in resolvedOutputs" :key="`${file.bucket}/${file.key}`" class="flex items-center gap-3 px-3 py-2 text-xs">
+              <span class="min-w-0 flex-1 truncate font-mono text-foreground" :title="`s3://${file.bucket}/${file.key}`">
+                <template v-if="multiBucket">{{ file.bucket }}/</template>{{ file.key }}
+              </span>
               <span v-if="file.size !== undefined" class="text-muted-foreground">{{ formatBytes(file.size) }}</span>
-              <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="file.href" target="_blank" rel="noopener">
+              <span v-if="file.missing" class="text-muted-foreground">not written</span>
+              <a v-else class="inline-flex items-center gap-1 text-primary hover:underline" :href="file.href" target="_blank" rel="noopener">
                 <Download class="h-3.5 w-3.5" /> Download
               </a>
             </li>

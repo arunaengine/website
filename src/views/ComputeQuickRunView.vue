@@ -24,7 +24,7 @@ import {
   type TesOutput,
   type TesTask,
 } from '@/lib/tes'
-import { isWorkspaceBucket, type WorkspaceMode } from '@/lib/workspaces'
+import { isWorkspaceBucket } from '@/lib/workspaces'
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -59,12 +59,14 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-// ── Runtimes (pinned slim images) ────────────────────────────────────────────
+// ── Runtimes (tagged upstream images) ────────────────────────────────────────
 interface Runtime {
   id: 'python' | 'node' | 'bash'
   label: string
+  hint: string
   image: string
-  interpreter: string
+  /** Argv prefix; the staged script path is appended as the last argument. */
+  command: string[]
   file: string
   lang: 'python' | 'javascript' | 'text'
   contentType: string
@@ -74,8 +76,9 @@ const RUNTIMES: Runtime[] = [
   {
     id: 'python',
     label: 'Python',
+    hint: 'Standard library only.',
     image: 'python:3.12-slim',
-    interpreter: 'python',
+    command: ['python'],
     file: 'script.py',
     lang: 'python',
     contentType: 'text/x-python',
@@ -84,8 +87,9 @@ const RUNTIMES: Runtime[] = [
   {
     id: 'node',
     label: 'Node.js',
+    hint: 'Built-in modules only.',
     image: 'node:22-slim',
-    interpreter: 'node',
+    command: ['node'],
     file: 'script.js',
     lang: 'javascript',
     contentType: 'text/javascript',
@@ -94,8 +98,9 @@ const RUNTIMES: Runtime[] = [
   {
     id: 'bash',
     label: 'Bash',
+    hint: 'Plain shell, no extra tooling.',
     image: 'bash:5.2',
-    interpreter: 'bash',
+    command: ['bash'],
     file: 'script.sh',
     lang: 'text',
     contentType: 'text/x-shellscript',
@@ -125,27 +130,12 @@ const script = ref(RUNTIMES[0].template)
 const taskName = ref('quick-run')
 const groupId = ref('')
 const inputs = ref<{ url: string; name: string }[]>([])
-const outputBucket = ref('')
-const outputPrefix = ref('quickruns/')
-const outputFiles = ref<{ name: string }[]>([])
+// The script needs an S3 home before the run starts; outputs pick their own
+// bucket and key per row.
+const stagingBucket = ref('')
+const outputRows = ref<{ bucket: string; path: string }[]>([])
 const inputDialogOpen = ref(false)
 const credentialDialogOpen = ref(false)
-
-// Workspace handling for the run's scratch storage — an explicit, required
-// choice (agreed contract; a node that predates it ignores the field and the
-// submit path reports that).
-const WORKSPACE_OPTIONS: { mode: WorkspaceMode; label: string; hint: string }[] = [
-  { mode: 'temporary', label: 'Temporary workspace', hint: 'Scratch bucket for this run, deleted after it succeeds.' },
-  { mode: 'kept', label: 'Keep workspace', hint: 'The run’s ws-… bucket stays for inspection after completion.' },
-  { mode: 'existing', label: 'Use existing bucket…', hint: 'The run works inside a bucket you pick.' },
-]
-const workspaceMode = ref<WorkspaceMode | ''>('')
-const workspaceBucket = ref('')
-const workspaceValid = computed(() => {
-  if (workspaceMode.value === 'temporary' || workspaceMode.value === 'kept') return true
-  return workspaceMode.value === 'existing' && !!workspaceBucket.value.trim()
-})
-const workspaceNotice = ref<string | null>(null)
 
 // A fresh id per submit attempt keys the uploaded script and the idempotency tag.
 const runId = ref(crypto.randomUUID())
@@ -165,13 +155,10 @@ watch(step, (s) => {
 const groupOptions = computed(() => myGroups.value.map((g) => ({ value: g.id, label: g.name })))
 const bucketOptions = computed(() => buckets.value.map((b) => ({ value: b, label: b })))
 
-const normalizedPrefix = computed(() => {
-  const p = outputPrefix.value.trim().replace(/^\/+/, '')
-  return p && !p.endsWith('/') ? `${p}/` : p
-})
 const scriptContainerPath = computed(() => `/work/${runtime.value.file}`)
-const scriptKey = computed(() => `${normalizedPrefix.value}.aruna/scripts/${runId.value}/${runtime.value.file}`)
-const scriptUrl = computed(() => `s3://${outputBucket.value.trim()}/${scriptKey.value}`)
+const scriptKey = computed(() => `.aruna/scripts/${runId.value}/${runtime.value.file}`)
+const scriptUrl = computed(() => `s3://${stagingBucket.value.trim()}/${scriptKey.value}`)
+const commandPreview = computed(() => `${runtime.value.command.join(' ')} ${scriptContainerPath.value}`)
 
 const scriptInput = computed<TesInput>(() => ({
   name: runtime.value.file,
@@ -183,13 +170,19 @@ const scriptInput = computed<TesInput>(() => ({
 const dataInputs = computed<TesInput[]>(() =>
   inputs.value.map((i) => ({ name: i.name, url: i.url, path: `/work/in/${i.name}`, type: 'FILE' })),
 )
+
+function normalizedOutputKey(path: string): string {
+  return path.trim().replace(/^\/+/, '')
+}
+function outputBasename(path: string): string {
+  return normalizedOutputKey(path).split('/').filter(Boolean).pop() ?? ''
+}
 const declaredOutputs = computed<TesOutput[]>(() =>
-  outputFiles.value
-    .map((f) => f.name.trim())
-    .filter(Boolean)
-    .map((name) => ({
-      url: `s3://${outputBucket.value.trim()}/${normalizedPrefix.value}${name}`,
-      path: `/work/out/${name}`,
+  outputRows.value
+    .filter((row) => row.bucket.trim() && outputBasename(row.path))
+    .map((row) => ({
+      url: `s3://${row.bucket.trim()}/${normalizedOutputKey(row.path)}`,
+      path: `/work/out/${outputBasename(row.path)}`,
       type: 'FILE',
     })),
 )
@@ -200,12 +193,13 @@ const task = computed<TesTask>(() =>
     inputs: [scriptInput.value, ...dataInputs.value],
     outputs: declaredOutputs.value,
     executors: [
-      { image: runtime.value.image, command: [runtime.value.interpreter, scriptContainerPath.value], workdir: '/work' },
+      {
+        image: runtime.value.image,
+        command: [...runtime.value.command, scriptContainerPath.value],
+        workdir: '/work',
+      },
     ],
     tags: { [TES_GROUP_TAG]: groupId.value, [TES_IDEMPOTENCY_TAG]: runId.value },
-    workspace: workspaceMode.value
-      ? { mode: workspaceMode.value, bucket: workspaceMode.value === 'existing' ? workspaceBucket.value.trim() : undefined }
-      : undefined,
   }),
 )
 
@@ -228,13 +222,16 @@ function removeInput(i: number) {
   inputs.value.splice(i, 1)
 }
 function addOutput() {
-  outputFiles.value.push({ name: 'result.txt' })
+  outputRows.value.push({
+    bucket: outputRows.value.at(-1)?.bucket || stagingBucket.value.trim() || buckets.value[0] || '',
+    path: 'quickruns/result.txt',
+  })
 }
-function outputDestination(name: string): string {
-  return `s3://${outputBucket.value.trim() || '<bucket>'}/${normalizedPrefix.value}${name.trim() || '<name>'}`
+function outputDestination(row: { bucket: string; path: string }): string {
+  return `s3://${row.bucket.trim() || '<bucket>'}/${normalizedOutputKey(row.path) || '<path>'}`
 }
 function removeOutput(i: number) {
-  outputFiles.value.splice(i, 1)
+  outputRows.value.splice(i, 1)
 }
 
 // ── Buckets ──────────────────────────────────────────────────────────────────
@@ -248,7 +245,7 @@ async function loadBuckets() {
     // Per-run ws-… scratch buckets are system-managed and never run targets.
     buckets.value = (await s3.listBuckets()).map((b) => b.name).filter((name) => !isWorkspaceBucket(name))
     bucketsLoaded.value = true
-    if (!outputBucket.value && buckets.value.length) outputBucket.value = buckets.value[0]
+    if (!stagingBucket.value && buckets.value.length) stagingBucket.value = buckets.value[0]
   } catch {
     buckets.value = []
     bucketsLoaded.value = false
@@ -259,11 +256,11 @@ async function loadBuckets() {
 
 // Runs only write into existing buckets; once the listing is known, a typed
 // name must match it (with a failed listing only non-empty is enforceable).
-const bucketValid = computed(() => {
-  const name = outputBucket.value.trim()
+function knownBucket(name: string): boolean {
   if (!name) return false
   return !bucketsLoaded.value || buckets.value.includes(name)
-})
+}
+const stagingBucketValid = computed(() => knownBucket(stagingBucket.value.trim()))
 
 function initDefaults() {
   if (!groupId.value && myGroups.value.length) groupId.value = myGroups.value[0].id
@@ -274,19 +271,30 @@ watch([currentUser, () => s3.hasActiveKey.value, myGroups], initDefaults)
 
 // ── Validity ─────────────────────────────────────────────────────────────────
 const outputsValid = computed(() => {
-  // The backend rejects duplicate output destinations, so block them here.
-  const names = outputFiles.value.map((f) => f.name.trim())
-  return names.every((name) => name.length > 0 && !name.includes('/')) && new Set(names).size === names.length
+  const rows = outputRows.value
+  const validRow = (row: { bucket: string; path: string }) => {
+    if (!knownBucket(row.bucket.trim())) return false
+    const key = normalizedOutputKey(row.path)
+    if (!key || key.endsWith('/')) return false
+    return key.split('/').every((segment) => segment && segment !== '.' && segment !== '..')
+  }
+  // The container writes flat files into /work/out/, and the backend rejects
+  // duplicate paths and destinations; block collisions on both sides here.
+  const basenames = rows.map((row) => outputBasename(row.path))
+  const destinations = rows.map((row) => `${row.bucket.trim()}/${normalizedOutputKey(row.path)}`)
+  return (
+    rows.every(validRow) &&
+    new Set(basenames).size === basenames.length &&
+    new Set(destinations).size === destinations.length
+  )
 })
 const dataReady = computed(
-  () => !!s3.endpoint.value && s3.hasActiveKey.value && groupId.value.length > 0 && bucketValid.value,
+  () => !!s3.endpoint.value && s3.hasActiveKey.value && groupId.value.length > 0 && stagingBucketValid.value,
 )
 const canContinue = computed(() => {
   switch (step.value) {
     case 1:
-      return (
-        script.value.trim().length > 0 && dataReady.value && outputsValid.value && workspaceValid.value
-      )
+      return script.value.trim().length > 0 && dataReady.value && outputsValid.value
     default:
       return true
   }
@@ -304,19 +312,21 @@ function back() {
 const submitting = ref(false)
 const submitError = ref<string | null>(null)
 const submittedTaskId = ref<string | null>(null)
+// Snapshot of the declared destinations for the result view.
+const submittedOutputs = ref<{ bucket: string; key: string; path: string }[]>([])
 
 async function submit() {
   submitError.value = null
-  workspaceNotice.value = null
   submitting.value = true
   try {
-    await s3.putTextObject(outputBucket.value.trim(), scriptKey.value, script.value, runtime.value.contentType)
+    await s3.putTextObject(stagingBucket.value.trim(), scriptKey.value, script.value, runtime.value.contentType)
     const created = await createTask(task.value)
+    submittedOutputs.value = outputRows.value.map((row) => ({
+      bucket: row.bucket.trim(),
+      key: normalizedOutputKey(row.path),
+      path: `/work/out/${outputBasename(row.path)}`,
+    }))
     submittedTaskId.value = created.id
-    if (created.workspaceIgnored) {
-      workspaceNotice.value =
-        'Workspace choices are not supported by this node yet, the run was submitted without one.'
-    }
   } catch (err) {
     submitError.value = isTesUnsupported(err)
       ? `This node does not expose the TES endpoint. ${errorMessage(err)}`
@@ -328,7 +338,7 @@ async function submit() {
 function runAnother() {
   submittedTaskId.value = null
   submitError.value = null
-  workspaceNotice.value = null
+  submittedOutputs.value = []
   goStep(0)
   runId.value = crypto.randomUUID()
 }
@@ -377,10 +387,7 @@ function runAnother() {
           </Button>
         </div>
       </div>
-      <p v-if="workspaceNotice" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-        {{ workspaceNotice }}
-      </p>
-      <QuickRunResult :task-id="submittedTaskId" :output-bucket="outputBucket.trim()" :output-prefix="normalizedPrefix" />
+      <QuickRunResult :task-id="submittedTaskId" :outputs="submittedOutputs" />
     </div>
 
     <!-- Wizard -->
@@ -391,7 +398,7 @@ function runAnother() {
         <!-- Step 1: Runtime -->
         <div v-if="step === 0" class="space-y-3">
           <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runtime</div>
-          <div class="grid gap-3 sm:grid-cols-3">
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <button
               v-for="rt in RUNTIMES"
               :key="rt.id"
@@ -401,11 +408,12 @@ function runAnother() {
               @click="runtimeId = rt.id"
             >
               <div class="text-sm font-semibold text-foreground">{{ rt.label }}</div>
-              <div class="mt-1 font-mono text-[11px] text-muted-foreground">{{ rt.image }}</div>
+              <div class="mt-0.5 text-[11px] text-muted-foreground">{{ rt.hint }}</div>
+              <div class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="rt.image">{{ rt.image }}</div>
             </button>
           </div>
           <p class="text-[11px] text-muted-foreground">
-            The script runs as <code class="rounded bg-muted px-1 font-mono">{{ runtime.interpreter }} {{ scriptContainerPath }}</code> in a fresh container.
+            The script runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in a fresh container.
           </p>
         </div>
 
@@ -421,34 +429,31 @@ function runAnother() {
             <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="size-3.5" /> Create credentials</Button>
           </div>
 
-          <div v-if="s3.endpoint.value && s3.hasActiveKey.value" class="grid gap-3 sm:grid-cols-3">
+          <div v-if="s3.endpoint.value && s3.hasActiveKey.value" class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="text-xs font-medium text-foreground">Group</label>
               <Select v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
               <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its Process Run crate.</p>
             </div>
             <div>
-              <label class="text-xs font-medium text-foreground">Output bucket <span class="text-destructive">*</span></label>
-              <Select v-if="bucketOptions.length" v-model="outputBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
+              <label class="text-xs font-medium text-foreground">Script bucket <span class="text-destructive">*</span></label>
+              <Select v-if="bucketOptions.length" v-model="stagingBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
               <Input
                 v-else
-                v-model="outputBucket"
+                v-model="stagingBucket"
                 class="mt-1 font-mono"
                 :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'"
-                :invalid="outputBucket.trim() && !bucketValid ? 'error' : undefined"
+                :invalid="stagingBucket.trim() && !stagingBucketValid ? 'error' : undefined"
               />
-              <p v-if="outputBucket.trim() && !bucketValid" class="mt-1 text-[11px] text-destructive">
-                This bucket does not exist. Results can only be written to one of your buckets.
+              <p v-if="stagingBucket.trim() && !stagingBucketValid" class="mt-1 text-[11px] text-destructive">
+                This bucket does not exist. The script can only be staged into one of your buckets.
               </p>
               <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
                 You have no buckets yet. Create one in Data first.
               </p>
-              <p v-else class="mt-1 text-[11px] text-muted-foreground">Required, receives output files and the staged script.</p>
-            </div>
-            <div>
-              <label class="text-xs font-medium text-foreground">Output prefix</label>
-              <Input v-model="outputPrefix" class="mt-1 font-mono" placeholder="quickruns/" />
-              <p class="mt-1 text-[11px] text-muted-foreground">Everything this run writes lands under this prefix.</p>
+              <p v-else class="mt-1 text-[11px] text-muted-foreground">
+                The script is uploaded under <code class="rounded bg-muted px-1 font-mono">.aruna/scripts/</code> here before the run.
+              </p>
             </div>
           </div>
 
@@ -467,7 +472,7 @@ function runAnother() {
               </Suspense>
               <p v-if="!script.trim()" class="text-[11px] text-destructive">The script cannot be empty.</p>
               <p class="text-[11px] text-muted-foreground">
-                Runs as <code class="rounded bg-muted px-1 font-mono">{{ runtime.interpreter }} {{ scriptContainerPath }}</code> in a fresh container.
+                Runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in a fresh container.
               </p>
             </div>
 
@@ -504,52 +509,37 @@ function runAnother() {
                     Files the script writes to <code class="rounded bg-muted px-1 font-mono">/work/out/</code> are uploaded after the run. stdout and stderr are always captured.
                   </p>
                 </div>
-                <div v-if="outputFiles.length" class="space-y-1.5">
-                  <div v-for="(row, i) in outputFiles" :key="i" class="surface-inline space-y-1 p-2 text-xs">
+                <div v-if="outputRows.length" class="space-y-1.5">
+                  <div v-for="(row, i) in outputRows" :key="i" class="surface-inline space-y-1 p-2 text-xs">
                     <div class="flex items-center gap-1.5">
-                      <span class="shrink-0 font-mono text-[11px] text-muted-foreground">/work/out/</span>
-                      <Input v-model="row.name" class="h-7 font-mono text-xs" placeholder="result.txt" />
+                      <Select
+                        v-if="bucketOptions.length"
+                        v-model="row.bucket"
+                        :options="bucketOptions"
+                        placeholder="Bucket"
+                        class="h-7 w-32 shrink-0 text-xs"
+                      />
+                      <Input v-else v-model="row.bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" />
+                      <Input v-model="row.path" class="h-7 font-mono text-xs" placeholder="results/output.txt" />
                       <Button variant="ghost" size="icon-sm" class="h-5 w-5 shrink-0" aria-label="Remove output" @click="removeOutput(i)"><X class="size-3" /></Button>
                     </div>
                     <div class="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground">
                       <CornerDownRight class="h-3 w-3 shrink-0" />
-                      <span class="truncate" :title="outputDestination(row.name)">{{ outputDestination(row.name) }}</span>
+                      <span class="truncate" :title="`/work/out/${outputBasename(row.path) || '<file>'} uploads to ${outputDestination(row)}`">
+                        /work/out/{{ outputBasename(row.path) || '&lt;file&gt;' }} → {{ outputDestination(row) }}
+                      </span>
                     </div>
                   </div>
                 </div>
                 <p v-else class="text-[11px] text-muted-foreground">No output files declared. Only stdout and stderr are captured.</p>
-                <p v-if="!outputsValid" class="text-[11px] text-destructive">Output names must be unique, non-empty single filenames (no slashes).</p>
+                <p v-if="!outputsValid" class="text-[11px] text-destructive">
+                  Each output needs one of your buckets and a canonical key; container file names and destinations must be unique.
+                </p>
                 <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output file</Button>
               </section>
             </div>
           </div>
 
-          <!-- Workspace -->
-          <section v-if="s3.endpoint.value && s3.hasActiveKey.value" class="space-y-2">
-            <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace <span class="text-destructive">*</span></div>
-            <p class="text-[11px] text-muted-foreground">Choose how the run's scratch storage is handled.</p>
-            <div class="grid gap-2 sm:grid-cols-3">
-              <button
-                v-for="option in WORKSPACE_OPTIONS"
-                :key="option.mode"
-                type="button"
-                class="rounded-lg border p-3 text-left transition-colors"
-                :class="workspaceMode === option.mode ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-border hover:bg-muted/40'"
-                @click="workspaceMode = option.mode"
-              >
-                <div class="text-xs font-semibold text-foreground">{{ option.label }}</div>
-                <div class="mt-0.5 text-[11px] text-muted-foreground">{{ option.hint }}</div>
-              </button>
-            </div>
-            <div v-if="workspaceMode === 'existing'" class="max-w-xs">
-              <label class="text-xs font-medium text-foreground">Workspace bucket</label>
-              <Select v-if="bucketOptions.length" v-model="workspaceBucket" :options="bucketOptions" placeholder="Select a bucket" class="mt-1" />
-              <Input v-else v-model="workspaceBucket" class="mt-1 font-mono" placeholder="my-workspace" />
-            </div>
-            <p v-if="!workspaceValid" class="text-[11px] text-destructive">
-              {{ workspaceMode === 'existing' ? 'Pick the bucket the run should work in.' : 'A workspace choice is required before submitting.' }}
-            </p>
-          </section>
         </div>
 
         <!-- Step 4: Review — mirrors the data step's in/out structure. -->
@@ -587,7 +577,7 @@ function runAnother() {
             </section>
           </div>
           <p class="text-xs text-muted-foreground">
-            Runs as <code class="rounded bg-muted px-1 font-mono">{{ runtime.interpreter }} {{ scriptContainerPath }}</code> in
+            Runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in
             <code class="rounded bg-muted px-1 font-mono">{{ runtime.image }}</code>; the script is uploaded on submit (the backend does not accept inline script content).
           </p>
           <CodeSnippet title="TES task (POST /ga4gh/tes/v1/tasks)" :code="JSON.stringify(task, null, 2)" />
@@ -600,7 +590,7 @@ function runAnother() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || submitting || !dataReady || !workspaceValid" @click="submit">
+        <Button v-else size="sm" :disabled="busy || submitting || !dataReady || !outputsValid" @click="submit">
           <ListPlus class="h-4 w-4" /> {{ submitting ? 'Submitting…' : 'Submit run' }}
         </Button>
       </div>

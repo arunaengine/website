@@ -60,9 +60,9 @@ const groupId = ref('')
 const inputs = ref<TesInput[]>([])
 const executors = ref<TesExecutor[]>([{ image: '', command: [''] }])
 
-const outputBucket = ref('')
-const outputPrefix = ref('runs/')
-const outputRows = ref<{ path: string }[]>([{ path: '/outputs/result.txt' }])
+// Free-form outputs: each row names the container file and its own
+// s3://bucket/key destination; no shared bucket or prefix.
+const outputRows = ref<{ path: string; url: string }[]>([{ path: '/outputs/result.txt', url: '' }])
 
 const cpuCores = ref('')
 const ramGb = ref('')
@@ -101,15 +101,9 @@ onMounted(async () => {
 })
 
 const groupOptions = computed(() => myGroups.value.map((g) => ({ value: g.id, label: g.name })))
-function basename(path: string): string {
-  return path.split('/').filter(Boolean).pop() || ''
-}
-function outputUrl(path: string): string {
-  return `s3://${outputBucket.value.trim()}/${outputPrefix.value.trim()}${basename(path)}`
-}
 
 const outputs = computed<TesOutput[]>(() =>
-  outputRows.value.map((row) => ({ url: outputUrl(row.path), path: row.path, type: 'FILE' })),
+  outputRows.value.map((row) => ({ url: row.url.trim(), path: row.path.trim(), type: 'FILE' })),
 )
 
 const resources = computed<TesResources>(() => {
@@ -146,10 +140,11 @@ const executorsValid = computed(
     executors.value[0].image.trim().length > 0 &&
     executors.value[0].command.some((argument) => argument.trim()),
 )
-const outputsValid = computed(() => {
-  if (!outputRows.value.length) return true
-  return outputBucket.value.trim().length > 0 && outputRows.value.every((r) => r.path.trim().startsWith('/'))
-})
+const outputsValid = computed(() =>
+  outputRows.value.every(
+    (row) => row.path.trim().startsWith('/') && /^s3:\/\/[^/]+\/.+/.test(row.url.trim()),
+  ),
+)
 const canContinue = computed(() => {
   switch (step.value) {
     case 0:
@@ -173,7 +168,7 @@ function back() {
 }
 
 function addOutputRow() {
-  outputRows.value.push({ path: '/outputs/result.txt' })
+  outputRows.value.push({ path: '/outputs/result.txt', url: '' })
 }
 function removeOutputRow(i: number) {
   outputRows.value.splice(i, 1)
@@ -269,29 +264,22 @@ async function submit() {
         <div v-else-if="step === 3" class="space-y-6">
           <div class="space-y-3">
             <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Outputs</div>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label class="text-xs font-medium text-foreground">Target bucket</label>
-                <Input v-model="outputBucket" class="mt-1 font-mono" placeholder="my-results" />
-              </div>
-              <div>
-                <label class="text-xs font-medium text-foreground">Prefix</label>
-                <Input v-model="outputPrefix" class="mt-1 font-mono" placeholder="runs/" />
-              </div>
-            </div>
             <div v-for="(row, i) in outputRows" :key="i" class="surface-inline space-y-2 p-3">
               <div class="flex items-end gap-3">
                 <div class="min-w-0 flex-1">
                   <label class="text-xs font-medium text-foreground">Container path</label>
                   <Input v-model="row.path" class="mt-1 font-mono" placeholder="/outputs/result.txt" />
                 </div>
+                <div class="min-w-0 flex-1">
+                  <label class="text-xs font-medium text-foreground">Destination</label>
+                  <Input v-model="row.url" class="mt-1 font-mono" placeholder="s3://my-results/runs/result.txt" />
+                </div>
                 <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Remove output" @click="removeOutputRow(i)"><X class="h-4 w-4" /></Button>
               </div>
-              <p class="truncate font-mono text-[11px] text-muted-foreground" :title="outputUrl(row.path)">→ {{ outputUrl(row.path) }}</p>
             </div>
             <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
             <p class="text-[11px] text-muted-foreground">The current TES facade captures individual files; directory outputs are not supported.</p>
-            <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">Set a target bucket and give every output an absolute container path (starts with /).</p>
+            <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">Every output needs an absolute container path (starts with /) and an s3://bucket/key destination.</p>
           </div>
 
           <div class="space-y-3">
