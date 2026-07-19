@@ -19,6 +19,8 @@ const props = defineProps<{
   groupId: string
   connectorId: string
   selectable?: boolean
+  /** Connector paths already referenced by the target bucket. */
+  checkedPaths?: ReadonlySet<string>
 }>()
 
 const emit = defineEmits<{
@@ -167,8 +169,27 @@ defineExpose({ reload: load })
           <table v-else class="w-full text-sm">
             <tbody>
               <tr v-for="entry in entries" :key="entry.path" class="border-t border-border first:border-t-0 hover:bg-muted/30">
-                <td v-if="selectable" class="w-8 px-2 py-1.5">
+                <td v-if="selectable" class="whitespace-nowrap px-2 py-1.5">
+                  <template v-if="checkedPaths?.has(entry.path)">
+                    <input
+                      type="checkbox"
+                      class="h-3.5 w-3.5 rounded border-border accent-primary"
+                      checked
+                      disabled
+                      :aria-label="`${entry.name} is already in the bucket`"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="ml-1 h-6 px-1.5 text-[10px]"
+                      :aria-pressed="selected.has(entry.path)"
+                      @click="toggle(entry, !selected.has(entry.path))"
+                    >
+                      {{ selected.has(entry.path) ? 'Cancel' : 'Restage' }}
+                    </Button>
+                  </template>
                   <input
+                    v-else
                     type="checkbox"
                     class="h-3.5 w-3.5 rounded border-border accent-primary"
                     :checked="selected.has(entry.path)"
@@ -209,7 +230,7 @@ defineExpose({ reload: load })
 
       <div v-if="selectable" class="mt-2 flex items-center justify-between gap-2">
         <span class="text-[11px] text-muted-foreground">
-          {{ selectedList.length ? `${selectedList.length} selected` : 'Select files or folders to import.' }}
+          {{ selectedList.length ? `${selectedList.length} selected` : checkedPaths?.size ? 'Existing references are checked; use Restage to add one to the basket.' : 'Select files or folders to import.' }}
         </span>
         <Button size="sm" :disabled="!selectedList.length" @click="addSelected">
           Add {{ selectedList.length || '' }} to basket

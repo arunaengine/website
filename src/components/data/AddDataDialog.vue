@@ -23,11 +23,11 @@ import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { type FolderEntry, type ObjectEntry } from '@/composables/useS3'
-import { invalidSourcePath } from '@/composables/useStaging'
+import { invalidSourcePath, invalidSourcePrefix } from '@/composables/useStaging'
 import { useBuilderBasket, type BuilderRow } from '@/composables/useBuilderBasket'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { formatBytes } from '@/lib/utils'
-import { ApiError, type BucketSearchHit, type ConnectorEntry, type SourceConnectorSummary, type UsageResponse } from '@/lib/api'
+import { ApiError, type BucketSearchHit, type ConnectorEntry, type SourceConnectorSummary, type StagingReferenceEntry, type UsageResponse } from '@/lib/api'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { computed, ref, watch } from 'vue'
 import {
@@ -55,6 +55,7 @@ const props = defineProps<{
   groupId: string | null
   /** Keys visible in the parent's current listing, for overwrite warnings. */
   existingKeys?: ReadonlySet<string>
+  existingReferences?: readonly StagingReferenceEntry[]
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -169,7 +170,29 @@ watch(connectorSel, () => {
   entriesListingFailed.value = false
 })
 
-const connectorPathError = computed(() => connectorPath.value.trim() !== '' && invalidSourcePath(connectorPath.value))
+function typedConnectorPathIsPrefix(path: string): boolean {
+  const trimmed = path.trim()
+  return trimmed === '.' || trimmed === './' || trimmed.endsWith('/')
+}
+
+const connectorPathError = computed(() => {
+  if (!connectorPath.value.trim()) return false
+  return typedConnectorPathIsPrefix(connectorPath.value)
+    ? invalidSourcePrefix(connectorPath.value)
+    : invalidSourcePath(connectorPath.value)
+})
+const existingConnectorReferenceKeys = computed(() => {
+  const map = new Map<string, string>()
+  for (const entry of props.existingReferences ?? []) {
+    if (entry.referenced && entry.connector_id === connectorSel.value && entry.source_path) {
+      map.set(entry.source_path, entry.key)
+    }
+  }
+  return map
+})
+const existingConnectorPaths = computed<ReadonlySet<string>>(
+  () => new Set(existingConnectorReferenceKeys.value.keys()),
+)
 
 function selectedConnectorName(): string | null {
   return connectors.value.find((connector) => connector.connector_id === connectorSel.value)?.name ?? null
@@ -184,20 +207,28 @@ function addConnectorSelection(selection: { files: ConnectorEntry[]; dirs: Conne
     connectorName: selectedConnectorName(),
   }
   basket.addStaging('connector', [
-    ...selection.files.map((entry) => ({ ...base, source: entry.path })),
+    ...selection.files.map((entry) => ({
+      ...base,
+      source: entry.path,
+      targetKey: existingConnectorReferenceKeys.value.get(entry.path),
+    })),
     ...selection.dirs.map((entry) => ({ ...base, source: `${entry.path.replace(/\/+$/, '')}/`, isPrefix: true })),
   ])
 }
 
 function addTypedConnectorPath() {
-  if (!groupSel.value || !connectorSel.value || invalidSourcePath(connectorPath.value)) return
+  const source = connectorPath.value.trim()
+  const isPrefix = typedConnectorPathIsPrefix(source)
+  if (!groupSel.value || !connectorSel.value || (isPrefix ? invalidSourcePrefix(source) : invalidSourcePath(source))) return
   basket.addStaging('connector', [
     {
-      source: connectorPath.value.trim(),
+      source,
       strategy: connectorStrategy.value,
       groupId: groupSel.value,
       connectorId: connectorSel.value,
       connectorName: selectedConnectorName(),
+      ...(isPrefix ? { isPrefix: true } : {}),
+      ...(source === '.' || source === './' ? { targetKey: props.prefix } : {}),
     },
   ])
   connectorPath.value = ''
@@ -318,6 +349,7 @@ async function createOtherRelationships() {
             source: { bucket: row.bucket, prefix: row.sourcePrefix },
             target: { node_id: targetNode, bucket: props.bucket, prefix: otherTargetPrefix(row) },
             mode: row.mode,
+            reference_handling: row.mode === 'reference' ? 'preserve' : 'materialize',
           },
           sourceApiBase ? { baseUrl: sourceApiBase } : {},
         )
@@ -532,6 +564,7 @@ watch(
                 v-if="!entriesUnsupported"
                 :group-id="groupSel"
                 :connector-id="connectorSel"
+                :checked-paths="existingConnectorPaths"
                 selectable
                 @add="addConnectorSelection"
                 @unsupported="entriesUnsupported = true"
@@ -551,6 +584,9 @@ watch(
                   </div>
                   <p v-if="connectorPathError" class="mt-1 text-[11px] text-destructive">
                     Use a relative path without leading '/', backslashes, or '.'/'..' segments.
+                  </p>
+                  <p v-else class="mt-1 text-[11px] text-muted-foreground">
+                    End a folder path with '/' or use '.' to add the connector root.
                   </p>
                 </div>
               </div>
@@ -697,7 +733,15 @@ watch(
                     <Badge v-if="row.isPrefix" variant="outline" class="text-[10px] uppercase">folder</Badge>
                     <span class="min-w-0 truncate font-mono text-xs" :title="row.source">{{ row.source }}</span>
                   </div>
-                  <span v-if="row.strategy" class="text-[10px] text-muted-foreground">{{ row.strategy }}</span>
+                  <Select
+                    v-if="row.strategy && rowEditable(row)"
+                    :model-value="row.strategy"
+                    :options="STRATEGY_OPTIONS"
+                    class="mt-1 h-7 w-56 text-[10px]"
+                    :aria-label="`Staging strategy for ${row.source}`"
+                    @update:model-value="(value: string) => (row.strategy = value as 'snapshot' | 'reference')"
+                  />
+                  <span v-else-if="row.strategy" class="text-[10px] text-muted-foreground">{{ row.strategy }}</span>
                   <span v-else-if="row.size !== null" class="text-[10px] text-muted-foreground">{{ formatBytes(row.size) }}</span>
                 </td>
                 <td class="px-3 py-2">
@@ -715,8 +759,23 @@ watch(
                   <div class="flex items-center gap-2">
                     <Loader2 v-if="row.state === 'submitting'" class="h-3 w-3 shrink-0 animate-spin text-primary" />
                     <Badge :variant="stateVariant(row.state)" class="text-[10px] uppercase">{{ row.state }}</Badge>
-                    <Progress v-if="row.sourceKind === 'upload' && row.state === 'submitting'" :value="row.progress" :warn="101" :critical="101" class="h-1.5 w-16" />
+                    <Progress
+                      v-if="row.state === 'submitting'"
+                      :value="row.progress"
+                      :indeterminate="row.sourceKind !== 'upload' && row.progressTotal == null"
+                      :warn="101"
+                      :critical="101"
+                      class="h-1.5 w-16"
+                    />
                   </div>
+                  <p v-if="row.state === 'submitting' && row.phase" class="mt-1 text-[10px] text-muted-foreground">
+                    {{ row.phase }}
+                    <template v-if="row.progressTotal != null">
+                      · {{ row.progressUnit === 'bytes' ? formatBytes(row.progressCurrent ?? 0) : row.progressCurrent }}
+                      / {{ row.progressUnit === 'bytes' ? formatBytes(row.progressTotal) : row.progressTotal }}
+                    </template>
+                    <span v-if="row.currentPath" class="block truncate font-mono" :title="row.currentPath">{{ row.currentPath }}</span>
+                  </p>
                   <p v-if="row.blockedReason && row.state === 'blocked'" class="mt-1 text-[10px] text-amber-700 dark:text-amber-400">{{ row.blockedReason }}</p>
                   <p v-if="row.error" class="mt-1 text-[10px] text-destructive">{{ row.error }}</p>
                 </td>

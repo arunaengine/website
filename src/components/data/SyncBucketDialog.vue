@@ -14,7 +14,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { ApiError, type BucketSearchHit, type CreateSyncRelationshipRequest, type SyncMode, type SyncRelationship } from '@/lib/api'
+import { ApiError, type BucketSearchHit, type CreateSyncRelationshipRequest, type SyncMode, type SyncReferenceHandling, type SyncRelationship } from '@/lib/api'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { computed, ref, watch } from 'vue'
 import { ArrowRight, Loader2 } from '@lucide/vue'
@@ -55,6 +55,7 @@ const targetNodeId = ref('')
 const targetBucket = ref('')
 const targetPrefix = ref('')
 const mode = ref<SyncMode>('once')
+const referenceHandling = ref<SyncReferenceHandling>('materialize')
 const replicateDeletes = ref(false)
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -68,6 +69,7 @@ watch(
     targetBucket.value = props.sourceBucket
     targetPrefix.value = ''
     mode.value = 'once'
+    referenceHandling.value = 'materialize'
     replicateDeletes.value = false
     busy.value = false
     error.value = null
@@ -103,6 +105,11 @@ const MODE_OPTIONS: ModeOption[] = [
     label: 'Reference',
     description: 'Exposes the source objects at the target without copying the data.',
   },
+]
+const REFERENCE_HANDLING_OPTIONS: Array<{ value: SyncReferenceHandling; label: string; description: string }> = [
+  { value: 'materialize', label: 'Materialize', description: 'Download referenced source data on the sender and copy the bytes to the target.' },
+  { value: 'preserve', label: 'Preserve references', description: 'Send reference metadata so the target keeps the objects lazy.' },
+  { value: 'skip', label: 'Skip references', description: 'Sync materialized objects only and leave referenced objects out.' },
 ]
 
 function pickSuggestion(hit: BucketSearchHit) {
@@ -154,7 +161,7 @@ async function submit() {
   if (tgtPrefix) target.prefix = tgtPrefix
   try {
     const relationship = await createSyncRelationship(
-      { source, target, mode: mode.value, replicate_deletes: replicateDeletes.value },
+      { source, target, mode: mode.value, reference_handling: mode.value === 'reference' ? 'preserve' : referenceHandling.value, replicate_deletes: replicateDeletes.value },
       pullMode.value && sourceApiBase.value ? { baseUrl: sourceApiBase.value } : {},
     )
     emit('created', relationship)
@@ -264,6 +271,17 @@ async function submit() {
               :value="option.value"
               class="mt-1 h-3.5 w-3.5 shrink-0 accent-primary"
             />
+            <span>
+              <span class="text-xs font-medium text-foreground">{{ option.label }}</span>
+              <span class="block text-[11px] text-muted-foreground">{{ option.description }}</span>
+            </span>
+          </label>
+        </fieldset>
+
+        <fieldset v-if="mode !== 'reference'" class="space-y-2">
+          <legend class="text-xs font-medium text-foreground">Source references</legend>
+          <label v-for="option in REFERENCE_HANDLING_OPTIONS" :key="option.value" class="flex items-start gap-2 text-sm">
+            <input v-model="referenceHandling" type="radio" :value="option.value" class="mt-1 h-3.5 w-3.5 shrink-0 accent-primary" />
             <span>
               <span class="text-xs font-medium text-foreground">{{ option.label }}</span>
               <span class="block text-[11px] text-muted-foreground">{{ option.description }}</span>

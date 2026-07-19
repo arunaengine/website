@@ -1,7 +1,7 @@
 // Per-bucket reference visibility shared by the data manager and the object
 // picker: ONE cursor-following /staging/references load per opened bucket
 // feeds the row indicators, the preview origin line and the header stats.
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useAruna } from './useAruna'
 import { aggregateReferences } from '@/lib/references'
 import type { StagingReferenceEntry } from '@/lib/api'
@@ -12,15 +12,20 @@ export function useStagingReferences(bucket: Ref<string>, active?: Ref<boolean>)
   const entries = ref<StagingReferenceEntry[]>([])
   const loading = ref(false)
   let requestId = 0
+  let controller: AbortController | undefined
 
   async function load() {
     const id = ++requestId
+    controller?.abort()
+    controller = undefined
     entries.value = []
     if (!bucket.value || !authToken.value) return
     if (active && !active.value) return
+    controller = new AbortController()
+    const signal = controller.signal
     loading.value = true
     try {
-      const result = await listStagingReferences(bucket.value)
+      const result = await listStagingReferences(bucket.value, undefined, signal)
       if (id !== requestId) return
       entries.value = result
     } catch {
@@ -32,6 +37,7 @@ export function useStagingReferences(bucket: Ref<string>, active?: Ref<boolean>)
   }
 
   watch([bucket, () => active?.value, authToken], () => void load(), { immediate: true })
+  onScopeDispose(() => controller?.abort())
 
   const referencedByKey = computed(() => {
     const map = new Map<string, StagingReferenceEntry>()

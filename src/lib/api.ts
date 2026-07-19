@@ -114,6 +114,7 @@ export interface UsageResponse {
   stored_bytes: number
   // Newer backends add logical bytes and, for authenticated callers, realm-wide totals.
   logical_bytes?: number
+  referenced_bytes: number
   realm?: UsageTotals
   // Present on GET /groups/{id}/usage from quota-aware backends.
   quota?: GroupQuotaStatus
@@ -135,6 +136,7 @@ export interface UsageTotals {
   stored_blobs: number
   stored_bytes: number
   logical_bytes: number
+  referenced_bytes: number
 }
 
 // ---------------------------------------------------------------------------
@@ -712,33 +714,51 @@ export interface StageBlobResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Staging jobs — arunaengine/aruna#276 ("staging jobs get a side panel").
-// POST /staging/ is synchronous and today's backend keeps NO job registry;
-// the types below document the assumed listing contract so the panel flips
-// on trivially once it ships:
-//   GET /staging/jobs -> 200 ListStagingJobsResponse
-// Callers MUST gate on featureEnabled('stagingJobs'); the flag ships off.
+// Durable staging jobs. POST accepts StagingBatchRequest and recursively walks
+// prefixes; list/detail expose truthful item/byte progress and per-item errors.
 // ---------------------------------------------------------------------------
 export type StagingJobState = 'queued' | 'running' | 'done' | 'failed'
+export type StagingJobPhase =
+  | 'queued'
+  | 'discovering'
+  | 'inspecting'
+  | 'registering'
+  | 'downloading'
+  | 'writing'
+  | 'completed'
+  | 'failed'
+
+export interface StagingJobProgress {
+  items_current: number
+  items_total?: number | null
+  bytes_current: number
+  bytes_total?: number | null
+  current_path?: string | null
+}
 
 export interface StagingJob {
   job_id: string
-  strategy: StagingStrategy
+  strategy: 'reference' | 'snapshot'
   group_id: string
   connector_id: string
-  source_path: string
   bucket: string
-  key: string
   state: StagingJobState
+  phase: StagingJobPhase
   submitted_at: string
   finished_at?: string | null
   error?: string | null
-  version_id?: string | null
-  size?: number | null
+  progress: StagingJobProgress
+  errors: Array<{ source_path: string; target_key: string; error: string }>
 }
 
 export interface ListStagingJobsResponse {
   jobs: StagingJob[]
+  next_cursor?: string
+}
+
+export interface CreateStagingJobResponse {
+  job_id: string
+  created: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -782,6 +802,7 @@ export interface StagingReferencesResponse {
 // delete are creator-only too (403 otherwise).
 // ---------------------------------------------------------------------------
 export type SyncMode = 'once' | 'reference' | 'continuous'
+export type SyncReferenceHandling = 'materialize' | 'preserve' | 'skip'
 
 // Wire state is a plain string ("enabled" | "paused" | "failed"); a failed
 // relationship carries failure_reason alongside. Kept open for future states.
@@ -807,6 +828,7 @@ export interface SyncRelationship {
   /** Target ARN, same shape as source. */
   target: string
   mode: SyncMode
+  reference_handling: SyncReferenceHandling
   replicate_deletes: boolean
   created_by: string
   created_at: string
@@ -839,7 +861,12 @@ export interface CreateSyncRelationshipRequest {
   source: { bucket: string; prefix?: string }
   target: { node_id: string; bucket: string; prefix?: string }
   mode: SyncMode
+  reference_handling: SyncReferenceHandling
   replicate_deletes?: boolean
+}
+
+export interface UpdateSyncRelationshipRequest {
+  reference_handling: SyncReferenceHandling
 }
 
 export interface SyncRelationshipListQuery {

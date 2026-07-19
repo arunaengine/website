@@ -31,6 +31,8 @@ import {
   type S3CredentialSummary,
   type ListSourceConnectorsResponse,
   type ListStagingJobsResponse,
+  type CreateStagingJobResponse,
+  type StagingJob,
   type SourceConnectorRequest,
   type SourceConnectorSummary,
   type ConnectorCheckResponse,
@@ -48,6 +50,7 @@ import {
   type SyncRelationshipListQuery,
   type SyncRelationshipListResponse,
   type SyncRunResponse,
+  type SyncReferenceHandling,
   type SparqlResponse,
   type UsageHistoryResolution,
   type UsageHistoryResponse,
@@ -637,34 +640,39 @@ async function stageBatch(input: StagingBatchRequest): Promise<StagingBatchRespo
   return request<StagingBatchResponse>('/staging/batch', { method: 'POST', body: JSON.stringify(input) })
 }
 
-// STUB against the assumed #276 job registry (see api.ts). On today's backends
-// this 404s; callers gate on featureEnabled('stagingJobs') and treat 404/405 as
-// "backend does not keep a staging job registry yet".
-async function listStagingJobs(): Promise<ListStagingJobsResponse> {
-  return request<ListStagingJobsResponse>('/staging/jobs')
+async function listStagingJobs(cursor?: string, limit = 50): Promise<ListStagingJobsResponse> {
+  return request<ListStagingJobsResponse>('/staging/jobs', { query: { limit, cursor } })
 }
 
-// Client-side ceiling on the cursor-following reference listing: indicators
-// and stats are progressive enhancements, so a huge bucket yields an honest
-// lower bound instead of an unbounded request storm.
-const STAGING_REFERENCES_CAP = 2000
+async function createStagingJob(input: StagingBatchRequest): Promise<CreateStagingJobResponse> {
+  return request<CreateStagingJobResponse>('/staging/jobs', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+async function getStagingJob(jobId: string): Promise<StagingJob> {
+  return request<StagingJob>(`/staging/jobs/${encodeURIComponent(jobId)}`)
+}
 
 // Reference-backed keys of a bucket (agreed contract, see api.ts). Follows
-// next_cursor until the listing is exhausted or the cap is reached.
+// next_cursor until the listing is exhausted.
 async function listStagingReferences(
   bucket: string,
   prefix?: string,
+  signal?: AbortSignal,
 ): Promise<StagingReferenceEntry[]> {
   const entries: StagingReferenceEntry[] = []
   let cursor: string | undefined
   do {
     const page = await request<StagingReferencesResponse>('/staging/references', {
+      signal,
       query: { bucket, prefix: prefix || undefined, limit: 500, cursor },
     })
-    entries.push(...(page.entries ?? []))
+    entries.push(...(page.entries ?? []).filter((entry) => entry.referenced))
     cursor = page.next_cursor
-  } while (cursor && entries.length < STAGING_REFERENCES_CAP)
-  return entries.length > STAGING_REFERENCES_CAP ? entries.slice(0, STAGING_REFERENCES_CAP) : entries
+  } while (cursor)
+  return entries
 }
 
 async function listGroupMembers(groupId: string): Promise<GroupMembersResponse> {
@@ -866,6 +874,16 @@ async function createSyncRelationship(
 async function runSyncRelationship(id: string): Promise<SyncRunResponse> {
   return request<SyncRunResponse>(`/data/sync-relationships/${encodeURIComponent(id)}/run`, {
     method: 'POST',
+  })
+}
+
+async function updateSyncReferenceHandling(
+  id: string,
+  referenceHandling: SyncReferenceHandling,
+): Promise<SyncRelationship> {
+  return request<SyncRelationship>(`/data/sync-relationships/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ reference_handling: referenceHandling }),
   })
 }
 
@@ -1332,6 +1350,8 @@ export function useAruna() {
     stageBlob,
     stageBatch,
     listStagingJobs,
+    createStagingJob,
+    getStagingJob,
     listStagingReferences,
     revokeS3Credential,
     listGroupMembers,
@@ -1352,6 +1372,7 @@ export function useAruna() {
     getSyncRelationship,
     createSyncRelationship,
     runSyncRelationship,
+    updateSyncReferenceHandling,
     deleteSyncRelationship,
     setAuthToken,
     setApiBaseUrl,

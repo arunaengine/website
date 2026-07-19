@@ -34,14 +34,24 @@ export function invalidSourcePath(path: string): boolean {
   return trimmed.split('/').some((segment) => segment === '.' || segment === '..')
 }
 
+export function invalidSourcePrefix(path: string): boolean {
+  const trimmed = path.trim()
+  if (trimmed === '.' || trimmed === './') return false
+  const withoutRoot = trimmed.startsWith('./') ? trimmed.slice(2) : trimmed
+  const normalized = withoutRoot.replace(/\/+$/, '')
+  return !normalized || invalidSourcePath(normalized)
+}
+
 // ApiError status mapping verified against aruna api/src/routes/staging.rs.
-export function stagingErrorMessage(err: unknown): string {
+export function stagingErrorMessage(err: unknown, strategy?: StagingStrategy): string {
   if (err instanceof ApiError) {
     switch (err.status) {
       case 400:
-        return 'Invalid source path, use a relative path without "." or ".." segments.'
+        return err.message
       case 403:
-        return 'Forbidden, you need write access to the target path and read access to the connector source. A group over its storage quota is also rejected with 403.'
+        return strategy === 'snapshot'
+          ? 'Forbidden, you need write access to the target path and read access to the connector source. Snapshot staging is also rejected when the group is over its storage quota.'
+          : 'Forbidden, you need write access to the target path and read access to the connector source.'
       case 404:
         return 'Bucket, connector or source not found, the bucket must belong to the selected group.'
       case 501:
@@ -92,7 +102,7 @@ async function submitStaging(input: {
     return result
   } catch (err) {
     entry.state = 'error'
-    entry.error = stagingErrorMessage(err)
+    entry.error = stagingErrorMessage(err, input.strategy)
     submissions.value = [...submissions.value]
     throw err
   }

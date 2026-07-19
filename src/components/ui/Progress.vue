@@ -10,6 +10,7 @@ const props = withDefaults(
     barClass?: string
     warn?: number
     critical?: number
+    indeterminate?: boolean
   }>(),
   { value: 0, max: 100, warn: 75, critical: 90 },
 )
@@ -31,8 +32,8 @@ const tone = computed(() => {
   >
     <div
       class="h-full transition-[width] duration-700"
-      :class="cn(tone, props.barClass)"
-      :style="{ width: `${pct}%` }"
+      :class="cn(tone, props.indeterminate && 'animate-pulse', props.barClass)"
+      :style="{ width: props.indeterminate ? '35%' : `${pct}%` }"
     />
   </div>
 </template>

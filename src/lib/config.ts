@@ -30,6 +30,7 @@ const DEFAULT_FEATURES: Record<string, boolean> = {
   jobs: true,
   placementAdmin: true,
   searchCursor: true,
+  stagingJobs: true,
   tes: true,
 }
 

@@ -6,15 +6,16 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { type SyncRelationship, type SyncRelationshipDetail } from '@/lib/api'
+import { type SyncReferenceHandling, type SyncRelationship, type SyncRelationshipDetail } from '@/lib/api'
 import { arnLocationLabel, parseArunaArn, syncModeLabel, syncStateVariant } from '@/lib/sync'
 import { formatBytes, formatDuration, relativeTime } from '@/lib/utils'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ArrowLeftRight, ArrowLeft, ArrowRight, Loader2, Play, RefreshCw, Trash2 } from '@lucide/vue'
 
 // Sync relationships touching one bucket on the connected node, outgoing and
@@ -28,26 +29,47 @@ const emit = defineEmits<{
   (e: 'changed'): void
 }>()
 
-const { listSyncRelationships, getSyncRelationship, runSyncRelationship, deleteSyncRelationship } =
+const { listSyncRelationships, getSyncRelationship, runSyncRelationship, updateSyncReferenceHandling, deleteSyncRelationship } =
   useAruna()
 const realmNodes = useRealmNodes()
 
 const outgoing = ref<SyncRelationship[]>([])
 const incoming = ref<SyncRelationship[]>([])
 const details = ref<Record<string, SyncRelationshipDetail>>({})
+const detailRetryNeeded = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const rowError = ref<Record<string, string>>({})
 const busyId = ref<string | null>(null)
 const confirmingId = ref<string | null>(null)
 let requestId = 0
+let pollTimer: number | undefined
+let disposed = false
 
-async function load() {
+function clearPoll() {
+  if (pollTimer !== undefined) window.clearTimeout(pollTimer)
+  pollTimer = undefined
+}
+
+function schedulePoll() {
+  clearPoll()
+  if (
+    disposed ||
+    !props.open ||
+    (!detailRetryNeeded.value && !Object.values(details.value).some((detail) => detail.pending_jobs > 0))
+  ) return
+  pollTimer = window.setTimeout(() => void load(true), 3_000)
+}
+
+async function load(silent = false) {
+  if (disposed) return
   const myRequest = ++requestId
-  loading.value = true
-  error.value = null
-  confirmingId.value = null
-  rowError.value = {}
+  if (!silent) {
+    loading.value = true
+    error.value = null
+    confirmingId.value = null
+    rowError.value = {}
+  }
   try {
     const response = await listSyncRelationships({ bucket: props.bucket, direction: 'both' })
     if (myRequest !== requestId) return
@@ -61,13 +83,18 @@ async function load() {
     const map: Record<string, SyncRelationshipDetail> = {}
     settled.forEach((result, index) => {
       if (result.status === 'fulfilled') map[all[index].id] = result.value
+      else if (details.value[all[index].id]) map[all[index].id] = details.value[all[index].id]
     })
     details.value = map
+    detailRetryNeeded.value = settled.some((result) => result.status === 'rejected')
   } catch (err) {
     if (myRequest !== requestId) return
-    error.value = err instanceof Error ? err.message : String(err)
+    if (!silent) error.value = err instanceof Error ? err.message : String(err)
   } finally {
-    if (myRequest === requestId) loading.value = false
+    if (myRequest === requestId && !disposed) {
+      loading.value = false
+      schedulePoll()
+    }
   }
 }
 
@@ -75,8 +102,17 @@ watch(
   () => [props.open, props.bucket] as const,
   ([open]) => {
     if (open) void load()
+    else {
+      ++requestId
+      clearPoll()
+    }
   },
 )
+onBeforeUnmount(() => {
+  disposed = true
+  ++requestId
+  clearPoll()
+})
 
 interface Row {
   relationship: SyncRelationship
@@ -87,6 +123,11 @@ const rows = computed<Row[]>(() => [
   ...outgoing.value.map((relationship) => ({ relationship, direction: 'outgoing' as const })),
   ...incoming.value.map((relationship) => ({ relationship, direction: 'incoming' as const })),
 ])
+const REFERENCE_HANDLING_OPTIONS = [
+  { value: 'materialize', label: 'Materialize refs' },
+  { value: 'preserve', label: 'Preserve refs' },
+  { value: 'skip', label: 'Skip refs' },
+]
 
 // The "other side" of the relationship, seen from this bucket.
 function counterpart(row: Row): { nodeId: string | null; label: string } {
@@ -129,6 +170,24 @@ async function rerun(row: Row) {
   }
 }
 
+async function setReferenceHandling(row: Row, value: string) {
+  if (busyId.value || row.direction !== 'outgoing') return
+  busyId.value = row.relationship.id
+  rowError.value = { ...rowError.value, [row.relationship.id]: '' }
+  try {
+    await updateSyncReferenceHandling(row.relationship.id, value as SyncReferenceHandling)
+    emit('changed')
+    await load(true)
+  } catch (err) {
+    rowError.value = {
+      ...rowError.value,
+      [row.relationship.id]: err instanceof Error ? err.message : String(err),
+    }
+  } finally {
+    busyId.value = null
+  }
+}
+
 async function remove(row: Row) {
   if (busyId.value) return
   busyId.value = row.relationship.id
@@ -158,7 +217,7 @@ async function remove(row: Row) {
             <ArrowLeftRight class="h-4 w-4 shrink-0 text-primary" />
             <span class="truncate">Sync status: <span class="font-mono text-sm">{{ props.bucket }}</span></span>
           </DialogTitle>
-          <Button variant="ghost" size="icon-sm" aria-label="Reload" :disabled="loading" @click="load">
+          <Button variant="ghost" size="icon-sm" aria-label="Reload" :disabled="loading" @click="() => load()">
             <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" />
           </Button>
         </div>
@@ -213,6 +272,26 @@ async function remove(row: Row) {
               </span>
               <span v-if="row.relationship.replicate_deletes">· replicates deletes</span>
             </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] text-muted-foreground">Source references</span>
+              <Select
+                v-if="row.direction === 'outgoing' && row.relationship.mode !== 'reference'"
+                :model-value="row.relationship.reference_handling"
+                :options="REFERENCE_HANDLING_OPTIONS"
+                class="h-7 w-40 text-[11px]"
+                aria-label="Source reference handling"
+                :disabled="busyId !== null"
+                @update:model-value="(value: string) => setReferenceHandling(row, value)"
+              />
+              <Badge v-else variant="outline" class="text-[10px]">{{ row.relationship.reference_handling }}</Badge>
+            </div>
+            <p
+              v-if="details[row.relationship.id]?.pending_jobs && row.relationship.reference_handling === 'materialize'"
+              class="text-[11px] text-muted-foreground"
+            >
+              Referenced objects are fetched from their original connector before transfer. Large sources can remain queued or transferring for a while; this status refreshes automatically.
+            </p>
 
             <p v-if="lastError(row)" class="break-all text-[11px] text-destructive">{{ lastError(row) }}</p>
             <p v-if="rowError[row.relationship.id]" class="break-all text-[11px] text-destructive">{{ rowError[row.relationship.id] }}</p>
