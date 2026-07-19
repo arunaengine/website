@@ -172,6 +172,7 @@ function openSyncFromHit(hit: BucketSearchHit) {
 }
 
 function onSyncChanged() {
+  void refreshBuckets()
   void loadSyncOverview()
 }
 

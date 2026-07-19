@@ -22,12 +22,11 @@ import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
+import { type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { invalidSourcePath } from '@/composables/useStaging'
 import { useBuilderBasket, type BuilderRow } from '@/composables/useBuilderBasket'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { formatBytes } from '@/lib/utils'
-import { isWorkspaceBucket } from '@/lib/workspaces'
 import { ApiError, type BucketSearchHit, type ConnectorEntry, type SourceConnectorSummary, type UsageResponse } from '@/lib/api'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { computed, ref, watch } from 'vue'
@@ -67,7 +66,6 @@ const emit = defineEmits<{
 const { myGroups, listGroupConnectors, createSyncRelationship, getGroupUsage } = useAruna()
 const { writesDisabled } = useConnectivity()
 const realmNodes = useRealmNodes()
-const s3 = useS3()
 
 const existingKeys = computed<ReadonlySet<string>>(() => props.existingKeys ?? new Set())
 
@@ -206,8 +204,8 @@ function addTypedConnectorPath() {
 }
 
 // ── Other buckets tab ───────────────────────────────────────────────────────
-// Import from any bucket in the realm: pick a bucket (local list or federated
-// search), browse it (per-node S3 client for remote buckets), multi-select
+// Import from any bucket in the realm: search local and remote buckets, browse
+// them through their per-node S3 client, then multi-select
 // objects/folders and create sync relationships into the current bucket —
 // mode "once" copies now, mode "reference" exposes without copying. The
 // create request POSTs to the SOURCE node's API (the source is always the
@@ -217,8 +215,6 @@ type OtherMode = 'once' | 'reference'
 const sourceBucket = ref('')
 const sourceNodeId = ref<string | null>(null)
 const sourceSearch = ref('')
-const localBuckets = ref<string[]>([])
-const localBucketsLoading = ref(false)
 const otherDefaultMode = ref<OtherMode>('once')
 
 interface OtherBucketRow {
@@ -240,37 +236,6 @@ const OTHER_MODE_OPTIONS: Array<{ value: OtherMode; label: string }> = [
   { value: 'once', label: 'Copy (once)' },
   { value: 'reference', label: 'Reference' },
 ]
-
-// The current bucket never offers itself as an import source.
-const localBucketOptions = computed(() =>
-  localBuckets.value
-    .filter((name) => name !== props.bucket)
-    .map((name) => ({ value: name, label: name })),
-)
-
-async function loadLocalBuckets() {
-  if (!s3.hasActiveKey.value || !s3.endpoint.value) return
-  localBucketsLoading.value = true
-  try {
-    localBuckets.value = (await s3.listBuckets())
-      .map((entry) => entry.name)
-      .filter((name) => !isWorkspaceBucket(name))
-  } catch {
-    localBuckets.value = []
-  } finally {
-    localBucketsLoading.value = false
-  }
-}
-
-watch(tab, (value) => {
-  if (value === 'other' && !localBuckets.value.length) void loadLocalBuckets()
-})
-
-function pickLocalSource(name: string) {
-  if (!name) return
-  sourceBucket.value = name
-  sourceNodeId.value = null
-}
 
 function pickSearchHit(hit: BucketSearchHit) {
   sourceBucket.value = hit.bucket
@@ -450,7 +415,6 @@ watch(
     sourceNodeId.value = null
     sourceSearch.value = ''
     otherRows.value = []
-    if (tab.value === 'other') void loadLocalBuckets()
   },
   { immediate: true },
 )
@@ -604,23 +568,16 @@ watch(
               there without copying the data.
             </p>
 
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label class="text-xs font-medium text-foreground">Local bucket</label>
-                <Select
-                  :model-value="sourceNodeId ? '' : sourceBucket"
-                  :options="localBucketOptions"
-                  :placeholder="localBucketsLoading ? 'Loading buckets…' : 'Select a bucket'"
-                  :disabled="!localBucketOptions.length && !localBucketsLoading"
-                  class="mt-1"
-                  @update:model-value="(v: string) => pickLocalSource(v)"
+            <div>
+              <label class="text-xs font-medium text-foreground">Source bucket</label>
+              <div class="mt-1">
+                <BucketSearchBox
+                  v-model="sourceSearch"
+                  mode="picker"
+                  :exclude-local-bucket="bucket"
+                  placeholder="Find a bucket on any node…"
+                  @select="pickSearchHit"
                 />
-              </div>
-              <div>
-                <label class="text-xs font-medium text-foreground">Or search across nodes</label>
-                <div class="mt-1">
-                  <BucketSearchBox v-model="sourceSearch" mode="picker" placeholder="Find buckets across nodes…" @select="pickSearchHit" />
-                </div>
               </div>
             </div>
 

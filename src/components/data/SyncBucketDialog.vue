@@ -241,6 +241,7 @@ async function submit() {
             v-model="targetBucket"
             mode="picker"
             :filter-node-id="pullMode ? realmNodes.localNodeId.value : targetNodeId || null"
+            allow-new
             placeholder="bucket-name"
             @select="pickSuggestion"
           />

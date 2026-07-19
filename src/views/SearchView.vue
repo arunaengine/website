@@ -449,7 +449,7 @@ async function runQuery() {
                   {{ isLocalNode(hit.node_id) ? 'this node' : nodeDisplayName(hit.node_id) }}
                 </Badge>
                 <span class="text-[10px] text-muted-foreground" :title="hit.group_id">
-                  {{ hit.group_name || truncateMiddle(hit.group_id) }}
+                  Group: {{ hit.group_name || truncateMiddle(hit.group_id) }}
                 </span>
               </RouterLink>
             </div>

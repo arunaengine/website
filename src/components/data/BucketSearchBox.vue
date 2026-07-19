@@ -25,9 +25,20 @@ const props = withDefaults(
     mode?: 'browse' | 'picker'
     /** Picker: restrict suggestions to buckets hosted on this node. */
     filterNodeId?: string | null
+    /** Picker: hide this bucket when it is hosted on the connected node. */
+    excludeLocalBucket?: string
+    /** Picker: explain that an unmatched value may create a new bucket. */
+    allowNew?: boolean
     placeholder?: string
   }>(),
-  { modelValue: undefined, mode: 'browse', filterNodeId: null, placeholder: 'Find buckets across nodes…' },
+  {
+    modelValue: undefined,
+    mode: 'browse',
+    filterNodeId: null,
+    excludeLocalBucket: undefined,
+    allowNew: false,
+    placeholder: 'Find buckets across nodes…',
+  },
 )
 
 const emit = defineEmits<{
@@ -67,6 +78,7 @@ const visibleHits = computed(() =>
   hits.value.filter((hit) => {
     if (isWorkspaceBucket(hit.bucket)) return false
     if (props.filterNodeId && hit.node_id !== props.filterNodeId) return false
+    if (props.excludeLocalBucket === hit.bucket && isLocalNode(hit.node_id)) return false
     return true
   }),
 )
@@ -227,7 +239,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
             <span class="truncate font-mono text-xs text-foreground">{{ hit.bucket }}</span>
             <span class="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
               <span class="max-w-24 truncate text-[10px] text-muted-foreground" :title="hit.group_id">
-                {{ hit.group_name || truncateMiddle(hit.group_id) }}
+                Group: {{ hit.group_name || truncateMiddle(hit.group_id) }}
               </span>
               <Badge
                 v-if="!isLocalNode(hit.node_id)"
@@ -268,7 +280,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
       </ul>
 
       <p v-else-if="searched && !searching" class="px-2.5 py-2 text-[11px] text-muted-foreground">
-        No buckets matched.
+        {{ allowNew ? 'No existing bucket matched. This name will create a new target bucket.' : 'No buckets matched.' }}
       </p>
 
       <div v-else class="flex items-center gap-2 px-2.5 py-2 text-[11px] text-muted-foreground">
