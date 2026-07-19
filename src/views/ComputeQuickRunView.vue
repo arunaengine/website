@@ -3,8 +3,10 @@ import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
+import Switch from '@/components/ui/Switch.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -29,6 +31,7 @@ import {
   type TesTask,
 } from '@/lib/tes'
 import { isWorkspaceBucket } from '@/lib/workspaces'
+import { fetchWithTimeout } from '@/lib/fetch'
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -65,7 +68,7 @@ function errorMessage(err: unknown): string {
 
 // ── Runtimes (tagged upstream images) ────────────────────────────────────────
 interface Runtime {
-  id: 'python-uv' | 'deno'
+  id: 'python-uv' | 'deno' | 'bash'
   label: string
   hint: string
   image: string
@@ -102,6 +105,17 @@ const RUNTIMES: Runtime[] = [
     lang: 'javascript',
     contentType: 'text/typescript',
     template: 'console.log("hello from aruna");\n',
+  },
+  {
+    id: 'bash',
+    label: 'Bash',
+    hint: 'Plain shell, no extra tooling.',
+    image: 'bash:5.2',
+    command: ['bash'],
+    file: 'script.sh',
+    lang: 'text',
+    contentType: 'text/x-shellscript',
+    template: 'echo "hello from aruna"\n',
   },
 ]
 const TES_NETWORK_TAG = 'aruna-engine.org/network'
@@ -149,6 +163,8 @@ watch(runtimeId, (next, prev) => {
   }
   dependencies.value = []
   dependencyDraft.value = ''
+  dependencyVerification.value = {}
+  if (next === 'bash') editorTab.value = 'work'
 })
 watch(step, (s) => {
   if (s === REVIEW_STEP) runId.value = crypto.randomUUID()
@@ -186,13 +202,15 @@ const dependencyConfig = computed(() => {
     2,
   )
 })
+function tomlString(value: string): string {
+  return JSON.stringify(value)
+}
+const stagedScript = computed(() => {
+  if (runtimeId.value !== 'python-uv' || !dependencies.value.length) return script.value
+  const dependencyLines = dependencies.value.map((dependency) => `#   ${tomlString(dependency)},`).join('\n')
+  return `# /// script\n# requires-python = ">=3.13"\n# dependencies = [\n${dependencyLines}\n# ]\n# ///\n${script.value}`
+})
 const executorCommand = computed(() => {
-  if (runtimeId.value === 'python-uv') {
-    return [
-      ...runtime.value.command,
-      ...dependencies.value.flatMap((dependency) => ['--with', dependency]),
-    ]
-  }
   return dependencyConfig.value
     ? [...runtime.value.command, `--config=${dependencyConfigPath}`]
     : runtime.value.command
@@ -265,7 +283,10 @@ const dependencyError = computed(() => {
   if (dependencies.value.some((entry) => entry.toLowerCase() === dependency.toLowerCase())) {
     return 'This dependency is already in the list.'
   }
-  if (runtimeId.value === 'python-uv' && dependency.startsWith('-')) {
+  if (
+    runtimeId.value === 'python-uv' &&
+    (dependency.startsWith('-') || !/^[a-z0-9][a-z0-9._-]*(?:\[[a-z0-9_,.-]+\])?(?:\s*(?:===|==|~=|!=|<=|>=|<|>).+|\s*@\s*\S+)?(?:\s*;.+)?$/i.test(dependency))
+  ) {
     return 'Use a PyPI requirement such as requests>=2.'
   }
   if (
@@ -285,15 +306,107 @@ const dependencyError = computed(() => {
   return null
 })
 
+type DependencyVerification = 'checking' | 'available' | 'not-found' | 'unverified'
+interface DependencyVerificationResult {
+  state: DependencyVerification
+  detail: string
+}
+const verifyDependencies = ref(false)
+const dependencyVerification = ref<Record<string, DependencyVerificationResult>>({})
+
+function pythonPackage(spec: string): { name: string; constraint: string } | null {
+  const match = spec.match(/^([a-z0-9][a-z0-9._-]*)(?:\[[^\]]+\])?\s*(.*)$/i)
+  return match ? { name: match[1], constraint: match[2].trim() } : null
+}
+
+async function verifyDependency(dependency: string): Promise<void> {
+  const checkedRuntime = runtimeId.value
+  dependencyVerification.value = {
+    ...dependencyVerification.value,
+    [dependency]: { state: 'checking', detail: 'Checking registry metadata…' },
+  }
+  let result: DependencyVerificationResult
+  try {
+    if (runtimeId.value === 'python-uv') {
+      const parsed = pythonPackage(dependency)
+      if (!parsed) throw new Error('The requirement could not be inspected in the browser.')
+      const response = await fetchWithTimeout(`https://pypi.org/pypi/${encodeURIComponent(parsed.name)}/json`, {}, 5_000)
+      if (response.status === 404) {
+        result = { state: 'not-found', detail: `${parsed.name} was not found on PyPI.` }
+      } else if (!response.ok) {
+        throw new Error(`PyPI returned ${response.status}.`)
+      } else {
+        const metadata = (await response.json()) as { releases?: Record<string, unknown> }
+        const exact = parsed.constraint.match(/^===?\s*([^,;\s]+)$/)
+        if (!parsed.constraint) {
+          result = { state: 'available', detail: 'Package exists on PyPI.' }
+        } else if (exact) {
+          result = metadata.releases && exact[1] in metadata.releases
+            ? { state: 'available', detail: `Version ${exact[1]} exists on PyPI.` }
+            : { state: 'not-found', detail: `Version ${exact[1]} was not found on PyPI.` }
+        } else {
+          result = { state: 'unverified', detail: 'Package exists; this version constraint needs uv to resolve it.' }
+        }
+      }
+    } else {
+      const name = npmPackageName(dependency)
+      const specifier = dependency.slice(name.length + (dependency.length > name.length ? 1 : 0))
+      const response = await fetchWithTimeout(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {}, 5_000)
+      if (response.status === 404) {
+        result = { state: 'not-found', detail: `${name} was not found on npm.` }
+      } else if (!response.ok) {
+        throw new Error(`npm returned ${response.status}.`)
+      } else {
+        const metadata = (await response.json()) as {
+          versions?: Record<string, unknown>
+          'dist-tags'?: Record<string, string>
+        }
+        if (!specifier) {
+          result = { state: 'available', detail: 'Package exists on npm.' }
+        } else if (metadata.versions && specifier in metadata.versions) {
+          result = { state: 'available', detail: `Version ${specifier} exists on npm.` }
+        } else if (metadata['dist-tags'] && specifier in metadata['dist-tags']) {
+          result = { state: 'available', detail: `Tag ${specifier} exists on npm.` }
+        } else if (/^\d+\.\d+\.\d+(?:-[0-9a-z.-]+)?$/i.test(specifier)) {
+          result = { state: 'not-found', detail: `Version ${specifier} was not found on npm.` }
+        } else {
+          result = { state: 'unverified', detail: 'Package exists; this version range needs Deno to resolve it.' }
+        }
+      }
+    }
+  } catch (err) {
+    result = {
+      state: 'unverified',
+      detail: err instanceof Error ? `Registry check unavailable: ${err.message}` : 'Registry check unavailable.',
+    }
+  }
+  if (!verifyDependencies.value || runtimeId.value !== checkedRuntime || !dependencies.value.includes(dependency)) return
+  dependencyVerification.value = { ...dependencyVerification.value, [dependency]: result }
+}
+
+watch(verifyDependencies, (enabled) => {
+  if (!enabled) {
+    dependencyVerification.value = {}
+    return
+  }
+  for (const dependency of dependencies.value) void verifyDependency(dependency)
+})
+
 function addDependency() {
   const dependency = dependencyDraft.value.trim()
   if (!dependency || dependencyError.value) return
   dependencies.value.push(dependency)
   dependencyDraft.value = ''
+  if (verifyDependencies.value) void verifyDependency(dependency)
 }
 
 function removeDependency(index: number) {
-  dependencies.value.splice(index, 1)
+  const [dependency] = dependencies.value.splice(index, 1)
+  if (dependency) {
+    const next = { ...dependencyVerification.value }
+    delete next[dependency]
+    dependencyVerification.value = next
+  }
 }
 
 // ── Inputs / outputs editing ─────────────────────────────────────────────────
@@ -413,7 +526,7 @@ async function submit() {
   submitting.value = true
   try {
     const uploads = [
-      s3.putTextObject(stagingBucket.value.trim(), scriptKey.value, script.value, runtime.value.contentType),
+      s3.putTextObject(stagingBucket.value.trim(), scriptKey.value, stagedScript.value, runtime.value.contentType),
     ]
     if (dependencyConfig.value) {
       uploads.push(
@@ -452,7 +565,7 @@ function runAnother() {
 
 <template>
   <div>
-    <PageHeader title="Quick run" description="Run a Python or JavaScript script with optional package dependencies without writing a TES task by hand.">
+    <PageHeader title="Quick run" description="Run a Python, JavaScript or Bash script with optional package dependencies without writing a TES task by hand.">
       <template #actions>
         <RouterLink :to="{ name: 'compute' }">
           <Button variant="outline" size="sm"><ArrowLeft class="h-4 w-4" /> Back to Compute</Button>
@@ -504,7 +617,7 @@ function runAnother() {
         <!-- Step 1: Runtime -->
         <div v-if="step === 0" class="space-y-3">
           <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runtime</div>
-          <div class="grid gap-3 sm:grid-cols-2">
+          <div class="grid gap-3 sm:grid-cols-3">
             <button
               v-for="rt in RUNTIMES"
               :key="rt.id"
@@ -566,7 +679,7 @@ function runAnother() {
           <Tabs v-model="editorTab">
             <TabsList>
               <TabsTrigger value="work">Script &amp; data</TabsTrigger>
-              <TabsTrigger value="dependencies">Dependencies ({{ dependencies.length }})</TabsTrigger>
+              <TabsTrigger v-if="runtimeId !== 'bash'" value="dependencies">Dependencies ({{ dependencies.length }})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="work" class="mt-4">
@@ -655,6 +768,13 @@ function runAnother() {
             </TabsContent>
 
             <TabsContent value="dependencies" class="mt-4 space-y-4">
+              <label class="flex max-w-2xl items-center justify-between gap-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs">
+                <span>
+                  <span class="font-medium text-foreground">Verify direct dependencies</span>
+                  <span class="block text-[11px] text-muted-foreground">Optional browser-only registry check. No task is created; uv or Deno still performs the authoritative resolution when the run starts.</span>
+                </span>
+                <Switch :checked="verifyDependencies" @update:checked="(value: boolean) => (verifyDependencies = value)" />
+              </label>
               <div class="max-w-2xl space-y-2">
                 <label class="text-xs font-medium text-foreground">
                   {{ runtimeId === 'python-uv' ? 'PyPI requirement' : 'npm package' }}
@@ -674,7 +794,7 @@ function runAnother() {
                 <p v-if="dependencyError" class="text-[11px] text-destructive">{{ dependencyError }}</p>
                 <p v-else class="text-[11px] text-muted-foreground">
                   <template v-if="runtimeId === 'python-uv'">
-                    Each requirement is passed directly to <code class="rounded bg-muted px-1 font-mono">uv run --with</code>.
+                    Requirements are stored as hidden PEP 723 metadata in the uploaded script; the editor stays unchanged.
                   </template>
                   <template v-else>
                     Packages are mapped to bare imports, for example <code class="rounded bg-muted px-1 font-mono">import chalk from "chalk"</code>.
@@ -689,6 +809,14 @@ function runAnother() {
                   class="surface-inline flex items-center gap-2 px-3 py-2 text-xs"
                 >
                   <code class="min-w-0 flex-1 truncate font-mono text-foreground">{{ dependency }}</code>
+                  <Badge
+                    v-if="dependencyVerification[dependency]"
+                    :variant="dependencyVerification[dependency].state === 'not-found' ? 'destructive' : dependencyVerification[dependency].state === 'available' ? 'success' : 'outline'"
+                    class="shrink-0 text-[10px]"
+                    :title="dependencyVerification[dependency].detail"
+                  >
+                    {{ dependencyVerification[dependency].state }}
+                  </Badge>
                   <Button
                     variant="ghost"
                     size="icon-sm"
@@ -714,7 +842,7 @@ function runAnother() {
               </div>
               <ul class="space-y-1.5 font-mono text-[11px]">
                 <li>
-                  <div class="truncate text-foreground" :title="scriptUrl">{{ runtime.file }} <span class="font-sans text-muted-foreground">(uploaded on submit)</span></div>
+                  <div class="truncate text-foreground" :title="scriptUrl">{{ runtime.file }} <span class="font-sans text-muted-foreground">(uploaded on submit)</span> <Badge v-if="runtimeId === 'python-uv' && dependencies.length" variant="outline" class="ml-1 font-sans text-[9px]">{{ dependencies.length }} inline dependencies</Badge></div>
                   <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ scriptContainerPath }}</div>
                 </li>
                 <li v-if="dependencyInput">

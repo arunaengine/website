@@ -14,7 +14,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { bracketMatching, indentUnit } from '@codemirror/language'
 import { python } from '@codemirror/lang-python'
 import { javascript } from '@codemirror/lang-javascript'
-import { EDITOR_FONT, highlightExtension, shadowMount } from '@/lib/codemirror'
+import { EDITOR_FONT, highlightExtension } from '@/lib/codemirror'
 import { useTheme } from '@/composables/useTheme'
 
 // Lazy-loaded on its own chunk: the quick-run wizard mounts it through
@@ -53,20 +53,18 @@ const theme = EditorView.theme({
   },
   '.cm-content': { padding: '10px 0', caretColor: 'hsl(var(--foreground))' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'hsl(var(--foreground))' },
-  // Line numbers and the current-line marker are orientation aids, not
-  // content; keep both close to the surface in either theme.
   '.cm-gutters': {
     backgroundColor: 'transparent',
     border: 'none',
-    color: 'hsl(var(--muted-foreground) / 0.55)',
+    color: 'hsl(var(--muted-foreground) / 0.8)',
   },
   '.cm-lineNumbers .cm-gutterElement': {
     padding: '0 10px 0 14px',
     minWidth: '36px',
     fontVariantNumeric: 'tabular-nums',
   },
-  '.cm-activeLine': { backgroundColor: 'hsl(var(--muted) / 0.3)' },
-  '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'hsl(var(--muted-foreground))' },
+  '.cm-activeLine': { backgroundColor: 'hsl(var(--muted) / 0.5)' },
+  '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'hsl(var(--foreground))' },
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': { backgroundColor: 'hsl(var(--accent))' },
   '&.cm-focused': { outline: 'none' },
 })
@@ -94,8 +92,7 @@ onMounted(() => {
       }),
     ],
   })
-  const { parent, root } = shadowMount(host.value)
-  view.value = new EditorView({ state, parent, root })
+  view.value = new EditorView({ state, parent: host.value })
 })
 
 onBeforeUnmount(() => {
