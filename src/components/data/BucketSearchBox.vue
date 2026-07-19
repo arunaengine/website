@@ -8,10 +8,12 @@ import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
 import { truncateMiddle } from '@/lib/utils'
 import { useDebounceFn } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import { AlertTriangle, ArrowLeftRight, Loader2, Pin, Search, X } from '@lucide/vue'
 
-// Federated bucket search over GET /search/buckets. Two modes:
+// Federated bucket search over GET /search/buckets, rendered as a compact
+// combobox: one input, results in a dropdown overlay. Local and remote hits
+// share one list; remote rows carry a small node annotation. Two modes:
 //  - browse (Data manager sidebar): rows open the bucket; pin toggles and a
 //    "sync to this node" affordance on remote hits.
 //  - picker (dialogs): the input doubles as the bucket-name field (v-model);
@@ -38,6 +40,8 @@ const emit = defineEmits<{
 const { authToken, searchBuckets } = useAruna()
 const { displayName, isLocalNode } = useRealmNodes()
 const shortcuts = useBucketShortcuts()
+
+const listId = `bucket-search-results-${useId()}`
 
 const query = ref(props.modelValue ?? '')
 watch(
@@ -66,6 +70,41 @@ const visibleHits = computed(() =>
     return true
   }),
 )
+
+// Dropdown state: opens on focus/typing, closes on blur (deferred so
+// mousedown on a row lands first), Escape, or a browse-mode pick.
+const open = ref(false)
+const activeIndex = ref(-1)
+watch(visibleHits, () => (activeIndex.value = -1))
+watch(query, () => (activeIndex.value = -1))
+const dropdownVisible = computed(() => open.value && active.value)
+let hideTimer: number | undefined
+
+function show() {
+  if (hideTimer !== undefined) window.clearTimeout(hideTimer)
+  open.value = true
+}
+
+function scheduleHide() {
+  hideTimer = window.setTimeout(() => (open.value = false), 120)
+}
+
+function onKeydown(event: KeyboardEvent) {
+  const list = visibleHits.value
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    open.value = true
+    activeIndex.value = list.length ? (activeIndex.value + 1) % list.length : -1
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    activeIndex.value = list.length ? (activeIndex.value - 1 + list.length) % list.length : -1
+  } else if (event.key === 'Enter') {
+    const hit = list[activeIndex.value]
+    if (hit) pick(hit)
+  } else if (event.key === 'Escape') {
+    open.value = false
+  }
+}
 
 const runSearch = useDebounceFn(async (term: string) => {
   const mySeq = ++seq
@@ -116,6 +155,12 @@ function pick(hit: BucketSearchHit) {
   } else {
     emit('open', hit)
   }
+  open.value = false
+}
+
+function syncHit(hit: BucketSearchHit) {
+  open.value = false
+  emit('sync', hit)
 }
 
 function pinNodeId(hit: BucketSearchHit): string | null {
@@ -124,61 +169,74 @@ function pinNodeId(hit: BucketSearchHit): string | null {
 </script>
 
 <template>
-  <div class="space-y-2">
-    <div class="relative">
-      <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-      <input
-        v-model="query"
-        :placeholder="placeholder"
-        :aria-label="placeholder"
-        class="h-8 w-full rounded-md border border-input bg-field pl-8 pr-7 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
-      />
-      <button
-        v-if="query"
-        type="button"
-        aria-label="Clear bucket search"
-        class="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
-        @click="clear"
-      >
-        <X class="h-3.5 w-3.5" />
-      </button>
-    </div>
+  <div class="relative">
+    <Search class="pointer-events-none absolute left-2.5 top-4 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+    <input
+      v-model="query"
+      role="combobox"
+      :aria-controls="listId"
+      :aria-expanded="dropdownVisible"
+      :placeholder="placeholder"
+      :aria-label="placeholder"
+      class="h-8 w-full rounded-md border border-input bg-field pl-8 pr-7 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
+      @focus="show"
+      @blur="scheduleHide"
+      @keydown="onKeydown"
+    />
+    <button
+      v-if="query"
+      type="button"
+      aria-label="Clear bucket search"
+      class="absolute right-1.5 top-4 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+      @mousedown.prevent
+      @click="clear"
+    >
+      <X class="h-3.5 w-3.5" />
+    </button>
 
-    <template v-if="active">
+    <div
+      v-if="dropdownVisible"
+      :id="listId"
+      class="absolute left-0 right-0 top-9 z-40 overflow-hidden rounded-md border border-border bg-popover shadow-xl"
+    >
       <div
         v-if="partial && searched"
         role="status"
-        class="flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-800 dark:text-amber-300"
+        class="flex items-center gap-1.5 border-b border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-800 dark:text-amber-300"
       >
         <AlertTriangle class="h-3.5 w-3.5 shrink-0" />
         <span>Partial results, {{ nodesQueried - nodesFailed }} of {{ nodesQueried }} nodes answered; matches on failed nodes are missing.</span>
       </div>
 
-      <p v-if="error" class="px-1 text-[11px] text-destructive">{{ error }}</p>
+      <p v-if="error" class="px-2.5 py-2 text-[11px] text-destructive">{{ error }}</p>
 
-      <div v-if="searching && !visibleHits.length" class="flex items-center gap-2 px-1 py-1 text-[11px] text-muted-foreground">
+      <div v-else-if="searching && !visibleHits.length" class="flex items-center gap-2 px-2.5 py-2 text-[11px] text-muted-foreground">
         <Loader2 class="h-3 w-3 animate-spin" /> Searching buckets…
       </div>
 
-      <ul v-else-if="visibleHits.length" class="max-h-64 space-y-0.5 overflow-y-auto">
-        <li v-for="hit in visibleHits" :key="hit.arn" class="group/hit flex items-center gap-1">
+      <ul v-else-if="visibleHits.length" role="listbox" class="max-h-64 overflow-y-auto py-1">
+        <li v-for="(hit, index) in visibleHits" :key="hit.arn" class="group/hit flex items-center gap-1 pr-1">
           <button
             type="button"
-            class="flex min-w-0 flex-1 flex-col gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-muted"
-            @click="pick(hit)"
+            role="option"
+            :aria-selected="index === activeIndex"
+            class="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted"
+            :class="index === activeIndex ? 'bg-muted' : ''"
+            @mousedown.prevent="pick(hit)"
           >
             <span class="truncate font-mono text-xs text-foreground">{{ hit.bucket }}</span>
-            <span class="flex min-w-0 items-center gap-1.5">
+            <span class="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
+              <span class="max-w-24 truncate text-[10px] text-muted-foreground" :title="hit.group_id">
+                {{ hit.group_name || truncateMiddle(hit.group_id) }}
+              </span>
               <Badge
-                :variant="isLocalNode(hit.node_id) ? 'accent' : 'outline'"
+                v-if="!isLocalNode(hit.node_id)"
+                variant="outline"
                 class="shrink-0 text-[10px]"
                 :title="hit.node_id"
               >
-                {{ isLocalNode(hit.node_id) ? 'this node' : displayName(hit.node_id) }}
+                on {{ displayName(hit.node_id) }}
               </Badge>
-              <span class="truncate text-[10px] text-muted-foreground" :title="hit.group_id">
-                {{ hit.group_name || truncateMiddle(hit.group_id) }}
-              </span>
             </span>
           </button>
           <template v-if="mode === 'browse'">
@@ -189,7 +247,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
               class="shrink-0 opacity-0 transition-opacity group-hover/hit:opacity-100 focus-visible:opacity-100"
               :title="`Sync ${hit.bucket} from ${displayName(hit.node_id)} to this node…`"
               :aria-label="`Sync ${hit.bucket} to this node`"
-              @click="emit('sync', hit)"
+              @mousedown.prevent="syncHit(hit)"
             >
               <ArrowLeftRight class="size-3.5" />
             </Button>
@@ -200,6 +258,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
               :class="shortcuts.isPinned(hit.bucket, pinNodeId(hit)) ? 'text-primary' : 'text-muted-foreground opacity-0 transition-opacity group-hover/hit:opacity-100 focus-visible:opacity-100'"
               :title="shortcuts.isPinned(hit.bucket, pinNodeId(hit)) ? 'Unpin bucket' : 'Pin bucket'"
               :aria-label="shortcuts.isPinned(hit.bucket, pinNodeId(hit)) ? `Unpin ${hit.bucket}` : `Pin ${hit.bucket}`"
+              @mousedown.prevent
               @click="shortcuts.togglePin(hit.bucket, pinNodeId(hit))"
             >
               <Pin class="size-3.5" :fill="shortcuts.isPinned(hit.bucket, pinNodeId(hit)) ? 'currentColor' : 'none'" />
@@ -208,9 +267,13 @@ function pinNodeId(hit: BucketSearchHit): string | null {
         </li>
       </ul>
 
-      <p v-else-if="searched && !searching" class="px-1 py-1 text-[11px] text-muted-foreground">
+      <p v-else-if="searched && !searching" class="px-2.5 py-2 text-[11px] text-muted-foreground">
         No buckets matched.
       </p>
-    </template>
+
+      <div v-else class="flex items-center gap-2 px-2.5 py-2 text-[11px] text-muted-foreground">
+        <Loader2 class="h-3 w-3 animate-spin" /> Searching buckets…
+      </div>
+    </div>
   </div>
 </template>
