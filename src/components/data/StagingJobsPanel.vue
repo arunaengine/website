@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import Sheet from '@/components/ui/Sheet.vue'
-import SheetContent from '@/components/ui/SheetContent.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -170,19 +171,21 @@ function jobPercent(job: StagingJob): number {
 </script>
 
 <template>
-  <Sheet :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <SheetContent side="right" class="w-full p-6 sm:max-w-md">
-      <DialogTitle class="sr-only">Staging jobs</DialogTitle>
-      <div class="flex items-center justify-between pr-8">
-        <h2 class="flex items-center gap-2 text-base font-semibold text-foreground">
-          <HardDriveDownload class="h-4 w-4 text-primary" /> Staging jobs
-        </h2>
-        <Button variant="ghost" size="icon-sm" aria-label="Reload" :disabled="loading" @click="() => loadJobs()">
-          <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" />
-        </Button>
-      </div>
+  <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
+    <DialogContent class="flex max-h-[85vh] max-w-xl flex-col">
+      <DialogHeader>
+        <div class="flex items-center justify-between gap-2 pr-8">
+          <DialogTitle class="flex items-center gap-2">
+            <HardDriveDownload class="h-4 w-4 text-primary" /> Staging jobs
+          </DialogTitle>
+          <Button variant="ghost" size="icon-sm" aria-label="Reload" :disabled="loading" @click="() => loadJobs()">
+            <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" />
+          </Button>
+        </div>
+      </DialogHeader>
 
-      <section class="mt-4 space-y-2">
+      <div class="scrollbar-thin min-h-0 flex-1 space-y-6 overflow-y-auto">
+      <section class="space-y-2">
         <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Node registry</p>
         <div v-if="loading" class="space-y-2">
           <Skeleton class="h-12 w-full" />
@@ -243,10 +246,10 @@ function jobPercent(job: StagingJob): number {
         </div>
       </section>
 
-      <section class="mt-6 space-y-2">
+      <section class="space-y-2">
         <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">This session</p>
         <EmptyState v-if="!staging.submissions.value.length" title="Nothing staged this session" />
-        <div v-else class="max-h-[40vh] space-y-2 overflow-y-auto">
+        <div v-else class="space-y-2">
           <div
             v-for="submission in staging.submissions.value"
             :key="submission.id"
@@ -266,6 +269,7 @@ function jobPercent(job: StagingJob): number {
           </div>
         </div>
       </section>
-    </SheetContent>
-  </Sheet>
+      </div>
+    </DialogContent>
+  </Dialog>
 </template>

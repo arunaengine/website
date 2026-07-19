@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import {
   CreateBucketCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
   ListBucketsCommand,
@@ -352,6 +353,57 @@ async function deleteObject(bucket: string, key: string, nodeId?: string | null)
   await client(nodeId).send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
 }
 
+export interface DeletePrefixResult {
+  deleted: number
+  errors: { key: string; message: string }[]
+}
+
+// Deletes EVERYTHING under `prefix`, including the zero-byte "folder/" marker
+// objects that listObjectsRecursive deliberately skips, in DeleteObjects
+// batches of up to 1000 keys. Per-key failures are collected instead of
+// aborting the walk so one locked object does not strand the rest.
+async function deletePrefix(
+  bucket: string,
+  prefix: string,
+  nodeId?: string | null,
+): Promise<DeletePrefixResult> {
+  const s3 = client(nodeId)
+  let deleted = 0
+  const errors: DeletePrefixResult['errors'] = []
+  let token: string | undefined
+  for (;;) {
+    const page = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix || undefined,
+        ContinuationToken: token,
+        MaxKeys: 1000,
+      }),
+    )
+    const keys = (page.Contents ?? [])
+      .map((entry) => entry.Key)
+      .filter((key): key is string => Boolean(key))
+    if (keys.length) {
+      const response = await s3.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: keys.map((key) => ({ Key: key })), Quiet: false },
+        }),
+      )
+      const failed = response.Errors ?? []
+      deleted += keys.length - failed.length
+      for (const failure of failed) {
+        errors.push({
+          key: failure.Key ?? '(unknown key)',
+          message: failure.Message ?? failure.Code ?? 'delete failed',
+        })
+      }
+    }
+    if (!page.IsTruncated || !page.NextContinuationToken) return { deleted, errors }
+    token = page.NextContinuationToken
+  }
+}
+
 // Single-object HEAD, mainly for the user metadata: reference-backed objects
 // expose aruna-last-refresh / aruna-source-etag there (lib/references.ts).
 async function headObject(bucket: string, key: string, nodeId?: string | null): Promise<ObjectHead> {
@@ -462,6 +514,7 @@ export function useS3() {
     createFolder,
     uploadObject,
     deleteObject,
+    deletePrefix,
     headObject,
     downloadUrl,
     getObjectText,

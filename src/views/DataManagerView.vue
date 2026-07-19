@@ -48,6 +48,7 @@ import {
   Download,
   Eye,
   FolderPlus,
+  HardDriveDownload,
   History,
   KeyRound,
   Link2,
@@ -307,7 +308,18 @@ watch(
   { immediate: true },
 )
 
-const deleteTarget = ref<{ bucket: string; object: ObjectEntry; nodeId: string | null } | null>(null)
+type DeleteTarget =
+  | { type: 'object'; bucket: string; object: ObjectEntry; nodeId: string | null }
+  | {
+      type: 'folder'
+      bucket: string
+      folder: FolderEntry
+      nodeId: string | null
+      /** Object count under the prefix; null while the recursive listing runs. */
+      count: number | null
+      countTruncated: boolean
+    }
+const deleteTarget = ref<DeleteTarget | null>(null)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 
@@ -763,15 +775,77 @@ async function download(object: ObjectEntry) {
   }
 }
 
+function openDeleteObject(object: ObjectEntry) {
+  deleteError.value = null
+  deleteTarget.value = { type: 'object', bucket: bucket.value, object, nodeId: remoteNodeId.value }
+}
+
+// Folder delete: the confirm dialog shows how many objects the recursive walk
+// finds (capped; '+' marks a truncated count) before anything is removed.
+const FOLDER_COUNT_LIMIT = 2000
+function openDeleteFolder(folder: FolderEntry) {
+  deleteError.value = null
+  deleteTarget.value = {
+    type: 'folder',
+    bucket: bucket.value,
+    folder,
+    nodeId: remoteNodeId.value,
+    count: null,
+    countTruncated: false,
+  }
+  void resolveFolderCount(folder)
+}
+
+async function resolveFolderCount(folder: FolderEntry) {
+  try {
+    const result = await s3.listObjectsRecursive(
+      bucket.value,
+      folder.prefix,
+      FOLDER_COUNT_LIMIT,
+      remoteNodeId.value,
+    )
+    const target = deleteTarget.value
+    if (target?.type === 'folder' && target.folder.prefix === folder.prefix) {
+      target.count = result.objects.length
+      target.countTruncated = result.truncated
+    }
+  } catch {
+    // The count stays unknown; deleting is still possible.
+    const target = deleteTarget.value
+    if (target?.type === 'folder' && target.folder.prefix === folder.prefix) {
+      target.count = -1
+    }
+  }
+}
+
 async function confirmDelete() {
   if (!deleteTarget.value) return
   const target = deleteTarget.value
   deleteBusy.value = true
   deleteError.value = null
   try {
-    await s3.deleteObject(target.bucket, target.object.key, target.nodeId)
+    if (target.type === 'object') {
+      await s3.deleteObject(target.bucket, target.object.key, target.nodeId)
+    } else {
+      const result = await s3.deletePrefix(target.bucket, target.folder.prefix, target.nodeId)
+      // A deleted prefix invalidates any preview under it.
+      if (
+        target.bucket === bucket.value &&
+        previewObject.value?.key.startsWith(target.folder.prefix)
+      ) {
+        previewOpen.value = false
+        previewObject.value = null
+      }
+      if (result.errors.length) {
+        const first = result.errors[0]
+        deleteError.value = `${result.deleted} object${result.deleted === 1 ? '' : 's'} deleted, ${result.errors.length} failed. First failure: ${first.key}: ${first.message}`
+        if (target.bucket === bucket.value) await loadObjects()
+        return
+      }
+    }
     deleteTarget.value = null
     if (target.bucket === bucket.value) await loadObjects()
+    if (target.type === 'folder') void references.reload()
   } catch (err) {
     deleteError.value = s3ErrorMessage(err)
   } finally {
@@ -1020,12 +1094,12 @@ const isEmpty = computed(
                     </div>
                   </template>
                 </Popover>
-                <Button v-if="!remoteBlocked" variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
                 <!-- Staging and the Add data pipeline always target the connected node. -->
                 <Button v-if="stagingJobsEnabled && !remoteNodeId" variant="outline" size="sm" @click="stagingPanelOpen = true">
-                  Staging
+                  <HardDriveDownload class="h-4 w-4" /> Staging
                   <Badge v-if="staging.runningCount.value" variant="secondary" class="ml-1">{{ staging.runningCount.value }}</Badge>
                 </Button>
+                <Button v-if="!remoteBlocked" variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
                 <Button v-if="!remoteNodeId" size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>
             </div>
@@ -1106,7 +1180,11 @@ const isEmpty = computed(
                     </td>
                     <td class="px-4 py-2.5 text-right text-muted-foreground">-</td>
                     <td class="px-4 py-2.5 text-muted-foreground">-</td>
-                    <td class="px-4 py-2.5"></td>
+                    <td class="px-4 py-2.5">
+                      <div class="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete folder" @click.stop="openDeleteFolder(folder)"><Trash2 class="size-3.5" /></Button>
+                      </div>
+                    </td>
                   </tr>
                   <!-- Row click previews; the action buttons stop propagation. -->
                   <tr
@@ -1137,7 +1215,7 @@ const isEmpty = computed(
                       <div class="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon-sm" aria-label="Preview" @click.stop="openPreview(object)"><Eye class="size-3.5" /></Button>
                         <Button variant="ghost" size="icon-sm" aria-label="Download" @click.stop="download(object)"><Download class="size-3.5" /></Button>
-                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click.stop="deleteTarget = { bucket, object, nodeId: remoteNodeId }; deleteError = null"><Trash2 class="size-3.5" /></Button>
+                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click.stop="openDeleteObject(object)"><Trash2 class="size-3.5" /></Button>
                       </div>
                     </td>
                   </tr>
@@ -1235,18 +1313,37 @@ const isEmpty = computed(
       </DialogContent>
     </Dialog>
 
-    <Dialog :open="deleteTarget !== null" @update:open="(v: boolean) => { if (!v) deleteTarget = null }">
+    <Dialog :open="deleteTarget !== null" @update:open="(v: boolean) => { if (!v && !deleteBusy) deleteTarget = null }">
       <DialogContent class="max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete object</DialogTitle>
-          <DialogDescription>
+          <DialogTitle>{{ deleteTarget?.type === 'folder' ? 'Delete folder' : 'Delete object' }}</DialogTitle>
+          <DialogDescription v-if="deleteTarget?.type === 'folder'">
+             Deletes the folder <span class="font-mono text-xs">{{ deleteTarget.folder.name }}/</span> from
+             <span class="font-mono text-xs">{{ deleteTarget.bucket }}</span>. ALL objects under it are permanently deleted.
+          </DialogDescription>
+          <DialogDescription v-else>
              Deletes <span class="font-mono text-xs">{{ deleteTarget?.object.key }}</span> from
              <span class="font-mono text-xs">{{ deleteTarget?.bucket }}</span>. A delete marker is written; earlier versions stay retrievable by version ID.
           </DialogDescription>
         </DialogHeader>
+        <div v-if="deleteTarget?.type === 'folder'" class="space-y-2 text-xs">
+          <p v-if="deleteTarget.count === null" class="flex items-center gap-2 text-muted-foreground">
+            <Loader2 class="h-3 w-3 animate-spin" /> Counting objects…
+          </p>
+          <p v-else-if="deleteTarget.count >= 0" class="text-muted-foreground">
+            Contains {{ deleteTarget.count }}{{ deleteTarget.countTruncated ? '+' : '' }} object{{ deleteTarget.count === 1 && !deleteTarget.countTruncated ? '' : 's' }}.
+          </p>
+          <p v-else class="text-muted-foreground">The object count could not be resolved.</p>
+          <p
+            v-if="references.prefixHasReferences(deleteTarget.folder.prefix) || keyIsSynced(deleteTarget.folder.prefix)"
+            class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300"
+          >
+            This folder includes referenced or synced content.
+          </p>
+        </div>
         <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
         <DialogFooter>
-          <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+          <DialogClose><Button variant="outline" :disabled="deleteBusy">Cancel</Button></DialogClose>
           <Button variant="destructive" :disabled="deleteBusy" @click="confirmDelete">{{ deleteBusy ? 'Deleting…' : 'Delete' }}</Button>
         </DialogFooter>
       </DialogContent>
