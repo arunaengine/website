@@ -166,16 +166,28 @@ const inputs = ref<TesDataRefEntry[]>([])
 // bucket and key per row. The destination key defaults to quickruns/<basename>
 // and tracks the captured container path until the key is edited directly.
 const stagingBucket = ref('')
-// Editable key prefix of the script location; the per-run id segment is always
-// appended so submits never overwrite each other.
-const SCRIPT_PREFIX_DEFAULT = '.aruna/scripts/'
-const scriptPrefix = ref(SCRIPT_PREFIX_DEFAULT)
 const outputRows = ref<{ bucket: string; path: string; containerPath: string; keyTouched: boolean }[]>([])
 const inputDialogOpen = ref(false)
 const credentialDialogOpen = ref(false)
 
 // A fresh id per submit attempt keys the uploaded script and the idempotency tag.
 const runId = ref(crypto.randomUUID())
+
+// Full S3 key of the uploaded script, freely editable. Until the user edits it
+// the key tracks this default (fresh run id + runtime file name), the same
+// pristine tracking output keys use for their captured path; one manual edit
+// pins it for good. The run id segment keeps each run's copy separate so
+// reruns never overwrite a script an earlier task references.
+const defaultScriptKey = computed(() => `.aruna/scripts/${runId.value}/${runtime.value.file}`)
+const scriptKey = ref(defaultScriptKey.value)
+const scriptKeyTouched = ref(false)
+function setScriptKey(value: string) {
+  scriptKey.value = value
+  scriptKeyTouched.value = true
+}
+watch(defaultScriptKey, (next) => {
+  if (!scriptKeyTouched.value) scriptKey.value = next
+})
 
 // Swap the template only while the script is still the previous runtime default.
 watch(runtimeId, (next, prev) => {
@@ -196,24 +208,24 @@ watch(step, (s) => {
 const groupOptions = computed(() => myGroups.value.map((g) => ({ value: g.id, label: g.name })))
 const bucketOptions = computed(() => buckets.value.map((b) => ({ value: b, label: b })))
 
+// The container path is tied to the runtime's file name, not to the S3 key
+// basename: the TES input materializes the object at `path`, so the exec
+// command works no matter what the uploaded key is called.
 const scriptContainerPath = computed(() => `/work/${runtime.value.file}`)
-// Empty prefix allowed (scripts land at <runId>/<file>); a trailing slash is
-// normalized on, a leading slash is invalid (S3 keys never start with one).
-const normalizedScriptPrefix = computed(() => {
-  const value = scriptPrefix.value.trim()
-  if (!value) return ''
-  return value.endsWith('/') ? value : `${value}/`
-})
-const scriptPrefixValid = computed(() => {
-  const value = normalizedScriptPrefix.value
-  if (!value) return true
-  if (value.startsWith('/')) return false
-  return value.slice(0, -1).split('/').every((segment) => segment && segment !== '.' && segment !== '..')
-})
-const scriptKey = computed(() => `${normalizedScriptPrefix.value}${runId.value}/${runtime.value.file}`)
-const scriptUrl = computed(() => `s3://${stagingBucket.value.trim()}/${scriptKey.value}`)
+const normalizedScriptKey = computed(() => scriptKey.value.trim())
+// A canonical object key: no leading slash, no empty or dot segments, and a
+// non-empty basename (a key ending in / has an empty last segment).
+const scriptKeyValid = computed(() =>
+  normalizedScriptKey.value.split('/').every((segment) => segment && segment !== '.' && segment !== '..'),
+)
+const scriptUrl = computed(() => `s3://${stagingBucket.value.trim()}/${normalizedScriptKey.value}`)
 const dependencyConfigPath = '/work/deno.json'
-const dependencyConfigKey = computed(() => `${normalizedScriptPrefix.value}${runId.value}/deno.json`)
+// The generated deno.json sits next to the script object, whatever directory
+// the key names.
+const dependencyConfigKey = computed(() => {
+  const key = normalizedScriptKey.value
+  return `${key.slice(0, key.lastIndexOf('/') + 1)}deno.json`
+})
 const dependencyConfigUrl = computed(
   () => `s3://${stagingBucket.value.trim()}/${dependencyConfigKey.value}`,
 )
@@ -554,7 +566,9 @@ async function applyScriptPick() {
   try {
     const text = await s3.getObjectText(pick.bucket, pick.key)
     // Runtime first: its watcher only swaps pristine templates and resets the
-    // dependency list, then the fetched text lands in the editor.
+    // dependency list, then the fetched text lands in the editor. The
+    // destination key is untouched; a pristine default just follows the new
+    // runtime file name.
     const inferred = inferRuntimeId(pick.name)
     if (inferred) runtimeId.value = inferred
     script.value = text
@@ -653,7 +667,7 @@ const dataReady = computed(
     s3.hasActiveKey.value &&
     groupId.value.length > 0 &&
     stagingBucketValid.value &&
-    scriptPrefixValid.value,
+    scriptKeyValid.value,
 )
 const canContinue = computed(() => {
   switch (step.value) {
@@ -684,7 +698,7 @@ async function submit() {
   submitting.value = true
   try {
     const uploads = [
-      s3.putTextObject(stagingBucket.value.trim(), scriptKey.value, stagedScript.value, runtime.value.contentType),
+      s3.putTextObject(stagingBucket.value.trim(), normalizedScriptKey.value, stagedScript.value, runtime.value.contentType),
     ]
     if (dependencyConfig.value) {
       uploads.push(
@@ -824,11 +838,12 @@ function runAnother() {
                   :invalid="stagingBucket.trim() && !stagingBucketValid ? 'error' : undefined"
                 />
                 <Input
-                  v-model="scriptPrefix"
+                  :model-value="scriptKey"
                   class="min-w-0 flex-1 font-mono"
-                  placeholder=".aruna/scripts/"
-                  aria-label="Script key prefix"
-                  :invalid="!scriptPrefixValid ? 'error' : undefined"
+                  :placeholder="defaultScriptKey"
+                  aria-label="Script object key"
+                  :invalid="!scriptKeyValid ? 'error' : undefined"
+                  @update:model-value="setScriptKey(String($event))"
                 />
               </div>
               <p v-if="stagingBucket.trim() && !stagingBucketValid" class="mt-1 text-[11px] text-destructive">
@@ -837,12 +852,12 @@ function runAnother() {
               <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
                 You have no buckets yet. Create one in Data first.
               </p>
-              <p v-else-if="!scriptPrefixValid" class="mt-1 text-[11px] text-destructive">
-                Use a key prefix without a leading slash, for example .aruna/scripts/.
+              <p v-else-if="!scriptKeyValid" class="mt-1 text-[11px] text-destructive">
+                Use an object key without a leading slash or empty segments, ending in a file name.
               </p>
               <p v-else class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="scriptUrl">{{ scriptUrl }}</p>
               <p class="mt-1 text-[11px] text-muted-foreground">
-                The script is copied under the run's script location on submit so runs stay reproducible.
+                The default key keeps each run's copy separate, so reruns never overwrite a script an earlier task references.
               </p>
             </div>
           </div>
