@@ -2,6 +2,7 @@
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { ArrowLeftRight, Boxes, Pin, Server } from '@lucide/vue'
+import { RouterLink } from 'vue-router'
 
 // One shared row for every bucket list surface (sidebar pins/locals, recently
 // browsed, federated search hits): text-sm, py-2, primary Boxes icon, optional
@@ -77,16 +78,6 @@ function onClick() {
             class="h-3 w-3 shrink-0 text-primary/60"
             aria-label="Sync relationships configured"
           />
-          <Tooltip v-if="nodeId" side="right">
-            <span class="inline-flex shrink-0" aria-label="Stored on another node">
-              <Server class="h-3.5 w-3.5 text-muted-foreground" />
-            </span>
-            <template #content>
-              <span class="block font-medium">Stored on another node</span>
-              <span class="block">{{ realmNodes.displayName(nodeId) }}</span>
-              <span class="block text-muted-foreground">{{ nodeId }}</span>
-            </template>
-          </Tooltip>
         </span>
       </button>
       <template #content><slot name="tooltip" /></template>
@@ -112,18 +103,24 @@ function onClick() {
           class="h-3 w-3 shrink-0 text-primary/60"
           aria-label="Sync relationships configured"
         />
-        <Tooltip v-if="nodeId" side="right">
-          <span class="inline-flex shrink-0" aria-label="Stored on another node">
-            <Server class="h-3.5 w-3.5 text-muted-foreground" />
-          </span>
-          <template #content>
-            <span class="block font-medium">Stored on another node</span>
-            <span class="block">{{ realmNodes.displayName(nodeId) }}</span>
-            <span class="block text-muted-foreground">{{ nodeId }}</span>
-          </template>
-        </Tooltip>
       </span>
     </button>
+
+    <Tooltip v-if="nodeId" side="right">
+      <RouterLink
+        :to="{ name: 'status', query: { node: nodeId } }"
+        class="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
+        :aria-label="`Stored on another node: ${realmNodes.displayName(nodeId)}. Open node status.`"
+        @mousedown.prevent
+      >
+        <Server class="h-3.5 w-3.5" />
+      </RouterLink>
+      <template #content>
+        <span class="block font-medium">Stored on another node</span>
+        <span class="block">{{ realmNodes.displayName(nodeId) }}</span>
+        <span class="block text-muted-foreground">Click to open the node</span>
+      </template>
+    </Tooltip>
 
     <slot name="actions" />
 
