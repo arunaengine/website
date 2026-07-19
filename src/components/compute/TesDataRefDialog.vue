@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -15,9 +15,9 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
-import { useS3 } from '@/composables/useS3'
+import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { useAruna } from '@/composables/useAruna'
-import { Database, FolderDown, KeyRound, LogIn, Plus, ShieldAlert } from '@lucide/vue'
+import { Database, KeyRound, LogIn, Plus, ShieldAlert } from '@lucide/vue'
 
 const props = defineProps<{ open: boolean; mode: 'input' }>()
 const emit = defineEmits<{
@@ -38,36 +38,46 @@ const pathInvalid = ref(false)
 // Folder staging: the TES facade stages FILE inputs only, so a folder pick is
 // expanded client-side into one input per object under the browsed prefix.
 const MAX_FOLDER_FILES = 200
-const folderLocation = ref<{ bucket: string; prefix: string }>({ bucket: '', prefix: '' })
 const folderBusy = ref(false)
 const folderError = ref<string | null>(null)
-const folderName = computed(() => {
-  const { bucket, prefix } = folderLocation.value
-  if (!bucket) return ''
-  const segment = prefix.replace(/\/+$/, '').split('/').filter(Boolean).pop()
-  return segment || bucket
-})
 
-async function addFolderContents() {
-  const { bucket, prefix } = folderLocation.value
-  if (!bucket || folderBusy.value) return
+async function addSelection(selection: {
+  bucket: string
+  objects: ObjectEntry[]
+  folders: FolderEntry[]
+}) {
+  if (!selection.bucket || folderBusy.value) return
   folderBusy.value = true
   folderError.value = null
   try {
-    const { objects, truncated } = await s3.listObjectsRecursive(bucket, prefix, MAX_FOLDER_FILES)
-    if (truncated) {
-      folderError.value = `This folder holds more than ${MAX_FOLDER_FILES} files. Stage a smaller folder or add files individually.`
+    const files = new Map(
+      selection.objects.map((object) => [object.key, { key: object.key, name: object.name }]),
+    )
+    for (const folder of selection.folders) {
+      const result = await s3.listObjectsRecursive(selection.bucket, folder.prefix, MAX_FOLDER_FILES)
+      if (result.truncated) {
+        folderError.value = `A selected folder holds more than ${MAX_FOLDER_FILES} files. Select a smaller folder.`
+        return
+      }
+      for (const object of result.objects) {
+        if (!files.has(object.key)) {
+          files.set(object.key, { key: object.key, name: `${folder.name}/${object.name}` })
+        }
+      }
+    }
+    if (files.size > MAX_FOLDER_FILES) {
+      folderError.value = `Select at most ${MAX_FOLDER_FILES} files in one batch.`
       return
     }
-    if (!objects.length) {
-      folderError.value = 'No files under this folder.'
+    if (!files.size) {
+      folderError.value = 'The selection contains no files.'
       return
     }
-    for (const object of objects) {
+    for (const file of files.values()) {
       emit('add', {
-        url: `s3://${bucket}/${object.key}`,
-        path: `/inputs/${folderName.value}/${object.name}`,
-        name: `${folderName.value}/${object.name}`,
+        url: `s3://${selection.bucket}/${file.key}`,
+        path: `/inputs/${file.name}`,
+        name: file.name,
       })
     }
     emit('update:open', false)
@@ -107,21 +117,11 @@ watch(
     pathTouched.value = false
     urlInvalid.value = false
     pathInvalid.value = false
-    folderLocation.value = { bucket: '', prefix: '' }
     folderBusy.value = false
     folderError.value = null
   },
   { immediate: true },
 )
-
-function pickObject(entry: { bucket: string; key: string; name: string }) {
-  emit('add', {
-    url: `s3://${entry.bucket}/${entry.key}`,
-    path: `/inputs/${entry.name}`,
-    name: entry.name,
-  })
-  emit('update:open', false)
-}
 
 function addReference() {
   const url = refUrl.value.trim()
@@ -142,14 +142,13 @@ function addReference() {
           <Database class="h-4 w-4 text-primary" /> Add input reference
         </DialogTitle>
         <DialogDescription>
-          Select a file, stage a whole folder, or enter an <code class="font-mono">s3://bucket/key</code> reference. The TES facade stages individual S3 files; folders are expanded into per-file inputs here.
+          Select files and folders together, or enter an <code class="font-mono">s3://bucket/key</code> reference. Selected folders include all files below them.
         </DialogDescription>
       </DialogHeader>
 
       <Tabs v-model="tab">
         <TabsList>
           <TabsTrigger value="node">Node data</TabsTrigger>
-          <TabsTrigger value="folder">Folder</TabsTrigger>
           <TabsTrigger value="manual">S3 reference</TabsTrigger>
         </TabsList>
 
@@ -165,37 +164,10 @@ function addReference() {
             </Button>
             <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
           </div>
-          <ObjectBrowserPanel v-else @select="pickObject" />
-        </TabsContent>
-
-        <TabsContent value="folder" class="space-y-3">
-          <div v-if="!s3.endpoint.value" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>This node does not advertise an S3 endpoint, so folders cannot be browsed here.</span>
-          </div>
-          <div v-else-if="!s3.hasActiveKey.value" class="space-y-2 rounded-md border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
-            <p class="flex items-center gap-2 font-medium text-foreground"><KeyRound class="h-3.5 w-3.5" /> S3 credentials are required to browse node data.</p>
-            <Button v-if="currentUser" variant="outline" size="sm" @click="credentialDialogOpen = true">
-              <Plus class="size-3.5" /> Create credentials
-            </Button>
-            <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
-          </div>
           <template v-else>
-            <ObjectBrowserPanel @navigate="folderLocation = $event" @select="pickObject" />
-            <div class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2">
-              <p class="min-w-0 text-[11px] text-muted-foreground">
-                <template v-if="folderLocation.bucket">
-                  Stages every file under
-                  <code class="rounded bg-muted px-1 font-mono">s3://{{ folderLocation.bucket }}/{{ folderLocation.prefix }}</code>
-                  into <code class="rounded bg-muted px-1 font-mono">/inputs/{{ folderName }}/</code> (up to {{ MAX_FOLDER_FILES }} files).
-                </template>
-                <template v-else>Open a bucket or folder above, then stage its contents.</template>
-              </p>
-              <Button size="sm" :disabled="!folderLocation.bucket || folderBusy" @click="addFolderContents">
-                <FolderDown class="size-3.5" /> {{ folderBusy ? 'Listing…' : 'Add folder contents' }}
-              </Button>
-            </div>
-            <p v-if="folderError" class="text-[11px] text-destructive">{{ folderError }}</p>
+            <ObjectBrowserPanel selectable @add="addSelection" />
+            <p v-if="folderBusy" class="mt-2 text-[11px] text-muted-foreground">Expanding selected folders…</p>
+            <p v-if="folderError" class="mt-2 text-[11px] text-destructive">{{ folderError }}</p>
           </template>
         </TabsContent>
 

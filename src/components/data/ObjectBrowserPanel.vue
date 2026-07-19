@@ -31,7 +31,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'select', entry: { bucket: string; key: string; name: string; size?: number }): void
-  (e: 'add', selection: { objects: ObjectEntry[]; folders: FolderEntry[] }): void
+  (e: 'add', selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }): void
   (e: 'auth-error'): void
   /** Fires on every location change; empty bucket = the bucket overview. */
   (e: 'navigate', location: { bucket: string; prefix: string }): void
@@ -229,7 +229,7 @@ function addSelected() {
     .filter((entry): entry is Extract<SelectionEntry, { kind: 'folder' }> => entry.kind === 'folder')
     .map((entry) => entry.folder)
   if (!objectEntries.length && !folderEntries.length) return
-  emit('add', { objects: objectEntries, folders: folderEntries })
+  emit('add', { bucket: activeBucket.value, objects: objectEntries, folders: folderEntries })
   selected.value = new Map()
 }
 
