@@ -61,17 +61,31 @@ function errorMessage(err: unknown): string {
 
 // ── Runtimes (tagged upstream images) ────────────────────────────────────────
 interface Runtime {
-  id: 'python' | 'node' | 'bash'
+  id: 'python' | 'python-uv' | 'node' | 'deno' | 'bash'
   label: string
   hint: string
   image: string
   /** Argv prefix; the staged script path is appended as the last argument. */
   command: string[]
+  /** Extra executor environment (e.g. cache dirs inside the writable /work). */
+  env?: Record<string, string>
   file: string
   lang: 'python' | 'javascript' | 'text'
   contentType: string
   template: string
+  /** Inline dependency header the editor can insert on demand. */
+  depsSnippet?: string
 }
+const PEP723_HEADER = `# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "requests",
+# ]
+# ///
+`
+const DENO_HEADER = `// Dependencies resolve on first run via npm: specifiers, e.g.:
+// import chalk from "npm:chalk@5";
+`
 const RUNTIMES: Runtime[] = [
   {
     id: 'python',
@@ -85,6 +99,19 @@ const RUNTIMES: Runtime[] = [
     template: 'print("hello from aruna")\n',
   },
   {
+    id: 'python-uv',
+    label: 'Python + packages',
+    hint: 'PyPI dependencies from a PEP 723 inline header, run with uv.',
+    image: 'ghcr.io/astral-sh/uv:python3.13-bookworm-slim',
+    command: ['uv', 'run'],
+    env: { UV_CACHE_DIR: '/work/.uv-cache' },
+    file: 'script.py',
+    lang: 'python',
+    contentType: 'text/x-python',
+    template: 'print("hello from aruna")\n',
+    depsSnippet: PEP723_HEADER,
+  },
+  {
     id: 'node',
     label: 'Node.js',
     hint: 'Built-in modules only.',
@@ -94,6 +121,19 @@ const RUNTIMES: Runtime[] = [
     lang: 'javascript',
     contentType: 'text/javascript',
     template: 'console.log("hello from aruna")\n',
+  },
+  {
+    id: 'deno',
+    label: 'JavaScript + packages',
+    hint: 'npm dependencies via npm: imports, run with Deno (TypeScript works too).',
+    image: 'denoland/deno:alpine-2.9.3',
+    command: ['deno', 'run', '-A'],
+    env: { DENO_DIR: '/work/.deno-cache' },
+    file: 'script.ts',
+    lang: 'javascript',
+    contentType: 'text/typescript',
+    template: 'console.log("hello from aruna");\n',
+    depsSnippet: DENO_HEADER,
   },
   {
     id: 'bash',
@@ -197,11 +237,19 @@ const task = computed<TesTask>(() =>
         image: runtime.value.image,
         command: [...runtime.value.command, scriptContainerPath.value],
         workdir: '/work',
+        env: runtime.value.env,
       },
     ],
     tags: { [TES_GROUP_TAG]: groupId.value, [TES_IDEMPOTENCY_TAG]: runId.value },
   }),
 )
+
+// ── Script helpers ───────────────────────────────────────────────────────────
+function insertDepsHeader() {
+  const snippet = runtime.value.depsSnippet
+  if (!snippet || script.value.startsWith(snippet.split('\n')[0])) return
+  script.value = `${snippet}${script.value}`
+}
 
 // ── Inputs / outputs editing ─────────────────────────────────────────────────
 function uniqueInputName(base: string): string {
@@ -462,7 +510,18 @@ function runAnother() {
             <div class="min-w-0 space-y-2">
               <div class="flex items-center justify-between">
                 <label class="text-xs font-medium text-foreground">Script <span class="font-mono text-muted-foreground">({{ runtime.file }})</span></label>
-                <Button variant="ghost" size="sm" @click="script = runtime.template">Reset to template</Button>
+                <div class="flex items-center gap-1">
+                  <Button
+                    v-if="runtime.depsSnippet"
+                    variant="ghost"
+                    size="sm"
+                    title="Insert the inline dependency header at the top of the script"
+                    @click="insertDepsHeader"
+                  >
+                    Insert dependency header
+                  </Button>
+                  <Button variant="ghost" size="sm" @click="script = runtime.template">Reset to template</Button>
+                </div>
               </div>
               <Suspense>
                 <ScriptEditor v-model="script" :language="runtime.lang" />
