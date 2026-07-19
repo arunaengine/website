@@ -5,6 +5,10 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
+import Tabs from '@/components/ui/Tabs.vue'
+import TabsContent from '@/components/ui/TabsContent.vue'
+import TabsList from '@/components/ui/TabsList.vue'
+import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import CodeSnippet from '@/components/onboarding/CodeSnippet.vue'
@@ -61,7 +65,7 @@ function errorMessage(err: unknown): string {
 
 // ── Runtimes (tagged upstream images) ────────────────────────────────────────
 interface Runtime {
-  id: 'python' | 'python-uv' | 'node' | 'deno' | 'bash'
+  id: 'python-uv' | 'deno'
   label: string
   hint: string
   image: string
@@ -73,59 +77,24 @@ interface Runtime {
   lang: 'python' | 'javascript' | 'text'
   contentType: string
   template: string
-  /** Inline dependency header the editor can insert on demand. */
-  depsSnippet?: string
 }
-const PEP723_HEADER = `# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "requests",
-# ]
-# ///
-`
-const DENO_HEADER = `// Dependencies resolve on first run via npm: specifiers, e.g.:
-// import chalk from "npm:chalk@5";
-`
 const RUNTIMES: Runtime[] = [
   {
-    id: 'python',
-    label: 'Python',
-    hint: 'Standard library only.',
-    image: 'python:3.12-slim',
-    command: ['python'],
-    file: 'script.py',
-    lang: 'python',
-    contentType: 'text/x-python',
-    template: 'print("hello from aruna")\n',
-  },
-  {
     id: 'python-uv',
-    label: 'Python + packages',
-    hint: 'PyPI dependencies from a PEP 723 inline header, run with uv.',
+    label: 'Python',
+    hint: 'PyPI dependencies managed by uv.',
     image: 'ghcr.io/astral-sh/uv:python3.13-bookworm-slim',
-    command: ['uv', 'run'],
+    command: ['uv', 'run', '--no-project'],
     env: { UV_CACHE_DIR: '/work/.uv-cache' },
     file: 'script.py',
     lang: 'python',
     contentType: 'text/x-python',
     template: 'print("hello from aruna")\n',
-    depsSnippet: PEP723_HEADER,
-  },
-  {
-    id: 'node',
-    label: 'Node.js',
-    hint: 'Built-in modules only.',
-    image: 'node:22-slim',
-    command: ['node'],
-    file: 'script.js',
-    lang: 'javascript',
-    contentType: 'text/javascript',
-    template: 'console.log("hello from aruna")\n',
   },
   {
     id: 'deno',
-    label: 'JavaScript + packages',
-    hint: 'npm dependencies via npm: imports, run with Deno (TypeScript works too).',
+    label: 'JavaScript / TypeScript',
+    hint: 'npm dependencies resolved by Deno.',
     image: 'denoland/deno:alpine-2.9.3',
     command: ['deno', 'run', '-A'],
     env: { DENO_DIR: '/work/.deno-cache' },
@@ -133,18 +102,6 @@ const RUNTIMES: Runtime[] = [
     lang: 'javascript',
     contentType: 'text/typescript',
     template: 'console.log("hello from aruna");\n',
-    depsSnippet: DENO_HEADER,
-  },
-  {
-    id: 'bash',
-    label: 'Bash',
-    hint: 'Plain shell, no extra tooling.',
-    image: 'bash:5.2',
-    command: ['bash'],
-    file: 'script.sh',
-    lang: 'text',
-    contentType: 'text/x-shellscript',
-    template: 'echo "hello from aruna"\n',
   },
 ]
 
@@ -164,9 +121,12 @@ function goStep(target: number) {
 }
 
 // ── Draft ────────────────────────────────────────────────────────────────────
-const runtimeId = ref<Runtime['id']>('python')
+const runtimeId = ref<Runtime['id']>('python-uv')
 const runtime = computed(() => RUNTIMES.find((r) => r.id === runtimeId.value) as Runtime)
 const script = ref(RUNTIMES[0].template)
+const editorTab = ref('work')
+const dependencies = ref<string[]>([])
+const dependencyDraft = ref('')
 const taskName = ref('quick-run')
 const groupId = ref('')
 const inputs = ref<{ url: string; name: string }[]>([])
@@ -186,6 +146,8 @@ watch(runtimeId, (next, prev) => {
   if (prevRt && script.value === prevRt.template) {
     script.value = (RUNTIMES.find((r) => r.id === next) as Runtime).template
   }
+  dependencies.value = []
+  dependencyDraft.value = ''
 })
 watch(step, (s) => {
   if (s === REVIEW_STEP) runId.value = crypto.randomUUID()
@@ -198,7 +160,43 @@ const bucketOptions = computed(() => buckets.value.map((b) => ({ value: b, label
 const scriptContainerPath = computed(() => `/work/${runtime.value.file}`)
 const scriptKey = computed(() => `.aruna/scripts/${runId.value}/${runtime.value.file}`)
 const scriptUrl = computed(() => `s3://${stagingBucket.value.trim()}/${scriptKey.value}`)
-const commandPreview = computed(() => `${runtime.value.command.join(' ')} ${scriptContainerPath.value}`)
+const dependencyConfigPath = '/work/deno.json'
+const dependencyConfigKey = computed(() => `.aruna/scripts/${runId.value}/deno.json`)
+const dependencyConfigUrl = computed(
+  () => `s3://${stagingBucket.value.trim()}/${dependencyConfigKey.value}`,
+)
+
+function npmPackageName(spec: string): string {
+  if (!spec.startsWith('@')) return spec.split('@')[0]
+  const slash = spec.indexOf('/')
+  const version = spec.indexOf('@', slash + 1)
+  return version === -1 ? spec : spec.slice(0, version)
+}
+
+const dependencyConfig = computed(() => {
+  if (runtimeId.value !== 'deno' || !dependencies.value.length) return null
+  return JSON.stringify(
+    {
+      imports: Object.fromEntries(
+        dependencies.value.map((dependency) => [npmPackageName(dependency), `npm:${dependency}`]),
+      ),
+    },
+    null,
+    2,
+  )
+})
+const executorCommand = computed(() => {
+  if (runtimeId.value === 'python-uv') {
+    return [
+      ...runtime.value.command,
+      ...dependencies.value.flatMap((dependency) => ['--with', dependency]),
+    ]
+  }
+  return dependencyConfig.value
+    ? [...runtime.value.command, `--config=${dependencyConfigPath}`]
+    : runtime.value.command
+})
+const commandPreview = computed(() => `${executorCommand.value.join(' ')} ${scriptContainerPath.value}`)
 
 const scriptInput = computed<TesInput>(() => ({
   name: runtime.value.file,
@@ -207,6 +205,17 @@ const scriptInput = computed<TesInput>(() => ({
   path: scriptContainerPath.value,
   type: 'FILE',
 }))
+const dependencyInput = computed<TesInput | null>(() =>
+  dependencyConfig.value
+    ? {
+        name: 'deno.json',
+        description: 'Quick-run dependency map generated by the portal',
+        url: dependencyConfigUrl.value,
+        path: dependencyConfigPath,
+        type: 'FILE',
+      }
+    : null,
+)
 const dataInputs = computed<TesInput[]>(() =>
   inputs.value.map((i) => ({ name: i.name, url: i.url, path: `/work/in/${i.name}`, type: 'FILE' })),
 )
@@ -230,12 +239,12 @@ const declaredOutputs = computed<TesOutput[]>(() =>
 const task = computed<TesTask>(() =>
   pruneTesTask({
     name: taskName.value,
-    inputs: [scriptInput.value, ...dataInputs.value],
+    inputs: [scriptInput.value, ...(dependencyInput.value ? [dependencyInput.value] : []), ...dataInputs.value],
     outputs: declaredOutputs.value,
     executors: [
       {
         image: runtime.value.image,
-        command: [...runtime.value.command, scriptContainerPath.value],
+        command: [...executorCommand.value, scriptContainerPath.value],
         workdir: '/work',
         env: runtime.value.env,
       },
@@ -244,11 +253,42 @@ const task = computed<TesTask>(() =>
   }),
 )
 
-// ── Script helpers ───────────────────────────────────────────────────────────
-function insertDepsHeader() {
-  const snippet = runtime.value.depsSnippet
-  if (!snippet || script.value.startsWith(snippet.split('\n')[0])) return
-  script.value = `${snippet}${script.value}`
+// ── Dependencies ─────────────────────────────────────────────────────────────
+const dependencyError = computed(() => {
+  const dependency = dependencyDraft.value.trim()
+  if (!dependency) return null
+  if (dependencies.value.some((entry) => entry.toLowerCase() === dependency.toLowerCase())) {
+    return 'This dependency is already in the list.'
+  }
+  if (runtimeId.value === 'python-uv' && dependency.startsWith('-')) {
+    return 'Use a PyPI requirement such as requests>=2.'
+  }
+  if (
+    runtimeId.value === 'deno' &&
+    !/^(?:@[a-z0-9._-]+\/[a-z0-9._-]+|[a-z0-9._-]+)(?:@[^\s]+)?$/i.test(dependency)
+  ) {
+    return 'Use an npm package such as chalk or @scope/package@1.'
+  }
+  if (
+    runtimeId.value === 'deno' &&
+    dependencies.value.some(
+      (entry) => npmPackageName(entry).toLowerCase() === npmPackageName(dependency).toLowerCase(),
+    )
+  ) {
+    return 'This npm package already has a selected version.'
+  }
+  return null
+})
+
+function addDependency() {
+  const dependency = dependencyDraft.value.trim()
+  if (!dependency || dependencyError.value) return
+  dependencies.value.push(dependency)
+  dependencyDraft.value = ''
+}
+
+function removeDependency(index: number) {
+  dependencies.value.splice(index, 1)
 }
 
 // ── Inputs / outputs editing ─────────────────────────────────────────────────
@@ -367,7 +407,20 @@ async function submit() {
   submitError.value = null
   submitting.value = true
   try {
-    await s3.putTextObject(stagingBucket.value.trim(), scriptKey.value, script.value, runtime.value.contentType)
+    const uploads = [
+      s3.putTextObject(stagingBucket.value.trim(), scriptKey.value, script.value, runtime.value.contentType),
+    ]
+    if (dependencyConfig.value) {
+      uploads.push(
+        s3.putTextObject(
+          stagingBucket.value.trim(),
+          dependencyConfigKey.value,
+          dependencyConfig.value,
+          'application/json',
+        ),
+      )
+    }
+    await Promise.all(uploads)
     const created = await createTask(task.value)
     submittedOutputs.value = outputRows.value.map((row) => ({
       bucket: row.bucket.trim(),
@@ -394,7 +447,7 @@ function runAnother() {
 
 <template>
   <div>
-    <PageHeader title="Quick run" description="Run a short python, node or bash script on this node without writing a TES task by hand.">
+    <PageHeader title="Quick run" description="Run a Python or JavaScript script with optional package dependencies without writing a TES task by hand.">
       <template #actions>
         <RouterLink :to="{ name: 'compute' }">
           <Button variant="outline" size="sm"><ArrowLeft class="h-4 w-4" /> Back to Compute</Button>
@@ -446,7 +499,7 @@ function runAnother() {
         <!-- Step 1: Runtime -->
         <div v-if="step === 0" class="space-y-3">
           <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runtime</div>
-          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div class="grid gap-3 sm:grid-cols-2">
             <button
               v-for="rt in RUNTIMES"
               :key="rt.id"
@@ -505,23 +558,19 @@ function runAnother() {
             </div>
           </div>
 
-          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+          <Tabs v-model="editorTab">
+            <TabsList>
+              <TabsTrigger value="work">Script &amp; data</TabsTrigger>
+              <TabsTrigger value="dependencies">Dependencies ({{ dependencies.length }})</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="work" class="mt-4">
+              <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
             <!-- Script editor -->
             <div class="min-w-0 space-y-2">
               <div class="flex items-center justify-between">
                 <label class="text-xs font-medium text-foreground">Script <span class="font-mono text-muted-foreground">({{ runtime.file }})</span></label>
-                <div class="flex items-center gap-1">
-                  <Button
-                    v-if="runtime.depsSnippet"
-                    variant="ghost"
-                    size="sm"
-                    title="Insert the inline dependency header at the top of the script"
-                    @click="insertDepsHeader"
-                  >
-                    Insert dependency header
-                  </Button>
-                  <Button variant="ghost" size="sm" @click="script = runtime.template">Reset to template</Button>
-                </div>
+                <Button variant="ghost" size="sm" @click="script = runtime.template">Reset to template</Button>
               </div>
               <Suspense>
                 <ScriptEditor v-model="script" :language="runtime.lang" />
@@ -597,7 +646,57 @@ function runAnother() {
                 <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output file</Button>
               </section>
             </div>
-          </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="dependencies" class="mt-4 space-y-4">
+              <div class="max-w-2xl space-y-2">
+                <label class="text-xs font-medium text-foreground">
+                  {{ runtimeId === 'python-uv' ? 'PyPI requirement' : 'npm package' }}
+                </label>
+                <div class="flex items-center gap-2">
+                  <Input
+                    v-model="dependencyDraft"
+                    class="font-mono text-xs"
+                    :placeholder="runtimeId === 'python-uv' ? 'requests>=2' : 'chalk@5'"
+                    :invalid="dependencyError ? 'error' : undefined"
+                    @keyup.enter.prevent="addDependency"
+                  />
+                  <Button size="sm" :disabled="!dependencyDraft.trim() || !!dependencyError" @click="addDependency">
+                    <Plus class="size-3.5" /> Add
+                  </Button>
+                </div>
+                <p v-if="dependencyError" class="text-[11px] text-destructive">{{ dependencyError }}</p>
+                <p v-else class="text-[11px] text-muted-foreground">
+                  <template v-if="runtimeId === 'python-uv'">
+                    Each requirement is passed directly to <code class="rounded bg-muted px-1 font-mono">uv run --with</code>.
+                  </template>
+                  <template v-else>
+                    Packages are mapped to bare imports, for example <code class="rounded bg-muted px-1 font-mono">import chalk from "chalk"</code>.
+                  </template>
+                </p>
+              </div>
+
+              <ul v-if="dependencies.length" class="max-w-2xl space-y-2">
+                <li
+                  v-for="(dependency, index) in dependencies"
+                  :key="dependency"
+                  class="surface-inline flex items-center gap-2 px-3 py-2 text-xs"
+                >
+                  <code class="min-w-0 flex-1 truncate font-mono text-foreground">{{ dependency }}</code>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    :aria-label="`Remove ${dependency}`"
+                    @click="removeDependency(index)"
+                  >
+                    <X class="size-3" />
+                  </Button>
+                </li>
+              </ul>
+              <p v-else class="text-xs text-muted-foreground">No extra dependencies. Standard library modules remain available.</p>
+            </TabsContent>
+          </Tabs>
 
         </div>
 
@@ -612,6 +711,10 @@ function runAnother() {
                 <li>
                   <div class="truncate text-foreground" :title="scriptUrl">{{ runtime.file }} <span class="font-sans text-muted-foreground">(uploaded on submit)</span></div>
                   <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ scriptContainerPath }}</div>
+                </li>
+                <li v-if="dependencyInput">
+                  <div class="truncate text-foreground" :title="dependencyConfigUrl">deno.json <span class="font-sans text-muted-foreground">(generated from dependencies)</span></div>
+                  <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ dependencyConfigPath }}</div>
                 </li>
                 <li v-for="(input, i) in inputs" :key="i">
                   <div class="truncate text-foreground" :title="input.url">{{ input.url }}</div>
