@@ -35,7 +35,7 @@ const truncated = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const unsupported = ref(false)
-const gatewayError = ref(false)
+const gatewayError = ref<string | null>(null)
 const selected = ref<Map<string, ConnectorEntry>>(new Map())
 let seq = 0
 
@@ -44,7 +44,7 @@ async function load() {
   const mySeq = ++seq
   loading.value = true
   error.value = null
-  gatewayError.value = false
+  gatewayError.value = null
   try {
     const response = await listConnectorEntries(props.groupId, props.connectorId, path.value || undefined, 500)
     if (mySeq !== seq) return
@@ -59,9 +59,7 @@ async function load() {
       unsupported.value = true
       emit('unsupported')
     } else if (err instanceof ApiError && (err.status === 502 || err.status === 504)) {
-      // Bad gateway: the node reached out but the source did not answer with a
-      // listing (plain HTTP mirrors often serve no directory index).
-      gatewayError.value = true
+      gatewayError.value = err.message
       emit('list-failed')
     } else {
       error.value = err instanceof Error ? err.message : String(err)
@@ -160,8 +158,7 @@ defineExpose({ reload: load })
           v-if="gatewayError"
           class="border-b border-border bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
         >
-          The node could not list this source. The source may not support directory listing (plain HTTP
-          mirrors often serve no index). You can still import from it by entering a path manually.
+          The node reached the source, but listing failed: {{ gatewayError }}. Retry the browser or enter a path manually.
         </div>
         <div class="max-h-[260px] overflow-y-auto">
           <div v-if="loading && !entries.length" class="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
