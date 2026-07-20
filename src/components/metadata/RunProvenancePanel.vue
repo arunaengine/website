@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useUserDirectory } from '@/composables/useUserDirectory'
 import { useS3 } from '@/composables/useS3'
 import { featureEnabled } from '@/lib/config'
 import { drsDownloadHref, drsObjectHref, isDrsReference, parseS3Url } from '@/lib/tes'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
-import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
+import { formatBytes, relativeTime, shortUserId, truncateMiddle } from '@/lib/utils'
 import { Cpu, Download, ExternalLink, FileInput, FileOutput, HardDrive, Terminal, Workflow } from '@lucide/vue'
 
 const props = defineProps<{ run: RunCrateModel }>()
 
 const { apiBaseUrl } = useAruna()
+const userDir = useUserDirectory()
 const s3 = useS3()
 const tesEnabled = computed(() => featureEnabled('tes'))
 
@@ -23,10 +25,21 @@ const status = computed(() => {
   return s ? { label: s, variant: 'outline' as const } : null
 })
 
+// The agent Person carries a `{ulid}@{realm}` identifier; resolve it to a
+// display name through the shared user directory, short id as the fallback.
+watch(
+  () => props.run.agent?.identifier,
+  (id) => {
+    if (id) void userDir.resolveUsers([id])
+  },
+  { immediate: true },
+)
+
 const agentLabel = computed(() => {
   const a = props.run.agent
   if (!a) return ''
-  return a.name || a.identifier || a.id.replace(/^#agent-/, '')
+  if (a.identifier) return userDir.cachedUser(a.identifier)?.name || a.name || shortUserId(a.identifier)
+  return a.name || a.id.replace(/^#agent-/, '')
 })
 
 function parsedMs(iso: string | undefined): number | null {
