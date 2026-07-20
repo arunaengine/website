@@ -127,8 +127,20 @@ const currentProfile = computed(() => profiles.value.find((profile) => profile.i
 // When no local profile resolves, fall back to the first raw conformsTo IRI so an external
 // profile association stays visible instead of reading "No profile".
 const conformsIri = computed(() => (currentProfile.value ? '' : current.value?.conformsToIds?.[0] ?? ''))
-const profileName = computed(() => currentProfile.value?.name ?? (conformsIri.value ? readableIri(conformsIri.value) : 'No profile'))
-const profileShortName = computed(() => currentProfile.value?.shortName ?? (conformsIri.value ? readableIri(conformsIri.value) : 'No profile'))
+// A conformsTo IRI that carries its own CreativeWork entity in the crate (e.g.
+// the Process Run Crate profile) shows that entity's name and version; a bare
+// spec URI with no entity falls back to its IRI tail.
+const conformsLabel = computed(() => {
+  const iri = conformsIri.value
+  if (!iri) return 'No profile'
+  const entity = crateGraph(currentCrate.value).find((e) => e['@id'] === iri)
+  const name = stringProp(entity?.name)
+  if (!name) return readableIri(iri)
+  const version = stringProp(entity?.version)
+  return version ? `${name} ${version}` : name
+})
+const profileName = computed(() => currentProfile.value?.name ?? conformsLabel.value)
+const profileShortName = computed(() => currentProfile.value?.shortName ?? conformsLabel.value)
 
 let crateFetchToken = 0
 
