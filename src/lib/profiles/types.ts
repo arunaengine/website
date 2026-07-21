@@ -8,6 +8,8 @@ export const DX_HAS_ARTIFACT = 'http://www.w3.org/ns/dx/prof/hasArtifact'
 export const DX_ROLE_SPECIFICATION = 'http://www.w3.org/ns/dx/prof/role/specification'
 export const DX_ROLE_SCHEMA = 'http://www.w3.org/ns/dx/prof/role/schema'
 export const DX_ROLE_GUIDANCE = 'http://www.w3.org/ns/dx/prof/role/guidance'
+export const DX_ROLE_CONSTRAINTS = 'http://www.w3.org/ns/dx/prof/role/constraints'
+export const SHACL_NS = 'http://www.w3.org/ns/shacl#'
 export const RO_CRATE_PROFILE = 'https://w3id.org/ro/crate/1.2'
 export const RO_CRATE_CONTEXT = 'https://w3id.org/ro/crate/1.2/context'
 export const JSON_SCHEMA_DRAFT_2020_12 = 'https://json-schema.org/draft/2020-12/schema'
@@ -265,6 +267,12 @@ export interface ParsedProfileCrate {
   // RO-Crate context does not already provide: non-schema.org terms plus alias
   // terms over schema.org URIs (e.g. `Author` → schema.org/Person).
   contextTerms?: Record<string, string>
+  // Turtle text of the GENERATED shapes.ttl artifact (constraints role), when
+  // the crate carries one with embedded/resolved text.
+  shapesText?: string
+  // Turtle text of the ATTACHED shapes.custom.ttl artifact, preserved verbatim
+  // through save/publish/import (plan 5.1: the only authored artifact).
+  customShapesText?: string
   entityRules: ProfileEntityRule[]
   datasetPropertyRules: ProfilePropertyRule[]
 }

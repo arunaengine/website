@@ -11,6 +11,9 @@ const ARTIFACT_FILES = [
   { key: 'html', name: 'profile.html', contentType: 'text/html' },
   { key: 'schema', name: 'schema.json', contentType: 'application/schema+json' },
   { key: 'mode', name: 'mode.json', contentType: 'application/json' },
+  { key: 'shapes', name: 'shapes.ttl', contentType: 'text/turtle' },
+  // Attached expert SHACL file; uploaded only when the profile carries one.
+  { key: 'customShapes', name: 'shapes.custom.ttl', contentType: 'text/turtle' },
 ] as const
 
 // Publishes the three profile artifacts of a PUBLIC profile to the group's
@@ -44,6 +47,7 @@ export function useProfilePublish() {
     const refs: Partial<Record<(typeof ARTIFACT_FILES)[number]['key'], ExternalProfileArtifacts['html']>> = {}
     for (const artifact of ARTIFACT_FILES) {
       const text = texts[artifact.key]
+      if (text === undefined) continue
       const key = `profiles/${slug}/${artifact.name}`
       await s3.putTextObject(bucket, key, text, artifact.contentType)
       const bytes = new TextEncoder().encode(text)
@@ -54,7 +58,13 @@ export function useProfilePublish() {
         sha256: await sha256(bytes),
       }
     }
-    return { html: refs.html!, schema: refs.schema!, mode: refs.mode! }
+    return {
+      html: refs.html!,
+      schema: refs.schema!,
+      mode: refs.mode!,
+      shapes: refs.shapes!,
+      ...(refs.customShapes ? { customShapes: refs.customShapes } : {}),
+    }
   }
 
   async function ensurePublicBucket(groupId: string, bucket: string): Promise<void> {

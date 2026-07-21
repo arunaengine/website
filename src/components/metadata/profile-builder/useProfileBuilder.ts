@@ -6,6 +6,7 @@ import { deriveEntityObligation, referencesToType, type ModeFile } from '@/lib/p
 import { CURATED_PROPERTY_TERMS, isSchemaOrgUri, mintTermUri } from '@/lib/profiles/propertyCatalog'
 import { CURATED_ENTITY_TYPES, entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { isHasPartUri } from '@/lib/profiles/emit'
+import { shapesFromEntityRules } from '@/lib/shacl/projection'
 import {
   isAbsoluteUri,
   isDatasetType,
@@ -132,18 +133,28 @@ export interface ProfileImportResult {
   basics?: Partial<ProfileBasics>
   entityRules: ProfileEntityRule[]
   mode?: ModeFile | null
-  kind?: 'mode' | 'crate'
+  kind?: 'mode' | 'crate' | 'shacl'
   preservedKeys?: string[]
+  // Attached expert SHACL file (shapes.custom.ttl) carried by the imported
+  // crate, preserved verbatim through the builder.
+  customShapesText?: string
 }
 
 // What was imported, lifted into the builder so the confirmation survives step
 // and tab navigation (the import section unmounts when hidden).
 export interface ImportSummary {
-  kind: 'mode' | 'crate'
+  kind: 'mode' | 'crate' | 'shacl'
   name?: string
   entityCount: number
   propertyCount: number
   preservedKeys: string[]
+}
+
+// Attach-block display metadata for shapes.custom.ttl; shapeCount is the number
+// of SHACL node shapes when known (parsed at attach time).
+export interface CustomShapesMeta {
+  fileName: string
+  shapeCount?: number
 }
 
 // A basics validation error anchored to the input it belongs to, so the step
@@ -503,6 +514,10 @@ export function useProfileBuilder() {
   // Raw imported mode file, preserved verbatim and re-emitted by buildProfileCrate
   // so features the builder does not model (layouts, lookup, localisation…) survive.
   const importedMode = ref<ModeFile | null>(null)
+  // Attached expert SHACL shapes (shapes.custom.ttl), kept verbatim (plan 5.1);
+  // the generated shapes.ttl is always emitted independently of this.
+  const customShapesText = ref('')
+  const customShapesMeta = ref<CustomShapesMeta | null>(null)
   // Summary of the last successful import (survives tab/step navigation).
   const importSummary = ref<ImportSummary | null>(null)
   // uid of a property draft just added by a quick action (M2). PropertyRuleCard
@@ -527,6 +542,8 @@ export function useProfileBuilder() {
     isPublic.value = false
     submitError.value = null
     importedMode.value = null
+    customShapesText.value = ''
+    customShapesMeta.value = null
     importSummary.value = null
     highlightPropertyUid.value = null
     entities.value = defaultEntities()
@@ -537,7 +554,7 @@ export function useProfileBuilder() {
   // import can warn before it replaces the draft wholesale.
   const hasEdits = computed(() => {
     if (importSummary.value) return true
-    if (trimmed(name.value) || trimmed(description.value)) return true
+    if (trimmed(name.value) || trimmed(description.value) || trimmed(customShapesText.value)) return true
     const defaults = defaultEntities()
     if (entities.value.length !== defaults.length) return true
     const root = entities.value[0]
@@ -564,6 +581,8 @@ export function useProfileBuilder() {
       : defaultEntities()
     selectedEntityIndex.value = 0
     importedMode.value = result.mode ?? null
+    customShapesText.value = result.customShapesText ?? ''
+    customShapesMeta.value = result.customShapesText ? { fileName: 'shapes.custom.ttl' } : null
     importSummary.value = {
       kind: result.kind ?? 'crate',
       name: result.basics?.name,
@@ -577,6 +596,19 @@ export function useProfileBuilder() {
   function setSlug(value: string | number) {
     slug.value = toText(value)
     slugTouched.value = true
+  }
+
+  // Attach / replace / remove the expert SHACL file. Callers parse the text
+  // first (dynamic import of lift.ts, so n3 stays out of the main bundle) and
+  // pass the display metadata they derived.
+  function setCustomShapes(text: string, meta: CustomShapesMeta) {
+    customShapesText.value = text
+    customShapesMeta.value = meta
+  }
+
+  function clearCustomShapes() {
+    customShapesText.value = ''
+    customShapesMeta.value = null
   }
 
   const selectedEntity = computed<DraftEntityRule | undefined>(() => entities.value[selectedEntityIndex.value])
@@ -838,9 +870,17 @@ export function useProfileBuilder() {
   const generatedSchema = computed(() => schemaFromEntityRules(profileBasics(), normalizedEntities.value))
   const generatedSchemaText = computed(() => JSON.stringify(generatedSchema.value, null, 2))
   const generatedCrate = computed(() =>
-    buildProfileCrate({ ...profileBasics(), entityRules: normalizedEntities.value, importedMode: importedMode.value ?? undefined }),
+    buildProfileCrate({
+      ...profileBasics(),
+      entityRules: normalizedEntities.value,
+      importedMode: importedMode.value ?? undefined,
+      customShapesText: trimmed(customShapesText.value) ? customShapesText.value : undefined,
+    }),
   )
   const generatedCrateText = computed(() => JSON.stringify(generatedCrate.value, null, 2))
+  // The generated shapes.ttl (dependency-free string projection), for the
+  // review step's raw artifacts area.
+  const generatedShapesText = computed(() => shapesFromEntityRules(profileBasics(), normalizedEntities.value))
 
   // Read-only derived obligation for an entity type: MUST/SHOULD/MAY plus the
   // referencing property that explains the derivation (for the editor badge).
@@ -1119,6 +1159,8 @@ export function useProfileBuilder() {
     selectedEntity,
     submitError,
     importedMode,
+    customShapesText,
+    customShapesMeta,
     importSummary,
     hasEdits,
     highlightPropertyUid,
@@ -1131,6 +1173,7 @@ export function useProfileBuilder() {
     generatedSchemaText,
     generatedCrate,
     generatedCrateText,
+    generatedShapesText,
     entityObligation,
     entityReferences,
     // validation
@@ -1144,6 +1187,8 @@ export function useProfileBuilder() {
     reset,
     applyImport,
     setSlug,
+    setCustomShapes,
+    clearCustomShapes,
     selectEntity,
     addEntity,
     addEntityRuleForType,

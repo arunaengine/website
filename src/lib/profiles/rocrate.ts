@@ -2,6 +2,7 @@ import { parseSchemaText, schemaFromEntityRules } from './schema'
 import { effectiveEntitySources } from './sources'
 import { entityRulesToMode, isModeFile, modeToEntityRules, type ModeFile } from './mode'
 import { buildProfileContext } from './propertyCatalog'
+import { shapesFromEntityRules } from '../shacl/projection'
 import { ARUNA_PROFILE_PREFIX, isDatasetType, isRecord, normalizeTypeUri, termNameFromUri } from './uri'
 import {
   DX_HAS_ARTIFACT,
@@ -9,11 +10,13 @@ import {
   DX_HAS_ROLE,
   DX_PROFILE,
   DX_RESOURCE_DESCRIPTOR,
+  DX_ROLE_CONSTRAINTS,
   DX_ROLE_GUIDANCE,
   DX_ROLE_SCHEMA,
   DX_ROLE_SPECIFICATION,
   JSON_SCHEMA_DRAFT_2020_12,
   RO_CRATE_PROFILE,
+  SHACL_NS,
   type JsonSchema,
   type ParsedProfileCrate,
   type ProfileBasics,
@@ -36,11 +39,17 @@ export interface ExternalProfileArtifacts {
   html: ExternalArtifactRef
   schema: ExternalArtifactRef
   mode: ExternalArtifactRef
+  shapes: ExternalArtifactRef
+  // Only when the profile carries an attached shapes.custom.ttl.
+  customShapes?: ExternalArtifactRef
 }
 
 export interface BuildProfileCrateInput extends ProfileBasics {
   entityRules: ProfileEntityRule[]
   importedMode?: ModeFile
+  // Attached expert SHACL file (shapes.custom.ttl), preserved verbatim; the
+  // generated shapes.ttl is always emitted regardless.
+  customShapesText?: string
   // When set, the artifact content lives on S3 (public profiles) and the File
   // entities reference it instead of embedding `text`. Private profiles keep
   // the embedded form so nothing private ever depends on a public bucket.
@@ -54,6 +63,8 @@ export interface ProfileArtifactTexts {
   html: string
   schema: string
   mode: string
+  shapes: string
+  customShapes?: string
 }
 
 export function buildProfileArtifactTexts(input: BuildProfileCrateInput): ProfileArtifactTexts {
@@ -64,6 +75,8 @@ export function buildProfileArtifactTexts(input: BuildProfileCrateInput): Profil
     html: profileHtml(input, entities),
     schema: JSON.stringify(schema, null, 2),
     mode: JSON.stringify(mode, null, 2),
+    shapes: shapesFromEntityRules(input, entities),
+    ...(input.customShapesText ? { customShapes: input.customShapesText } : {}),
   }
 }
 
@@ -77,12 +90,16 @@ export function buildProfileCrate(input: BuildProfileCrateInput): Record<string,
   const entities = normalizeEntityRules(input.entityRules)
   const schema = schemaFromEntityRules(input, entities)
   const mode = entityRulesToMode(input, entities, input.importedMode)
+  const shapes = shapesFromEntityRules(input, entities)
+  const customShapes = input.customShapesText?.trim() ? input.customShapesText : undefined
   const context = buildProfileContext(entities)
   const definitions = mintedTermDefinitions(entities)
   const external = input.externalArtifacts
   const htmlId = external?.html.id ?? 'profile.html'
   const schemaId = external?.schema.id ?? 'schema.json'
   const modeId = external?.mode.id ?? 'mode.json'
+  const shapesId = external?.shapes.id ?? 'shapes.ttl'
+  const customShapesId = external?.customShapes?.id ?? 'shapes.custom.ttl'
 
   return {
     '@context': context,
@@ -105,7 +122,13 @@ export function buildProfileCrate(input: BuildProfileCrateInput): Record<string,
         ...(input.license ? { license: { '@id': input.license } } : {}),
         version: input.version || undefined,
         isProfileOf: { '@id': RO_CRATE_PROFILE },
-        hasPart: [{ '@id': htmlId }, { '@id': schemaId }, { '@id': modeId }],
+        hasPart: [
+          { '@id': htmlId },
+          { '@id': schemaId },
+          { '@id': modeId },
+          { '@id': shapesId },
+          ...(customShapes ? [{ '@id': customShapesId }] : []),
+        ],
         // Minted term definitions must be reachable from the root: craqle's
         // export prunes contextual entities nothing links to, and @context
         // mappings alone create no graph edge.
@@ -116,6 +139,8 @@ export function buildProfileCrate(input: BuildProfileCrateInput): Record<string,
           { '@id': '#profile-resource' },
           { '@id': '#schema-resource' },
           { '@id': '#mode-resource' },
+          { '@id': '#shapes-resource' },
+          ...(customShapes ? [{ '@id': '#custom-shapes-resource' }] : []),
         ],
       },
       {
@@ -143,6 +168,26 @@ export function buildProfileCrate(input: BuildProfileCrateInput): Record<string,
         ...(external ? externalFileProps(external.mode) : { text: JSON.stringify(mode, null, 2) }),
       },
       {
+        '@id': shapesId,
+        '@type': 'File',
+        name: `${input.name} SHACL Shapes`,
+        encodingFormat: 'text/turtle',
+        conformsTo: { '@id': SHACL_NS },
+        ...(external ? externalFileProps(external.shapes) : { text: shapes }),
+      },
+      ...(customShapes
+        ? [
+            {
+              '@id': customShapesId,
+              '@type': 'File',
+              name: `${input.name} Attached SHACL Shapes`,
+              encodingFormat: 'text/turtle',
+              conformsTo: { '@id': SHACL_NS },
+              ...(external?.customShapes ? externalFileProps(external.customShapes) : { text: customShapes }),
+            },
+          ]
+        : []),
+      {
         '@id': '#profile-resource',
         '@type': DX_RESOURCE_DESCRIPTOR,
         [DX_HAS_ROLE]: { '@id': DX_ROLE_SPECIFICATION },
@@ -163,6 +208,22 @@ export function buildProfileCrate(input: BuildProfileCrateInput): Record<string,
         [DX_HAS_ROLE]: { '@id': DX_ROLE_GUIDANCE },
         [DX_HAS_ARTIFACT]: { '@id': modeId },
       },
+      {
+        '@id': '#shapes-resource',
+        '@type': DX_RESOURCE_DESCRIPTOR,
+        [DX_HAS_ROLE]: { '@id': DX_ROLE_CONSTRAINTS },
+        [DX_HAS_ARTIFACT]: { '@id': shapesId },
+      },
+      ...(customShapes
+        ? [
+            {
+              '@id': '#custom-shapes-resource',
+              '@type': DX_RESOURCE_DESCRIPTOR,
+              [DX_HAS_ROLE]: { '@id': DX_ROLE_CONSTRAINTS },
+              [DX_HAS_ARTIFACT]: { '@id': customShapesId },
+            },
+          ]
+        : []),
       ...(input.license ? [licenseEntity(input.license)] : []),
       ...definitions,
     ],
@@ -182,7 +243,10 @@ export function parseProfileCrate(rocrate: unknown): ParsedProfileCrate {
   const entityRules = mode ? modeToEntityRules(mode, schema) : []
   const datasetPropertyRules = entityRules.find((entity) => isDatasetType(entity.type))?.propertyRules ?? []
   const contextTerms = contextTermsFromCrate(rocrate, mode)
+  const { shapesText, customShapesText } = extractShapesTexts(rocrate)
   return {
+    ...(shapesText ? { shapesText } : {}),
+    ...(customShapesText ? { customShapesText } : {}),
     name: textValue(root?.name) || (mode?.metadata?.name ? String(mode.metadata.name) : '') || schema?.title || '',
     description:
       textValue(root?.description) ||
@@ -250,6 +314,39 @@ async function fetchArtifactText(url: string): Promise<string> {
   const response = await fetch(url)
   if (!response.ok) throw new Error(`Fetching profile artifact failed (${response.status} ${response.statusText}): ${url}`)
   return await response.text()
+}
+
+// The SHACL artifacts' Turtle texts: artifacts referenced by a `constraints`
+// ResourceDescriptor first, any text/turtle File as fallback (descriptors can
+// be pruned by re-exports). The attached file is told apart from the generated
+// one by its `shapes.custom.ttl` id/contentUrl suffix — the same convention
+// extractProfileMode uses for mode.json.
+export function extractShapesTexts(rocrate: unknown): { shapesText?: string; customShapesText?: string } {
+  const entries = graph(rocrate)
+  const candidates: Array<Record<string, unknown>> = []
+  for (const descriptor of entries) {
+    if (!typeContains(descriptor, DX_RESOURCE_DESCRIPTOR)) continue
+    const roles = idValues(descriptor[DX_HAS_ROLE] ?? descriptor.hasRole)
+    if (!roles.some((role) => role.includes('/constraints'))) continue
+    const artifactRef = idValues(descriptor[DX_HAS_ARTIFACT] ?? descriptor.hasArtifact)[0]
+    const artifact = artifactRef ? entityById(entries, artifactRef) : undefined
+    if (artifact) candidates.push(artifact)
+  }
+  if (!candidates.length) {
+    candidates.push(...entries.filter((entry) => textValue(entry.encodingFormat).includes('text/turtle')))
+  }
+
+  let shapesText: string | undefined
+  let customShapesText: string | undefined
+  for (const artifact of candidates) {
+    const text = artifact.text
+    if (typeof text !== 'string' || !text.trim()) continue
+    const isCustom =
+      idMatches(artifact['@id'], 'shapes.custom.ttl') || idMatches(idValue(artifact.contentUrl), 'shapes.custom.ttl')
+    if (isCustom) customShapesText ??= text
+    else shapesText ??= text
+  }
+  return { shapesText, customShapesText }
 }
 
 export function extractProfileSchema(rocrate: unknown): JsonSchema | undefined {

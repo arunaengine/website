@@ -96,6 +96,8 @@ watch(
         basics: { name: profile.name, description: profile.description, version: profile.version },
         entityRules: profile.entityRules,
         mode: profile.mode ?? null,
+        // Re-editing keeps an attached shapes.custom.ttl verbatim.
+        customShapesText: profile.customShapesText,
       })
       // Editing keeps the document identity: path profiles/<slug> and group.
       builder.setSlug(profile.id)
@@ -129,9 +131,14 @@ async function submit() {
   try {
     const basics = builder.profileBasics()
     const entityRules = builder.normalizedEntities
-    const crateInput = { ...basics, entityRules, importedMode: builder.importedMode ?? undefined }
-    // Public profiles publish mode/schema/html to S3 and reference them by DRS
-    // id + contentUrl; private profiles keep the artifacts embedded as text.
+    const crateInput = {
+      ...basics,
+      entityRules,
+      importedMode: builder.importedMode ?? undefined,
+      customShapesText: builder.customShapesText.trim() ? builder.customShapesText : undefined,
+    }
+    // Public profiles publish mode/schema/html/shapes to S3 and reference them
+    // by DRS id + contentUrl; private profiles keep the artifacts embedded as text.
     const externalArtifacts = builder.isPublic
       ? await publishProfileArtifacts(builder.groupId, basics.slug, buildProfileArtifactTexts(crateInput))
       : undefined

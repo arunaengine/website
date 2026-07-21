@@ -144,10 +144,11 @@ function violationsFor(property: string) {
     <!-- What each generated artifact is for (D6). The entity and property rules
          are the source of truth; these three files are derived from them. -->
     <p class="text-xs text-muted-foreground">
-      Your rules generate three files:
+      Your rules generate four files:
       <b class="text-foreground">profile.html</b> is the human-readable specification,
-      <b class="text-foreground">mode.json</b> is the editor form structure (Describo/Crate-O-compatible), and
-      <b class="text-foreground">schema.json</b> holds the validation rules. They all travel together in the Profile Crate.
+      <b class="text-foreground">mode.json</b> is the editor form structure (Describo/Crate-O-compatible),
+      <b class="text-foreground">schema.json</b> holds the validation rules, and
+      <b class="text-foreground">shapes.ttl</b> holds SHACL shapes for deep validation. They all travel together in the Profile Crate.
       Editors read the mode file; validation reads the validation rules, mode files have no vocabulary for constraints or recommended levels.
     </p>
 
@@ -156,6 +157,7 @@ function violationsFor(property: string) {
         <TabsTrigger value="preview">Form preview</TabsTrigger>
         <TabsTrigger value="schema">Validation rules</TabsTrigger>
         <TabsTrigger value="mode">Mode file</TabsTrigger>
+        <TabsTrigger value="shapes">SHACL shapes</TabsTrigger>
         <TabsTrigger value="crate">Profile Crate</TabsTrigger>
       </TabsList>
 
@@ -224,8 +226,22 @@ function violationsFor(property: string) {
         <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ modeText }}</pre>
       </TabsContent>
 
+      <TabsContent value="shapes">
+        <p class="mb-2 text-[11px] text-muted-foreground">
+          Generated SHACL shapes (<code>shapes.ttl</code>), used for deep in-browser validation of dataset crates.
+          <template v-if="builder.customShapesMeta">
+            An attached <code>{{ builder.customShapesMeta.fileName }}</code> travels alongside it verbatim<template v-if="builder.customShapesMeta.shapeCount !== undefined"> ({{ builder.customShapesMeta.shapeCount }} {{ builder.customShapesMeta.shapeCount === 1 ? 'shape' : 'shapes' }})</template>.
+          </template>
+        </p>
+        <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedShapesText }}</pre>
+        <template v-if="builder.customShapesText.trim()">
+          <p class="mb-2 mt-3 text-[11px] text-muted-foreground">Attached shapes (<code>shapes.custom.ttl</code>), kept verbatim.</p>
+          <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.customShapesText }}</pre>
+        </template>
+      </TabsContent>
+
       <TabsContent value="crate">
-        <p class="mb-2 text-[11px] text-muted-foreground">The complete profile document that is saved, all three files travel inside it.</p>
+        <p class="mb-2 text-[11px] text-muted-foreground">The complete profile document that is saved, all generated files travel inside it.</p>
         <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedCrateText }}</pre>
       </TabsContent>
     </Tabs>

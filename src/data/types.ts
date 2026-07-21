@@ -204,6 +204,10 @@ export interface MetadataProfile {
   mode?: ModeFile
   // Non-schema.org term → URI mappings recovered from the profile crate context.
   contextTerms?: Record<string, string>
+  // Generated SHACL shapes (shapes.ttl) Turtle text, for deep validation.
+  shapesText?: string
+  // Attached expert SHACL shapes (shapes.custom.ttl), preserved verbatim.
+  customShapesText?: string
   // Suggested keywords / vocabularies that are pre-populated when this profile is used
   suggestedKeywords: string[]
   // Whether this profile is editable by the current user (some are realm-managed templates)

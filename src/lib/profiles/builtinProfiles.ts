@@ -1,6 +1,7 @@
 import { buildProfileCrate } from './rocrate'
 import { schemaFromEntityRules } from './schema'
 import { entityRulesToMode } from './mode'
+import { shapesFromEntityRules } from '../shacl/projection'
 import type { ProfileBasics, ProfileEntityRule } from './types'
 import type { MetadataProfile } from '@/data/types'
 
@@ -142,6 +143,7 @@ export const PROCESS_RUN_CRATE_PROFILE: MetadataProfile = {
   propertyRules: ENTITY_RULES[0].propertyRules,
   schema: schemaFromEntityRules(BASICS, ENTITY_RULES),
   mode: entityRulesToMode(BASICS, ENTITY_RULES),
+  shapesText: shapesFromEntityRules(BASICS, ENTITY_RULES),
   suggestedKeywords: ['process', 'provenance', 'run'],
   managed: true,
   builtIn: true,

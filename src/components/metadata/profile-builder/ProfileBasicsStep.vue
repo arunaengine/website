@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
+import Button from '@/components/ui/Button.vue'
+import Badge from '@/components/ui/Badge.vue'
+import { ChevronDown, FileCode2, Globe, Loader2, Upload, X } from '@lucide/vue'
+import { useArtifactFetch } from './useArtifactFetch'
 import type { ProfileBuilder } from './useProfileBuilder'
 
 // `locked` freezes the profile's stored identity (owning group and slug/path)
@@ -15,6 +20,91 @@ const builder = props.builder
 function fieldError(fieldId: string): string {
   return builder.basicsFieldErrors.find((error) => error.fieldId === fieldId)?.message ?? ''
 }
+
+// --- SHACL shapes (advanced): attach/replace/remove shapes.custom.ttl. The
+// generated shapes.ttl always exists; this block only manages the optional
+// expert attachment (plan 6.1). Turtle parsing goes through a dynamic import
+// of lift.ts so n3 never enters the main bundle.
+const shapesOpen = ref(false)
+const shapesFileInput = ref<HTMLInputElement | null>(null)
+const shapesUrl = ref('')
+const shapesBusy = ref(false)
+const shapesError = ref('')
+const { fetchArtifactText } = useArtifactFetch()
+
+async function attachShapesText(text: string, fileName: string) {
+  shapesError.value = ''
+  shapesBusy.value = true
+  try {
+    const { liftShapes } = await import('@/lib/shacl/lift')
+    let shapeCount = 0
+    try {
+      const verdict = liftShapes(text)
+      shapeCount = verdict.kind === 'rules' ? verdict.entities.length : verdict.shapeCount
+    } catch (err) {
+      shapesError.value = `Not parseable as Turtle: ${err instanceof Error ? err.message : String(err)}`
+      return
+    }
+    if (!shapeCount) {
+      shapesError.value = 'That file parses as Turtle but contains no SHACL node shapes.'
+      return
+    }
+    builder.setCustomShapes(text, { fileName, shapeCount })
+    shapesUrl.value = ''
+  } finally {
+    shapesBusy.value = false
+  }
+}
+
+function onShapesFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => { void attachShapesText(String(reader.result), file.name) }
+  reader.onerror = () => { shapesError.value = 'Could not read that file.' }
+  reader.readAsText(file)
+  input.value = ''
+}
+
+async function shapesFromUrl() {
+  const target = shapesUrl.value.trim()
+  if (!target) return
+  shapesBusy.value = true
+  shapesError.value = ''
+  try {
+    const text = await fetchArtifactText(target)
+    await attachShapesText(text, target.split('/').pop() || 'shapes.custom.ttl')
+  } catch (err) {
+    shapesError.value = err instanceof TypeError
+      ? 'Could not fetch that URL. If it is hosted on another server, that server does not allow browser (cross-origin) access. Download the file and upload it instead.'
+      : err instanceof Error ? err.message : String(err)
+  } finally {
+    shapesBusy.value = false
+  }
+}
+
+// An attachment arriving without a shape count (crate import, edit re-open)
+// gets one counted lazily, so the chip can say how many shapes it carries.
+watch(
+  () => builder.customShapesText,
+  (text) => {
+    const meta = builder.customShapesMeta
+    if (!text.trim() || !meta || meta.shapeCount !== undefined) return
+    void (async () => {
+      try {
+        const { liftShapes } = await import('@/lib/shacl/lift')
+        const verdict = liftShapes(text)
+        const shapeCount = verdict.kind === 'rules' ? verdict.entities.length : verdict.shapeCount
+        if (builder.customShapesText === text) builder.setCustomShapes(text, { ...meta, shapeCount })
+      } catch {
+        // Unparseable attachment from an imported crate: keep it verbatim, the
+        // chip just shows no count.
+      }
+    })()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -85,5 +175,58 @@ function fieldError(fieldId: string): string {
       </span>
       <Switch :checked="builder.isPublic" @update:checked="(value: boolean) => (builder.isPublic = value)" />
     </label>
+
+    <!-- SHACL shapes (advanced): optional expert attachment, collapsed by default. -->
+    <div class="rounded-md border border-border">
+      <button
+        type="button"
+        class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+        :aria-expanded="shapesOpen"
+        @click="shapesOpen = !shapesOpen"
+      >
+        <span class="flex items-center gap-2 text-sm font-medium text-foreground">
+          <FileCode2 class="h-4 w-4 text-primary" /> SHACL shapes (advanced)
+          <Badge v-if="builder.customShapesMeta" variant="secondary">
+            {{ builder.customShapesMeta.fileName }}<template v-if="builder.customShapesMeta.shapeCount !== undefined"> · {{ builder.customShapesMeta.shapeCount }} {{ builder.customShapesMeta.shapeCount === 1 ? 'shape' : 'shapes' }}</template>
+          </Badge>
+        </span>
+        <ChevronDown class="h-4 w-4 text-muted-foreground transition-transform" :class="shapesOpen ? 'rotate-180' : ''" />
+      </button>
+      <div v-if="shapesOpen" class="space-y-3 border-t border-border px-3 py-3">
+        <p class="text-[11px] text-muted-foreground">
+          The builder always generates SHACL shapes from your rules. You can additionally attach an expert SHACL file (Turtle); it is stored verbatim as <code>shapes.custom.ttl</code> and runs alongside the generated shapes when datasets are validated.
+        </p>
+
+        <div v-if="builder.customShapesMeta" class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
+          <FileCode2 class="h-3.5 w-3.5 shrink-0 text-primary" />
+          <span class="font-medium text-foreground">{{ builder.customShapesMeta.fileName }}</span>
+          <span v-if="builder.customShapesMeta.shapeCount !== undefined" class="text-muted-foreground">
+            {{ builder.customShapesMeta.shapeCount }} {{ builder.customShapesMeta.shapeCount === 1 ? 'node shape' : 'node shapes' }}, valid Turtle
+          </span>
+          <span class="flex-1"></span>
+          <Button type="button" variant="outline" size="sm" :disabled="shapesBusy" @click="shapesFileInput?.click()">Replace</Button>
+          <Button type="button" variant="ghost" size="sm" @click="builder.clearCustomShapes()">
+            <X class="size-3.5" /> Remove
+          </Button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <input ref="shapesFileInput" type="file" accept=".ttl,text/turtle" class="hidden" @change="onShapesFile" />
+          <Button v-if="!builder.customShapesMeta" type="button" variant="outline" size="sm" :disabled="shapesBusy" @click="shapesFileInput?.click()">
+            <Upload class="size-3.5" /> Upload .ttl
+          </Button>
+          <span v-if="!builder.customShapesMeta" class="text-[11px] text-muted-foreground">or</span>
+          <div class="flex min-w-[220px] flex-1 items-center gap-2">
+            <Input v-model="shapesUrl" placeholder="https://…/shapes.ttl" @keydown.enter="shapesFromUrl" />
+            <Button type="button" variant="outline" size="sm" :disabled="shapesBusy || !shapesUrl.trim()" @click="shapesFromUrl">
+              <Loader2 v-if="shapesBusy" class="size-3.5 animate-spin" />
+              <Globe v-else class="size-3.5" /> Fetch
+            </Button>
+          </div>
+        </div>
+
+        <p v-if="shapesError" class="text-[11px] text-destructive">{{ shapesError }}</p>
+      </div>
+    </div>
   </section>
 </template>
