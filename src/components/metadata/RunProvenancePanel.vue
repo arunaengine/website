@@ -9,7 +9,7 @@ import { featureEnabled } from '@/lib/config'
 import { drsDownloadHref, drsObjectHref, isDrsReference, parseS3Url } from '@/lib/tes'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
 import { formatBytes, relativeTime, shortUserId, truncateMiddle } from '@/lib/utils'
-import { Cpu, Download, ExternalLink, FileInput, FileOutput, HardDrive, Terminal, Workflow } from '@lucide/vue'
+import { Cpu, Download, ExternalLink, FileInput, FileOutput, HardDrive, Play, Terminal } from '@lucide/vue'
 
 const props = defineProps<{ run: RunCrateModel }>()
 
@@ -42,6 +42,16 @@ const agentLabel = computed(() => {
   return a.name || a.id.replace(/^#agent-/, '')
 })
 
+const instrumentLabel = computed(() => props.run.instrument?.name || props.run.instrument?.identifier || '')
+const containerLabel = computed(() => {
+  const container = props.run.container
+  if (!container) return ''
+  if (container.reference) return container.reference
+  const repository = [container.registry, container.name].filter(Boolean).join('/')
+  if (container.sha256) return `${repository || 'container'}@sha256:${container.sha256}`
+  return container.tag ? `${repository}:${container.tag}` : repository
+})
+
 function parsedMs(iso: string | undefined): number | null {
   if (!iso) return null
   const ms = Date.parse(iso)
@@ -64,8 +74,8 @@ const duration = computed(() => {
   return `${Math.floor(min / 60)}h ${min % 60}m`
 })
 
-// Same link forms TaskDetailPanel resolves for TES outputs, plus the run
-// crate's workspace-relative refs mapped into the ws-{jobid} bucket.
+// Same link forms TaskDetailPanel resolves for TES outputs, plus any
+// workspace-relative refs mapped through the crate's recorded bucket.
 type ResolvedLink =
   | { kind: 's3'; bucketId: string; prefix: string }
   | { kind: 'drs'; object: string; download: string }
@@ -107,14 +117,14 @@ const outputRows = computed(() => props.run.outputs.map(toRow))
 const flow = computed(() => [
   {
     key: 'inputs',
-    label: 'Inputs',
+    label: 'Input files',
     icon: FileInput,
     rows: inputRows.value,
     empty: 'No declared inputs.',
   },
   {
     key: 'outputs',
-    label: 'Outputs',
+    label: 'Output files',
     icon: FileOutput,
     rows: outputRows.value,
     empty: 'No outputs were captured.',
@@ -125,7 +135,7 @@ const flow = computed(() => [
 <template>
   <section class="surface overflow-hidden" aria-label="Run provenance">
     <div class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
-      <Workflow class="h-4 w-4 text-primary" /> Run provenance
+      <Play class="h-4 w-4 text-primary" /> {{ run.actionName || run.name || 'Process run' }}
       <Badge v-if="status" :variant="status.variant" class="text-[10px] uppercase">{{ status.label }}</Badge>
       <RouterLink
         v-if="tesEnabled && run.runId"
@@ -138,12 +148,12 @@ const flow = computed(() => [
 
     <dl class="grid gap-3 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4">
       <div v-if="run.runId" class="min-w-0">
-        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Run</dt>
-        <dd class="mt-1 break-all font-mono text-[11px] text-foreground" :title="run.runId">{{ run.runId }}</dd>
+        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Compute task ID</dt>
+        <dd class="mt-1 font-mono text-[11px] text-foreground" :title="run.runId">{{ truncateMiddle(run.runId, 18, 10) }}</dd>
       </div>
       <div v-if="agentLabel" class="min-w-0">
-        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Agent</dt>
-        <dd class="mt-1 break-all font-mono text-[11px] text-foreground" :title="run.agent?.identifier || run.agent?.id">{{ agentLabel }}</dd>
+        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Submitted by</dt>
+        <dd class="mt-1 break-all text-sm text-foreground" :title="run.agent?.identifier || run.agent?.id">{{ agentLabel }}</dd>
       </div>
       <div v-if="run.workspaceBucket" class="min-w-0">
         <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Workspace</dt>
@@ -179,11 +189,25 @@ const flow = computed(() => [
           <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             <Terminal class="h-3.5 w-3.5" /> Executor
           </div>
-          <div v-if="run.image || run.command.length || run.actionName" class="mt-2 space-y-1">
-            <div v-if="run.image" class="break-all font-mono text-[11px] text-foreground">{{ run.image }}</div>
-            <div v-if="run.command.length" class="whitespace-pre-wrap break-all font-mono text-[11px] text-muted-foreground">{{ run.command.join(' ') }}</div>
-            <div v-if="!run.image && !run.command.length" class="text-xs text-muted-foreground">{{ run.actionName }}</div>
-          </div>
+          <dl v-if="instrumentLabel || containerLabel || run.command" class="mt-2 space-y-2 text-xs">
+            <div v-if="instrumentLabel">
+              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Software</dt>
+              <dd class="mt-0.5 break-all text-foreground">{{ instrumentLabel }}</dd>
+            </div>
+            <div v-if="containerLabel">
+              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Container image</dt>
+              <dd class="mt-0.5 break-all font-mono text-[11px]">
+                <a v-if="run.container?.url" :href="run.container.url" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-primary hover:underline">
+                  {{ containerLabel }} <ExternalLink class="h-3 w-3 shrink-0" />
+                </a>
+                <span v-else class="text-foreground">{{ containerLabel }}</span>
+              </dd>
+            </div>
+            <div v-if="run.command">
+              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Command</dt>
+              <dd class="mt-0.5 whitespace-pre-wrap break-all font-mono text-[11px] text-foreground">{{ run.command }}</dd>
+            </div>
+          </dl>
           <p v-else class="mt-2 text-xs text-muted-foreground">No executor details recorded.</p>
         </div>
 

@@ -124,15 +124,18 @@ watch(current, (c) => {
 })
 const currentCrate = computed(() => fullCrates.value[detailId.value] ?? current.value?.roCrate ?? {})
 const currentProfile = computed(() => profiles.value.find((profile) => profile.id === current.value?.profileId))
-// When no local profile resolves, fall back to the first raw conformsTo IRI so an external
-// profile association stays visible instead of reading "No profile".
-const conformsIri = computed(() => (currentProfile.value ? '' : current.value?.conformsToIds?.[0] ?? ''))
+// Keep unresolved conformance paths visible without treating their order as meaningful.
+const conformsIris = computed(() => (currentProfile.value ? [] : current.value?.conformsToIds ?? []))
+const conformsTitle = computed(() => conformsIris.value.join('\n'))
 // A conformsTo IRI that carries its own CreativeWork entity in the crate (e.g.
 // the Process Run Crate profile) shows that entity's name and version; a bare
 // spec URI with no entity falls back to its IRI tail.
 const conformsLabel = computed(() => {
-  const iri = conformsIri.value
-  if (!iri) return 'No profile'
+  const iris = conformsIris.value
+  if (!iris.length) return 'No profile'
+  if (iris.length > 1) return `${iris.length} profiles`
+  let iri = ''
+  for (const value of iris) iri = value
   const entity = crateGraph(currentCrate.value).find((e) => e['@id'] === iri)
   const name = stringProp(entity?.name)
   if (!name) return readableIri(iri)
@@ -312,13 +315,14 @@ const relatedDocs = computed<RelatedDocRow[]>(() => {
   const rootId = crateRootId(crate)
   const root = rootId ? g.find((e) => e['@id'] === rootId) : undefined
   if (!root) return []
+  const internalIds = new Set(g.map((entity) => stringProp(entity['@id'])).filter(Boolean))
   const rows: RelatedDocRow[] = []
   const seen = new Set<string>()
   for (const property of ['mentions', 'citation', 'about'] as const) {
     const refs = root[property]
     for (const ref of Array.isArray(refs) ? refs : refs ? [refs] : []) {
       const iri = stringProp(ref)
-      if (!iri || seen.has(iri)) continue
+      if (!iri || seen.has(iri) || internalIds.has(iri)) continue
       seen.add(iri)
       const item = metadataItems.value.find((entry) => entry.graph_iri === iri || entry.document_id === iri)
       const entity = g.find((e) => e['@id'] === iri)
@@ -344,7 +348,7 @@ function entitySize(row: DataEntity): string {
   <div>
     <PageHeader
       :title="current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Metadata'"
-      :description="current ? `${profileName} · ${current.ulid}` : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate metadata document.'"
+      :description="current ? (runProvenance ? profileName : `${profileName} · ${current.ulid}`) : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate metadata document.'"
     >
       <template #actions>
         <Button
@@ -379,7 +383,7 @@ function entitySize(row: DataEntity): string {
               <RouterLink v-if="currentProfile" :to="{ name: 'profile-detail', params: { profileId: currentProfile.id } }" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:opacity-80">
                 <ListChecks class="h-3 w-3" /> {{ currentProfile.name }}
               </RouterLink>
-              <span v-else-if="conformsIri" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary" :title="conformsIri">
+              <span v-else-if="conformsIris.length" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary" :title="conformsTitle">
                 <ListChecks class="h-3 w-3" /> {{ profileName }}
               </span>
               <h1 class="mt-3 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ current.title }}</h1>
@@ -399,7 +403,7 @@ function entitySize(row: DataEntity): string {
             </div>
             <div class="surface-muted p-3">
               <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Profile</dt>
-              <dd class="mt-1 break-all text-sm font-medium text-foreground" :title="conformsIri || undefined">{{ profileShortName }}</dd>
+              <dd class="mt-1 break-all text-sm font-medium text-foreground" :title="conformsTitle || undefined">{{ profileShortName }}</dd>
             </div>
             <div class="surface-muted p-3">
               <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">License</dt>
@@ -536,7 +540,7 @@ function entitySize(row: DataEntity): string {
 
         <section v-if="relatedDocs.length" class="surface overflow-hidden">
           <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
-            <Link2 class="h-4 w-4 text-primary" /> Related datasets
+            <Link2 class="h-4 w-4 text-primary" /> Related resources
             <span class="text-xs font-normal text-muted-foreground">{{ relatedDocs.length }}</span>
           </div>
           <ul class="divide-y divide-border">

@@ -1,10 +1,8 @@
-// Parses the run crate the backend writes for finished execution jobs
-// (aruna operations/src/jobs/workflow/run_crate.rs): an RO-Crate graph whose
-// Dataset root `mentions` a `#run-{jobId}` CreateAction with agent (Person),
-// instrument (container image), object (workspace/{key} input refs), result
-// (workspace/{key} output refs backed by File entities) and actionStatus.
-// Returns null when no CreateAction parses so callers fall back to the
-// generic crate rendering.
+import { PROCESS_RUN_PROFILE_URI } from './profiles/builtinProfiles'
+
+// Parses the backend's Process Run Crate into the dedicated run UI model.
+// Returns null unless the root declares the exact profile and references a
+// CreateAction, so other crates retain the generic rendering.
 
 export interface RunCrateFileRef {
   id: string
@@ -19,11 +17,30 @@ export interface RunCrateAgent {
   identifier?: string
 }
 
+export interface RunCrateInstrument {
+  id: string
+  name?: string
+  identifier?: string
+  version?: string
+}
+
+export interface RunCrateContainer {
+  id: string
+  name?: string
+  reference?: string
+  registry?: string
+  tag?: string
+  sha256?: string
+  url?: string
+}
+
 export interface RunCrateModel {
   runId?: string
+  name?: string
   actionName?: string
-  image?: string
-  command: string[]
+  command?: string
+  instrument?: RunCrateInstrument
+  container?: RunCrateContainer
   actionStatus?: string
   startTime?: string
   endTime?: string
@@ -66,12 +83,6 @@ function stringOf(value: unknown): string | undefined {
   return undefined
 }
 
-function stringListOf(value: unknown): string[] {
-  if (typeof value === 'string') return value.trim() ? [value] : []
-  if (Array.isArray(value)) return value.flatMap(stringListOf)
-  return []
-}
-
 function refIdsOf(value: unknown): string[] {
   const refs = Array.isArray(value) ? value : value !== undefined && value !== null ? [value] : []
   const ids: string[] = []
@@ -83,16 +94,65 @@ function refIdsOf(value: unknown): string[] {
 }
 
 const WORKSPACE_PREFIX = 'workspace/'
+const WORKSPACE_PROPERTY_ID = 'https://w3id.org/aruna/terms/workspace-bucket'
+const WFRUN = 'https://w3id.org/ro/terms/workflow-run#'
 
 function fileRef(id: string, byId: Map<string, Record<string, unknown>>): RunCrateFileRef {
   const entity = byId.get(id)
-  const fallbackName = id.startsWith(WORKSPACE_PREFIX) ? id.slice(WORKSPACE_PREFIX.length) : id
+  const fallbackName = id.startsWith(WORKSPACE_PREFIX)
+    ? id.slice(WORKSPACE_PREFIX.length)
+    : (id.split('/').filter(Boolean).pop() ?? id)
   return {
     id,
     name: stringOf(entity?.name) || fallbackName,
     contentSize: stringOf(entity?.contentSize),
     contentUrl: stringOf(entity?.contentUrl),
   }
+}
+
+function instrumentOf(
+  value: unknown,
+  byId: Map<string, Record<string, unknown>>,
+): RunCrateInstrument | undefined {
+  const id = idOf(value)
+  if (!id) return undefined
+  const entity = byId.get(id)
+  const direct = id.startsWith('#') ? undefined : id
+  const name = stringOf(entity?.name)
+  const identifier = stringOf(entity?.identifier) ?? direct
+  const version = stringOf(entity?.softwareVersion)
+  return name || identifier || version ? { id, name, identifier, version } : undefined
+}
+
+function containerOf(
+  value: unknown,
+  byId: Map<string, Record<string, unknown>>,
+): RunCrateContainer | undefined {
+  const id = idOf(value)
+  if (!id) return undefined
+  const entity = byId.get(id)
+  const direct = id.startsWith('#') ? undefined : id
+  const name = stringOf(entity?.name)
+  const reference = stringOf(entity?.identifier) ?? direct
+  const registry = stringOf(entity?.registry ?? entity?.[`${WFRUN}registry`])
+  const tag = stringOf(entity?.tag ?? entity?.[`${WFRUN}tag`])
+  const sha256 = stringOf(entity?.sha256 ?? entity?.[`${WFRUN}sha256`])
+  const rawUrl = stringOf(entity?.url)
+  const url = rawUrl && /^https?:\/\//i.test(rawUrl) ? rawUrl : undefined
+  return name || reference || registry || tag || sha256 || url
+    ? { id, name, reference, registry, tag, sha256, url }
+    : undefined
+}
+
+function workspaceOf(
+  value: unknown,
+  byId: Map<string, Record<string, unknown>>,
+): string | undefined {
+  for (const id of refIdsOf(value)) {
+    const property = byId.get(id)
+    if (stringOf(property?.propertyID) === WORKSPACE_PROPERTY_ID) return stringOf(property?.value)
+  }
+  return undefined
 }
 
 // Actual crates carry the schema.org local name; tolerate full IRIs too.
@@ -115,6 +175,7 @@ export function parseRunCrate(crate: unknown, documentPath: string): RunCrateMod
   const descriptor = byId.get('ro-crate-metadata.json')
   const rootId = idOf(descriptor?.about)
   const root = rootId ? byId.get(rootId) : undefined
+  if (!refIdsOf(root?.conformsTo).includes(PROCESS_RUN_PROFILE_URI)) return null
   const mentionedId = idOf(root?.mentions)
   const mentioned = mentionedId ? byId.get(mentionedId) : undefined
   const action =
@@ -138,16 +199,17 @@ export function parseRunCrate(crate: unknown, documentPath: string): RunCrateMod
 
   return {
     runId,
+    name: stringOf(root?.name),
     actionName: stringOf(action.name),
-    image: stringOf(action.instrument),
-    command: stringListOf(action.command),
+    command: stringOf(action.description),
+    instrument: instrumentOf(action.instrument, byId),
+    container: containerOf(action.containerImage ?? action[`${WFRUN}containerImage`], byId),
     actionStatus: actionStatusOf(action.actionStatus),
     startTime: stringOf(action.startTime),
     endTime: stringOf(action.endTime),
     error: stringOf(action.error),
     agent,
-    // Deterministic bucket name, mirroring JobRecord::workspace_bucket_name.
-    workspaceBucket: runId ? `ws-${runId.toLowerCase()}` : undefined,
+    workspaceBucket: workspaceOf(action.additionalProperty, byId),
     inputs: refIdsOf(action.object).map((id) => fileRef(id, byId)),
     outputs: refIdsOf(action.result).map((id) => fileRef(id, byId)),
   }
