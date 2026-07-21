@@ -37,7 +37,7 @@
     --border: 223 16% 91%; /* #E5E7EC */
     --input: 218 14% 84%; /* #D1D5DC */
     --field: 0 0% 100%; /* input surfaces */
-    --ring: 199 80% 52%; /* #24A9E6 sky blue */
+    --ring: 202 90% 42%; /* #0B85CB deep sky — 3.7:1 on bg for a visible focus ring */
 
     --radius: 0.5rem; /* cards 8 · buttons 6 · badges 4 · panels 10 */
   }
@@ -59,17 +59,17 @@
     --secondary: 240 9% 13%; /* #1E1E24 */
     --secondary-foreground: 224 20% 82%; /* #C7CCDA */
 
-    --muted: 240 8% 12%; /* #1C1C21 */
-    --muted-foreground: 223 16% 60%; /* #8891A8 */
+    --muted: 240 7% 15%; /* #232329 — lifted so subtle fills/hovers read on near-black */
+    --muted-foreground: 223 18% 66%; /* #99A2B8 — 7.1:1 on card, comfortably AA */
 
-    --accent: 222 27% 19%; /* blue-tinted hover */
+    --accent: 221 39% 30%; /* #2F426A — visible blue-tinted hover (was near-invisible @19%) */
     --accent-foreground: 223 33% 96%;
 
     --destructive: 0 84% 60%; /* #ef4444 */
     --destructive-foreground: 223 33% 96%;
 
-    --border: 240 7% 16%; /* #26262C ≈ white @ 7% */
-    --input: 240 7% 21%; /* #32323A ≈ white @ 10% */
+    --border: 240 6% 26%; /* #3E3E46 — clearer structural edges (was #26262C, ~1.3:1) */
+    --input: 240 6% 34%; /* #51515C — interactive control edge, ~2.5:1 (was ~1.5:1) */
     --field: 240 8% 12%; /* #1C1C21 input surfaces */
     --ring: 191 67% 60%; /* #55C4DE aqua */
   }
