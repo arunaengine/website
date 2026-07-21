@@ -119,5 +119,15 @@ export function useBucketShortcuts() {
     }))
   }
 
-  return { pinned, recent, isPinned, togglePin, recordRecent }
+  // Drops a bucket from both lists at once, e.g. after it is deleted so no
+  // stale pin or "recently browsed" row points at a bucket that is gone.
+  function remove(bucket: string, nodeId: string | null = null) {
+    const entry: BucketShortcut = { bucket, nodeId }
+    update((current) => ({
+      pinned: current.pinned.filter((pin) => !sameShortcut(pin, entry)),
+      recent: current.recent.filter((item) => !sameShortcut(item, entry)),
+    }))
+  }
+
+  return { pinned, recent, isPinned, togglePin, recordRecent, remove }
 }

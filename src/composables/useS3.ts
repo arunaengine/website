@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import {
   CreateBucketCommand,
+  DeleteBucketCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
@@ -14,6 +15,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { parseS3Url } from '@/lib/tes'
 import { useAruna } from './useAruna'
 
 export interface S3Key {
@@ -109,6 +111,24 @@ function endpointForNode(nodeId?: string | null): string | null {
   if (!nodeId || nodeId === nodeInfo.value?.node.peer_id) return endpoint.value
   const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === nodeId)
   return node?.info?.urls?.s3 ?? null
+}
+
+// Maps a path-style object URL (as stored in profile-crate `contentUrl`s) back to
+// the bucket/key/node an authenticated GetObject needs. Tries the connected
+// node's endpoint first, then every realm node's published S3 endpoint, so a
+// crate published on a remote node still resolves. Returns null for hosts that
+// belong to no known node, the genuinely external URLs a browser must fetch
+// directly.
+function resolveObjectUrl(url: string): { bucket: string; key: string; nodeId: string | null } | null {
+  const local = parseS3Url(url, endpoint.value)
+  if (local) return { ...local, nodeId: null }
+  for (const node of realmInfo.value?.nodes ?? []) {
+    const nodeEndpoint = node.info?.urls?.s3
+    if (!nodeEndpoint) continue
+    const parsed = parseS3Url(url, nodeEndpoint)
+    if (parsed) return { ...parsed, nodeId: node.node_id }
+  }
+  return null
 }
 
 function client(nodeId?: string | null): S3Client {
@@ -452,6 +472,15 @@ async function deletePrefix(
   return { deleted, errors }
 }
 
+// Removes the bucket itself. S3 only drops an EMPTY bucket, so callers empty it
+// first (deletePrefix with a bare '' prefix walks and batch-deletes every key).
+// A versioning-enabled store keeps noncurrent versions and delete markers after
+// that purge and rejects this call with "BucketNotEmpty", surfaced distinctly
+// via isS3BucketNotEmptyError so the UI can explain the leftover versions.
+async function deleteBucket(bucket: string, nodeId?: string | null): Promise<void> {
+  await client(nodeId).send(new DeleteBucketCommand({ Bucket: bucket }))
+}
+
 // Single-object HEAD, mainly for the user metadata: reference-backed objects
 // expose aruna-last-refresh / aruna-source-etag there (lib/references.ts).
 async function headObject(bucket: string, key: string, nodeId?: string | null): Promise<ObjectHead> {
@@ -497,6 +526,16 @@ export function s3ErrorMessage(err: unknown): string {
     if (error.message) return error.message
   }
   return String(err)
+}
+
+// DeleteBucket refuses a non-empty bucket with the S3 code "BucketNotEmpty"
+// (HTTP 409). After a full object purge this only happens on a versioning-
+// enabled store, where noncurrent versions and delete markers survive the
+// version-less DeleteObjects batches, a case the browser cannot clear.
+export function isS3BucketNotEmptyError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const error = err as { name?: string; Code?: string }
+  return error.name === 'BucketNotEmpty' || error.Code === 'BucketNotEmpty'
 }
 
 const S3_AUTH_ERROR_NAMES = new Set([
@@ -551,6 +590,7 @@ export function useS3() {
     hasActiveKey,
     endpoint,
     endpointForNode,
+    resolveObjectUrl,
     setActiveKey,
     clearActiveKey,
     listBuckets,
@@ -563,6 +603,7 @@ export function useS3() {
     uploadObject,
     deleteObject,
     deletePrefix,
+    deleteBucket,
     headObject,
     downloadUrl,
     getObjectText,

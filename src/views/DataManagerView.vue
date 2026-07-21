@@ -30,7 +30,7 @@ import { useStaging } from '@/composables/useStaging'
 import { useStagingReferences } from '@/composables/useStagingReferences'
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import { featureEnabled } from '@/lib/config'
-import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
+import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3BucketNotEmptyError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
@@ -349,6 +349,27 @@ type DeleteTarget =
 const deleteTarget = ref<DeleteTarget | null>(null)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
+
+// Bucket deletion is destructive and irreversible (it removes the container and
+// every object inside), so it gets its own type-to-confirm dialog rather than
+// the single-click object/folder delete above.
+interface BucketDeleteTarget {
+  bucket: string
+  nodeId: string | null
+  /** Object count under the bucket; null while the walk runs, -1 when unknown. */
+  count: number | null
+  /** Summed size of the counted objects; a lower bound when countTruncated. */
+  bytes: number
+  countTruncated: boolean
+}
+const bucketDeleteTarget = ref<BucketDeleteTarget | null>(null)
+const bucketDeleteBusy = ref(false)
+const bucketDeleteError = ref<string | null>(null)
+const bucketDeleteConfirm = ref('')
+// The typed name must match exactly before the destructive action unlocks.
+const bucketDeleteConfirmed = computed(
+  () => bucketDeleteTarget.value !== null && bucketDeleteConfirm.value === bucketDeleteTarget.value.bucket,
+)
 
 const newFolderOpen = ref(false)
 const newFolderName = ref('')
@@ -895,6 +916,68 @@ async function confirmDelete() {
   }
 }
 
+// Bucket delete only exposes local (connected-node) buckets: a remote node's S3
+// endpoint is often CORS-blocked from this origin, so a browser-side DeleteBucket
+// there would fail confusingly. openDeleteBucket also kicks off the object walk
+// that fills the dialog's "contains N objects, X" line.
+function openDeleteBucket(name: string, nodeId: string | null) {
+  bucketDeleteError.value = null
+  bucketDeleteConfirm.value = ''
+  bucketDeleteTarget.value = { bucket: name, nodeId, count: null, bytes: 0, countTruncated: false }
+  void resolveBucketStats(name, nodeId)
+}
+
+async function resolveBucketStats(name: string, nodeId: string | null) {
+  try {
+    const result = await s3.listObjectsRecursive(name, '', FOLDER_COUNT_LIMIT, nodeId)
+    const target = bucketDeleteTarget.value
+    if (target?.bucket !== name || target.nodeId !== nodeId) return
+    target.count = result.objects.length
+    target.bytes = result.objects.reduce((sum, object) => sum + (object.size ?? 0), 0)
+    target.countTruncated = result.truncated
+  } catch {
+    // The count stays unknown; deleting is still possible (empty via purge).
+    const target = bucketDeleteTarget.value
+    if (target?.bucket === name && target.nodeId === nodeId) target.count = -1
+  }
+}
+
+async function confirmDeleteBucket() {
+  const target = bucketDeleteTarget.value
+  if (!target || !bucketDeleteConfirmed.value) return
+  bucketDeleteBusy.value = true
+  bucketDeleteError.value = null
+  try {
+    // S3 only removes an empty bucket. Skip the purge only when the walk proved
+    // it empty; otherwise batch-delete every object first (deletePrefix paginates
+    // and DeleteObjects in 1000-key batches, reused from the folder delete).
+    const knownEmpty = target.count === 0 && !target.countTruncated
+    if (!knownEmpty) {
+      const result = await s3.deletePrefix(target.bucket, '', target.nodeId)
+      if (result.errors.length) {
+        const first = result.errors[0]
+        bucketDeleteError.value = `${result.deleted} object${result.deleted === 1 ? '' : 's'} deleted, ${result.errors.length} could not be removed, so the bucket was kept. First failure: ${first.key}: ${first.message}`
+        return
+      }
+    }
+    await s3.deleteBucket(target.bucket, target.nodeId)
+    shortcuts.remove(target.bucket, target.nodeId)
+    const wasOpen = bucket.value === target.bucket && remoteNodeId.value === target.nodeId
+    bucketDeleteTarget.value = null
+    bucketDeleteConfirm.value = ''
+    // Leave the dead bucket's route before refreshing so the listing is clean.
+    if (wasOpen) await router.push({ name: 'buckets' })
+    await refreshBuckets()
+    void loadSyncOverview()
+  } catch (err) {
+    bucketDeleteError.value = isS3BucketNotEmptyError(err)
+      ? 'The bucket still holds data after the purge. This usually means object versioning is enabled, so older versions and delete markers remain that the browser cannot remove. Ask a node administrator to delete it.'
+      : s3ErrorMessage(err)
+  } finally {
+    bucketDeleteBusy.value = false
+  }
+}
+
 const isEmpty = computed(
   () => !listLoading.value && !listError.value && !folders.value.length && !objects.value.length,
 )
@@ -1003,7 +1086,22 @@ const isEmpty = computed(
                     :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
                     @open="openBucketOn(entry.bucket, entry.nodeId)"
                     @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
-                  />
+                  >
+                    <!-- Delete is offered for local buckets only; remote S3
+                         endpoints are usually CORS-blocked from this origin. -->
+                    <template v-if="entry.nodeId === null" #actions>
+                      <button
+                        type="button"
+                        class="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
+                        :title="`Delete ${entry.bucket}`"
+                        :aria-label="`Delete bucket ${entry.bucket}`"
+                        @mousedown.prevent
+                        @click="openDeleteBucket(entry.bucket, entry.nodeId)"
+                      >
+                        <Trash2 class="h-3 w-3" />
+                      </button>
+                    </template>
+                  </BucketRow>
                 </li>
               </ul>
               <p v-else class="px-4 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
@@ -1405,6 +1503,56 @@ const isEmpty = computed(
         <DialogFooter>
           <DialogClose><Button variant="outline" :disabled="deleteBusy">Cancel</Button></DialogClose>
           <Button variant="destructive" :disabled="deleteBusy" @click="confirmDelete">{{ deleteBusy ? 'Deleting…' : 'Delete' }}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog
+      :open="bucketDeleteTarget !== null"
+      @update:open="(v: boolean) => { if (!v && !bucketDeleteBusy) { bucketDeleteTarget = null; bucketDeleteConfirm = '' } }"
+    >
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete bucket</DialogTitle>
+          <DialogDescription v-if="bucketDeleteTarget">
+            Permanently deletes the bucket <span class="font-mono text-xs">{{ bucketDeleteTarget.bucket }}</span> and everything stored in it. This cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <div v-if="bucketDeleteTarget" class="space-y-3 text-xs">
+          <p v-if="bucketDeleteTarget.count === null" class="flex items-center gap-2 text-muted-foreground">
+            <Loader2 class="h-3 w-3 animate-spin" /> Checking bucket contents…
+          </p>
+          <p v-else-if="bucketDeleteTarget.count === 0" class="text-muted-foreground">This bucket is empty.</p>
+          <div
+            v-else-if="bucketDeleteTarget.count > 0"
+            class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive"
+          >
+            Deletes {{ bucketDeleteTarget.count }}{{ bucketDeleteTarget.countTruncated ? '+' : '' }} object{{ bucketDeleteTarget.count === 1 && !bucketDeleteTarget.countTruncated ? '' : 's' }}<template v-if="bucketDeleteTarget.bytes > 0"> ({{ bucketDeleteTarget.countTruncated ? 'at least ' : '' }}{{ formatBytes(bucketDeleteTarget.bytes) }})</template>. ALL contents are removed before the bucket itself.
+          </div>
+          <p v-else class="text-muted-foreground">
+            The contents could not be listed. Any objects present are removed before the bucket is deleted.
+          </p>
+          <div class="space-y-1">
+            <label class="block text-muted-foreground">
+              Type <span class="font-mono text-foreground">{{ bucketDeleteTarget.bucket }}</span> to confirm.
+            </label>
+            <Input
+              v-model="bucketDeleteConfirm"
+              class="font-mono text-xs"
+              autocomplete="off"
+              placeholder="bucket name"
+              @keyup.enter="confirmDeleteBucket"
+            />
+          </div>
+        </div>
+        <p v-if="bucketDeleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ bucketDeleteError }}</p>
+        <DialogFooter>
+          <DialogClose><Button variant="outline" :disabled="bucketDeleteBusy">Cancel</Button></DialogClose>
+          <Button
+            variant="destructive"
+            :disabled="!bucketDeleteConfirmed || bucketDeleteBusy"
+            @click="confirmDeleteBucket"
+          >{{ bucketDeleteBusy ? 'Deleting…' : 'Delete bucket' }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
