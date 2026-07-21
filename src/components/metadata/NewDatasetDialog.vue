@@ -31,9 +31,12 @@ import {
 } from '@/lib/profiles/entityEntries'
 import { licenseEntity, parseProfileCrate } from '@/lib/profiles/rocrate'
 import { schemaFromPropertyRules } from '@/lib/profiles/schema'
+import { mapShaclFindings } from '@/lib/shacl/mapFindings'
+import { useShaclValidation } from '@/lib/shacl/useShaclValidation'
+import type { ShaclFinding } from '@/lib/shacl/findings'
 import { buildProfileContext, isSchemaOrgUri } from '@/lib/profiles/propertyCatalog'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
-import { isAbsoluteUri, isInvalidReferenceUri, REFERENCE_URI_MESSAGE } from '@/lib/profiles/uri'
+import { isAbsoluteUri, isInvalidReferenceUri, REFERENCE_URI_MESSAGE, termNameFromUri } from '@/lib/profiles/uri'
 import { validateProfileData, validateRequiredInstances } from '@/lib/profiles/validate'
 import {
   DX_PROFILE,
@@ -102,6 +105,10 @@ const generatedValues = ref<Record<string, unknown>>({})
 // or a reuse reference (external URI / crate data-reference id), per the
 // rule's entitySources policy (plan Phase 4).
 const entityEntries = ref<Record<string, EntityEntry[]>>({})
+// SHACL shapes texts of the active profile (generated shapes.ttl + attached
+// shapes.custom.ttl), driving the deep-validation worker. Empty when the
+// profile carries none (e.g. a legacy v2 crate): deep validation then stays off.
+const profileShapes = ref<string[]>([])
 const profileLoading = ref(false)
 const profileLoadError = ref<string | null>(null)
 // True when the full-crate load (or its S3 artifact resolution) FAILED — as
@@ -348,9 +355,11 @@ const entityEntryErrorCount = computed(() => {
 
 // Schema presence / cardinality violations that target a hasPart rule, surfaced at
 // the Data references section (hasPart has no generic control of its own).
-const hasPartSchemaViolations = computed(() =>
-  profileViolations.value.filter((violation) => hasPartProperties.value.has(violation.fieldId ?? '')),
-)
+// Mapped deep-validation findings for hasPart append here too (display-only).
+const hasPartSchemaViolations = computed(() => [
+  ...profileViolations.value.filter((violation) => hasPartProperties.value.has(violation.fieldId ?? '')),
+  ...[...hasPartProperties.value].flatMap((property) => shaclViolationsFor(property)),
+])
 
 const profileInputCount = computed(() => generatedScalarControls.value.length + entityControls.value.length)
 
@@ -448,12 +457,17 @@ const scaffoldFieldErrors = computed<Record<string, string>>(() => {
 
 // Profile violations that target the built-in fields (a profile may validate
 // name/description/datePublished/license too); attached to the scaffold inputs.
+// Deep-validation findings mapped to these fields ride along (display-only,
+// already deduplicated against the bespoke set).
 const builtInViolations = computed<Record<string, ProfileViolation[]>>(() => {
   const map: Record<string, ProfileViolation[]> = {}
   for (const violation of profileViolations.value) {
     const fieldId = violation.fieldId ?? ''
     if (!builtInDatasetKeys.has(fieldId)) continue
     ;(map[fieldId] ??= []).push(violation)
+  }
+  for (const [fieldId, violations] of Object.entries(shaclMapped.value.inline)) {
+    if (builtInDatasetKeys.has(fieldId)) (map[fieldId] ??= []).push(...violations)
   }
   return map
 })
@@ -496,6 +510,60 @@ const scaffoldClaimedKeys = computed(() =>
     .filter((property) => !(property === 'license' && licenseControl.value)),
 )
 
+// --- Deep validation (plan section 8): the exact crate JSON buildRoCrate
+// would save, validated against the profile's SHACL shapes in a lazy worker.
+// Debounced on every form change while a profile with shapes is active, plus
+// the explicit "Validate against profile" action. Findings NEVER gate
+// submission — the bespoke validator above stays the synchronous first line.
+const {
+  findings: shaclFindings,
+  running: shaclRunning,
+  unavailable: shaclUnavailable,
+  error: shaclError,
+  validate: shaclValidate,
+  validateNow: shaclValidateNow,
+  reset: shaclReset,
+} = useShaclValidation()
+
+// Reactive snapshot of the crate to validate; JSON-cloned before posting so no
+// reactive proxy ever crosses the worker boundary.
+const crateForValidation = computed(() => (profileShapes.value.length && !profileLoading.value ? buildRoCrate() : null))
+watch(crateForValidation, (crate) => {
+  if (!props.open || !crate) return
+  shaclValidate({ crate: JSON.parse(JSON.stringify(crate)), shapes: profileShapes.value, rootId: './' })
+})
+
+function validateAgainstProfile() {
+  if (!profileShapes.value.length) return
+  shaclValidateNow({ crate: JSON.parse(JSON.stringify(buildRoCrate())), shapes: profileShapes.value, rootId: './' })
+}
+
+// Findings resolvable to a rendered Dataset control render inline next to it,
+// deduplicated against the bespoke messages by field + severity; the rest
+// lands in the conformance panel below, grouped by severity.
+const shaclMapped = computed(() => mapShaclFindings(shaclFindings.value, profileDatasetRules.value, profileViolations.value))
+function shaclViolationsFor(property: string): ProfileViolation[] {
+  return shaclMapped.value.inline[property] ?? []
+}
+const shaclPanelGroups = computed(() => {
+  const groups: Array<{ severity: ShaclFinding['severity']; label: string; findings: ShaclFinding[] }> = [
+    { severity: 'error', label: 'Errors', findings: [] },
+    { severity: 'warning', label: 'Warnings', findings: [] },
+    { severity: 'info', label: 'Notes', findings: [] },
+  ]
+  for (const finding of shaclMapped.value.panel) {
+    groups.find((group) => group.severity === finding.severity)?.findings.push(finding)
+  }
+  return groups.filter((group) => group.findings.length)
+})
+const shaclInlineCount = computed(() => Object.values(shaclMapped.value.inline).reduce((total, list) => total + list.length, 0))
+
+// Where a panel finding sits: crate-local focus id plus the property short name.
+function findingLocation(finding: ShaclFinding): string {
+  const focus = finding.focusId === './' ? 'Dataset' : finding.focusId
+  return finding.path ? `${focus} · ${termNameFromUri(finding.path)}` : focus
+}
+
 watch(
   () => props.open,
   (open) => {
@@ -535,7 +603,7 @@ async function loadSelectedProfileSchema() {
   if (!profile) return
 
   // Apply the summary-parsed rules immediately, then refine from the full crate.
-  applyParsedProfile(profile.entityRules, profile.propertyRules, profile.schema, profile.contextTerms)
+  applyParsedProfile(profile.entityRules, profile.propertyRules, profile.schema, profile.contextTerms, shapesList(profile.shapesText, profile.customShapesText))
   if (!profile.documentId) return
 
   profileLoading.value = true
@@ -545,7 +613,7 @@ async function loadSelectedProfileSchema() {
     const rocrate = await loadRoCrate(profile.documentId)
     if (token !== profileLoadToken) return
     const parsed = parseProfileCrate(rocrate)
-    applyParsedProfile(parsed.entityRules, parsed.datasetPropertyRules, parsed.schema, parsed.contextTerms)
+    applyParsedProfile(parsed.entityRules, parsed.datasetPropertyRules, parsed.schema, parsed.contextTerms, shapesList(parsed.shapesText, parsed.customShapesText))
     if (!parsed.schema && !parsed.entityRules.length) profileLoadError.value = 'Selected profile has no machine-readable rules.'
   } catch (err) {
     if (token !== profileLoadToken) return
@@ -564,6 +632,8 @@ function resetGeneratedProfileFields() {
   profileContextTerms.value = {}
   generatedValues.value = {}
   entityEntries.value = {}
+  profileShapes.value = []
+  shaclReset()
   profileLoadError.value = null
   profileLoadFailed.value = false
   // Clear the in-flight flag too, so switching to "No profile reference" mid-load
@@ -571,12 +641,18 @@ function resetGeneratedProfileFields() {
   profileLoading.value = false
 }
 
+function shapesList(...texts: Array<string | undefined>): string[] {
+  return texts.filter((text): text is string => Boolean(text?.trim()))
+}
+
 function applyParsedProfile(
   entityRules: ProfileEntityRule[],
   datasetPropertyRules: ProfilePropertyRule[],
   schema: JsonSchema | undefined,
   contextTerms: Record<string, string> | undefined,
+  shapes: string[],
 ) {
+  profileShapes.value = shapes
   profileSchema.value = schema
   profileDatasetRules.value = datasetPropertyRules
   profileEntityRules.value = entityRules
@@ -1071,7 +1147,7 @@ async function submit() {
               :key="control.property"
               :control="control"
               :model-value="generatedValues[control.property]"
-              :violations="profileViolations.filter((item) => item.fieldId === control.property)"
+              :violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...shaclViolationsFor(control.property)]"
               :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
               @update:model-value="(value: unknown) => setGeneratedValue(control.property, value)"
             />
@@ -1082,7 +1158,7 @@ async function submit() {
               :sub-controls="entitySubControls[control.property] ?? []"
               :entries="entityEntries[control.property] ?? []"
               :entry-violations="entityEntryViolations[control.property] ?? []"
-              :presence-violations="profileViolations.filter((item) => item.fieldId === control.property)"
+              :presence-violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...shaclViolationsFor(control.property)]"
               :type-label="entityTypeLabelFor(control)"
               :crate-options="crateOptions"
               @add-new="addEntityEntry(control, 'new')"
@@ -1161,6 +1237,50 @@ async function submit() {
             {{ violation.message }}
           </p>
         </div>
+        <!-- Profile conformance: deep SHACL validation of the crate about to be
+             saved. Advisory only — findings never gate submission. -->
+        <div v-if="profileId && profileShapes.length" class="rounded-md border border-border p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs font-medium text-foreground">Profile conformance</p>
+            <div class="flex items-center gap-2">
+              <span v-if="shaclRunning" class="text-[11px] text-muted-foreground">Checking…</span>
+              <Button type="button" variant="outline" size="sm" :disabled="shaclUnavailable || shaclRunning" @click="validateAgainstProfile">
+                Validate against profile
+              </Button>
+            </div>
+          </div>
+          <p v-if="shaclUnavailable" class="mt-2 text-[11px] text-muted-foreground">
+            Deep validation is unavailable in this browser session; the form checks above still apply unchanged.
+          </p>
+          <p v-else-if="shaclError" class="mt-2 text-[11px] text-destructive">Deep validation failed: {{ shaclError }}</p>
+          <template v-else>
+            <p v-if="!shaclFindings.length" class="mt-2 text-[11px] text-muted-foreground">
+              No conformance findings against the profile's shapes.
+            </p>
+            <p v-else-if="shaclInlineCount && !shaclPanelGroups.length" class="mt-2 text-[11px] text-muted-foreground">
+              All findings are shown inline at their fields above.
+            </p>
+            <div v-for="group in shaclPanelGroups" :key="group.severity" class="mt-2">
+              <p
+                class="text-[11px] font-medium"
+                :class="group.severity === 'error' ? 'text-destructive' : group.severity === 'warning' ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'"
+              >
+                {{ group.label }}
+              </p>
+              <ul class="mt-1 space-y-1">
+                <li
+                  v-for="(finding, index) in group.findings"
+                  :key="`${finding.sourceShape}${finding.focusId}${index}`"
+                  class="text-[11px]"
+                  :class="group.severity === 'error' ? 'text-destructive' : group.severity === 'warning' ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'"
+                >
+                  <span class="font-medium">{{ findingLocation(finding) }}:</span> {{ finding.message }}
+                </li>
+              </ul>
+            </div>
+          </template>
+        </div>
+
         <label class="flex items-center justify-between rounded-md border border-border p-3 text-sm">
           <span>
             Public metadata
