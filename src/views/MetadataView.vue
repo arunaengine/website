@@ -315,14 +315,15 @@ const relatedDocs = computed<RelatedDocRow[]>(() => {
   const rootId = crateRootId(crate)
   const root = rootId ? g.find((e) => e['@id'] === rootId) : undefined
   if (!root) return []
-  const internalIds = new Set(g.map((entity) => stringProp(entity['@id'])).filter(Boolean))
   const rows: RelatedDocRow[] = []
   const seen = new Set<string>()
   for (const property of ['mentions', 'citation', 'about'] as const) {
     const refs = root[property]
     for (const ref of Array.isArray(refs) ? refs : refs ? [refs] : []) {
       const iri = stringProp(ref)
-      if (!iri || seen.has(iri) || internalIds.has(iri)) continue
+      // Crate-local fragments (a run crate's own #run action) are internal
+      // wiring; related documents have in-graph stubs and must still render.
+      if (!iri || seen.has(iri) || iri.startsWith('#')) continue
       seen.add(iri)
       const item = metadataItems.value.find((entry) => entry.graph_iri === iri || entry.document_id === iri)
       const entity = g.find((e) => e['@id'] === iri)
