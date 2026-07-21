@@ -150,6 +150,8 @@ async function downloadProfileCrate(profile: MetadataProfile) {
           license: '',
           entityRules: profile.entityRules,
           importedMode: profile.mode ?? undefined,
+          // An attached shapes.custom.ttl survives the best-effort rebuild too.
+          customShapesText: profile.customShapesText,
         })
   downloadJson(finalCrate, `${profile.id}.crate.json`)
 }

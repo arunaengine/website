@@ -67,6 +67,7 @@ async function fromStored() {
       mode: profile.mode ?? null,
       kind: 'crate',
       preservedKeys: preservedKeys(profile.mode),
+      customShapesText: profile.customShapesText,
     }
     if (props.builder.hasEdits) {
       pendingImport.value = result

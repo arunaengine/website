@@ -6,18 +6,49 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
-import { CheckCircle2, AlertTriangle, Lightbulb } from '@lucide/vue'
+import { CheckCircle2, AlertTriangle, ChevronDown, FileCode2, Lightbulb, Repeat2 } from '@lucide/vue'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
-import { entityRulesToMode } from '@/lib/profiles/mode'
-import { parseProfileCrate } from '@/lib/profiles/rocrate'
+import { buildProfileArtifactTexts, parseProfileCrate } from '@/lib/profiles/rocrate'
 import { validateProfileData } from '@/lib/profiles/validate'
-import { obligationBadgeVariant, PROFILE_ENTITY_SOURCE_LABELS, PROFILE_OBLIGATION_LABELS } from '@/lib/profiles/labels'
+import { obligationBadgeVariant, PROFILE_ENTITY_SOURCE_LABELS, PROFILE_OBLIGATION_LABELS, PROFILE_VALUE_KIND_LABELS } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import type { ProfileBuilder } from './useProfileBuilder'
 
 const props = defineProps<{ builder: ProfileBuilder }>()
 const builder = props.builder
+
+// Readable rule sentences (the plan 6.2 outline shape), leading the review so
+// authors verify their intent before any raw artifact appears.
+const ruleSentences = computed(() =>
+  builder.normalizedEntities.map((entity) => ({
+    key: entity.id,
+    label: entity.label,
+    type: entity.type,
+    rules: entity.propertyRules.map((rule) => ({
+      key: rule.id,
+      obligation: rule.obligation,
+      label: rule.label || rule.valueName,
+      target:
+        rule.kind === 'entity'
+          ? `references ${(rule.entityTypes ?? []).map((type) => entityTypeLabel(type)).filter(Boolean).join(' or ') || 'an entity'}`
+          : PROFILE_VALUE_KIND_LABELS[rule.kind] ?? rule.kind,
+      repeatable: rule.kind === 'keyword-list' || Boolean(rule.multipleValues),
+    })),
+  })),
+)
+
+// All raw artifacts live under ONE collapsed disclosure (plan 6.1 Review);
+// texts come from the same emitter the crate embeds, so they can never drift.
+const generatedFilesOpen = ref(false)
+const artifactTexts = computed(() =>
+  buildProfileArtifactTexts({
+    ...builder.profileBasics(),
+    entityRules: builder.normalizedEntities,
+    importedMode: builder.importedMode ?? undefined,
+    customShapesText: builder.customShapesText.trim() ? builder.customShapesText : undefined,
+  }),
+)
 
 // Plain-English lines for every constraint the schema/mode preview cannot show at
 // a glance: allowed URL sets, list cardinality, reference mode, required contents.
@@ -78,16 +109,6 @@ const previewSchema = computed(() => roundTrip.value.parsed?.schema ?? builder.g
 const values = ref<Record<string, unknown>>({})
 watch(controls, (list) => { values.value = defaultControlValues(list) }, { immediate: true })
 
-// Pretty-printed Describo/Crate-O mode file — the canonical machine-readable rule
-// serialization, including any verbatim-preserved keys from an imported mode.
-const modeText = computed(() =>
-  JSON.stringify(
-    entityRulesToMode(builder.profileBasics(), builder.normalizedEntities, builder.importedMode ?? undefined),
-    null,
-    2,
-  ),
-)
-
 const normalizedValues = computed(() => normalizeProfileValues(values.value, controls.value))
 const violations = computed(() => validateProfileData(previewSchema.value, normalizedValues.value))
 
@@ -121,6 +142,23 @@ function violationsFor(property: string) {
       </ul>
     </div>
 
+    <!-- Readable rule sentences: what the profile requires, per entity. -->
+    <div class="rounded-lg border border-border p-3">
+      <div class="text-sm font-medium text-foreground">Rules</div>
+      <div v-for="entity in ruleSentences" :key="entity.key" class="mt-2">
+        <div class="text-xs font-medium text-muted-foreground">{{ entity.label }}</div>
+        <p v-if="!entity.rules.length" class="mt-1 text-[11px] text-muted-foreground">No property rules.</p>
+        <ul v-else class="mt-1 space-y-1">
+          <li v-for="rule in entity.rules" :key="rule.key" class="flex flex-wrap items-center gap-1.5 text-[11px] text-foreground">
+            <Badge :variant="obligationBadgeVariant(rule.obligation)" class="text-[10px]">{{ rule.obligation }}</Badge>
+            <span class="font-medium">{{ rule.label }}</span>
+            <span class="text-muted-foreground">{{ rule.target }}</span>
+            <span v-if="rule.repeatable" class="inline-flex items-center gap-0.5 text-muted-foreground"><Repeat2 class="h-3 w-3" /> repeatable</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
     <!-- Human summary of the constraints the raw artifacts express tersely:
          allowed URL sets, list cardinality, reference mode, required contents. -->
     <div v-if="constraintSummary.length" class="rounded-lg border border-border p-3">
@@ -141,109 +179,130 @@ function violationsFor(property: string) {
       </div>
     </div>
 
-    <!-- What each generated artifact is for (D6). The entity and property rules
-         are the source of truth; these three files are derived from them. -->
-    <p class="text-xs text-muted-foreground">
-      Your rules generate four files:
-      <b class="text-foreground">profile.html</b> is the human-readable specification,
-      <b class="text-foreground">mode.json</b> is the editor form structure (Describo/Crate-O-compatible),
-      <b class="text-foreground">schema.json</b> holds the validation rules, and
-      <b class="text-foreground">shapes.ttl</b> holds SHACL shapes for deep validation. They all travel together in the Profile Crate.
-      Editors read the mode file; validation reads the validation rules, mode files have no vocabulary for constraints or recommended levels.
-    </p>
-
-    <Tabs default-value="preview">
-      <TabsList>
-        <TabsTrigger value="preview">Form preview</TabsTrigger>
-        <TabsTrigger value="schema">Validation rules</TabsTrigger>
-        <TabsTrigger value="mode">Mode file</TabsTrigger>
-        <TabsTrigger value="shapes">SHACL shapes</TabsTrigger>
-        <TabsTrigger value="crate">Profile Crate</TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="preview">
-        <div class="rounded-lg border border-border p-4">
-          <p class="text-xs text-muted-foreground">
-            A read-only preview of the form people see when they create a Dataset with this profile, built by
-            saving your rules into the Profile Crate and reading them back, so it shows exactly what survives
-            (including any documented round-trip simplifications).
-            Required (MUST) values that are empty show an error, recommended (SHOULD) values show an amber warning.
-          </p>
-          <p v-if="roundTrip.error" class="mt-2 text-[11px] text-destructive">
-            The emitted crate could not be parsed back ({{ roundTrip.error }}), the preview below falls back to the in-memory rules.
-          </p>
-          <div v-if="!controls.length" class="mt-3 text-xs text-muted-foreground">
-            The Dataset entity has no property rules yet, so no inputs are generated.
+    <!-- Form preview leads (with the rule sentences) before any raw artifact. -->
+    <div class="rounded-lg border border-border p-4">
+      <div class="text-sm font-medium text-foreground">Form preview</div>
+      <p class="mt-1 text-xs text-muted-foreground">
+        A read-only preview of the form people see when they create a Dataset with this profile, built by
+        saving your rules into the Profile Crate and reading them back, so it shows exactly what survives
+        (including any documented round-trip simplifications).
+        Required (MUST) values that are empty show an error, recommended (SHOULD) values show an amber warning.
+      </p>
+      <p v-if="roundTrip.error" class="mt-2 text-[11px] text-destructive">
+        The emitted crate could not be parsed back ({{ roundTrip.error }}), the preview below falls back to the in-memory rules.
+      </p>
+      <div v-if="!controls.length" class="mt-3 text-xs text-muted-foreground">
+        The Dataset entity has no property rules yet, so no inputs are generated.
+      </div>
+      <div v-else class="mt-3 grid gap-3 sm:grid-cols-2">
+        <!-- Entity references are filled with a sub-form in the dataset dialog;
+             the review preview just names the referenced types. -->
+        <div
+          v-for="control in controls.filter((c) => c.control === 'entity')"
+          :key="control.property"
+          class="sm:col-span-2"
+        >
+          <label class="flex items-center gap-2 text-xs font-medium text-foreground">
+            {{ control.label }}
+            <Badge v-if="control.obligation" :variant="obligationBadgeVariant(control.obligation)" class="text-[10px]">
+              {{ PROFILE_OBLIGATION_LABELS[control.obligation].label }}
+            </Badge>
+          </label>
+          <div class="mt-1 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+            References
+            <span class="font-medium text-foreground">{{ control.entityRule ? entityTypeLabel(control.entityRule.type) : entityTypeLabel(control.entityTypes?.[0] ?? '') || 'an entity' }}</span>
+           , added as {{ control.multiple ? 'one or more sub-forms' : 'a sub-form' }} when creating a dataset.
           </div>
-          <div v-else class="mt-3 grid gap-3 sm:grid-cols-2">
-            <!-- Entity references are filled with a sub-form in the dataset dialog;
-                 the review preview just names the referenced types. -->
-            <div
-              v-for="control in controls.filter((c) => c.control === 'entity')"
-              :key="control.property"
-              class="sm:col-span-2"
-            >
-              <label class="flex items-center gap-2 text-xs font-medium text-foreground">
-                {{ control.label }}
-                <Badge v-if="control.obligation" :variant="obligationBadgeVariant(control.obligation)" class="text-[10px]">
-                  {{ PROFILE_OBLIGATION_LABELS[control.obligation].label }}
-                </Badge>
-              </label>
-              <div class="mt-1 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-                References
-                <span class="font-medium text-foreground">{{ control.entityRule ? entityTypeLabel(control.entityRule.type) : entityTypeLabel(control.entityTypes?.[0] ?? '') || 'an entity' }}</span>
-               , added as {{ control.multiple ? 'one or more sub-forms' : 'a sub-form' }} when creating a dataset.
-              </div>
-              <p
-                v-for="violation in violationsFor(control.property)"
-                :key="violation.ruleId + violation.pointer"
-                class="mt-1 text-[11px]"
-                :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
-              >
-                {{ violation.message }}
-              </p>
-            </div>
-            <ProfileControlField
-              v-for="control in controls.filter((c) => c.control !== 'entity')"
-              :key="control.property"
-              :control="control"
-              :model-value="values[control.property]"
-              :violations="violationsFor(control.property)"
-              disabled
-              :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
-            />
-          </div>
+          <p
+            v-for="violation in violationsFor(control.property)"
+            :key="violation.ruleId + violation.pointer"
+            class="mt-1 text-[11px]"
+            :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
+          >
+            {{ violation.message }}
+          </p>
         </div>
-      </TabsContent>
+        <ProfileControlField
+          v-for="control in controls.filter((c) => c.control !== 'entity')"
+          :key="control.property"
+          :control="control"
+          :model-value="values[control.property]"
+          :violations="violationsFor(control.property)"
+          disabled
+          :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
+        />
+      </div>
+    </div>
 
-      <TabsContent value="schema">
-        <p class="mb-2 text-[11px] text-muted-foreground">Validation rules, value constraints plus which properties are required (MUST) and recommended (SHOULD).</p>
-        <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedSchemaText }}</pre>
-      </TabsContent>
-
-      <TabsContent value="mode">
-        <p class="mb-2 text-[11px] text-muted-foreground">Describo/Crate-O-compatible mode file, form structure only, usable directly in those editors. Constraints and recommended levels stay in the validation rules.</p>
-        <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ modeText }}</pre>
-      </TabsContent>
-
-      <TabsContent value="shapes">
-        <p class="mb-2 text-[11px] text-muted-foreground">
-          Generated SHACL shapes (<code>shapes.ttl</code>), used for deep in-browser validation of dataset crates.
-          <template v-if="builder.customShapesMeta">
-            An attached <code>{{ builder.customShapesMeta.fileName }}</code> travels alongside it verbatim<template v-if="builder.customShapesMeta.shapeCount !== undefined"> ({{ builder.customShapesMeta.shapeCount }} {{ builder.customShapesMeta.shapeCount === 1 ? 'shape' : 'shapes' }})</template>.
-          </template>
+    <!-- All raw artifacts under ONE disclosure (plan 6.1 Review): the rules
+         above are the source of truth; these files are derived from them. -->
+    <div class="rounded-lg border border-border">
+      <button
+        type="button"
+        class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+        :aria-expanded="generatedFilesOpen"
+        @click="generatedFilesOpen = !generatedFilesOpen"
+      >
+        <span class="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+          Generated files
+          <Badge variant="secondary" class="text-[10px]">profile.html · mode.json · schema.json · shapes.ttl</Badge>
+          <!-- Attached deep-validation shapes: read-only chip with count. -->
+          <Badge v-if="builder.customShapesMeta" variant="secondary" class="inline-flex items-center gap-1 text-[10px]">
+            <FileCode2 class="h-3 w-3" /> {{ builder.customShapesMeta.fileName }}<template v-if="builder.customShapesMeta.shapeCount !== undefined"> · {{ builder.customShapesMeta.shapeCount }} {{ builder.customShapesMeta.shapeCount === 1 ? 'shape' : 'shapes' }}</template>
+          </Badge>
+        </span>
+        <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground transition-transform" :class="generatedFilesOpen ? 'rotate-180' : ''" />
+      </button>
+      <div v-if="generatedFilesOpen" class="border-t border-border p-3">
+        <p class="text-xs text-muted-foreground">
+          Your rules generate these files, all traveling together in the Profile Crate:
+          <b class="text-foreground">profile.html</b> is the human-readable specification,
+          <b class="text-foreground">mode.json</b> the editor form structure (Describo/Crate-O-compatible),
+          <b class="text-foreground">schema.json</b> the validation rules, and
+          <b class="text-foreground">shapes.ttl</b> the SHACL shapes for deep validation.
+          Editors read the mode file; validation reads the validation rules, mode files have no vocabulary for constraints or recommended levels.
         </p>
-        <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedShapesText }}</pre>
-        <template v-if="builder.customShapesText.trim()">
-          <p class="mb-2 mt-3 text-[11px] text-muted-foreground">Attached shapes (<code>shapes.custom.ttl</code>), kept verbatim.</p>
-          <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.customShapesText }}</pre>
-        </template>
-      </TabsContent>
+        <Tabs default-value="schema" class="mt-3">
+          <TabsList>
+            <TabsTrigger value="schema">Validation rules</TabsTrigger>
+            <TabsTrigger value="mode">Mode file</TabsTrigger>
+            <TabsTrigger value="html">Description</TabsTrigger>
+            <TabsTrigger value="shapes">SHACL shapes</TabsTrigger>
+            <TabsTrigger value="crate">Profile Crate</TabsTrigger>
+          </TabsList>
 
-      <TabsContent value="crate">
-        <p class="mb-2 text-[11px] text-muted-foreground">The complete profile document that is saved, all generated files travel inside it.</p>
-        <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedCrateText }}</pre>
-      </TabsContent>
-    </Tabs>
+          <TabsContent value="schema">
+            <p class="mb-2 text-[11px] text-muted-foreground">Validation rules (<code>schema.json</code>), value constraints plus which properties are required (MUST) and recommended (SHOULD).</p>
+            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.schema }}</pre>
+          </TabsContent>
+
+          <TabsContent value="mode">
+            <p class="mb-2 text-[11px] text-muted-foreground">Describo/Crate-O-compatible mode file (<code>mode.json</code>), form structure only, usable directly in those editors.</p>
+            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.mode }}</pre>
+          </TabsContent>
+
+          <TabsContent value="html">
+            <p class="mb-2 text-[11px] text-muted-foreground">Human-readable specification (<code>profile.html</code>), the RFC-2119 wording of the rules.</p>
+            <pre class="max-h-72 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.html }}</pre>
+          </TabsContent>
+
+          <TabsContent value="shapes">
+            <p class="mb-2 text-[11px] text-muted-foreground">
+              Generated SHACL shapes (<code>shapes.ttl</code>), used for deep in-browser validation of dataset crates.
+            </p>
+            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.shapes }}</pre>
+            <template v-if="artifactTexts.customShapes">
+              <p class="mb-2 mt-3 text-[11px] text-muted-foreground">Attached shapes (<code>shapes.custom.ttl</code>), kept verbatim.</p>
+              <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.customShapes }}</pre>
+            </template>
+          </TabsContent>
+
+          <TabsContent value="crate">
+            <p class="mb-2 text-[11px] text-muted-foreground">The complete profile document that is saved, all generated files travel inside it.</p>
+            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedCrateText }}</pre>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
   </section>
 </template>

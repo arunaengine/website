@@ -6,7 +6,6 @@ import { deriveEntityObligation, referencesToType, type ModeFile } from '@/lib/p
 import { CURATED_PROPERTY_TERMS, isSchemaOrgUri, mintTermUri } from '@/lib/profiles/propertyCatalog'
 import { CURATED_ENTITY_TYPES, entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { isHasPartUri } from '@/lib/profiles/emit'
-import { shapesFromEntityRules } from '@/lib/shacl/projection'
 import {
   isAbsoluteUri,
   isDatasetType,
@@ -868,7 +867,6 @@ export function useProfileBuilder() {
   )
   const datasetEntity = computed(() => normalizedEntities.value.find((entity) => isDatasetType(entity.type)))
   const generatedSchema = computed(() => schemaFromEntityRules(profileBasics(), normalizedEntities.value))
-  const generatedSchemaText = computed(() => JSON.stringify(generatedSchema.value, null, 2))
   const generatedCrate = computed(() =>
     buildProfileCrate({
       ...profileBasics(),
@@ -878,9 +876,6 @@ export function useProfileBuilder() {
     }),
   )
   const generatedCrateText = computed(() => JSON.stringify(generatedCrate.value, null, 2))
-  // The generated shapes.ttl (dependency-free string projection), for the
-  // review step's raw artifacts area.
-  const generatedShapesText = computed(() => shapesFromEntityRules(profileBasics(), normalizedEntities.value))
 
   // Read-only derived obligation for an entity type: MUST/SHOULD/MAY plus the
   // referencing property that explains the derivation (for the editor badge).
@@ -1170,10 +1165,8 @@ export function useProfileBuilder() {
     normalizedEntities,
     datasetEntity,
     generatedSchema,
-    generatedSchemaText,
     generatedCrate,
     generatedCrateText,
-    generatedShapesText,
     entityObligation,
     entityReferences,
     // validation
