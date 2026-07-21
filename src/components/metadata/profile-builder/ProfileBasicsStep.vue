@@ -77,7 +77,7 @@ async function shapesFromUrl() {
     await attachShapesText(text, target.split('/').pop() || 'shapes.custom.ttl')
   } catch (err) {
     shapesError.value = err instanceof TypeError
-      ? 'Could not fetch that URL. If it is hosted on another server, that server does not allow browser (cross-origin) access. Download the file and upload it instead.'
+      ? 'Could not fetch that URL. If it is hosted on another server (or redirects to one, like a w3id.org id), that server does not allow browser (cross-origin) access. Download the file and upload it instead.'
       : err instanceof Error ? err.message : String(err)
   } finally {
     shapesBusy.value = false

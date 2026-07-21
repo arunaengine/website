@@ -305,6 +305,16 @@ function setCratePending(documentId: string, pending: boolean) {
   cratePending.value = { ...cratePending.value, [documentId]: pending }
 }
 
+// Resolve externalized profile artifacts through the authenticated S3 path
+// (presigned GetObject for portal-owned buckets, node DRS for DRS ids, a raw
+// browser fetch only for genuinely external hosts). Imported lazily because
+// useS3 imports useAruna at module load, so a static import here would form a
+// cycle; by call time both modules are fully initialized.
+async function fetchProfileArtifact(url: string): Promise<string> {
+  const { fetchUrlText } = await import('./useS3')
+  return fetchUrlText(url)
+}
+
 // A 503 from the rocrate export means the graph projection is still
 // materializing (expected right after create), so poll with backoff instead
 // of surfacing an error, and give up with CrateNotReadyError after ~20s.
@@ -325,7 +335,7 @@ async function loadRoCrate(documentId: string): Promise<unknown> {
         // embedding text; fetch that content once here so the synchronous
         // consumers (mapProfile, the dataset dialog) keep reading `text`.
         // Crates without external artifacts pass through untouched.
-        const resolved = await resolveProfileArtifacts(response.rocrate)
+        const resolved = await resolveProfileArtifacts(response.rocrate, fetchProfileArtifact)
         assertCurrentSession(context.epoch)
         fullCrates.value = { ...fullCrates.value, [documentId]: resolved }
         return resolved
@@ -758,11 +768,11 @@ async function listUsers(opts: { limit?: number; startAfter?: string } = {}): Pr
   })
 }
 
-async function runSparql(query: string): Promise<SparqlResult> {
+async function runSparql(query: string, mode: 'local' | 'distributed'): Promise<SparqlResult> {
   const started = performance.now()
   const result = await request<SparqlResponse>('/metadata/sparql/query', {
     method: 'POST',
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, mode }),
   })
   if (result.kind === 'Boolean') {
     return {

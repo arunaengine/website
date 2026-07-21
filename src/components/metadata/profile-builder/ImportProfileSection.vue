@@ -241,7 +241,7 @@ async function fromUrl() {
     // instead, so a TypeError here means an external server that blocks browser
     // access, which no client-side change can work around.
     if (err instanceof TypeError) {
-      error.value = 'Could not fetch that URL. If it is hosted on another server, that server does not allow browser (cross-origin) access. Download the file and use Upload JSON instead.'
+      error.value = 'Could not fetch that URL. If it is hosted on another server (or redirects to one, like a w3id.org id), that server does not allow browser (cross-origin) access. Download the file and use Upload file instead.'
       pendingImport.value = null
     } else {
       fail(err)

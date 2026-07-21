@@ -15,7 +15,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { parseS3Url } from '@/lib/tes'
+import { drsDownloadHref, isDrsReference, parseS3Url } from '@/lib/tes'
 import { useAruna } from './useAruna'
 
 export interface S3Key {
@@ -519,6 +519,41 @@ async function getObjectBlob(bucket: string, key: string, nodeId?: string | null
   return (await fetchObject(bucket, key, nodeId)).blob()
 }
 
+// One profile artifact (or a pasted document itself) fetched as text. A URL that
+// maps to a bucket on one of this realm's nodes is read through an authenticated
+// presigned GetObject, the same signed path the profiles view uses, so it works
+// even when the object is not anonymously public or its bucket predates the
+// public-read CORS rule. A portal DRS id (a w3id data URL or content-hash ARN,
+// not the GA4GH drs:// scheme) resolves through the connected node's own
+// download endpoint rather than following an anonymous w3id.org redirect that
+// drops CORS. Anything else is a genuinely external host, fetched directly by
+// the browser and subject to that host's CORS policy. Shared by the crate
+// importer and the SHACL attach block (via useArtifactFetch) and by
+// loadRoCrate when resolving externalized profile artifacts.
+export async function fetchUrlText(target: string): Promise<string> {
+  const object = hasActiveKey.value ? resolveObjectUrl(target) : null
+  if (object) return getObjectText(object.bucket, object.key, object.nodeId)
+  if (isDrsReference(target) && !/^drs:\/\//i.test(target)) return fetchDrsText(target)
+  const response = await fetch(target)
+  if (!response.ok) throw new Error(`Fetch failed (${response.status} ${response.statusText}).`)
+  return response.text()
+}
+
+// Resolve a portal DRS id through the connected node's GA4GH download endpoint,
+// carrying the bearer token so non-public objects resolve too. The endpoint
+// redirects to a presigned object URL the browser then reads; a remote host that
+// still refuses cross-origin reads surfaces as a TypeError, the same honest CORS
+// gap a raw fetch would hit, so callers can advise download-and-upload.
+async function fetchDrsText(id: string): Promise<string> {
+  const base = apiBaseUrl.value
+  if (!base) throw new Error('Resolving that DRS id needs the node API endpoint, which is not known yet.')
+  const response = await fetch(drsDownloadHref(base, id), {
+    headers: authToken.value ? { Authorization: `Bearer ${authToken.value}` } : {},
+  })
+  if (!response.ok) throw new Error(`DRS resolve failed (${response.status} ${response.statusText}).`)
+  return response.text()
+}
+
 export function s3ErrorMessage(err: unknown): string {
   if (err && typeof err === 'object') {
     const error = err as { name?: string; message?: string }
@@ -608,5 +643,6 @@ export function useS3() {
     downloadUrl,
     getObjectText,
     getObjectBlob,
+    fetchUrlText,
   }
 }
