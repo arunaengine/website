@@ -27,7 +27,6 @@ import { vocabKind, type VocabTerm } from '@/lib/profiles/vocabulary'
 import VocabSuggestions from './VocabSuggestions.vue'
 import type { ProfileEntitySource } from '@/lib/profiles/types'
 import {
-  OBLIGATION_OPTIONS,
   VALUE_KIND_OPTIONS,
   hasPreservedUrlOptions,
   propertyName,
@@ -65,23 +64,13 @@ const structural = computed(() => property.value.lock === 'structural')
 const isEntity = computed(() => property.value.kind === 'entity')
 
 // Which structural baseline rule this is, by term URI — drives the opened
-// affordances. license: obligation MUST↔SHOULD + kind url↔select-url;
-// datePublished: obligation MUST↔SHOULD; name/description: obligation fixed MUST.
+// affordances. license: kind url↔select-url, everything else frozen. The
+// obligation select (and its baseline clamp mirror) lives on PropertyRuleRow,
+// via obligationEditDisabled/obligationOptionsFor in useProfileBuilder.
 const isLicenseRule = computed(() => sameSchemaOrgType(property.value.propertyUri, `${SCHEMA_ORG}license`))
-const isDatePublishedRule = computed(() => sameSchemaOrgType(property.value.propertyUri, `${SCHEMA_ORG}datePublished`))
-// Obligation stays editable on unlocked rules and on structural license/datePublished.
-const obligationDisabled = computed(
-  () => property.value.lock === 'full' || (structural.value && !isLicenseRule.value && !isDatePublishedRule.value),
-)
 // Kind stays editable on unlocked rules; on a structural rule only license switches
 // (url↔select-url), everything else is frozen.
 const kindDisabled = computed(() => property.value.lock === 'full' || (structural.value && !isLicenseRule.value))
-
-// Structural baseline obligation floors at SHOULD (RO-Crate 1.2): license /
-// datePublished are MUST↔SHOULD, never MAY. Non-baseline rules keep all three.
-const obligationOptions = computed(() =>
-  structural.value ? OBLIGATION_OPTIONS.filter((option) => option.value !== 'MAY') : OBLIGATION_OPTIONS,
-)
 
 // select-object is import-only/read-only. select-url IS authorable, so it appears
 // in the dropdown; a structural license is restricted to url↔select-url.

@@ -486,7 +486,6 @@ async function save() {
                 <div class="ml-auto flex items-center gap-2">
                   <label :for="`user-cap-${i}`" class="text-[11px] font-medium text-muted-foreground">Max groups</label>
                   <Input :id="`user-cap-${i}`" v-model="u.max_groups" type="number" min="0" placeholder="Unlimited" class="w-24 text-right" />
-                  <span class="text-[11px] text-muted-foreground">groups</span>
                   <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="removeUserCap(i)"><Trash2 class="h-3.5 w-3.5" /></Button>
                 </div>
               </div>

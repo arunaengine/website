@@ -253,6 +253,23 @@ function clampBaselineObligation(property: DraftPropertyRule): ProfileObligation
   return property.obligation
 }
 
+// UI mirror of clampBaselineObligation, shared by every obligation editor (the
+// row Select today) so the control never offers a choice the emitted profile
+// would silently override: name/description are fixed MUST, license and
+// datePublished float between MUST and SHOULD, unlocked rules keep all three.
+export function obligationEditDisabled(property: DraftPropertyRule): boolean {
+  if (property.lock === 'full') return true
+  if (property.lock !== 'structural') return false
+  const uri = trimmed(property.propertyUri)
+  return !(sameSchemaOrgType(uri, `${SCHEMA_ORG}license`) || sameSchemaOrgType(uri, `${SCHEMA_ORG}datePublished`))
+}
+
+export function obligationOptionsFor(property: DraftPropertyRule): typeof OBLIGATION_OPTIONS {
+  return property.lock === 'structural'
+    ? OBLIGATION_OPTIONS.filter((option) => option.value !== 'MAY')
+    : OBLIGATION_OPTIONS
+}
+
 // ---------------------------------------------------------------------------
 // Factories
 // ---------------------------------------------------------------------------

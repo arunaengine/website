@@ -1527,7 +1527,7 @@ const isEmpty = computed(
             v-else-if="bucketDeleteTarget.count > 0"
             class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive"
           >
-            Deletes {{ bucketDeleteTarget.count }}{{ bucketDeleteTarget.countTruncated ? '+' : '' }} object{{ bucketDeleteTarget.count === 1 && !bucketDeleteTarget.countTruncated ? '' : 's' }}<template v-if="bucketDeleteTarget.bytes > 0"> ({{ bucketDeleteTarget.countTruncated ? 'at least ' : '' }}{{ formatBytes(bucketDeleteTarget.bytes) }})</template>. ALL contents are removed before the bucket itself.
+            Deletes {{ bucketDeleteTarget.count }}{{ bucketDeleteTarget.countTruncated ? '+' : '' }} object{{ bucketDeleteTarget.count === 1 && !bucketDeleteTarget.countTruncated ? '' : 's' }}<template v-if="bucketDeleteTarget.bytes > 0"> ({{ bucketDeleteTarget.countTruncated ? 'at least ' : '' }}{{ formatBytes(bucketDeleteTarget.bytes) }})</template>. All contents are removed before the bucket itself.
           </div>
           <p v-else class="text-muted-foreground">
             The contents could not be listed. Any objects present are removed before the bucket is deleted.

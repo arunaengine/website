@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight, CornerDownRight, ListPlus, Lock, Trash2 } fr
 import { OBLIGATION_ACCENT, PROFILE_VALUE_KIND_LABELS } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { normalizeTypeUri, sameSchemaOrgType } from '@/lib/profiles/uri'
-import { OBLIGATION_OPTIONS, type DraftEntityRule, type DraftPropertyRule, type ProfileBuilder } from './useProfileBuilder'
+import { obligationEditDisabled, obligationOptionsFor, type DraftEntityRule, type DraftPropertyRule, type ProfileBuilder } from './useProfileBuilder'
 import type { ProfileObligation } from '@/lib/profiles/types'
 
 // One compact, sentence-like rule row (plan 6.2): obligation, label, value/target
@@ -36,7 +36,11 @@ watch(
   { immediate: true },
 )
 
-const fullLock = computed(() => props.property.lock === 'full')
+// Mirror the RO-Crate baseline clamp in the UI: name/description are fixed
+// MUST (select disabled), license/datePublished only offer MUST and SHOULD.
+// Without this the select could show a choice normalize silently overrides.
+const obligationDisabled = computed(() => obligationEditDisabled(props.property))
+const obligationOptions = computed(() => obligationOptionsFor(props.property))
 
 const obligationModel = computed<ProfileObligation>({
   get: () => props.property.obligation,
@@ -98,10 +102,11 @@ async function goToTarget() {
 <template>
   <div ref="rowEl" class="rounded-lg border border-border border-l-2 bg-background" :class="OBLIGATION_ACCENT[property.obligation]">
     <div class="flex items-center gap-2 px-2.5 py-1.5">
-      <div :class="fullLock ? 'pointer-events-none opacity-60' : ''">
+      <div :class="obligationDisabled ? 'opacity-60' : ''">
         <Select
           v-model="obligationModel"
-          :options="OBLIGATION_OPTIONS"
+          :options="obligationOptions"
+          :disabled="obligationDisabled"
           class="h-7 w-[132px] text-[11px]"
           :aria-label="`Obligation for ${property.label || 'untitled property'}`"
         />
@@ -130,7 +135,7 @@ async function goToTarget() {
         v-if="!property.lock"
         type="button"
         variant="ghost"
-        size="sm"
+        size="icon-sm"
         class="shrink-0 text-muted-foreground hover:text-destructive"
         :aria-label="`Remove ${property.label || 'property'}`"
         @click="emit('remove')"

@@ -214,7 +214,9 @@ const flow = computed(() => [
           <dl v-if="instrumentLabel || containerLabel || run.command" class="mt-2 space-y-2 text-xs">
             <div v-if="instrumentLabel">
               <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Software</dt>
-              <dd class="mt-0.5 break-all text-foreground"><ExternalLink :href="instrumentLabel" :label="instrumentLabel" /></dd>
+              <!-- Prefer the identifier as link target: the label is often a plain
+                   name while the identifier carries the URL (e.g. a DOI or repo). -->
+              <dd class="mt-0.5 break-all text-foreground"><ExternalLink :href="run.instrument?.identifier || instrumentLabel" :label="instrumentLabel" /></dd>
             </div>
             <div v-if="containerLabel">
               <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Container image</dt>
