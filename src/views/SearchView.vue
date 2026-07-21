@@ -3,6 +3,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
+import Select from '@/components/ui/Select.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
@@ -18,7 +19,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { conformsToProcessRun } from '@/lib/profiles/builtinProfiles'
-import { Search, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound } from '@lucide/vue'
+import { Search, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound, Filter, X } from '@lucide/vue'
 import type { MetadataDoc, SparqlResult } from '@/data/types'
 import type { BucketSearchHit, UserSearchHit } from '@/lib/api'
 import type { RouteLocationRaw } from 'vue-router'
@@ -38,12 +39,19 @@ function queryFilter(value: unknown): string | null {
   return queryString(value) || null
 }
 
+// Sentinel value for the "no filter" option: radix Select items cannot carry an
+// empty-string value, so the writable computeds below map it to/from null.
+const ANY = '__any__'
+
 const q = ref(queryString(route.query.q))
 const profileFilter = ref<string | null>(queryFilter(route.query.profile))
 // Search push-down: the group filter maps to the server group_id and the profile
 // filter to conforms_to when it resolves to a local profile IRI. Browse (no
 // active query) still filters the loaded catalog client-side.
 const groupFilter = ref<string | null>(queryFilter(route.query.group))
+// Entity/resource type facet, derived from the RO-Crate @type of the loaded
+// catalog. Applied client-side in both the browse and the search branches.
+const typeFilter = ref<string | null>(queryFilter(route.query.type))
 const favouritesOnly = ref(false)
 
 // A local profile carries the conformsTo IRI that documents reference; a filter
@@ -88,17 +96,18 @@ const running = ref(false)
 // (e.g. clearFilters): vue-router only updates route.query after the async
 // navigation settles, so the second replace would resurrect a param the first
 // meant to drop.
-watch([q, profileFilter, groupFilter, expertMode], ([nq, np, ng, ne]) => {
+watch([q, profileFilter, groupFilter, typeFilter, expertMode], ([nq, np, ng, nt, ne]) => {
   if (
     queryString(route.query.q) === nq &&
     queryFilter(route.query.profile) === np &&
     queryFilter(route.query.group) === ng &&
+    queryFilter(route.query.type) === nt &&
     (queryString(route.query.expert) === '1') === ne
   ) {
     return
   }
   void router.replace({
-    query: { ...route.query, q: nq || undefined, profile: np || undefined, group: ng || undefined, expert: ne ? '1' : undefined },
+    query: { ...route.query, q: nq || undefined, profile: np || undefined, group: ng || undefined, type: nt || undefined, expert: ne ? '1' : undefined },
   })
 })
 
@@ -109,25 +118,34 @@ watch(
     q.value = queryString(query.q)
     profileFilter.value = queryFilter(query.profile)
     groupFilter.value = queryFilter(query.group)
+    typeFilter.value = queryFilter(query.type)
     expertMode.value = queryString(query.expert) === '1'
   },
 )
 
 const PAGE_SIZE = 12
 const page = ref(1)
-watch([q, profileFilter, groupFilter, favouritesOnly], () => {
+watch([q, profileFilter, groupFilter, typeFilter, favouritesOnly], () => {
   page.value = 1
 })
 
 // The active search query switches the whole branch, so the browse "filtering"
 // state only tracks the client-side filters.
-const filtering = computed(() => Boolean(profileFilter.value || groupFilter.value || favouritesOnly.value))
+const filtering = computed(() => Boolean(profileFilter.value || groupFilter.value || typeFilter.value || favouritesOnly.value))
 const favouriteIds = computed(() => currentUser.value?.favouriteMetadataIds ?? [])
+
+// The RO-Crate @type is stored comma-joined (e.g. "Dataset, SoftwareSourceCode");
+// split it so a doc matches a facet when any of its types equals the selection.
+function docTypes(doc?: MetadataDoc | null): string[] {
+  if (!doc?.type) return []
+  return doc.type.split(',').map((entry) => entry.trim()).filter(Boolean)
+}
 
 const hits = computed(() =>
   metadata.value.filter((doc) => {
     if (profileFilter.value && !(doc.profileIds ?? []).includes(profileFilter.value)) return false
     if (groupFilter.value && doc.realmId !== groupFilter.value) return false
+    if (typeFilter.value && !docTypes(doc).includes(typeFilter.value)) return false
     if (favouritesOnly.value && !favouriteIds.value.includes(doc.ulid)) return false
     return true
   }),
@@ -164,12 +182,84 @@ const groupOptions = computed(() => {
     .sort((a, b) => a.label.localeCompare(b.label))
 })
 
+// Distinct entity/resource types actually present in the loaded catalog, plus the
+// active filter so a value carried in from the URL is never dropped. The type
+// facet only appears when the data offers a real choice (more than one type).
+const typeOptions = computed(() => {
+  const types = new Set<string>()
+  for (const doc of metadata.value) for (const type of docTypes(doc)) types.add(type)
+  if (typeFilter.value) types.add(typeFilter.value)
+  return [...types].sort((a, b) => a.localeCompare(b))
+})
+const showTypeFilter = computed(() => typeOptions.value.length > 1)
+
+// One writable computed per facet Select: radix Select speaks non-empty string
+// values, so the "All" sentinel is mapped to and from the underlying null ref.
+const profileSelect = computed<string>({
+  get: () => profileFilter.value ?? ANY,
+  set: (value) => (profileFilter.value = value === ANY ? null : value),
+})
+const typeSelect = computed<string>({
+  get: () => typeFilter.value ?? ANY,
+  set: (value) => (typeFilter.value = value === ANY ? null : value),
+})
+const groupSelect = computed<string>({
+  get: () => groupFilter.value ?? ANY,
+  set: (value) => (groupFilter.value = value === ANY ? null : value),
+})
+const profileSelectOptions = computed(() => {
+  const options = [{ value: ANY, label: 'All' }]
+  const seen = new Set<string>()
+  for (const profile of profiles.value) {
+    options.push({ value: profile.id, label: profile.name || profile.shortName })
+    seen.add(profile.id)
+  }
+  if (profileFilter.value && !seen.has(profileFilter.value)) {
+    options.push({ value: profileFilter.value, label: truncateMiddle(profileFilter.value) })
+  }
+  return options
+})
+const typeSelectOptions = computed(() => [
+  { value: ANY, label: 'All' },
+  ...typeOptions.value.map((type) => ({ value: type, label: type })),
+])
+const groupSelectOptions = computed(() => [
+  { value: ANY, label: 'All' },
+  ...groupOptions.value.map((option) => ({ value: option.id, label: option.label })),
+])
+
+// Active-filter summary: a removable chip per engaged facet plus a reset, so the
+// current narrowing stays legible even when the Select triggers wrap.
+type FilterKey = 'profile' | 'type' | 'group' | 'favourites'
+const activeFilterChips = computed<Array<{ key: FilterKey; label: string }>>(() => {
+  const chips: Array<{ key: FilterKey; label: string }> = []
+  if (profileFilter.value) {
+    const profile = profiles.value.find((item) => item.id === profileFilter.value)
+    chips.push({ key: 'profile', label: `Profile: ${profile?.name ?? profile?.shortName ?? truncateMiddle(profileFilter.value)}` })
+  }
+  if (typeFilter.value) chips.push({ key: 'type', label: `Type: ${typeFilter.value}` })
+  if (groupFilter.value) {
+    chips.push({ key: 'group', label: `Group: ${groupNames.value.get(groupFilter.value) ?? truncateMiddle(groupFilter.value)}` })
+  }
+  if (favouritesOnly.value) chips.push({ key: 'favourites', label: 'Favourites only' })
+  return chips
+})
+function removeFilter(key: FilterKey) {
+  if (key === 'profile') profileFilter.value = null
+  else if (key === 'type') typeFilter.value = null
+  else if (key === 'group') groupFilter.value = null
+  else favouritesOnly.value = false
+}
+
 // Group and profile filters are pushed to the server; only a favourites filter,
 // and a non-IRI profile filter, still narrow the returned hits client-side.
 const visibleResults = computed(() =>
   searchResults.value.filter((line) => {
     if (favouritesOnly.value && !favouriteIds.value.includes(line.hit.document_id)) return false
     if (profileFilter.value && !profilePushedDown.value && !(line.doc?.profileIds ?? []).includes(profileFilter.value)) return false
+    // Type is a client-side facet: id-only hits carry no catalog doc and so drop
+    // out while a type filter is active, mirroring the client-side profile filter.
+    if (typeFilter.value && !docTypes(line.doc).includes(typeFilter.value)) return false
     return true
   }),
 )
@@ -301,6 +391,7 @@ async function toggleFav(id: string) {
 function clearFilters() {
   profileFilter.value = null
   groupFilter.value = null
+  typeFilter.value = null
   favouritesOnly.value = false
 }
 
@@ -341,23 +432,69 @@ async function runQuery() {
             <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input v-model="q" placeholder="Search datasets, groups and people…" class="h-11 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
           </div>
-          <div class="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-            <span class="text-muted-foreground">Profile:</span>
-            <button class="chip transition-colors" :class="profileFilter === null ? 'border-primary/40 text-primary' : ''" @click="profileFilter = null">any</button>
-            <button v-for="profile in profiles" :key="profile.id" class="chip transition-colors" :class="profileFilter === profile.id ? 'border-primary/40 text-primary' : ''" @click="profileFilter = profileFilter === profile.id ? null : profile.id">
-              {{ profile.shortName }}
-            </button>
-            <span class="ml-1 text-muted-foreground">Group:</span>
-            <select
-              v-model="groupFilter"
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <span class="hidden shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground sm:inline-flex">
+              <Filter class="h-3.5 w-3.5" /> Filter
+            </span>
+            <Select
+              v-model="profileSelect"
+              :options="profileSelectOptions"
+              label="Profile"
+              aria-label="Filter by profile"
+              class="h-9 w-auto min-w-[9rem] max-w-[15rem] text-xs"
+            />
+            <Select
+              v-if="showTypeFilter"
+              v-model="typeSelect"
+              :options="typeSelectOptions"
+              label="Type"
+              aria-label="Filter by entity type"
+              class="h-9 w-auto min-w-[8rem] max-w-[15rem] text-xs"
+            />
+            <Select
+              v-model="groupSelect"
+              :options="groupSelectOptions"
+              label="Group"
               aria-label="Filter by group"
-              class="h-7 rounded-md border border-input bg-background px-2 text-[11px] text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              class="h-9 w-auto min-w-[9rem] max-w-[15rem] text-xs"
+            />
+            <button
+              v-if="currentUser"
+              type="button"
+              :aria-pressed="favouritesOnly"
+              class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-3 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              :class="favouritesOnly
+                ? 'border-amber-400/60 bg-amber-400/10 text-amber-600 dark:text-amber-400'
+                : 'border-input bg-field text-muted-foreground hover:text-foreground'"
+              @click="favouritesOnly = !favouritesOnly"
             >
-              <option :value="null">any group</option>
-              <option v-for="option in groupOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
-            </select>
-            <button v-if="currentUser" class="chip inline-flex items-center gap-1 transition-colors" :class="favouritesOnly ? 'border-amber-400/60 text-amber-600 dark:text-amber-400' : ''" @click="favouritesOnly = !favouritesOnly">
-              <Star class="h-3 w-3" :fill="favouritesOnly ? 'currentColor' : 'none'" /> Favourites
+              <Star class="h-3.5 w-3.5" :fill="favouritesOnly ? 'currentColor' : 'none'" /> Favourites
+            </button>
+          </div>
+
+          <!-- Active-filter summary: removable chips plus a single reset. -->
+          <div v-if="filtering" class="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <span
+              v-for="chip in activeFilterChips"
+              :key="chip.key"
+              class="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 py-0.5 pl-2.5 pr-1 text-[11px] text-foreground"
+            >
+              {{ chip.label }}
+              <button
+                type="button"
+                class="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
+                :aria-label="`Remove ${chip.label} filter`"
+                @click="removeFilter(chip.key)"
+              >
+                <X class="h-3 w-3" />
+              </button>
+            </span>
+            <button
+              type="button"
+              class="ml-1 text-[11px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+              @click="clearFilters"
+            >
+              Reset all
             </button>
           </div>
         </div>
