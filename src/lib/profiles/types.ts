@@ -34,13 +34,16 @@ export type ProfileValueKind =
   | 'select-url'
   | 'select-object'
 
-// How an `entity`-kind property's value is realised in the dataset crate.
-// `inline` (the legacy default when absent) fills a sub-form that flattens into a
-// contextual entity + `{"@id"}` reference; `external` emits ONLY a `{"@id"}`
-// reference to an absolute URI (ORCID / ROR / DOI…), never an inline entity;
-// `crate` emits a `{"@id"}` reference to another entity in the same crate (e.g.
-// an attached File), its id passed through from the data-reference picker.
-export type ProfileReferenceMode = 'inline' | 'external' | 'crate'
+// How a dataset author may satisfy an `entity`-kind property (the fulfilment
+// policy). `new` fills the target shape as a sub-form that flattens into a
+// contextual entity + `{"@id"}` reference; `existing-external` emits ONLY a
+// `{"@id"}` reference to an absolute URI (ORCID / ROR / DOI…), never an inline
+// entity; `existing-crate` emits a `{"@id"}` reference to another entity in the
+// same crate (e.g. an attached File), its id passed through from the
+// data-reference picker. A rule may allow SEVERAL sources (reuse-or-create);
+// absent `entitySources` means `['new']` (the legacy inline default, which
+// keeps presence-only schema emission byte-stable). See sources.ts helpers.
+export type ProfileEntitySource = 'new' | 'existing-external' | 'existing-crate'
 
 // A specific entity a list-valued `entity` rule MUST/SHOULD contain (e.g. a
 // `hasPart` File named `index.html`). Matched by exact `name` OR exact `@id`; at
@@ -82,9 +85,11 @@ export interface ProfilePropertyRule {
   // minItems`. Meaningless (ignored) on single-valued rules.
   minItems?: number
   maxItems?: number
-  // `entity` kind only: how the reference is emitted (see ProfileReferenceMode).
-  // Absent === 'inline' (the legacy default), which stays byte-stable.
-  referenceMode?: ProfileReferenceMode
+  // `entity` kind only: which sources may satisfy the property (see
+  // ProfileEntitySource). Absent === ['new'] (the legacy inline default), which
+  // stays byte-stable in schema emission. Normalized to canonical order with
+  // duplicates removed; never stored as exactly ['new'] (that collapses to absent).
+  entitySources?: ProfileEntitySource[]
   // `entity` kind + multipleValues (e.g. `hasPart`): specific instances the list
   // MUST/SHOULD contain. Emitted as JSON Schema `contains` (single) / an `allOf`
   // of `contains` (several); validated by validateRequiredInstances.
@@ -154,6 +159,12 @@ export interface JsonSchemaProperty {
   minContains?: number
   maxContains?: number
   allOf?: JsonSchemaProperty[]
+  // Entity-source policy encoding (v3): an entity value slot is a `$ref` to the
+  // target shape's `$defs` entry (source `new`), a string with format `iri`
+  // (`existing-external`) / `iri-reference` (`existing-crate`), or an `anyOf`
+  // over several of those branches when a rule allows more than one source.
+  anyOf?: JsonSchemaProperty[]
+  $ref?: string
   properties?: Record<string, JsonSchemaProperty>
   required?: string[]
 }
@@ -221,10 +232,11 @@ export interface ProfileControl {
   // C can render each option's `name` / `@id`.
   valueOptions?: unknown[]
   // Threaded from the property rule so wave B forms render without re-deriving:
-  // `referenceMode` picks the entity input (sub-form / URI / crate picker);
-  // `minItems`/`maxItems` drive list-count validation; `requiredInstances` lists
-  // the entries a list MUST/SHOULD contain (see validateRequiredInstances).
-  referenceMode?: ProfileReferenceMode
+  // `entitySources` picks the entity input(s) (sub-form / URI / crate picker,
+  // see primaryEntityInput in sources.ts); `minItems`/`maxItems` drive
+  // list-count validation; `requiredInstances` lists the entries a list
+  // MUST/SHOULD contain (see validateRequiredInstances).
+  entitySources?: ProfileEntitySource[]
   minItems?: number
   maxItems?: number
   requiredInstances?: ProfileRequiredInstance[]

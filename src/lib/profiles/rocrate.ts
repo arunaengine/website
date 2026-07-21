@@ -1,4 +1,5 @@
 import { parseSchemaText, schemaFromEntityRules } from './schema'
+import { effectiveEntitySources } from './sources'
 import { entityRulesToMode, isModeFile, modeToEntityRules, type ModeFile } from './mode'
 import { buildProfileContext } from './propertyCatalog'
 import { ARUNA_PROFILE_PREFIX, isDatasetType, isRecord, normalizeTypeUri, termNameFromUri } from './uri'
@@ -453,8 +454,17 @@ function ruleConstraintHtml(rule: ProfilePropertyRule): string {
   if (rule.minItems !== undefined && rule.maxItems !== undefined) notes.push(`between ${rule.minItems} and ${rule.maxItems} entries`)
   else if (rule.minItems !== undefined) notes.push(`at least ${rule.minItems} ${rule.minItems === 1 ? 'entry' : 'entries'}`)
   else if (rule.maxItems !== undefined) notes.push(`at most ${rule.maxItems} ${rule.maxItems === 1 ? 'entry' : 'entries'}`)
-  if (rule.kind === 'entity' && rule.referenceMode === 'external') notes.push('referenced by an external URI')
-  if (rule.kind === 'entity' && rule.referenceMode === 'crate') notes.push('referenced from within this crate')
+  if (rule.kind === 'entity' && rule.entitySources?.length) {
+    // Only non-default policies note themselves, so legacy-shaped (inline-only)
+    // profiles keep emitting byte-identical profile.html.
+    const phrases: string[] = []
+    for (const source of effectiveEntitySources(rule.entitySources)) {
+      if (source === 'new') phrases.push('describing a new entity')
+      else if (source === 'existing-external') phrases.push('an external URI')
+      else phrases.push('an entity in this crate')
+    }
+    notes.push(`fulfilled by ${phrases.join(' or ')}`)
+  }
   if (rule.kind === 'select-url') {
     const options = (rule.valueOptions ?? []).filter((value): value is string => typeof value === 'string')
     if (options.length) notes.push(`chosen from: ${options.map((value) => escapeHtml(value)).join(', ')}`)

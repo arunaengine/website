@@ -4,20 +4,31 @@ import {
   type JsonSchemaProperty,
   type ProfileBasics,
   type ProfileEntityRule,
+  type ProfileEntitySource,
   type ProfilePropertyRule,
-  type ProfileReferenceMode,
   type ProfileRequiredInstance,
   type ProfileValueKind,
 } from './types'
-import { isDatasetType, SCHEMA_ORG, termNameFromUri } from './uri'
+import { effectiveEntitySources, normalizeEntitySources } from './sources'
+import { isDatasetType, sameSchemaOrgType, SCHEMA_ORG, termNameFromUri } from './uri'
+
+// Resolves an entity-kind rule's target class to its `$defs` key (the canonical
+// className) when the profile defines a rule for one of its target types.
+// Undefined when no target has a rule (the `new` branch then encodes as a plain
+// object) or when the target is the root Dataset (which has no `$defs` entry).
+export type ResolveDefName = (rule: ProfilePropertyRule) => string | undefined
 
 // MUST rules become `required`; SHOULD rules become `recommended` (a sibling of
 // `required`, the Bioschemas convention). `entity`-kind rules join the presence
 // arrays but get no `properties` entry: their values are `{"@id"}` references
 // validated against the referenced entity's own schema, and presence-only
 // membership lets required/recommended checks fire on empty instance lists.
-export function schemaFromPropertyRules(profile: Pick<ProfileBasics, 'name' | 'description'>, rules: ProfilePropertyRule[]): JsonSchema {
-  const body = schemaBody(rules)
+export function schemaFromPropertyRules(
+  profile: Pick<ProfileBasics, 'name' | 'description'>,
+  rules: ProfilePropertyRule[],
+  resolveDefName?: ResolveDefName,
+): JsonSchema {
+  const body = schemaBody(rules, resolveDefName)
   const schema: JsonSchema = {
     $schema: JSON_SCHEMA_DRAFT_2020_12,
     $id: './schema.json',
@@ -36,12 +47,23 @@ export function schemaFromPropertyRules(profile: Pick<ProfileBasics, 'name' | 'd
 // its class short name, so per-class constraints and obligations round-trip.
 export function schemaFromEntityRules(profile: Pick<ProfileBasics, 'name' | 'description'>, entities: ProfileEntityRule[]): JsonSchema {
   const datasetEntity = entities.find((entity) => isDatasetType(entity.type))
-  const schema = schemaFromPropertyRules(profile, datasetEntity?.propertyRules ?? [])
+  // `new`-branch policy encodings point at the target shape's `$defs` entry: the
+  // first target type with a non-Dataset entity rule wins (matching how controls
+  // resolve the sub-form). The Dataset root has no `$defs` entry, so it never
+  // resolves; the branch then falls back to a plain object schema.
+  const resolveDefName: ResolveDefName = (rule) => {
+    for (const target of rule.entityTypes ?? []) {
+      const match = entities.find((entity) => entity !== datasetEntity && sameSchemaOrgType(entity.type, target))
+      if (match) return match.className || termNameFromUri(match.type)
+    }
+    return undefined
+  }
+  const schema = schemaFromPropertyRules(profile, datasetEntity?.propertyRules ?? [], resolveDefName)
 
   const defs: Record<string, JsonSchema> = {}
   for (const entity of entities) {
     if (entity === datasetEntity) continue
-    const body = schemaBody(entity.propertyRules)
+    const body = schemaBody(entity.propertyRules, resolveDefName)
     const def: JsonSchema = { type: 'object', title: entity.label }
     if (entity.description) def.description = entity.description
     def.required = body.required
@@ -55,7 +77,7 @@ export function schemaFromEntityRules(profile: Pick<ProfileBasics, 'name' | 'des
   return schema
 }
 
-function schemaBody(rules: ProfilePropertyRule[]): {
+function schemaBody(rules: ProfilePropertyRule[], resolveDefName?: ResolveDefName): {
   required: string[]
   recommended: string[]
   properties: Record<string, JsonSchemaProperty>
@@ -72,10 +94,10 @@ function schemaBody(rules: ProfilePropertyRule[]): {
     if (rule.kind === 'select-object') continue
     if (rule.kind === 'entity') {
       // Entity refs stay presence-array-only (byte-stable) UNLESS they carry
-      // machine constraints (reference mode / cardinality / required instances),
-      // which are encoded as a `properties` entry — a documented extension of the
-      // "presence arrays only" convention (D4).
-      const entityProperty = entityConstraintProperty(rule)
+      // machine constraints (entity-source policy / cardinality / required
+      // instances), which are encoded as a `properties` entry — a documented
+      // extension of the "presence arrays only" convention (D4).
+      const entityProperty = entityConstraintProperty(rule, resolveDefName)
       if (entityProperty) properties[rule.valueName] = entityProperty
       continue
     }
@@ -133,39 +155,58 @@ export function schemaPropertyFromRule(rule: ProfilePropertyRule): JsonSchemaPro
 
 // The `properties` entry for an `entity`-kind rule, or undefined when the rule
 // carries no machine constraint (in which case it stays presence-array-only, so
-// legacy inline-reference profiles emit byte-identically). Reference mode maps to
-// a `format` (external → `iri`, crate → `iri-reference`); requiredInstances map to
-// `contains` (single) or an `allOf` of `contains` (several) — object-shaped array
-// assertions that win the `items` slot, so a format is not also emitted there.
-export function entityConstraintProperty(rule: ProfilePropertyRule): JsonSchemaProperty | undefined {
-  const format = referenceFormat(rule.referenceMode)
+// legacy inline-only profiles emit byte-identically). The entity-source policy
+// encodes STRUCTURALLY, no invented keywords (plan 5.4): source `new` → a `$ref`
+// to the target shape's `$defs` entry (plain object schema when unresolvable),
+// `existing-external` → string format `iri`, `existing-crate` → string format
+// `iri-reference`, several sources → `anyOf` of those branches (canonical
+// order). Single-source policies therefore emit exactly the v2 shapes.
+// requiredInstances map to `contains` (single) / an `allOf` of `contains`
+// (several); `contains` and `items` are independent keywords, so a non-default
+// policy now coexists with required instances instead of being dropped (the v2
+// lossy combo is gone).
+export function entityConstraintProperty(
+  rule: ProfilePropertyRule,
+  resolveDefName?: ResolveDefName,
+): JsonSchemaProperty | undefined {
+  const sources = effectiveEntitySources(rule.entitySources)
+  const defaultPolicy = sources.length === 1 && sources[0] === 'new'
   const instances = (rule.requiredInstances ?? []).filter((instance) => instance.name || instance.id)
   const isList = Boolean(rule.multipleValues)
   const hasCardinality = isList && (rule.minItems !== undefined || rule.maxItems !== undefined)
-  if (!format && !instances.length && !hasCardinality) return undefined
+  if (defaultPolicy && !instances.length && !hasCardinality) return undefined
 
-  if (instances.length) {
-    const property: JsonSchemaProperty = { type: 'array' }
-    if (instances.length === 1) {
-      property.contains = containsSchemaForInstance(instances[0])
-      property.minContains = 1
-    } else {
-      property.allOf = instances.map((instance) => ({ contains: containsSchemaForInstance(instance), minContains: 1 }))
-    }
-    if (isList && rule.minItems !== undefined) property.minItems = rule.minItems
-    if (isList && rule.maxItems !== undefined) property.maxItems = rule.maxItems
-    return property
+  const valueSchema = defaultPolicy ? undefined : entitySourceSchema(sources, rule, resolveDefName)
+
+  if (!isList && !instances.length) return valueSchema
+
+  const property: JsonSchemaProperty = { type: 'array' }
+  if (valueSchema) property.items = valueSchema
+  if (instances.length === 1) {
+    property.contains = containsSchemaForInstance(instances[0])
+    property.minContains = 1
+  } else if (instances.length > 1) {
+    property.allOf = instances.map((instance) => ({ contains: containsSchemaForInstance(instance), minContains: 1 }))
   }
+  if (isList && rule.minItems !== undefined) property.minItems = rule.minItems
+  if (isList && rule.maxItems !== undefined) property.maxItems = rule.maxItems
+  return property
+}
 
-  if (isList) {
-    const property: JsonSchemaProperty = { type: 'array' }
-    if (format) property.items = { type: 'string', format }
-    if (rule.minItems !== undefined) property.minItems = rule.minItems
-    if (rule.maxItems !== undefined) property.maxItems = rule.maxItems
-    return property
-  }
-
-  return format ? { type: 'string', format } : undefined
+// One value slot's schema for a non-default source policy: a single branch, or
+// `anyOf` over the allowed branches in canonical source order.
+function entitySourceSchema(
+  sources: ProfileEntitySource[],
+  rule: ProfilePropertyRule,
+  resolveDefName?: ResolveDefName,
+): JsonSchemaProperty {
+  const branches = sources.map((source): JsonSchemaProperty => {
+    if (source === 'existing-external') return { type: 'string', format: 'iri' }
+    if (source === 'existing-crate') return { type: 'string', format: 'iri-reference' }
+    const defName = resolveDefName?.(rule)
+    return defName ? { $ref: `#/$defs/${defName}` } : { type: 'object' }
+  })
+  return branches.length === 1 ? branches[0] : { anyOf: branches }
 }
 
 // A single required instance → the object subschema used as `contains`: a `const`
@@ -181,11 +222,6 @@ function containsSchemaForInstance(instance: ProfileRequiredInstance): JsonSchem
   return schema
 }
 
-function referenceFormat(mode: ProfileReferenceMode | undefined): 'iri' | 'iri-reference' | undefined {
-  if (mode === 'external') return 'iri'
-  if (mode === 'crate') return 'iri-reference'
-  return undefined
-}
 
 export function parseSchemaText(value: unknown): JsonSchema | undefined {
   if (isJsonSchema(value)) return value
@@ -211,7 +247,7 @@ export function propertyRulesFromSchema(schema: JsonSchema | undefined): Profile
     // Scalar constraints live on `items` for arrays (see schemaPropertyFromRule),
     // so read them from there to round-trip multi-valued rules faithfully.
     const constraints = property.type === 'array' ? property.items ?? {} : property
-    const referenceMode = referenceModeFromSchemaProperty(property)
+    const entitySources = entitySourcesFromSchemaProperty(property)
     const requiredInstances = requiredInstancesFromSchemaProperty(property)
     const rule: ProfilePropertyRule = {
       id: valueName,
@@ -236,19 +272,28 @@ export function propertyRulesFromSchema(schema: JsonSchema | undefined): Profile
     }
     if (property.minItems !== undefined) rule.minItems = property.minItems
     if (property.maxItems !== undefined) rule.maxItems = property.maxItems
-    if (referenceMode) rule.referenceMode = referenceMode
+    if (entitySources) rule.entitySources = entitySources
     if (requiredInstances) rule.requiredInstances = requiredInstances
     return rule
   })
 }
 
-// The reference mode implied by a `format` on an entity-ref property (or its array
-// `items`): `iri` → external, `iri-reference` → crate. Absent → undefined (inline).
-function referenceModeFromSchemaProperty(property: JsonSchemaProperty): ProfileReferenceMode | undefined {
+// The entity-source policy recovered from a value slot (or its array `items`):
+// `$ref`/object branches → `new`, format `iri` → `existing-external`, format
+// `iri-reference` → `existing-crate`; an `anyOf` contributes every recognized
+// branch. Unrecognized shapes (including the v2 presence-only / contains-only
+// forms) yield undefined, which downstream treats as the legacy ['new'].
+function entitySourcesFromSchemaProperty(property: JsonSchemaProperty): ProfileEntitySource[] | undefined {
   const shape = property.type === 'array' ? property.items ?? {} : property
-  if (shape.format === 'iri') return 'external'
-  if (shape.format === 'iri-reference') return 'crate'
-  return undefined
+  const branches = shape.anyOf ?? [shape]
+  const sources: ProfileEntitySource[] = []
+  for (const branch of branches) {
+    if (branch.$ref || branch.type === 'object') sources.push('new')
+    else if (branch.format === 'iri') sources.push('existing-external')
+    else if (branch.format === 'iri-reference') sources.push('existing-crate')
+  }
+  if (!sources.length) return undefined
+  return normalizeEntitySources(sources)
 }
 
 // requiredInstances recovered from `contains` (single) or an `allOf` of `contains`

@@ -11,7 +11,7 @@ import { controlsFromRules, defaultControlValues, normalizeProfileValues } from 
 import { entityRulesToMode } from '@/lib/profiles/mode'
 import { parseProfileCrate } from '@/lib/profiles/rocrate'
 import { validateProfileData } from '@/lib/profiles/validate'
-import { obligationBadgeVariant, PROFILE_OBLIGATION_LABELS, PROFILE_REFERENCE_MODE_LABELS } from '@/lib/profiles/labels'
+import { obligationBadgeVariant, PROFILE_ENTITY_SOURCE_LABELS, PROFILE_OBLIGATION_LABELS } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import type { ProfileBuilder } from './useProfileBuilder'
@@ -35,8 +35,8 @@ function constraintLines(rule: ProfilePropertyRule): string[] {
   } else if (rule.maxItems !== undefined) {
     lines.push(`Must have at most ${rule.maxItems} ${rule.maxItems === 1 ? 'entry' : 'entries'}.`)
   }
-  if (rule.referenceMode) {
-    lines.push(`Referenced as: ${PROFILE_REFERENCE_MODE_LABELS[rule.referenceMode].label}.`)
+  if (rule.entitySources?.length) {
+    lines.push(`Allowed sources: ${rule.entitySources.map((source) => PROFILE_ENTITY_SOURCE_LABELS[source].label).join('; ')}.`)
   }
   for (const instance of rule.requiredInstances ?? []) {
     const match = instance.id !== undefined ? `@id ${instance.id}` : `name ${instance.name}`

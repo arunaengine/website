@@ -334,9 +334,10 @@ function ruleFromInput(
     rule.entityTypes = classTokens.map((token) => resolveClassUri(token, ctx.context))
     // Absent `multiple` means single (matches the documented default + scalars).
     rule.multipleValues = Boolean(input.multiple)
-    // Reference mode, list cardinality and required instances have no mode-file
-    // vocabulary — they ride on the schema and rehydrate from the hydrated carrier.
-    if (hydrated?.referenceMode) rule.referenceMode = hydrated.referenceMode
+    // Entity-source policy, list cardinality and required instances have no
+    // mode-file vocabulary — they ride on the schema and rehydrate from the
+    // hydrated carrier.
+    if (hydrated?.entitySources) rule.entitySources = hydrated.entitySources
     if (hydrated?.minItems !== undefined) rule.minItems = hydrated.minItems
     if (hydrated?.maxItems !== undefined) rule.maxItems = hydrated.maxItems
     if (hydrated?.requiredInstances?.length) rule.requiredInstances = hydrated.requiredInstances

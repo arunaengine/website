@@ -164,13 +164,13 @@ function firstStringValue(props: Record<string, unknown>): string {
   return ''
 }
 
-// An `external` / `crate` entity reference's value(s) → bare `{"@id"}` reference(s),
-// with NO inline contextual entity (that is what `referenceMode: 'inline'` does via
-// buildEntityInstance). `external` values are absolute URIs typed by the author;
-// `crate` values are crate-local ids passed through from the data-reference picker
+// A reuse-only entity reference's value(s) → bare `{"@id"}` reference(s), with
+// NO inline contextual entity (that is what the `new` source does via
+// buildEntityInstance). External values are absolute URIs typed by the author;
+// crate values are crate-local ids passed through from the data-reference picker
 // — this helper does not mint or resolve either. Returns an array of refs when the
 // control is `multiple` (deduped, order-preserving), a single ref otherwise, or
-// undefined when nothing is set. B2 calls it for non-inline entity controls.
+// undefined when nothing is set. B2 calls it for reuse-only entity controls.
 export function emitEntityReference(
   control: ProfileControl,
   raw: unknown,

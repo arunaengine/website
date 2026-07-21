@@ -39,7 +39,7 @@ export function controlsFromRules(rules: ProfilePropertyRule[], entities: Profil
       ...(rule.kind === 'select-object' ? { valueOptions: rule.valueOptions ?? [] } : {}),
       // Constraint metadata the schema can't surface to entity controls (whose
       // schema is presence-only): threaded so wave B forms render without re-deriving.
-      ...(rule.referenceMode ? { referenceMode: rule.referenceMode } : {}),
+      ...(rule.entitySources ? { entitySources: rule.entitySources } : {}),
       ...(rule.minItems !== undefined ? { minItems: rule.minItems } : {}),
       ...(rule.maxItems !== undefined ? { maxItems: rule.maxItems } : {}),
       ...(rule.requiredInstances?.length ? { requiredInstances: rule.requiredInstances } : {}),

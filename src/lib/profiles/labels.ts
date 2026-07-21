@@ -1,4 +1,4 @@
-import type { ProfileObligation, ProfileReferenceMode, ProfileValueKind } from './types'
+import type { ProfileEntitySource, ProfileObligation, ProfileValueKind } from './types'
 
 // Single source of truth for how value kinds are labelled in the UI.
 export const PROFILE_VALUE_KIND_LABELS: Record<ProfileValueKind, string> = {
@@ -18,27 +18,23 @@ export const PROFILE_VALUE_KIND_LABELS: Record<ProfileValueKind, string> = {
   'select-object': 'Object choice',
 }
 
-// Single source of truth for how entity-reference modes are labelled and explained
-// (the reference-mode radio in the profile builder, wave B1). `inline` is the
-// legacy default; the `#id`-vs-identifier-URI behaviour is spelled out so it is no
-// longer invisible to authors.
-export const PROFILE_REFERENCE_MODE_LABELS: Record<ProfileReferenceMode, { label: string; help: string }> = {
-  inline: {
-    label: 'Inline entity (filled out as a sub-form)',
-    help: 'Author fills a sub-form; it becomes a contextual entity. An absolute-URI identifier (e.g. an ORCID) becomes its @id, otherwise a local #id is generated.',
+// Single source of truth for how entity sources are labelled and explained (the
+// allowed-sources checkboxes in the profile builder). A rule may allow several;
+// the sentence frame is "Dataset authors may: <label> / <label>".
+export const PROFILE_ENTITY_SOURCE_LABELS: Record<ProfileEntitySource, { label: string; help: string }> = {
+  new: {
+    label: 'Describe a new entity (sub-form)',
+    help: 'The author fills the entity rules as a sub-form; it becomes a contextual entity. An absolute-URI identifier (e.g. an ORCID) becomes its @id, otherwise a local #id is generated.',
   },
-  external: {
-    label: 'External URI (ORCID / ROR / DOI…)',
-    help: 'A single URI field; emitted as a bare {"@id"} reference to a persistent external identifier, never an inline entity.',
+  'existing-external': {
+    label: 'Reuse via external URI (ORCID / ROR / DOI…)',
+    help: 'A URI field emitted as a bare {"@id"} reference to a persistent external identifier; its fields are never re-entered and only the reference itself can be validated.',
   },
-  crate: {
-    label: 'Entity in this crate (e.g. an attached file)',
+  'existing-crate': {
+    label: 'Reuse an entity in this crate (e.g. an attached file)',
     help: 'References another entity in the same crate, e.g. a file picked from the crate contents; emitted as a crate-local {"@id"} reference.',
   },
 }
-
-// The order reference modes are listed in the builder radio.
-export const REFERENCE_MODE_ORDER: ProfileReferenceMode[] = ['inline', 'external', 'crate']
 
 // Single source of truth for how RFC-2119 obligations are labelled and explained.
 export const PROFILE_OBLIGATION_LABELS: Record<ProfileObligation, { label: string; help: string }> = {

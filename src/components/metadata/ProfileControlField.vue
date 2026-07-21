@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button.vue'
 import { Plus, X } from '@lucide/vue'
 import { isInvalidReferenceUri, isRecord, REFERENCE_URI_MESSAGE } from '@/lib/profiles/uri'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
+import { primaryEntityInput } from '@/lib/profiles/sources'
 import type { ProfileControl, ProfileViolation } from '@/lib/profiles/types'
 
 // Shared renderer for one profile control: label + required star + the right
@@ -22,11 +23,16 @@ const props = defineProps<{
   modelValue: unknown
   violations?: ProfileViolation[]
   disabled?: boolean
-  // Crate-local pick options (the dialog's data references) for a
-  // `referenceMode: 'crate'` entity control; each `{ value: @id, label }`.
-  // Ignored for every other control / reference mode.
+  // Crate-local pick options (the dialog's data references) for an entity
+  // control whose policy resolves to the crate picker; each `{ value: @id,
+  // label }`. Ignored for every other control / entity input.
   crateOptions?: Array<{ value: string; label: string }>
 }>()
+
+// Which entity input this control renders (Phase 0 bridge until the combined
+// reuse-or-create control lands): controls that allow `new` render a sub-form in
+// DatasetEntityInstances and never reach the entity branch here.
+const entityInput = computed(() => primaryEntityInput(props.control.entitySources))
 
 const emit = defineEmits<{ (e: 'update:modelValue', value: unknown): void }>()
 
@@ -91,8 +97,8 @@ const entityPlaceholder = computed(() => {
 
 const crateEntityOptions = computed(() => props.crateOptions ?? [])
 
-// A `referenceMode: 'external'` multiple entity control edits a real string array
-// of reference URIs; each row emits the whole array back (the parent stores it
+// An external-URI multiple entity control edits a real string array of
+// reference URIs; each row emits the whole array back (the parent stores it
 // verbatim), mirroring DatasetEntityInstances' nested repeatable list. Per-row URI
 // errors are shown inline; the dialog derives the matching submit-gating violations
 // via the same uri.ts predicate so display and gating agree.
@@ -321,14 +327,15 @@ function update(value: unknown) {
       <span>{{ control.description || 'Enabled' }}</span>
       <Switch :checked="Boolean(modelValue)" :disabled="disabled" @update:checked="(value: boolean) => update(value)" />
     </label>
-    <!-- Entity references. Inline entities render a sub-form (DatasetEntityInstances)
-         and never reach this renderer; here a reference is a crate pick
-         (referenceMode 'crate') or an absolute URI (external, or a depth-1 nested
-         reference whose mode is inline/absent). URI-format errors show inline; the
-         dialog computes the matching gating violations from the same predicate. -->
+    <!-- Entity references. Controls that allow describing a new entity render a
+         sub-form (DatasetEntityInstances) and never reach this renderer; here a
+         reference is a crate pick or an absolute URI (external, or a depth-1
+         nested reference whose policy allows `new`). URI-format errors show
+         inline; the dialog computes the matching gating violations from the same
+         predicate. -->
     <template v-else-if="control.control === 'entity'">
       <!-- crate: choose from the crate's data references. -->
-      <template v-if="control.referenceMode === 'crate' && crateEntityOptions.length">
+      <template v-if="entityInput === 'existing-crate' && crateEntityOptions.length">
         <div v-if="control.multiple" class="mt-1 space-y-1 rounded-md border border-border bg-card px-3 py-2" :class="invalidBoxClass">
           <label v-for="option in crateEntityOptions" :key="option.value" class="flex items-center gap-2 text-sm">
             <input
@@ -352,7 +359,7 @@ function update(value: unknown) {
           @update:model-value="(value: string) => update(value)"
         />
       </template>
-      <p v-else-if="control.referenceMode === 'crate'" class="mt-1 text-[11px] text-muted-foreground">Add a data reference below, then pick it here.</p>
+      <p v-else-if="entityInput === 'existing-crate'" class="mt-1 text-[11px] text-muted-foreground">Add a data reference below, then pick it here.</p>
       <!-- external (multiple): a repeatable list of reference URIs. -->
       <div v-else-if="control.multiple">
         <div class="flex justify-end">

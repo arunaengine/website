@@ -8,12 +8,12 @@ import Button from '@/components/ui/Button.vue'
 import { ChevronDown, ChevronRight, Lock, Plus, Trash2 } from '@lucide/vue'
 import {
   OBLIGATION_ACCENT,
+  PROFILE_ENTITY_SOURCE_LABELS,
   PROFILE_OBLIGATION_LABELS,
-  PROFILE_REFERENCE_MODE_LABELS,
   PROFILE_VALUE_KIND_LABELS,
-  REFERENCE_MODE_ORDER,
   obligationBadgeVariant,
 } from '@/lib/profiles/labels'
+import { ENTITY_SOURCE_ORDER, effectiveEntitySources, normalizeEntitySources } from '@/lib/profiles/sources'
 import {
   isSchemaOrgUri,
   loadCustomPropertyTerms,
@@ -28,7 +28,7 @@ import { isAbsoluteUri, isValidPropertyTermName, normalizeTypeUri, sameSchemaOrg
 import { isHasPartUri } from '@/lib/profiles/emit'
 import { vocabKind, type VocabTerm } from '@/lib/profiles/vocabulary'
 import VocabSuggestions from './VocabSuggestions.vue'
-import type { ProfileReferenceMode } from '@/lib/profiles/types'
+import type { ProfileEntitySource } from '@/lib/profiles/types'
 import {
   OBLIGATION_OPTIONS,
   VALUE_KIND_OPTIONS,
@@ -203,21 +203,11 @@ function removeUrlOption(index: number) {
   property.value.urlOptions.splice(index, 1)
 }
 
-// WS4: reference mode is a per-entity-rule concern. It is hidden when the list is
-// content-shaped instead — required contents present, or the hasPart term whose
-// values come from the dataset's data references (the mode would not persist, see
-// the round-trip caveat).
 const isHasPart = computed(() => isHasPartUri(resolvedUri.value))
-// Reference mode carries only for inline-shaped references. It is hidden for hasPart
-// (bound to the data references) and for content-shaped lists (multi-valued rules
-// with required contents), matching normalizeProperty which drops referenceMode in
-// exactly those cases, so the control never disagrees with what is emitted.
-const showReferenceMode = computed(
-  () =>
-    isEntity.value &&
-    !isHasPart.value &&
-    !(isMultiValued.value && property.value.requiredInstances.length > 0),
-)
+// The allowed-sources policy carries for every entity reference except hasPart,
+// whose values come from the dataset's data references (normalizeProperty drops
+// the policy there, so the control never disagrees with what is emitted).
+const showEntitySources = computed(() => isEntity.value && !isHasPart.value)
 
 // M5: hasPart values are always crate entity references (its attached files /
 // datasets); a scalar kind would brick the dataset dialog. Flag it inline, matching
@@ -236,16 +226,25 @@ watch(
     if (isHasPartEntity && !wasHasPartEntity) property.value.multipleValues = true
   },
 )
-const referenceModeValue = computed<ProfileReferenceMode>(() => property.value.referenceMode ?? 'inline')
-const referenceModeOptions = REFERENCE_MODE_ORDER.map((mode) => ({ mode, ...PROFILE_REFERENCE_MODE_LABELS[mode] }))
+const selectedSources = computed<ProfileEntitySource[]>(() => effectiveEntitySources(property.value.entitySources))
+const entitySourceOptions = ENTITY_SOURCE_ORDER.map((source) => ({ source, ...PROFILE_ENTITY_SOURCE_LABELS[source] }))
 
-function setReferenceMode(mode: ProfileReferenceMode) {
-  // Store the legacy default (inline) as absent so byte-stability holds.
-  property.value.referenceMode = mode === 'inline' ? undefined : mode
+function toggleEntitySource(source: ProfileEntitySource) {
+  const current = new Set(selectedSources.value)
+  if (current.has(source)) {
+    // At least one source must stay allowed, otherwise the rule is unfulfillable.
+    if (current.size === 1) return
+    current.delete(source)
+  } else {
+    current.add(source)
+  }
+  // The legacy default (exactly ['new']) stores as absent so byte-stability holds.
+  property.value.entitySources = normalizeEntitySources([...current])
 }
 
-// Per-mode explanation shown under the referenced-types picker, replacing the old
-// opaque copy. hasPart and required-contents cases get their own guidance.
+// Explanation shown under the referenced-types picker. hasPart and
+// required-contents cases get their own guidance; otherwise summarize the policy
+// as the sentence dataset authors will experience.
 const referenceHelp = computed(() => {
   if (isHasPart.value) {
     return 'Values come from the dataset’s data references (its attached files); each required item below is checked against them, and more are always allowed.'
@@ -253,7 +252,12 @@ const referenceHelp = computed(() => {
   if (property.value.requiredInstances.length) {
     return 'Values become @id references to entities in the crate. The required items below must be present; more are always allowed.'
   }
-  return PROFILE_REFERENCE_MODE_LABELS[referenceModeValue.value].help
+  const phrases = selectedSources.value.map((source) => {
+    if (source === 'new') return 'describe a new entity'
+    if (source === 'existing-external') return 'reuse one via an external URI'
+    return 'reuse an entity from this crate'
+  })
+  return `Dataset authors may ${phrases.join(', or ')}.`
 })
 
 // WS5/M1/M2: the required-contents editor is authorable ONLY for the hasPart term —
@@ -690,29 +694,28 @@ function createEntityRule(uri: string) {
       </div>
     </div>
 
-    <!-- Entity-reference block: how the reference is realised (WS4), which types it
-         targets, and any required contents (WS5). -->
+    <!-- Entity-reference block: which sources may fulfil the reference, which
+         types it targets, and any required contents (WS5). -->
     <div v-if="isEntity" class="mt-2 space-y-2">
-      <!-- WS4: reference mode. Hidden when the list is content-shaped instead
-           (required contents present, or hasPart bound to the data references). -->
-      <div v-if="showReferenceMode">
-        <label class="text-[11px] font-medium text-muted-foreground">Reference mode</label>
+      <!-- Allowed sources: a rule may allow several (reuse-or-create). Hidden for
+           hasPart, which binds to the data references. -->
+      <div v-if="showEntitySources">
+        <label class="text-[11px] font-medium text-muted-foreground">Allowed sources</label>
         <div class="mt-1 space-y-1">
           <label
-            v-for="option in referenceModeOptions"
-            :key="option.mode"
+            v-for="option in entitySourceOptions"
+            :key="option.source"
             class="flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-1.5 text-[11px] transition-colors"
-            :class="referenceModeValue === option.mode
+            :class="selectedSources.includes(option.source)
               ? 'border-aruna-royal/60 bg-aruna-royal/10'
               : 'border-border hover:border-primary/40'"
           >
             <input
-              type="radio"
+              type="checkbox"
               class="mt-0.5 accent-aruna-royal"
-              :name="`refmode-${property.uid}`"
-              :checked="referenceModeValue === option.mode"
-              :disabled="anyLock"
-              @change="setReferenceMode(option.mode)"
+              :checked="selectedSources.includes(option.source)"
+              :disabled="anyLock || (selectedSources.length === 1 && selectedSources.includes(option.source))"
+              @change="toggleEntitySource(option.source)"
             />
             <span>
               <span class="font-medium text-foreground">{{ option.label }}</span>

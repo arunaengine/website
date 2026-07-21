@@ -25,6 +25,7 @@ import { controlsFromRules, defaultControlValues, normalizeProfileValues } from 
 import { buildEntityInstance, emitEntityReference, emitSelectObject, isHasPartUri, slugify, uniqueId } from '@/lib/profiles/emit'
 import { licenseEntity, parseProfileCrate } from '@/lib/profiles/rocrate'
 import { schemaFromPropertyRules } from '@/lib/profiles/schema'
+import { primaryEntityInput } from '@/lib/profiles/sources'
 import { buildProfileContext, isSchemaOrgUri } from '@/lib/profiles/propertyCatalog'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { isAbsoluteUri, isInvalidReferenceUri, REFERENCE_URI_MESSAGE } from '@/lib/profiles/uri'
@@ -92,8 +93,9 @@ const profileEntityRules = ref<ProfileEntityRule[]>([])
 const profileContextTerms = ref<Record<string, string>>({})
 const generatedValues = ref<Record<string, unknown>>({})
 // Inline entity-ref instance state, keyed by the entity control property
-// (valueName). Each instance is a record of scalar/URI values keyed by sub-control
-// property. Only `referenceMode: inline` (or absent) controls use this.
+// (valueName). Each instance is a record of scalar/URI values keyed by
+// sub-control property. Only controls whose source policy allows `new` (the
+// sub-form input) use this.
 const entityInstances = ref<Record<string, Array<Record<string, unknown>>>>({})
 // External/crate entity-ref values, keyed by control property: a single reference
 // holds a URI/id string, a multiple reference a string array. Emitted via
@@ -178,14 +180,16 @@ const entityControls = computed(() =>
     (control) => control.control === 'entity' && !builtInDatasetKeys.has(control.property) && !hasPartProperties.value.has(control.property),
   ),
 )
-// inline (or absent) entity controls render a sub-form (DatasetEntityInstances);
-// external / crate controls render a URI input / crate picker (ProfileControlField).
-const inlineEntityControls = computed(() => entityControls.value.filter((control) => !isReferenceMode(control)))
-const referenceEntityControls = computed(() => entityControls.value.filter(isReferenceMode))
-function isReferenceMode(control: ProfileControl): boolean {
-  return control.referenceMode === 'external' || control.referenceMode === 'crate'
+// Controls whose policy allows describing a new entity render a sub-form
+// (DatasetEntityInstances); reuse-only controls render a URI input / crate
+// picker (ProfileControlField). primaryEntityInput is the Phase 0 bridge until
+// the combined reuse-or-create control lands (plan Phase 4).
+const inlineEntityControls = computed(() => entityControls.value.filter((control) => !isReuseOnly(control)))
+const referenceEntityControls = computed(() => entityControls.value.filter(isReuseOnly))
+function isReuseOnly(control: ProfileControl): boolean {
+  return primaryEntityInput(control.entitySources) !== 'new'
 }
-// Crate-local pick options for `referenceMode: 'crate'` controls: the current data
+// Crate-local pick options for crate-picker controls: the current data
 // references, whose `{"@id"}` is the reference url (the same id the hasPart File
 // entity carries), so a crate reference resolves to that entity.
 const crateOptions = computed(() => dataRefList.value.map((entry) => ({ value: entry.url, label: entry.label || entry.url })))
@@ -252,7 +256,7 @@ const entitySchemas = computed<Record<string, JsonSchema | undefined>>(() => {
 // dangling `{"@id"}` (M4). Mirrors instanceValidationValues' nested-ref trimming.
 function effectiveEntityRefValue(control: ProfileControl): unknown {
   const raw = entityRefValues.value[control.property]
-  if (control.referenceMode === 'crate') {
+  if (primaryEntityInput(control.entitySources) === 'existing-crate') {
     const valid = new Set(dataRefList.value.map((entry) => entry.url))
     return control.multiple
       ? (Array.isArray(raw) ? raw.map(String) : []).filter((id) => valid.has(id))
@@ -359,7 +363,7 @@ const entityInstanceErrorCount = computed(() => {
 const entityReferenceFormatViolations = computed<ProfileViolation[]>(() => {
   const out: ProfileViolation[] = []
   for (const control of referenceEntityControls.value) {
-    if (control.referenceMode !== 'external') continue
+    if (primaryEntityInput(control.entitySources) !== 'existing-external') continue
     const raw = entityRefValues.value[control.property]
     const entries = control.multiple ? (Array.isArray(raw) ? raw : []) : [raw]
     entries.forEach((entry, index) => {
@@ -654,7 +658,7 @@ function applyParsedProfile(
   const seededRefs: Record<string, unknown> = {}
   for (const control of controls) {
     if (control.control !== 'entity' || builtInDatasetKeys.has(control.property) || hasPartProps.has(control.property)) continue
-    if (control.referenceMode === 'external' || control.referenceMode === 'crate') {
+    if (primaryEntityInput(control.entitySources) !== 'new') {
       seededRefs[control.property] = control.multiple ? [] : ''
       continue
     }
@@ -1123,7 +1127,7 @@ async function submit() {
               :control="control"
               :model-value="entityRefValues[control.property]"
               :violations="referenceControlViolations(control)"
-              :crate-options="control.referenceMode === 'crate' ? crateOptions : undefined"
+              :crate-options="primaryEntityInput(control.entitySources) === 'existing-crate' ? crateOptions : undefined"
               @update:model-value="(value: unknown) => setEntityRefValue(control.property, value)"
             />
           </div>

@@ -20,12 +20,13 @@ import { OBLIGATION_ORDER, PROFILE_OBLIGATION_LABELS, PROFILE_VALUE_KIND_LABELS 
 import type {
   ProfileBasics,
   ProfileEntityRule,
+  ProfileEntitySource,
   ProfileObligation,
   ProfilePropertyRule,
-  ProfileReferenceMode,
   ProfileRequiredInstance,
   ProfileValueKind,
 } from '@/lib/profiles/types'
+import { normalizeEntitySources } from '@/lib/profiles/sources'
 
 // Two levels of builder-session lock on a baseline draft rule. `full` is the old
 // all-or-nothing read-only (the Root Dataset entity itself). `structural` fixes a
@@ -83,10 +84,11 @@ export interface DraftPropertyRule {
   // rule is multi-valued. min >= 1, max >= min (validated in rulesErrors).
   minItems: string | number
   maxItems: string | number
-  // Entity-kind reference mode (WS4): how a `{"@id"}` reference is realised.
-  // Absent = 'inline' (the legacy default; stays byte-stable). Meaningless on
-  // scalar kinds — normalize drops it.
-  referenceMode?: ProfileReferenceMode
+  // Entity-kind fulfilment policy: which sources may satisfy the property
+  // (describe new / reuse external URI / reuse crate entity). Absent = ['new']
+  // (the legacy inline default; stays byte-stable). Meaningless on scalar
+  // kinds — normalize drops it.
+  entitySources?: ProfileEntitySource[]
   // Entity-kind + multi-valued "required contents" (WS5): specific instances the
   // list MUST/SHOULD contain (e.g. a hasPart File named index.html).
   requiredInstances: DraftRequiredInstance[]
@@ -299,7 +301,7 @@ export function draftProperty(input: Partial<DraftPropertyRule> = {}): DraftProp
     multipleValues: input.multipleValues ?? false,
     minItems: input.minItems ?? '',
     maxItems: input.maxItems ?? '',
-    referenceMode: input.referenceMode,
+    entitySources: input.entitySources,
     requiredInstances: input.requiredInstances ?? [],
     urlOptions: input.urlOptions ?? [],
     valueOptions: input.valueOptions,
@@ -336,7 +338,7 @@ export function draftFromPropertyRule(rule: ProfilePropertyRule, isRootEntity = 
     multipleValues: rule.multipleValues ?? false,
     minItems: rule.minItems ?? '',
     maxItems: rule.maxItems ?? '',
-    referenceMode: rule.referenceMode,
+    entitySources: rule.entitySources,
     requiredInstances: (rule.requiredInstances ?? []).map(draftRequiredInstance),
     // All-string select-url options round-trip as the authorable URL list; preserved
     // (non-string) select-url and select-object keep their raw options on valueOptions.
@@ -752,12 +754,13 @@ export function useProfileBuilder() {
           .map(normalizeRequiredInstance)
           .filter((instance): instance is ProfileRequiredInstance => Boolean(instance))
       : []
-    // Reference mode (WS4) only carries for inline-shaped entity references. When
-    // the list is content-shaped instead (requiredInstances, or hasPart which the
-    // dataset dialog binds to its data-references section), schema.json encodes the
-    // `contains`, so a referenceMode would not survive the round-trip — drop it.
-    const referenceMode =
-      isEntity && !requiredInstances.length && !isHasPartUri(propertyUri) ? property.referenceMode : undefined
+    // Entity-source policy only carries for entity references that the generated
+    // form actually renders as an entity control. hasPart binds to the dataset
+    // dialog's data-references section, so a policy there is meaningless — drop
+    // it. Required-contents lists KEEP their policy: schema.json encodes `items`
+    // alongside `contains`, so both round-trip (the v2 lossy combo is gone).
+    const entitySources =
+      isEntity && !isHasPartUri(propertyUri) ? normalizeEntitySources(property.entitySources) : undefined
     return {
       id,
       label,
@@ -781,7 +784,7 @@ export function useProfileBuilder() {
       // List cardinality is meaningful only on multi-valued rules.
       minItems: isMulti ? parseNumber(property.minItems) : undefined,
       maxItems: isMulti ? parseNumber(property.maxItems) : undefined,
-      referenceMode,
+      entitySources,
       requiredInstances: requiredInstances.length ? requiredInstances : undefined,
       // Target types are meaningful only for entity references.
       entityTypes: isEntity ? property.entityTypes.filter(Boolean) : undefined,
