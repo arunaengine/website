@@ -154,10 +154,11 @@ function goStep(target: number) {
 const runtimeId = ref<Runtime['id']>('python-uv')
 const runtime = computed(() => RUNTIMES.find((r) => r.id === runtimeId.value) as Runtime)
 const script = ref(RUNTIMES[0].template)
+const selectedScript = ref<{ bucket: string; key: string; content: string } | null>(null)
 const editorTab = ref('work')
 const dependencies = ref<string[]>([])
 const dependencyDraft = ref('')
-const taskName = ref('quick-run')
+const taskName = ref('Quick run')
 const groupId = ref('')
 // Files and folder summaries from the picker; folders expand to per-file
 // FILE inputs only at task assembly (the facade accepts FILE inputs only).
@@ -218,7 +219,7 @@ const normalizedScriptKey = computed(() => scriptKey.value.trim())
 const scriptKeyValid = computed(() =>
   normalizedScriptKey.value.split('/').every((segment) => segment && segment !== '.' && segment !== '..'),
 )
-const scriptUrl = computed(() => `s3://${stagingBucket.value.trim()}/${normalizedScriptKey.value}`)
+const stagingScriptUrl = computed(() => `s3://${stagingBucket.value.trim()}/${normalizedScriptKey.value}`)
 const dependencyConfigPath = '/work/deno.json'
 // The generated deno.json sits next to the script object, whatever directory
 // the key names.
@@ -257,6 +258,20 @@ const stagedScript = computed(() => {
   const dependencyLines = dependencies.value.map((dependency) => `#   ${tomlString(dependency)},`).join('\n')
   return `# /// script\n# requires-python = ">=3.13"\n# dependencies = [\n${dependencyLines}\n# ]\n# ///\n${script.value}`
 })
+const reuseSelectedScript = computed(() => {
+  const selected = selectedScript.value
+  return selected !== null && stagedScript.value === selected.content
+})
+const scriptUrl = computed(() => {
+  const selected = selectedScript.value
+  return reuseSelectedScript.value && selected
+    ? `s3://${selected.bucket}/${selected.key}`
+    : stagingScriptUrl.value
+})
+const needsStagingLocation = computed(() => !reuseSelectedScript.value || dependencyConfig.value !== null)
+const stagedFileUrl = computed(() =>
+  reuseSelectedScript.value && dependencyConfig.value ? dependencyConfigUrl.value : stagingScriptUrl.value,
+)
 const executorCommand = computed(() => {
   return dependencyConfig.value
     ? [...runtime.value.command, `--config=${dependencyConfigPath}`]
@@ -266,7 +281,9 @@ const commandPreview = computed(() => `${executorCommand.value.join(' ')} ${scri
 
 const scriptInput = computed<TesInput>(() => ({
   name: runtime.value.file,
-  description: 'Quick-run script uploaded by the portal',
+  description: reuseSelectedScript.value
+    ? 'Existing script selected for this quick run'
+    : 'Quick-run script uploaded by the portal',
   url: scriptUrl.value,
   path: scriptContainerPath.value,
   type: 'FILE',
@@ -531,9 +548,8 @@ function removeOutput(i: number) {
 }
 
 // ── Load existing script ─────────────────────────────────────────────────────
-// Reuses a script object from any bucket: its text is fetched into the editor
-// (the submit path still uploads the canonical per-run copy). Single-object
-// pick via the browser panel's default select mode; folders only navigate.
+// Reuses an unchanged script object from any bucket. Editing it or Python
+// dependency injection falls back to the per-run upload path.
 const loadScriptOpen = ref(false)
 const loadScriptBusy = ref(false)
 const loadScriptError = ref<string | null>(null)
@@ -572,6 +588,7 @@ async function applyScriptPick() {
     const inferred = inferRuntimeId(pick.name)
     if (inferred) runtimeId.value = inferred
     script.value = text
+    selectedScript.value = { bucket: pick.bucket, key: pick.key, content: text }
     pendingScriptPick.value = null
     loadScriptOpen.value = false
   } catch (err) {
@@ -666,8 +683,7 @@ const dataReady = computed(
     !!s3.endpoint.value &&
     s3.hasActiveKey.value &&
     groupId.value.length > 0 &&
-    stagingBucketValid.value &&
-    scriptKeyValid.value,
+    (!needsStagingLocation.value || (stagingBucketValid.value && scriptKeyValid.value)),
 )
 const canContinue = computed(() => {
   switch (step.value) {
@@ -697,9 +713,19 @@ async function submit() {
   submitError.value = null
   submitting.value = true
   try {
-    const uploads = [
-      s3.putTextObject(stagingBucket.value.trim(), normalizedScriptKey.value, stagedScript.value, runtime.value.contentType),
-    ]
+    const reuseScript = reuseSelectedScript.value
+    const submittedTask = task.value
+    const uploads: Promise<void>[] = []
+    if (!reuseScript) {
+      uploads.push(
+        s3.putTextObject(
+          stagingBucket.value.trim(),
+          normalizedScriptKey.value,
+          stagedScript.value,
+          runtime.value.contentType,
+        ),
+      )
+    }
     if (dependencyConfig.value) {
       uploads.push(
         s3.putTextObject(
@@ -711,7 +737,7 @@ async function submit() {
       )
     }
     await Promise.all(uploads)
-    const created = await createTask(task.value)
+    const created = await createTask(submittedTask)
     submittedOutputs.value = outputRows.value.map((row) => ({
       bucket: row.bucket.trim(),
       key: normalizedOutputKey(row.path),
@@ -827,38 +853,45 @@ function runAnother() {
               <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its Process Run crate.</p>
             </div>
             <div>
-              <label class="text-xs font-medium text-foreground">Script location <span class="text-destructive">*</span></label>
-              <div class="mt-1 flex items-center gap-2">
-                <Select v-if="bucketOptions.length" v-model="stagingBucket" :options="bucketOptions" placeholder="Select a bucket" class="w-40 shrink-0" />
-                <Input
-                  v-else
-                  v-model="stagingBucket"
-                  class="w-40 shrink-0 font-mono"
-                  :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'"
-                  :invalid="stagingBucket.trim() && !stagingBucketValid ? 'error' : undefined"
-                />
-                <Input
-                  :model-value="scriptKey"
-                  class="min-w-0 flex-1 font-mono"
-                  :placeholder="defaultScriptKey"
-                  aria-label="Script object key"
-                  :invalid="!scriptKeyValid ? 'error' : undefined"
-                  @update:model-value="setScriptKey(String($event))"
-                />
+              <div v-if="reuseSelectedScript">
+                <label class="text-xs font-medium text-foreground">Existing script</label>
+                <p class="mt-1 truncate font-mono text-[11px] text-foreground" :title="scriptUrl">{{ scriptUrl }}</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">Reused directly; no script object will be uploaded.</p>
               </div>
-              <p v-if="stagingBucket.trim() && !stagingBucketValid" class="mt-1 text-[11px] text-destructive">
-                This bucket does not exist. The script can only be staged into one of your buckets.
-              </p>
-              <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
-                You have no buckets yet. Create one in Data first.
-              </p>
-              <p v-else-if="!scriptKeyValid" class="mt-1 text-[11px] text-destructive">
-                Use an object key without a leading slash or empty segments, ending in a file name.
-              </p>
-              <p v-else class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="scriptUrl">{{ scriptUrl }}</p>
-              <p class="mt-1 text-[11px] text-muted-foreground">
-                The default key keeps each run's copy separate, so reruns never overwrite a script an earlier task references.
-              </p>
+              <div v-if="needsStagingLocation" :class="reuseSelectedScript ? 'mt-3' : ''">
+                <label class="text-xs font-medium text-foreground">{{ reuseSelectedScript ? 'Generated files location' : 'Script location' }} <span class="text-destructive">*</span></label>
+                <div class="mt-1 flex items-center gap-2">
+                  <Select v-if="bucketOptions.length" v-model="stagingBucket" :options="bucketOptions" placeholder="Select a bucket" class="w-40 shrink-0" />
+                  <Input
+                    v-else
+                    v-model="stagingBucket"
+                    class="w-40 shrink-0 font-mono"
+                    :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'"
+                    :invalid="stagingBucket.trim() && !stagingBucketValid ? 'error' : undefined"
+                  />
+                  <Input
+                    :model-value="scriptKey"
+                    class="min-w-0 flex-1 font-mono"
+                    :placeholder="defaultScriptKey"
+                    :aria-label="reuseSelectedScript ? 'Generated file path basis' : 'Script object key'"
+                    :invalid="!scriptKeyValid ? 'error' : undefined"
+                    @update:model-value="setScriptKey(String($event))"
+                  />
+                </div>
+                <p v-if="stagingBucket.trim() && !stagingBucketValid" class="mt-1 text-[11px] text-destructive">
+                  This bucket does not exist. Files can only be staged into one of your buckets.
+                </p>
+                <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
+                  You have no buckets yet. Create one in Data first.
+                </p>
+                <p v-else-if="!scriptKeyValid" class="mt-1 text-[11px] text-destructive">
+                  Use an object key without a leading slash or empty segments, ending in a file name.
+                </p>
+                <p v-else class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="stagedFileUrl">{{ stagedFileUrl }}</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">
+                  {{ reuseSelectedScript ? 'Generated dependency files are uploaded here.' : "The default key keeps each run's copy separate, so reruns never overwrite a script an earlier task references." }}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -1080,7 +1113,7 @@ function runAnother() {
               </div>
               <ul class="space-y-1.5 font-mono text-[11px]">
                 <li>
-                  <div class="truncate text-foreground" :title="scriptUrl">{{ runtime.file }} <span class="font-sans text-muted-foreground">(uploaded on submit)</span> <Badge v-if="runtimeId === 'python-uv' && dependencies.length" variant="outline" class="ml-1 font-sans text-[9px]">{{ dependencies.length }} inline dependencies</Badge></div>
+                  <div class="truncate text-foreground" :title="scriptUrl">{{ runtime.file }} <span class="font-sans text-muted-foreground">({{ reuseSelectedScript ? 'reused without upload' : 'uploaded on submit' }})</span> <Badge v-if="runtimeId === 'python-uv' && dependencies.length" variant="outline" class="ml-1 font-sans text-[9px]">{{ dependencies.length }} inline dependencies</Badge></div>
                   <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ scriptContainerPath }}</div>
                 </li>
                 <li v-if="dependencyInput">
@@ -1119,7 +1152,8 @@ function runAnother() {
           </div>
           <p class="text-xs text-muted-foreground">
             Runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in
-            <code class="rounded bg-muted px-1 font-mono">{{ runtime.image }}</code>; the script is uploaded on submit (the backend does not accept inline script content).
+            <code class="rounded bg-muted px-1 font-mono">{{ runtime.image }}</code>;
+            {{ reuseSelectedScript ? 'the selected script object is reused without an upload.' : 'the script is uploaded on submit because the backend does not accept inline script content.' }}
           </p>
           <TaskJsonPreview title="TES task (POST /ga4gh/tes/v1/tasks)" :task="task" />
           <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ submitError }}</p>
@@ -1145,7 +1179,7 @@ function runAnother() {
         <DialogHeader>
           <DialogTitle class="flex items-center gap-2"><FolderOpen class="h-4 w-4 text-primary" /> Load existing script</DialogTitle>
           <DialogDescription>
-            Pick a script object to load its content into the editor. Submitting still uploads a fresh copy under the run's script location so runs stay reproducible.
+            Pick a script object to load into the editor. Unchanged content is reused directly; editing it uploads a fresh per-run copy.
           </DialogDescription>
         </DialogHeader>
         <div
