@@ -6,6 +6,7 @@ import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import PropertyRuleRow from './PropertyRuleRow.vue'
 import PropertyTermPicker from './PropertyTermPicker.vue'
+import ClassPropertyChecklist from './ClassPropertyChecklist.vue'
 import { Settings2, Trash2, TriangleAlert } from '@lucide/vue'
 import { PROFILE_OBLIGATION_LABELS, obligationBadgeVariant } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
@@ -128,8 +129,9 @@ function removeShape() {
       <p v-if="!entity.properties.length" class="rounded-md border border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
         No rules yet. Add the properties a {{ entity.label || entityTypeLabel(entity.type) }} must, should or may carry.
       </p>
-      <div class="pt-1">
+      <div class="space-y-1.5 pt-1">
         <PropertyTermPicker :builder="builder" :entity="entity" />
+        <ClassPropertyChecklist :builder="builder" :entity="entity" />
       </div>
     </div>
   </section>
