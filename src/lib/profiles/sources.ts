@@ -28,9 +28,10 @@ export function normalizeEntitySources(
   return effective.length === 1 && effective[0] === 'new' ? undefined : effective
 }
 
-// Which single input the dataset dialog renders for an entity control until the
-// combined reuse-or-create control (Phase 4) lands: the sub-form whenever `new`
-// is allowed, else the external-URI input, else the crate picker.
+// Which single input a DEPTH-1 NESTED entity reference renders (inside a
+// described-new instance, where references are plain inputs): the URI input
+// unless the policy is crate-only. Top-level entity controls use the combined
+// reuse-or-create entry model instead (lib/profiles/entityEntries.ts).
 export function primaryEntityInput(sources: ProfileEntitySource[] | undefined): ProfileEntitySource {
   const effective = effectiveEntitySources(sources)
   if (effective.includes('new')) return 'new'

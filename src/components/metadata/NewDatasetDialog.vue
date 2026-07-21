@@ -22,10 +22,15 @@ import { useAruna } from '@/composables/useAruna'
 import type { DataEntity } from '@/lib/dataEntities'
 import type { MetadataDoc } from '@/data/types'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
-import { buildEntityInstance, emitEntityReference, emitSelectObject, isHasPartUri, slugify, uniqueId } from '@/lib/profiles/emit'
+import { emitEntityEntries, emitSelectObject, isHasPartUri, slugify, uniqueId } from '@/lib/profiles/emit'
+import {
+  effectiveEntryValues,
+  entryRefInvalid,
+  entrySourcePolicy,
+  type EntityEntry,
+} from '@/lib/profiles/entityEntries'
 import { licenseEntity, parseProfileCrate } from '@/lib/profiles/rocrate'
 import { schemaFromPropertyRules } from '@/lib/profiles/schema'
-import { primaryEntityInput } from '@/lib/profiles/sources'
 import { buildProfileContext, isSchemaOrgUri } from '@/lib/profiles/propertyCatalog'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { isAbsoluteUri, isInvalidReferenceUri, REFERENCE_URI_MESSAGE } from '@/lib/profiles/uri'
@@ -53,9 +58,9 @@ const MINIMAL_ENTITY_RULE: ProfilePropertyRule = {
   obligation: 'MAY',
 }
 
-// Monotonic per-instance identity so entity-instance cards key on a stable uid
+// Monotonic per-entry identity so entity-entry cards key on a stable uid
 // rather than their array index (mirrors the builder draft uid discipline).
-let entityInstanceUid = 0
+let entityEntryUid = 0
 
 const props = defineProps<{
   open: boolean
@@ -92,15 +97,11 @@ const profileDatasetRules = ref<ProfilePropertyRule[]>([])
 const profileEntityRules = ref<ProfileEntityRule[]>([])
 const profileContextTerms = ref<Record<string, string>>({})
 const generatedValues = ref<Record<string, unknown>>({})
-// Inline entity-ref instance state, keyed by the entity control property
-// (valueName). Each instance is a record of scalar/URI values keyed by
-// sub-control property. Only controls whose source policy allows `new` (the
-// sub-form input) use this.
-const entityInstances = ref<Record<string, Array<Record<string, unknown>>>>({})
-// External/crate entity-ref values, keyed by control property: a single reference
-// holds a URI/id string, a multiple reference a string array. Emitted via
-// emitEntityReference (bare `{"@id"}` refs, no inline entity).
-const entityRefValues = ref<Record<string, unknown>>({})
+// Combined reuse-or-create entry lists, keyed by the entity control property
+// (valueName). Each entry is either a described-new instance (sub-form values)
+// or a reuse reference (external URI / crate data-reference id), per the
+// rule's entitySources policy (plan Phase 4).
+const entityEntries = ref<Record<string, EntityEntry[]>>({})
 const profileLoading = ref(false)
 const profileLoadError = ref<string | null>(null)
 // True when the full-crate load (or its S3 artifact resolution) FAILED — as
@@ -180,19 +181,13 @@ const entityControls = computed(() =>
     (control) => control.control === 'entity' && !builtInDatasetKeys.has(control.property) && !hasPartProperties.value.has(control.property),
   ),
 )
-// Controls whose policy allows describing a new entity render a sub-form
-// (DatasetEntityInstances); reuse-only controls render a URI input / crate
-// picker (ProfileControlField). primaryEntityInput is the Phase 0 bridge until
-// the combined reuse-or-create control lands (plan Phase 4).
-const inlineEntityControls = computed(() => entityControls.value.filter((control) => !isReuseOnly(control)))
-const referenceEntityControls = computed(() => entityControls.value.filter(isReuseOnly))
-function isReuseOnly(control: ProfileControl): boolean {
-  return primaryEntityInput(control.entitySources) !== 'new'
-}
-// Crate-local pick options for crate-picker controls: the current data
-// references, whose `{"@id"}` is the reference url (the same id the hasPart File
-// entity carries), so a crate reference resolves to that entity.
+// Crate-local pick options for reuse entries: the current data references,
+// whose `{"@id"}` is the reference url (the same id the hasPart File entity
+// carries), so a crate reference resolves to that entity.
 const crateOptions = computed(() => dataRefList.value.map((entry) => ({ value: entry.url, label: entry.label || entry.url })))
+// The ids a crate reuse reference may resolve to right now (stale ids are
+// pruned from validation and emission, M4).
+const crateIdSet = computed(() => new Set(dataRefList.value.map((entry) => entry.url)))
 
 // Data references as `{ id, name }` candidates for hasPart required-instance
 // matching. Built EXACTLY the way buildRoCrate names/ids the hasPart File entities
@@ -230,7 +225,7 @@ const hasPartRequirements = computed(() =>
 // so instances are never fieldless.
 const entitySubControls = computed<Record<string, ProfileControl[]>>(() => {
   const map: Record<string, ProfileControl[]> = {}
-  for (const control of inlineEntityControls.value) {
+  for (const control of entityControls.value) {
     map[control.property] = control.entityRule
       ? controlsFromRules(control.entityRule.propertyRules, profileEntityRules.value)
       : controlsFromRules([MINIMAL_ENTITY_RULE], profileEntityRules.value)
@@ -240,7 +235,7 @@ const entitySubControls = computed<Record<string, ProfileControl[]>>(() => {
 // Per-entity JSON Schema used for per-instance scalar validation.
 const entitySchemas = computed<Record<string, JsonSchema | undefined>>(() => {
   const map: Record<string, JsonSchema | undefined> = {}
-  for (const control of inlineEntityControls.value) {
+  for (const control of entityControls.value) {
     map[control.property] = control.entityRule
       ? schemaFromPropertyRules(entityBasics(control.entityRule), control.entityRule.propertyRules)
       : schemaFromPropertyRules({ name: entityTypeLabelFor(control), description: '' }, [MINIMAL_ENTITY_RULE])
@@ -248,44 +243,23 @@ const entitySchemas = computed<Record<string, JsonSchema | undefined>>(() => {
   return map
 })
 
-// The reference value a control actually contributes, reconciled with the current
-// form state so validation and emission never disagree: external blanks are dropped
-// so an empty repeatable row can't satisfy required/minItems and then emit nothing
-// (H1); crate ids no longer present in the data references are dropped so a removed
-// data reference resurfaces its MUST/minItems violation instead of emitting a
-// dangling `{"@id"}` (M4). Mirrors instanceValidationValues' nested-ref trimming.
-function effectiveEntityRefValue(control: ProfileControl): unknown {
-  const raw = entityRefValues.value[control.property]
-  if (primaryEntityInput(control.entitySources) === 'existing-crate') {
-    const valid = new Set(dataRefList.value.map((entry) => entry.url))
-    return control.multiple
-      ? (Array.isArray(raw) ? raw.map(String) : []).filter((id) => valid.has(id))
-      : (typeof raw === 'string' && valid.has(raw) ? raw : '')
-  }
-  return control.multiple
-    ? (Array.isArray(raw) ? raw.map((entry) => String(entry).trim()).filter(Boolean) : [])
-    : (typeof raw === 'string' ? raw.trim() : '')
-}
-
 // The values record fed to the Dataset schema validator: scalar profile values
-// plus each entity control's instance array (so isEmptyValue([]) drives the
-// required/recommended presence checks on entity references).
+// plus each entity control's effective entry values, so presence and list
+// cardinality act on the COMBINED entry count (described-new instances always
+// count; reuse blanks and stale crate ids are pruned — H1/M4 — so validation
+// matches what will actually be emitted).
 const normalizedGeneratedValues = computed(() => {
   const values: Record<string, unknown> = {
     ...coreProfileValues(),
     ...normalizeProfileValues(generatedValues.value, generatedScalarControls.value),
   }
-  // Inline entity refs: the instance array drives presence + list cardinality on
-  // the reference itself (isEmptyValue([]) → missing, length → min/maxItems).
-  for (const control of inlineEntityControls.value) {
-    values[control.property] = entityInstances.value[control.property] ?? []
-  }
-  // External/crate refs: the effective URI/id string (single) or string array
-  // (multiple) — blanks and stale crate ids pruned (effectiveEntityRefValue) so the
-  // schema's presence + cardinality checks fire on what will actually be emitted.
-  // Format is checked separately (validate.ts does not enforce iri / iri-reference).
-  for (const control of referenceEntityControls.value) {
-    values[control.property] = effectiveEntityRefValue(control)
+  for (const control of entityControls.value) {
+    const effective = effectiveEntryValues(
+      entityEntries.value[control.property] ?? [],
+      entrySourcePolicy(control.entitySources),
+      crateIdSet.value,
+    )
+    values[control.property] = control.multiple ? effective : effective[0] ?? ''
   }
   // hasPart: the data references drive the rule's presence + cardinality (the
   // required-instance contents are validated separately via validateRequiredInstances).
@@ -306,18 +280,35 @@ const generatedCreateValues = computed(() => normalizeProfileValues(generatedVal
 const profileViolations = computed(() => validateProfileData(profileSchema.value, normalizedGeneratedValues.value))
 const profileCollisionKeys = computed(() => profileControls.value.map((control) => control.property).filter((property) => reservedDatasetKeys.has(property)))
 
-// Per-instance scalar violations for every entity control, keyed by control
-// property. Outer array index aligns with the instance index.
-const entityInstanceViolations = computed<Record<string, ProfileViolation[][]>>(() => {
+// Per-entry violations for every entity control, keyed by control property;
+// outer array index aligns with the entry index. Described-new entries get the
+// target shape's scalar validation plus nested reference-format checks; reuse
+// entries get the reference-format check ONLY (reuse-by-URI is never
+// re-validated against the shape — plan 5.4, stated in the UI).
+const entityEntryViolations = computed<Record<string, ProfileViolation[][]>>(() => {
   const map: Record<string, ProfileViolation[][]> = {}
-  for (const control of inlineEntityControls.value) {
+  for (const control of entityControls.value) {
+    const policy = entrySourcePolicy(control.entitySources)
     const subControls = entitySubControls.value[control.property] ?? []
     const schema = entitySchemas.value[control.property]
-    const instances = entityInstances.value[control.property] ?? []
-    map[control.property] = instances.map((instance) => [
-      ...validateProfileData(schema, instanceValidationValues(instance, subControls)),
-      ...referenceUriViolations(instance, subControls),
-    ])
+    const entries = entityEntries.value[control.property] ?? []
+    map[control.property] = entries.map((entry) => {
+      if (entry.source === 'new') {
+        return [
+          ...validateProfileData(schema, instanceValidationValues(entry.instance ?? {}, subControls)),
+          ...referenceUriViolations(entry.instance ?? {}, subControls),
+        ]
+      }
+      return entryRefInvalid(entry, policy, crateIdSet.value)
+        ? [{
+            ruleId: 'format.uri',
+            pointer: `/${control.property}`,
+            fieldId: control.property,
+            message: REFERENCE_URI_MESSAGE,
+            severity: 'error' as const,
+          }]
+        : []
+    })
   }
   return map
 })
@@ -347,52 +338,13 @@ function referenceUriViolations(instance: Record<string, unknown>, subControls: 
   }
   return violations
 }
-const entityInstanceErrorCount = computed(() => {
+const entityEntryErrorCount = computed(() => {
   let count = 0
-  for (const perInstance of Object.values(entityInstanceViolations.value)) {
-    for (const violations of perInstance) count += violations.filter((violation) => violation.severity === 'error').length
+  for (const perEntry of Object.values(entityEntryViolations.value)) {
+    for (const violations of perEntry) count += violations.filter((violation) => violation.severity === 'error').length
   }
   return count
 })
-
-// External references are absolute URIs typed by the author; a non-empty value
-// that is not one is a blocking error (it would emit a broken `{"@id"}`). Mirrors
-// referenceUriViolations for nested refs; crate references are picked from a list
-// so they need no format check. Shown inline by ProfileControlField (single) /
-// per-row; these feed submit gating (canSubmit + the footer count).
-const entityReferenceFormatViolations = computed<ProfileViolation[]>(() => {
-  const out: ProfileViolation[] = []
-  for (const control of referenceEntityControls.value) {
-    if (primaryEntityInput(control.entitySources) !== 'existing-external') continue
-    const raw = entityRefValues.value[control.property]
-    const entries = control.multiple ? (Array.isArray(raw) ? raw : []) : [raw]
-    entries.forEach((entry, index) => {
-      if (typeof entry === 'string' && isInvalidReferenceUri(entry)) {
-        out.push({
-          ruleId: 'format.uri',
-          pointer: control.multiple ? `/${control.property}/${index}` : `/${control.property}`,
-          fieldId: control.property,
-          message: REFERENCE_URI_MESSAGE,
-          severity: 'error',
-        })
-      }
-    })
-  }
-  return out
-})
-
-// Violations rendered on a reference control: schema presence / cardinality always,
-// plus the single-reference URI-format error (a multiple reference shows its format
-// errors per-row inside ProfileControlField, so they are not passed again here).
-function referenceControlViolations(control: ProfileControl): ProfileViolation[] {
-  const base = profileViolations.value.filter((violation) => violation.fieldId === control.property)
-  if (control.multiple) return base
-  return [...base, ...entityReferenceFormatViolations.value.filter((violation) => violation.fieldId === control.property)]
-}
-
-function setEntityRefValue(property: string, value: unknown) {
-  entityRefValues.value = { ...entityRefValues.value, [property]: value }
-}
 
 // Schema presence / cardinality violations that target a hasPart rule, surfaced at
 // the Data references section (hasPart has no generic control of its own).
@@ -428,14 +380,15 @@ const licenseControlViolations = computed<ProfileViolation[]>(() => {
   }
   return out
 })
-const hasEntityInstances = computed(() =>
-  inlineEntityControls.value.some((control) => (entityInstances.value[control.property] ?? []).length),
-)
-const hasEntityReferences = computed(() =>
-  referenceEntityControls.value.some((control) => {
-    const value = entityRefValues.value[control.property]
-    return Array.isArray(value) ? value.some((entry) => String(entry).trim()) : Boolean(String(value ?? '').trim())
-  }),
+const hasEntityEntries = computed(() =>
+  entityControls.value.some(
+    (control) =>
+      effectiveEntryValues(
+        entityEntries.value[control.property] ?? [],
+        entrySourcePolicy(control.entitySources),
+        crateIdSet.value,
+      ).length > 0,
+  ),
 )
 
 // Anything beyond the scaffold fields requires submitting a full RO-Crate.
@@ -446,8 +399,7 @@ const needsRoCrate = computed(() =>
       || (showAuthorsScaffold.value && creatorList.value.length)
       || (showIdentifierScaffold.value && identifier.value.trim())
       || dataRefList.value.length
-      || hasEntityInstances.value
-      || hasEntityReferences.value
+      || hasEntityEntries.value
       || Object.keys(generatedCreateValues.value).length,
   ),
 )
@@ -476,8 +428,7 @@ const canSubmit = computed(() => Boolean(
     && !profileCollisionKeys.value.length
     && !hasPartScalarCollisionKeys.value.length
     && !profileViolations.value.some((violation) => violation.severity === 'error')
-    && !entityInstanceErrorCount.value
-    && !entityReferenceFormatViolations.value.length
+    && !entityEntryErrorCount.value
     && !hasPartRequiredViolations.value.some((violation) => violation.severity === 'error'),
 ))
 
@@ -525,8 +476,7 @@ const submitBlockerSummary = computed<string[]>(() => {
   const fieldErrorCount =
     Object.keys(scaffoldFieldErrors.value).length
     + profileViolations.value.filter((violation) => violation.severity === 'error' && !builtInDatasetKeys.has(violation.fieldId ?? '')).length
-    + entityInstanceErrorCount.value
-    + entityReferenceFormatViolations.value.length
+    + entityEntryErrorCount.value
     + hasPartRequiredViolations.value.filter((violation) => violation.severity === 'error').length
     + dataRefs.value.filter(dataRefUrlError).length
   if (fieldErrorCount) parts.push(`${fieldErrorCount} ${fieldErrorCount === 1 ? 'field needs' : 'fields need'} attention (marked at the inputs).`)
@@ -613,8 +563,7 @@ function resetGeneratedProfileFields() {
   profileEntityRules.value = []
   profileContextTerms.value = {}
   generatedValues.value = {}
-  entityInstances.value = {}
-  entityRefValues.value = {}
+  entityEntries.value = {}
   profileLoadError.value = null
   profileLoadFailed.value = false
   // Clear the in-flight flag too, so switching to "No profile reference" mid-load
@@ -648,28 +597,29 @@ function applyParsedProfile(
   // hasPart rule is a blocking collision, not a sub-form); scalar hasPart controls
   // must NOT be treated as bound here (M5).
   const hasPartProps = new Set(datasetPropertyRules.filter((rule) => isHasPartUri(rule.propertyUri) && rule.kind === 'entity').map((rule) => rule.valueName))
-  // Required (MUST) inline entity references start with one instance so their
-  // sub-form shows up immediately instead of hiding behind an "Add" click; the
-  // instance's own required sub-fields then flag inline what still needs filling.
-  // SHOULD/MAY entities keep the explicit Add so an untouched form never emits (or
-  // silently satisfies a recommendation with) an empty entity. External/crate and
-  // hasPart references have no sub-form and are seeded below / bound to Data references.
-  const seeded: Record<string, Array<Record<string, unknown>>> = {}
-  const seededRefs: Record<string, unknown> = {}
+  // Seeding: a required (MUST) rule that allows describing a new entity starts
+  // with one described-new entry so its sub-form shows up immediately; the
+  // entry's own required sub-fields then flag inline what still needs filling.
+  // SHOULD/MAY rules keep the explicit Add so an untouched form never emits (or
+  // silently satisfies a recommendation with) an empty entity. Reuse-only
+  // single-valued rules seed one empty reference entry (the input shows right
+  // away; a blank never emits); reuse-only lists start empty. hasPart rules
+  // bind to Data references and are never seeded here.
+  const seeded: Record<string, EntityEntry[]> = {}
   for (const control of controls) {
     if (control.control !== 'entity' || builtInDatasetKeys.has(control.property) || hasPartProps.has(control.property)) continue
-    if (primaryEntityInput(control.entitySources) !== 'new') {
-      seededRefs[control.property] = control.multiple ? [] : ''
-      continue
+    const policy = entrySourcePolicy(control.entitySources)
+    if (policy.allowNew) {
+      if (!control.required) continue
+      const subControls = control.entityRule
+        ? controlsFromRules(control.entityRule.propertyRules, entityRules)
+        : controlsFromRules([MINIMAL_ENTITY_RULE], entityRules)
+      seeded[control.property] = [newEntityEntry(subControls)]
+    } else if (!control.multiple) {
+      seeded[control.property] = [newRefEntry()]
     }
-    if (!control.required) continue
-    const subControls = control.entityRule
-      ? controlsFromRules(control.entityRule.propertyRules, entityRules)
-      : controlsFromRules([MINIMAL_ENTITY_RULE], entityRules)
-    seeded[control.property] = [newEntityInstance(subControls)]
   }
-  entityInstances.value = seeded
-  entityRefValues.value = seededRefs
+  entityEntries.value = seeded
 }
 
 function coreProfileValues(): Record<string, unknown> {
@@ -714,18 +664,24 @@ function entityBasics(rule: ProfileEntityRule): Pick<ProfileBasics, 'name' | 'de
   return { name: rule.label, description: rule.description }
 }
 
-// A fresh instance for an entity control: scalar controls seeded from defaults,
-// nested entity references seeded as empty URI strings (depth-1 reference input).
+// A fresh instance record for a described-new entry: scalar controls seeded
+// from defaults, nested entity references seeded as empty URI strings (depth-1
+// reference input).
 function newEntityInstance(subControls: ProfileControl[]): Record<string, unknown> {
   const values = defaultControlValues(subControls)
   for (const control of subControls) {
     // Single reference → one URI string; multiple → a list of URI strings (D5).
     if (control.control === 'entity') values[control.property] = control.multiple ? [] : ''
   }
-  // Stable per-instance key for card/collapse state (not a control property, so
-  // it is ignored by normalization and never emitted into the crate).
-  values.__uid = ++entityInstanceUid
   return values
+}
+
+function newEntityEntry(subControls: ProfileControl[]): EntityEntry {
+  return { __uid: ++entityEntryUid, source: 'new', instance: newEntityInstance(subControls) }
+}
+
+function newRefEntry(): EntityEntry {
+  return { __uid: ++entityEntryUid, source: 'existing', ref: '' }
 }
 
 // Values for per-instance validation: scalar controls normalized (keeping empty
@@ -751,23 +707,43 @@ function instanceValidationValues(instance: Record<string, unknown>, subControls
   return values
 }
 
-function addEntityInstance(control: ProfileControl) {
-  const subControls = entitySubControls.value[control.property] ?? []
-  const list = [...(entityInstances.value[control.property] ?? []), newEntityInstance(subControls)]
-  entityInstances.value = { ...entityInstances.value, [control.property]: list }
+function addEntityEntry(control: ProfileControl, source: 'new' | 'existing') {
+  const entry = source === 'new' ? newEntityEntry(entitySubControls.value[control.property] ?? []) : newRefEntry()
+  const list = [...(entityEntries.value[control.property] ?? []), entry]
+  entityEntries.value = { ...entityEntries.value, [control.property]: list }
 }
 
-function removeEntityInstance(property: string, index: number) {
-  const list = [...(entityInstances.value[property] ?? [])]
+function removeEntityEntry(property: string, index: number) {
+  const list = [...(entityEntries.value[property] ?? [])]
   list.splice(index, 1)
-  entityInstances.value = { ...entityInstances.value, [property]: list }
+  entityEntries.value = { ...entityEntries.value, [property]: list }
 }
 
-function setEntityInstanceValue(property: string, index: number, subProperty: string, value: unknown) {
-  const list = [...(entityInstances.value[property] ?? [])]
-  if (!list[index]) return
-  list[index] = { ...list[index], [subProperty]: value }
-  entityInstances.value = { ...entityInstances.value, [property]: list }
+// Single-valued fields: switch the one entry between describe-new and reuse.
+// The replaced entry's values are dropped deliberately (a fresh start per
+// source keeps the emission unambiguous).
+function switchEntityEntrySource(control: ProfileControl, index: number, source: 'new' | 'existing') {
+  const list = [...(entityEntries.value[control.property] ?? [])]
+  const current = list[index]
+  if (!current || current.source === source) return
+  list[index] = source === 'new' ? newEntityEntry(entitySubControls.value[control.property] ?? []) : newRefEntry()
+  entityEntries.value = { ...entityEntries.value, [control.property]: list }
+}
+
+function setEntityEntryValue(property: string, index: number, subProperty: string, value: unknown) {
+  const list = [...(entityEntries.value[property] ?? [])]
+  const entry = list[index]
+  if (!entry || entry.source !== 'new') return
+  list[index] = { ...entry, instance: { ...(entry.instance ?? {}), [subProperty]: value } }
+  entityEntries.value = { ...entityEntries.value, [property]: list }
+}
+
+function setEntityEntryRef(property: string, index: number, value: string) {
+  const list = [...(entityEntries.value[property] ?? [])]
+  const entry = list[index]
+  if (!entry || entry.source !== 'existing') return
+  list[index] = { ...entry, ref: value }
+  entityEntries.value = { ...entityEntries.value, [property]: list }
 }
 
 function buildRoCrate() {
@@ -839,37 +815,28 @@ function buildRoCrate() {
     })
   }
 
-  // Inline entity references → flattened contextual entities + {"@id"} refs.
-  for (const control of inlineEntityControls.value) {
-    const instances = entityInstances.value[control.property] ?? []
-    if (!instances.length) continue
-    const subControls = entitySubControls.value[control.property] ?? []
-    const typeName = entityTypeName(control)
-    // A short label for the synthetic @id slug — typeName may be a full URI (M1),
-    // which would make an ugly `@id`, so slug from the human label instead.
-    const typeLabel = entityTypeLabelFor(control)
-    const refs: Array<Record<string, unknown>> = []
-    const seenRefs = new Set<string>()
-    instances.forEach((instance, index) => {
-      const entity = buildEntityInstance(instance, subControls, typeName, typeLabel, index, usedSyntheticIds, addEntity)
-      addEntity(entity)
-      const id = String(entity['@id'])
-      if (seenRefs.has(id)) return
-      seenRefs.add(id)
-      refs.push({ '@id': id })
-    })
+  // Entity entries → described-new entries flatten into contextual entities +
+  // {"@id"} refs; reuse entries contribute bare {"@id"} refs (no inline
+  // entity). Repeated @ids dedupe within the property (emitEntityEntries) and
+  // shared contextual entities collapse crate-wide via addEntity, so reusing
+  // and describing the same entity never duplicates it.
+  for (const control of entityControls.value) {
+    const entries = entityEntries.value[control.property] ?? []
+    if (!entries.length) continue
+    const refs = emitEntityEntries(
+      entries,
+      entrySourcePolicy(control.entitySources),
+      crateIdSet.value,
+      entitySubControls.value[control.property] ?? [],
+      // The emitted @type; the label slugs the synthetic @id (typeName may be a
+      // full URI, M1, which would make an ugly @id).
+      entityTypeName(control),
+      entityTypeLabelFor(control),
+      usedSyntheticIds,
+      addEntity,
+    )
     if (!refs.length) continue
     dataset[control.property] = control.multiple ? refs : refs[0]
-  }
-
-  // External / crate entity references → bare {"@id"} reference(s), no inline entity.
-  // External values are absolute URIs; crate values are crate-local ids passed
-  // through from the data-reference picker (they resolve to hasPart File entities).
-  for (const control of referenceEntityControls.value) {
-    // Emit the effective value (blanks + stale crate ids pruned) so a removed data
-    // reference never leaves a dangling `{"@id"}` behind (M4), matching validation.
-    const ref = emitEntityReference(control, effectiveEntityRefValue(control))
-    if (ref) dataset[control.property] = ref
   }
 
   // Profile select-object choices → the chosen option emitted verbatim as a
@@ -1109,26 +1076,21 @@ async function submit() {
               @update:model-value="(value: unknown) => setGeneratedValue(control.property, value)"
             />
           </div>
-          <div v-for="control in inlineEntityControls" :key="control.property">
+          <div v-for="control in entityControls" :key="control.property">
             <DatasetEntityInstances
               :control="control"
               :sub-controls="entitySubControls[control.property] ?? []"
-              :instances="entityInstances[control.property] ?? []"
-              :instance-violations="entityInstanceViolations[control.property] ?? []"
+              :entries="entityEntries[control.property] ?? []"
+              :entry-violations="entityEntryViolations[control.property] ?? []"
               :presence-violations="profileViolations.filter((item) => item.fieldId === control.property)"
               :type-label="entityTypeLabelFor(control)"
-              @add="addEntityInstance(control)"
-              @remove="(index: number) => removeEntityInstance(control.property, index)"
-              @update="(index: number, subProperty: string, value: unknown) => setEntityInstanceValue(control.property, index, subProperty, value)"
-            />
-          </div>
-          <div v-for="control in referenceEntityControls" :key="control.property">
-            <ProfileControlField
-              :control="control"
-              :model-value="entityRefValues[control.property]"
-              :violations="referenceControlViolations(control)"
-              :crate-options="primaryEntityInput(control.entitySources) === 'existing-crate' ? crateOptions : undefined"
-              @update:model-value="(value: unknown) => setEntityRefValue(control.property, value)"
+              :crate-options="crateOptions"
+              @add-new="addEntityEntry(control, 'new')"
+              @add-existing="addEntityEntry(control, 'existing')"
+              @remove="(index: number) => removeEntityEntry(control.property, index)"
+              @switch-source="(index: number, source: 'new' | 'existing') => switchEntityEntrySource(control, index, source)"
+              @update="(index: number, subProperty: string, value: unknown) => setEntityEntryValue(control.property, index, subProperty, value)"
+              @update-ref="(index: number, value: string) => setEntityEntryRef(control.property, index, value)"
             />
           </div>
         </template>

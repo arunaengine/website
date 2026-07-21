@@ -1,5 +1,7 @@
 import { normalizeProfileValues } from './controls'
 import { isAbsoluteUri, isRecord, sameSchemaOrgType, SCHEMA_ORG } from './uri'
+import type { EntityEntry, EntrySourcePolicy } from './entityEntries'
+import { effectiveEntryRef } from './entityEntries'
 import type { ProfileControl } from './types'
 
 // Emission helpers for profile-driven dataset crates, shared with
@@ -164,24 +166,41 @@ function firstStringValue(props: Record<string, unknown>): string {
   return ''
 }
 
-// A reuse-only entity reference's value(s) → bare `{"@id"}` reference(s), with
-// NO inline contextual entity (that is what the `new` source does via
-// buildEntityInstance). External values are absolute URIs typed by the author;
-// crate values are crate-local ids passed through from the data-reference picker
-// — this helper does not mint or resolve either. Returns an array of refs when the
-// control is `multiple` (deduped, order-preserving), a single ref otherwise, or
-// undefined when nothing is set. B2 calls it for reuse-only entity controls.
-export function emitEntityReference(
-  control: ProfileControl,
-  raw: unknown,
-): { '@id': string } | Array<{ '@id': string }> | undefined {
-  const ids = (Array.isArray(raw) ? raw : [raw])
-    .filter((entry): entry is string => typeof entry === 'string')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-  if (!ids.length) return undefined
-  if (control.multiple) return [...new Set(ids)].map((id) => ({ '@id': id }))
-  return { '@id': ids[0] }
+// One entity control's combined reuse-or-create entries → the {"@id"}
+// reference list for the owning dataset property (plan Phase 4). Described-new
+// entries flatten through buildEntityInstance into contextual entities (added
+// via addEntity, which dedupes by @id across the whole crate); reuse entries
+// contribute a bare {"@id"} with NO inline entity. Repeated @ids within the
+// property are deduped order-preserving, so a reuse reference pointing at the
+// same @id an instance produced (or two identical reuse rows) emits once.
+// Blank/stale reuse refs contribute nothing (effectiveEntryRef).
+export function emitEntityEntries(
+  entries: EntityEntry[],
+  policy: EntrySourcePolicy,
+  validCrateIds: ReadonlySet<string>,
+  subControls: ProfileControl[],
+  typeName: string,
+  typeLabel: string,
+  usedSyntheticIds: Set<string>,
+  addEntity: AddEntity,
+): Array<{ '@id': string }> {
+  const refs: Array<{ '@id': string }> = []
+  const seen = new Set<string>()
+  entries.forEach((entry, index) => {
+    let id: string
+    if (entry.source === 'new') {
+      const entity = buildEntityInstance(entry.instance ?? {}, subControls, typeName, typeLabel, index, usedSyntheticIds, addEntity)
+      addEntity(entity)
+      id = String(entity['@id'])
+    } else {
+      id = effectiveEntryRef(entry, policy, validCrateIds)
+      if (!id) return
+    }
+    if (seen.has(id)) return
+    seen.add(id)
+    refs.push({ '@id': id })
+  })
+  return refs
 }
 
 // True for the schema.org `hasPart` property URI (http/https). The dataset dialog's
