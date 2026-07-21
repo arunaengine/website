@@ -18,7 +18,7 @@ import ProfileReviewStep from '@/components/metadata/profile-builder/ProfileRevi
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import { useProfileBuilder } from '@/components/metadata/profile-builder/useProfileBuilder'
 import { computed, ref, watch } from 'vue'
-import { ListChecks, Check, CheckCircle2, ArrowLeft, ArrowRight, KeyRound, Plus } from '@lucide/vue'
+import { ListChecks, Check, CheckCircle2, ArrowLeft, ArrowRight, FileUp, KeyRound, Plus } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
 import { useProfilePublish } from '@/composables/useProfilePublish'
@@ -231,10 +231,15 @@ async function submit() {
         <ProfileBasicsStep v-if="step === 1 && isEditing" :builder="builder" locked />
         <Tabs v-else-if="step === 1" v-model="startTab">
           <TabsList>
-            <TabsTrigger value="create">Create</TabsTrigger>
-            <TabsTrigger value="import">Import existing</TabsTrigger>
+            <TabsTrigger value="create"><Plus class="mr-1 size-3.5" /> Create</TabsTrigger>
+            <TabsTrigger value="import"><FileUp class="mr-1 size-3.5" /> Import existing</TabsTrigger>
           </TabsList>
           <TabsContent value="create" class="space-y-4">
+            <p v-if="!builder.importSummary" class="text-[11px] text-muted-foreground">
+              Starting from an existing profile crate or a Describo/Crate-O mode file? Switch to
+              <button type="button" class="font-medium text-aruna-royal underline-offset-2 hover:underline" @click="startTab = 'import'">Import existing</button>
+              above.
+            </p>
             <div v-if="builder.importSummary" class="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
               <CheckCircle2 class="h-3.5 w-3.5 shrink-0" />
               <span>

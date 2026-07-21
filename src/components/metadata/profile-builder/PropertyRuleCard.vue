@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
-import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { ChevronDown, ChevronRight, Lock, Plus, Trash2 } from '@lucide/vue'
 import {
   OBLIGATION_ACCENT,
   PROFILE_ENTITY_SOURCE_LABELS,
   PROFILE_OBLIGATION_LABELS,
-  PROFILE_VALUE_KIND_LABELS,
-  obligationBadgeVariant,
 } from '@/lib/profiles/labels'
 import { ENTITY_SOURCE_ORDER, effectiveEntitySources, normalizeEntitySources } from '@/lib/profiles/sources'
 import {
@@ -58,13 +55,6 @@ const emit = defineEmits<{ (e: 'remove'): void }>()
 // through a computed so the card always tracks its live prop; the parent keys
 // each card on the draft uid so it stays pinned to one draft.
 const property = computed(() => props.property)
-const expanded = ref(false)
-
-// Whole-card collapse (issue 7): each card instance is keyed on its draft uid,
-// so local state sticks to one draft. Rules the author just created (the add
-// paths set highlightPropertyUid) start open; everything else starts collapsed
-// behind the one-line summary header.
-const cardOpen = ref(props.builder.highlightPropertyUid === props.property.uid)
 
 // Baseline rules carry a builder-session lock (see DraftLock in useProfileBuilder).
 // `full` (unused on properties today) locks everything; `structural` fixes identity
@@ -130,26 +120,6 @@ const enumOptionsError = computed(() => {
     .filter(Boolean)
   return options.length ? '' : 'Add at least one allowed value, comma-separated, e.g. LC-MS, MALDI-TOF.'
 })
-
-// M2: when a quick action creates this card, scroll it into view and briefly flash
-// its border so the author sees where the new rule landed. Clears the builder flag
-// afterwards so re-adding the same-uid draft can flash again.
-const cardRef = ref<HTMLElement | null>(null)
-const flashing = ref(false)
-watch(
-  () => props.builder.highlightPropertyUid,
-  async (uid) => {
-    if (uid !== property.value.uid) return
-    cardOpen.value = true
-    await nextTick()
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    cardRef.value?.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' })
-    flashing.value = true
-    setTimeout(() => { flashing.value = false }, 1500)
-    props.builder.highlightPropertyUid = null
-  },
-  { immediate: true },
-)
 
 // Imported Describo/Crate-O SelectObject rules are preserved verbatim and not
 // authorable: render a read-only summary card (label, description and obligation
@@ -414,17 +384,6 @@ function applyVocabTerm(term: VocabTerm) {
   }
 }
 
-// Technical identifiers (property name, term URI) live behind a per-card
-// disclosure (RoleBuilder's showRaw pattern); it opens itself when something
-// in it needs attention.
-const showTech = ref(false)
-watch(
-  () => Boolean(valueNameError.value) || externalMode.value,
-  (needsAttention) => {
-    if (needsAttention) showTech.value = true
-  },
-)
-
 // ---------------------------------------------------------------------------
 // Entity-reference target types (kind === 'entity'), grouped so the profile's
 // own entity rules (which supply a real sub-form) come first, then the curated /
@@ -488,36 +447,62 @@ function toggleTarget(uri: string) {
 function createEntityRule(uri: string) {
   props.builder.addEntityRuleForType(uri)
 }
+
+// ---------------------------------------------------------------------------
+// One "Advanced" disclosure holds every power setting (technical identifiers,
+// allowed sources, list cardinality, allowed values/URLs, constraints, required
+// contents). It stays collapsed by default so the card leads with the primary
+// decisions. It auto-opens once, seeded on mount, when the rule already carries
+// advanced content — an imported rule, any non-default constraint, or a field
+// that is currently invalid — so those settings are never silently hidden. It
+// then only ever opens (never auto-closes) if a field inside later turns
+// invalid, mirroring the old technical-details disclosure that opened itself on
+// a name error.
+// ---------------------------------------------------------------------------
+const advancedNeedsAttention = computed(() => {
+  // Invalid fields that live inside Advanced.
+  if (valueNameError.value) return true
+  if (listCountError.value) return true
+  if (property.value.kind === 'enum' && enumOptionsError.value) return true
+  if (property.value.kind === 'select-url' && urlOptionsError.value) return true
+  // The external-URI editor is part of the technical-identifiers group.
+  if (externalMode.value) return true
+  // Non-default / non-empty power settings.
+  if (trimmed(property.value.defaultValue)) return true
+  if (trimmed(property.value.example)) return true
+  if (trimmed(property.value.pattern)) return true
+  if (trimmed(property.value.minLength) || trimmed(property.value.maxLength)) return true
+  if (trimmed(property.value.minValue) || trimmed(property.value.maxValue) || trimmed(property.value.stepValue)) return true
+  if (trimmed(property.value.minItems) || trimmed(property.value.maxItems)) return true
+  if (property.value.kind === 'enum' && trimmed(property.value.enumOptions)) return true
+  if (property.value.kind === 'select-url' && property.value.urlOptions.some((url) => trimmed(url))) return true
+  if (property.value.requiredInstances.length > 0) return true
+  if (showEntitySources.value && (property.value.entitySources?.length ?? 0) > 0) return true
+  // A pasted / custom (non-schema.org) property term URI is an advanced choice.
+  if (property.value.propertyUri && !isSchemaOrgUri(property.value.propertyUri)) return true
+  return false
+})
+
+// Seed the open state from the initial evaluation ("once, on mount"), then keep
+// opening it whenever a field inside turns invalid.
+const advancedOpen = ref(advancedNeedsAttention.value)
+watch(advancedNeedsAttention, (needsAttention) => {
+  if (needsAttention) advancedOpen.value = true
+})
 </script>
 
 <template>
-  <div
-    ref="cardRef"
-    class="rounded-lg border border-border border-l-2 bg-card p-3 transition-shadow"
-    :class="[accentClass, flashing ? 'ring-2 ring-aruna-royal/70 ring-offset-2 ring-offset-background' : '']"
-  >
+  <div class="rounded-lg border border-border border-l-2 bg-card p-3" :class="accentClass">
     <div v-if="anyLock" class="mb-2 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
       <Lock class="h-3 w-3" /> RO-Crate baseline
     </div>
 
-    <!-- Collapsed-state header: the plain-English summary doubles as the toggle. -->
-    <button type="button" class="flex w-full items-start justify-between gap-2 text-left" @click="cardOpen = !cardOpen">
-      <p class="text-xs text-muted-foreground">
-        Each <b class="text-foreground">{{ entityTypeName }}</b>
-        <Badge :variant="obligationBadgeVariant(property.obligation)" class="mx-1">{{ property.obligation }}</Badge>
-        have {{ isMultiValued ? 'a list of' : '' }}
-        <code class="rounded bg-muted px-1 py-0.5 text-[11px] text-foreground">{{ property.valueName || 'property' }}</code>
-        ({{ PROFILE_VALUE_KIND_LABELS[property.kind] }})
-      </p>
-      <component :is="cardOpen ? ChevronDown : ChevronRight" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-    </button>
-
-    <template v-if="cardOpen">
     <!-- Preserved import summary: SelectObject rules are not authorable in the
-         builder; label, description and obligation stay editable, the option list
-         is edited in Describo/Crate-O and travels back out verbatim. -->
+         builder; label and description stay editable, the option list is edited
+         in Describo/Crate-O and travels back out verbatim. Obligation and removal
+         are owned by the row. -->
     <template v-if="isPreservedSelect">
-      <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="grid gap-2 sm:grid-cols-2">
         <div>
           <label class="text-[11px] font-medium text-muted-foreground">Label</label>
           <Input v-model="property.label" class="mt-0.5" :disabled="anyLock" />
@@ -526,34 +511,22 @@ function createEntityRule(uri: string) {
           <label class="text-[11px] font-medium text-muted-foreground">Value type</label>
           <Select v-model="property.kind" :options="kindOptions" class="mt-0.5" disabled />
         </div>
-        <div>
-          <label class="text-[11px] font-medium text-muted-foreground">Obligation</label>
-          <Select v-model="property.obligation" :options="OBLIGATION_OPTIONS" class="mt-0.5" :disabled="obligationDisabled" />
-        </div>
-        <div class="sm:col-span-2 lg:col-span-3">
+        <div class="sm:col-span-2">
           <label class="text-[11px] font-medium text-muted-foreground">Description shown to users</label>
           <Input v-model="property.description" class="mt-0.5" placeholder="What this value should contain." :disabled="anyLock" />
         </div>
       </div>
       <p class="mt-2 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-        Preserved from import, {{ preservedOptionCount }} {{ preservedOptionCount === 1 ? 'option' : 'options' }}. Edit the option list in Describo/Crate-O; label, description and obligation are editable here.
+        Preserved from import, {{ preservedOptionCount }} {{ preservedOptionCount === 1 ? 'option' : 'options' }}. Edit the option list in Describo/Crate-O; label and description are editable here.
       </p>
       <p class="mt-2 text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[property.obligation].help }}</p>
-      <div v-if="!anyLock" class="mt-2 flex justify-end">
-        <button
-          type="button"
-          class="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive"
-          @click="emit('remove')"
-        >
-          <Trash2 class="h-3 w-3" /> Remove property rule
-        </button>
-      </div>
     </template>
 
     <template v-else>
-    <!-- Always-visible core row: plain-language fields only. The technical
-         identifiers (property name, term URI) live in the disclosure below. -->
-    <div class="mt-2 grid gap-2 sm:grid-cols-3">
+    <!-- Primary decisions: what the field is called, what it holds, and the help
+         text shown under it in the generated form. Everything else lives behind
+         the single Advanced disclosure below. -->
+    <div class="grid gap-2 sm:grid-cols-2">
       <div>
         <label class="text-[11px] font-medium text-muted-foreground">Label</label>
         <Input v-model="property.label" class="mt-0.5" placeholder="License" :disabled="anyLock" @blur="autofillName" />
@@ -562,10 +535,10 @@ function createEntityRule(uri: string) {
         <label class="text-[11px] font-medium text-muted-foreground">Value type</label>
         <Select v-model="property.kind" :options="kindOptions" class="mt-0.5" :disabled="kindDisabled" />
       </div>
-      <div>
-        <label class="text-[11px] font-medium text-muted-foreground">Obligation</label>
-        <Select v-model="property.obligation" :options="obligationOptions" class="mt-0.5" :disabled="obligationDisabled" />
-      </div>
+    </div>
+    <div class="mt-2">
+      <label class="text-[11px] font-medium text-muted-foreground">Description shown to users</label>
+      <Input v-model="property.description" class="mt-0.5" placeholder="What this value should contain." :disabled="anyLock" />
     </div>
 
     <!-- Discourage minting: while this rule would mint a portal-hosted term,
@@ -581,150 +554,22 @@ function createEntityRule(uri: string) {
     <!-- M5: hasPart must be an entity reference or the dataset dialog cannot bind it. -->
     <p v-if="hasPartKindError" class="mt-2 text-[11px] text-destructive">{{ hasPartKindError }}</p>
 
-    <!-- WS2: list cardinality is a core control, not a buried "more option".
-         Promoted next to the kind so authors see it. keyword-list is always a
-         list, so it shows the count inputs without the toggle. -->
-    <div class="mt-2 rounded-md border border-border px-3 py-2 text-xs">
-      <label v-if="showMultipleSwitch" class="flex items-center justify-between gap-2">
+    <!-- WS2: the multiple-values toggle stays on the primary surface; the min/max
+         entry counts it unlocks live in Advanced. keyword-list is always a list,
+         so it hides the toggle (its counts still appear under Advanced). -->
+    <div v-if="showMultipleSwitch" class="mt-2 rounded-md border border-border px-3 py-2 text-xs">
+      <label class="flex items-center justify-between gap-2">
         <span>
           Allow multiple values
           <span class="block text-[11px] text-muted-foreground">Users can supply a list instead of a single value.</span>
         </span>
         <Switch :checked="property.multipleValues" :disabled="anyLock" @update:checked="(value: boolean) => (property.multipleValues = value)" />
       </label>
-      <div v-if="isMultiValued" class="grid gap-2 sm:grid-cols-2" :class="showMultipleSwitch ? 'mt-2' : ''">
-        <div>
-          <label class="text-[11px] font-medium text-muted-foreground">Min entries</label>
-          <Input v-model="property.minItems" type="number" min="1" class="mt-0.5" placeholder="optional" :disabled="anyLock" :invalid="listCountError ? 'error' : undefined" />
-        </div>
-        <div>
-          <label class="text-[11px] font-medium text-muted-foreground">Max entries</label>
-          <Input v-model="property.maxItems" type="number" min="1" class="mt-0.5" placeholder="optional" :disabled="anyLock" :invalid="listCountError ? 'error' : undefined" />
-        </div>
-        <p v-if="listCountError" class="text-[11px] text-destructive sm:col-span-2">{{ listCountError }}</p>
-      </div>
     </div>
 
-    <!-- "One of" needs its allowed values right where the kind was chosen —
-         hiding them under "More options" made the kind look unusable (issue 9). -->
-    <div v-if="property.kind === 'enum'" class="mt-2">
-      <label class="text-[11px] font-medium text-muted-foreground">Allowed values</label>
-      <Input v-model="property.enumOptions" class="mt-0.5" placeholder="LC-MS, MALDI-TOF" :disabled="anyLock" :invalid="enumOptionsError ? 'error' : undefined" />
-      <p v-if="enumOptionsError" class="mt-0.5 text-[11px] text-destructive">{{ enumOptionsError }}</p>
-      <p v-else class="mt-0.5 text-[11px] text-muted-foreground">Comma-separated list of the values users may pick.</p>
-    </div>
-
-    <!-- WS3: select-url is authorable — an add/remove list of the allowed absolute
-         URLs users may pick from. At least one is required. L1: an imported set that
-         carries non-string (structured) options is preserved verbatim and read-only. -->
-    <div v-if="property.kind === 'select-url'" class="mt-2">
-      <label class="text-[11px] font-medium text-muted-foreground">Allowed URLs</label>
-      <p
-        v-if="isPreservedUrlOptions"
-        class="mt-1 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
-      >
-        Preserved from import, {{ preservedOptionCount }} {{ preservedOptionCount === 1 ? 'option' : 'options' }} kept as-is because they include structured (non-URL) values. Edit the option list in Describo/Crate-O.
-      </p>
-      <template v-else>
-      <div class="mt-1 space-y-1.5">
-        <div v-for="(_, index) in property.urlOptions" :key="index" class="flex items-center gap-1.5">
-          <Input v-model="property.urlOptions[index]" placeholder="https://creativecommons.org/licenses/by/4.0/" :disabled="kindDisabled" />
-          <button
-            v-if="!kindDisabled"
-            type="button"
-            class="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-destructive"
-            @click="removeUrlOption(index)"
-          >
-            <Trash2 class="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-      <Button v-if="!kindDisabled" type="button" variant="outline" size="sm" class="mt-1.5" @click="addUrlOption">
-        <Plus class="h-3 w-3" /> Add URL
-      </Button>
-      <p v-if="urlOptionsError" class="mt-1 text-[11px] text-destructive">{{ urlOptionsError }}</p>
-      <p v-else class="mt-1 text-[11px] text-muted-foreground">Users pick one of these absolute URLs.</p>
-      </template>
-    </div>
-
-    <!-- Technical details: the machine identifiers behind this rule (RO-Crate
-         property name and ontology term URI). Opens itself when something in it
-         needs attention (a name error, or the external-URI input). -->
-    <div class="mt-2">
-      <button
-        type="button"
-        class="inline-flex max-w-full items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
-        @click="showTech = !showTech"
-      >
-        <component :is="showTech ? ChevronDown : ChevronRight" class="h-3.5 w-3.5 shrink-0" />
-        Technical details
-        <span class="min-w-0 truncate font-mono text-[10px] font-normal text-muted-foreground/80">{{ resolvedUri }}</span>
-      </button>
-      <div v-if="showTech" class="mt-1.5 grid gap-2 rounded-md border border-border p-3 sm:grid-cols-2">
-        <div>
-          <label class="text-[11px] font-medium text-muted-foreground">Property name</label>
-          <Input v-model="property.valueName" class="mt-0.5" placeholder="license" :disabled="anyLock" />
-          <p v-if="valueNameError" class="mt-0.5 text-[11px] text-destructive">{{ valueNameError }}</p>
-          <p v-else class="mt-0.5 text-[11px] text-muted-foreground">The compact JSON key in the crate.</p>
-        </div>
-        <div>
-          <label class="text-[11px] font-medium text-muted-foreground">Property term</label>
-          <Select
-            :model-value="pickerValue"
-            :options="termOptions"
-            class="mt-0.5"
-            :disabled="anyLock"
-            @update:model-value="onTermSelect"
-          />
-          <div v-if="externalMode" class="mt-1.5">
-            <Input
-              v-model="property.propertyUri"
-              placeholder="Search the vocabulary, or paste a term URI"
-              :disabled="anyLock"
-              @blur="commitExternalUri"
-              @keydown.enter="commitExternalUri"
-            />
-            <VocabSuggestions :query="String(property.propertyUri ?? '')" kind="property" @pick="applyVocabTerm" />
-            <p class="mt-0.5 text-[11px] text-muted-foreground">
-              Type to search schema.org and Dublin Core, or paste any absolute term URI from an existing ontology.
-            </p>
-          </div>
-        </div>
-        <p class="break-all font-mono text-[11px] text-muted-foreground sm:col-span-2">{{ resolvedUri }}</p>
-      </div>
-    </div>
-
-    <!-- Entity-reference block: which sources may fulfil the reference, which
-         types it targets, and any required contents (WS5). -->
+    <!-- Entity-reference targets: which types this reference points at. The
+         allowed-sources policy and required-contents editor move to Advanced. -->
     <div v-if="isEntity" class="mt-2 space-y-2">
-      <!-- Allowed sources: a rule may allow several (reuse-or-create). Hidden for
-           hasPart, which binds to the data references. -->
-      <div v-if="showEntitySources">
-        <label class="text-[11px] font-medium text-muted-foreground">Allowed sources</label>
-        <div class="mt-1 space-y-1">
-          <label
-            v-for="option in entitySourceOptions"
-            :key="option.source"
-            class="flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-1.5 text-[11px] transition-colors"
-            :class="selectedSources.includes(option.source)
-              ? 'border-aruna-royal/60 bg-aruna-royal/10'
-              : 'border-border hover:border-primary/40'"
-          >
-            <input
-              type="checkbox"
-              class="mt-0.5 accent-aruna-royal"
-              :checked="selectedSources.includes(option.source)"
-              :disabled="anyLock || (selectedSources.length === 1 && selectedSources.includes(option.source))"
-              @change="toggleEntitySource(option.source)"
-            />
-            <span>
-              <span class="font-medium text-foreground">{{ option.label }}</span>
-              <span class="block text-muted-foreground">{{ option.help }}</span>
-            </span>
-          </label>
-        </div>
-      </div>
-
       <div>
         <label class="text-[11px] font-medium text-muted-foreground">Referenced entity types</label>
         <p class="text-[11px] text-muted-foreground">{{ referenceHelp }}</p>
@@ -777,100 +622,213 @@ function createEntityRule(uri: string) {
           <Plus class="h-3 w-3" /> Create entity rule for {{ target.label }}
         </Button>
       </div>
-
-      <!-- WS5: required contents for a multi-valued reference (most useful for
-           hasPart). Rows match a required entry by Name or @id, with an optional
-           hint. More entries than listed are always allowed. -->
-      <div v-if="showRequiredContents" class="rounded-md border border-border px-3 py-2">
-        <div class="text-[11px] font-medium text-foreground">Required contents</div>
-        <p class="text-[11px] text-muted-foreground">
-          Checked against the dataset's data references; more files are always allowed.
-        </p>
-        <p class="mt-0.5 text-[11px] text-muted-foreground">
-          Match by <b>Name</b> against the entry's label / filename (e.g. <code class="rounded bg-muted px-1">index.html</code>). Match by <b>@id</b> only against its exact reference URL, data references are absolute URLs, so a bare filename never matches.
-        </p>
-        <div v-for="(row, index) in property.requiredInstances" :key="index" class="mt-1.5 space-y-1">
-          <div class="flex flex-wrap items-center gap-1.5">
-            <Select v-model="row.match" :options="MATCH_OPTIONS" class="w-[92px] shrink-0" :disabled="anyLock" />
-            <Input v-model="row.value" class="min-w-[140px] flex-1" :placeholder="row.match === 'id' ? 'https://example.org/data/index.html' : 'index.html'" :disabled="anyLock" :invalid="!trimmed(row.value) ? 'error' : undefined" />
-            <button
-              v-if="!anyLock"
-              type="button"
-              class="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-destructive"
-              @click="removeRequiredInstance(index)"
-            >
-              <Trash2 class="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <Input v-model="row.hint" class="text-[11px]" placeholder="Optional hint shown to users" :disabled="anyLock" />
-        </div>
-        <Button v-if="!anyLock" type="button" variant="outline" size="sm" class="mt-1.5" @click="addRequiredInstance">
-          <Plus class="h-3 w-3" /> Add required item
-        </Button>
-      </div>
     </div>
 
     <p class="mt-2 text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[property.obligation].help }}</p>
 
-    <div class="mt-2 flex items-center justify-between">
+    <!-- One Advanced disclosure for every power setting. Collapsed by default;
+         auto-opens when the rule already carries advanced content (see
+         advancedNeedsAttention). -->
+    <div class="mt-2">
       <button
         type="button"
         class="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
-        @click="expanded = !expanded"
+        :aria-expanded="advancedOpen"
+        @click="advancedOpen = !advancedOpen"
       >
-        <component :is="expanded ? ChevronDown : ChevronRight" class="h-3.5 w-3.5" />
-        More options
+        <component :is="advancedOpen ? ChevronDown : ChevronRight" class="h-3.5 w-3.5 shrink-0" />
+        Advanced
       </button>
-      <button
-        v-if="!anyLock"
-        type="button"
-        class="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive"
-        @click="emit('remove')"
-      >
-        <Trash2 class="h-3 w-3" /> Remove property rule
-      </button>
-    </div>
 
-    <!-- Collapsible advanced constraints -->
-    <div v-if="expanded" class="mt-2 grid gap-2 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="sm:col-span-2 lg:col-span-3">
-        <label class="text-[11px] font-medium text-muted-foreground">Description shown to users</label>
-        <Input v-model="property.description" class="mt-0.5" placeholder="What this value should contain." :disabled="anyLock" />
-      </div>
-      <div v-if="!isEntity">
-        <label class="text-[11px] font-medium text-muted-foreground">Example value</label>
-        <Input v-model="property.example" class="mt-0.5" placeholder="https://creativecommons.org/licenses/by/4.0/" :disabled="anyLock" />
-      </div>
-      <div v-if="!isEntity">
-        <label class="text-[11px] font-medium text-muted-foreground">Default value</label>
-        <Input v-model="property.defaultValue" class="mt-0.5" :disabled="anyLock" />
-      </div>
-      <div v-if="property.kind !== 'boolean' && property.kind !== 'enum' && !isEntity">
-        <label class="text-[11px] font-medium text-muted-foreground">Pattern (regex)</label>
-        <Input v-model="property.pattern" class="mt-0.5" placeholder="^[A-Z][a-z]+ [a-z]+$" :disabled="anyLock" />
-      </div>
-      <div v-if="lengthKinds.includes(property.kind)">
-        <label class="text-[11px] font-medium text-muted-foreground">Min length</label>
-        <Input v-model="property.minLength" type="number" class="mt-0.5" :disabled="anyLock" />
-      </div>
-      <div v-if="lengthKinds.includes(property.kind)">
-        <label class="text-[11px] font-medium text-muted-foreground">Max length</label>
-        <Input v-model="property.maxLength" type="number" class="mt-0.5" :disabled="anyLock" />
-      </div>
-      <div v-if="numericKinds.includes(property.kind)">
-        <label class="text-[11px] font-medium text-muted-foreground">Min value</label>
-        <Input v-model="property.minValue" type="number" class="mt-0.5" :disabled="anyLock" />
-      </div>
-      <div v-if="numericKinds.includes(property.kind)">
-        <label class="text-[11px] font-medium text-muted-foreground">Max value</label>
-        <Input v-model="property.maxValue" type="number" class="mt-0.5" :disabled="anyLock" />
-      </div>
-      <div v-if="numericKinds.includes(property.kind)">
-        <label class="text-[11px] font-medium text-muted-foreground">Step</label>
-        <Input v-model="property.stepValue" type="number" class="mt-0.5" :disabled="anyLock" />
+      <div v-if="advancedOpen" class="mt-2 space-y-3 border-t border-border pt-3">
+        <!-- Technical identifiers: the machine identifiers behind this rule
+             (RO-Crate property name and ontology term URI). -->
+        <div>
+          <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Technical identifiers</div>
+          <div class="mt-1 grid gap-2 rounded-md border border-border p-3 sm:grid-cols-2">
+            <div>
+              <label class="text-[11px] font-medium text-muted-foreground">Property name</label>
+              <Input v-model="property.valueName" class="mt-0.5" placeholder="license" :disabled="anyLock" />
+              <p v-if="valueNameError" class="mt-0.5 text-[11px] text-destructive">{{ valueNameError }}</p>
+              <p v-else class="mt-0.5 text-[11px] text-muted-foreground">The compact JSON key in the crate.</p>
+            </div>
+            <div>
+              <label class="text-[11px] font-medium text-muted-foreground">Property term</label>
+              <Select
+                :model-value="pickerValue"
+                :options="termOptions"
+                class="mt-0.5"
+                :disabled="anyLock"
+                @update:model-value="onTermSelect"
+              />
+              <div v-if="externalMode" class="mt-1.5">
+                <Input
+                  v-model="property.propertyUri"
+                  placeholder="Search the vocabulary, or paste a term URI"
+                  :disabled="anyLock"
+                  @blur="commitExternalUri"
+                  @keydown.enter="commitExternalUri"
+                />
+                <VocabSuggestions :query="String(property.propertyUri ?? '')" kind="property" @pick="applyVocabTerm" />
+                <p class="mt-0.5 text-[11px] text-muted-foreground">
+                  Type to search schema.org and Dublin Core, or paste any absolute term URI from an existing ontology.
+                </p>
+              </div>
+            </div>
+            <p class="break-all font-mono text-[11px] text-muted-foreground sm:col-span-2">{{ resolvedUri }}</p>
+          </div>
+        </div>
+
+        <!-- Allowed sources: a rule may allow several (reuse-or-create). Hidden for
+             hasPart, which binds to the data references. -->
+        <div v-if="showEntitySources">
+          <label class="text-[11px] font-medium text-muted-foreground">Allowed sources</label>
+          <div class="mt-1 space-y-1">
+            <label
+              v-for="option in entitySourceOptions"
+              :key="option.source"
+              class="flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-1.5 text-[11px] transition-colors"
+              :class="selectedSources.includes(option.source)
+                ? 'border-aruna-royal/60 bg-aruna-royal/10'
+                : 'border-border hover:border-primary/40'"
+            >
+              <input
+                type="checkbox"
+                class="mt-0.5 accent-aruna-royal"
+                :checked="selectedSources.includes(option.source)"
+                :disabled="anyLock || (selectedSources.length === 1 && selectedSources.includes(option.source))"
+                @change="toggleEntitySource(option.source)"
+              />
+              <span>
+                <span class="font-medium text-foreground">{{ option.label }}</span>
+                <span class="block text-muted-foreground">{{ option.help }}</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- WS2: list cardinality for a multi-valued rule. -->
+        <div v-if="isMultiValued" class="grid gap-2 sm:grid-cols-2">
+          <div>
+            <label class="text-[11px] font-medium text-muted-foreground">Min entries</label>
+            <Input v-model="property.minItems" type="number" min="1" class="mt-0.5" placeholder="optional" :disabled="anyLock" :invalid="listCountError ? 'error' : undefined" />
+          </div>
+          <div>
+            <label class="text-[11px] font-medium text-muted-foreground">Max entries</label>
+            <Input v-model="property.maxItems" type="number" min="1" class="mt-0.5" placeholder="optional" :disabled="anyLock" :invalid="listCountError ? 'error' : undefined" />
+          </div>
+          <p v-if="listCountError" class="text-[11px] text-destructive sm:col-span-2">{{ listCountError }}</p>
+        </div>
+
+        <!-- "One of" allowed values. -->
+        <div v-if="property.kind === 'enum'">
+          <label class="text-[11px] font-medium text-muted-foreground">Allowed values</label>
+          <Input v-model="property.enumOptions" class="mt-0.5" placeholder="LC-MS, MALDI-TOF" :disabled="anyLock" :invalid="enumOptionsError ? 'error' : undefined" />
+          <p v-if="enumOptionsError" class="mt-0.5 text-[11px] text-destructive">{{ enumOptionsError }}</p>
+          <p v-else class="mt-0.5 text-[11px] text-muted-foreground">Comma-separated list of the values users may pick.</p>
+        </div>
+
+        <!-- WS3: select-url is authorable — an add/remove list of the allowed absolute
+             URLs users may pick from. At least one is required. L1: an imported set that
+             carries non-string (structured) options is preserved verbatim and read-only. -->
+        <div v-if="property.kind === 'select-url'">
+          <label class="text-[11px] font-medium text-muted-foreground">Allowed URLs</label>
+          <p
+            v-if="isPreservedUrlOptions"
+            class="mt-1 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
+          >
+            Preserved from import, {{ preservedOptionCount }} {{ preservedOptionCount === 1 ? 'option' : 'options' }} kept as-is because they include structured (non-URL) values. Edit the option list in Describo/Crate-O.
+          </p>
+          <template v-else>
+          <div class="mt-1 space-y-1.5">
+            <div v-for="(_, index) in property.urlOptions" :key="index" class="flex items-center gap-1.5">
+              <Input v-model="property.urlOptions[index]" placeholder="https://creativecommons.org/licenses/by/4.0/" :disabled="kindDisabled" />
+              <button
+                v-if="!kindDisabled"
+                type="button"
+                class="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-destructive"
+                @click="removeUrlOption(index)"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          <Button v-if="!kindDisabled" type="button" variant="outline" size="sm" class="mt-1.5" @click="addUrlOption">
+            <Plus class="h-3 w-3" /> Add URL
+          </Button>
+          <p v-if="urlOptionsError" class="mt-1 text-[11px] text-destructive">{{ urlOptionsError }}</p>
+          <p v-else class="mt-1 text-[11px] text-muted-foreground">Users pick one of these absolute URLs.</p>
+          </template>
+        </div>
+
+        <!-- Scalar constraints: default / example / pattern / length / numeric range. -->
+        <div v-if="!isEntity" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <label class="text-[11px] font-medium text-muted-foreground">Example value</label>
+            <Input v-model="property.example" class="mt-0.5" placeholder="https://creativecommons.org/licenses/by/4.0/" :disabled="anyLock" />
+          </div>
+          <div>
+            <label class="text-[11px] font-medium text-muted-foreground">Default value</label>
+            <Input v-model="property.defaultValue" class="mt-0.5" :disabled="anyLock" />
+          </div>
+          <div v-if="property.kind !== 'boolean' && property.kind !== 'enum'">
+            <label class="text-[11px] font-medium text-muted-foreground">Pattern (regex)</label>
+            <Input v-model="property.pattern" class="mt-0.5" placeholder="^[A-Z][a-z]+ [a-z]+$" :disabled="anyLock" />
+          </div>
+          <div v-if="lengthKinds.includes(property.kind)">
+            <label class="text-[11px] font-medium text-muted-foreground">Min length</label>
+            <Input v-model="property.minLength" type="number" class="mt-0.5" :disabled="anyLock" />
+          </div>
+          <div v-if="lengthKinds.includes(property.kind)">
+            <label class="text-[11px] font-medium text-muted-foreground">Max length</label>
+            <Input v-model="property.maxLength" type="number" class="mt-0.5" :disabled="anyLock" />
+          </div>
+          <div v-if="numericKinds.includes(property.kind)">
+            <label class="text-[11px] font-medium text-muted-foreground">Min value</label>
+            <Input v-model="property.minValue" type="number" class="mt-0.5" :disabled="anyLock" />
+          </div>
+          <div v-if="numericKinds.includes(property.kind)">
+            <label class="text-[11px] font-medium text-muted-foreground">Max value</label>
+            <Input v-model="property.maxValue" type="number" class="mt-0.5" :disabled="anyLock" />
+          </div>
+          <div v-if="numericKinds.includes(property.kind)">
+            <label class="text-[11px] font-medium text-muted-foreground">Step</label>
+            <Input v-model="property.stepValue" type="number" class="mt-0.5" :disabled="anyLock" />
+          </div>
+        </div>
+
+        <!-- WS5: required contents for a multi-valued reference (most useful for
+             hasPart). Rows match a required entry by Name or @id, with an optional
+             hint. More entries than listed are always allowed. -->
+        <div v-if="showRequiredContents" class="rounded-md border border-border px-3 py-2">
+          <div class="text-[11px] font-medium text-foreground">Required contents</div>
+          <p class="text-[11px] text-muted-foreground">
+            Checked against the dataset's data references; more files are always allowed.
+          </p>
+          <p class="mt-0.5 text-[11px] text-muted-foreground">
+            Match by <b>Name</b> against the entry's label / filename (e.g. <code class="rounded bg-muted px-1">index.html</code>). Match by <b>@id</b> only against its exact reference URL, data references are absolute URLs, so a bare filename never matches.
+          </p>
+          <div v-for="(row, index) in property.requiredInstances" :key="index" class="mt-1.5 space-y-1">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <Select v-model="row.match" :options="MATCH_OPTIONS" class="w-[92px] shrink-0" :disabled="anyLock" />
+              <Input v-model="row.value" class="min-w-[140px] flex-1" :placeholder="row.match === 'id' ? 'https://example.org/data/index.html' : 'index.html'" :disabled="anyLock" :invalid="!trimmed(row.value) ? 'error' : undefined" />
+              <button
+                v-if="!anyLock"
+                type="button"
+                class="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-destructive"
+                @click="removeRequiredInstance(index)"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <Input v-model="row.hint" class="text-[11px]" placeholder="Optional hint shown to users" :disabled="anyLock" />
+          </div>
+          <Button v-if="!anyLock" type="button" variant="outline" size="sm" class="mt-1.5" @click="addRequiredInstance">
+            <Plus class="h-3 w-3" /> Add required item
+          </Button>
+        </div>
       </div>
     </div>
-    </template>
     </template>
   </div>
 </template>
