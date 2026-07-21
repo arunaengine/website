@@ -1,9 +1,6 @@
 <script setup lang="ts">
-// Non-interactive profile chip shared by the dashboard / search / recent-datasets
-// cards (L6). Those cards are themselves RouterLinks, so a nested profile anchor
-// would be invalid HTML — this stays a titled span. Resolution: a locally-known
-// profile → its short name (tooltip "Profile: <name>"); otherwise the first raw
-// conformsTo IRI (tooltip = the full IRI); no conformance → "No profile".
+// Non-interactive chip for cards that are already links. It shows a resolved
+// profile, one unresolved IRI, or an honest count for multiple profiles.
 import { computed } from 'vue'
 import { ListChecks } from '@lucide/vue'
 import { useAruna, readableIri } from '@/composables/useAruna'
@@ -15,8 +12,11 @@ const { profiles } = useAruna()
 const chip = computed(() => {
   const resolved = profiles.value.find((profile) => profile.id === props.doc.profileId)
   if (resolved) return { label: resolved.shortName, profileId: resolved.id, title: '' }
-  const iri = props.doc.conformsToIds?.[0]
-  if (iri) return { label: readableIri(iri), profileId: '', title: iri }
+  const iris = props.doc.conformsToIds ?? []
+  if (iris.length === 1) {
+    for (const iri of iris) return { label: readableIri(iri), profileId: '', title: iri }
+  }
+  if (iris.length > 1) return { label: `${iris.length} profiles`, profileId: '', title: iris.join('\n') }
   return { label: 'No profile', profileId: '', title: '' }
 })
 

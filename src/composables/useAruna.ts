@@ -63,7 +63,11 @@ import {
   type UnifiedSearchResponse,
 } from '@/lib/api'
 import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
-import { WORKFLOW_RUN_CRATE_PROFILE } from '@/lib/profiles/builtinProfiles'
+import {
+  PROCESS_RUN_CRATE_PROFILE,
+  PROCESS_RUN_CRATE_PROFILE_ID,
+  PROCESS_RUN_PROFILE_URI,
+} from '@/lib/profiles/builtinProfiles'
 
 const TOKEN_KEY = 'aruna.authToken'
 const API_BASE_KEY = 'aruna.apiBaseUrl'
@@ -1105,12 +1109,11 @@ function memberCount(roles?: ApiRole[]): number | undefined {
   return users.size
 }
 
-// Stored profiles plus the bundled built-ins (a stored profile with the same id
-// wins, so a node can override the built-in with its own copy).
+// Stored profiles plus the bundled Process Run profile. Its id is reserved so
+// exact Process Run conformance always resolves to the bundled definition.
 const profiles = computed<MetadataProfile[]>(() => {
-  const stored = profileItems.value.map(mapProfile)
-  const taken = new Set(stored.map((profile) => profile.id))
-  return [...stored, ...(taken.has(WORKFLOW_RUN_CRATE_PROFILE.id) ? [] : [WORKFLOW_RUN_CRATE_PROFILE])]
+  const stored = profileItems.value.map(mapProfile).filter((profile) => profile.id !== PROCESS_RUN_CRATE_PROFILE.id)
+  return [...stored, PROCESS_RUN_CRATE_PROFILE]
 })
 const metadata = computed<MetadataDoc[]>(() => metadataItems.value.map(mapMetadataDoc))
 
@@ -1121,11 +1124,15 @@ function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
   const keywords = arrayText(entity?.keywords ?? entity?.keyword)
   const license = idValue(entity?.license) || textValue(entity?.license) || ''
   const contributors = people(entity?.author ?? entity?.creator ?? entity?.contributor)
-  const profileIds = profileIdsFromConformsTo(entity?.conformsTo)
-  const profileId = profileIds[0] ?? ''
   // Keep the raw conformance ids so the UI can show an external profile IRI even when it
   // resolves to no local profile. Drop the RO-Crate spec conformance URI, which is not a profile.
-  const conformsToIds = idValues(entity?.conformsTo).filter((id) => !id.startsWith('https://w3id.org/ro/crate'))
+  const conformsToIds = idValues(entity?.conformsTo).filter(
+    (id) => id !== 'https://w3id.org/ro/crate/1.1' && id !== 'https://w3id.org/ro/crate/1.2',
+  )
+  const profileIds = profileIdsFromConformsTo(entity?.conformsTo)
+  let profileId = ''
+  if (conformsToIds.includes(PROCESS_RUN_PROFILE_URI)) profileId = PROCESS_RUN_CRATE_PROFILE_ID
+  else if (profileIds.length === 1) for (const resolvedId of profileIds) profileId = resolvedId
   return {
     ulid: item.document_id,
     title,
@@ -1186,7 +1193,7 @@ function mapProfile(item: MetadataDocumentListItem): MetadataProfile {
     name,
     shortName: name.split(/\s+/)[0] || pathId,
     description: parsed.description || textValue(entity?.description) || '',
-    domain: typeList(entity).includes('http://www.w3.org/ns/dx/prof#Profile') ? 'RO-Crate Profile' : textValue(entity?.domain) || 'RO-Crate',
+    domain: typeList(entity).includes('http://www.w3.org/ns/dx/prof/Profile') ? 'RO-Crate Profile' : textValue(entity?.domain) || 'RO-Crate',
     version: parsed.version,
     iconColor: colorFor(pathId),
     entityRules: parsed.entityRules,
@@ -1258,6 +1265,7 @@ function profileIdsFromConformsTo(value: unknown): string[] {
 }
 
 function profileIdFromConformanceId(id: string): string | undefined {
+  if (id === PROCESS_RUN_PROFILE_URI) return PROCESS_RUN_CRATE_PROFILE_ID
   const byGraph = profileItems.value.find((profile) => profile.graph_iri === id)
   if (byGraph) return profileIdFromPath(byGraph.document_path) || byGraph.document_id
   return undefined

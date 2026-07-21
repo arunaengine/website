@@ -17,9 +17,8 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useDebounceFn } from '@vueuse/core'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
-import { conformsToWorkflowRun } from '@/lib/profiles/builtinProfiles'
-import { parseRunCrate } from '@/lib/runCrate'
-import { Search, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound, Workflow } from '@lucide/vue'
+import { conformsToProcessRun } from '@/lib/profiles/builtinProfiles'
+import { Search, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound } from '@lucide/vue'
 import type { MetadataDoc, SparqlResult } from '@/data/types'
 import type { BucketSearchHit, UserSearchHit } from '@/lib/api'
 import type { RouteLocationRaw } from 'vue-router'
@@ -133,17 +132,9 @@ const hits = computed(() =>
     return true
   }),
 )
-// Workflow runs are their own Discover section: a document counts as a run
-// crate when its conformance ids match the Workflow Run Crate profiles
-// (w3id.org/ro/wfrun, or the bundled built-in) or when it parses as run
-// provenance the way the run panels do.
+// Process runs are their own Discover section and match the complete profile IRI.
 function isRunCrateDoc(doc: MetadataDoc): boolean {
-  if (conformsToWorkflowRun(doc.conformsToIds)) return true
-  try {
-    return parseRunCrate(doc.roCrate, '') !== null
-  } catch {
-    return false
-  }
+  return conformsToProcessRun(doc.conformsToIds)
 }
 const catalogSplit = computed(() => {
   const runs: MetadataDoc[] = []
@@ -609,12 +600,12 @@ async function runQuery() {
               </div>
             </section>
 
-            <!-- Run crates (Workflow Run RO-Crate / run provenance) get their own
+            <!-- Process Run crates get their own
                  section so compute runs never mix with ordinary datasets. -->
             <section v-if="catalogSplit.runs.length">
               <div class="mb-3 flex items-center gap-2">
-                <Workflow class="h-4 w-4 text-primary" />
-                <h2 class="font-display text-sm font-semibold text-aruna-navy">Workflow runs</h2>
+                <Play class="h-4 w-4 text-primary" />
+                <h2 class="font-display text-sm font-semibold text-aruna-navy">Compute runs</h2>
                 <span class="text-xs text-muted-foreground">{{ catalogSplit.runs.length }}</span>
               </div>
               <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
