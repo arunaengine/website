@@ -6,7 +6,7 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
-import { CheckCircle2, AlertTriangle, ChevronDown, FileCode2, Lightbulb, Repeat2 } from '@lucide/vue'
+import { CheckCircle2, AlertTriangle, ChevronDown, Download, FileCode2, Lightbulb, Repeat2 } from '@lucide/vue'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
 import { buildProfileArtifactTexts, parseProfileCrate } from '@/lib/profiles/rocrate'
 import { validateProfileData } from '@/lib/profiles/validate'
@@ -49,6 +49,33 @@ const artifactTexts = computed(() =>
     customShapesText: builder.customShapesText.trim() ? builder.customShapesText : undefined,
   }),
 )
+
+// Per-artifact downloads: the same texts the crate embeds, saved as real files
+// so a generated SHACL shape (or any artifact) is usable outside the portal.
+function downloadText(text: string | undefined, filename: string, type: string) {
+  if (!text) return
+  const blob = new Blob([text], { type })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
+const fileSlug = computed(() => builder.slug.trim() || 'profile')
+const artifactDownloads = computed(() => [
+  { label: 'shapes.ttl', text: artifactTexts.value.shapes, filename: `${fileSlug.value}.shapes.ttl`, type: 'text/turtle' },
+  ...(artifactTexts.value.customShapes
+    ? [{ label: 'shapes.custom.ttl', text: artifactTexts.value.customShapes, filename: `${fileSlug.value}.shapes.custom.ttl`, type: 'text/turtle' }]
+    : []),
+  { label: 'schema.json', text: artifactTexts.value.schema, filename: `${fileSlug.value}.schema.json`, type: 'application/json' },
+  { label: 'mode.json', text: artifactTexts.value.mode, filename: `${fileSlug.value}.mode.json`, type: 'application/json' },
+  { label: 'profile.html', text: artifactTexts.value.html, filename: `${fileSlug.value}.profile.html`, type: 'text/html' },
+  { label: 'profile crate', text: builder.generatedCrateText, filename: `${fileSlug.value}.crate.json`, type: 'application/json' },
+])
 
 // Plain-English lines for every constraint the schema/mode preview cannot show at
 // a glance: allowed URL sets, list cardinality, reference mode, required contents.
@@ -262,6 +289,18 @@ function violationsFor(property: string) {
           <b class="text-foreground">shapes.ttl</b> the SHACL shapes for deep validation.
           Editors read the mode file; validation reads the validation rules, mode files have no vocabulary for constraints or recommended levels.
         </p>
+        <div class="mt-2 flex flex-wrap items-center gap-1.5">
+          <span class="text-[11px] font-medium text-muted-foreground">Download:</span>
+          <button
+            v-for="artifact in artifactDownloads"
+            :key="artifact.label"
+            type="button"
+            class="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-foreground transition-colors hover:border-aruna-royal/60 hover:bg-aruna-royal/10"
+            @click="downloadText(artifact.text, artifact.filename, artifact.type)"
+          >
+            <Download class="size-3" /> {{ artifact.label }}
+          </button>
+        </div>
         <Tabs default-value="schema" class="mt-3">
           <TabsList>
             <TabsTrigger value="schema">Validation rules</TabsTrigger>

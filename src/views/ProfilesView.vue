@@ -168,6 +168,23 @@ function downloadModeFile(profile: MetadataProfile) {
   downloadJson(mode, `${profile.id}.mode.json`)
 }
 
+// SHACL export: the stored generated shapes (plus attached custom shapes when
+// present) as .ttl files, so the profile's constraints are usable in any SHACL
+// tool outside the portal.
+function downloadShapes(profile: MetadataProfile) {
+  const parts = [profile.shapesText, profile.customShapesText].filter((text): text is string => Boolean(text?.trim()))
+  if (!parts.length) return
+  const blob = new Blob([parts.join('\n\n')], { type: 'text/turtle' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `${profile.id}.shapes.ttl`
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
 function groupByObligation(rules: ProfilePropertyRule[]) {
   return OBLIGATION_ORDER
     .map((obligation) => ({ obligation, rules: rules.filter((rule) => rule.obligation === obligation) }))
@@ -274,6 +291,15 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 title="Mode file (Describo/Crate-O), structure only; validation rules travel in the profile crate"
               >
                 <Download class="h-3.5 w-3.5" /> Mode file (Describo/Crate-O)
+              </Button>
+              <Button
+                v-if="selected.shapesText || selected.customShapesText"
+                variant="outline"
+                size="sm"
+                @click="downloadShapes(selected)"
+                title="SHACL shapes generated from this profile's rules (plus attached shapes, when present), usable in any SHACL validator"
+              >
+                <Download class="h-3.5 w-3.5" /> SHACL shapes
               </Button>
               <Button v-if="currentUser && preferredId !== selected.id" variant="outline" size="sm" :disabled="saving" @click="setPreferred(selected.id)">
                 <Star class="h-3.5 w-3.5" /> Set as my default
