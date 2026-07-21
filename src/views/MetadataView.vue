@@ -16,6 +16,7 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { computed, ref, watch } from 'vue'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
@@ -23,13 +24,13 @@ import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useArun
 import { useS3 } from '@/composables/useS3'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
-import { formatBytes, relativeTime } from '@/lib/utils'
+import { formatBytes, isHttpUrl, relativeTime } from '@/lib/utils'
 import { metaWatchPathPrefix } from '@/lib/watches'
 import { parseRunCrate } from '@/lib/runCrate'
 import { crateGraph, crateRootId, dataEntitiesOf, stringProp, type DataEntity } from '@/lib/dataEntities'
 import { useCrateReferences } from '@/composables/useCrateReferences'
 import type { CrateObjectReference } from '@/lib/crateReferences'
-import { ArrowLeft, ListChecks, Code2, Eye, FileJson2, ExternalLink, Link2, Pencil, Trash2, Star } from '@lucide/vue'
+import { ArrowLeft, ListChecks, Code2, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Link2, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -384,6 +385,15 @@ function entitySize(row: DataEntity): string {
               <RouterLink v-if="currentProfile" :to="{ name: 'profile-detail', params: { profileId: currentProfile.id } }" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:opacity-80">
                 <ListChecks class="h-3 w-3" /> {{ currentProfile.name }}
               </RouterLink>
+              <ExternalLink
+                v-else-if="conformsIris.length === 1 && isHttpUrl(conformsIris[0])"
+                :href="conformsIris[0]"
+                :show-icon="false"
+                class="rounded-full bg-primary/10 px-2 py-0.5 text-[11px]"
+                :title="conformsTitle"
+              >
+                <ListChecks class="h-3 w-3" /> {{ profileName }}
+              </ExternalLink>
               <span v-else-if="conformsIris.length" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary" :title="conformsTitle">
                 <ListChecks class="h-3 w-3" /> {{ profileName }}
               </span>
@@ -409,7 +419,8 @@ function entitySize(row: DataEntity): string {
             <div class="surface-muted p-3">
               <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">License</dt>
               <dd class="mt-1 truncate text-sm">
-                <a v-if="current.license" :href="current.license" target="_blank" rel="noopener" class="inline-flex items-center gap-1 font-medium text-primary hover:underline">License <ExternalLink class="h-3 w-3" /></a>
+                <ExternalLink v-if="current.license && isHttpUrl(current.license)" :href="current.license" label="License" class="font-medium" />
+                <span v-else-if="current.license" class="font-medium text-foreground">{{ current.license }}</span>
                 <span v-else class="text-muted-foreground">Not set</span>
               </dd>
             </div>
@@ -520,8 +531,8 @@ function entitySize(row: DataEntity): string {
                     <Button v-if="canPreview(row)" variant="ghost" size="icon-sm" aria-label="Preview" @click.stop="openPreview(row)">
                       <Eye class="size-3.5" />
                     </Button>
-                    <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open ${row.name} in a new tab`" @click.stop>
-                      <ExternalLink class="h-3.5 w-3.5" />
+                    <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener noreferrer" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open ${row.name} in a new tab`" @click.stop>
+                      <ExternalLinkIcon class="h-3.5 w-3.5" />
                     </a>
                     <span v-if="!canPreview(row) && !entityLink(row)" class="text-muted-foreground">-</span>
                   </div>
@@ -554,16 +565,13 @@ function entitySize(row: DataEntity): string {
               >
                 {{ row.label }}
               </RouterLink>
-              <a
-                v-else-if="row.iri.startsWith('http')"
+              <ExternalLink
+                v-else-if="isHttpUrl(row.iri)"
                 :href="row.iri"
-                target="_blank"
-                rel="noopener"
-                class="inline-flex min-w-0 items-center gap-1 truncate text-primary hover:underline"
+                :label="row.label"
+                class="min-w-0 truncate"
                 :title="row.iri"
-              >
-                {{ row.label }} <ExternalLink class="h-3 w-3 shrink-0" />
-              </a>
+              />
               <span v-else class="min-w-0 truncate text-muted-foreground" :title="row.iri">{{ row.label }}</span>
               <Badge variant="outline" class="shrink-0 text-[10px] uppercase">{{ row.documentId ? 'in portal' : 'external' }}</Badge>
             </li>

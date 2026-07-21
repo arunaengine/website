@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
@@ -23,7 +24,7 @@ import {
   type TesTask,
 } from '@/lib/tes'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Ban, Download, ExternalLink, FileText, RefreshCw } from '@lucide/vue'
+import { Ban, Download, ExternalLink as ExternalLinkIcon, FileText, RefreshCw } from '@lucide/vue'
 
 const props = defineProps<{ taskId: string; open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled'): void }>()
@@ -349,10 +350,10 @@ const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.
               <span class="text-muted-foreground">→</span>
               <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
               <template v-else-if="row.link.kind === 'drs'">
-                <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLink class="h-3 w-3" /></a>
-                <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener" aria-label="Download"><Download class="h-3.5 w-3.5" /></a>
+                <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
+                <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download"><Download class="h-3.5 w-3.5" /></a>
               </template>
-              <span v-else class="font-mono text-muted-foreground">{{ row.url }}</span>
+              <ExternalLink v-else :href="row.url" :label="row.url" class="font-mono text-muted-foreground hover:text-primary" />
             </div>
           </div>
 
@@ -364,10 +365,10 @@ const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.
               <span class="text-muted-foreground">→</span>
               <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
               <template v-else-if="row.link.kind === 'drs'">
-                <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLink class="h-3 w-3" /></a>
-                <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener" aria-label="Download"><Download class="h-3.5 w-3.5" /></a>
+                <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
+                <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download"><Download class="h-3.5 w-3.5" /></a>
               </template>
-              <span v-else class="font-mono text-muted-foreground">{{ row.url }}</span>
+              <ExternalLink v-else :href="row.url" :label="row.url" class="font-mono text-muted-foreground hover:text-primary" />
             </div>
           </div>
         </section>

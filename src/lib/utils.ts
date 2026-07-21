@@ -69,6 +69,21 @@ export function shortUserId(userId: string, taken?: Iterable<string>): string {
   return short()
 }
 
+// True only for absolute http(s) URLs. Everything else — bare identifiers,
+// ORCIDs without a scheme, and unsafe schemes like javascript:/data:/mailto:
+// — is rejected, so callers can safely turn the value into an anchor.
+export function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  try {
+    const { protocol } = new URL(trimmed)
+    return protocol === 'http:' || protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 export function copyToClipboard(text: string): Promise<void> {
   if (typeof navigator !== 'undefined' && navigator.clipboard) {
     return navigator.clipboard.writeText(text)

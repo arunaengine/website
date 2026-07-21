@@ -3,6 +3,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import NewProfileDialog from '@/components/metadata/NewProfileDialog.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
@@ -338,8 +339,15 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                       <span class="text-sm font-medium text-foreground">{{ rule.label }}</span>
                       <code class="hash rounded bg-muted px-1.5 py-0.5 text-foreground/70">{{ rule.valueName }}</code>
                       <span class="text-[10px] uppercase tracking-wide text-muted-foreground">{{ PROFILE_VALUE_KIND_LABELS[rule.kind] }}</span>
-                      <!-- Absolute property term URI (mode input `id`), truncated. -->
-                      <code v-if="rule.propertyUri" class="inline-block max-w-[240px] truncate align-middle font-mono text-[10px] text-muted-foreground/70" :title="rule.propertyUri">{{ rule.propertyUri }}</code>
+                      <!-- Absolute property term URI (mode input `id`), truncated; an
+                           http(s) term IRI is a link to its vocabulary definition. -->
+                      <ExternalLink
+                        v-if="rule.propertyUri"
+                        :href="rule.propertyUri"
+                        :show-icon="false"
+                        class="inline-block max-w-[240px] truncate align-middle font-mono text-[10px] text-muted-foreground/70 hover:text-primary"
+                        :title="rule.propertyUri"
+                      />
                     </div>
                     <p v-if="rule.description" class="mt-0.5 text-[12px] text-muted-foreground">{{ rule.description }}</p>
                     <!-- Entity-reference targets: the entity types this property points at. -->

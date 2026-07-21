@@ -2,14 +2,15 @@
 import { computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { useS3 } from '@/composables/useS3'
 import { featureEnabled } from '@/lib/config'
 import { drsDownloadHref, drsObjectHref, isDrsReference, parseS3Url } from '@/lib/tes'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
-import { formatBytes, relativeTime, shortUserId, truncateMiddle } from '@/lib/utils'
-import { Cpu, Download, ExternalLink, FileInput, FileOutput, HardDrive, Play, Terminal } from '@lucide/vue'
+import { formatBytes, isHttpUrl, relativeTime, shortUserId, truncateMiddle } from '@/lib/utils'
+import { Cpu, Download, ExternalLink as ExternalLinkIcon, FileInput, FileOutput, HardDrive, Play, Terminal } from '@lucide/vue'
 
 const props = defineProps<{ run: RunCrateModel }>()
 
@@ -40,6 +41,17 @@ const agentLabel = computed(() => {
   if (!a) return ''
   if (a.identifier) return userDir.cachedUser(a.identifier)?.name || a.name || shortUserId(a.identifier)
   return a.name || a.id.replace(/^#agent-/, '')
+})
+
+// Where "Submitted by" points: an Aruna `{ulid}@{realm}` id resolves to the
+// in-portal user profile (same form AuthorChips links); an http(s) identifier
+// (e.g. an ORCID URL) opens externally; otherwise the name stays plain text.
+const ARUNA_USER_ID = /^[0-9A-HJKMNP-TV-Z]{26}@[A-Za-z0-9_-]{43}$/
+const agentLink = computed(() => {
+  const id = props.run.agent?.identifier
+  if (id && ARUNA_USER_ID.test(id)) return { kind: 'user' as const, id }
+  if (isHttpUrl(id)) return { kind: 'external' as const, href: id }
+  return { kind: 'plain' as const }
 })
 
 const instrumentLabel = computed(() => props.run.instrument?.name || props.run.instrument?.identifier || '')
@@ -153,7 +165,17 @@ const flow = computed(() => [
       </div>
       <div v-if="agentLabel" class="min-w-0">
         <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Submitted by</dt>
-        <dd class="mt-1 break-all text-sm text-foreground" :title="run.agent?.identifier || run.agent?.id">{{ agentLabel }}</dd>
+        <dd class="mt-1 break-all text-sm" :title="run.agent?.identifier || run.agent?.id">
+          <RouterLink
+            v-if="agentLink.kind === 'user'"
+            class="text-primary hover:underline"
+            :to="{ name: 'user-profile', params: { id: agentLink.id } }"
+          >
+            {{ agentLabel }}
+          </RouterLink>
+          <ExternalLink v-else-if="agentLink.kind === 'external'" :href="agentLink.href" :label="agentLabel" />
+          <span v-else class="text-foreground">{{ agentLabel }}</span>
+        </dd>
       </div>
       <div v-if="run.workspaceBucket" class="min-w-0">
         <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Workspace</dt>
@@ -192,13 +214,13 @@ const flow = computed(() => [
           <dl v-if="instrumentLabel || containerLabel || run.command" class="mt-2 space-y-2 text-xs">
             <div v-if="instrumentLabel">
               <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Software</dt>
-              <dd class="mt-0.5 break-all text-foreground">{{ instrumentLabel }}</dd>
+              <dd class="mt-0.5 break-all text-foreground"><ExternalLink :href="instrumentLabel" :label="instrumentLabel" /></dd>
             </div>
             <div v-if="containerLabel">
               <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Container image</dt>
               <dd class="mt-0.5 break-all font-mono text-[11px]">
-                <a v-if="run.container?.url" :href="run.container.url" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-primary hover:underline">
-                  {{ containerLabel }} <ExternalLink class="h-3 w-3 shrink-0" />
+                <a v-if="run.container?.url" :href="run.container.url" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-primary hover:underline">
+                  {{ containerLabel }} <ExternalLinkIcon class="h-3 w-3 shrink-0" />
                 </a>
                 <span v-else class="text-foreground">{{ containerLabel }}</span>
               </dd>
@@ -228,8 +250,8 @@ const flow = computed(() => [
                 {{ row.name }}
               </RouterLink>
               <template v-else-if="row.link.kind === 'drs'">
-                <a class="inline-flex items-center gap-1 break-all font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener">{{ truncateMiddle(row.name, 24, 12) }} <ExternalLink class="h-3 w-3" /></a>
-                <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener" :aria-label="`Download ${row.name}`"><Download class="h-3.5 w-3.5" /></a>
+                <a class="inline-flex items-center gap-1 break-all font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.name, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
+                <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" :aria-label="`Download ${row.name}`"><Download class="h-3.5 w-3.5" /></a>
               </template>
               <span v-else class="break-all font-mono text-muted-foreground" :title="row.id">{{ row.name }}</span>
               <span v-if="row.size" class="text-muted-foreground">{{ row.size }}</span>
