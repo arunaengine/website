@@ -6,9 +6,10 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type GroupDetailResponse } from '@/lib/api'
@@ -25,10 +26,31 @@ const name = ref('')
 const submitError = ref<string | null>(null)
 const capReached = ref(false)
 
+// Dialog discard guard: outside clicks never close the dialog; an explicit close
+// (X, Escape, Cancel) after a name has been typed asks before discarding.
+const confirmDiscardOpen = ref(false)
+const hasDraftProgress = computed(() => Boolean(name.value.trim()))
+function requestClose(next: boolean) {
+  if (next) {
+    emit('update:open', true)
+    return
+  }
+  if (hasDraftProgress.value) {
+    confirmDiscardOpen.value = true
+    return
+  }
+  emit('update:open', false)
+}
+function discardDraft() {
+  confirmDiscardOpen.value = false
+  emit('update:open', false)
+}
+
 watch(
   () => props.open,
   (open) => {
     if (!open) return
+    confirmDiscardOpen.value = false
     name.value = ''
     submitError.value = null
     capReached.value = false
@@ -51,8 +73,8 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-md">
+  <Dialog :open="props.open" @update:open="requestClose">
+    <DialogContent class="max-w-md" @interact-outside="(event: Event) => event.preventDefault()">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Users class="h-4 w-4 text-primary" /> Create group
@@ -78,6 +100,8 @@ async function submit() {
           {{ saving ? 'Creating…' : 'Create group' }}
         </Button>
       </DialogFooter>
+
+      <DiscardDraftConfirm :open="confirmDiscardOpen" @keep="confirmDiscardOpen = false" @discard="discardDraft" />
     </DialogContent>
   </Dialog>
 </template>

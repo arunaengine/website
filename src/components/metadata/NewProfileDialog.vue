@@ -6,6 +6,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
 import Button from '@/components/ui/Button.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -61,6 +62,26 @@ const step = ref(1)
 // Step 1 mode switch: author from scratch or import an existing profile.
 const startTab = ref('create')
 
+// Dialog discard guard: outside clicks never close the dialog; an explicit close
+// (X, Escape, Cancel) while the builder has edits asks before discarding. The
+// open watcher below resets all state, so "Discard" only needs to close.
+const confirmDiscardOpen = ref(false)
+function requestClose(next: boolean) {
+  if (next) {
+    emit('update:open', true)
+    return
+  }
+  if (builder.hasEdits) {
+    confirmDiscardOpen.value = true
+    return
+  }
+  emit('update:open', false)
+}
+function discardDraft() {
+  confirmDiscardOpen.value = false
+  emit('update:open', false)
+}
+
 const currentStepErrors = computed(() => {
   if (step.value === 1) return builder.basicsErrors
   if (step.value === 2) return builder.rulesErrors
@@ -86,6 +107,7 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return
+    confirmDiscardOpen.value = false
     builder.reset()
     step.value = 1
     startTab.value = 'create'
@@ -192,8 +214,8 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-6xl">
+  <Dialog :open="props.open" @update:open="requestClose">
+    <DialogContent class="max-w-6xl" @interact-outside="(event: Event) => event.preventDefault()">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <ListChecks class="h-4 w-4 text-primary" /> {{ isEditing ? 'Edit metadata profile' : 'New metadata profile' }}
@@ -309,6 +331,8 @@ async function submit() {
       </DialogFooter>
 
       <CreateCredentialDialog v-model:open="credentialDialogOpen" />
+
+      <DiscardDraftConfirm :open="confirmDiscardOpen" @keep="confirmDiscardOpen = false" @discard="discardDraft" />
     </DialogContent>
   </Dialog>
 </template>

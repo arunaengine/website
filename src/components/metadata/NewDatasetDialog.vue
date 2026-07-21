@@ -6,6 +6,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
@@ -564,10 +565,42 @@ function findingLocation(finding: ShaclFinding): string {
   return finding.path ? `${focus} · ${termNameFromUri(finding.path)}` : focus
 }
 
+// Dialog discard guard: outside clicks never close the dialog; an explicit close
+// (X, Escape, Cancel) while the form holds draft content asks before discarding.
+// Cheap check over existing computeds only, no deep watching. Seeded defaults
+// (group, date published, license, profile reference) are not treated as edits.
+const confirmDiscardOpen = ref(false)
+const hasDraftProgress = computed(() => Boolean(
+  title.value.trim()
+    || description.value.trim()
+    || keywordList.value.length
+    || creatorList.value.length
+    || identifier.value.trim()
+    || dataRefList.value.length
+    || hasEntityEntries.value
+    || Object.keys(generatedCreateValues.value).length,
+))
+function requestClose(next: boolean) {
+  if (next) {
+    emit('update:open', true)
+    return
+  }
+  if (hasDraftProgress.value) {
+    confirmDiscardOpen.value = true
+    return
+  }
+  emit('update:open', false)
+}
+function discardDraft() {
+  confirmDiscardOpen.value = false
+  emit('update:open', false)
+}
+
 watch(
   () => props.open,
   (open) => {
     if (!open) return
+    confirmDiscardOpen.value = false
     groupId.value = groups.value[0]?.id ?? ''
     profileId.value = props.defaultProfileId ?? currentUser.value?.preferredProfileId ?? ''
     path.value = ''
@@ -822,6 +855,15 @@ function setEntityEntryRef(property: string, index: number, value: string) {
   entityEntries.value = { ...entityEntries.value, [property]: list }
 }
 
+// Author-chosen @id override for a described-new entry (see normalizedCustomId).
+function setEntityEntryCustomId(property: string, index: number, value: string) {
+  const list = [...(entityEntries.value[property] ?? [])]
+  const entry = list[index]
+  if (!entry || entry.source !== 'new') return
+  list[index] = { ...entry, customId: value }
+  entityEntries.value = { ...entityEntries.value, [property]: list }
+}
+
 function buildRoCrate() {
   const dataset: Record<string, unknown> = {
     '@id': './',
@@ -1001,8 +1043,8 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-3xl">
+  <Dialog :open="props.open" @update:open="requestClose">
+    <DialogContent class="max-w-3xl" @interact-outside="(event: Event) => event.preventDefault()">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <FileJson2 class="h-4 w-4 text-primary" /> New metadata document
@@ -1167,6 +1209,7 @@ async function submit() {
               @switch-source="(index: number, source: 'new' | 'existing') => switchEntityEntrySource(control, index, source)"
               @update="(index: number, subProperty: string, value: unknown) => setEntityEntryValue(control.property, index, subProperty, value)"
               @update-ref="(index: number, value: string) => setEntityEntryRef(control.property, index, value)"
+              @update-custom-id="(index: number, value: string) => setEntityEntryCustomId(control.property, index, value)"
             />
           </div>
         </template>
@@ -1303,6 +1346,8 @@ async function submit() {
       </DialogFooter>
 
       <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (groupId = group.group_id)" />
+
+      <DiscardDraftConfirm :open="confirmDiscardOpen" @keep="confirmDiscardOpen = false" @discard="discardDraft" />
     </DialogContent>
   </Dialog>
 </template>
