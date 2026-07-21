@@ -7,16 +7,38 @@ import { TriangleAlert } from '@lucide/vue'
 
 const props = defineProps<{ info: InfoResponse }>()
 
-const facts = computed(() => {
-  const portal = props.info.portal
-  const portalVersion = portal?.installed ? portal.version || 'unknown version' : 'not installed'
-  return [
-    { label: 'API version', value: props.info.api_version || '-' },
-    { label: 'Portal', value: portalVersion },
-    { label: 'Portal source', value: portal?.source || '-' },
-    { label: 'Connections', value: connectionCount.value ?? '-' },
-  ]
+interface Fact {
+  label: string
+  value: string
+  // Optional hover tooltip; falls back to the value when omitted.
+  title?: string
+}
+
+const portal = computed(() => props.info.portal)
+
+// Three honest portal states. `installed: false` is the only case where the
+// node itself verifiably reports that no portal is present. A missing portal
+// block means the status was not reported at all: a remote node is probed
+// directly and its /info is not augmented by the connected portal server, so
+// the browser cannot know its portal status. That must read as "unknown",
+// never "not installed".
+const portalValue = computed(() => {
+  const p = portal.value
+  if (!p) return 'unknown'
+  if (!p.installed) return 'not installed'
+  return p.version || 'unknown version'
 })
+
+const portalTitle = computed(() =>
+  portal.value ? portalValue.value : 'Portal status not reported for this node',
+)
+
+const facts = computed<Fact[]>(() => [
+  { label: 'API version', value: props.info.api_version || '-' },
+  { label: 'Portal', value: portalValue.value, title: portalTitle.value },
+  { label: 'Portal source', value: portal.value?.source || '-' },
+  { label: 'Connections', value: String(connectionCount.value ?? '-') },
+])
 
 const connectionCount = computed(() => {
   const connections = props.info.connections
@@ -43,7 +65,7 @@ const services = computed(() =>
     <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
       <div v-for="fact in facts" :key="fact.label">
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{{ fact.label }}</dt>
-        <dd class="mt-0.5 truncate font-mono text-xs tabular-nums text-foreground/90" :title="String(fact.value)">{{ fact.value }}</dd>
+        <dd class="mt-0.5 truncate font-mono text-xs tabular-nums text-foreground/90" :title="fact.title ?? fact.value">{{ fact.value }}</dd>
       </div>
     </dl>
 
