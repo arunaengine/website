@@ -103,7 +103,7 @@ function runRemoteSearch(query: string) {
         [update.providerId]: { label: update.providerLabel, status: update.status, hits: update.hits },
       }
     },
-    { kinds: [props.kind], limit: 6, signal: controller.signal },
+    { kinds: [props.kind], limit: 100, signal: controller.signal },
   ).finally(() => {
     if (seq === searchSeq) remotePending.value = false
   })
@@ -136,7 +136,6 @@ const remoteHits = computed<TermHit[]>(() => {
   return Object.values(remoteResults.value)
     .flatMap((result) => result.hits)
     .filter((hit) => !excluded.has(hit.iri))
-    .slice(0, 4)
 })
 
 const degraded = computed(() =>
@@ -205,7 +204,7 @@ function pickRemote(hit: TermHit) {
           :title="degradedTooltip"
         />
       </p>
-      <ul v-if="remoteHits.length" class="space-y-0.5">
+      <ul v-if="remoteHits.length" class="max-h-64 space-y-0.5 overflow-y-auto scrollbar-thin">
         <li v-for="hit in remoteHits" :key="hit.iri">
           <button
             type="button"

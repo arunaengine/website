@@ -2,12 +2,19 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogClose from '@/components/ui/DialogClose.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogFooter from '@/components/ui/DialogFooter.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
 import NewProfileDialog from '@/components/metadata/NewProfileDialog.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
-import { ListChecks, Pencil, Plus, Star, Lock, Download } from '@lucide/vue'
+import { ListChecks, Pencil, Plus, Star, Lock, Download, Trash2 } from '@lucide/vue'
 import {
   OBLIGATION_ACCENT,
   OBLIGATION_ORDER,
@@ -24,10 +31,12 @@ import type { ProfilePropertyRule } from '@/lib/profiles/types'
 
 const route = useRoute()
 const router = useRouter()
-const { profiles, profileItems, currentUser, userInfo, updateUserProfile, saving, loadRoCrate, fullCrates } = useAruna()
+const { profiles, profileItems, currentUser, userInfo, updateUserProfile, saving, loadRoCrate, deleteMetadataDocument, fullCrates } = useAruna()
 const showNewProfile = ref(false)
 // Set while the dialog edits an existing profile; null keeps it in create mode.
 const editingProfile = ref<MetadataProfile | null>(null)
+const showDelete = ref(false)
+const deleteError = ref<string | null>(null)
 
 const selectedId = computed(() => (route.params.profileId as string) || profiles.value[0]?.id || '')
 const selected = computed(() => profiles.value.find((profile) => profile.id === selectedId.value))
@@ -52,6 +61,18 @@ function openEdit(profile: MetadataProfile) {
 function openCreate() {
   editingProfile.value = null
   showNewProfile.value = true
+}
+
+async function confirmDelete() {
+  if (!selected.value?.documentId) return
+  deleteError.value = null
+  try {
+    await deleteMetadataDocument(selected.value.documentId)
+    showDelete.value = false
+    router.push({ name: 'profiles' })
+  } catch (err) {
+    deleteError.value = err instanceof Error ? err.message : String(err)
+  }
 }
 
 async function setPreferred(id: string) {
@@ -276,6 +297,15 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 <Pencil class="h-3.5 w-3.5" /> Edit
               </Button>
               <Button
+                v-if="canEditSelected"
+                variant="outline"
+                size="sm"
+                class="text-destructive hover:text-destructive"
+                @click="deleteError = null; showDelete = true"
+              >
+                <Trash2 class="h-3.5 w-3.5" /> Delete
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 :disabled="downloadingCrate"
@@ -410,6 +440,22 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
         Select a visible profile document.
       </section>
     </div>
+
+    <Dialog :open="showDelete" @update:open="(value: boolean) => (showDelete = value)">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete metadata profile</DialogTitle>
+          <DialogDescription>
+            Deletes <span class="font-medium text-foreground">{{ selected?.name }}</span> and its graph from the catalog. Published S3 artifacts are not touched.
+          </DialogDescription>
+        </DialogHeader>
+        <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
+        <DialogFooter>
+          <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+          <Button variant="destructive" :disabled="saving" @click="confirmDelete">{{ saving ? 'Deleting…' : 'Delete' }}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <NewProfileDialog
       v-model:open="showNewProfile"

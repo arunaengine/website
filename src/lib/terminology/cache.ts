@@ -12,7 +12,7 @@
 //    so a dead gateway is not re-probed on every keystroke.
 import type { ProviderStatus, TermHit } from './types'
 
-const STORE_KEY = 'aruna.termCache.v1'
+const STORE_KEY = 'aruna.termCache.v2'
 const MAX_PERSISTED_ENTRIES = 200
 // Persisted entries older than this are served stale and revalidated.
 const FRESH_MS = 6 * 60 * 60 * 1000

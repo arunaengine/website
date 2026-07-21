@@ -423,6 +423,7 @@ async function deleteMetadataDocument(documentId: string): Promise<void> {
     await request<void>(`/metadata/${encodeURIComponent(documentId)}`, { method: 'DELETE' })
     invalidateCrate(documentId)
     metadataItems.value = metadataItems.value.filter((item) => item.document_id !== documentId)
+    profileItems.value = profileItems.value.filter((item) => item.document_id !== documentId)
     await loadMetadata().catch(() => undefined)
   } finally {
     saving.value = false

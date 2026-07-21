@@ -120,6 +120,14 @@ const steps = [
 const step = ref(1)
 // Step 1 mode switch: author from scratch or import an existing profile.
 const startTab = ref('create')
+const duplicateNameError = computed(() => {
+  if (isEditing.value) return ''
+  const name = builder.name.trim().toLowerCase()
+  return name && profiles.value.some((profile) => profile.name.trim().toLowerCase() === name)
+    ? 'A profile with this name already exists.'
+    : ''
+})
+const formErrors = computed(() => duplicateNameError.value ? [...builder.allErrors, duplicateNameError.value] : builder.allErrors)
 
 // Fetch the group's buckets when the publish destination block first appears.
 watch(
@@ -150,9 +158,9 @@ function discardDraft() {
 }
 
 const currentStepErrors = computed(() => {
-  if (step.value === 1) return builder.basicsErrors
+  if (step.value === 1) return duplicateNameError.value ? [...builder.basicsErrors, duplicateNameError.value] : builder.basicsErrors
   if (step.value === 2) return builder.rulesErrors
-  return builder.allErrors
+  return formErrors.value
 })
 
 // The step callout only lists errors with no field anchor — basics errors are
@@ -161,13 +169,14 @@ const currentStepErrors = computed(() => {
 const currentStepCallout = computed(() => {
   if (step.value === 1) {
     const unanchored = builder.basicsFieldErrors.filter((error) => !error.fieldId).map((error) => error.message)
+    if (duplicateNameError.value) unanchored.push(duplicateNameError.value)
     if (startTab.value === 'import' && builder.basicsFieldErrors.some((error) => error.fieldId && error.fieldId !== 'token')) {
       return [...unanchored, 'Finish the profile details in the Create tab, importing prefills them.']
     }
     return unanchored
   }
   if (step.value === 2) return builder.rulesErrors
-  return builder.allErrors
+  return formErrors.value
 })
 
 watch(
@@ -219,7 +228,7 @@ function goNext() {
 }
 
 async function submit() {
-  if (builder.allErrors.length || saving.value || publishing.value || publishBlocked.value) return
+  if (formErrors.value.length || saving.value || publishing.value || publishBlocked.value) return
   builder.submitError = null
   publishing.value = true
   try {
@@ -296,7 +305,7 @@ async function submit() {
 
 <template>
   <Dialog :open="props.open" @update:open="requestClose">
-    <DialogContent class="max-w-6xl" @interact-outside="(event: Event) => event.preventDefault()">
+    <DialogContent class="max-h-[calc(100vh-2rem)] max-w-6xl overflow-y-auto" @interact-outside="(event: Event) => event.preventDefault()">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <ListChecks class="h-4 w-4 text-primary" /> {{ isEditing ? 'Edit metadata profile' : 'New metadata profile' }}
@@ -442,7 +451,7 @@ async function submit() {
           <Button v-if="step < 3" :disabled="currentStepErrors.length > 0" @click="goNext">
             Next <ArrowRight class="h-3.5 w-3.5" />
           </Button>
-          <Button v-else :disabled="builder.allErrors.length > 0 || saving || publishing || publishBlocked" @click="submit">
+          <Button v-else :disabled="formErrors.length > 0 || saving || publishing || publishBlocked" @click="submit">
             {{ publishing ? 'Publishing…' : saving ? 'Saving…' : isEditing ? 'Save profile' : 'Create profile' }}
           </Button>
         </div>
