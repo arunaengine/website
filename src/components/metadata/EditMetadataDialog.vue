@@ -17,7 +17,7 @@ import TabsContent from '@/components/ui/TabsContent.vue'
 import Select from '@/components/ui/Select.vue'
 import DatasetFilesEditor from '@/components/metadata/DatasetFilesEditor.vue'
 import { Pencil, Plus, X } from '@lucide/vue'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { applyDataEntities, dataEntitiesOf, type DataEntity } from '@/lib/dataEntities'
@@ -46,7 +46,8 @@ const rawError = ref<string | null>(null)
 const activeTab = ref<'fields' | 'files' | 'raw'>('fields')
 
 // The pristine, unresolved crate fetched from the backend; edits mutate a clone.
-const pristine = ref<unknown>(null)
+// Shallow: structuredClone in buildFromFields rejects reactive proxies.
+const pristine = shallowRef<unknown>(null)
 const rawText = ref('')
 const loadedDocumentId = ref<string | null>(null)
 let loadToken = 0
