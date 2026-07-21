@@ -220,9 +220,16 @@ async function allowPublicReadCors(bucket: string): Promise<void> {
       CORSConfiguration: {
         CORSRules: [
           {
-            AllowedMethods: ['GET', 'HEAD'],
+            // PUT is required: PutBucketCors REPLACES the bucket's whole CORS
+            // config, and the publish flow itself uploads the artifacts from
+            // the browser right after applying this rule - GET/HEAD-only made
+            // those PUTs fail their own preflight. CORS is not access control:
+            // writes still need valid signatures; anonymous access stays
+            // read-only via the Everyone-principal role.
+            AllowedMethods: ['GET', 'HEAD', 'PUT'],
             AllowedOrigins: ['*'],
             AllowedHeaders: ['*'],
+            ExposeHeaders: ['ETag'],
             MaxAgeSeconds: 3600,
           },
         ],
