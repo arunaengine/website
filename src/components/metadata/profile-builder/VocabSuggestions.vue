@@ -109,7 +109,24 @@ function runRemoteSearch(query: string) {
   })
 }
 
-watch(debounced, runRemoteSearch, { immediate: true })
+// The remote leg gets its own, slower debounce (the bundled section above keeps
+// the snappy 150ms one): the gateway is a slow federated fan-out, and firing on
+// every keystroke aborts the in-flight request before it can ever complete, so
+// a steady typist would never see a remote result at all. Waiting for a real
+// typing pause lets slow-but-healthy responses actually land; stale-while-
+// revalidate caching then serves repeats instantly.
+const remoteDebounced = ref(props.query)
+let remoteTimer: number | undefined
+watch(
+  () => props.query,
+  (value) => {
+    window.clearTimeout(remoteTimer)
+    remoteTimer = window.setTimeout(() => {
+      remoteDebounced.value = value
+    }, 600)
+  },
+)
+watch(remoteDebounced, runRemoteSearch, { immediate: true })
 onUnmounted(() => searchAbort?.abort())
 
 // Registry output is already deduped against bundled hits by normalized IRI;
