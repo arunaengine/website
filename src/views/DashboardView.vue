@@ -141,25 +141,30 @@ const pageDescription = computed(() =>
         </template>
       </section>
 
-      <section v-if="usageInfo" class="grid gap-3.5 sm:grid-cols-3">
-        <StatCard
-          label="Objects"
-          :value="formatNumber(usageInfo.objects)"
-          :icon="Files"
-          :hint="storedReferencedHint(usageInfo)"
-        />
-        <StatCard
-          label="Stored data"
-          :value="formatBytes(usageInfo.stored_bytes)"
-          :icon="Database"
-          hint="Aggregate blob storage on this node"
-        />
-        <StatCard
-          label="Buckets"
-          :value="formatNumber(usageInfo.buckets)"
-          :icon="FolderOpen"
-          hint="Node-reported total; may include per-run system workspaces (ws-…)"
-        />
+      <section v-if="!bootstrapped || usageInfo" class="grid gap-3.5 sm:grid-cols-3">
+        <template v-if="usageInfo">
+          <StatCard
+            label="Objects"
+            :value="formatNumber(usageInfo.objects)"
+            :icon="Files"
+            :hint="storedReferencedHint(usageInfo)"
+          />
+          <StatCard
+            label="Stored data"
+            :value="formatBytes(usageInfo.stored_bytes)"
+            :icon="Database"
+            hint="Aggregate blob storage on this node"
+          />
+          <StatCard
+            label="Buckets"
+            :value="formatNumber(usageInfo.buckets)"
+            :icon="FolderOpen"
+            hint="Node-reported total; may include per-run system workspaces (ws-…)"
+          />
+        </template>
+        <template v-else>
+          <Skeleton v-for="n in 3" :key="n" class="h-[108px]" />
+        </template>
       </section>
 
       <section v-if="currentUser && myGroups.length">

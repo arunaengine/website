@@ -51,6 +51,32 @@ function badgeFor(entry: CardEntry) {
   return QUOTA_STATE_BADGES[entryState(entry)]
 }
 
+// Percentage of the soft quota in use (matches the QuotaBar's own reading).
+function quotaPct(entry: CardEntry): number {
+  const quota = entry.quota?.quota_bytes
+  if (quota == null || quota <= 0) return 0
+  return Math.round(((entry.usedBytes ?? 0) / quota) * 100)
+}
+
+// Muted tail of the primary usage line. Separators live inside the string so
+// spacing survives template whitespace condensing (" 9.9 MB" + this).
+function quotaRemainder(entry: CardEntry): string {
+  const quota = entry.quota?.quota_bytes
+  return quota != null ? ` / ${formatBytes(quota)}` : ' · unlimited'
+}
+
+// Secondary detail moved off the primary usage line: the hard cap (when it
+// differs from the quota) and any referenced-but-not-counted footprint.
+function quotaDetail(entry: CardEntry): string {
+  const parts: string[] = []
+  const quota = entry.quota?.quota_bytes
+  const cap = entry.quota?.ceiling_bytes
+  if (quota != null && cap != null && cap !== quota) parts.push(`cap ${formatBytes(cap)}`)
+  const referenced = entry.referencedBytes ?? 0
+  if (referenced > 0) parts.push(`${formatBytes(referenced)} referenced (not counted)`)
+  return parts.join(' · ')
+}
+
 async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   const queue = [...items]
   const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
@@ -80,7 +106,16 @@ async function load() {
   const groups = [...myGroups.value]
     .sort((a, b) => a.name.localeCompare(b.name))
     .slice(0, CARD_LIMIT)
-  entries.value = groups.map((group) => ({ groupId: group.id, name: group.name, status: 'loading' }))
+  // Preserve already-loaded cards across a reload so a dashboard refresh
+  // updates their quota bars in place instead of flashing every card back to a
+  // skeleton (the revision-driven reloads fire on mount, on interval and on
+  // manual refresh).
+  const previous = new Map(entries.value.map((entry) => [entry.groupId, entry]))
+  entries.value = groups.map((group): CardEntry => {
+    const prior = previous.get(group.id)
+    if (prior && prior.status === 'ready') return { ...prior, name: group.name }
+    return { groupId: group.id, name: group.name, status: 'loading' }
+  })
   await mapLimit(entries.value, 3, (entry) => fetchEntry(entry, seq))
 }
 
@@ -163,17 +198,29 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
           <Button variant="ghost" size="sm" class="mt-1 h-6 px-2 text-xs" @click="retry(entry)">Retry</Button>
         </div>
         <template v-else>
-          <QuotaBar
-            v-if="entry.quota"
-            class="mt-2"
-            :used="entry.usedBytes ?? 0"
-            :quota="entry.quota.quota_bytes"
-            :ceiling="entry.quota.ceiling_bytes"
-            :referenced="entry.referencedBytes ?? 0"
-            :warn="entry.quota.warning"
-            label="Storage"
-            compact
-          />
+          <div v-if="entry.quota" class="mt-2">
+            <div class="flex items-baseline justify-between gap-2 text-[11px]">
+              <span class="min-w-0 truncate tabular-nums"><span class="font-medium text-foreground">{{ formatBytes(entry.usedBytes ?? 0) }}</span><span class="text-muted-foreground">{{ quotaRemainder(entry) }}</span></span>
+              <span
+                v-if="entry.quota.quota_bytes != null"
+                class="shrink-0 tabular-nums text-muted-foreground"
+              >{{ quotaPct(entry) }}%</span>
+            </div>
+            <QuotaBar
+              class="mt-1.5"
+              :used="entry.usedBytes ?? 0"
+              :quota="entry.quota.quota_bytes"
+              :ceiling="entry.quota.ceiling_bytes"
+              :referenced="entry.referencedBytes ?? 0"
+              :warn="entry.quota.warning"
+              :show-labels="false"
+              compact
+            />
+            <p
+              v-if="quotaDetail(entry)"
+              class="mt-1 text-[10px] leading-tight text-muted-foreground tabular-nums"
+            >{{ quotaDetail(entry) }}</p>
+          </div>
           <p v-else class="mt-2 text-[11px] text-muted-foreground">
             {{ formatBytes(entry.usedBytes ?? 0) }} · no quota policy reported<template v-if="entry.referencedBytes"> · {{ formatBytes(entry.referencedBytes) }} referenced (not counted)</template>
           </p>
