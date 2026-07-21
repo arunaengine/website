@@ -20,9 +20,13 @@ import type { TermHit, TerminologyProvider, TermKind } from '../types'
 
 export const TS4NFDI_PROVIDER_ID = 'ts4nfdi'
 
-// Remote budget: long enough for the federated fan-out, short enough that a
-// dead gateway never leaves the picker spinning.
-const REQUEST_TIMEOUT_MS = 4_000
+// Remote budget: long enough for the federated fan-out (the gateway queries
+// OLS, OntoPortal and Skosmos backends in turn, so a healthy answer can take
+// several seconds), short enough that a dead gateway never leaves the picker
+// spinning. A dead or CORS-blocked gateway fails fast well inside this window;
+// the budget only bites when a reachable gateway is genuinely slow, and the
+// bundled floor plus per-provider negative caching keep that from stalling the UI.
+const REQUEST_TIMEOUT_MS = 9_000
 
 function stringField(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
