@@ -4,12 +4,12 @@ import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Input from '@/components/ui/Input.vue'
-import Sheet from '@/components/ui/Sheet.vue'
-import SheetContent from '@/components/ui/SheetContent.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -154,8 +154,8 @@ function attributeKeys(user: ApiUser): string[] {
   return Object.keys(user.attributes).sort()
 }
 
-// ── Detail drawer ────────────────────────────────────────────────────────────
-const drawerOpen = ref(false)
+// ── Detail dialog (centered modal; side sheets are banned in this app) ───────
+const detailOpen = ref(false)
 const selected = ref<ApiUser | null>(null)
 const detail = ref<ApiUser | null>(null)
 const detailLoading = ref(false)
@@ -179,12 +179,15 @@ async function loadDetail(userId: string) {
 function inspect(row: UserRow) {
   selected.value = row.user
   detail.value = row.hydrated ? row.user : null
-  drawerOpen.value = true
+  detailOpen.value = true
   void loadDetail(row.user.user_id)
 }
 
+// Hide attributes whose value is empty or unset so they do not render as blank rows.
 const detailAttributes = computed(() =>
-  Object.entries(detail.value?.attributes ?? {}).sort(([a], [b]) => a.localeCompare(b)),
+  Object.entries(detail.value?.attributes ?? {})
+    .filter(([, value]) => value != null && String(value).trim() !== '')
+    .sort(([a], [b]) => a.localeCompare(b)),
 )
 
 // Member lists are only served for groups the caller belongs to (backend
@@ -360,9 +363,10 @@ const sharedGroups = computed(() => {
       </section>
     </div>
 
-    <Sheet :open="drawerOpen" @update:open="(v: boolean) => (drawerOpen = v)">
-      <SheetContent side="right" class="w-full p-6 sm:max-w-xl">
-        <DialogTitle class="sr-only">User details</DialogTitle>
+    <Dialog :open="detailOpen" @update:open="(v: boolean) => (detailOpen = v)">
+      <DialogContent class="flex max-h-[85vh] w-[92vw] max-w-2xl flex-col gap-0 overflow-hidden bg-background p-0">
+        <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-6">
+          <DialogTitle class="sr-only">User details</DialogTitle>
 
         <div v-if="detailLoading && !detail" class="space-y-4">
           <Skeleton class="h-8 w-2/3" />
@@ -433,7 +437,8 @@ const sharedGroups = computed(() => {
             </p>
           </section>
         </div>
-      </SheetContent>
-    </Sheet>
+        </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

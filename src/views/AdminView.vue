@@ -9,9 +9,10 @@ import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useUserDirectory } from '@/composables/useUserDirectory'
 import { featureEnabled } from '@/lib/config'
 import { storedReferencedHint } from '@/lib/quota'
-import { formatBytes, formatNumber } from '@/lib/utils'
+import { formatBytes, formatNumber, shortUserId } from '@/lib/utils'
 import { ApiError, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
@@ -19,6 +20,9 @@ import { Database, HardDrive, Layers, Link2, Boxes, RefreshCw, Save, Plus, Trash
 
 const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, isManagementNode, nodeInfo, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
 const { isAuthenticated } = useAuth()
+// Shared realm directory: resolves saved user-cap ids to display names so rows
+// show a handle instead of the raw {ulid}@{realm} identity.
+const { resolveUsers, cachedUser } = useUserDirectory()
 
 const nodeCapability = computed(() => nodeInfo.value?.node.capabilities ?? 'server')
 
@@ -145,6 +149,30 @@ function reseed() {
 // Re-seed from a refreshed realm config only while the admin has no edits open.
 watch(() => realmInfo.value?.quota, () => { if (!dirty.value) reseed() })
 watch(dirty, (d) => { if (d) { saveError.value = null; saveMessage.value = null } })
+
+// Saved overrides carry only ids; hydrate names through the shared directory so
+// each row can show a handle. Rows re-render as the reactive cache fills in.
+watch(
+  () => draft.value.userCaps.map((u) => u.user_id),
+  (ids) => { if (ids.length) void resolveUsers(ids) },
+  { immediate: true },
+)
+// Handle first, raw {ulid}@{realm} identity kept in the row title and copyable
+// elsewhere. Falls back to a short ULID form when no name is known.
+function capName(u: UserCapRow): string {
+  return u.name || cachedUser(u.user_id)?.name || shortUserId(u.user_id)
+}
+function capHasName(u: UserCapRow): boolean {
+  return !!(u.name || cachedUser(u.user_id)?.name)
+}
+// Human-readable meaning of the per-user cap value (unit: group memberships).
+function maxGroupsPreview(value: string | number): string {
+  const s = text(value).trim()
+  if (s === '') return 'Unlimited group memberships (overrides the realm maximum).'
+  const n = Number(s)
+  if (!Number.isInteger(n) || n < 0) return 'Enter a whole number of groups, or leave empty for unlimited.'
+  return `May join up to ${n} ${n === 1 ? 'group' : 'groups'} (overrides the realm maximum).`
+}
 
 const groupOptions = computed(() => {
   const seen = new Map<string, string>()
@@ -449,15 +477,20 @@ async function save() {
             <h3 class="font-display text-sm font-semibold text-aruna-navy">User group-cap overrides</h3>
           </header>
           <div class="space-y-3 p-5">
-            <div v-for="(u, i) in draft.userCaps" :key="u.user_id" class="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background p-3">
-              <div class="min-w-0">
-                <div class="truncate text-sm font-medium text-foreground">{{ u.name || u.user_id }}</div>
-                <div class="truncate font-mono text-[10px] text-muted-foreground">{{ u.user_id.slice(0, 12) }}</div>
+            <div v-for="(u, i) in draft.userCaps" :key="u.user_id" class="rounded-lg border border-border bg-background p-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="min-w-0" :title="u.user_id">
+                  <div class="truncate text-sm font-medium text-foreground">{{ capName(u) }}</div>
+                  <div v-if="capHasName(u)" class="truncate font-mono text-[10px] text-muted-foreground">{{ shortUserId(u.user_id) }}</div>
+                </div>
+                <div class="ml-auto flex items-center gap-2">
+                  <label :for="`user-cap-${i}`" class="text-[11px] font-medium text-muted-foreground">Max groups</label>
+                  <Input :id="`user-cap-${i}`" v-model="u.max_groups" type="number" min="0" placeholder="Unlimited" class="w-24 text-right" />
+                  <span class="text-[11px] text-muted-foreground">groups</span>
+                  <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="removeUserCap(i)"><Trash2 class="h-3.5 w-3.5" /></Button>
+                </div>
               </div>
-              <div class="ml-auto flex items-center gap-2">
-                <Input v-model="u.max_groups" type="number" min="0" placeholder="Unlimited" class="w-32" />
-                <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="removeUserCap(i)"><Trash2 class="h-3.5 w-3.5" /></Button>
-              </div>
+              <p class="mt-1.5 text-[11px] text-muted-foreground">{{ maxGroupsPreview(u.max_groups) }}</p>
             </div>
             <p v-if="!draft.userCaps.length" class="text-xs text-muted-foreground">No per-user overrides. The global maximum applies to everyone.</p>
             <div class="relative max-w-md">
@@ -473,8 +506,8 @@ async function save() {
                   class="flex w-full items-baseline justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted"
                   @click="addUserCap(hit)"
                 >
-                  <span class="truncate text-foreground">{{ hit.name }}</span>
-                  <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{{ hit.user_id.slice(0, 8) }}</span>
+                  <span class="truncate text-foreground">{{ hit.name || shortUserId(hit.user_id) }}</span>
+                  <span class="shrink-0 font-mono text-[10px] text-muted-foreground" :title="hit.user_id">{{ shortUserId(hit.user_id) }}</span>
                 </button>
               </div>
             </div>
