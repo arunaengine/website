@@ -21,6 +21,10 @@ export interface EntityEntry {
   instance?: Record<string, unknown>
   // source 'existing': the reference id/URI as typed or picked.
   ref?: string
+  // source 'new', optional: an author-chosen @id for the described entity,
+  // overriding the synthetic `#<type>-<name>` (and the identifier-derived) id.
+  // Normalized by normalizedCustomId at emission.
+  customId?: string
 }
 
 export interface EntrySourcePolicy {
@@ -41,6 +45,20 @@ export function entrySourcePolicy(sources: ProfileEntitySource[] | undefined): E
     allowCrate,
     allowExisting: allowExternal || allowCrate,
   }
+}
+
+// A described-new entry's author-typed identifier, normalized for emission: an
+// absolute URI is used as-is, anything else becomes a crate-local #id (the #
+// prefix is added when missing). Blank/whitespace means "no override", so the
+// synthetic id derivation applies. Two entries naming the same @id merge into
+// one entity at emission (addEntity dedupes by @id), which is the deliberate
+// way to reference one described entity from several properties.
+export function normalizedCustomId(entry: EntityEntry): string | undefined {
+  if (entry.source !== 'new') return undefined
+  const raw = (entry.customId ?? '').trim()
+  if (!raw) return undefined
+  if (isAbsoluteUri(raw)) return raw
+  return raw.startsWith('#') ? raw : `#${raw}`
 }
 
 // The reference an 'existing' entry effectively contributes, or '' when it

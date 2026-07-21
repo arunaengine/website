@@ -43,6 +43,8 @@ const emit = defineEmits<{
   (e: 'switchSource', index: number, source: 'new' | 'existing'): void
   (e: 'update', index: number, property: string, value: unknown): void
   (e: 'updateRef', index: number, value: string): void
+  // Author-chosen @id override for a described-new entry (see normalizedCustomId).
+  (e: 'updateCustomId', index: number, value: string): void
 }>()
 
 const policy = computed(() => entrySourcePolicy(props.control.entitySources))
@@ -310,6 +312,19 @@ function emptyStateText(): string {
             @update:model-value="(value: unknown) => emit('update', index, field.property, value)"
           />
         </template>
+        <!-- Optional explicit @id: overrides both the identifier-derived and the
+             synthetic id. Absolute URIs are used as-is; anything else becomes a
+             crate-local #id. -->
+        <div class="sm:col-span-2">
+          <label class="text-[11px] font-medium text-muted-foreground">Identifier (@id), optional</label>
+          <Input
+            :model-value="entry.customId ?? ''"
+            class="mt-0.5 font-mono"
+            placeholder="e.g. https://orcid.org/0000-…, or #my-local-id (blank = generated)"
+            :aria-label="`${typeLabel} @id override`"
+            @update:model-value="(value: string | number) => emit('updateCustomId', index, String(value))"
+          />
+        </div>
       </div>
     </div>
   </div>

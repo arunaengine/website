@@ -1,7 +1,7 @@
 import { normalizeProfileValues } from './controls'
 import { isAbsoluteUri, isRecord, sameSchemaOrgType, SCHEMA_ORG } from './uri'
 import type { EntityEntry, EntrySourcePolicy } from './entityEntries'
-import { effectiveEntryRef } from './entityEntries'
+import { effectiveEntryRef, normalizedCustomId } from './entityEntries'
 import type { ProfileControl } from './types'
 
 // Emission helpers for profile-driven dataset crates, shared with
@@ -39,6 +39,9 @@ export function buildEntityInstance(
   index: number,
   usedSyntheticIds: Set<string>,
   addEntity: AddEntity,
+  // Author-chosen @id (already normalized, see normalizedCustomId): wins over
+  // both the identifier-derived and the synthetic id.
+  overrideId?: string,
 ): Record<string, unknown> {
   // Entity refs and select-object choices are references, not scalars; both are
   // handled by the reference branches below. Excluding them here keeps this path
@@ -71,7 +74,9 @@ export function buildEntityInstance(
 
   const identifierValue = instance.identifier
   let id: string
-  if (typeof identifierValue === 'string' && isAbsoluteUri(identifierValue.trim())) {
+  if (overrideId) {
+    id = overrideId
+  } else if (typeof identifierValue === 'string' && isAbsoluteUri(identifierValue.trim())) {
     id = identifierValue.trim()
   } else {
     const nameForSlug = typeof props.name === 'string' ? props.name : firstStringValue(props)
@@ -189,7 +194,7 @@ export function emitEntityEntries(
   entries.forEach((entry, index) => {
     let id: string
     if (entry.source === 'new') {
-      const entity = buildEntityInstance(entry.instance ?? {}, subControls, typeName, typeLabel, index, usedSyntheticIds, addEntity)
+      const entity = buildEntityInstance(entry.instance ?? {}, subControls, typeName, typeLabel, index, usedSyntheticIds, addEntity, normalizedCustomId(entry))
       addEntity(entity)
       id = String(entity['@id'])
     } else {
