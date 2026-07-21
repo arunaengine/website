@@ -8,6 +8,8 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
 import Button from '@/components/ui/Button.vue'
+import Select from '@/components/ui/Select.vue'
+import Input from '@/components/ui/Input.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
@@ -52,6 +54,63 @@ const publishBlocked = computed(() => builder.isPublic && (!s3.endpoint.value ||
 const publishing = ref(false)
 const credentialDialogOpen = ref(false)
 
+// Publish destination (public profiles only). `destBucket` is an override: an
+// empty string means "use the dedicated default bucket", so it stays correct
+// even as the group changes the computed default. `destPrefix` tracks
+// profiles/<slug> until the author edits it.
+const destBucket = ref('')
+const destPrefix = ref('')
+const destPrefixEdited = ref(false)
+const destBuckets = ref<string[]>([])
+
+const defaultDestBucket = computed(() => `profiles-${builder.groupId.toLowerCase()}`)
+const defaultDestPrefix = computed(() => `profiles/${builder.slug.trim()}`)
+const selectedDestBucket = computed(() => destBucket.value || defaultDestBucket.value)
+
+const destBucketOptions = computed(() => {
+  const def = defaultDestBucket.value
+  const options = [{ value: def, label: `${def} (default)` }]
+  for (const name of destBuckets.value) {
+    if (name !== def) options.push({ value: name, label: name })
+  }
+  return options
+})
+
+// A best-effort preview of the written key path, cleaned the way the publish
+// flow sanitizes the prefix (leading/trailing and doubled slashes removed).
+const destExamplePath = computed(() => {
+  const prefix = (destPrefix.value.trim() || defaultDestPrefix.value)
+    .replace(/\/{2,}/g, '/')
+    .replace(/^\/+|\/+$/g, '')
+  return `${selectedDestBucket.value}/${prefix || defaultDestPrefix.value}/shapes.ttl`
+})
+
+function onDestBucketChange(value: string) {
+  destBucket.value = value === defaultDestBucket.value ? '' : value
+}
+function onDestPrefixInput(value: string) {
+  destPrefixEdited.value = true
+  destPrefix.value = value
+}
+
+// Keep the prefix in step with the slug until the author overrides it.
+watch(
+  () => builder.slug,
+  (slug) => {
+    if (!destPrefixEdited.value) destPrefix.value = `profiles/${slug.trim()}`
+  },
+)
+
+// Load the group's existing buckets once the destination block is visible.
+async function loadDestBuckets() {
+  if (!s3.hasActiveKey.value || !s3.endpoint.value) return
+  try {
+    destBuckets.value = (await s3.listBuckets()).map((entry) => entry.name)
+  } catch {
+    destBuckets.value = []
+  }
+}
+
 const steps = [
   { n: 1, label: 'Basics' },
   { n: 2, label: 'Rules' },
@@ -61,6 +120,14 @@ const steps = [
 const step = ref(1)
 // Step 1 mode switch: author from scratch or import an existing profile.
 const startTab = ref('create')
+
+// Fetch the group's buckets when the publish destination block first appears.
+watch(
+  () => step.value === 3 && builder.isPublic && !publishBlocked.value,
+  (visible) => {
+    if (visible) loadDestBuckets()
+  },
+)
 
 // Dialog discard guard: outside clicks never close the dialog; an explicit close
 // (X, Escape, Cancel) while the builder has edits asks before discarding. The
@@ -111,6 +178,9 @@ watch(
     builder.reset()
     step.value = 1
     startTab.value = 'create'
+    destBucket.value = ''
+    destPrefixEdited.value = false
+    destBuckets.value = []
     const profile = props.editProfile
     if (profile) {
       builder.applyImport({
@@ -129,6 +199,8 @@ watch(
       // The import chip is meant for the import tab, not the edit seeding.
       builder.importSummary = null
     }
+    // Seed the destination prefix from the now-final slug.
+    destPrefix.value = `profiles/${builder.slug.trim()}`
   },
   { immediate: true },
 )
@@ -161,8 +233,17 @@ async function submit() {
     }
     // Public profiles publish mode/schema/html/shapes to S3 and reference them
     // by DRS id + contentUrl; private profiles keep the artifacts embedded as text.
+    // A destination that resolves to today's default is passed as undefined so
+    // the default publish path stays byte-identical.
+    const chosenBucket = selectedDestBucket.value
+    const chosenPrefix = destPrefix.value.trim()
+    const isDefaultDestination =
+      chosenBucket === `profiles-${builder.groupId.toLowerCase()}` && chosenPrefix === `profiles/${basics.slug}`
+    const destination = isDefaultDestination
+      ? undefined
+      : { bucket: chosenBucket, prefix: chosenPrefix || undefined }
     const externalArtifacts = builder.isPublic
-      ? await publishProfileArtifacts(builder.groupId, basics.slug, buildProfileArtifactTexts(crateInput))
+      ? await publishProfileArtifacts(builder.groupId, basics.slug, buildProfileArtifactTexts(crateInput), destination)
       : undefined
     const profileCrate = buildProfileCrate({ ...crateInput, externalArtifacts })
     if (props.editProfile?.documentId) {
@@ -313,6 +394,43 @@ async function submit() {
         <Button v-if="s3.endpoint.value" variant="outline" size="sm" @click="credentialDialogOpen = true">
           <Plus class="size-3.5" /> Create credentials
         </Button>
+      </div>
+
+      <!-- Publish destination: pick which bucket / prefix the public artifacts
+           (notably shapes.ttl) are written to. Only when publishing is possible. -->
+      <div v-if="step === 3 && builder.isPublic && !publishBlocked" class="rounded-md border border-border px-3 py-2">
+        <div class="text-xs font-medium text-foreground">Publish destination</div>
+        <p class="mt-0.5 text-[11px] text-muted-foreground">
+          Where this profile's public artifacts (including shapes.ttl) are stored.
+        </p>
+        <div class="mt-2 grid gap-2 sm:grid-cols-2">
+          <div>
+            <label class="text-[11px] font-medium text-muted-foreground">Bucket</label>
+            <Select
+              class="mt-1"
+              :options="destBucketOptions"
+              :model-value="selectedDestBucket"
+              aria-label="Publish destination bucket"
+              @update:model-value="onDestBucketChange"
+            />
+          </div>
+          <div>
+            <label class="text-[11px] font-medium text-muted-foreground">Prefix</label>
+            <Input
+              class="mt-1"
+              :model-value="destPrefix"
+              placeholder="profiles/slug"
+              aria-label="Publish destination prefix"
+              @update:model-value="(value: string | number) => onDestPrefixInput(String(value))"
+            />
+          </div>
+        </div>
+        <p class="mt-2 text-[11px] text-muted-foreground">
+          Files go to <code class="text-foreground">{{ destExamplePath }}</code>
+        </p>
+        <p class="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+          Everything under this destination becomes publicly readable.
+        </p>
       </div>
 
       <DialogFooter class="sm:justify-between">

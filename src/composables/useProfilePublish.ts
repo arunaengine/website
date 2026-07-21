@@ -16,8 +16,15 @@ const ARTIFACT_FILES = [
   { key: 'customShapes', name: 'shapes.custom.ttl', contentType: 'text/turtle' },
 ] as const
 
-// Publishes the three profile artifacts of a PUBLIC profile to the group's
-// profiles bucket and returns the external references for buildProfileCrate:
+// The chosen (or defaulted) place a public profile's artifacts are written.
+export interface PublishDestination {
+  bucket?: string
+  prefix?: string
+}
+
+// Publishes the profile artifacts of a PUBLIC profile to the group's chosen
+// destination (default: the dedicated `profiles-<group>` bucket under
+// `profiles/<slug>`) and returns the external references for buildProfileCrate:
 // `@id` = content-addressed DRS id, `contentUrl` = path-style S3 URL. Ensures
 // the bucket exists, carries permissive read CORS, and is covered by a public
 // (Everyone-principal) READ role so the URLs work without credentials.
@@ -34,6 +41,7 @@ export function useProfilePublish() {
     groupId: string,
     slug: string,
     texts: ProfileArtifactTexts,
+    destination?: PublishDestination,
   ): Promise<ExternalProfileArtifacts> {
     const endpoint = s3.endpoint.value
     if (!endpoint) throw new Error('Publishing a public profile needs the node S3 endpoint, which this node does not advertise.')
@@ -41,14 +49,21 @@ export function useProfilePublish() {
       throw new Error('Publishing a public profile uploads its artifacts to S3, create S3 credentials for this group first (Data manager or Settings).')
     }
 
-    const bucket = `profiles-${groupId.toLowerCase()}`
-    await ensurePublicBucket(groupId, bucket)
+    const defaultBucket = `profiles-${groupId.toLowerCase()}`
+    const defaultPrefix = `profiles/${slug}`
+    const bucket = destination?.bucket?.trim() || defaultBucket
+    const prefix = sanitizePrefix(destination?.prefix, defaultPrefix)
+    // The whole-bucket role path is safe only for the dedicated default bucket;
+    // any custom bucket or prefix scopes the public role to just this prefix so
+    // publishing can never make an unrelated existing bucket world-readable.
+    const isDefaultDestination = bucket === defaultBucket && prefix === defaultPrefix
+    await ensurePublicBucket(groupId, bucket, isDefaultDestination ? undefined : prefix)
 
     const refs: Partial<Record<(typeof ARTIFACT_FILES)[number]['key'], ExternalProfileArtifacts['html']>> = {}
     for (const artifact of ARTIFACT_FILES) {
       const text = texts[artifact.key]
       if (text === undefined) continue
-      const key = `profiles/${slug}/${artifact.name}`
+      const key = `${prefix}/${artifact.name}`
       await s3.putTextObject(bucket, key, text, artifact.contentType)
       const bytes = new TextEncoder().encode(text)
       refs[artifact.key] = {
@@ -67,7 +82,10 @@ export function useProfilePublish() {
     }
   }
 
-  async function ensurePublicBucket(groupId: string, bucket: string): Promise<void> {
+  // `scopePrefix` undefined means the dedicated default bucket: the public role
+  // covers the whole bucket (byte-identical to the original behavior, so old
+  // roles keep matching). A defined prefix scopes the role to just that prefix.
+  async function ensurePublicBucket(groupId: string, bucket: string, scopePrefix?: string): Promise<void> {
     try {
       await s3.createBucket(bucket)
     } catch (err) {
@@ -77,11 +95,12 @@ export function useProfilePublish() {
     }
     await s3.allowPublicReadCors(bucket)
 
-    // One public-read role per group covers the whole profiles bucket; skip
-    // creation when a public role already grants READ on its path.
+    // One public-read role per destination path; skip creation when a public
+    // role already grants READ on its exact path.
     const group = await getGroup(groupId)
     const nodeId = await localNodeId()
-    const path = `/${group.realm_id}/g/${groupId}/data/${nodeId}/${bucket}/**`
+    const base = `/${group.realm_id}/g/${groupId}/data/${nodeId}/${bucket}`
+    const path = scopePrefix ? `${base}/${scopePrefix}/**` : `${base}/**`
     const covered = group.roles.some(
       (role) => role.public && Object.entries(role.permissions).some(
         ([rolePath, level]) => rolePath === path && level.toLowerCase() === 'read',
@@ -89,10 +108,32 @@ export function useProfilePublish() {
     )
     if (covered) return
     await createGroupRole(groupId, {
-      name: 'public-read-profiles',
+      // Distinct name per scoped destination so a prefix-scoped role never
+      // collides with the whole-bucket 'public-read-profiles' role.
+      name: scopePrefix ? `public-read-${roleNameSuffix(bucket, scopePrefix)}` : 'public-read-profiles',
       permissions: { [path]: 'read' },
       public: true,
     })
+  }
+
+  // Normalizes a user-supplied key prefix into a safe S3 key path: strips
+  // leading/trailing slashes, collapses empty (doubled) segments, drops any
+  // char outside the S3-safe set, and falls back to `fallback` when nothing
+  // usable survives so a destination prefix is never empty.
+  function sanitizePrefix(raw: string | undefined, fallback: string): string {
+    if (raw === undefined) return fallback
+    const cleaned = raw
+      .split('/')
+      .map((segment) => segment.replace(/[^A-Za-z0-9._-]/g, ''))
+      .filter((segment) => segment.length > 0)
+      .join('/')
+    return cleaned || fallback
+  }
+
+  // A stable, name-safe suffix for a prefix-scoped public role.
+  function roleNameSuffix(bucket: string, prefix: string): string {
+    const suffix = `${bucket}-${prefix}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    return (suffix || 'profiles').slice(0, 48)
   }
 
   async function localNodeId(): Promise<string> {
