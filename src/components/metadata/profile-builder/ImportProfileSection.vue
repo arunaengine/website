@@ -9,6 +9,7 @@ import { isModeFile, MODELED_MODE_KEYS, modeBasics, modeToEntityRules } from '@/
 import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
 import { isRecord } from '@/lib/profiles/uri'
 import { useAruna } from '@/composables/useAruna'
+import { useS3 } from '@/composables/useS3'
 import type { ProfileBasics } from '@/lib/profiles/types'
 import type { ProfileBuilder, ProfileImportResult } from './useProfileBuilder'
 
@@ -26,8 +27,23 @@ const pendingImport = ref<ProfileImportResult | null>(null)
 // "Start from an existing profile": prefill the builder from any stored or
 // built-in profile on this node — the same ingest path as an uploaded crate.
 const { profiles, loadRoCrate } = useAruna()
+const s3 = useS3()
 const storedId = ref('')
 const storedBusy = ref(false)
+
+// Fetch one profile artifact (or the pasted document itself) as text. A URL that
+// resolves to a bucket on one of this realm's nodes is read through an
+// authenticated GetObject, the same signed path the profiles view uses, so it
+// works even when the object is not anonymously public or its bucket predates
+// the public-read CORS rule. Anything else is a genuinely external host, fetched
+// directly by the browser (and subject to that host's own CORS policy).
+async function fetchArtifact(target: string): Promise<string> {
+  const object = s3.hasActiveKey.value ? s3.resolveObjectUrl(target) : null
+  if (object) return s3.getObjectText(object.bucket, object.key, object.nodeId)
+  const response = await fetch(target)
+  if (!response.ok) throw new Error(`Fetch failed (${response.status} ${response.statusText}).`)
+  return response.text()
+}
 const storedOptions = computed(() =>
   profiles.value.map((profile) => ({
     value: profile.id,
@@ -85,7 +101,7 @@ async function ingest(json: unknown) {
       preservedKeys: preservedKeys(json),
     }
   } else if (isRecord(json) && Array.isArray(json['@graph'])) {
-    const parsed = parseProfileCrate(await resolveProfileArtifacts(json))
+    const parsed = parseProfileCrate(await resolveProfileArtifacts(json, fetchArtifact))
     const basics: Partial<ProfileBasics> = {
       name: parsed.name,
       description: parsed.description,
@@ -154,13 +170,14 @@ async function fromUrl() {
   busy.value = true
   error.value = ''
   try {
-    const response = await fetch(target)
-    if (!response.ok) throw new Error(`Fetch failed (${response.status} ${response.statusText}).`)
-    await ingest(await response.json())
+    await ingest(JSON.parse(await fetchArtifact(target)))
   } catch (err) {
-    // Cross-origin / network failures surface as an opaque TypeError.
+    // A cross-origin browser fetch the remote host refuses surfaces as an opaque
+    // TypeError. Portal-owned URLs are read through an authenticated GetObject
+    // instead, so a TypeError here means an external server that blocks browser
+    // access, which no client-side change can work around.
     if (err instanceof TypeError) {
-      error.value = 'Could not fetch that URL, it may block cross-origin requests (CORS) or be unreachable. Download the file and upload it instead.'
+      error.value = 'Could not fetch that URL. If it is hosted on another server, that server does not allow browser (cross-origin) access. Download the file and use Upload JSON instead.'
       pendingImport.value = null
     } else {
       fail(err)
