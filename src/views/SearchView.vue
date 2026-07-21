@@ -3,7 +3,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
-import Select from '@/components/ui/Select.vue'
+import SearchFilterBar, { type Facet, type FilterModel } from '@/components/search/SearchFilterBar.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
@@ -19,7 +19,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { conformsToProcessRun } from '@/lib/profiles/builtinProfiles'
-import { Search, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound, Filter, X } from '@lucide/vue'
+import { Search, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound } from '@lucide/vue'
 import type { MetadataDoc, SparqlResult } from '@/data/types'
 import type { BucketSearchHit, UserSearchHit } from '@/lib/api'
 import type { RouteLocationRaw } from 'vue-router'
@@ -38,10 +38,6 @@ function queryString(value: unknown): string {
 function queryFilter(value: unknown): string | null {
   return queryString(value) || null
 }
-
-// Sentinel value for the "no filter" option: radix Select items cannot carry an
-// empty-string value, so the writable computeds below map it to/from null.
-const ANY = '__any__'
 
 const q = ref(queryString(route.query.q))
 const profileFilter = ref<string | null>(queryFilter(route.query.profile))
@@ -86,7 +82,8 @@ const expertMode = ref(queryString(route.query.expert) === '1')
 const favBusy = ref<Set<string>>(new Set())
 const favError = ref<string | null>(null)
 const showNewDataset = ref(false)
-const sparql = ref(`SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 25`)
+const sparql = ref(`SELECT DISTINCT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 25`)
+const sparqlDistributed = ref(true)
 const sparqlResult = ref<SparqlResult | null>(null)
 const sparqlError = ref<string | null>(null)
 const running = ref(false)
@@ -193,22 +190,10 @@ const typeOptions = computed(() => {
 })
 const showTypeFilter = computed(() => typeOptions.value.length > 1)
 
-// One writable computed per facet Select: radix Select speaks non-empty string
-// values, so the "All" sentinel is mapped to and from the underlying null ref.
-const profileSelect = computed<string>({
-  get: () => profileFilter.value ?? ANY,
-  set: (value) => (profileFilter.value = value === ANY ? null : value),
-})
-const typeSelect = computed<string>({
-  get: () => typeFilter.value ?? ANY,
-  set: (value) => (typeFilter.value = value === ANY ? null : value),
-})
-const groupSelect = computed<string>({
-  get: () => groupFilter.value ?? ANY,
-  set: (value) => (groupFilter.value = value === ANY ? null : value),
-})
-const profileSelectOptions = computed(() => {
-  const options = [{ value: ANY, label: 'All' }]
+// Per-facet option lists (no "All" entry: SearchFilterBar prepends it). Each keeps
+// the active value present so a filter carried in from the URL is never dropped.
+const profileFacetOptions = computed(() => {
+  const options: Array<{ value: string; label: string }> = []
   const seen = new Set<string>()
   for (const profile of profiles.value) {
     options.push({ value: profile.id, label: profile.name || profile.shortName })
@@ -219,37 +204,36 @@ const profileSelectOptions = computed(() => {
   }
   return options
 })
-const typeSelectOptions = computed(() => [
-  { value: ANY, label: 'All' },
-  ...typeOptions.value.map((type) => ({ value: type, label: type })),
-])
-const groupSelectOptions = computed(() => [
-  { value: ANY, label: 'All' },
-  ...groupOptions.value.map((option) => ({ value: option.id, label: option.label })),
-])
+const typeFacetOptions = computed(() => typeOptions.value.map((type) => ({ value: type, label: type })))
+const groupFacetOptions = computed(() => groupOptions.value.map((option) => ({ value: option.id, label: option.label })))
 
-// Active-filter summary: a removable chip per engaged facet plus a reset, so the
-// current narrowing stays legible even when the Select triggers wrap.
-type FilterKey = 'profile' | 'type' | 'group' | 'favourites'
-const activeFilterChips = computed<Array<{ key: FilterKey; label: string }>>(() => {
-  const chips: Array<{ key: FilterKey; label: string }> = []
-  if (profileFilter.value) {
-    const profile = profiles.value.find((item) => item.id === profileFilter.value)
-    chips.push({ key: 'profile', label: `Profile: ${profile?.name ?? profile?.shortName ?? truncateMiddle(profileFilter.value)}` })
-  }
-  if (typeFilter.value) chips.push({ key: 'type', label: `Type: ${typeFilter.value}` })
-  if (groupFilter.value) {
-    chips.push({ key: 'group', label: `Group: ${groupNames.value.get(groupFilter.value) ?? truncateMiddle(groupFilter.value)}` })
-  }
-  if (favouritesOnly.value) chips.push({ key: 'favourites', label: 'Favourites only' })
-  return chips
+// Extensible filter config: one entry per facet. Adding a facet means pushing
+// one more entry here (single select, `multi: true`, or `toggle: true`) with no
+// template changes. The favourites toggle only appears for a signed-in user.
+const filterFacets = computed<Facet[]>(() => {
+  const facets: Facet[] = [{ key: 'profile', label: 'Profile', options: profileFacetOptions.value }]
+  if (showTypeFilter.value || typeFilter.value) facets.push({ key: 'type', label: 'Type', options: typeFacetOptions.value })
+  facets.push({ key: 'group', label: 'Group', options: groupFacetOptions.value })
+  if (currentUser.value) facets.push({ key: 'favourites', label: 'Favourites', toggle: true, icon: Star })
+  return facets
 })
-function removeFilter(key: FilterKey) {
-  if (key === 'profile') profileFilter.value = null
-  else if (key === 'type') typeFilter.value = null
-  else if (key === 'group') groupFilter.value = null
-  else favouritesOnly.value = false
-}
+
+// Bridge the facet record to the existing filter refs so all URL-sync and
+// page-reset watchers keep firing exactly as before.
+const filterModel = computed<FilterModel>({
+  get: () => ({
+    profile: profileFilter.value,
+    type: typeFilter.value,
+    group: groupFilter.value,
+    favourites: favouritesOnly.value,
+  }),
+  set: (next) => {
+    profileFilter.value = typeof next.profile === 'string' ? next.profile : null
+    typeFilter.value = typeof next.type === 'string' ? next.type : null
+    groupFilter.value = typeof next.group === 'string' ? next.group : null
+    favouritesOnly.value = next.favourites === true
+  },
+})
 
 // Group and profile filters are pushed to the server; only a favourites filter,
 // and a non-IRI profile filter, still narrow the returned hits client-side.
@@ -396,10 +380,16 @@ function clearFilters() {
 }
 
 async function runQuery() {
-  running.value = true
   sparqlError.value = null
+  const selectClause = sparql.value.match(/(?:^|[>\r\n])\s*SELECT\b([\s\S]*?)(?:\bWHERE\b|\{)/i)?.[1]
+  if (sparqlDistributed.value && selectClause !== undefined && !/\bDISTINCT\b/i.test(selectClause)) {
+    sparqlError.value = 'Distributed SELECT queries must include DISTINCT in the SELECT clause.'
+    sparqlResult.value = null
+    return
+  }
+  running.value = true
   try {
-    sparqlResult.value = await runSparql(sparql.value)
+    sparqlResult.value = await runSparql(sparql.value, sparqlDistributed.value ? 'distributed' : 'local')
   } catch (err) {
     sparqlError.value = err instanceof Error ? err.message : String(err)
     sparqlResult.value = null
@@ -430,73 +420,9 @@ async function runQuery() {
         <div class="surface p-4">
           <div class="relative">
             <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input v-model="q" placeholder="Search datasets, groups and people…" class="h-11 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+            <input v-model="q" placeholder="Search datasets, groups and people…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring" />
           </div>
-          <div class="mt-3 flex flex-wrap items-center gap-2">
-            <span class="hidden shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground sm:inline-flex">
-              <Filter class="h-3.5 w-3.5" /> Filter
-            </span>
-            <Select
-              v-model="profileSelect"
-              :options="profileSelectOptions"
-              label="Profile"
-              aria-label="Filter by profile"
-              class="h-9 w-auto min-w-[9rem] max-w-[15rem] text-xs"
-            />
-            <Select
-              v-if="showTypeFilter"
-              v-model="typeSelect"
-              :options="typeSelectOptions"
-              label="Type"
-              aria-label="Filter by entity type"
-              class="h-9 w-auto min-w-[8rem] max-w-[15rem] text-xs"
-            />
-            <Select
-              v-model="groupSelect"
-              :options="groupSelectOptions"
-              label="Group"
-              aria-label="Filter by group"
-              class="h-9 w-auto min-w-[9rem] max-w-[15rem] text-xs"
-            />
-            <button
-              v-if="currentUser"
-              type="button"
-              :aria-pressed="favouritesOnly"
-              class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-3 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              :class="favouritesOnly
-                ? 'border-amber-400/60 bg-amber-400/10 text-amber-600 dark:text-amber-400'
-                : 'border-input bg-field text-muted-foreground hover:text-foreground'"
-              @click="favouritesOnly = !favouritesOnly"
-            >
-              <Star class="h-3.5 w-3.5" :fill="favouritesOnly ? 'currentColor' : 'none'" /> Favourites
-            </button>
-          </div>
-
-          <!-- Active-filter summary: removable chips plus a single reset. -->
-          <div v-if="filtering" class="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <span
-              v-for="chip in activeFilterChips"
-              :key="chip.key"
-              class="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 py-0.5 pl-2.5 pr-1 text-[11px] text-foreground"
-            >
-              {{ chip.label }}
-              <button
-                type="button"
-                class="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
-                :aria-label="`Remove ${chip.label} filter`"
-                @click="removeFilter(chip.key)"
-              >
-                <X class="h-3 w-3" />
-              </button>
-            </span>
-            <button
-              type="button"
-              class="ml-1 text-[11px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-              @click="clearFilters"
-            >
-              Reset all
-            </button>
-          </div>
+          <SearchFilterBar v-model="filterModel" :facets="filterFacets" aria-label="Discover filters" class="mt-3" />
         </div>
 
         <p v-if="favError" class="text-xs text-destructive">{{ favError }}</p>
@@ -785,10 +711,17 @@ async function runQuery() {
               <h2 class="font-display text-sm font-semibold text-aruna-navy">SPARQL workbench</h2>
               <Badge variant="secondary" class="text-[10px] uppercase">real API</Badge>
             </div>
-            <Button size="sm" :disabled="running" @click="runQuery"><Play class="h-3.5 w-3.5" /> {{ running ? 'Running…' : 'Run query' }}</Button>
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span>Local</span>
+                <Switch :checked="sparqlDistributed" aria-label="Use distributed SPARQL execution" @update:checked="sparqlDistributed = $event" />
+                <span>Distributed</span>
+              </div>
+              <Button size="sm" :disabled="running" @click="runQuery"><Play class="h-3.5 w-3.5" /> {{ running ? 'Running…' : 'Run query' }}</Button>
+            </div>
           </div>
           <textarea v-model="sparql" rows="14" class="mt-3 w-full rounded-md border border-input bg-muted/20 p-3 font-mono text-[12px] leading-relaxed text-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-          <p class="mt-2 text-[11px] text-muted-foreground">Only SELECT and ASK queries are accepted by the API.</p>
+          <p class="mt-2 text-[11px] text-muted-foreground">Only SELECT and ASK queries are accepted. Distributed SELECT queries must include DISTINCT.</p>
           <div v-if="sparqlError" class="mt-3 text-xs text-destructive">{{ sparqlError }}</div>
         </section>
 
