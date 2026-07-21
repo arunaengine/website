@@ -4,7 +4,7 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Button from '@/components/ui/Button.vue'
-import { ChevronDown, ChevronRight, Lock, Plus, Trash2 } from '@lucide/vue'
+import { ChevronDown, ChevronRight, Lock, Plus, Trash2, X } from '@lucide/vue'
 import {
   OBLIGATION_ACCENT,
   PROFILE_ENTITY_SOURCE_LABELS,
@@ -20,7 +20,8 @@ import {
   termNameFromUri,
   type PropertyTermOption,
 } from '@/lib/profiles/propertyCatalog'
-import { CURATED_ENTITY_TYPES, entityTypeLabel } from '@/lib/profiles/entityTypes'
+import { entityTypeLabel } from '@/lib/profiles/entityTypes'
+import EntityTypePicker from './EntityTypePicker.vue'
 import { isAbsoluteUri, isValidPropertyTermName, normalizeTypeUri, sameSchemaOrgType, SCHEMA_ORG } from '@/lib/profiles/uri'
 import { isHasPartUri } from '@/lib/profiles/emit'
 import { vocabKind, type VocabTerm } from '@/lib/profiles/vocabulary'
@@ -392,29 +393,17 @@ const profileEntityRules = computed(() =>
     })
     .filter((item) => item.uri),
 )
-const profileTargetUris = computed(() => new Set(profileEntityRules.value.map((item) => item.uri)))
 
-// Group 1: this profile's entity rules, labeled with their rule label + class name.
-const profileTargetOptions = computed(() => {
-  const seen = new Set<string>()
-  const options: { uri: string; label: string }[] = []
-  for (const rule of profileEntityRules.value) {
-    if (seen.has(rule.uri)) continue
-    seen.add(rule.uri)
-    options.push({ uri: rule.uri, label: `${rule.label} · ${rule.className}` })
-  }
-  return options
-})
-
-// Group 2: curated types (and any already-selected custom targets) with no rule.
-const otherTargetOptions = computed(() => {
-  const map = new Map<string, string>()
-  for (const type of CURATED_ENTITY_TYPES) if (!profileTargetUris.value.has(type.uri)) map.set(type.uri, type.label)
-  for (const uri of property.value.entityTypes) {
-    if (uri && !profileTargetUris.value.has(uri) && !map.has(uri)) map.set(uri, entityTypeLabel(uri))
-  }
-  return [...map].map(([uri, label]) => ({ uri, label }))
-})
+// Selected targets as removable chips, labeled by the profile shape that
+// defines them (when one exists) with a plain type-label fallback.
+const selectedTargets = computed(() =>
+  property.value.entityTypes
+    .filter(Boolean)
+    .map((uri) => {
+      const shape = profileEntityRules.value.find((rule) => sameSchemaOrgType(rule.uri, uri))
+      return { uri, label: shape ? shape.label : entityTypeLabel(uri), hasShape: Boolean(shape) }
+    }),
+)
 
 // Selected targets that no entity rule defines — no sub-form is generated for
 // them until one is created (offered inline as a quick action).
@@ -424,11 +413,16 @@ const unresolvedTargets = computed(() =>
     .map((uri) => ({ uri, label: entityTypeLabel(uri) })),
 )
 
-function toggleTarget(uri: string) {
+function addTarget(choice: { uri: string }) {
+  if (!choice.uri) return
+  const list = property.value.entityTypes
+  if (!list.some((entry) => sameSchemaOrgType(entry, choice.uri))) list.push(choice.uri)
+}
+
+function removeTarget(uri: string) {
   const list = property.value.entityTypes
   const index = list.indexOf(uri)
   if (index >= 0) list.splice(index, 1)
-  else list.push(uri)
 }
 
 // Append an entity rule for an other-type target and select it (D6). The target
@@ -563,42 +557,34 @@ watch(advancedNeedsAttention, (needsAttention) => {
         <label class="text-[11px] font-medium text-muted-foreground">Referenced entity types</label>
         <p class="text-[11px] text-muted-foreground">{{ referenceHelp }}</p>
       </div>
-      <div v-if="profileTargetOptions.length">
-        <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">This profile's entity rules</div>
-        <div class="mt-1 flex flex-wrap gap-1.5">
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span
+          v-for="target in selectedTargets"
+          :key="target.uri"
+          class="inline-flex items-center gap-1 rounded-full border border-aruna-royal/60 bg-aruna-royal/10 px-2.5 py-1 text-[11px] text-foreground"
+          :title="target.uri"
+        >
+          {{ target.label }}
+          <span v-if="target.hasShape" class="text-[10px] text-muted-foreground">(shape)</span>
           <button
-            v-for="option in profileTargetOptions"
-            :key="option.uri"
+            v-if="!anyLock"
             type="button"
-            class="rounded-full border px-2 py-0.5 text-[11px] transition-colors"
-            :class="property.entityTypes.includes(option.uri)
-              ? 'border-aruna-royal/60 bg-aruna-royal/10 text-aruna-royal'
-              : 'border-border text-muted-foreground hover:border-primary/40'"
-            :disabled="anyLock"
-            @click="toggleTarget(option.uri)"
+            class="text-muted-foreground transition-colors hover:text-destructive"
+            :aria-label="`Remove target ${target.label}`"
+            @click="removeTarget(target.uri)"
           >
-            {{ option.label }}
+            <X class="size-3" />
           </button>
-        </div>
+        </span>
+        <span v-if="!selectedTargets.length" class="text-[11px] text-muted-foreground">No target type yet, add one:</span>
       </div>
-      <div>
-        <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Other types</div>
-        <div class="mt-1 flex flex-wrap gap-1.5">
-          <button
-            v-for="option in otherTargetOptions"
-            :key="option.uri"
-            type="button"
-            class="rounded-full border px-2 py-0.5 text-[11px] transition-colors"
-            :class="property.entityTypes.includes(option.uri)
-              ? 'border-aruna-royal/60 bg-aruna-royal/10 text-aruna-royal'
-              : 'border-border text-muted-foreground hover:border-primary/40'"
-            :disabled="anyLock"
-            @click="toggleTarget(option.uri)"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-      </div>
+      <EntityTypePicker
+        v-if="!anyLock"
+        :builder="builder"
+        :exclude="property.entityTypes"
+        button-label="Add target type"
+        @pick="addTarget"
+      />
       <!-- A selected other-type target has no rule, so no sub-form is generated —
            offer to create one in a click. -->
       <div

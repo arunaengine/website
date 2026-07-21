@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import Button from '@/components/ui/Button.vue'
 import EntityShapeSection from './EntityShapeSection.vue'
-import { Plus } from '@lucide/vue'
+import EntityTypePicker from './EntityTypePicker.vue'
 import { PROFILE_OBLIGATION_LABELS } from '@/lib/profiles/labels'
 import type { ProfileBuilder } from './useProfileBuilder'
 
@@ -39,13 +38,18 @@ const orderedEntities = computed(() => [
       :entity="entity"
     />
 
-    <div class="flex flex-wrap items-center gap-2">
-      <Button type="button" variant="outline" size="sm" @click="builder.addEntity()">
-        <Plus class="size-3.5" /> Add entity shape
-      </Button>
-      <span class="text-[11px] text-muted-foreground">
+    <div class="space-y-1">
+      <!-- Choosing a type first prevents the old trap of every new shape
+           silently starting as a Person. Picking an existing shape's type
+           simply navigates to it (addEntityRuleForType dedupes). -->
+      <EntityTypePicker
+        :builder="builder"
+        button-label="Add entity shape"
+        @pick="(choice) => builder.addEntityRuleForType(choice.uri, choice.label)"
+      />
+      <p class="text-[11px] text-muted-foreground">
         Tip: picking an entity-valued property (e.g. Creator) and choosing "Add Person rules" creates the shape for you.
-      </span>
+      </p>
     </div>
   </section>
 </template>
