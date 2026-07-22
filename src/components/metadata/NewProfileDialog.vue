@@ -10,6 +10,7 @@ import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
 import Button from '@/components/ui/Button.vue'
 import Select from '@/components/ui/Select.vue'
 import Input from '@/components/ui/Input.vue'
+import Switch from '@/components/ui/Switch.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
@@ -21,7 +22,7 @@ import ProfileReviewStep from '@/components/metadata/profile-builder/ProfileRevi
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import { useProfileBuilder } from '@/components/metadata/profile-builder/useProfileBuilder'
 import { computed, ref, watch } from 'vue'
-import { ListChecks, Check, CheckCircle2, ArrowLeft, ArrowRight, FileUp, KeyRound, Plus } from '@lucide/vue'
+import { ListChecks, Check, CheckCircle2, ArrowLeft, ArrowRight, FileUp, KeyRound, Lock, Plus } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
 import { useProfilePublish } from '@/composables/useProfilePublish'
@@ -401,32 +402,53 @@ async function submit() {
         </ul>
       </div>
 
-      <div
-        v-if="step === 3 && publishBlocked"
-        class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-      >
-        <span class="flex items-center gap-2">
-          <KeyRound class="h-3.5 w-3.5 shrink-0" />
-          <template v-if="!s3.endpoint.value">
-            Public profiles publish their artifacts to this node's S3 storage, but the node does not advertise an S3 endpoint.
-          </template>
-          <template v-else>
-            Public profiles publish their artifacts to S3 so other tools can fetch them without a token, create S3 credentials for this group first.
-          </template>
-        </span>
-        <Button v-if="s3.endpoint.value" variant="outline" size="sm" @click="credentialDialogOpen = true">
-          <Plus class="size-3.5" /> Create credentials
-        </Button>
-      </div>
+      <!-- Publish destination. Always rendered on the review step, including when
+           the profile is private or publishing is blocked: an author who came
+           looking for "which bucket does this go to" must find an answer rather
+           than an absent control. -->
+      <div v-if="step === 3" class="rounded-md border border-border px-3 py-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div class="text-xs font-medium text-foreground">Publish destination</div>
+            <p class="mt-0.5 text-[11px] text-muted-foreground">
+              Where this profile's artifacts (mode.json, schema.json, profile.html, shapes.ttl) are stored.
+            </p>
+          </div>
+          <label class="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+            Public profile
+            <Switch :checked="builder.isPublic" @update:checked="(value: boolean) => (builder.isPublic = value)" />
+          </label>
+        </div>
 
-      <!-- Publish destination: pick which bucket / prefix the public artifacts
-           (notably shapes.ttl) are written to. Only when publishing is possible. -->
-      <div v-if="step === 3 && builder.isPublic && !publishBlocked" class="rounded-md border border-border px-3 py-2">
-        <div class="text-xs font-medium text-foreground">Publish destination</div>
-        <p class="mt-0.5 text-[11px] text-muted-foreground">
-          Where this profile's public artifacts (including shapes.ttl) are stored.
+        <!-- Private: nothing is uploaded, so there is no bucket to choose. -->
+        <p v-if="!builder.isPublic" class="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+          <Lock class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            This profile is private, so its artifacts stay embedded in the profile document and no bucket is used.
+            Turn on <b class="text-foreground">Public profile</b> to publish them where other tools can fetch them without a token.
+          </span>
         </p>
-        <div class="mt-2 grid gap-2 sm:grid-cols-2">
+
+        <!-- Public, but nothing to publish with yet. -->
+        <div
+          v-else-if="publishBlocked"
+          class="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300"
+        >
+          <span class="flex items-center gap-2">
+            <KeyRound class="h-3.5 w-3.5 shrink-0" />
+            <template v-if="!s3.endpoint.value">
+              Public profiles publish their artifacts to this node's S3 storage, but the node does not advertise an S3 endpoint.
+            </template>
+            <template v-else>
+              Choosing a bucket needs S3 credentials for this group, create them to pick a destination and publish.
+            </template>
+          </span>
+          <Button v-if="s3.endpoint.value" variant="outline" size="sm" @click="credentialDialogOpen = true">
+            <Plus class="size-3.5" /> Create credentials
+          </Button>
+        </div>
+
+        <div v-else class="mt-2 grid gap-2 sm:grid-cols-2">
           <div>
             <label class="text-[11px] font-medium text-muted-foreground">Bucket</label>
             <Select
@@ -448,12 +470,14 @@ async function submit() {
             />
           </div>
         </div>
-        <p class="mt-2 text-[11px] text-muted-foreground">
-          Files go to <code class="text-foreground">{{ destExamplePath }}</code>
-        </p>
-        <p class="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
-          Everything under this destination becomes publicly readable.
-        </p>
+        <template v-if="builder.isPublic && !publishBlocked">
+          <p class="mt-2 text-[11px] text-muted-foreground">
+            Files go to <code class="text-foreground">{{ destExamplePath }}</code>
+          </p>
+          <p class="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+            Everything under this destination becomes publicly readable.
+          </p>
+        </template>
       </div>
 
       <DialogFooter class="sm:justify-between">
