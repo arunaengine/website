@@ -8,8 +8,7 @@ import type { LiftNote } from '@/lib/shacl/lift'
 // works, instead of only in the import confirmation they already dismissed.
 const props = defineProps<{
   notes: LiftNote[]
-  // Whether the source file rides along as shapes.custom.ttl. Everything listed
-  // here only keeps validating while it does, so the wording follows it.
+  // Whether the source constraints are preserved in the unified shapes.ttl.
   attached: boolean
 }>()
 
@@ -62,10 +61,10 @@ function scopeText(note: LiftNote): string {
     <p class="mt-2 flex items-start gap-1.5">
       <FileCode2 class="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span v-if="attached">
-        The original file rides along as <code>shapes.custom.ttl</code>, so everything above still runs when a dataset is validated, it just has no input of its own.
+        The original constraints are included in the unified <code>shapes.ttl</code>, so everything above still runs when a dataset is validated, it just has no input of its own.
       </span>
       <span v-else>
-        The original file is <b>not</b> attached, so nothing above is checked at all. Attach it under SHACL shapes (advanced) in the Basics step to keep it enforcing.
+        The original constraints are <b>not</b> included, so nothing above is checked. Upload the file under SHACL shapes (advanced) in the Basics step to include them.
       </span>
     </p>
   </div>

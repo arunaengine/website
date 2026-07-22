@@ -69,9 +69,6 @@ function downloadText(text: string | undefined, filename: string, type: string) 
 const fileSlug = computed(() => builder.slug.trim() || 'profile')
 const artifactDownloads = computed(() => [
   { label: 'shapes.ttl', text: artifactTexts.value.shapes, filename: `${fileSlug.value}.shapes.ttl`, type: 'text/turtle' },
-  ...(artifactTexts.value.customShapes
-    ? [{ label: 'shapes.custom.ttl', text: artifactTexts.value.customShapes, filename: `${fileSlug.value}.shapes.custom.ttl`, type: 'text/turtle' }]
-    : []),
   { label: 'schema.json', text: artifactTexts.value.schema, filename: `${fileSlug.value}.schema.json`, type: 'application/json' },
   { label: 'mode.json', text: artifactTexts.value.mode, filename: `${fileSlug.value}.mode.json`, type: 'application/json' },
   { label: 'profile.html', text: artifactTexts.value.html, filename: `${fileSlug.value}.profile.html`, type: 'text/html' },
@@ -278,9 +275,9 @@ function violationsFor(property: string) {
         <span class="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
           Generated files
           <Badge variant="secondary" class="text-[10px]">profile.html · mode.json · schema.json · shapes.ttl</Badge>
-          <!-- Attached deep-validation shapes: read-only chip with count. -->
+          <!-- Imported source shapes: read-only chip with count. -->
           <Badge v-if="builder.customShapesMeta" variant="secondary" class="inline-flex items-center gap-1 text-[10px]">
-            <FileCode2 class="h-3 w-3" /> {{ builder.customShapesMeta.fileName }}<template v-if="builder.customShapesMeta.shapeCount !== undefined"> · {{ builder.customShapesMeta.shapeCount }} {{ builder.customShapesMeta.shapeCount === 1 ? 'shape' : 'shapes' }}</template>
+            <FileCode2 class="h-3 w-3" /> {{ builder.customShapesMeta.fileName }} merged into shapes.ttl<template v-if="builder.customShapesMeta.shapeCount !== undefined"> · {{ builder.customShapesMeta.shapeCount }} {{ builder.customShapesMeta.shapeCount === 1 ? 'shape' : 'shapes' }}</template>
           </Badge>
         </span>
         <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground transition-transform" :class="generatedFilesOpen ? 'rotate-180' : ''" />
@@ -291,7 +288,7 @@ function violationsFor(property: string) {
           <b class="text-foreground">profile.html</b> is the human-readable specification,
           <b class="text-foreground">mode.json</b> the editor form structure (Describo/Crate-O-compatible),
           <b class="text-foreground">schema.json</b> the validation rules, and
-          <b class="text-foreground">shapes.ttl</b> the SHACL shapes for deep validation.
+          <b class="text-foreground">shapes.ttl</b> the unified generated and imported SHACL shapes for deep validation.
           Editors read the mode file; validation reads the validation rules, mode files have no vocabulary for constraints or recommended levels.
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-1.5">
@@ -332,13 +329,9 @@ function violationsFor(property: string) {
 
           <TabsContent value="shapes">
             <p class="mb-2 text-[11px] text-muted-foreground">
-              Generated SHACL shapes (<code>shapes.ttl</code>), used for deep in-browser validation of dataset crates.
+              Unified generated and imported SHACL shapes (<code>shapes.ttl</code>), used for deep in-browser validation of dataset crates.
             </p>
             <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.shapes }}</pre>
-            <template v-if="artifactTexts.customShapes">
-              <p class="mb-2 mt-3 text-[11px] text-muted-foreground">Attached shapes (<code>shapes.custom.ttl</code>), kept verbatim.</p>
-              <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.customShapes }}</pre>
-            </template>
           </TabsContent>
 
           <TabsContent value="crate">

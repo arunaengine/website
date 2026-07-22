@@ -275,7 +275,7 @@ async function fromUrl() {
         <Badge variant="secondary">Describo/Crate-O-compatible</Badge>
       </h4>
       <p class="mt-1 text-xs text-muted-foreground">
-        Start from a Describo/Crate-O mode file, an RO-Crate profile crate, or a SHACL shapes file (.ttl). Rules we recognize become editable here; everything else in the file is kept unchanged and written back on export.
+        Start from a Describo/Crate-O mode file, an RO-Crate profile crate, or a SHACL shapes file (.ttl). Rules we recognize become editable here; remaining SHACL constraints are preserved in the unified shapes.ttl.
       </p>
     </div>
 
@@ -320,7 +320,7 @@ async function fromUrl() {
       </div>
       <p class="text-muted-foreground">
         <template v-if="pendingResidual">
-          Creating the fields lets authors fill them in and see what each one requires. Keeping the file attached alongside them means the
+          Creating the fields lets authors fill them in and see what each one requires. Including the original constraints alongside them means the
           constraints listed below, which no input can express, still run when a dataset is validated.
         </template>
         <template v-else>
@@ -332,7 +332,7 @@ async function fromUrl() {
 
       <div class="flex flex-wrap items-center gap-2">
         <Button v-if="pendingResidual" type="button" size="sm" @click="convertPendingShacl(true)">
-          Create {{ pendingShacl.lift.fieldCount }} fields, keep file attached
+          Create {{ pendingShacl.lift.fieldCount }} fields, include all constraints
         </Button>
         <Button
           type="button"
@@ -342,7 +342,7 @@ async function fromUrl() {
         >
           Create {{ pendingShacl.lift.fieldCount }} fields{{ pendingResidual ? ' only' : '' }}
         </Button>
-        <Button type="button" variant="outline" size="sm" @click="keepPendingShaclAttached">Keep attached only</Button>
+        <Button type="button" variant="outline" size="sm" @click="keepPendingShaclAttached">Keep constraints only</Button>
         <Button type="button" variant="ghost" size="sm" @click="pendingShacl = null">Cancel</Button>
       </div>
     </div>
@@ -350,9 +350,9 @@ async function fromUrl() {
     <div v-if="shaclNotice" class="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
       <div class="flex items-center gap-2 font-medium">
         <CheckCircle2 class="h-3.5 w-3.5" />
-        Attached {{ shaclNotice.fileName }} as shapes.custom.ttl ({{ shaclNotice.shapeCount }} {{ shaclNotice.shapeCount === 1 ? 'shape' : 'shapes' }}).
+        Included {{ shaclNotice.fileName }} in the unified shapes.ttl ({{ shaclNotice.shapeCount }} {{ shaclNotice.shapeCount === 1 ? 'shape' : 'shapes' }}).
       </div>
-      <p class="mt-1">Manage the attachment under SHACL shapes (advanced) in the Create tab.</p>
+      <p class="mt-1">Manage the imported source under SHACL shapes (advanced) in the Create tab.</p>
     </div>
 
     <!-- Attach-only imports where nothing could be lifted: say why, right here. -->

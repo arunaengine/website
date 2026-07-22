@@ -136,8 +136,7 @@ export interface ProfileImportResult {
   mode?: ModeFile | null
   kind?: 'mode' | 'crate' | 'shacl'
   preservedKeys?: string[]
-  // Attached expert SHACL file (shapes.custom.ttl) carried by the imported
-  // crate, preserved verbatim through the builder.
+  // Imported expert SHACL source preserved inside the unified shapes.ttl.
   customShapesText?: string
   customShapesName?: string
   // What a SHACL import could not turn into an editable rule (see lift.ts).
@@ -156,8 +155,7 @@ export interface ImportSummary {
   preservedKeys: string[]
 }
 
-// Attach-block display metadata for shapes.custom.ttl; shapeCount is the number
-// of SHACL node shapes when known (parsed at attach time).
+// Display metadata for the imported source section in shapes.ttl.
 export interface CustomShapesMeta {
   fileName: string
   shapeCount?: number
@@ -520,8 +518,7 @@ export function useProfileBuilder() {
   // Raw imported mode file, preserved verbatim and re-emitted by buildProfileCrate
   // so features the builder does not model (layouts, lookup, localisation…) survive.
   const importedMode = ref<ModeFile | null>(null)
-  // Attached expert SHACL shapes (shapes.custom.ttl), kept verbatim (plan 5.1);
-  // the generated shapes.ttl is always emitted independently of this.
+  // Imported expert SHACL source, kept verbatim inside the unified shapes.ttl.
   const customShapesText = ref('')
   const customShapesMeta = ref<CustomShapesMeta | null>(null)
   // Summary of the last successful import (survives tab/step navigation).
@@ -599,7 +596,7 @@ export function useProfileBuilder() {
     importedMode.value = result.mode ?? null
     customShapesText.value = result.customShapesText ?? ''
     customShapesMeta.value = result.customShapesText
-      ? { fileName: result.customShapesName ?? 'shapes.custom.ttl' }
+      ? { fileName: result.customShapesName ?? 'Imported SHACL source' }
       : null
     liftNotes.value = result.liftNotes ?? []
     importSummary.value = {

@@ -12,8 +12,6 @@ const ARTIFACT_FILES = [
   { key: 'schema', name: 'schema.json', contentType: 'application/schema+json' },
   { key: 'mode', name: 'mode.json', contentType: 'application/json' },
   { key: 'shapes', name: 'shapes.ttl', contentType: 'text/turtle' },
-  // Attached expert SHACL file; uploaded only when the profile carries one.
-  { key: 'customShapes', name: 'shapes.custom.ttl', contentType: 'text/turtle' },
 ] as const
 
 // The chosen (or defaulted) place a public profile's artifacts are written.
@@ -82,7 +80,6 @@ export function useProfilePublish() {
       schema: refs.schema!,
       mode: refs.mode!,
       shapes: refs.shapes!,
-      ...(refs.customShapes ? { customShapes: refs.customShapes } : {}),
     }
   }
 

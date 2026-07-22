@@ -8,6 +8,8 @@ import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { ChevronDown, FileCode2, Globe, Loader2, Upload, X } from '@lucide/vue'
 import { useArtifactFetch } from './useArtifactFetch'
+import { sameSchemaOrgType } from '@/lib/profiles/uri'
+import type { ProfileEntityRule } from '@/lib/profiles/types'
 import type { ProfileBuilder } from './useProfileBuilder'
 
 // `locked` freezes the profile's stored identity (owning group and slug/path)
@@ -21,9 +23,9 @@ function fieldError(fieldId: string): string {
   return builder.basicsFieldErrors.find((error) => error.fieldId === fieldId)?.message ?? ''
 }
 
-// --- SHACL shapes (advanced): attach/replace/remove shapes.custom.ttl. The
-// generated shapes.ttl always exists; this block only manages the optional
-// expert attachment (plan 6.1). Turtle parsing goes through a dynamic import
+// --- SHACL shapes (advanced): merge/replace/remove imported source shapes. The
+// generated and imported sections are exported together as shapes.ttl. Turtle
+// parsing goes through a dynamic import
 // of lift.ts so n3 never enters the main bundle.
 const shapesOpen = ref(false)
 const shapesFileInput = ref<HTMLInputElement | null>(null)
@@ -32,23 +34,51 @@ const shapesBusy = ref(false)
 const shapesError = ref('')
 const { fetchArtifactText } = useArtifactFetch()
 
+function mergeEntityRules(current: ProfileEntityRule[], incoming: ProfileEntityRule[]): ProfileEntityRule[] {
+  const merged = current.map((entity) => ({ ...entity, propertyRules: [...entity.propertyRules] }))
+  for (const entity of incoming) {
+    const existing = merged.find((candidate) => sameSchemaOrgType(candidate.type, entity.type))
+    if (!existing) {
+      merged.push(entity)
+      continue
+    }
+    for (const property of entity.propertyRules) {
+      const index = existing.propertyRules.findIndex((candidate) => sameSchemaOrgType(candidate.propertyUri, property.propertyUri))
+      if (index >= 0) existing.propertyRules[index] = property
+      else existing.propertyRules.push(property)
+    }
+  }
+  return merged
+}
+
 async function attachShapesText(text: string, fileName: string) {
   shapesError.value = ''
   shapesBusy.value = true
   try {
     const { liftShapes } = await import('@/lib/shacl/lift')
-    let shapeCount = 0
+    let lift
     try {
-      shapeCount = liftShapes(text).shapeCount
+      lift = liftShapes(text)
     } catch (err) {
       shapesError.value = `Not parseable as Turtle: ${err instanceof Error ? err.message : String(err)}`
       return
     }
-    if (!shapeCount) {
+    if (!lift.shapeCount) {
       shapesError.value = 'That file parses as Turtle but contains no SHACL node shapes.'
       return
     }
-    builder.setCustomShapes(text, { fileName, shapeCount })
+    if (lift.fieldCount) {
+      builder.applyImport({
+        entityRules: mergeEntityRules(builder.normalizedEntities, lift.entities),
+        mode: builder.importedMode,
+        kind: 'shacl',
+        customShapesText: text,
+        customShapesName: fileName,
+        liftNotes: lift.notes,
+      })
+    } else {
+      builder.setCustomShapes(text, { fileName, shapeCount: lift.shapeCount })
+    }
     shapesUrl.value = ''
   } finally {
     shapesBusy.value = false
@@ -73,7 +103,7 @@ async function shapesFromUrl() {
   shapesError.value = ''
   try {
     const text = await fetchArtifactText(target)
-    await attachShapesText(text, target.split('/').pop() || 'shapes.custom.ttl')
+    await attachShapesText(text, target.split('/').pop() || 'shapes.ttl')
   } catch (err) {
     shapesError.value = err instanceof TypeError
       ? 'Could not fetch that URL. If it is hosted on another server (or redirects to one, like a w3id.org id), that server does not allow browser (cross-origin) access. Download the file and upload it instead.'
@@ -185,14 +215,14 @@ watch(
         <span class="flex items-center gap-2 text-sm font-medium text-foreground">
           <FileCode2 class="h-4 w-4 text-primary" /> SHACL shapes (advanced)
           <Badge v-if="builder.customShapesMeta" variant="secondary">
-            {{ builder.customShapesMeta.fileName }}<template v-if="builder.customShapesMeta.shapeCount !== undefined"> · {{ builder.customShapesMeta.shapeCount }} {{ builder.customShapesMeta.shapeCount === 1 ? 'shape' : 'shapes' }}</template>
+            {{ builder.customShapesMeta.fileName }} · merged into shapes.ttl<template v-if="builder.customShapesMeta.shapeCount !== undefined"> · {{ builder.customShapesMeta.shapeCount }} {{ builder.customShapesMeta.shapeCount === 1 ? 'shape' : 'shapes' }}</template>
           </Badge>
         </span>
         <ChevronDown class="h-4 w-4 text-muted-foreground transition-transform" :class="shapesOpen ? 'rotate-180' : ''" />
       </button>
       <div v-if="shapesOpen" class="space-y-3 border-t border-border px-3 py-3">
         <p class="text-[11px] text-muted-foreground">
-          The builder always generates SHACL shapes from your rules. You can additionally attach an expert SHACL file (Turtle); it is stored verbatim as <code>shapes.custom.ttl</code> and runs alongside the generated shapes when datasets are validated.
+          Uploading SHACL shapes adds supported properties to the editable form rules. The original constraints are preserved in the same unified <code>shapes.ttl</code>, including constraints without a form equivalent.
         </p>
 
         <div v-if="builder.customShapesMeta" class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
