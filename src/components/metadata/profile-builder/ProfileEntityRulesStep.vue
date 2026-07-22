@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import EntityShapeSection from './EntityShapeSection.vue'
 import EntityTypePicker from './EntityTypePicker.vue'
+import LiftNotesPanel from './LiftNotesPanel.vue'
 import { PROFILE_OBLIGATION_LABELS } from '@/lib/profiles/labels'
 import type { ProfileBuilder } from './useProfileBuilder'
 
@@ -30,6 +31,10 @@ const orderedEntities = computed(() => [
         Rules for a Person, Organization or File apply when one is described; entity-valued rules link to those shared shapes.
       </p>
     </div>
+
+    <!-- Imported SHACL the rules below could not fully express, shown here so it
+         is obvious which parts of the file have no field. -->
+    <LiftNotesPanel :notes="builder.liftNotes" :attached="Boolean(builder.customShapesText.trim())" />
 
     <EntityShapeSection
       v-for="entity in orderedEntities"

@@ -10,7 +10,9 @@ import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocra
 import { isRecord } from '@/lib/profiles/uri'
 import { useAruna } from '@/composables/useAruna'
 import { useArtifactFetch } from './useArtifactFetch'
-import type { ProfileBasics, ProfileEntityRule } from '@/lib/profiles/types'
+import LiftNotesPanel from './LiftNotesPanel.vue'
+import type { ProfileBasics } from '@/lib/profiles/types'
+import type { LiftResult } from '@/lib/shacl/lift'
 import type { ProfileBuilder, ProfileImportResult } from './useProfileBuilder'
 
 const props = defineProps<{ builder: ProfileBuilder }>()
@@ -23,12 +25,12 @@ const error = ref('')
 // A parsed import held back because the builder already has edits; applied only
 // after the author confirms the replacement.
 const pendingImport = ref<ProfileImportResult | null>(null)
-// A fully-liftable SHACL file awaiting the author's choice (plan 6.6):
-// convert to editable rules, or keep attached as shapes.custom.ttl verbatim.
-const pendingShacl = ref<{ text: string; fileName: string; entities: ProfileEntityRule[] } | null>(null)
-// Confirmation of a completed attach; reasons list what was too complex to lift
-// (empty when the author chose "keep attached" for a liftable file).
-const shaclNotice = ref<{ fileName: string; shapeCount: number; reasons: string[] } | null>(null)
+// A parsed SHACL file awaiting the author's choice: turn the shapes the builder
+// understands into editable rules (keeping the file attached so the rest still
+// validates), or keep the file attached and author nothing.
+const pendingShacl = ref<{ text: string; fileName: string; lift: LiftResult } | null>(null)
+// Confirmation of an attach-only choice.
+const shaclNotice = ref<{ fileName: string; shapeCount: number } | null>(null)
 
 // "Start from an existing profile": prefill the builder from any stored or
 // built-in profile on this node — the same ingest path as an uploaded crate.
@@ -39,6 +41,11 @@ const storedBusy = ref(false)
 // Authenticated-when-possible artifact fetch, shared with the basics step's
 // SHACL attach block (useArtifactFetch documents the resolution rules).
 const { fetchArtifactText: fetchArtifact } = useArtifactFetch()
+// Whether keeping the file attached actually buys anything: with no notes the
+// generated shapes already say everything the file said, and attaching it too
+// would only re-check the same constraints from a second shape.
+const pendingResidual = computed(() => Boolean(pendingShacl.value?.lift.notes.length))
+
 const storedOptions = computed(() =>
   profiles.value.map((profile) => ({
     value: profile.id,
@@ -135,39 +142,46 @@ async function ingestText(text: string, fileName: string) {
   await ingestTurtle(text, fileName)
 }
 
-// Bare SHACL file: fully-liftable files offer convert-vs-attach; anything else
-// attaches verbatim as shapes.custom.ttl with the non-liftable reasons listed.
+// Bare SHACL file: lift whatever the rule model can express and offer the
+// choice, falling straight through to attach-only when nothing lifted.
 // lift.ts is loaded on demand so the Turtle parser stays out of the main bundle.
 async function ingestTurtle(text: string, fileName: string) {
   const { liftShapes } = await import('@/lib/shacl/lift')
-  let verdict: ReturnType<typeof liftShapes>
+  let lift: LiftResult
   try {
-    verdict = liftShapes(text)
+    lift = liftShapes(text)
   } catch (err) {
     throw new Error(`Not parseable as Turtle: ${err instanceof Error ? err.message : String(err)}`)
   }
   shaclNotice.value = null
-  if (verdict.kind === 'rules') {
-    pendingShacl.value = { text, fileName, entities: verdict.entities }
-    pendingImport.value = null
-    error.value = ''
+  if (!lift.shapeCount) throw new Error('No SHACL node shapes found in that file.')
+  if (!lift.fieldCount) {
+    // Nothing became a field; attaching is the only thing left to offer.
+    attachShacl(text, fileName, lift.shapeCount)
+    props.builder.liftNotes = lift.notes
     return
   }
-  if (!verdict.shapeCount) throw new Error('No SHACL node shapes found in that file.')
-  attachShacl(text, fileName, verdict.shapeCount, verdict.reasons)
+  pendingShacl.value = { text, fileName, lift }
+  pendingImport.value = null
+  error.value = ''
 }
 
-// "Convert to editable rules": replaces the draft like any other import, so the
-// existing has-edits confirmation applies.
-function convertPendingShacl() {
+// "Create the fields": replaces the draft like any other import, so the existing
+// has-edits confirmation applies. `attach` keeps the source file riding along as
+// shapes.custom.ttl, which is what keeps the constraints the builder could not
+// model (SPARQL rules, value exclusions) enforcing.
+function convertPendingShacl(attach: boolean) {
   const pending = pendingShacl.value
   if (!pending) return
   pendingShacl.value = null
   const result: ProfileImportResult = {
-    entityRules: pending.entities,
+    entityRules: pending.lift.entities,
     mode: null,
     kind: 'shacl',
     preservedKeys: [],
+    liftNotes: pending.lift.notes,
+    customShapesText: attach ? pending.text : undefined,
+    customShapesName: pending.fileName,
   }
   if (props.builder.hasEdits) {
     pendingImport.value = result
@@ -177,17 +191,18 @@ function convertPendingShacl() {
   apply(result)
 }
 
-// "Keep attached": no draft replacement, the file rides along verbatim.
+// "Keep attached only": no draft replacement, the file rides along verbatim.
 function keepPendingShaclAttached() {
   const pending = pendingShacl.value
   if (!pending) return
   pendingShacl.value = null
-  attachShacl(pending.text, pending.fileName, pending.entities.length, [])
+  attachShacl(pending.text, pending.fileName, pending.lift.shapeCount)
+  props.builder.liftNotes = []
 }
 
-function attachShacl(text: string, fileName: string, shapeCount: number, reasons: string[]) {
+function attachShacl(text: string, fileName: string, shapeCount: number) {
   props.builder.setCustomShapes(text, { fileName, shapeCount })
-  shaclNotice.value = { fileName, shapeCount, reasons }
+  shaclNotice.value = { fileName, shapeCount }
   error.value = ''
 }
 
@@ -296,18 +311,38 @@ async function fromUrl() {
       <span>{{ error }}</span>
     </div>
 
-    <div v-if="pendingShacl" class="rounded-md border border-border bg-card px-3 py-2 text-xs">
+    <div v-if="pendingShacl" class="space-y-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
       <div class="flex items-center gap-2 font-medium text-foreground">
         <FileCode2 class="h-3.5 w-3.5 shrink-0 text-primary" />
-        {{ pendingShacl.fileName }} is a SHACL shapes file the builder can fully convert
-        ({{ pendingShacl.entities.length }} {{ pendingShacl.entities.length === 1 ? 'shape' : 'shapes' }}).
+        {{ pendingShacl.fileName }}: {{ pendingShacl.lift.shapeCount }} SHACL {{ pendingShacl.lift.shapeCount === 1 ? 'shape' : 'shapes' }},
+        {{ pendingShacl.lift.fieldCount }} editable {{ pendingShacl.lift.fieldCount === 1 ? 'field' : 'fields' }}
+        across {{ pendingShacl.lift.entities.length }} {{ pendingShacl.lift.entities.length === 1 ? 'entity' : 'entities' }}.
       </div>
-      <p class="mt-1 text-muted-foreground">
-        Convert it into editable rules, or keep the file attached as-is; attached shapes run during dataset validation but stay read-only.
+      <p class="text-muted-foreground">
+        <template v-if="pendingResidual">
+          Creating the fields lets authors fill them in and see what each one requires. Keeping the file attached alongside them means the
+          constraints listed below, which no input can express, still run when a dataset is validated.
+        </template>
+        <template v-else>
+          Every shape in the file maps to a rule, so the profile regenerates the same constraints from the fields, no attachment needed.
+        </template>
       </p>
-      <div class="mt-2 flex items-center gap-2">
-        <Button type="button" variant="outline" size="sm" @click="convertPendingShacl">Convert to editable rules</Button>
-        <Button type="button" variant="outline" size="sm" @click="keepPendingShaclAttached">Keep attached</Button>
+
+      <LiftNotesPanel :notes="pendingShacl.lift.notes" attached />
+
+      <div class="flex flex-wrap items-center gap-2">
+        <Button v-if="pendingResidual" type="button" size="sm" @click="convertPendingShacl(true)">
+          Create {{ pendingShacl.lift.fieldCount }} fields, keep file attached
+        </Button>
+        <Button
+          type="button"
+          :variant="pendingResidual ? 'outline' : 'default'"
+          size="sm"
+          @click="convertPendingShacl(false)"
+        >
+          Create {{ pendingShacl.lift.fieldCount }} fields{{ pendingResidual ? ' only' : '' }}
+        </Button>
+        <Button type="button" variant="outline" size="sm" @click="keepPendingShaclAttached">Keep attached only</Button>
         <Button type="button" variant="ghost" size="sm" @click="pendingShacl = null">Cancel</Button>
       </div>
     </div>
@@ -317,14 +352,11 @@ async function fromUrl() {
         <CheckCircle2 class="h-3.5 w-3.5" />
         Attached {{ shaclNotice.fileName }} as shapes.custom.ttl ({{ shaclNotice.shapeCount }} {{ shaclNotice.shapeCount === 1 ? 'shape' : 'shapes' }}).
       </div>
-      <template v-if="shaclNotice.reasons.length">
-        <p class="mt-1">Too complex to convert into editable rules:</p>
-        <ul class="mt-1 list-disc pl-4">
-          <li v-for="reason in shaclNotice.reasons" :key="reason">{{ reason }}</li>
-        </ul>
-      </template>
       <p class="mt-1">Manage the attachment under SHACL shapes (advanced) in the Create tab.</p>
     </div>
+
+    <!-- Attach-only imports where nothing could be lifted: say why, right here. -->
+    <LiftNotesPanel v-if="shaclNotice && builder.liftNotes.length" :notes="builder.liftNotes" attached />
 
     <div v-if="pendingImport" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
       <div class="flex items-center gap-2 font-medium">

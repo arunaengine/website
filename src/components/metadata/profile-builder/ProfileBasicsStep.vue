@@ -39,8 +39,7 @@ async function attachShapesText(text: string, fileName: string) {
     const { liftShapes } = await import('@/lib/shacl/lift')
     let shapeCount = 0
     try {
-      const verdict = liftShapes(text)
-      shapeCount = verdict.kind === 'rules' ? verdict.entities.length : verdict.shapeCount
+      shapeCount = liftShapes(text).shapeCount
     } catch (err) {
       shapesError.value = `Not parseable as Turtle: ${err instanceof Error ? err.message : String(err)}`
       return
@@ -94,8 +93,7 @@ watch(
     void (async () => {
       try {
         const { liftShapes } = await import('@/lib/shacl/lift')
-        const verdict = liftShapes(text)
-        const shapeCount = verdict.kind === 'rules' ? verdict.entities.length : verdict.shapeCount
+        const { shapeCount } = liftShapes(text)
         if (builder.customShapesText === text) builder.setCustomShapes(text, { ...meta, shapeCount })
       } catch {
         // Unparseable attachment from an imported crate: keep it verbatim, the

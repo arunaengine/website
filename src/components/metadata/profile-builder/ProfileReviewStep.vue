@@ -6,6 +6,7 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
+import LiftNotesPanel from './LiftNotesPanel.vue'
 import { CheckCircle2, AlertTriangle, ChevronDown, Download, FileCode2, Lightbulb, Repeat2 } from '@lucide/vue'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
 import { buildProfileArtifactTexts, parseProfileCrate } from '@/lib/profiles/rocrate'
@@ -168,6 +169,10 @@ function violationsFor(property: string) {
         <li v-for="hint in builder.rulesHints" :key="hint">{{ hint }}</li>
       </ul>
     </div>
+
+    <!-- Imported SHACL that no rule below represents. Repeated from the Rules
+         step so it is still in view at the point of committing. -->
+    <LiftNotesPanel :notes="builder.liftNotes" :attached="Boolean(builder.customShapesText.trim())" />
 
     <!-- Readable rule sentences: what the profile requires, per entity. -->
     <div class="rounded-lg border border-border p-3">

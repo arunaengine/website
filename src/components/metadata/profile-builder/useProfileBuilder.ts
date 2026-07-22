@@ -27,6 +27,8 @@ import type {
   ProfileValueKind,
 } from '@/lib/profiles/types'
 import { normalizeEntitySources } from '@/lib/profiles/sources'
+// Type-only: lift.ts carries the RDF stack and is never imported for value here.
+import type { LiftNote } from '@/lib/shacl/lift'
 
 // Two levels of builder-session lock on a baseline draft rule. `full` is the old
 // all-or-nothing read-only (the Root Dataset entity itself). `structural` fixes a
@@ -137,6 +139,11 @@ export interface ProfileImportResult {
   // Attached expert SHACL file (shapes.custom.ttl) carried by the imported
   // crate, preserved verbatim through the builder.
   customShapesText?: string
+  customShapesName?: string
+  // What a SHACL import could not turn into an editable rule (see lift.ts).
+  // Kept on the builder so the Rules and Review steps can say which parts of
+  // the file generate no input.
+  liftNotes?: LiftNote[]
 }
 
 // What was imported, lifted into the builder so the confirmation survives step
@@ -519,6 +526,10 @@ export function useProfileBuilder() {
   const customShapesMeta = ref<CustomShapesMeta | null>(null)
   // Summary of the last successful import (survives tab/step navigation).
   const importSummary = ref<ImportSummary | null>(null)
+  // Parts of an imported SHACL file that produced no editable rule, or only a
+  // partial one. Surfaced next to the rules so "no input for X" is visible where
+  // the author is working, not only at import time.
+  const liftNotes = ref<LiftNote[]>([])
   // uid of a property draft just added by a quick action (M2). PropertyRuleCard
   // watches this to scroll the freshly-created card into view and briefly flash it,
   // then clears it, so a one-click "Add reference" lands the author on the new rule.
@@ -544,6 +555,7 @@ export function useProfileBuilder() {
     customShapesText.value = ''
     customShapesMeta.value = null
     importSummary.value = null
+    liftNotes.value = []
     highlightPropertyUid.value = null
     entities.value = defaultEntities()
     selectedEntityIndex.value = 0
@@ -575,13 +587,21 @@ export function useProfileBuilder() {
     // L2: the first Dataset-typed rule is the RO-Crate root — only its baseline four
     // rules re-lock as structural (a nested Dataset sub-entity is left untouched).
     const rootIndex = result.entityRules.findIndex((entity) => isDatasetType(normalizeTypeUri(entity.type)))
-    entities.value = result.entityRules.length
-      ? result.entityRules.map((entity, index) => draftFromEntityRule(entity, index === rootIndex))
+    const drafts = result.entityRules.map((entity, index) => draftFromEntityRule(entity, index === rootIndex))
+    // Every RO-Crate has a root Dataset, and the dataset form is generated from
+    // its rules. An import that describes none (a SHACL file with only
+    // class-targeted shapes, say) would otherwise land the author on a draft that
+    // can never be saved, so seed the RO-Crate baseline root alongside it.
+    entities.value = drafts.length
+      ? (rootIndex >= 0 ? drafts : [...defaultEntities(), ...drafts])
       : defaultEntities()
     selectedEntityIndex.value = 0
     importedMode.value = result.mode ?? null
     customShapesText.value = result.customShapesText ?? ''
-    customShapesMeta.value = result.customShapesText ? { fileName: 'shapes.custom.ttl' } : null
+    customShapesMeta.value = result.customShapesText
+      ? { fileName: result.customShapesName ?? 'shapes.custom.ttl' }
+      : null
+    liftNotes.value = result.liftNotes ?? []
     importSummary.value = {
       kind: result.kind ?? 'crate',
       name: result.basics?.name,
@@ -1157,6 +1177,7 @@ export function useProfileBuilder() {
     customShapesText,
     customShapesMeta,
     importSummary,
+    liftNotes,
     hasEdits,
     highlightPropertyUid,
     // options
