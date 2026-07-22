@@ -208,6 +208,9 @@ export interface MetadataProfile {
   shapesText?: string
   // Attached expert SHACL shapes (shapes.custom.ttl), preserved verbatim.
   customShapesText?: string
+  // S3 contentUrl of one published artifact; editing derives the publish
+  // destination (bucket/prefix) from it so re-saving keeps the chosen place.
+  artifactUrl?: string
   // Suggested keywords / vocabularies that are pre-populated when this profile is used
   suggestedKeywords: string[]
   // Whether this profile is editable by the current user (some are realm-managed templates)

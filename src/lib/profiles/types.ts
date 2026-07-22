@@ -273,6 +273,9 @@ export interface ParsedProfileCrate {
   // Turtle text of the ATTACHED shapes.custom.ttl artifact, preserved verbatim
   // through save/publish/import (plan 5.1: the only authored artifact).
   customShapesText?: string
+  // S3 contentUrl of any externalized (published) artifact, so an edit can
+  // republish into the same bucket/prefix instead of the computed default.
+  artifactUrl?: string
   entityRules: ProfileEntityRule[]
   datasetPropertyRules: ProfilePropertyRule[]
 }

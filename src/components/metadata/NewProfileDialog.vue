@@ -28,6 +28,7 @@ import { useProfilePublish } from '@/composables/useProfilePublish'
 import type { MetadataProfile } from '@/data/types'
 import { buildProfileArtifactTexts, buildProfileCrate } from '@/lib/profiles/rocrate'
 import { entityRulesToMode } from '@/lib/profiles/mode'
+import { parseS3Url } from '@/lib/tes'
 
 const props = defineProps<{
   open: boolean
@@ -70,8 +71,10 @@ const selectedDestBucket = computed(() => destBucket.value || defaultDestBucket.
 const destBucketOptions = computed(() => {
   const def = defaultDestBucket.value
   const options = [{ value: def, label: `${def} (default)` }]
-  for (const name of destBuckets.value) {
-    if (name !== def) options.push({ value: name, label: name })
+  // The current override is listed even before the bucket listing arrives, so
+  // an edited profile's remembered destination renders immediately.
+  for (const name of [...(destBucket.value ? [destBucket.value] : []), ...destBuckets.value]) {
+    if (!options.some((option) => option.value === name)) options.push({ value: name, label: name })
   }
   return options
 })
@@ -210,6 +213,17 @@ watch(
     }
     // Seed the destination prefix from the now-final slug.
     destPrefix.value = `profiles/${builder.slug.trim()}`
+    // Editing a published profile keeps its actual destination: derive bucket
+    // and prefix from a stored artifact URL instead of the computed default.
+    const published = profile?.artifactUrl ? parseS3Url(profile.artifactUrl, s3.endpoint.value) : null
+    if (published) {
+      destBucket.value = published.bucket === defaultDestBucket.value ? '' : published.bucket
+      const prefix = published.key.split('/').slice(0, -1).join('/')
+      if (prefix && prefix !== destPrefix.value) {
+        destPrefix.value = prefix
+        destPrefixEdited.value = true
+      }
+    }
   },
   { immediate: true },
 )

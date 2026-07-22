@@ -1214,6 +1214,7 @@ function mapProfile(item: MetadataDocumentListItem): MetadataProfile {
     contextTerms: parsed.contextTerms,
     shapesText: parsed.shapesText,
     customShapesText: parsed.customShapesText,
+    artifactUrl: parsed.artifactUrl,
     suggestedKeywords: arrayText(entity?.keywords ?? entity?.keyword),
     managed: item.public,
     usedCount: metadataItems.value.filter((doc) => mapMetadataDoc(doc).profileIds?.includes(pathId)).length,

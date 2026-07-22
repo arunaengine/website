@@ -244,9 +244,11 @@ export function parseProfileCrate(rocrate: unknown): ParsedProfileCrate {
   const datasetPropertyRules = entityRules.find((entity) => isDatasetType(entity.type))?.propertyRules ?? []
   const contextTerms = contextTermsFromCrate(rocrate, mode)
   const { shapesText, customShapesText } = extractShapesTexts(rocrate)
+  const artifactUrl = publishedArtifactUrl(entries)
   return {
     ...(shapesText ? { shapesText } : {}),
     ...(customShapesText ? { customShapesText } : {}),
+    ...(artifactUrl ? { artifactUrl } : {}),
     name: textValue(root?.name) || (mode?.metadata?.name ? String(mode.metadata.name) : '') || schema?.title || '',
     description:
       textValue(root?.description) ||
@@ -300,6 +302,21 @@ export async function resolveProfileArtifacts(
     if (entity) entity.text = item.text
   }
   return copy
+}
+
+// The S3 contentUrl of any descriptor-referenced artifact of a PUBLISHED
+// (externalized) profile. All artifacts are written side by side, so one URL
+// pins the whole published location; embedded (private) profiles yield none.
+function publishedArtifactUrl(entries: Array<Record<string, unknown>>): string | undefined {
+  for (const descriptor of entries) {
+    if (!typeContains(descriptor, DX_RESOURCE_DESCRIPTOR)) continue
+    for (const id of idValues(descriptor[DX_HAS_ARTIFACT] ?? descriptor.hasArtifact)) {
+      const entity = entityById(entries, id)
+      const url = entity && (idValue(entity.contentUrl) || textValue(entity.contentUrl))
+      if (url && /^https?:\/\//.test(url)) return url
+    }
+  }
+  return undefined
 }
 
 // contentUrl (the S3 https URL) first; a fetchable absolute @id second.
