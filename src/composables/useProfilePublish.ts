@@ -1,6 +1,6 @@
 import { blake3, sha256 } from 'hash-wasm'
 import { useAruna } from './useAruna'
-import { useS3 } from './useS3'
+import { isS3NetworkError, useS3 } from './useS3'
 import type { ExternalProfileArtifacts, ProfileArtifactTexts } from '@/lib/profiles/rocrate'
 
 // Where content-addressed data resolves: any aruna node's GA4GH DRS API accepts
@@ -64,7 +64,11 @@ export function useProfilePublish() {
       const text = texts[artifact.key]
       if (text === undefined) continue
       const key = `${prefix}/${artifact.name}`
-      await s3.putTextObject(bucket, key, text, artifact.contentType)
+      try {
+        await s3.putTextObject(bucket, key, text, artifact.contentType)
+      } catch (err) {
+        throw corsAwareError(err, `Uploading ${artifact.name}`, bucket)
+      }
       const bytes = new TextEncoder().encode(text)
       refs[artifact.key] = {
         id: `${W3ID_DATA_PREFIX}${await blake3(bytes)}`,
@@ -91,9 +95,15 @@ export function useProfilePublish() {
     } catch (err) {
       // Re-publishing into the existing bucket is the normal case.
       const name = (err as { name?: string }).name ?? ''
-      if (name !== 'BucketAlreadyOwnedByYou' && name !== 'BucketAlreadyExists') throw err
+      if (name !== 'BucketAlreadyOwnedByYou' && name !== 'BucketAlreadyExists') {
+        throw corsAwareError(err, 'Creating the destination bucket', bucket)
+      }
     }
-    await s3.allowPublicReadCors(bucket)
+    try {
+      await s3.allowPublicReadCors(bucket)
+    } catch (err) {
+      throw corsAwareError(err, 'Updating the public-read CORS rules', bucket)
+    }
 
     // One public-read role per destination path; skip creation when a public
     // role already grants READ on its exact path.
@@ -114,6 +124,21 @@ export function useProfilePublish() {
       permissions: { [path]: 'read' },
       public: true,
     })
+  }
+
+  // A browser request that died before any HTTP response almost always means
+  // the destination bucket's stored CORS rules rejected the preflight — e.g. a
+  // profiles bucket written by an older portal version whose rule allowed only
+  // GET/HEAD, which blocks every write including the fix itself. Name the
+  // bucket and the way out instead of surfacing the SDK's bare "Failed to
+  // fetch".
+  function corsAwareError(err: unknown, action: string, bucket: string): unknown {
+    if (!isS3NetworkError(err)) return err
+    return new Error(
+      `${action} was blocked by the browser before reaching bucket "${bucket}" (CORS preflight). ` +
+        `The bucket likely carries an outdated CORS configuration; update the aruna node so portal origins ` +
+        `always pass bucket CORS, then publish again.`,
+    )
   }
 
   // Normalizes a user-supplied key prefix into a safe S3 key path: strips
