@@ -4,6 +4,7 @@ import { Validator } from 'shacl-engine'
 import type { ShaclEngineResult } from 'shacl-engine'
 import roCrateContext from './ro-crate-context-1.2.json'
 import { CRATE_BASE_IRI, SH } from './projection'
+import { isDatasetType } from '../profiles/uri'
 import type { ShaclFinding, ShaclSeverity } from './findings'
 
 // Deep in-browser crate validation (plan section 8). This module carries the
@@ -103,7 +104,18 @@ function bindRootTargets(shapes: Store, rootId: string) {
   const nodeShapes = shapes
     .getQuads(null, RDF_TYPE, DataFactory.namedNode(`${SH}NodeShape`), null)
     .map((quad) => quad.subject)
+  const rootClasses = new Set(
+    nodeShapes.flatMap((shape) =>
+      shapes.getQuads(shape, `${SH}class`, null, null).some((quad) => isDatasetType(quad.object.value))
+        ? shapes.getQuads(shape, `${SH}targetClass`, null, null).map((quad) => quad.object.value)
+        : [],
+    ),
+  )
   for (const shape of nodeShapes) {
+    if (shapes.getQuads(shape, `${SH}targetClass`, null, null).some((quad) => rootClasses.has(quad.object.value))) {
+      shapes.addQuad(shape, DataFactory.namedNode(`${SH}targetNode`), rootIri)
+      continue
+    }
     const targeted =
       shapes.getQuads(shape, `${SH}targetClass`, null, null).length +
       shapes.getQuads(shape, `${SH}targetNode`, null, null).length +
