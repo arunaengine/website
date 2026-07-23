@@ -16,6 +16,7 @@ import Popover from '@/components/ui/Popover.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
+import RoCrateImportDialog from '@/components/data/RoCrateImportDialog.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
@@ -23,6 +24,7 @@ import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import SyncStatusPanel from '@/components/data/SyncStatusPanel.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
+import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -34,6 +36,7 @@ import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3BucketNotEm
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
+import type { RoCrateJobSubmission } from '@/lib/rocrate'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
 import { parseArunaArn, prefixesOverlap, syncBucketKey } from '@/lib/sync'
 import { formatBytes, relativeTime } from '@/lib/utils'
@@ -42,6 +45,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeftRight,
+  ArchiveRestore,
   Boxes,
   ChevronRight,
   CloudOff,
@@ -302,11 +306,20 @@ const dragActive = ref(false)
 const stripDrag = ref(false)
 
 const addDataOpen = ref(false)
+const roCrateImportOpen = ref(false)
+const roCrateJobOpen = ref(false)
+const roCrateJob = ref<RoCrateJobSubmission | null>(null)
 const staging = useStaging()
 // Staging jobs side panel: config-gated (no job-listing endpoint on today's
 // backend). The dialog's connector tab covers registered connectors regardless.
 const stagingJobsEnabled = featureEnabled('stagingJobs')
+const jobsEnabled = featureEnabled('jobs')
 const stagingPanelOpen = ref(false)
+
+function onRoCrateSubmitted(job: RoCrateJobSubmission) {
+  roCrateJob.value = job
+  roCrateJobOpen.value = true
+}
 
 // ALL uploads (toolbar, drop zones and the Add data dialog) run through the
 // shared persistent queue; the floating transfers panel renders their
@@ -1257,6 +1270,14 @@ const isEmpty = computed(
                 </Popover>
                 <!-- The Add data pipeline always targets the connected node. -->
                 <Button v-if="!remoteBlocked" variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
+                <Button
+                  v-if="jobsEnabled && !remoteNodeId && currentUser && activeGroupId"
+                  variant="outline"
+                  size="sm"
+                  @click="roCrateImportOpen = true"
+                >
+                  <ArchiveRestore class="h-4 w-4" /> Import crate
+                </Button>
                 <Button v-if="!remoteNodeId" size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>
             </div>
@@ -1419,6 +1440,23 @@ const isEmpty = computed(
       :existing-references="references.entries.value"
       @staged="() => { void loadObjects(); void references.reload() }"
       @sync-created="onSyncChanged"
+    />
+
+    <RoCrateImportDialog
+      v-model:open="roCrateImportOpen"
+      :bucket="bucket"
+      :prefix="s3Prefix"
+      :group-id="activeGroupId"
+      @submitted="onRoCrateSubmitted"
+    />
+
+    <JobDetailPanel
+      v-if="roCrateJob"
+      :job-id="roCrateJob.job_id"
+      :open="roCrateJobOpen"
+      :owner-node-url="roCrateJob.owner_node_url"
+      :report-url="roCrateJob.report_url"
+      @update:open="roCrateJobOpen = $event"
     />
 
     <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />

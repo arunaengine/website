@@ -7,6 +7,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
 import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import AuthorChips from '@/components/metadata/AuthorChips.vue'
+import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -21,21 +22,26 @@ import { computed, ref, watch } from 'vue'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
+import { isJobsUnsupported, useJobs } from '@/composables/useJobs'
 import { useS3 } from '@/composables/useS3'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { formatBytes, isHttpUrl, relativeTime } from '@/lib/utils'
 import { metaWatchPathPrefix } from '@/lib/watches'
 import { parseRunCrate } from '@/lib/runCrate'
+import { submitRoCrateExport, type RoCrateExportSubmission } from '@/lib/rocrate'
 import { crateGraph, crateRootId, dataEntitiesOf, stringProp, type DataEntity } from '@/lib/dataEntities'
 import { useCrateReferences } from '@/composables/useCrateReferences'
 import type { CrateObjectReference } from '@/lib/crateReferences'
-import { ArrowLeft, ListChecks, Code2, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Link2, Pencil, Trash2, Star } from '@lucide/vue'
+import { ArrowLeft, ListChecks, Code2, Download, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Link2, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
 const s3 = useS3()
+const { jobsEnabled } = useJobs()
 const {
+  apiBaseUrl,
+  authToken,
   metadata,
   metadataItems,
   profiles,
@@ -69,6 +75,10 @@ async function toggleFav() {
 const showEdit = ref(false)
 const showDelete = ref(false)
 const deleteError = ref<string | null>(null)
+const exportBusy = ref(false)
+const exportError = ref<string | null>(null)
+const exportJobOpen = ref(false)
+const exportJob = ref<RoCrateExportSubmission | null>(null)
 // The document's S3 key path, for the delete confirmation copy.
 const currentPath = computed(
   () => metadataItems.value.find((i) => i.document_id === detailId.value)?.document_path ?? fetchedSummary.value?.document_path ?? '',
@@ -83,6 +93,28 @@ async function confirmDelete() {
     router.push({ name: 'search' })
   } catch (err) {
     deleteError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+async function startExport() {
+  if (!detailId.value || exportBusy.value) return
+  exportBusy.value = true
+  exportError.value = null
+  try {
+    exportJob.value = await submitRoCrateExport(
+      detailId.value,
+      '',
+      { baseUrl: apiBaseUrl.value, token: authToken.value },
+    )
+    exportJobOpen.value = true
+  } catch (err) {
+    exportError.value = isJobsUnsupported(err)
+      ? 'This backend does not support attached RO-Crate exports yet.'
+      : err instanceof Error
+        ? err.message
+        : String(err)
+  } finally {
+    exportBusy.value = false
   }
 }
 // The owning group_id is the document's realmId (see mapMetadataDoc). Membership
@@ -124,6 +156,62 @@ watch(current, (c) => {
   if (c && docState.value !== 'found') docState.value = 'found'
 })
 const currentCrate = computed(() => fullCrates.value[detailId.value] ?? current.value?.roCrate ?? {})
+
+interface LicenseRow {
+  kind: 'Literal' | 'Internal reference' | 'External IRI'
+  label: string
+  href?: string
+}
+
+function licenseValues(value: unknown): unknown[] {
+  return Array.isArray(value) ? value.flatMap(licenseValues) : value == null ? [] : [value]
+}
+
+function licenseText(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) return licenseText(value[0])
+  if (value && typeof value === 'object') {
+    const entry = value as Record<string, unknown>
+    return licenseText(entry['@value'] ?? entry.name)
+  }
+  return ''
+}
+
+const licenseRows = computed<LicenseRow[]>(() => {
+  const graph = crateGraph(currentCrate.value)
+  const rootId = crateRootId(currentCrate.value)
+  const root = rootId ? graph.find((entity) => entity['@id'] === rootId) : undefined
+  const raw = root?.license
+  const values = licenseValues(raw)
+  if (!values.length && current.value?.license) {
+    return [{ kind: 'Literal', label: current.value.license }]
+  }
+  return values.map((value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return { kind: 'Literal', label: String(value) }
+    }
+    const entry = value as Record<string, unknown>
+    const id = typeof entry['@id'] === 'string' ? entry['@id'] : ''
+    if (!id) {
+      return {
+        kind: 'Literal',
+        label: licenseText(entry) || JSON.stringify(entry),
+      }
+    }
+    const entity = graph.find((candidate) => candidate['@id'] === id)
+    const kind = entity
+      ? 'Internal reference'
+      : /^[A-Za-z][A-Za-z0-9+.-]*:/.test(id)
+        ? 'External IRI'
+        : 'Internal reference'
+    return {
+      kind,
+      label: licenseText(entity?.name) || id,
+      ...(isHttpUrl(id) ? { href: id } : {}),
+    }
+  })
+})
 const currentProfile = computed(() => profiles.value.find((profile) => profile.id === current.value?.profileId))
 // Keep unresolved conformance paths visible without treating their order as meaningful.
 const conformsIris = computed(() => (currentProfile.value ? [] : current.value?.conformsToIds ?? []))
@@ -209,6 +297,9 @@ watch(
     showCrate.value = false
     crateError.value = null
     crateNotReady.value = false
+    exportError.value = null
+    exportJobOpen.value = false
+    exportJob.value = null
     if (!id || !ready) {
       docState.value = 'loading'
       return
@@ -369,6 +460,14 @@ function entitySize(row: DataEntity): string {
           event-kind="metadata_created"
           :resource-label="currentPath"
         />
+        <Button
+          v-if="currentUser && jobsEnabled && docState === 'found'"
+          variant="outline"
+          :disabled="exportBusy"
+          @click="startExport"
+        >
+          <Download class="h-4 w-4" /> {{ exportBusy ? 'Starting…' : 'Export RO-Crate' }}
+        </Button>
         <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
         <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
         <RouterLink :to="{ name: 'search' }">
@@ -378,6 +477,12 @@ function entitySize(row: DataEntity): string {
     </PageHeader>
 
     <div class="container space-y-6 py-8">
+      <p
+        v-if="exportError"
+        class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive"
+      >
+        {{ exportError }}
+      </p>
       <template v-if="current">
         <article class="surface p-6">
           <div class="flex flex-wrap items-start justify-between gap-3">
@@ -418,9 +523,19 @@ function entitySize(row: DataEntity): string {
             </div>
             <div class="surface-muted p-3">
               <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">License</dt>
-              <dd class="mt-1 truncate text-sm">
-                <ExternalLink v-if="current.license && isHttpUrl(current.license)" :href="current.license" label="License" class="font-medium" />
-                <span v-else-if="current.license" class="font-medium text-foreground">{{ current.license }}</span>
+              <dd class="mt-1 text-sm">
+                <ul v-if="licenseRows.length" class="space-y-1.5">
+                  <li v-for="(license, index) in licenseRows" :key="`${license.kind}-${license.label}-${index}`">
+                    <Badge variant="outline" class="mr-1.5 text-[9px] uppercase">{{ license.kind }}</Badge>
+                    <ExternalLink
+                      v-if="license.href"
+                      :href="license.href"
+                      :label="license.label"
+                      class="font-medium"
+                    />
+                    <span v-else class="break-words font-medium text-foreground">{{ license.label }}</span>
+                  </li>
+                </ul>
                 <span v-else class="text-muted-foreground">Not set</span>
               </dd>
             </div>
@@ -616,6 +731,16 @@ function entitySize(row: DataEntity): string {
       :name="previewTarget.name"
       :size="previewTarget.size"
       :content-type="previewTarget.contentType"
+    />
+
+    <JobDetailPanel
+      v-if="exportJob"
+      :job-id="exportJob.job_id"
+      :open="exportJobOpen"
+      :owner-node-url="exportJob.owner_node_url"
+      :report-url="exportJob.report_url"
+      :artifact-url="exportJob.artifact_url"
+      @update:open="exportJobOpen = $event"
     />
 
     <EditMetadataDialog v-if="current" v-model:open="showEdit" :document-id="current.ulid" :profile="currentProfile" @saved="onSaved" />

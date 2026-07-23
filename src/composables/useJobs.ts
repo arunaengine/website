@@ -173,7 +173,11 @@ export type JobDetailState = 'idle' | 'loading' | 'ready' | 'error' | 'unsupport
 
 // Single-job fetch that keeps polling while the job is non-terminal
 // (TaskDetailPanel pattern). `jobId` returning null clears and stops.
-export function useJobDetail(jobId: () => string | null) {
+export function useJobDetail(
+  jobId: () => string | null,
+  ownerNodeUrl: () => string | null = () => null,
+) {
+  const { apiBaseUrl, authToken } = useAruna()
   const job = ref<JobStatusResponse | null>(null)
   const loadState = ref<JobDetailState>('idle')
   const loadError = ref<string | null>(null)
@@ -204,7 +208,10 @@ export function useJobDetail(jobId: () => string | null) {
     const id = jobId()
     if (!id) return
     try {
-      job.value = await getJob(id, client())
+      job.value = await getJob(id, {
+        baseUrl: ownerNodeUrl() || apiBaseUrl.value,
+        token: authToken.value,
+      })
       lastPollError.value = null
       if (isTerminalJobState(job.value.state)) stopPolling()
     } catch (err) {
@@ -221,7 +228,10 @@ export function useJobDetail(jobId: () => string | null) {
     lastPollError.value = null
     cancelError.value = null
     try {
-      job.value = await getJob(id, client())
+      job.value = await getJob(id, {
+        baseUrl: ownerNodeUrl() || apiBaseUrl.value,
+        token: authToken.value,
+      })
       loadState.value = 'ready'
       if (!isTerminalJobState(job.value.state)) startPolling()
     } catch (err) {
@@ -245,7 +255,10 @@ export function useJobDetail(jobId: () => string | null) {
     cancelling.value = true
     cancelError.value = null
     try {
-      job.value = await requestCancelJob(id, client())
+      job.value = await requestCancelJob(id, {
+        baseUrl: ownerNodeUrl() || apiBaseUrl.value,
+        token: authToken.value,
+      })
       // 202 keeps the job live until the executor observes the flag.
       if (!isTerminalJobState(job.value.state)) startPolling()
       return true
@@ -258,8 +271,8 @@ export function useJobDetail(jobId: () => string | null) {
   }
 
   watch(
-    jobId,
-    (id) => {
+    [jobId, ownerNodeUrl],
+    ([id]) => {
       stopPolling()
       job.value = null
       loadState.value = 'idle'

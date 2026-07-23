@@ -52,6 +52,83 @@ export interface JobStatusResponse {
   run_crate?: unknown
 }
 
+export interface ImportRoCrateResult {
+  document_id: string | null
+  entries_total: number
+  imported: number
+  unlisted: number
+  failed: number
+  report_digest: string
+}
+
+export interface ExportRoCrateResult {
+  artifact: {
+    blake3: string
+    size: number
+    expires_at_ms: number
+  } | null
+  included: number
+  omitted: {
+    external: number
+    denied: number
+    missing: number
+    offline: number
+    unsupported: number
+  }
+  report_digest: string
+}
+
+export type JobReasonCode =
+  | 'imported'
+  | 'unlisted'
+  | 'failed'
+  | 'not_attempted'
+  | 'included'
+  | 'external'
+  | 'denied'
+  | 'missing'
+  | 'offline'
+  | 'unsupported'
+  | 'path_synthesized'
+  | 'unrewritten_reference'
+  | 'signature_dropped'
+  | 'unsupported_crate_version'
+
+interface JobReportRowBase {
+  entry_key: string
+  code: JobReasonCode
+  message: string | null
+}
+
+export interface ImportReportRow extends JobReportRowBase {
+  detail: {
+    archive_path: string
+    target_key: string | null
+    version_id: string | null
+    blake3: string | null
+    size: number | null
+    arn: string | null
+    w3id: string | null
+  }
+}
+
+export interface ExportReportRow extends JobReportRowBase {
+  detail: {
+    entity_id: string
+    zip_path: string | null
+    source: 'local' | 'remote' | 'hash' | null
+    resolved_version: string | null
+  }
+}
+
+export type JobReportRow = ImportReportRow | ExportReportRow
+
+export interface JobReportResponse {
+  rows: JobReportRow[]
+  next_cursor?: string
+  report_digest: string
+}
+
 export interface JobListResponse {
   jobs: JobStatusResponse[]
   // Opaque base64url cursor; omitted on the last page. Pass back verbatim.
@@ -84,6 +161,18 @@ export function getJob(jobId: string, client: ApiClientOptions): Promise<JobStat
 // There is no restart endpoint.
 export function cancelJob(jobId: string, client: ApiClientOptions): Promise<JobStatusResponse> {
   return apiRequest<JobStatusResponse>(`/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' }, client)
+}
+
+export function getJobReport(
+  jobId: string,
+  cursor: string | undefined,
+  client: ApiClientOptions,
+): Promise<JobReportResponse> {
+  return apiRequest<JobReportResponse>(
+    `/jobs/${encodeURIComponent(jobId)}/report`,
+    { query: { limit: 200, cursor } },
+    client,
+  )
 }
 
 export const JOB_STATE_ORDER: JobState[] = [
@@ -130,4 +219,20 @@ export function formatJobProgress(progress: JobProgressResponse): string {
 export function jobProgressPercent(progress: JobProgressResponse): number | null {
   if (progress.total == null || progress.total <= 0) return null
   return Math.min(100, (progress.current / progress.total) * 100)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+export function importRoCrateResult(job: JobStatusResponse): ImportRoCrateResult | null {
+  return job.kind === 'import_rocrate' && isRecord(job.result)
+    ? (job.result as unknown as ImportRoCrateResult)
+    : null
+}
+
+export function exportRoCrateResult(job: JobStatusResponse): ExportRoCrateResult | null {
+  return job.kind === 'export_rocrate' && isRecord(job.result)
+    ? (job.result as unknown as ExportRoCrateResult)
+    : null
 }
