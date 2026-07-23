@@ -29,7 +29,8 @@ function assertEnabled() {
 // "Flag on, backend without the job framework yet" — consumers render the
 // honest not-served-yet panel instead of a raw error (useTes pattern).
 export function isJobsUnsupported(err: unknown): boolean {
-  return err instanceof ApiError && (err.status === 404 || err.status === 405)
+  return err instanceof ApiError
+    && (err.status === 405 || err.status === 501 || (err.status === 404 && !err.code))
 }
 
 // The jobs surface rejects path-restricted (delegated) tokens with 403.
@@ -186,6 +187,8 @@ export function useJobDetail(
   const cancelError = ref<string | null>(null)
 
   let pollTimer: number | undefined
+  let responseId = 0
+  let pollRequest: number | undefined
   function stopPolling() {
     if (pollTimer) {
       window.clearInterval(pollTimer)
@@ -206,35 +209,46 @@ export function useJobDetail(
 
   async function poll() {
     const id = jobId()
-    if (!id) return
+    if (!id || pollRequest !== undefined) return
+    const request = ++responseId
+    pollRequest = request
     try {
-      job.value = await getJob(id, {
+      const response = await getJob(id, {
         baseUrl: ownerNodeUrl() || apiBaseUrl.value,
         token: authToken.value,
       })
+      if (request !== responseId || id !== jobId()) return
+      job.value = response
       lastPollError.value = null
-      if (isTerminalJobState(job.value.state)) stopPolling()
+      if (isTerminalJobState(response.state)) stopPolling()
     } catch (err) {
+      if (request !== responseId || id !== jobId()) return
       // A poll error never kills the timer or the rendered job.
       lastPollError.value = errorMessage(err)
+    } finally {
+      if (pollRequest === request) pollRequest = undefined
     }
   }
 
   async function load() {
     const id = jobId()
     if (!id || !jobsEnabled.value) return
+    const request = ++responseId
     loadState.value = 'loading'
     loadError.value = null
     lastPollError.value = null
     cancelError.value = null
     try {
-      job.value = await getJob(id, {
+      const response = await getJob(id, {
         baseUrl: ownerNodeUrl() || apiBaseUrl.value,
         token: authToken.value,
       })
+      if (request !== responseId || id !== jobId()) return
+      job.value = response
       loadState.value = 'ready'
-      if (!isTerminalJobState(job.value.state)) startPolling()
+      if (!isTerminalJobState(response.state)) startPolling()
     } catch (err) {
+      if (request !== responseId || id !== jobId()) return
       // On GET /jobs/{id} a 404 means THIS job is unknown (foreign or already
       // pruned), so only 405 is safe to read as an absent endpoint.
       if (err instanceof ApiError && err.status === 404) {
@@ -252,17 +266,21 @@ export function useJobDetail(
   async function cancel(): Promise<boolean> {
     const id = jobId()
     if (!id || cancelling.value) return false
+    const request = ++responseId
     cancelling.value = true
     cancelError.value = null
     try {
-      job.value = await requestCancelJob(id, {
+      const response = await requestCancelJob(id, {
         baseUrl: ownerNodeUrl() || apiBaseUrl.value,
         token: authToken.value,
       })
+      if (request !== responseId || id !== jobId()) return false
+      job.value = response
       // 202 keeps the job live until the executor observes the flag.
-      if (!isTerminalJobState(job.value.state)) startPolling()
+      if (!isTerminalJobState(response.state)) startPolling()
       return true
     } catch (err) {
+      if (request !== responseId || id !== jobId()) return false
       cancelError.value = errorMessage(err)
       return false
     } finally {
@@ -273,6 +291,8 @@ export function useJobDetail(
   watch(
     [jobId, ownerNodeUrl],
     ([id]) => {
+      ++responseId
+      pollRequest = undefined
       stopPolling()
       job.value = null
       loadState.value = 'idle'

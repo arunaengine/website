@@ -41,13 +41,15 @@ export interface RoCrateUpload {
 
 function responseError(xhr: XMLHttpRequest): ApiError {
   let message = `${xhr.status} ${xhr.statusText}`.trim()
+  let code: string | undefined
   try {
-    const body = JSON.parse(xhr.responseText) as { message?: string; error?: string }
+    const body = JSON.parse(xhr.responseText) as { message?: string; error?: string; code?: string }
     message = body.message || body.error || message
+    code = typeof body.code === 'string' ? body.code : undefined
   } catch {
     // Keep the HTTP status text when the response is not JSON.
   }
-  return new ApiError(xhr.status, message)
+  return new ApiError(xhr.status, message, code)
 }
 
 export function uploadRoCrate(

@@ -185,11 +185,112 @@ function reportMeta(row: JobReportRow): string {
 
 const downloading = ref(false)
 const downloadError = ref<string | null>(null)
+let downloadRegistration: Promise<ServiceWorkerRegistration> | undefined
 
 function artifactName(headers: Headers): string {
   const disposition = headers.get('Content-Disposition') ?? ''
   const name = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? `ro-crate-${props.jobId}.zip`
-  return name.replaceAll('/', '_').replaceAll('\\', '_')
+  return name.replace(/[\/\\\u0000-\u001f\u007f]/g, '_').trim() || `ro-crate-${props.jobId}.zip`
+}
+
+async function downloadService(): Promise<ServiceWorkerRegistration> {
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('This browser cannot stream large downloads to disk.')
+  }
+  const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin)
+  downloadRegistration ??= navigator.serviceWorker.register(
+    new URL('rocrate-download-sw.js', baseUrl),
+    { scope: baseUrl.pathname },
+  )
+  const registration = await downloadRegistration
+  if (registration.active) return registration
+  const ready = await navigator.serviceWorker.ready
+  if (ready.scope !== registration.scope || !ready.active) {
+    throw new Error('The streaming download service could not be started.')
+  }
+  return ready
+}
+
+async function streamArtifact(response: Response): Promise<void> {
+  if (!response.body) throw new Error('The artifact response did not contain a body.')
+  const registration = await downloadService()
+  const worker = registration.active
+  if (!worker) throw new Error('The streaming download service is not active.')
+  const id = crypto.randomUUID()
+  const name = artifactName(response.headers)
+  const channel = new MessageChannel()
+  const reader = response.body.getReader()
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false
+      let reading = false
+      const fail = (error: unknown) => {
+        if (settled) return
+        settled = true
+        reject(error instanceof Error ? error : new Error(String(error)))
+      }
+
+      const sendChunk = async () => {
+        if (settled || reading) return
+        reading = true
+        try {
+          const { done, value } = await reader.read()
+          if (done) {
+            channel.port1.postMessage({ type: 'end' })
+          } else {
+            const chunk = new Uint8Array(value).buffer
+            channel.port1.postMessage({ type: 'chunk', chunk }, [chunk])
+          }
+        } catch (error) {
+          channel.port1.postMessage({
+            type: 'error',
+            message: error instanceof Error ? error.message : String(error),
+          })
+          fail(error)
+        } finally {
+          reading = false
+        }
+      }
+
+      channel.port1.onmessage = (event: MessageEvent) => {
+        const message = event.data as { type?: string; message?: string }
+        if (message.type === 'ready') {
+          const anchor = document.createElement('a')
+          anchor.href = new URL(`__rocrate_download/${id}`, registration.scope).href
+          anchor.download = name
+          anchor.hidden = true
+          document.body.append(anchor)
+          anchor.click()
+          anchor.remove()
+        } else if (message.type === 'pull') {
+          void sendChunk()
+        } else if (message.type === 'done') {
+          if (!settled) {
+            settled = true
+            resolve()
+          }
+        } else if (message.type === 'cancel') {
+          fail(new Error('The artifact download was cancelled.'))
+        } else if (message.type === 'error') {
+          fail(new Error(message.message || 'The artifact download failed.'))
+        }
+      }
+      channel.port1.onmessageerror = () => fail(new Error('The artifact download channel failed.'))
+      worker.postMessage({
+        type: 'rocrate-download',
+        id,
+        filename: name,
+        contentType: response.headers.get('Content-Type') || 'application/zip',
+        contentLength: response.headers.get('Content-Length'),
+      }, [channel.port2])
+    })
+  } catch (error) {
+    await reader.cancel().catch(() => undefined)
+    throw error
+  } finally {
+    reader.releaseLock()
+    channel.port1.close()
+  }
 }
 
 async function downloadArtifact() {
@@ -226,13 +327,7 @@ async function downloadArtifact() {
       await response.body.pipeTo(await fileHandle.createWritable())
       return
     }
-    const blob = await response.blob()
-    const href = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = href
-    anchor.download = artifactName(response.headers)
-    anchor.click()
-    URL.revokeObjectURL(href)
+    await streamArtifact(response)
   } catch (err) {
     if (!(err instanceof DOMException && err.name === 'AbortError')) {
       downloadError.value = err instanceof Error ? err.message : String(err)

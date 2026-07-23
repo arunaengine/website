@@ -18,6 +18,7 @@ import TabsContent from '@/components/ui/TabsContent.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import ConnectorEntriesBrowser from '@/components/data/ConnectorEntriesBrowser.vue'
 import { useAruna } from '@/composables/useAruna'
+import { isJobsUnsupported } from '@/composables/useJobs'
 import { invalidSourcePath } from '@/composables/useStaging'
 import { ApiError, type SourceConnectorSummary } from '@/lib/api'
 import {
@@ -244,7 +245,7 @@ function sourceFromForm(): RoCrateImportSource {
 }
 
 function errorMessage(err: unknown): string {
-  if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
+  if (isJobsUnsupported(err)) {
     return 'This backend does not support attached RO-Crate imports yet.'
   }
   if (err instanceof ApiError && err.status === 409) {

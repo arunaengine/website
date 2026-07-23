@@ -8,6 +8,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -54,13 +55,15 @@ export async function apiRequest<T>(
   const response = await fetchWithTimeout(url, { ...options, headers }, DEFAULT_REQUEST_TIMEOUT_MS)
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`
+    let code: string | undefined
     try {
-      const body = await response.json()
+      const body = (await response.json()) as { message?: string; error?: string; code?: string }
       message = body.message || body.error || message
+      code = typeof body.code === 'string' ? body.code : undefined
     } catch {
       // Keep the HTTP status message if the body is not JSON.
     }
-    throw new ApiError(response.status, message)
+    throw new ApiError(response.status, message, code)
   }
 
   if (response.status === 204 || response.status === 205) return undefined as T
