@@ -14,12 +14,16 @@ import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Tabs from '@/components/ui/Tabs.vue'
+import TabsList from '@/components/ui/TabsList.vue'
+import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import DatasetFilesEditor from '@/components/metadata/DatasetFilesEditor.vue'
 import DatasetEntityInstances from '@/components/metadata/DatasetEntityInstances.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
 import { computed, ref, watch } from 'vue'
-import { Check, FileJson2, Plus, X } from '@lucide/vue'
+import { AlertTriangle, Check, FileJson, FileJson2, FileUp, Plus, Upload, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
+import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
 import type { DataEntity } from '@/lib/dataEntities'
 import type { MetadataDoc } from '@/data/types'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
@@ -565,20 +569,108 @@ function findingLocation(finding: ShaclFinding): string {
   return finding.path ? `${focus} · ${termNameFromUri(finding.path)}` : focus
 }
 
+// ── Import-crate mode ────────────────────────────────────────────────────────
+// Very prominent alternative to authoring from scratch: an uploaded or pasted
+// ro-crate-metadata.json becomes a NEW document (group + path + visibility
+// chosen here; the crate is submitted verbatim). Validation and the preview
+// summary come from the shared lib the detail-page import uses too.
+const startTab = ref<'create' | 'import'>('create')
+const importFileInput = ref<HTMLInputElement | null>(null)
+const importPaste = ref('')
+const importError = ref('')
+const importPreview = ref<CrateImportPreview | null>(null)
+const importPath = ref('')
+const importPathTouched = ref(false)
+
+function importPreviewFrom(text: string, source: string) {
+  importError.value = ''
+  try {
+    importPreview.value = analyzeCrateJson(text, source)
+    // Prefill the document path from the crate's root name until edited.
+    if (!importPathTouched.value || !importPath.value.trim()) {
+      importPath.value = `datasets/${slugify(importPreview.value.rootName) || 'imported-crate'}`
+      importPathTouched.value = false
+    }
+  } catch (err) {
+    importPreview.value = null
+    importError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+function onImportFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => importPreviewFrom(String(reader.result), file.name)
+  reader.onerror = () => {
+    importError.value = 'Could not read that file.'
+  }
+  reader.readAsText(file)
+  // Reset so re-selecting the same file fires change again.
+  input.value = ''
+}
+
+const canSubmitImport = computed(() =>
+  Boolean(currentUser.value && groupId.value && importPath.value.trim() && importPreview.value),
+)
+
+async function submitImport() {
+  const pending = importPreview.value
+  if (!pending || !canSubmitImport.value) return
+  submitError.value = null
+  try {
+    const created = await createMetadata({
+      group_id: groupId.value,
+      path: importPath.value.trim(),
+      public: isPublic.value,
+      rocrate: pending.crate,
+    })
+    const doc = metadata.value.find((item) => item.ulid === created.document_id) ?? {
+      ulid: created.document_id,
+      title: pending.rootName,
+      description: '',
+      type: 'Dataset',
+      license: '',
+      keywords: [],
+      currentVersion: 1,
+      versions: [],
+      linkedObjects: [],
+      primaryBucketId: '',
+      realmId: created.group_id,
+      createdAt: created.created_at,
+      updatedAt: created.updated_at,
+      author: currentUser.value?.name ?? '',
+      organization: currentUser.value?.affiliation ?? '',
+      nodeId: '',
+      profileId: '',
+      profileIds: [],
+      contributors: [],
+      roCrate: pending.crate,
+    }
+    emit('created', doc)
+    emit('update:open', false)
+  } catch (err) {
+    submitError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
 // Dialog discard guard: outside clicks never close the dialog; an explicit close
 // (X, Escape, Cancel) while the form holds draft content asks before discarding.
 // Cheap check over existing computeds only, no deep watching. Seeded defaults
 // (group, date published, license, profile reference) are not treated as edits.
 const confirmDiscardOpen = ref(false)
 const hasDraftProgress = computed(() => Boolean(
-  title.value.trim()
-    || description.value.trim()
-    || keywordList.value.length
-    || creatorList.value.length
-    || identifier.value.trim()
-    || dataRefList.value.length
-    || hasEntityEntries.value
-    || Object.keys(generatedCreateValues.value).length,
+  startTab.value === 'import'
+    ? importPaste.value.trim() || importPreview.value
+    : title.value.trim()
+      || description.value.trim()
+      || keywordList.value.length
+      || creatorList.value.length
+      || identifier.value.trim()
+      || dataRefList.value.length
+      || hasEntityEntries.value
+      || Object.keys(generatedCreateValues.value).length,
 ))
 function requestClose(next: boolean) {
   if (next) {
@@ -601,6 +693,12 @@ watch(
   (open) => {
     if (!open) return
     confirmDiscardOpen.value = false
+    startTab.value = 'create'
+    importPaste.value = ''
+    importError.value = ''
+    importPreview.value = null
+    importPath.value = ''
+    importPathTouched.value = false
     groupId.value = groups.value[0]?.id ?? ''
     profileId.value = props.defaultProfileId ?? currentUser.value?.preferredProfileId ?? ''
     path.value = ''
@@ -1050,11 +1148,78 @@ async function submit() {
           <FileJson2 class="h-4 w-4 text-primary" /> New metadata document
         </DialogTitle>
         <DialogDescription>
-          Creates a real RO-Crate metadata document through the Aruna API.
+          Author a new RO-Crate metadata document, or import an existing crate as a new document.
         </DialogDescription>
       </DialogHeader>
 
-      <div class="max-h-[70vh] space-y-4 overflow-y-auto px-1 scrollbar-thin">
+      <Tabs v-model="startTab">
+        <TabsList>
+          <TabsTrigger value="create"><Plus class="mr-1 size-3.5" /> Create new</TabsTrigger>
+          <TabsTrigger value="import"><FileUp class="mr-1 size-3.5" /> Import crate</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div v-if="startTab === 'import'" class="max-h-[70vh] space-y-4 overflow-y-auto px-1 scrollbar-thin">
+        <div v-if="!currentUser" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          Sign in before creating metadata.
+        </div>
+        <p class="text-xs text-muted-foreground">
+          Create a new document from an existing <code class="font-mono">ro-crate-metadata.json</code> instead of authoring it field by field. The crate is previewed before anything is created.
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <input ref="importFileInput" type="file" accept="application/json,application/ld+json,.json,.jsonld" class="hidden" @change="onImportFile" />
+          <Button type="button" variant="outline" size="sm" @click="importFileInput?.click()">
+            <Upload class="size-3.5" /> Upload file
+          </Button>
+          <span class="text-[11px] text-muted-foreground">or paste the JSON-LD below</span>
+        </div>
+        <div class="space-y-2">
+          <Textarea v-model="importPaste" rows="6" class="font-mono text-xs" spellcheck="false" placeholder='{ "@context": "https://w3id.org/ro/crate/1.1/context", "@graph": [ … ] }' />
+          <Button type="button" variant="outline" size="sm" :disabled="!importPaste.trim()" @click="importPreviewFrom(importPaste, 'pasted JSON')">Preview pasted JSON</Button>
+        </div>
+        <div v-if="importError" class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{{ importError }}</span>
+        </div>
+        <template v-if="importPreview">
+          <div class="space-y-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
+            <div class="flex items-center gap-2 font-medium text-foreground">
+              <FileJson class="h-3.5 w-3.5 shrink-0 text-primary" />
+              {{ importPreview.source }}: {{ importPreview.rootName }}
+            </div>
+            <p class="text-muted-foreground">
+              {{ importPreview.entityCount }} {{ importPreview.entityCount === 1 ? 'entity' : 'entities' }} in the graph,
+              {{ importPreview.fileCount }} referenced data {{ importPreview.fileCount === 1 ? 'file' : 'files' }}.
+            </p>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="text-xs font-medium text-foreground">Group</label>
+              <Select v-model="groupId" :options="groupOptions" placeholder="Choose a group" class="mt-1" />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Document path</label>
+              <Input
+                :model-value="importPath"
+                class="mt-1"
+                placeholder="datasets/my-dataset"
+                @update:model-value="(value: string | number) => { importPath = String(value); importPathTouched = true }"
+              />
+              <p class="mt-1 text-[11px] text-muted-foreground">Stored as the metadata document path in Aruna.</p>
+            </div>
+          </div>
+          <label class="flex items-center justify-between rounded-md border border-border p-3 text-sm">
+            <span>
+              Public metadata
+              <span class="block text-[11px] text-muted-foreground">Public documents are visible without a bearer token.</span>
+            </span>
+            <Switch :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
+          </label>
+        </template>
+        <div v-if="submitError" class="text-xs text-destructive">{{ submitError }}</div>
+      </div>
+
+      <div v-else class="max-h-[70vh] space-y-4 overflow-y-auto px-1 scrollbar-thin">
         <div v-if="!currentUser" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
           Sign in before creating metadata.
         </div>
@@ -1334,13 +1499,16 @@ async function submit() {
         <div v-if="submitError" class="text-xs text-destructive">{{ submitError }}</div>
       </div>
 
-      <div v-if="!canSubmit && !saving && currentUser && submitBlockerSummary.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+      <div v-if="startTab === 'create' && !canSubmit && !saving && currentUser && submitBlockerSummary.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
         {{ submitBlockerSummary.join(' ') }}
       </div>
 
       <DialogFooter>
         <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
-        <Button :disabled="!canSubmit || saving" @click="submit">
+        <Button v-if="startTab === 'import'" :disabled="!canSubmitImport || saving" @click="submitImport">
+          {{ saving ? 'Importing…' : 'Import crate' }}
+        </Button>
+        <Button v-else :disabled="!canSubmit || saving" @click="submit">
           {{ saving ? 'Creating…' : 'Create metadata' }}
         </Button>
       </DialogFooter>
