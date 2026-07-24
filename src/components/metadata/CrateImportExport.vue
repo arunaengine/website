@@ -10,14 +10,14 @@ import {
   ChevronRight,
   Code2,
   Copy,
-  Download,
   FileJson,
   Loader2,
   Upload,
 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError } from '@/lib/api'
-import { crateGraph, crateRootId, dataEntitiesOf, stringProp } from '@/lib/dataEntities'
+import { crateGraph } from '@/lib/dataEntities'
+import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
 import { copyToClipboard } from '@/lib/utils'
 
 const props = defineProps<{
@@ -37,19 +37,22 @@ const { saving, replaceMetadataRoCrate } = useAruna()
 const showCrate = ref(false)
 const importOpen = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const sectionEl = ref<HTMLElement | null>(null)
 const pasteText = ref('')
 const importError = ref('')
 const importing = ref(false)
 
-interface PendingImport {
-  crate: unknown
-  source: string
-  rootName: string
-  entityCount: number
-  fileCount: number
-}
-const pendingImport = ref<PendingImport | null>(null)
+const pendingImport = ref<CrateImportPreview | null>(null)
 const importedSummary = ref<{ rootName: string; entityCount: number } | null>(null)
+
+// The page header's Import action opens the panel from outside; the section
+// sits mid-page, so scroll it into view.
+function openImport() {
+  if (!props.canImport) return
+  importOpen.value = true
+  requestAnimationFrame(() => sectionEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+}
+defineExpose({ openImport })
 
 // Navigating to another document resets the whole surface; stale previews must
 // never replace a different crate.
@@ -78,59 +81,17 @@ async function copyCrate() {
   copyTimer = window.setTimeout(() => (copied.value = false), 1500)
 }
 
-// RO-Crate spec filename so the download drops straight into a crate directory.
-function downloadCrate() {
-  const blob = new Blob([crateJson.value], { type: 'application/ld+json' })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = 'ro-crate-metadata.json'
-  anchor.click()
-  URL.revokeObjectURL(url)
-}
-
-function toggleImport() {
-  importOpen.value = !importOpen.value
-  if (!importOpen.value) {
-    pendingImport.value = null
-    importError.value = ''
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
-}
-
-// Sanity checks before anything is written: parseable JSON that structurally
-// looks like an RO-Crate (@context plus a @graph with a findable root dataset).
-function analyze(text: string, source: string): PendingImport {
-  let json: unknown
-  try {
-    json = JSON.parse(text)
-  } catch (err) {
-    throw new Error(`Not valid JSON: ${err instanceof Error ? err.message : String(err)}`)
-  }
-  if (!isRecord(json)) throw new Error('Expected a JSON object, not an array or scalar.')
-  if (!('@context' in json)) throw new Error('Not an RO-Crate: the top-level @context is missing.')
-  const graph = crateGraph(json)
-  if (!graph.length) throw new Error('Not an RO-Crate: @graph is missing or empty.')
-  const rootId = crateRootId(json)
-  const root = rootId ? graph.find((entity) => entity['@id'] === rootId) : undefined
-  if (!root) throw new Error('Not an RO-Crate: no root dataset entity was found in @graph.')
-  return {
-    crate: json,
-    source,
-    rootName: stringProp(root.name) || rootId || 'Untitled dataset',
-    entityCount: graph.length,
-    fileCount: dataEntitiesOf(json).length,
-  }
+function closeImport() {
+  importOpen.value = false
+  pendingImport.value = null
+  importError.value = ''
 }
 
 function preview(text: string, source: string) {
   importError.value = ''
   importedSummary.value = null
   try {
-    pendingImport.value = analyze(text, source)
+    pendingImport.value = analyzeCrateJson(text, source)
   } catch (err) {
     pendingImport.value = null
     importError.value = err instanceof Error ? err.message : String(err)
@@ -177,7 +138,7 @@ async function confirmImport() {
 </script>
 
 <template>
-  <section class="surface p-4">
+  <section ref="sectionEl" class="surface scroll-mt-4 p-4">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <button
         type="button"
@@ -185,21 +146,13 @@ async function confirmImport() {
         @click="showCrate = !showCrate"
       >
         <component :is="showCrate ? ChevronDown : ChevronRight" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <Code2 class="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> RO-Crate JSON-LD
+        <Code2 class="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> RO-Crate JSON-LD (raw)
         <span v-if="hasCrate" class="text-xs font-normal text-muted-foreground">{{ entityCount }} {{ entityCount === 1 ? 'entity' : 'entities' }}</span>
       </button>
-      <div class="flex items-center gap-1">
-        <Button variant="ghost" size="icon-sm" :disabled="!hasCrate" aria-label="Copy JSON-LD to clipboard" title="Copy JSON-LD" @click="copyCrate">
-          <Check v-if="copied" class="size-3.5 text-emerald-600 dark:text-emerald-400" />
-          <Copy v-else class="size-3.5" />
-        </Button>
-        <Button variant="ghost" size="icon-sm" :disabled="!hasCrate" aria-label="Download ro-crate-metadata.json" title="Download ro-crate-metadata.json" @click="downloadCrate">
-          <Download class="size-3.5" />
-        </Button>
-        <Button v-if="canImport" variant="outline" size="sm" @click="toggleImport">
-          <Upload class="size-3.5" /> Import
-        </Button>
-      </div>
+      <Button variant="ghost" size="icon-sm" :disabled="!hasCrate" aria-label="Copy JSON-LD to clipboard" title="Copy JSON-LD" @click="copyCrate">
+        <Check v-if="copied" class="size-3.5 text-emerald-600 dark:text-emerald-400" />
+        <Copy v-else class="size-3.5" />
+      </Button>
     </div>
 
     <div v-if="loading && preparing" class="mt-3 text-xs text-muted-foreground">Preparing the crate…</div>
@@ -216,13 +169,16 @@ async function confirmImport() {
     ><code>{{ crateJson }}</code></pre>
 
     <div v-if="importOpen && canImport" class="mt-3 space-y-3 rounded-xl border border-border bg-muted/20 p-4">
-      <div>
-        <h4 class="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <FileJson class="h-4 w-4 text-primary" /> Import RO-Crate metadata
-        </h4>
-        <p class="mt-1 text-xs text-muted-foreground">
-          Replace this document's crate with an <code class="font-mono">ro-crate-metadata.json</code> file. The import is previewed and confirmed before anything is written.
-        </p>
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <h4 class="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <FileJson class="h-4 w-4 text-primary" /> Import RO-Crate metadata
+          </h4>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Replace this document's crate with an <code class="font-mono">ro-crate-metadata.json</code> file. The import is previewed and confirmed before anything is written.
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" class="shrink-0" @click="closeImport">Close</Button>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">

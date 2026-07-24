@@ -33,7 +33,8 @@ import { crateGraph, crateRootId, dataEntitiesOf, stringProp, type DataEntity } 
 import { isProjectCrate, subcrateLinksOf } from '@/lib/subcrates'
 import { useCrateReferences } from '@/composables/useCrateReferences'
 import type { CrateObjectReference } from '@/lib/crateReferences'
-import { ArrowLeft, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star } from '@lucide/vue'
+import { downloadCrateJson } from '@/lib/crateImport'
+import { ArrowLeft, Download, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star, Upload } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -88,10 +89,14 @@ async function confirmDelete() {
     deleteError.value = err instanceof Error ? err.message : String(err)
   }
 }
-// The owning group_id is the document's realmId (see mapMetadataDoc). Membership
-// is a UI heuristic; the backend still enforces write permission (a 403 surfaces
-// inside the edit dialog).
-const canWrite = computed(() => Boolean(userInfo.value?.groups.some((g) => g.group_id === current.value?.realmId)))
+// The owning group_id is the document's realmId (see mapMetadataDoc), with the
+// registry summary as fallback so documents not (yet) in the catalog listing
+// still expose write actions to group members. Membership is a UI heuristic;
+// the backend still enforces write permission (a 403 surfaces inline).
+const canWrite = computed(() => {
+  const groupId = current.value?.realmId ?? fetchedSummary.value?.group_id
+  return Boolean(groupId && userInfo.value?.groups.some((g) => g.group_id === groupId))
+})
 
 // Canonical metadata watch prefix for this document; empty until the owning
 // group and document path are both known.
@@ -126,6 +131,10 @@ watch(current, (c) => {
   if (c && docState.value !== 'found') docState.value = 'found'
 })
 const currentCrate = computed(() => fullCrates.value[detailId.value] ?? current.value?.roCrate ?? {})
+// Header export/import: export is enabled once the crate has entities; import
+// delegates to the crate section's panel (scrolled into view on open).
+const crateHasEntities = computed(() => crateGraph(currentCrate.value).length > 0)
+const crateSection = ref<InstanceType<typeof CrateImportExport> | null>(null)
 const currentProfile = computed(() => profiles.value.find((profile) => profile.id === current.value?.profileId))
 // Keep unresolved conformance paths visible without treating their order as meaningful.
 const conformsIris = computed(() => (currentProfile.value ? [] : current.value?.conformsToIds ?? []))
@@ -377,6 +386,18 @@ function entitySize(row: DataEntity): string {
           event-kind="metadata_created"
           :resource-label="currentPath"
         />
+        <Button
+          v-if="docState === 'found'"
+          variant="outline"
+          :disabled="!crateHasEntities"
+          title="Download ro-crate-metadata.json"
+          @click="downloadCrateJson(currentCrate)"
+        >
+          <Download class="h-4 w-4" /> Export
+        </Button>
+        <Button v-if="docState === 'found' && canWrite" variant="outline" title="Replace this document's crate with an imported one" @click="crateSection?.openImport()">
+          <Upload class="h-4 w-4" /> Import
+        </Button>
         <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
         <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
         <RouterLink :to="{ name: 'search' }">
@@ -475,9 +496,10 @@ function entitySize(row: DataEntity): string {
       <!-- Crate + referenced data for any resolved document (keyed on detailId). -->
       <template v-if="docState === 'found'">
         <CrateImportExport
+          ref="crateSection"
           :crate="currentCrate"
           :document-id="detailId"
-          :can-import="Boolean(current) && canWrite"
+          :can-import="canWrite"
           :loading="loadingCrate"
           :preparing="Boolean(cratePending[detailId])"
           :not-ready="crateNotReady"
