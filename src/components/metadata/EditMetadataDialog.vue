@@ -16,12 +16,15 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import Select from '@/components/ui/Select.vue'
 import DatasetFilesEditor from '@/components/metadata/DatasetFilesEditor.vue'
-import { Pencil, Plus, X } from '@lucide/vue'
+import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
+import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
+import { Layers, Pencil, Plus, X } from '@lucide/vue'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
-import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
+import { ApiError, type MetadataDocumentListItem, type MetadataDocumentSummary } from '@/lib/api'
 import { applyDataEntities, dataEntitiesOf, type DataEntity } from '@/lib/dataEntities'
-import { subcrateLinksOf } from '@/lib/subcrates'
+import { addSubcrateLink, removeSubcrateLink, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
+import { groupCustomFieldRows, seedCustomFieldRows, type CustomFieldRow, type PreservedFieldRow } from '@/lib/customFields'
 import { licenseEntity } from '@/lib/profiles/rocrate'
 import { validateProfileData } from '@/lib/profiles/validate'
 import type { MetadataProfile } from '@/data/types'
@@ -38,7 +41,7 @@ const emit = defineEmits<{
   (e: 'saved', summary: MetadataDocumentSummary): void
 }>()
 
-const { saving, fetchRoCrateRaw, getMetadataDocument, replaceMetadataRoCrate, metadata, metadataItems } = useAruna()
+const { saving, fetchRoCrateRaw, getMetadataDocument, replaceMetadataRoCrate, metadata, metadataItems, apiBaseUrl } = useAruna()
 
 const loading = ref(false)
 const loadError = ref<string | null>(null)
@@ -63,20 +66,51 @@ const license = ref('')
 const licenseWasString = ref(false)
 const isPublic = ref(false)
 
-// Additional scalar root properties beyond the managed built-ins. Only string/
-// number/boolean values seed as rows; structured values stay untouched in the
-// crate (edit them via the Raw JSON tab).
+// Additional typed root properties beyond the managed built-ins. Scalars,
+// {"@id"} references and arrays of those seed as editable rows; deeper
+// structured values are listed read-only and stay untouched in the crate
+// (edit them via the Raw JSON tab).
 const MANAGED_KEYS = new Set([
   '@id', '@type', '@context', 'name', 'description', 'keywords', 'datePublished',
   'license', 'hasPart', 'author', 'creator', 'contributor', 'conformsTo',
   'mentions', 'about', 'identifier',
 ])
-interface CustomFieldRow {
-  key: string
-  value: string
-}
 const customFields = ref<CustomFieldRow[]>([])
+const preservedFields = ref<PreservedFieldRow[]>([])
 let seededCustomKeys: string[] = []
+
+// Subcrate links (RO-Crate 1.2), editable as a list: unlink drops the link,
+// the picker adds new ones; the save composes them via the subcrates helpers.
+const subcrates = ref<SubcrateLink[]>([])
+const subcratePickerOpen = ref(false)
+
+// The spec's subjectOf fallback needs a URL that resolves to the child's crate
+// JSON; the portal serves it at GET /metadata/{id}/rocrate.
+function crateJsonUrl(documentId: string): string {
+  return `${apiBaseUrl.value.replace(/\/+$/, '')}/metadata/${encodeURIComponent(documentId)}/rocrate`
+}
+
+function subcrateTitleOf(item: MetadataDocumentListItem): string {
+  return metadata.value.find((doc) => doc.ulid === item.document_id)?.title || item.document_path
+}
+
+function onSubcratesPicked(items: MetadataDocumentListItem[]) {
+  const linked = new Set(subcrates.value.map((link) => link.iri))
+  for (const item of items) {
+    if (!item.graph_iri || linked.has(item.graph_iri)) continue
+    subcrates.value.push({
+      iri: item.graph_iri,
+      name: subcrateTitleOf(item),
+      identifier: item.document_id,
+      subjectOf: crateJsonUrl(item.document_id),
+    })
+  }
+  subcratePickerOpen.value = false
+}
+
+function removeSubcrate(iri: string) {
+  subcrates.value = subcrates.value.filter((link) => link.iri !== iri)
+}
 
 // Cross-document references: root `mentions` entries whose @id matches a
 // catalog document's graph IRI are editable here; anything else in `mentions`
@@ -198,19 +232,15 @@ function seedFields(crate: unknown) {
   licenseWasString.value = typeof root?.license === 'string'
   license.value = licenseIri(root?.license)
 
-  const rows: CustomFieldRow[] = []
-  for (const [key, value] of Object.entries(root ?? {})) {
-    if (MANAGED_KEYS.has(key)) continue
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      rows.push({ key, value: String(value) })
-    }
-  }
-  customFields.value = rows
-  seededCustomKeys = rows.map((row) => row.key)
+  const seeded = seedCustomFieldRows(root ?? {}, MANAGED_KEYS)
+  customFields.value = seeded.rows
+  preservedFields.value = seeded.preserved
+  seededCustomKeys = [...new Set(seeded.rows.map((row) => row.key))]
 
-  // Subcrate references (RO-Crate 1.2) are managed in the detail view's
-  // Subcrates section, not the files editor; they must not seed as file rows.
-  const subcrateIris = new Set(subcrateLinksOf(crate).map((link) => link.iri))
+  // Subcrate references (RO-Crate 1.2) are managed in their own list, not the
+  // files editor; they must not seed as file rows.
+  subcrates.value = subcrateLinksOf(crate)
+  const subcrateIris = new Set(subcrates.value.map((link) => link.iri))
   files.value = dataEntitiesOf(crate).filter((row) => !subcrateIris.has(row.id))
 
   const mentions = Array.isArray(root?.mentions) ? root.mentions : root?.mentions ? [root.mentions] : []
@@ -229,10 +259,19 @@ function buildFromFields(): unknown {
   const clone: unknown = structuredClone(pristine.value)
   const root = findRoot(clone)
   if (!root) throw new Error('This crate has no root dataset entity to edit.')
+  // Unlinked subcrates are removed FIRST, while their entities still exist in
+  // the clone, so removeSubcrateLink can also clean up subjectOf leftovers.
+  const keptSubcrateIris = new Set(subcrates.value.map((link) => link.iri))
+  for (const link of subcrateLinksOf(pristine.value)) {
+    if (!keptSubcrateIris.has(link.iri)) removeSubcrateLink(clone, link.iri)
+  }
   // File edits rebuild hasPart and File entities before mentions are rewritten, so
   // a removed file still counted as referenced by an existing mention is preserved.
   applyDataEntities(clone, files.value)
   restoreSubcrates(clone)
+  // Newly picked subcrates compose via the spec-conformant helper; kept links
+  // were already restored verbatim above (addSubcrateLink is idempotent).
+  for (const link of subcrates.value) addSubcrateLink(clone, link)
   root.name = name.value.trim()
   root.description = description.value.trim()
   const keywords = keywordsText.value.split(',').map((k) => k.trim()).filter(Boolean)
@@ -250,16 +289,16 @@ function buildFromFields(): unknown {
     upsertLicenseEntity(clone, licenseValue)
   }
 
-  // Custom fields: rows removed since seeding delete their key; blank or
-  // managed keys are skipped rather than clobbering structured properties.
-  const liveKeys = new Set(customFields.value.map((row) => row.key.trim()).filter(Boolean))
+  // Custom fields: rows write typed values (repeated keys merge into arrays);
+  // keys removed since seeding are deleted; managed keys are skipped rather
+  // than clobbering structured properties. Preserved keys are never touched.
+  const grouped = groupCustomFieldRows(customFields.value)
   for (const key of seededCustomKeys) {
-    if (!liveKeys.has(key)) delete root[key]
+    if (!(key in grouped)) delete root[key]
   }
-  for (const row of customFields.value) {
-    const key = row.key.trim()
-    if (!key || MANAGED_KEYS.has(key)) continue
-    root[key] = row.value
+  for (const [key, value] of Object.entries(grouped)) {
+    if (MANAGED_KEYS.has(key)) continue
+    root[key] = value
   }
 
   const mentionRefs = [...preservedMentions, ...relatedIds.value.map((id) => ({ '@id': id }))]
@@ -270,10 +309,12 @@ function buildFromFields(): unknown {
 }
 
 // The files rebuild (applyDataEntities) knows nothing about subcrates: it drops
-// their hasPart refs and entities. Restore both verbatim from the pristine
-// crate so a Fields/Files save never loses subcrate links.
+// their hasPart refs and entities. Restore the KEPT links verbatim from the
+// pristine crate so a Fields/Files save never loses subcrate links; links the
+// user unlinked in this session are not restored.
 function restoreSubcrates(clone: unknown) {
-  const links = subcrateLinksOf(pristine.value)
+  const kept = new Set(subcrates.value.map((link) => link.iri))
+  const links = subcrateLinksOf(pristine.value).filter((link) => kept.has(link.iri))
   if (!links.length || !isRecord(clone)) return
   const root = findRoot(clone)
   if (!root) return
@@ -343,9 +384,8 @@ const violations = computed(() => {
     datePublished: datePublished.value.trim(),
     license: license.value.trim(),
   }
-  for (const row of customFields.value) {
-    const key = row.key.trim()
-    if (key && !(key in values)) values[key] = row.value
+  for (const [key, value] of Object.entries(groupCustomFieldRows(customFields.value))) {
+    if (!(key in values)) values[key] = value
   }
   return validateProfileData(schema, values)
 })
@@ -436,24 +476,7 @@ async function save() {
               </div>
             </div>
 
-            <div>
-              <div class="flex items-center justify-between gap-3">
-                <label class="text-xs font-medium text-foreground">Additional fields</label>
-                <Button variant="outline" size="sm" @click="customFields.push({ key: '', value: '' })">
-                  <Plus class="h-3.5 w-3.5" /> Add field
-                </Button>
-              </div>
-              <div v-for="(row, index) in customFields" :key="index" class="mt-1.5 flex items-center gap-2">
-                <Input v-model="row.key" class="w-44 font-mono text-xs" placeholder="property" />
-                <Input v-model="row.value" placeholder="value" />
-                <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" aria-label="Remove field" @click="customFields.splice(index, 1)">
-                  <X class="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <p class="mt-1 text-[11px] text-muted-foreground">
-                Simple text properties on the root entity. Structured values are preserved as-is; edit them in the Raw JSON tab.
-              </p>
-            </div>
+            <CustomFieldsEditor v-model:rows="customFields" :preserved="preservedFields" />
 
             <div>
               <label class="text-xs font-medium text-foreground">Related datasets</label>
@@ -471,6 +494,29 @@ async function save() {
               </ul>
               <p class="mt-1 text-[11px] text-muted-foreground">
                 Written as <code class="font-mono">mentions</code> references; they render as browsable links on the detail page.
+              </p>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between gap-3">
+                <label class="text-xs font-medium text-foreground">Subcrates</label>
+                <Button variant="outline" size="sm" @click="subcratePickerOpen = true">
+                  <Plus class="h-3.5 w-3.5" /> Link subcrate
+                </Button>
+              </div>
+              <ul v-if="subcrates.length" class="mt-2 space-y-1">
+                <li v-for="link in subcrates" :key="link.iri" class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs">
+                  <span class="flex min-w-0 items-center gap-1.5">
+                    <Layers class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span class="min-w-0 truncate text-foreground" :title="link.iri">{{ link.name }}</span>
+                  </span>
+                  <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" :aria-label="`Unlink subcrate ${link.name}`" title="Unlink subcrate (the child document itself is kept)" @click="removeSubcrate(link.iri)">
+                    <X class="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              </ul>
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                References to other crates (RO-Crate 1.2), written as <code class="font-mono">hasPart</code> Dataset entities. Linked crates stay independent documents.
               </p>
             </div>
 
@@ -514,6 +560,13 @@ async function save() {
         <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
         <Button :disabled="loading || Boolean(loadError) || saving" @click="save">{{ saving ? 'Saving…' : 'Save changes' }}</Button>
       </DialogFooter>
+
+      <SubcratePickerDialog
+        v-model:open="subcratePickerOpen"
+        :excluded-iris="subcrates.map((link) => link.iri)"
+        :exclude-document-id="documentId"
+        @select="onSubcratesPicked"
+      />
     </DialogContent>
   </Dialog>
 </template>

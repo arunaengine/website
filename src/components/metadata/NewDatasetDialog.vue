@@ -20,10 +20,15 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import DatasetFilesEditor from '@/components/metadata/DatasetFilesEditor.vue'
 import DatasetEntityInstances from '@/components/metadata/DatasetEntityInstances.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
+import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
+import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
 import { computed, ref, watch } from 'vue'
-import { AlertTriangle, Check, FileJson, FileJson2, FileUp, Plus, Upload, X } from '@lucide/vue'
+import { AlertTriangle, Check, FileJson, FileJson2, FileUp, Layers, Plus, Upload, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
+import { groupCustomFieldRows, type CustomFieldRow } from '@/lib/customFields'
+import { addSubcrateLink, type SubcrateLink } from '@/lib/subcrates'
+import type { MetadataDocumentListItem } from '@/lib/api'
 import type { DataEntity } from '@/lib/dataEntities'
 import type { MetadataDoc } from '@/data/types'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
@@ -80,7 +85,7 @@ const emit = defineEmits<{
   (e: 'created', doc: MetadataDoc): void
 }>()
 
-const { groups, profiles, metadata, createMetadata, loadRoCrate, saving, currentUser } = useAruna()
+const { groups, profiles, metadata, createMetadata, loadRoCrate, saving, currentUser, apiBaseUrl } = useAruna()
 
 const groupId = ref('')
 const profileId = ref('')
@@ -94,6 +99,13 @@ const keywords = ref('')
 const identifier = ref('')
 const creators = ref<string[]>([])
 const dataRefs = ref<Array<{ label: string; url: string }>>([])
+// Typed extra root properties (shared CustomFieldsEditor rows).
+const customFields = ref<CustomFieldRow[]>([])
+const customFieldValues = computed(() => groupCustomFieldRows(customFields.value))
+// Subcrate references (RO-Crate 1.2) selected during creation; composed into
+// the built crate via the spec-conformant addSubcrateLink helper.
+const subcrates = ref<SubcrateLink[]>([])
+const subcratePickerOpen = ref(false)
 const submitError = ref<string | null>(null)
 const createGroupOpen = ref(false)
 const profileSchema = ref<JsonSchema | undefined>()
@@ -405,6 +417,34 @@ const hasEntityEntries = computed(() =>
   ),
 )
 
+// The spec's subjectOf fallback needs a URL that resolves to the child's crate
+// JSON; the portal serves it at GET /metadata/{id}/rocrate.
+function crateJsonUrl(documentId: string): string {
+  return `${apiBaseUrl.value.replace(/\/+$/, '')}/metadata/${encodeURIComponent(documentId)}/rocrate`
+}
+
+function subcrateTitleOf(item: MetadataDocumentListItem): string {
+  return metadata.value.find((doc) => doc.ulid === item.document_id)?.title || item.document_path
+}
+
+function onSubcratesPicked(items: MetadataDocumentListItem[]) {
+  const linked = new Set(subcrates.value.map((link) => link.iri))
+  for (const item of items) {
+    if (!item.graph_iri || linked.has(item.graph_iri)) continue
+    subcrates.value.push({
+      iri: item.graph_iri,
+      name: subcrateTitleOf(item),
+      identifier: item.document_id,
+      subjectOf: crateJsonUrl(item.document_id),
+    })
+  }
+  subcratePickerOpen.value = false
+}
+
+function removeSubcrate(iri: string) {
+  subcrates.value = subcrates.value.filter((link) => link.iri !== iri)
+}
+
 // Anything beyond the scaffold fields requires submitting a full RO-Crate.
 const needsRoCrate = computed(() =>
   Boolean(
@@ -414,7 +454,9 @@ const needsRoCrate = computed(() =>
       || (showIdentifierScaffold.value && identifier.value.trim())
       || dataRefList.value.length
       || hasEntityEntries.value
-      || Object.keys(generatedCreateValues.value).length,
+      || Object.keys(generatedCreateValues.value).length
+      || Object.keys(customFieldValues.value).length
+      || subcrates.value.length,
   ),
 )
 
@@ -670,7 +712,9 @@ const hasDraftProgress = computed(() => Boolean(
       || identifier.value.trim()
       || dataRefList.value.length
       || hasEntityEntries.value
-      || Object.keys(generatedCreateValues.value).length,
+      || Object.keys(generatedCreateValues.value).length
+      || Object.keys(customFieldValues.value).length
+      || subcrates.value.length,
 ))
 function requestClose(next: boolean) {
   if (next) {
@@ -711,6 +755,9 @@ watch(
     identifier.value = ''
     creators.value = []
     dataRefs.value = []
+    customFields.value = []
+    subcrates.value = []
+    subcratePickerOpen.value = false
     submitError.value = null
     resetGeneratedProfileFields()
     void loadSelectedProfileSchema()
@@ -1069,7 +1116,16 @@ function buildRoCrate() {
       addEntity({ '@id': entry.url, '@type': 'File', name: entry.label || entry.url })
     }
   }
-  return {
+
+  // Typed additional fields (repeated keys already merged into arrays). Keys a
+  // profile control or built-in scaffold already owns are skipped rather than
+  // clobbered; validation stays open-world, so extras never break conformance.
+  for (const [key, value] of Object.entries(customFieldValues.value)) {
+    if (builtInDatasetKeys.has(key) || reservedDatasetKeys.has(key) || key in dataset) continue
+    dataset[key] = value
+  }
+
+  const crate = {
     // Array-form @context (context URL + custom-term mappings) when the profile
     // has non-schema.org terms; the plain context URL otherwise.
     '@context': buildProfileContext([], profileContextTerms.value),
@@ -1084,6 +1140,10 @@ function buildRoCrate() {
       ...contextualEntities,
     ],
   }
+  // Subcrate references compose last: hasPart refs, Dataset entities and the
+  // subjectOf CreativeWork fallback, per the spec-conformant helper.
+  for (const link of subcrates.value) addSubcrateLink(crate, link)
+  return crate
 }
 
 async function submit() {
@@ -1445,6 +1505,31 @@ async function submit() {
             {{ violation.message }}
           </p>
         </div>
+
+        <CustomFieldsEditor v-model:rows="customFields" />
+
+        <div>
+          <div class="flex items-center justify-between gap-3">
+            <label class="text-xs font-medium text-foreground">Subcrates</label>
+            <Button variant="outline" size="sm" @click="subcratePickerOpen = true">
+              <Plus class="h-3.5 w-3.5" /> Link subcrate
+            </Button>
+          </div>
+          <ul v-if="subcrates.length" class="mt-2 space-y-1">
+            <li v-for="link in subcrates" :key="link.iri" class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs">
+              <span class="flex min-w-0 items-center gap-1.5">
+                <Layers class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span class="min-w-0 truncate text-foreground" :title="link.iri">{{ link.name }}</span>
+              </span>
+              <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" :aria-label="`Unlink subcrate ${link.name}`" @click="removeSubcrate(link.iri)">
+                <X class="h-3.5 w-3.5" />
+              </Button>
+            </li>
+          </ul>
+          <p class="mt-1 text-[11px] text-muted-foreground">
+            References to other crates (RO-Crate 1.2), written as <code class="font-mono">hasPart</code> Dataset entities. Linked crates stay independent documents.
+          </p>
+        </div>
         <!-- Profile conformance: deep SHACL validation of the crate about to be
              saved. Advisory only — findings never gate submission. -->
         <div v-if="profileId && profileShapes.length" class="rounded-md border border-border p-3">
@@ -1514,6 +1599,12 @@ async function submit() {
       </DialogFooter>
 
       <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (groupId = group.group_id)" />
+
+      <SubcratePickerDialog
+        v-model:open="subcratePickerOpen"
+        :excluded-iris="subcrates.map((link) => link.iri)"
+        @select="onSubcratesPicked"
+      />
 
       <DiscardDraftConfirm :open="confirmDiscardOpen" @keep="confirmDiscardOpen = false" @discard="discardDraft" />
     </DialogContent>
