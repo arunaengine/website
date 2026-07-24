@@ -12,6 +12,7 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import TasksPanel from '@/components/compute/TasksPanel.vue'
 import JobsPanel from '@/components/jobs/JobsPanel.vue'
 import { useTes } from '@/composables/useTes'
@@ -27,7 +28,7 @@ const route = useRoute()
 const { tesEnabled } = useTes()
 const { jobsEnabled } = useJobs()
 const { currentUser } = useAruna()
-const { signIn, stage } = useAuth()
+const { signIn, stage, authPending } = useAuth()
 
 const anyEnabled = computed(() => tesEnabled.value || jobsEnabled.value)
 const bothEnabled = computed(() => tesEnabled.value && jobsEnabled.value)
@@ -92,6 +93,16 @@ function startSignIn() {
       >
         <template #icon><Cpu class="h-7 w-7" /></template>
       </EmptyState>
+    </div>
+
+    <!-- Session restore in flight: a stored token exists but the user profile
+         has not resolved yet — never flash the signed-out gate. -->
+    <div v-else-if="authPending" class="container py-8">
+      <section class="surface mx-auto max-w-xl space-y-3 p-8">
+        <Skeleton class="mx-auto h-8 w-8 rounded-full" />
+        <Skeleton class="mx-auto h-4 w-44" />
+        <Skeleton class="mx-auto h-3 w-64" />
+      </section>
     </div>
 
     <!-- Gate 2: not signed in — tasks and jobs are scoped to the account. -->

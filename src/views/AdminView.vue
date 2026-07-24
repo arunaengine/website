@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
@@ -19,7 +20,7 @@ import { computed, ref, watch } from 'vue'
 import { Database, HardDrive, Layers, Link2, Boxes, RefreshCw, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
 
 const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, isManagementNode, nodeInfo, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
-const { isAuthenticated } = useAuth()
+const { isAuthenticated, authPending } = useAuth()
 // Shared realm directory: resolves saved user-cap ids to display names so rows
 // show a handle instead of the raw {ulid}@{realm} identity.
 const { resolveUsers, cachedUser } = useUserDirectory()
@@ -329,7 +330,17 @@ async function save() {
       </template>
     </PageHeader>
 
-    <div v-if="!isRealmAdmin" class="container py-8">
+    <!-- Session restore in flight: the admin role is unknown until the user
+         profile resolves — never flash the access-required gate. -->
+    <div v-if="authPending" class="container py-8">
+      <section class="surface mx-auto max-w-xl space-y-3 p-8">
+        <Skeleton class="mx-auto h-8 w-8 rounded-full" />
+        <Skeleton class="mx-auto h-4 w-44" />
+        <Skeleton class="mx-auto h-3 w-64" />
+      </section>
+    </div>
+
+    <div v-else-if="!isRealmAdmin" class="container py-8">
       <section class="surface mx-auto max-w-xl p-8 text-center">
         <ShieldCheck class="mx-auto h-8 w-8 text-muted-foreground/70" />
         <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Realm admin access required</h2>

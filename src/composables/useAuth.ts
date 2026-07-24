@@ -209,5 +209,12 @@ export function useAuth() {
     hasSession: computed(() => Boolean(aruna.authToken.value)),
     /** The token was accepted and the user profile is loaded. */
     isAuthenticated: computed(() => Boolean(aruna.currentUser.value)),
+    /**
+     * A stored token exists but the initial refresh has not resolved yet: the
+     * user is probably signed in, so render a loading state instead of the
+     * signed-out branch (no stored session = never pending, signed-out content
+     * shows immediately).
+     */
+    authPending: computed(() => Boolean(aruna.authToken.value) && !aruna.bootstrapped.value),
   }
 }

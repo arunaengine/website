@@ -11,6 +11,7 @@ import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, 
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { useAuth } from '@/composables/useAuth'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useNotifications } from '@/composables/useNotifications'
 import { storedReferencedHint } from '@/lib/quota'
@@ -18,6 +19,7 @@ import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
 const { currentUser, metadata, profiles, nodes, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh, loadInfo } = useAruna()
+const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const showNewDataset = ref(false)
 const refreshing = ref(false)
@@ -94,11 +96,17 @@ const recentMetadata = computed(() =>
   [...metadata.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5),
 )
 
+// While a stored session restores, keep the copy neutral instead of flashing
+// the guest greeting and its sign-in hint.
 const pageTitle = computed(() =>
-  currentUser.value ? `Welcome back, ${currentUser.value.name.split(' ')[0]}.` : 'Aruna data portal',
+  currentUser.value
+    ? `Welcome back, ${currentUser.value.name.split(' ')[0]}.`
+    : authPending.value
+      ? 'Welcome back.'
+      : 'Aruna data portal',
 )
 const pageDescription = computed(() =>
-  currentUser.value
+  currentUser.value || authPending.value
     ? 'Live data from the local Aruna API.'
     : 'You are browsing public data as a guest. Sign in to create datasets and manage your groups.',
 )

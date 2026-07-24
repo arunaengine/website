@@ -7,6 +7,7 @@ import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import GroupDetail from '@/components/groups/GroupDetail.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useAuth } from '@/composables/useAuth'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { useRoute } from 'vue-router'
@@ -16,6 +17,7 @@ import { relativeTime } from '@/lib/utils'
 import type { JoinRequest } from '@/lib/api'
 
 const { currentUser, myGroups, discoverableGroups, loading, refresh } = useAruna()
+const { authPending } = useAuth()
 const {
   joinRequestsEnabled,
   ownRequests,
@@ -75,8 +77,10 @@ function toggleGroup(groupId: string) {
   selectedGroupId.value = selectedGroupId.value === groupId ? '' : groupId
 }
 
+// While a stored session restores, keep the signed-in copy so the sign-in
+// hint never flashes for users who are actually signed in.
 const description = computed(() =>
-  currentUser.value
+  currentUser.value || authPending.value
     ? 'Your groups in this realm, manage members, roles and permissions.'
     : 'Groups in this realm. Sign in from the top bar to create and manage groups.',
 )
@@ -129,7 +133,7 @@ const description = computed(() =>
           <li v-if="!myGroups.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
             <p>
               {{
-                loading
+                loading || authPending
                   ? 'Loading groups…'
                   : currentUser
                     ? 'You are not a member of any group yet, create one to get started.'

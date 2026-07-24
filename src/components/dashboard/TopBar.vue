@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import Avatar from '@/components/ui/Avatar.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
@@ -24,7 +25,7 @@ const showResults = ref(false)
 const showNewDataset = ref(false)
 const { realm, role } = useRealm()
 const { currentUser, metadata, groups, authError, loading } = useAruna()
-const { hasSession, signIn, signOut, stage } = useAuth()
+const { hasSession, signIn, signOut, stage, authPending } = useAuth()
 const { isDark, toggleTheme } = useTheme()
 const route = useRoute()
 
@@ -285,6 +286,13 @@ function scheduleHide() {
           >
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <!-- Session restore in flight: an avatar-sized placeholder instead of
+           flashing the Sign in button. -->
+      <div v-else-if="authPending" class="flex h-9 items-center gap-2 px-1.5" aria-hidden="true">
+        <Skeleton class="h-7 w-7 rounded-full" />
+        <Skeleton class="hidden h-3 w-20 sm:block" />
+      </div>
 
       <template v-else>
         <Button

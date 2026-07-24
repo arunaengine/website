@@ -5,6 +5,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Separator from '@/components/ui/Separator.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
@@ -39,7 +40,7 @@ const {
   updateUserProfile,
   revokeS3Credential,
 } = useAruna()
-const { signIn, signOut, isAuthenticated, stage, stageError } = useAuth()
+const { signIn, signOut, isAuthenticated, authPending, stage, stageError } = useAuth()
 const { activeKey, clearActiveKey } = useS3()
 // Optimistic until a watch request answers 404/403 (mirrors the bell's probe).
 const { available: watchesAvailable } = useWatches()
@@ -209,7 +210,15 @@ function toggleGroup(groupId: string) {
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Session &amp; API connection</h3>
             <p class="text-xs text-muted-foreground">Sign-in is handled by the realm's identity provider; the issued Aruna token authenticates this browser.</p>
           </header>
-          <div class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <!-- While the stored session restores, show a placeholder instead of
+               flashing "Not signed in" plus a Sign in button. -->
+          <div v-if="authPending" class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+            <div class="min-w-0 flex-1 space-y-1.5">
+              <Skeleton class="h-4 w-44" />
+              <Skeleton class="h-3 w-64" />
+            </div>
+          </div>
+          <div v-else class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div class="text-sm">
               <div class="font-medium text-foreground">{{ isAuthenticated ? `Signed in as ${currentUser?.name}` : 'Not signed in' }}</div>
               <div class="text-xs text-muted-foreground">{{ isAuthenticated ? 'Authenticated endpoints are available.' : 'Public endpoints only, sign in to manage data.' }}</div>
@@ -235,7 +244,7 @@ function toggleGroup(groupId: string) {
               <CopyButton :value="userInfo.user.user_id" label="Copy user identity" />
             </div>
           </div>
-          <div v-if="!isAuthenticated" class="grid gap-5 border-b border-border p-5 md:grid-cols-2">
+          <div v-if="!isAuthenticated && !authPending" class="grid gap-5 border-b border-border p-5 md:grid-cols-2">
             <div>
               <label class="text-xs font-medium text-foreground">Onboarding secret (first admin, optional)</label>
               <Input v-model="onboardingSecret" class="mt-1" type="password" placeholder="Paste onboarding secret" />

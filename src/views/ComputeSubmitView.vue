@@ -8,6 +8,7 @@ import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
 import ExecutorStepsEditor from '@/components/compute/ExecutorStepsEditor.vue'
@@ -40,7 +41,7 @@ const router = useRouter()
 const route = useRoute()
 const { tesEnabled, busy, createTask, getTask } = useTes()
 const { currentUser, myGroups } = useAruna()
-const { signIn, stage } = useAuth()
+const { signIn, stage, authPending } = useAuth()
 
 const signingIn = computed(() => stage.value === 'redirecting')
 function startSignIn() {
@@ -394,6 +395,15 @@ async function submit() {
       >
         <template #icon><Cpu class="h-7 w-7" /></template>
       </EmptyState>
+    </div>
+
+    <!-- Session restore in flight: never flash the signed-out gate. -->
+    <div v-else-if="authPending" class="container py-8">
+      <section class="surface mx-auto max-w-xl space-y-3 p-8">
+        <Skeleton class="mx-auto h-8 w-8 rounded-full" />
+        <Skeleton class="mx-auto h-4 w-44" />
+        <Skeleton class="mx-auto h-3 w-64" />
+      </section>
     </div>
 
     <!-- Gate 2: not signed in -->
