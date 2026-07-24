@@ -19,15 +19,20 @@ import { ApiError } from '@/lib/api'
 import { Boxes, ChevronRight, Globe2, HardDrive, MapPin, MapPinned, RefreshCw } from '@lucide/vue'
 
 const route = useRoute()
-const { realm, realmInfo, nodeInfo, usageInfo, loadInfo } = useAruna()
+const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, loadInfo } = useAruna()
 
 const REFRESH_INTERVAL_MS = 60_000
+// The very first latency round waits out page-load network contention (asset
+// and bootstrap requests share the connection pool); the cells show a muted
+// "measuring" meanwhile. Subsequent rounds fire immediately.
+const INITIAL_PROBE_DELAY_MS = 2_000
 
 const expandedId = ref('')
 const statusError = ref<string | null>(null)
 const lastUpdated = ref<Date | null>(null)
 const refreshing = ref(false)
 const probes = ref<Record<string, NodeProbe>>({})
+let probedOnce = false
 
 async function refreshStatus() {
   if (refreshing.value) return
@@ -36,6 +41,10 @@ async function refreshStatus() {
     await loadInfo()
     statusError.value = null
     lastUpdated.value = new Date()
+    if (!probedOnce) {
+      await new Promise((resolve) => setTimeout(resolve, INITIAL_PROBE_DELAY_MS))
+      probedOnce = true
+    }
     await probeRealmNodes()
   } catch (err) {
     statusError.value = err instanceof ApiError || err instanceof Error ? err.message : String(err)
@@ -44,10 +53,15 @@ async function refreshStatus() {
   }
 }
 
+// The base a node's latency is measured against; the local node falls back to
+// the portal's own configured API base so it is probed exactly like the rest.
+function probeBase(node: RealmNodeInfo): string | null {
+  return nodeApiBase(node) ?? (isLocal(node) ? apiBaseUrl.value : null)
+}
+
 async function probeRealmNodes() {
   const targets = (realmInfo.value?.nodes ?? [])
-    .filter((node) => !isLocal(node))
-    .map((node) => ({ id: node.node_id, base: nodeApiBase(node) }))
+    .map((node) => ({ id: node.node_id, base: probeBase(node) }))
     .filter((target): target is { id: string; base: string } => !!target.base)
   const results = await Promise.all(
     targets.map(async ({ id, base }) => [id, await probeNode(base)] as const),
@@ -69,13 +83,13 @@ function isLocal(node: RealmNodeInfo): boolean {
   return node.kind === 'local' || (!!localPeerId.value && node.node_id === localPeerId.value)
 }
 
-// The local node is reported through the already-loaded /info data instead of
-// a second probe against the same endpoint.
+// The local node's DATA comes from the already-loaded /info; its probe (see
+// probeRealmNodes) exists purely for the browser-measured latency.
 function probeFor(node: RealmNodeInfo): NodeProbe | undefined {
   if (isLocal(node)) {
     return nodeInfo.value
-      ? { state: 'ok', info: nodeInfo.value, usage: usageInfo.value }
-      : undefined
+      ? { state: 'ok', info: nodeInfo.value, usage: usageInfo.value, latencyMs: probes.value[node.node_id]?.latencyMs }
+      : probes.value[node.node_id]
   }
   return probes.value[node.node_id]
 }
@@ -97,12 +111,16 @@ function usageSummary(node: RealmNodeInfo): string | null {
   return `${formatNumber(usage.objects)} obj · ${formatBytes(usage.stored_bytes)}`
 }
 
-// Browser-measured /info round trip; the local node reads from the already
-// loaded /info instead of a probe, so it honestly shows nothing.
+// Browser-measured /info round trip (min of a cold and a warm sample), for
+// every node including the local one.
 function latencyFor(node: RealmNodeInfo): number | null {
-  if (isLocal(node)) return null
   const probe = probes.value[node.node_id]
   return probe?.state === 'ok' && probe.latencyMs !== undefined ? probe.latencyMs : null
+}
+// True while a probeable node's first latency sample has not landed yet (the
+// delayed initial round, or a fresh page load).
+function latencyPending(node: RealmNodeInfo): boolean {
+  return !probes.value[node.node_id] && Boolean(probeBase(node))
 }
 function latencyClass(ms: number): string {
   if (ms < 150) return 'text-emerald-600 dark:text-emerald-400'
@@ -180,7 +198,7 @@ watch(
 
 <template>
   <div>
-    <PageHeader title="Status" description="Realm topology and local node health, refreshed every 10 seconds.">
+    <PageHeader title="Status" description="Realm topology and local node health, refreshed every minute.">
       <template #actions>
         <span class="text-[11px] tabular-nums text-muted-foreground">Updated {{ lastUpdatedLabel }}</span>
         <Button variant="outline" size="sm" :disabled="refreshing" @click="refreshStatus">
@@ -326,9 +344,16 @@ watch(
                 v-if="latencyFor(node) !== null"
                 class="shrink-0 font-mono text-[11px] tabular-nums"
                 :class="latencyClass(latencyFor(node)!)"
-                title="REST /info round trip measured from this browser"
+                title="Best of two REST /info round trips measured from this browser"
               >
                 {{ Math.round(latencyFor(node)!) }} ms
+              </span>
+              <span
+                v-else-if="latencyPending(node)"
+                class="shrink-0 font-mono text-[11px] text-muted-foreground"
+                title="The first latency sample is delayed until page load settles"
+              >
+                measuring…
               </span>
               <Badge
                 v-if="restBadge(node)"
