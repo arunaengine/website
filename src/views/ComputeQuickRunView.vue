@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
@@ -33,6 +33,7 @@ import {
   TES_GROUP_TAG,
   TES_IDEMPOTENCY_TAG,
   expandDataRefEntry,
+  parseS3Url,
   pruneTesTask,
   validContainerDir,
   validContainerFilePath as validContainerPath,
@@ -41,6 +42,7 @@ import {
   type TesOutput,
   type TesTask,
 } from '@/lib/tes'
+import { RUNTIMES, TES_NETWORK_TAG, detectQuickRun, type Runtime } from '@/lib/quickRuntimes'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { fetchWithTimeout } from '@/lib/fetch'
 import {
@@ -67,7 +69,7 @@ const ScriptEditor = defineAsyncComponent({
 
 const router = useRouter()
 const route = useRoute()
-const { tesEnabled, busy, createTask } = useTes()
+const { tesEnabled, busy, createTask, getTask } = useTes()
 const { currentUser, myGroups } = useAruna()
 const { signIn, stage } = useAuth()
 const s3 = useS3()
@@ -80,59 +82,8 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-// ── Runtimes (tagged upstream images) ────────────────────────────────────────
-interface Runtime {
-  id: 'python-uv' | 'deno' | 'bash'
-  label: string
-  hint: string
-  image: string
-  /** Argv prefix; the staged script path is appended as the last argument. */
-  command: string[]
-  /** Extra executor environment (e.g. cache dirs inside the writable /work). */
-  env?: Record<string, string>
-  file: string
-  lang: 'python' | 'javascript' | 'text'
-  contentType: string
-  template: string
-}
-const RUNTIMES: Runtime[] = [
-  {
-    id: 'python-uv',
-    label: 'Python',
-    hint: 'PyPI dependencies managed by uv.',
-    image: 'ghcr.io/astral-sh/uv:python3.13-bookworm-slim',
-    command: ['uv', 'run', '--no-project'],
-    env: { UV_CACHE_DIR: '/work/.uv-cache' },
-    file: 'script.py',
-    lang: 'python',
-    contentType: 'text/x-python',
-    template: 'print("hello from aruna")\n',
-  },
-  {
-    id: 'deno',
-    label: 'JavaScript / TypeScript',
-    hint: 'npm dependencies resolved by Deno.',
-    image: 'denoland/deno:alpine-2.9.3',
-    command: ['deno', 'run', '-A'],
-    env: { DENO_DIR: '/work/.deno-cache' },
-    file: 'script.ts',
-    lang: 'javascript',
-    contentType: 'text/typescript',
-    template: 'console.log("hello from aruna");\n',
-  },
-  {
-    id: 'bash',
-    label: 'Bash',
-    hint: 'Plain shell, no extra tooling.',
-    image: 'bash:5.2',
-    command: ['bash'],
-    file: 'script.sh',
-    lang: 'text',
-    contentType: 'text/x-shellscript',
-    template: 'echo "hello from aruna"\n',
-  },
-]
-const TES_NETWORK_TAG = 'aruna-engine.org/network'
+// Runtimes (tagged upstream images) live in lib/quickRuntimes so the task
+// detail panel can detect quick runs for the re-run flow.
 
 // One combined "Script & data" step: the selected data references are listed
 // with their editable container mount paths (defaulting to /work/in and
@@ -641,6 +592,8 @@ onMounted(() => {
   initDefaults()
   // Existing dependencies (e.g. after "Run again") are re-checked automatically.
   for (const dependency of dependencies.value) void verifyDependency(dependency)
+  const rerun = route.query.rerun
+  if (typeof rerun === 'string' && rerun) void applyRerun(rerun)
 })
 watch([currentUser, () => s3.hasActiveKey.value, myGroups], initDefaults)
 
@@ -759,6 +712,151 @@ function runAnother() {
   goStep(0)
   runId.value = crypto.randomUUID()
 }
+
+// ── Re-run prefill (?rerun=<taskId>) ─────────────────────────────────────────
+// The task id rides in the query so a page refresh re-applies the prefill.
+const rerunSource = ref<{ id: string; name: string } | null>(null)
+const rerunNotes = ref<string[]>([])
+const rerunError = ref<string | null>(null)
+const rerunLoading = ref(false)
+
+// Reverses the stagedScript PEP 723 injection: strips a portal-shaped leading
+// metadata block and returns the dependency list it carried.
+function extractInlineDependencies(text: string): { script: string; dependencies: string[] } {
+  const match = text.match(
+    /^# \/\/\/ script\n# requires-python = "[^"]*"\n# dependencies = \[\n((?:#   .*\n)*)# \]\n# \/\/\/\n/,
+  )
+  if (!match) return { script: text, dependencies: [] }
+  const dependencies: string[] = []
+  for (const line of match[1].split('\n')) {
+    const dep = line.match(/^#\s+("(?:[^"\\]|\\.)*"),?\s*$/)
+    if (!dep) continue
+    try {
+      dependencies.push(JSON.parse(dep[1]) as string)
+    } catch {
+      // A hand-edited block that no longer parses stays in the script verbatim.
+      return { script: text, dependencies: [] }
+    }
+  }
+  return { script: text.slice(match[0].length), dependencies }
+}
+
+function dependenciesFromDenoConfig(text: string): string[] {
+  try {
+    const parsed = JSON.parse(text) as { imports?: Record<string, string> }
+    return Object.values(parsed.imports ?? {})
+      .filter((value) => typeof value === 'string' && value.startsWith('npm:'))
+      .map((value) => value.slice('npm:'.length))
+  } catch {
+    return []
+  }
+}
+
+async function applyRerun(id: string) {
+  rerunLoading.value = true
+  rerunError.value = null
+  rerunNotes.value = []
+  try {
+    const source = await getTask(id, 'FULL')
+    const match = detectQuickRun(source)
+    if (!match) {
+      rerunError.value = 'This task was not created by Quick run. Use the New task wizard to re-run it.'
+      return
+    }
+    const notes: string[] = []
+    runtimeId.value = match.runtime.id
+    // Let the runtime watcher (template swap + dependency reset) run before
+    // the restored values land, or it would clobber them.
+    await nextTick()
+    taskName.value = source.name || 'Quick run'
+    const group = source.tags?.[TES_GROUP_TAG]
+    if (group) groupId.value = group
+
+    // Data inputs: everything except the staged script and generated deno.json.
+    const sourceDataInputs = (source.inputs ?? []).filter(
+      (input) => input !== match.scriptInput && input.path !== dependencyConfigPath,
+    )
+    inputs.value = sourceDataInputs.map((input) => ({
+      kind: 'file',
+      url: input.url ?? '',
+      path: input.path,
+      name: input.name || input.path.split('/').filter(Boolean).pop() || 'input',
+    }))
+    if (sourceDataInputs.some((input) => input.name?.includes('/'))) {
+      notes.push('Folder selections were restored as individual file inputs.')
+    }
+
+    outputRows.value = []
+    for (const output of source.outputs ?? []) {
+      const parsed = parseS3Url(output.url)
+      if (!parsed) {
+        notes.push(`The output destination ${output.url} is not an s3:// URL and was not restored.`)
+        continue
+      }
+      const dir = output.type === 'DIRECTORY' || output.path.endsWith('/')
+      outputRows.value.push({
+        bucket: parsed.bucket,
+        path: parsed.key,
+        containerPath: dir && !output.path.endsWith('/') ? `${output.path}/` : output.path,
+        keyTouched: true,
+      })
+    }
+
+    // Script content: re-fetch the staged object; without S3 access the
+    // editor keeps the runtime template.
+    const scriptRef = match.scriptInput.url ? parseS3Url(match.scriptInput.url) : null
+    if (scriptRef && s3.hasActiveKey.value && s3.endpoint.value) {
+      try {
+        const text = await s3.getObjectText(scriptRef.bucket, scriptRef.key)
+        const extracted =
+          match.runtime.id === 'python-uv' ? extractInlineDependencies(text) : { script: text, dependencies: [] }
+        script.value = extracted.script
+        dependencies.value = extracted.dependencies
+        selectedScript.value = { bucket: scriptRef.bucket, key: scriptRef.key, content: text }
+        stagingBucket.value = scriptRef.bucket
+        for (const dependency of extracted.dependencies) void verifyDependency(dependency)
+      } catch (err) {
+        notes.push(`The script content could not be loaded from ${match.scriptInput.url} (${errorMessage(err)}); the editor shows the template.`)
+      }
+    } else if (scriptRef) {
+      notes.push('S3 credentials are required to restore the script content; the editor shows the template.')
+    } else {
+      notes.push('The original script is not an s3:// object, so its content could not be restored.')
+    }
+
+    if (match.runtime.id === 'deno') {
+      const configInput = (source.inputs ?? []).find((input) => input.path === dependencyConfigPath)
+      const configRef = configInput?.url ? parseS3Url(configInput.url) : null
+      if (configRef && s3.hasActiveKey.value && s3.endpoint.value) {
+        try {
+          const deps = dependenciesFromDenoConfig(await s3.getObjectText(configRef.bucket, configRef.key))
+          dependencies.value = deps
+          for (const dependency of deps) void verifyDependency(dependency)
+        } catch {
+          notes.push('The npm dependency list (deno.json) could not be restored.')
+        }
+      } else if (configInput) {
+        notes.push('The npm dependency list (deno.json) could not be restored.')
+      }
+    }
+
+    rerunSource.value = { id, name: source.name || id }
+    rerunNotes.value = notes
+    // Land on Script & data unless the URL already pins a step (refresh).
+    if (!route.query.step) goStep(1)
+  } catch (err) {
+    rerunError.value = errorMessage(err)
+  } finally {
+    rerunLoading.value = false
+  }
+}
+
+function dismissRerun() {
+  rerunSource.value = null
+  rerunNotes.value = []
+  rerunError.value = null
+  void router.replace({ query: { ...route.query, rerun: undefined } })
+}
 </script>
 
 <template>
@@ -809,6 +907,22 @@ function runAnother() {
 
     <!-- Wizard -->
     <div v-else class="container space-y-6 py-8">
+      <!-- Re-run prefill status -->
+      <div v-if="rerunLoading" class="surface-inline px-4 py-3 text-xs text-muted-foreground">Loading the task to re-run…</div>
+      <div v-else-if="rerunError" class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">
+        <span>{{ rerunError }}</span>
+        <Button variant="ghost" size="sm" @click="dismissRerun">Dismiss</Button>
+      </div>
+      <div v-else-if="rerunSource" class="space-y-1.5 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="font-medium text-foreground">Prefilled from run <span class="font-mono">{{ rerunSource.name }}</span>.</span>
+          <Button variant="ghost" size="sm" @click="dismissRerun">Dismiss</Button>
+        </div>
+        <ul v-if="rerunNotes.length" class="list-disc space-y-0.5 pl-4 text-muted-foreground">
+          <li v-for="note in rerunNotes" :key="note">{{ note }}</li>
+        </ul>
+      </div>
+
       <WizardSteps :steps="WIZARD_STEPS" :current="step" />
 
       <section class="surface space-y-5 p-6">

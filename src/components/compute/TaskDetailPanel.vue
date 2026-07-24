@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -12,7 +12,9 @@ import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
+import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { useS3 } from '@/composables/useS3'
+import { detectQuickRun } from '@/lib/quickRuntimes'
 import {
   TES_GROUP_TAG,
   drsDownloadHref,
@@ -24,13 +26,15 @@ import {
   type TesTask,
 } from '@/lib/tes'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Ban, Download, ExternalLink as ExternalLinkIcon, FileText, RefreshCw } from '@lucide/vue'
+import { Ban, Download, ExternalLink as ExternalLinkIcon, FileText, RefreshCw, RotateCcw, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ taskId: string; open: boolean }>()
-const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled'): void }>()
+const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled'): void; (e: 'hidden'): void }>()
 
+const router = useRouter()
 const { getTask, cancelTask, busy } = useTes()
 const { myGroups, apiBaseUrl, metadataItems, loadMetadata } = useAruna()
+const { hide } = useHiddenTasks()
 const s3 = useS3()
 
 function errorMessage(err: unknown): string {
@@ -235,6 +239,43 @@ async function confirmCancel() {
   }
 }
 const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.state))
+
+// ── Re-run ───────────────────────────────────────────────────────────────────
+// Quick runs reopen the quick-run wizard, anything else the New task wizard;
+// both read ?rerun=<taskId> and prefill from the FULL task record.
+function rerun() {
+  if (!task.value) return
+  const target = detectQuickRun(task.value) ? 'compute-quick' : 'compute-new'
+  void router.push({ name: target, query: { rerun: props.taskId } })
+}
+
+// ── Delete (client-side hide; TES has no delete endpoint yet) ────────────────
+const confirmingDelete = ref(false)
+const deleteBusy = ref(false)
+const deleteError = ref<string | null>(null)
+function requestDelete() {
+  confirmingDelete.value = true
+  deleteError.value = null
+}
+// An active task is canceled first so the hide never orphans a running job.
+async function confirmDelete() {
+  deleteBusy.value = true
+  deleteError.value = null
+  try {
+    if (canCancel.value) {
+      await cancelTask(props.taskId)
+      emit('canceled')
+    }
+    hide(props.taskId)
+    confirmingDelete.value = false
+    emit('hidden')
+    emit('update:open', false)
+  } catch (err) {
+    deleteError.value = errorMessage(err)
+  } finally {
+    deleteBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -385,18 +426,38 @@ const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.
           </div>
         </section>
 
-        <!-- Cancel -->
-        <section v-if="canCancel" class="border-t border-border pt-4">
-          <div class="flex items-center gap-2">
-            <template v-if="!confirmingCancel">
-              <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busy" @click="requestCancel"><Ban class="h-3.5 w-3.5" /> Cancel task</Button>
+        <!-- Actions: re-run, cancel, delete -->
+        <section class="space-y-2 border-t border-border pt-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" title="Start a new run prefilled from this task" @click="rerun"><RotateCcw class="h-3.5 w-3.5" /> Re-run</Button>
+            <template v-if="canCancel">
+              <template v-if="!confirmingCancel">
+                <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busy" @click="requestCancel"><Ban class="h-3.5 w-3.5" /> Cancel task</Button>
+              </template>
+              <template v-else>
+                <Button variant="destructive" size="sm" :disabled="busy" @click="confirmCancel"><Ban class="h-3.5 w-3.5" /> Confirm cancel</Button>
+                <Button variant="ghost" size="sm" :disabled="busy" @click="confirmingCancel = false">Keep running</Button>
+              </template>
             </template>
-            <template v-else>
-              <Button variant="destructive" size="sm" :disabled="busy" @click="confirmCancel"><Ban class="h-3.5 w-3.5" /> Confirm cancel</Button>
-              <Button variant="ghost" size="sm" :disabled="busy" @click="confirmingCancel = false">Keep running</Button>
-            </template>
+            <div class="ml-auto flex items-center gap-2">
+              <template v-if="!confirmingDelete">
+                <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="deleteBusy" @click="requestDelete">
+                  <Trash2 class="h-3.5 w-3.5" /> {{ canCancel ? 'Cancel and delete' : 'Delete' }}
+                </Button>
+              </template>
+              <template v-else>
+                <Button variant="destructive" size="sm" :disabled="deleteBusy || busy" @click="confirmDelete">
+                  <Trash2 class="h-3.5 w-3.5" /> {{ deleteBusy ? 'Deleting…' : canCancel ? 'Confirm cancel and delete' : 'Confirm delete' }}
+                </Button>
+                <Button variant="ghost" size="sm" :disabled="deleteBusy" @click="confirmingDelete = false">Keep</Button>
+              </template>
+            </div>
           </div>
-          <p v-if="cancelError" class="mt-2 text-[11px] text-destructive">{{ cancelError }}</p>
+          <p v-if="confirmingDelete" class="text-[11px] text-muted-foreground">
+            {{ canCancel ? 'Cancels the run first, then removes' : 'Removes' }} it from the task list in this browser only; the record stays on the node and reappears via the Deleted filter.
+          </p>
+          <p v-if="cancelError" class="text-[11px] text-destructive">{{ cancelError }}</p>
+          <p v-if="deleteError" class="text-[11px] text-destructive">{{ deleteError }}</p>
         </section>
       </div>
     </div>

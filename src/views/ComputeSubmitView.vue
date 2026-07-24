@@ -19,6 +19,7 @@ import { useS3 } from '@/composables/useS3'
 import {
   TES_GROUP_TAG,
   expandDataRefEntry,
+  parseS3Url,
   pruneTesTask,
   validContainerDir,
   validContainerFilePath,
@@ -34,7 +35,7 @@ import { ArrowLeft, ArrowRight, Cpu, FileText, Folder, ListPlus, LogIn, Plus, X 
 
 const router = useRouter()
 const route = useRoute()
-const { tesEnabled, busy, createTask } = useTes()
+const { tesEnabled, busy, createTask, getTask } = useTes()
 const { currentUser, myGroups } = useAruna()
 const { signIn, stage } = useAuth()
 
@@ -128,6 +129,96 @@ onMounted(async () => {
 })
 
 const groupOptions = computed(() => myGroups.value.map((g) => ({ value: g.id, label: g.name })))
+
+// ── Re-run prefill (?rerun=<taskId>) ─────────────────────────────────────────
+// The task id rides in the query so a page refresh re-applies the prefill.
+const rerunSource = ref<{ id: string; name: string } | null>(null)
+const rerunNotes = ref<string[]>([])
+const rerunError = ref<string | null>(null)
+const rerunLoading = ref(false)
+
+async function applyRerun(id: string) {
+  rerunLoading.value = true
+  rerunError.value = null
+  rerunNotes.value = []
+  try {
+    const source = await getTask(id, 'FULL')
+    const notes: string[] = []
+    name.value = source.name ?? ''
+    description.value = source.description ?? ''
+    const group = source.tags?.[TES_GROUP_TAG]
+    if (group) groupId.value = group
+
+    inputs.value = (source.inputs ?? []).map((input) => ({
+      kind: 'file',
+      url: input.url ?? '',
+      path: input.path,
+      name: input.name || input.path.split('/').filter(Boolean).pop() || 'input',
+    }))
+    if ((source.inputs ?? []).some((input) => input.name?.includes('/'))) {
+      notes.push('Folder selections were restored as individual file inputs.')
+    }
+
+    const executor = source.executors?.[0]
+    if (executor) {
+      executors.value = [
+        {
+          image: executor.image,
+          command: executor.command.length ? [...executor.command] : [''],
+          ...(executor.workdir ? { workdir: executor.workdir } : {}),
+          ...(executor.env ? { env: { ...executor.env } } : {}),
+        },
+      ]
+      if ((source.executors?.length ?? 0) > 1) {
+        notes.push('Only the first executor was restored; the facade accepts one per task.')
+      }
+    }
+
+    outputRows.value = (source.outputs ?? []).flatMap((output) => {
+      const parsed = parseS3Url(output.url)
+      if (!parsed) {
+        notes.push(`The output destination ${output.url} is not an s3:// URL and was not restored.`)
+        return []
+      }
+      const dir = output.type === 'DIRECTORY' || output.path.endsWith('/')
+      return [{ path: dir && !output.path.endsWith('/') ? `${output.path}/` : output.path, bucket: parsed.bucket, key: parsed.key }]
+    })
+
+    const r = source.resources
+    cpuCores.value = r?.cpu_cores != null ? String(r.cpu_cores) : ''
+    ramGb.value = r?.ram_gb != null ? String(r.ram_gb) : ''
+    diskGb.value = r?.disk_gb != null ? String(r.disk_gb) : ''
+    preemptible.value = !!r?.preemptible
+
+    // The workspace choice is a create-time extension the task record does not
+    // echo back, so it always needs a fresh pick.
+    if (source.workspace) {
+      workspaceMode.value = source.workspace.mode
+      workspaceBucket.value = source.workspace.bucket ?? ''
+    } else {
+      notes.push('The workspace choice is not part of the task record; pick one before submitting.')
+    }
+
+    rerunSource.value = { id, name: source.name || id }
+    rerunNotes.value = notes
+  } catch (err) {
+    rerunError.value = errorMessage(err)
+  } finally {
+    rerunLoading.value = false
+  }
+}
+
+function dismissRerun() {
+  rerunSource.value = null
+  rerunNotes.value = []
+  rerunError.value = null
+  void router.replace({ query: { ...route.query, rerun: undefined } })
+}
+
+onMounted(() => {
+  const rerun = route.query.rerun
+  if (typeof rerun === 'string' && rerun) void applyRerun(rerun)
+})
 
 const outputs = computed<TesOutput[]>(() =>
   outputRows.value.map((row) => ({
@@ -278,6 +369,22 @@ async function submit() {
 
     <!-- Wizard -->
     <div v-else class="container space-y-6 py-8">
+      <!-- Re-run prefill status -->
+      <div v-if="rerunLoading" class="surface-inline px-4 py-3 text-xs text-muted-foreground">Loading the task to re-run…</div>
+      <div v-else-if="rerunError" class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">
+        <span>{{ rerunError }}</span>
+        <Button variant="ghost" size="sm" @click="dismissRerun">Dismiss</Button>
+      </div>
+      <div v-else-if="rerunSource" class="space-y-1.5 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="font-medium text-foreground">Prefilled from task <span class="font-mono">{{ rerunSource.name }}</span>.</span>
+          <Button variant="ghost" size="sm" @click="dismissRerun">Dismiss</Button>
+        </div>
+        <ul v-if="rerunNotes.length" class="list-disc space-y-0.5 pl-4 text-muted-foreground">
+          <li v-for="note in rerunNotes" :key="note">{{ note }}</li>
+        </ul>
+      </div>
+
       <WizardSteps :steps="WIZARD_STEPS" :current="step" />
 
       <section class="surface space-y-5 p-6">

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -10,15 +10,17 @@ import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import TaskDetailPanel from '@/components/compute/TaskDetailPanel.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
+import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import {
   TES_GROUP_TAG,
   isActiveTesState,
+  isTerminalTesState,
   type TesServiceInfo,
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { ChevronRight, ListPlus, RefreshCw, Zap } from '@lucide/vue'
+import { ArchiveRestore, ChevronRight, ListPlus, RefreshCw, Trash2, Zap } from '@lucide/vue'
 
 // Task list section of the unified Compute view. Mounted only when the tes
 // feature is enabled and a user is signed in (ComputeView gates both).
@@ -74,14 +76,16 @@ async function loadServiceInfo() {
 // ── State filter ─────────────────────────────────────────────────────────────
 // Chips cover only states the facade actually emits (aruna api tes.rs):
 // PAUSED and PREEMPTED never occur; UNKNOWN (indeterminate) counts as failed.
-type StateGroup = 'all' | 'active' | 'done' | 'failed' | 'canceled'
-const GROUP_STATES: Record<Exclude<StateGroup, 'all'>, TesState[]> = {
+// 'deleted' is not a TES state: it lists client-side hidden tasks instead.
+type StateFilterGroup = 'active' | 'done' | 'failed' | 'canceled'
+type StateGroup = 'all' | StateFilterGroup | 'deleted'
+const GROUP_STATES: Record<StateFilterGroup, TesState[]> = {
   active: ['QUEUED', 'INITIALIZING', 'RUNNING', 'CANCELING'],
   done: ['COMPLETE'],
   failed: ['EXECUTOR_ERROR', 'SYSTEM_ERROR', 'UNKNOWN'],
   canceled: ['CANCELED'],
 }
-const GROUP_LABELS: Record<Exclude<StateGroup, 'all'>, string> = {
+const GROUP_LABELS: Record<StateFilterGroup, string> = {
   active: 'Active',
   done: 'Completed',
   failed: 'Failed',
@@ -89,25 +93,52 @@ const GROUP_LABELS: Record<Exclude<StateGroup, 'all'>, string> = {
 }
 const stateGroup = ref<StateGroup>('all')
 
-function inGroup(task: TesTask, group: Exclude<StateGroup, 'all'>): boolean {
+const { hide, unhide, isHidden } = useHiddenTasks()
+const hiddenTasks = computed(() => tasks.value.filter((task) => isHidden(task.id)))
+const shownTasks = computed(() => tasks.value.filter((task) => !isHidden(task.id)))
+
+function inGroup(task: TesTask, group: StateFilterGroup): boolean {
   return !!task.state && GROUP_STATES[group].includes(task.state)
 }
 const visibleTasks = computed(() => {
   const group = stateGroup.value
-  return group === 'all' ? tasks.value : tasks.value.filter((task) => inGroup(task, group))
+  if (group === 'deleted') return hiddenTasks.value
+  if (group === 'all') return shownTasks.value
+  return shownTasks.value.filter((task) => inGroup(task, group))
 })
 const emptyGroupLabel = computed(() => {
   const group = stateGroup.value
-  return group === 'all' ? '' : `${GROUP_LABELS[group].toLowerCase()} `
+  if (group === 'all') return ''
+  return group === 'deleted' ? 'deleted ' : `${GROUP_LABELS[group].toLowerCase()} `
 })
+// The Deleted chip only exists while some loaded task is hidden: a subtle
+// escape hatch, not a permanent empty bucket.
 const chipOptions = computed(() => [
-  { value: 'all', label: 'All', count: tasks.value.length },
-  ...(Object.keys(GROUP_LABELS) as Array<Exclude<StateGroup, 'all'>>).map((group) => ({
+  { value: 'all', label: 'All', count: shownTasks.value.length },
+  ...(Object.keys(GROUP_LABELS) as StateFilterGroup[]).map((group) => ({
     value: group,
     label: GROUP_LABELS[group],
-    count: tasks.value.filter((task) => inGroup(task, group)).length,
+    count: shownTasks.value.filter((task) => inGroup(task, group)).length,
   })),
+  ...(hiddenTasks.value.length ? [{ value: 'deleted', label: 'Deleted', count: hiddenTasks.value.length }] : []),
 ])
+watch(hiddenTasks, (list) => {
+  if (!list.length && stateGroup.value === 'deleted') stateGroup.value = 'all'
+})
+
+// ── Row-level delete (two-step inline confirm) ───────────────────────────────
+const confirmingDeleteId = ref<string | null>(null)
+let rowDeleteTimer: number | undefined
+function requestRowDelete(id: string) {
+  confirmingDeleteId.value = id
+  window.clearTimeout(rowDeleteTimer)
+  rowDeleteTimer = window.setTimeout(() => (confirmingDeleteId.value = null), 4000)
+}
+function confirmRowDelete(id: string) {
+  window.clearTimeout(rowDeleteTimer)
+  confirmingDeleteId.value = null
+  hide(id)
+}
 
 // ── Task list ────────────────────────────────────────────────────────────────
 const tasks = ref<TesTask[]>([])
@@ -215,7 +246,10 @@ onMounted(() => {
     void fetchList({ silent: true })
   }, 10_000)
 })
-onUnmounted(() => window.clearInterval(pollTimer))
+onUnmounted(() => {
+  window.clearInterval(pollTimer)
+  window.clearTimeout(rowDeleteTimer)
+})
 </script>
 
 <template>
@@ -323,7 +357,36 @@ onUnmounted(() => window.clearInterval(pollTimer))
               {{ task.creation_time ? relativeTime(task.creation_time) : '-' }}
             </td>
             <td class="hidden px-5 py-2.5 text-[11px] tabular-nums text-muted-foreground sm:table-cell">{{ taskDuration(task) || '-' }}</td>
-            <td class="px-5 py-2.5 text-right"><ChevronRight v-if="task.id" class="ml-auto h-4 w-4 text-muted-foreground" /></td>
+            <td class="px-5 py-2.5 text-right">
+              <div class="flex items-center justify-end gap-1">
+                <Button
+                  v-if="stateGroup === 'deleted' && task.id"
+                  variant="outline"
+                  size="sm"
+                  :aria-label="`Restore ${task.name || 'task'} to the list`"
+                  @click.stop="unhide(task.id)"
+                >
+                  <ArchiveRestore class="h-3.5 w-3.5" /> Restore
+                </Button>
+                <template v-else-if="task.id && isTerminalTesState(task.state)">
+                  <Button
+                    v-if="confirmingDeleteId !== task.id"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-muted-foreground hover:text-destructive"
+                    :aria-label="`Delete ${task.name || 'task'} from the list`"
+                    title="Delete from list (this browser only)"
+                    @click.stop="requestRowDelete(task.id)"
+                  >
+                    <Trash2 class="h-3.5 w-3.5" />
+                  </Button>
+                  <Button v-else variant="destructive" size="sm" title="Removes it from this browser's list only" @click.stop="confirmRowDelete(task.id)">
+                    <Trash2 class="h-3.5 w-3.5" /> Delete?
+                  </Button>
+                </template>
+                <ChevronRight v-if="task.id" class="h-4 w-4 text-muted-foreground" />
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -338,6 +401,7 @@ onUnmounted(() => window.clearInterval(pollTimer))
       :open="!!openTaskId"
       @update:open="(v) => !v && closeTask()"
       @canceled="reload"
+      @hidden="closeTask"
     />
   </div>
 </template>
