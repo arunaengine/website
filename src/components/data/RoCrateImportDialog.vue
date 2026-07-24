@@ -324,7 +324,11 @@ function close(value: boolean) {
 }
 
 function cancel() {
-  activeUpload?.abort()
+  if (activeUpload) {
+    activeUpload.abort()
+    emit('update:open', false)
+    return
+  }
   if (!busy.value) emit('update:open', false)
 }
 </script>
@@ -472,7 +476,7 @@ function cancel() {
           </ul>
         </div>
 
-        <div v-if="busy && sourceKind === 'local'" class="space-y-2">
+        <div v-if="uploadActive && sourceKind === 'local'" class="space-y-2">
           <div class="flex justify-between text-xs text-muted-foreground">
             <span>Uploading archive</span>
             <span>{{ formatBytes(uploadLoaded) }} / {{ formatBytes(uploadTotal) }}</span>

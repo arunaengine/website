@@ -13,13 +13,16 @@ import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJobDetail } from '@/composables/useJobs'
 import { ApiError } from '@/lib/api'
+import { fetchWithTimeout } from '@/lib/fetch'
 import {
+  artifactFilename,
   exportRoCrateResult,
   formatJobProgress,
   getJobReport,
   importRoCrateResult,
   isTerminalJobState,
   jobProgressPercent,
+  mergeJobReport,
   type JobReasonCode,
   type JobReportRow,
 } from '@/lib/jobs'
@@ -107,13 +110,31 @@ async function loadReport(more = false) {
       reportClient(),
     )
     if (request !== reportRequest) return
-    reportRows.value = more ? [...reportRows.value, ...page.rows] : page.rows
-    reportCursor.value = page.next_cursor ?? null
-    reportDigest.value = page.report_digest
+    const merged = mergeJobReport(
+      {
+        rows: reportRows.value,
+        ...(reportCursor.value ? { next_cursor: reportCursor.value } : {}),
+        report_digest: reportDigest.value,
+      },
+      page,
+      more,
+    )
+    reportRows.value = merged.rows
+    reportCursor.value = merged.next_cursor ?? null
+    reportDigest.value = merged.report_digest
   } catch (err) {
     if (request !== reportRequest) return
     if (err instanceof ApiError && err.status === 404) {
       reportError.value = 'The terminal report is not available yet.'
+    } else if (
+      err instanceof ApiError
+      && err.status === 409
+      && err.code === 'report_cursor_conflict'
+    ) {
+      reportRows.value = []
+      reportCursor.value = null
+      reportDigest.value = ''
+      reportError.value = 'The report cursor no longer matches this report. Reload it from the first page.'
     } else {
       reportError.value = err instanceof Error ? err.message : String(err)
     }
@@ -185,12 +206,95 @@ function reportMeta(row: JobReportRow): string {
 
 const downloading = ref(false)
 const downloadError = ref<string | null>(null)
+const preferredArtifactName = ref('')
+const artifactNameLoading = ref(false)
 let downloadRegistration: Promise<ServiceWorkerRegistration> | undefined
+let artifactNameRequest = 0
 
-function artifactName(headers: Headers): string {
-  const disposition = headers.get('Content-Disposition') ?? ''
-  const name = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? `ro-crate-${props.jobId}.zip`
-  return name.replace(/[\/\\\u0000-\u001f\u007f]/g, '_').trim() || `ro-crate-${props.jobId}.zip`
+function artifactUrl(): string {
+  return props.artifactUrl
+    || `${(props.ownerNodeUrl || apiBaseUrl.value).replace(/\/$/, '')}/jobs/${encodeURIComponent(props.jobId)}/artifacts/rocrate`
+}
+
+function artifactHeaders(): Headers {
+  const headers = new Headers()
+  if (authToken.value) headers.set('Authorization', `Bearer ${authToken.value}`)
+  return headers
+}
+
+function fallbackArtifactName(): string {
+  return `ro-crate-${props.jobId}.zip`
+}
+
+async function loadArtifactName() {
+  const request = ++artifactNameRequest
+  preferredArtifactName.value = ''
+  if (
+    !props.open
+    || job.value?.kind !== 'export_rocrate'
+    || !terminal.value
+    || !exportResult.value?.artifact
+  ) {
+    artifactNameLoading.value = false
+    return
+  }
+  artifactNameLoading.value = true
+  try {
+    const response = await fetchWithTimeout(
+      artifactUrl(),
+      { method: 'HEAD', headers: artifactHeaders() },
+      5_000,
+    )
+    if (request === artifactNameRequest && response.ok) {
+      preferredArtifactName.value = artifactFilename(response.headers, fallbackArtifactName())
+    }
+  } catch {
+    // The authenticated GET still reports an actionable download error.
+  } finally {
+    if (request === artifactNameRequest) artifactNameLoading.value = false
+  }
+}
+
+watch(
+  () => [
+    props.open,
+    props.jobId,
+    props.artifactUrl,
+    props.ownerNodeUrl,
+    job.value?.state,
+    job.value?.kind,
+    exportResult.value?.artifact?.blake3,
+    authToken.value,
+  ] as const,
+  () => void loadArtifactName(),
+  { immediate: true },
+)
+
+async function waitForActivation(
+  registration: ServiceWorkerRegistration,
+): Promise<ServiceWorkerRegistration> {
+  if (registration.active) return registration
+  const worker = registration.installing ?? registration.waiting
+  if (!worker) throw new Error('The streaming download service could not be started.')
+  if (worker.state !== 'activated') {
+    await new Promise<void>((resolve, reject) => {
+      const onStateChange = () => {
+        if (worker.state === 'activated') {
+          worker.removeEventListener('statechange', onStateChange)
+          resolve()
+        } else if (worker.state === 'redundant') {
+          worker.removeEventListener('statechange', onStateChange)
+          reject(new Error('The streaming download service could not be started.'))
+        }
+      }
+      worker.addEventListener('statechange', onStateChange)
+      onStateChange()
+    })
+  }
+  if (!registration.active) {
+    throw new Error('The streaming download service could not be started.')
+  }
+  return registration
 }
 
 async function downloadService(): Promise<ServiceWorkerRegistration> {
@@ -198,26 +302,20 @@ async function downloadService(): Promise<ServiceWorkerRegistration> {
     throw new Error('This browser cannot stream large downloads to disk.')
   }
   const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin)
+  const downloadScope = new URL('__rocrate_download/', baseUrl)
   downloadRegistration ??= navigator.serviceWorker.register(
     new URL('rocrate-download-sw.js', baseUrl),
-    { scope: baseUrl.pathname },
+    { scope: downloadScope.pathname },
   )
-  const registration = await downloadRegistration
-  if (registration.active) return registration
-  const ready = await navigator.serviceWorker.ready
-  if (ready.scope !== registration.scope || !ready.active) {
-    throw new Error('The streaming download service could not be started.')
-  }
-  return ready
+  return waitForActivation(await downloadRegistration)
 }
 
-async function streamArtifact(response: Response): Promise<void> {
+async function streamArtifact(response: Response, name: string): Promise<void> {
   if (!response.body) throw new Error('The artifact response did not contain a body.')
   const registration = await downloadService()
   const worker = registration.active
   if (!worker) throw new Error('The streaming download service is not active.')
   const id = crypto.randomUUID()
-  const name = artifactName(response.headers)
   const channel = new MessageChannel()
   const reader = response.body.getReader()
   try {
@@ -256,7 +354,7 @@ async function streamArtifact(response: Response): Promise<void> {
         const message = event.data as { type?: string; message?: string }
         if (message.type === 'ready') {
           const anchor = document.createElement('a')
-          anchor.href = new URL(`__rocrate_download/${id}`, registration.scope).href
+          anchor.href = new URL(id, registration.scope).href
           anchor.download = name
           anchor.hidden = true
           document.body.append(anchor)
@@ -294,9 +392,7 @@ async function streamArtifact(response: Response): Promise<void> {
 }
 
 async function downloadArtifact() {
-  const url =
-    props.artifactUrl ||
-    `${(props.ownerNodeUrl || apiBaseUrl.value).replace(/\/$/, '')}/jobs/${encodeURIComponent(props.jobId)}/artifacts/rocrate`
+  const url = artifactUrl()
   downloading.value = true
   downloadError.value = null
   try {
@@ -310,24 +406,27 @@ async function downloadArtifact() {
     )
     const fileHandle = pickerWindow.showSaveFilePicker
       ? await pickerWindow.showSaveFilePicker({
-          suggestedName: `ro-crate-${props.jobId}.zip`,
+          suggestedName: preferredArtifactName.value || fallbackArtifactName(),
           types: [{ description: 'RO-Crate ZIP', accept: { 'application/zip': ['.zip'] } }],
         })
       : null
-    const headers = new Headers()
-    if (authToken.value) headers.set('Authorization', `Bearer ${authToken.value}`)
-    const response = await fetch(url, { headers })
+    const response = await fetch(url, { headers: artifactHeaders() })
     if (!response.ok) {
       throw new ApiError(
         response.status,
         response.status === 410 ? 'This export artifact has expired.' : `${response.status} ${response.statusText}`,
       )
     }
+    const name = artifactFilename(
+      response.headers,
+      preferredArtifactName.value || fallbackArtifactName(),
+    )
+    preferredArtifactName.value = name
     if (fileHandle && response.body) {
       await response.body.pipeTo(await fileHandle.createWritable())
       return
     }
-    await streamArtifact(response)
+    await streamArtifact(response, name)
   } catch (err) {
     if (!(err instanceof DOMException && err.name === 'AbortError')) {
       downloadError.value = err instanceof Error ? err.message : String(err)
@@ -501,10 +600,10 @@ async function confirmCancel() {
             <dd class="break-all font-mono text-[10px]">{{ exportResult.artifact.blake3 }}</dd>
           </dl>
           <div v-if="exportResult.artifact" class="space-y-2">
-            <Button size="sm" :disabled="downloading || artifactExpired" @click="downloadArtifact">
-              <Loader2 v-if="downloading" class="h-3.5 w-3.5 animate-spin" />
+            <Button size="sm" :disabled="downloading || artifactExpired || artifactNameLoading" @click="downloadArtifact">
+              <Loader2 v-if="downloading || artifactNameLoading" class="h-3.5 w-3.5 animate-spin" />
               <Download v-else class="h-3.5 w-3.5" />
-              {{ downloading ? 'Downloading…' : artifactExpired ? 'Artifact expired' : 'Download RO-Crate' }}
+              {{ artifactNameLoading ? 'Preparing download…' : downloading ? 'Downloading…' : artifactExpired ? 'Artifact expired' : 'Download RO-Crate' }}
             </Button>
             <p v-if="downloadError" class="text-xs text-destructive">{{ downloadError }}</p>
           </div>
@@ -539,6 +638,21 @@ async function confirmCancel() {
                     <p v-if="row.message" class="mt-1 max-w-xs break-words text-[10px] text-muted-foreground">
                       {{ row.message }}
                     </p>
+                    <div
+                      v-if="row.detail.validation"
+                      class="mt-1 max-w-xs space-y-0.5 break-words text-[10px] text-muted-foreground"
+                    >
+                      <p class="font-medium text-foreground">{{ row.detail.validation.code }}</p>
+                      <p v-if="row.detail.validation.message !== row.message">
+                        {{ row.detail.validation.message }}
+                      </p>
+                      <p v-if="row.detail.validation.pointer">
+                        Pointer: <span class="font-mono">{{ row.detail.validation.pointer }}</span>
+                      </p>
+                      <p v-if="row.detail.validation.entity_id">
+                        Entity: <span class="font-mono">{{ row.detail.validation.entity_id }}</span>
+                      </p>
+                    </div>
                   </td>
                   <td class="max-w-xs break-all px-3 py-2 font-mono text-[10px]">{{ reportSubject(row) }}</td>
                   <td class="max-w-xs break-all px-3 py-2 font-mono text-[10px]">

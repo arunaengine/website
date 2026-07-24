@@ -100,6 +100,13 @@ interface JobReportRowBase {
   message: string | null
 }
 
+export interface JobValidationViolation {
+  code: string
+  message: string
+  pointer: string
+  entity_id: string | null
+}
+
 export interface ImportReportRow extends JobReportRowBase {
   detail: {
     archive_path: string
@@ -109,6 +116,7 @@ export interface ImportReportRow extends JobReportRowBase {
     size: number | null
     arn: string | null
     w3id: string | null
+    validation: JobValidationViolation | null
   }
 }
 
@@ -118,6 +126,7 @@ export interface ExportReportRow extends JobReportRowBase {
     zip_path: string | null
     source: 'local' | 'remote' | 'hash' | null
     resolved_version: string | null
+    validation: JobValidationViolation | null
   }
 }
 
@@ -127,6 +136,36 @@ export interface JobReportResponse {
   rows: JobReportRow[]
   next_cursor?: string
   report_digest: string
+}
+
+export function mergeJobReport(
+  current: JobReportResponse,
+  page: JobReportResponse,
+  append: boolean,
+): JobReportResponse {
+  return {
+    rows: append ? [...current.rows, ...page.rows] : page.rows,
+    ...(page.next_cursor ? { next_cursor: page.next_cursor } : {}),
+    report_digest: page.report_digest,
+  }
+}
+
+export function artifactFilename(headers: Headers, fallback: string): string {
+  const disposition = headers.get('Content-Disposition') ?? ''
+  const encoded = disposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i)?.[1]?.trim().replace(/^"|"$/g, '')
+  let name = ''
+  if (encoded) {
+    try {
+      name = decodeURIComponent(encoded)
+    } catch {
+      name = ''
+    }
+  }
+  if (!name) {
+    const match = disposition.match(/filename\s*=\s*(?:"([^"]*)"|([^;]*))/i)
+    name = (match?.[1] ?? match?.[2] ?? fallback).trim()
+  }
+  return name.replace(/[\/\\\u0000-\u001f\u007f]/g, '_').trim() || fallback
 }
 
 export interface JobListResponse {

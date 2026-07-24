@@ -1,5 +1,5 @@
 const downloads = new Map()
-const downloadPrefix = new URL('__rocrate_download/', self.registration.scope).pathname
+const downloadPrefix = new URL(self.registration.scope).pathname
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))

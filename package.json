@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "test": "vitest run",
     "preview": "vite preview",
     "release:assets": "bash scripts/build-dist-tarball.sh"
   },
@@ -60,6 +61,7 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^6.0.3",
     "vite": "^8.1.2",
+    "vitest": "^4.1.10",
     "vue-tsc": "^3.3.6"
   }
 }
