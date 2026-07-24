@@ -277,8 +277,9 @@ onUnmounted(() => {
     </p>
     <ErrorPanel v-else-if="serviceState === 'error'" :message="serviceError || 'Failed to load the TES service info.'" @retry="loadServiceInfo" />
 
-    <!-- List -->
-    <div v-if="listState === 'loading'" class="surface divide-y divide-border overflow-hidden">
+    <!-- List. 'idle' is the pre-fetch gap while init() awaits service info,
+         show the same skeleton instead of a blank area. -->
+    <div v-if="listState === 'idle' || listState === 'loading'" class="surface divide-y divide-border overflow-hidden">
       <div v-for="n in 5" :key="n" class="px-5 py-3"><Skeleton class="h-6 w-full" /></div>
     </div>
 
@@ -291,8 +292,10 @@ onUnmounted(() => {
       Tasks cannot be listed until this node exposes the GA4GH TES endpoint.
     </p>
 
-    <!-- First-run empty state doubles as the run-mode chooser. -->
-    <section v-else-if="listState === 'ready' && !tasks.length" class="surface px-5 py-10 text-center">
+    <!-- First-run empty state doubles as the run-mode chooser. Branch on the
+         SHOWN list so hiding every task brings the chooser back, but keep the
+         Deleted chip view reachable via the stateGroup escape below. -->
+    <section v-else-if="listState === 'ready' && !shownTasks.length && stateGroup !== 'deleted'" class="surface px-5 py-10 text-center">
       <p class="text-sm font-medium text-foreground">No compute tasks yet</p>
       <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Start your first run, submissions appear here.</p>
       <div class="mx-auto mt-5 grid max-w-xl gap-3 text-left sm:grid-cols-2">
@@ -305,6 +308,10 @@ onUnmounted(() => {
           <span class="mt-1 block text-xs text-muted-foreground">Describe a full GA4GH TES task by hand, image, command, resources.</span>
         </button>
       </div>
+      <p v-if="hiddenTasks.length" class="mt-5 text-xs text-muted-foreground">
+        {{ hiddenTasks.length }} deleted {{ hiddenTasks.length === 1 ? 'run' : 'runs' }} hidden from this list.
+        <button type="button" class="text-primary hover:underline" @click="stateGroup = 'deleted'">Show</button>
+      </p>
     </section>
 
     <div v-else-if="tasks.length" class="surface overflow-hidden">
