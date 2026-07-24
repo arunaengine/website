@@ -4,6 +4,8 @@ export interface NodeProbe {
   state: 'ok' | 'unreachable'
   info: InfoResponse | null
   usage: UsageResponse | null
+  /** Browser-measured duration of the /info request, in milliseconds. */
+  latencyMs?: number
   error?: string
 }
 
@@ -25,12 +27,16 @@ export async function probeNode(apiBase: string): Promise<NodeProbe> {
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
   try {
+    // Only the /info request is timed: it always runs, so latency numbers stay
+    // comparable across nodes with and without the usage endpoint.
+    const started = performance.now()
     const info = await fetchJson<InfoResponse>(`${apiBase}/info`, controller.signal)
+    const latencyMs = performance.now() - started
     // /info/usage is still rolling out; a 404 must not mark the node unreachable.
     const usage = await fetchJson<UsageResponse>(`${apiBase}/info/usage`, controller.signal).catch(
       () => null,
     )
-    return { state: 'ok', info, usage }
+    return { state: 'ok', info, usage, latencyMs }
   } catch (err) {
     const timedOut = err instanceof DOMException && err.name === 'AbortError'
     return {

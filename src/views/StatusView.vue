@@ -97,6 +97,19 @@ function usageSummary(node: RealmNodeInfo): string | null {
   return `${formatNumber(usage.objects)} obj · ${formatBytes(usage.stored_bytes)}`
 }
 
+// Browser-measured /info round trip; the local node reads from the already
+// loaded /info instead of a probe, so it honestly shows nothing.
+function latencyFor(node: RealmNodeInfo): number | null {
+  if (isLocal(node)) return null
+  const probe = probes.value[node.node_id]
+  return probe?.state === 'ok' && probe.latencyMs !== undefined ? probe.latencyMs : null
+}
+function latencyClass(ms: number): string {
+  if (ms < 150) return 'text-emerald-600 dark:text-emerald-400'
+  if (ms < 500) return 'text-amber-600 dark:text-amber-400'
+  return 'text-red-600 dark:text-red-400'
+}
+
 const kindOrder: Record<RealmNodeInfo['kind'], number> = { local: 0, management: 1, server: 2, user: 3 }
 
 const sortedNodes = computed(() =>
@@ -308,6 +321,14 @@ watch(
                 class="hidden shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline"
               >
                 {{ usageSummary(node) }}
+              </span>
+              <span
+                v-if="latencyFor(node) !== null"
+                class="shrink-0 font-mono text-[11px] tabular-nums"
+                :class="latencyClass(latencyFor(node)!)"
+                title="REST /info round trip measured from this browser"
+              >
+                {{ Math.round(latencyFor(node)!) }} ms
               </span>
               <Badge
                 v-if="restBadge(node)"
