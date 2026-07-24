@@ -56,14 +56,17 @@ function onClick() {
 </script>
 
 <template>
-  <div class="flex items-center gap-1 rounded-sm pr-2">
+  <div
+    class="flex items-center gap-1 rounded-sm pr-2 hover:bg-muted has-[:focus-visible]:bg-muted"
+    :class="active || highlighted ? 'bg-muted' : ''"
+  >
     <Tooltip v-if="$slots.tooltip" side="right">
       <button
         type="button"
         :role="option ? 'option' : undefined"
         :aria-selected="option ? highlighted : undefined"
-        class="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-3 py-2 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted"
-        :class="active ? 'bg-muted font-medium text-foreground' : highlighted ? 'bg-muted text-foreground' : 'text-muted-foreground'"
+        class="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-3 py-2 text-left text-sm outline-none"
+        :class="active ? 'font-medium text-foreground' : highlighted ? 'text-foreground' : 'text-muted-foreground'"
         @mousedown="onMousedown"
         @click="onClick"
       >
@@ -87,8 +90,8 @@ function onClick() {
       type="button"
       :role="option ? 'option' : undefined"
       :aria-selected="option ? highlighted : undefined"
-      class="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-3 py-2 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted"
-      :class="active ? 'bg-muted font-medium text-foreground' : highlighted ? 'bg-muted text-foreground' : 'text-muted-foreground'"
+      class="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-3 py-2 text-left text-sm outline-none"
+      :class="active ? 'font-medium text-foreground' : highlighted ? 'text-foreground' : 'text-muted-foreground'"
       @mousedown="onMousedown"
       @click="onClick"
     >
