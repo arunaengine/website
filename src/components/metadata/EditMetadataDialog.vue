@@ -21,6 +21,7 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { applyDataEntities, dataEntitiesOf, type DataEntity } from '@/lib/dataEntities'
+import { subcrateLinksOf } from '@/lib/subcrates'
 import { licenseEntity } from '@/lib/profiles/rocrate'
 import { validateProfileData } from '@/lib/profiles/validate'
 import type { MetadataProfile } from '@/data/types'
@@ -207,7 +208,10 @@ function seedFields(crate: unknown) {
   customFields.value = rows
   seededCustomKeys = rows.map((row) => row.key)
 
-  files.value = dataEntitiesOf(crate)
+  // Subcrate references (RO-Crate 1.2) are managed in the detail view's
+  // Subcrates section, not the files editor; they must not seed as file rows.
+  const subcrateIris = new Set(subcrateLinksOf(crate).map((link) => link.iri))
+  files.value = dataEntitiesOf(crate).filter((row) => !subcrateIris.has(row.id))
 
   const mentions = Array.isArray(root?.mentions) ? root.mentions : root?.mentions ? [root.mentions] : []
   const catalogIris = new Set(metadataItems.value.map((item) => item.graph_iri))
@@ -228,6 +232,7 @@ function buildFromFields(): unknown {
   // File edits rebuild hasPart and File entities before mentions are rewritten, so
   // a removed file still counted as referenced by an existing mention is preserved.
   applyDataEntities(clone, files.value)
+  restoreSubcrates(clone)
   root.name = name.value.trim()
   root.description = description.value.trim()
   const keywords = keywordsText.value.split(',').map((k) => k.trim()).filter(Boolean)
@@ -262,6 +267,28 @@ function buildFromFields(): unknown {
   else delete root.mentions
   for (const id of relatedIds.value) upsertRelatedEntity(clone, id)
   return clone
+}
+
+// The files rebuild (applyDataEntities) knows nothing about subcrates: it drops
+// their hasPart refs and entities. Restore both verbatim from the pristine
+// crate so a Fields/Files save never loses subcrate links.
+function restoreSubcrates(clone: unknown) {
+  const links = subcrateLinksOf(pristine.value)
+  if (!links.length || !isRecord(clone)) return
+  const root = findRoot(clone)
+  if (!root) return
+  const pristineGraph = graphOf(pristine.value)
+  const graph = Array.isArray(clone['@graph']) ? (clone['@graph'] as unknown[]) : []
+  const hasPart = Array.isArray(root.hasPart) ? root.hasPart : root.hasPart ? [root.hasPart] : []
+  for (const link of links) {
+    if (!graph.some((entity) => isRecord(entity) && entity['@id'] === link.iri)) {
+      const original = pristineGraph.find((entity) => entity['@id'] === link.iri)
+      if (original) graph.push(structuredClone(original))
+    }
+    if (!hasPart.some((ref) => refIdOf(ref) === link.iri)) hasPart.push({ '@id': link.iri })
+  }
+  root.hasPart = hasPart
+  clone['@graph'] = graph
 }
 
 // Each related document gets a resolvable contextual entity so the reference

@@ -6,6 +6,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
 import CrateImportExport from '@/components/metadata/CrateImportExport.vue'
+import SubcratesSection from '@/components/metadata/SubcratesSection.vue'
 import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import AuthorChips from '@/components/metadata/AuthorChips.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
@@ -29,9 +30,10 @@ import { formatBytes, isHttpUrl, relativeTime } from '@/lib/utils'
 import { metaWatchPathPrefix } from '@/lib/watches'
 import { parseRunCrate } from '@/lib/runCrate'
 import { crateGraph, crateRootId, dataEntitiesOf, stringProp, type DataEntity } from '@/lib/dataEntities'
+import { isProjectCrate, subcrateLinksOf } from '@/lib/subcrates'
 import { useCrateReferences } from '@/composables/useCrateReferences'
 import type { CrateObjectReference } from '@/lib/crateReferences'
-import { ArrowLeft, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Link2, Pencil, Trash2, Star } from '@lucide/vue'
+import { ArrowLeft, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -217,10 +219,17 @@ watch(
   { immediate: true },
 )
 
+// Subcrate links (RO-Crate 1.2 "referencing other RO-Crates" pattern) render in
+// their own section; the Referenced data table below excludes them.
+const subcrateIris = computed(() => new Set(subcrateLinksOf(currentCrate.value).map((link) => link.iri)))
+const projectCrate = computed(() => isProjectCrate(currentCrate.value))
+
 // The union of entities referenced from the root's hasPart and every File/Dataset
-// entity (excluding the root and the metadata descriptor), shared with the editor.
+// entity (excluding the root, the metadata descriptor and subcrate links).
 const dataEntities = computed<DataEntity[]>(() =>
-  dataEntitiesOf(fullCrates.value[detailId.value] ?? current.value?.roCrate),
+  dataEntitiesOf(fullCrates.value[detailId.value] ?? current.value?.roCrate).filter(
+    (row) => !subcrateIris.value.has(row.id),
+  ),
 )
 
 // Which OTHER catalog documents reference each file entity here, from the cache-fed
@@ -403,7 +412,10 @@ function entitySize(row: DataEntity): string {
               </div>
               <AuthorChips :crate="currentCrate" class="mt-4" />
             </div>
-            <Badge variant="secondary">{{ relativeTime(current.updatedAt) }}</Badge>
+            <div class="flex shrink-0 flex-col items-end gap-1.5">
+              <Badge variant="secondary">{{ relativeTime(current.updatedAt) }}</Badge>
+              <Badge v-if="projectCrate" variant="outline" class="gap-1 text-[10px] uppercase"><Layers class="h-3 w-3" /> Project crate</Badge>
+            </div>
           </div>
 
           <dl class="mt-6 grid gap-3 sm:grid-cols-4">
@@ -472,6 +484,14 @@ function entitySize(row: DataEntity): string {
           :error="crateError"
           @retry="fetchCrate(detailId)"
           @imported="onSaved"
+        />
+
+        <SubcratesSection
+          v-if="subcrateIris.size || (Boolean(current) && canWrite)"
+          :crate="currentCrate"
+          :document-id="detailId"
+          :can-write="Boolean(current) && canWrite"
+          @changed="onSaved"
         />
 
         <RunProvenancePanel v-if="runProvenance" :run="runProvenance" />
