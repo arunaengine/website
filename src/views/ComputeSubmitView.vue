@@ -12,6 +12,8 @@ import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
 import ExecutorStepsEditor from '@/components/compute/ExecutorStepsEditor.vue'
 import TesInputsEditor from '@/components/compute/TesInputsEditor.vue'
+import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
+import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
@@ -47,7 +49,7 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-const WIZARD_STEPS = ['Basics', 'Inputs', 'Executor', 'Outputs & resources', 'Review']
+const WIZARD_STEPS = ['Basics', 'Workload', 'Review']
 // The step lives in ?step=N so browser back/forward walks the wizard instead
 // of leaving it.
 const step = computed(() => {
@@ -293,10 +295,8 @@ const canContinue = computed(() => {
   switch (step.value) {
     case 0:
       return groupId.value.length > 0
-    case 2:
-      return executorsValid.value
-    case 3:
-      return outputsValid.value && workspaceValid.value
+    case 1:
+      return executorsValid.value && outputsValid.value && workspaceValid.value
     default:
       return true
   }
@@ -316,6 +316,40 @@ function addOutputRow() {
 }
 function removeOutputRow(i: number) {
   outputRows.value.splice(i, 1)
+}
+
+// ── Filesystem-tree wiring (shared component with the quick-run wizard) ──────
+const dataView = ref<'tree' | 'table'>('tree')
+const inputDialogOpen = ref(false)
+const inputMountDefault = ref('/inputs/')
+const treeOutputs = computed(() =>
+  outputRows.value.map((row) => ({ containerPath: row.path, destination: outputDestination(row) })),
+)
+function addInputEntry(entry: TesDataRefEntry) {
+  inputs.value = [...inputs.value, entry]
+}
+function removeInputEntry(index: number) {
+  inputs.value = inputs.value.filter((_, i) => i !== index)
+}
+function onTreeInputPath(index: number, path: string) {
+  inputs.value = inputs.value.map((entry, i) =>
+    i === index ? (entry.kind === 'folder' ? { ...entry, basePath: path } : { ...entry, path }) : entry,
+  )
+}
+function onTreeOutputPath(index: number, path: string) {
+  const row = outputRows.value[index]
+  if (row) row.path = path
+}
+function onTreeAddOutput(containerDir: string) {
+  outputRows.value.push({ path: containerDir, bucket: outputRows.value.at(-1)?.bucket ?? '', key: '' })
+}
+function onTreeAddInput(containerDir: string) {
+  inputMountDefault.value = containerDir
+  inputDialogOpen.value = true
+}
+function openInputDialog() {
+  inputMountDefault.value = '/inputs/'
+  inputDialogOpen.value = true
 }
 
 // ── Submit ───────────────────────────────────────────────────────────────────
@@ -410,58 +444,135 @@ async function submit() {
           </div>
         </div>
 
-        <!-- Step 2: Inputs -->
-        <div v-else-if="step === 1">
-          <TesInputsEditor v-model="inputs" />
-        </div>
-
-        <!-- Step 3: Executors -->
-        <div v-else-if="step === 2">
-          <ExecutorStepsEditor v-model="executors" />
-        </div>
-
-        <!-- Step 4: Outputs & resources -->
-        <div v-else-if="step === 3" class="space-y-6">
-          <div class="space-y-3">
-            <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Outputs</div>
-            <!-- Same row grid as TesInputsEditor: flexible content column plus
-                 a fixed 1.75rem action column so both editors share one right
-                 edge for controls and remove buttons. -->
-            <div v-for="(row, i) in outputRows" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.75rem] gap-x-2 p-3">
-              <div class="min-w-0 space-y-2">
-                <div class="flex flex-wrap items-end gap-3">
-                  <div class="min-w-0 flex-1">
-                    <label class="text-xs font-medium text-foreground">Capture <span class="text-muted-foreground">(container path)</span></label>
-                    <Input v-model="row.path" class="mt-1 font-mono" placeholder="/outputs/result.txt" aria-label="Container path to capture" />
-                  </div>
-                  <span class="pb-2.5 text-xs text-muted-foreground">into</span>
-                  <div class="w-44">
-                    <label class="text-xs font-medium text-foreground">Bucket</label>
-                    <Select v-if="workspaceBucketOptions.length" v-model="row.bucket" :options="workspaceBucketOptions" placeholder="Bucket" class="mt-1" aria-label="Destination bucket" />
-                    <Input v-else v-model="row.bucket" class="mt-1 font-mono" placeholder="my-results" aria-label="Destination bucket" />
-                  </div>
-                  <div class="min-w-0 flex-1">
-                    <label class="text-xs font-medium text-foreground">Key</label>
-                    <Input v-model="row.key" class="mt-1 font-mono" placeholder="runs/result.txt" aria-label="Destination key" @blur="onOutputKeyBlur(row)" />
-                  </div>
-                </div>
-                <div class="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                  <Badge variant="outline" class="shrink-0 gap-1 font-sans text-[10px]">
-                    <component :is="isDirCapture(row.path) ? Folder : FileText" class="h-3 w-3" />
-                    {{ isDirCapture(row.path) ? 'Folder' : 'File' }}
-                  </Badge>
-                  <span class="truncate" :title="outputDestination(row)">{{ outputDestination(row) }}</span>
+        <!-- Step 2: Workload, the container filesystem (inputs and captures)
+             and the executor that runs against it, one coherent surface. -->
+        <div v-else-if="step === 1" class="space-y-6">
+          <div class="grid gap-5 xl:grid-cols-2">
+            <div class="min-w-0 space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Container filesystem</div>
+                <div class="inline-flex rounded-md border border-border p-0.5">
+                  <button
+                    type="button"
+                    :class="[
+                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                      dataView === 'tree' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    ]"
+                    @click="dataView = 'tree'"
+                  >
+                    Tree
+                  </button>
+                  <button
+                    type="button"
+                    :class="[
+                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                      dataView === 'table' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    ]"
+                    @click="dataView = 'table'"
+                  >
+                    Table
+                  </button>
                 </div>
               </div>
-              <Button variant="ghost" size="icon-sm" class="self-center text-destructive hover:text-destructive" aria-label="Remove output" @click="removeOutputRow(i)"><X class="h-4 w-4" /></Button>
+
+              <section v-if="dataView === 'tree'" class="surface-inline space-y-2.5 p-3.5">
+                <p class="text-[11px] text-muted-foreground">
+                  What the task sees at run time. Hover a folder to create subfolders, stage inputs, or capture it as an output.
+                </p>
+                <ContainerFsTree
+                  :inputs="inputs"
+                  :outputs="treeOutputs"
+                  :workspace="executors[0]?.workdir || null"
+                  @update-input-path="onTreeInputPath"
+                  @remove-input="removeInputEntry"
+                  @update-output-path="onTreeOutputPath"
+                  @remove-output="removeOutputRow"
+                  @add-output="onTreeAddOutput"
+                  @add-input="onTreeAddInput"
+                >
+                  <template #output-details="{ index }">
+                    <div v-if="outputRows[index]" class="flex items-center gap-1.5">
+                      <span class="shrink-0 text-[10px] font-medium text-muted-foreground">into</span>
+                      <Select
+                        v-if="workspaceBucketOptions.length"
+                        v-model="outputRows[index].bucket"
+                        :options="workspaceBucketOptions"
+                        placeholder="Bucket"
+                        class="h-7 w-32 shrink-0 text-xs"
+                        aria-label="Destination bucket"
+                      />
+                      <Input v-else v-model="outputRows[index].bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="my-results" aria-label="Destination bucket" />
+                      <span class="shrink-0 text-muted-foreground">/</span>
+                      <Input
+                        v-model="outputRows[index].key"
+                        class="h-7 min-w-0 flex-1 font-mono text-xs"
+                        placeholder="runs/result.txt"
+                        aria-label="Destination key"
+                        @blur="onOutputKeyBlur(outputRows[index])"
+                      />
+                    </div>
+                  </template>
+                </ContainerFsTree>
+                <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
+                  Every capture needs an absolute container path, one bucket and a canonical key; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
+                </p>
+                <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
+                  <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
+                </div>
+                <p class="text-[11px] text-muted-foreground">A folder capture (path ending in /) uploads everything the task wrote under it after the run.</p>
+              </section>
+
+              <template v-else>
+                <TesInputsEditor v-model="inputs" />
+                <div class="space-y-3">
+                  <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Outputs</div>
+                  <!-- Same row grid as TesInputsEditor: flexible content column plus
+                       a fixed 1.75rem action column so both editors share one right
+                       edge for controls and remove buttons. -->
+                  <div v-for="(row, i) in outputRows" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.75rem] gap-x-2 p-3">
+                    <div class="min-w-0 space-y-2">
+                      <div class="flex flex-wrap items-end gap-3">
+                        <div class="min-w-0 flex-1">
+                          <label class="text-xs font-medium text-foreground">Capture <span class="text-muted-foreground">(container path)</span></label>
+                          <Input v-model="row.path" class="mt-1 font-mono" placeholder="/outputs/result.txt" aria-label="Container path to capture" />
+                        </div>
+                        <span class="pb-2.5 text-xs text-muted-foreground">into</span>
+                        <div class="w-44">
+                          <label class="text-xs font-medium text-foreground">Bucket</label>
+                          <Select v-if="workspaceBucketOptions.length" v-model="row.bucket" :options="workspaceBucketOptions" placeholder="Bucket" class="mt-1" aria-label="Destination bucket" />
+                          <Input v-else v-model="row.bucket" class="mt-1 font-mono" placeholder="my-results" aria-label="Destination bucket" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <label class="text-xs font-medium text-foreground">Key</label>
+                          <Input v-model="row.key" class="mt-1 font-mono" placeholder="runs/result.txt" aria-label="Destination key" @blur="onOutputKeyBlur(row)" />
+                        </div>
+                      </div>
+                      <div class="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                        <Badge variant="outline" class="shrink-0 gap-1 font-sans text-[10px]">
+                          <component :is="isDirCapture(row.path) ? Folder : FileText" class="h-3 w-3" />
+                          {{ isDirCapture(row.path) ? 'Folder' : 'File' }}
+                        </Badge>
+                        <span class="truncate" :title="outputDestination(row)">{{ outputDestination(row) }}</span>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon-sm" class="self-center text-destructive hover:text-destructive" aria-label="Remove output" @click="removeOutputRow(i)"><X class="h-4 w-4" /></Button>
+                  </div>
+                  <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
+                  <p class="text-[11px] text-muted-foreground">A folder capture (container path ending in /) uploads everything the task wrote under that path after the run.</p>
+                  <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
+                    Every capture needs an absolute container path, one bucket and a canonical key; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
+                  </p>
+                </div>
+              </template>
             </div>
-            <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
-            <p class="text-[11px] text-muted-foreground">A folder capture (container path ending in /) uploads everything the task wrote under that path after the run.</p>
-            <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
-              Every capture needs an absolute container path, one bucket and a canonical key; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
-            </p>
+
+            <div class="min-w-0">
+              <ExecutorStepsEditor v-model="executors" />
+            </div>
           </div>
 
+          <div class="grid gap-6 lg:grid-cols-2">
           <div class="space-y-3">
             <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Resources</div>
             <div class="grid gap-3 sm:grid-cols-3">
@@ -509,9 +620,10 @@ async function submit() {
               {{ workspaceMode === 'existing' ? 'Pick the bucket the run should work in.' : 'A workspace choice is required before submitting.' }}
             </p>
           </div>
+          </div>
         </div>
 
-        <!-- Step 5: Review -->
+        <!-- Step 3: Review -->
         <div v-else class="space-y-3">
           <TaskJsonPreview title="TES task (POST /ga4gh/tes/v1/tasks)" :task="task" />
           <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ submitError }}</p>
@@ -540,5 +652,9 @@ async function submit() {
         <Button v-else size="sm" :disabled="busy || !workspaceValid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
       </div>
     </div>
+
+    <!-- Input picker for the filesystem tree's per-folder add-input action;
+         the Table view's TesInputsEditor keeps its own dialog. -->
+    <TesDataRefDialog v-model:open="inputDialogOpen" mode="input" :mount-default="inputMountDefault" @add="addInputEntry" />
   </div>
 </template>

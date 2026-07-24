@@ -329,7 +329,7 @@ function indent(depth: number) {
   return { paddingLeft: `${depth * 16}px` }
 }
 
-const MARKER_LABEL: Record<MarkerKind, string> = { script: 'script', in: 'in', out: 'out', ws: 'workspace' }
+const MARKER_LABEL: Record<MarkerKind, string> = { script: 'script', in: 'in', out: 'out', ws: 'workdir' }
 const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline'> = {
   script: 'secondary',
   in: 'sky',
