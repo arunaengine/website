@@ -65,7 +65,7 @@ const groupId = ref('')
 // Files and folder summaries from the picker; folders expand to per-file
 // FILE inputs at task assembly (the facade accepts FILE inputs only).
 const inputs = ref<TesDataRefEntry[]>([])
-const executors = ref<TesExecutor[]>([{ image: '', command: [''] }])
+const executors = ref<TesExecutor[]>([{ image: '', command: [] }])
 
 // Capture-into outputs: each row captures one container path (a file, or a
 // folder when the path ends in '/') into its own bucket + key destination.
@@ -164,7 +164,7 @@ async function applyRerun(id: string) {
       executors.value = [
         {
           image: executor.image,
-          command: executor.command.length ? [...executor.command] : [''],
+          command: [...executor.command],
           ...(executor.workdir ? { workdir: executor.workdir } : {}),
           ...(executor.env ? { env: { ...executor.env } } : {}),
         },
@@ -256,10 +256,13 @@ const task = computed<TesTask>(() =>
 )
 
 // ── Validity ─────────────────────────────────────────────────────────────────
+// The editor emits an empty argv for an empty or unparseable command line, so
+// a non-empty command with at least one real argument is the whole check.
 const executorsValid = computed(
   () =>
     executors.value.length === 1 &&
     executors.value[0].image.trim().length > 0 &&
+    executors.value[0].command.length > 0 &&
     executors.value[0].command.some((argument) => argument.trim()),
 )
 const outputsValid = computed(() => {

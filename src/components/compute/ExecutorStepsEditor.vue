@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import { quoteCommand, tokenizeCommand } from '@/lib/shellwords'
 import type { TesExecutor } from '@/lib/tes'
 import { Plus, Terminal, X } from '@lucide/vue'
 
@@ -15,23 +17,27 @@ interface EnvRow {
 
 interface ExecutorDraft {
   image: string
-  command: string[]
+  // One natural command line; tokenized shell-style into the argv on emit.
+  commandLine: string
   workdir: string
   env: EnvRow[]
 }
 
 function fromModel(list: TesExecutor[]): ExecutorDraft {
-  const executor = list[0] ?? { image: '', command: [''] }
+  const executor = list[0] ?? { image: '', command: [] }
   return {
     image: executor.image ?? '',
-    command: executor.command?.length ? [...executor.command] : [''],
+    commandLine: quoteCommand(executor.command ?? []),
     workdir: executor.workdir ?? '',
     env: Object.entries(executor.env ?? {}).map(([key, value]) => ({ key, value })),
   }
 }
 
 function toModel(draft: ExecutorDraft): TesExecutor[] {
-  const executor: TesExecutor = { image: draft.image, command: [...draft.command] }
+  const parsed = tokenizeCommand(draft.commandLine)
+  // A tokenization error emits an empty argv, which the wizard's validity
+  // check treats as an incomplete executor.
+  const executor: TesExecutor = { image: draft.image, command: parsed.error ? [] : parsed.argv }
   if (draft.workdir.trim()) executor.workdir = draft.workdir
   const env: Record<string, string> = {}
   for (const row of draft.env) if (row.key.trim()) env[row.key.trim()] = row.value
@@ -42,14 +48,7 @@ function toModel(draft: ExecutorDraft): TesExecutor[] {
 const executor = ref<ExecutorDraft>(fromModel(props.modelValue))
 watch(executor, (value) => emit('update:modelValue', toModel(value)), { deep: true })
 
-function addArg() {
-  executor.value.command.push('')
-}
-
-function removeArg(index: number) {
-  executor.value.command.splice(index, 1)
-  if (!executor.value.command.length) executor.value.command.push('')
-}
+const commandTokens = computed(() => tokenizeCommand(executor.value.commandLine))
 
 function addEnv() {
   executor.value.env.push({ key: '', value: '' })
@@ -73,23 +72,24 @@ function removeEnv(index: number) {
 
     <div>
       <label class="text-xs font-medium text-foreground">Command</label>
-      <div class="mt-1 space-y-1.5">
-        <div v-for="(_, index) in executor.command" :key="index" class="flex items-center gap-2">
-          <Input
-            v-model="executor.command[index]"
-            class="font-mono"
-            :placeholder="index === 0 ? 'echo' : 'argument'"
-            :disabled="disabled"
-          />
-          <Button variant="ghost" size="icon-sm" :disabled="disabled" aria-label="Remove argument" @click="removeArg(index)">
-            <X class="h-4 w-4" />
-          </Button>
-        </div>
+      <Input
+        v-model="executor.commandLine"
+        class="mt-1 font-mono"
+        placeholder='python train.py --epochs 5 "my file.csv"'
+        :disabled="disabled"
+        :invalid="commandTokens.error ? 'error' : undefined"
+        aria-label="Command line"
+      />
+      <p v-if="commandTokens.error" class="mt-1 text-[11px] text-destructive">{{ commandTokens.error }}</p>
+      <div v-else-if="commandTokens.argv.length" class="mt-1.5 flex flex-wrap items-center gap-1">
+        <span class="text-[10px] uppercase tracking-wider text-muted-foreground">argv</span>
+        <Badge v-for="(arg, index) in commandTokens.argv" :key="`${index}-${arg}`" variant="outline" class="max-w-60 font-mono text-[10px]">
+          <span class="truncate">{{ arg }}</span>
+        </Badge>
       </div>
-      <Button variant="ghost" size="sm" class="mt-1.5" :disabled="disabled" @click="addArg">
-        <Plus class="size-3.5" /> Add argument
-      </Button>
-      <p class="mt-1 text-[11px] text-muted-foreground">Executed as an argv array without a shell.</p>
+      <p class="mt-1 text-[11px] text-muted-foreground">
+        Executed as this argument list without a shell: quote arguments that contain spaces ("my file.csv"); there is no variable expansion, globbing or piping.
+      </p>
     </div>
 
     <div>
