@@ -1182,6 +1182,19 @@ const isEmpty = computed(
               </div>
               <div class="flex items-center gap-2">
                 <input ref="fileInput" type="file" multiple class="hidden" @change="onFileInput" />
+                <!-- Same local-only gating as the sidebar delete: remote S3
+                     endpoints are usually CORS-blocked from this origin. -->
+                <Button
+                  v-if="!remoteNodeId"
+                  variant="outline"
+                  size="icon-sm"
+                  class="h-8 w-8 text-destructive hover:text-destructive"
+                  :title="`Delete ${bucket}`"
+                  aria-label="Delete bucket"
+                  @click="openDeleteBucket(bucket, null)"
+                >
+                  <Trash2 class="h-4 w-4" />
+                </Button>
                 <WatchButton
                   v-if="watchPathPrefix"
                   :path-prefix="watchPathPrefix"
