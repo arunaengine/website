@@ -29,6 +29,7 @@ import { asyncChunkError } from '@/lib/chunk-recovery'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useComputeDataView } from '@/composables/useComputeDataView'
 import { useS3 } from '@/composables/useS3'
 import {
   TES_GROUP_TAG,
@@ -123,7 +124,8 @@ const outputRows = ref<{ bucket: string; path: string; containerPath: string; ke
 const inputDialogOpen = ref(false)
 const credentialDialogOpen = ref(false)
 // Filesystem-tree view is the default; the row grids stay as the Table view.
-const dataView = ref<'tree' | 'table'>('tree')
+// The choice persists per browser (shared with the full task wizard).
+const dataView = useComputeDataView()
 // Container directory the input picker mounts under; the tree's per-folder
 // "add input" affordance retargets it before opening the dialog.
 const inputMountDefault = ref('/work/in/')
@@ -1195,7 +1197,7 @@ function dismissRerun() {
 
               <section v-if="dataView === 'tree'" class="surface-muted space-y-2.5 p-3.5">
                 <p class="text-[11px] text-muted-foreground">
-                  The container filesystem as the script will see it. Hover a folder to create subfolders, stage inputs, or capture it as an output.
+                  The container filesystem as the script will see it. Use a folder's + menu to create subfolders, stage inputs, or capture outputs.
                 </p>
                 <ContainerFsTree
                   :inputs="inputs"

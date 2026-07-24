@@ -3,17 +3,22 @@ import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import { validContainerDir, validContainerFilePath, type TesDataRefEntry } from '@/lib/tes'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ChevronRight,
+  EllipsisVertical,
   FileCode2,
   FileText,
   Folder,
   FolderPlus,
   Pencil,
-  Settings2,
+  Plus,
   X,
 } from '@lucide/vue'
 
@@ -116,7 +121,9 @@ const model = computed(() => {
     else markersByPath.set(path, [marker])
   }
 
-  if (props.workspace) place(props.workspace, { kind: 'ws', dir: true, raw: props.workspace })
+  if (props.workspace) {
+    place(props.workspace, { kind: 'ws', dir: true, raw: props.workspace, secondary: 'working directory' })
+  }
   if (props.script) {
     place(props.script.path, { kind: 'script', dir: false, raw: props.script.path, secondary: props.script.label })
   }
@@ -309,20 +316,27 @@ function dirValueOf(row: Row): string {
 }
 
 // ── Output destination details (rendered by the host through the slot) ──────
-const openOutputDetails = ref<Set<number>>(new Set())
-function toggleOutputDetails(index: number) {
-  const next = new Set(openOutputDetails.value)
-  if (next.has(index)) next.delete(index)
-  else next.add(index)
-  openOutputDetails.value = next
+// Always inline below the captured row, mirroring the Table view.
+function outIndicesFor(row: Row): number[] {
+  return row.markers
+    .filter((marker) => marker.kind === 'out' && marker.index !== undefined)
+    .map((marker) => marker.index!)
 }
-function outDetailIndexFor(row: Row): number | null {
-  for (const marker of row.markers) {
-    if (marker.kind === 'out' && marker.index !== undefined && openOutputDetails.value.has(marker.index)) {
-      return marker.index
-    }
-  }
-  return null
+
+// ── Row menus ────────────────────────────────────────────────────────────────
+// At most two visible controls per row: a "+" menu on folders (new folder /
+// add input / capture output) and a kebab menu for row-specific actions.
+function indexMarkersOf(row: Row): Marker[] {
+  return row.markers.filter((marker) => marker.index !== undefined)
+}
+function isRemovableExtraDir(row: Row): boolean {
+  return row.extra && !row.hasChildren && !row.markers.length
+}
+function hasRowMenu(row: Row): boolean {
+  return canRename(row) || indexMarkersOf(row).length > 0 || isRemovableExtraDir(row)
+}
+function secondaryOf(row: Row): Marker | null {
+  return row.markers.find((marker) => marker.secondary) ?? null
 }
 
 function indent(depth: number) {
@@ -395,81 +409,74 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
             {{ MARKER_LABEL[marker.kind] }}<template v-if="marker.files"> · {{ marker.files.length }}</template>
           </Badge>
           <span
-            v-for="secondary in [row.markers.find((m) => m.secondary)?.secondary].filter(Boolean)"
-            :key="String(secondary)"
-            class="hidden min-w-0 flex-1 truncate font-mono text-[10px] text-muted-foreground sm:inline"
-            :title="String(secondary)"
+            v-for="marker in [secondaryOf(row)].filter((m): m is Marker => m !== null)"
+            :key="marker.kind"
+            class="hidden min-w-0 flex-1 truncate text-[10px] text-muted-foreground sm:inline"
+            :class="marker.kind === 'ws' ? 'italic' : 'font-mono'"
+            :title="marker.secondary"
           >
-            {{ secondary }}
+            {{ marker.secondary }}
           </span>
 
-          <span class="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+          <span class="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
             <template v-if="!disabled">
-              <template v-if="row.isDir">
-                <Button variant="ghost" size="icon-sm" class="h-5 w-5" :title="`New folder in ${row.name}`" :aria-label="`New folder in ${row.name}`" @click="startNewFolder(row.path)">
-                  <FolderPlus class="size-3" />
-                </Button>
-                <Button variant="ghost" size="icon-sm" class="h-5 w-5" :title="`Add input data under ${dirValueOf(row)}`" :aria-label="`Add input data under ${dirValueOf(row)}`" @click="emit('add-input', dirValueOf(row))">
-                  <ArrowDownToLine class="size-3" />
-                </Button>
-                <Button
-                  v-if="row.path !== '/' && !row.markers.some((m) => m.kind === 'out' && m.dir)"
-                  variant="ghost"
-                  size="icon-sm"
-                  class="h-5 w-5"
-                  :title="`Capture ${dirValueOf(row)} as an output folder`"
-                  :aria-label="`Capture ${dirValueOf(row)} as an output folder`"
-                  @click="emit('add-output', dirValueOf(row))"
-                >
-                  <ArrowUpFromLine class="size-3" />
-                </Button>
-              </template>
-              <Button
-                v-for="(marker, i) in row.markers.filter((m) => m.kind === 'out' && m.index !== undefined)"
-                :key="`d${i}`"
-                variant="ghost"
-                size="icon-sm"
-                class="h-5 w-5"
-                title="Edit the capture destination"
-                aria-label="Edit the capture destination"
-                @click="toggleOutputDetails(marker.index!)"
-              >
-                <Settings2 class="size-3" />
-              </Button>
-              <Button v-if="canRename(row)" variant="ghost" size="icon-sm" class="h-5 w-5" :title="`Rename or move ${row.name}`" :aria-label="`Rename or move ${row.name}`" @click="startEdit(row)">
-                <Pencil class="size-3" />
-              </Button>
-              <Button
-                v-for="(marker, i) in row.markers.filter((m) => m.index !== undefined)"
-                :key="`r${i}`"
-                variant="ghost"
-                size="icon-sm"
-                class="h-5 w-5 text-muted-foreground hover:text-destructive"
-                :title="marker.kind === 'out' ? 'Remove this output capture' : 'Remove this input'"
-                :aria-label="marker.kind === 'out' ? 'Remove this output capture' : 'Remove this input'"
-                @click="removeMarker(marker)"
-              >
-                <X class="size-3" />
-              </Button>
-              <Button
-                v-if="row.extra && !row.hasChildren && !row.markers.length"
-                variant="ghost"
-                size="icon-sm"
-                class="h-5 w-5 text-muted-foreground hover:text-destructive"
-                :title="`Remove folder ${row.name}`"
-                :aria-label="`Remove folder ${row.name}`"
-                @click="removeExtraDir(row.path)"
-              >
-                <X class="size-3" />
-              </Button>
+              <DropdownMenu v-if="row.isDir">
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost" size="icon-sm" class="h-5 w-5" :title="`Add to ${row.name}`" :aria-label="`Add to ${row.name}`">
+                    <Plus class="size-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" class="min-w-[11rem]" @close-auto-focus="(e: Event) => e.preventDefault()">
+                  <DropdownMenuItem class="text-xs" @select="startNewFolder(row.path)">
+                    <FolderPlus class="size-3.5 text-muted-foreground" /> New folder
+                  </DropdownMenuItem>
+                  <DropdownMenuItem class="text-xs" @select="emit('add-input', dirValueOf(row))">
+                    <ArrowDownToLine class="size-3.5 text-muted-foreground" /> Add input here
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-if="row.path !== '/' && !row.markers.some((m) => m.kind === 'out' && m.dir)"
+                    class="text-xs"
+                    @select="emit('add-output', dirValueOf(row))"
+                  >
+                    <ArrowUpFromLine class="size-3.5 text-muted-foreground" /> Capture as output
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu v-if="hasRowMenu(row)">
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost" size="icon-sm" class="h-5 w-5" :title="`Actions for ${row.name}`" :aria-label="`Actions for ${row.name}`">
+                    <EllipsisVertical class="size-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" class="min-w-[11rem]" @close-auto-focus="(e: Event) => e.preventDefault()">
+                  <DropdownMenuItem v-if="canRename(row)" class="text-xs" @select="startEdit(row)">
+                    <Pencil class="size-3.5 text-muted-foreground" /> {{ markerFor(row) ? 'Edit path' : 'Rename or move' }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-for="(marker, i) in indexMarkersOf(row)"
+                    :key="`rm${i}`"
+                    class="text-xs text-destructive focus:text-destructive"
+                    @select="removeMarker(marker)"
+                  >
+                    <X class="size-3.5" /> {{ marker.kind === 'out' ? 'Remove output capture' : 'Remove input' }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-if="isRemovableExtraDir(row)"
+                    class="text-xs text-destructive focus:text-destructive"
+                    @select="removeExtraDir(row.path)"
+                  >
+                    <X class="size-3.5" /> Remove folder
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </template>
           </span>
         </template>
       </div>
 
-      <!-- Host-rendered destination editors for an opened output capture. -->
-      <div v-if="outDetailIndexFor(row) !== null" class="py-1 pr-1" :style="indent(row.depth + 1)">
-        <slot name="output-details" :index="outDetailIndexFor(row)!" />
+      <!-- Host-rendered destination editors, inline below every capture. -->
+      <div v-for="index in outIndicesFor(row)" :key="`out-${index}`" class="py-1 pr-1" :style="indent(row.depth + 1)">
+        <slot name="output-details" :index="index" />
       </div>
 
       <!-- New-folder input row. -->
@@ -506,8 +513,8 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
     </template>
 
     <!-- Rows whose path cannot be placed in the tree (invalid container path). -->
-    <div v-if="model.unplaced.length" class="mt-2 space-y-1 rounded-md border border-destructive/30 bg-destructive/5 p-2">
-      <p class="text-[11px] font-medium text-destructive">Not an absolute container path:</p>
+    <div v-if="model.unplaced.length" class="mt-2 space-y-1 rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
+      <p class="text-[11px] font-medium text-amber-800 dark:text-amber-300">Not placed, not an absolute container path:</p>
       <div v-for="(marker, i) in model.unplaced" :key="i" class="flex items-center gap-1.5">
         <Badge :variant="MARKER_VARIANT[marker.kind]" class="shrink-0 px-1.5 text-[9px] uppercase">{{ MARKER_LABEL[marker.kind] }}</Badge>
         <template v-if="editing && editing.marker === marker">
@@ -522,7 +529,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
           />
         </template>
         <template v-else>
-          <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-destructive">{{ marker.raw || '(empty)' }}</span>
+          <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-amber-800 dark:text-amber-300">{{ marker.raw || '(empty)' }}</span>
           <Button v-if="!disabled && marker.index !== undefined" variant="ghost" size="icon-sm" class="h-5 w-5" aria-label="Edit path" @click="startEditMarker(marker)">
             <Pencil class="size-3" />
           </Button>

@@ -17,6 +17,7 @@ import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useComputeDataView } from '@/composables/useComputeDataView'
 import { useS3 } from '@/composables/useS3'
 import {
   TES_GROUP_TAG,
@@ -319,7 +320,8 @@ function removeOutputRow(i: number) {
 }
 
 // ── Filesystem-tree wiring (shared component with the quick-run wizard) ──────
-const dataView = ref<'tree' | 'table'>('tree')
+// The Tree|Table choice persists per browser (shared with quick run).
+const dataView = useComputeDataView()
 const inputDialogOpen = ref(false)
 const inputMountDefault = ref('/inputs/')
 const treeOutputs = computed(() =>
@@ -477,7 +479,7 @@ async function submit() {
 
               <section v-if="dataView === 'tree'" class="surface-inline space-y-2.5 p-3.5">
                 <p class="text-[11px] text-muted-foreground">
-                  What the task sees at run time. Hover a folder to create subfolders, stage inputs, or capture it as an output.
+                  What the task sees at run time. Use a folder's + menu to create subfolders, stage inputs, or capture outputs.
                 </p>
                 <ContainerFsTree
                   :inputs="inputs"
