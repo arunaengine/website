@@ -15,7 +15,7 @@ import type { MetadataDocumentListItem } from '@/lib/api'
 
 // Catalog picker for subcrate linking, shared by the detail page's Subcrates
 // section and the create/edit metadata dialogs. Selection is emitted; the host
-// owns the actual crate write (which may be async — `busy`/`error` reflect it).
+// owns the actual crate write (which may be async; `busy`/`error` reflect it).
 const props = defineProps<{
   open: boolean
   // Graph IRIs already linked; hidden from the candidate list.

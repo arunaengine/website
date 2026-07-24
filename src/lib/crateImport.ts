@@ -3,7 +3,7 @@ import { crateGraph, crateRootId, dataEntitiesOf, stringProp } from '@/lib/dataE
 // Shared RO-Crate import helpers: structural validation + preview summary for
 // every surface that accepts an uploaded/pasted crate (the metadata detail
 // page's import-replace and the create dialog's import mode), plus the export
-// download counterpart. Validation is deliberately structural only — the
+// download counterpart. Validation is deliberately structural only; the
 // backend accepts arbitrary crates, so this is a sanity gate, not a schema.
 
 export interface CrateImportPreview {

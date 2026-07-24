@@ -19,7 +19,7 @@ import { Lock, Plus, X } from '@lucide/vue'
 // The key input is terminology-backed (bundled schema.org + Dublin Core always
 // instant, remote providers streamed with soft degradation) so users pick
 // proper vocabulary properties instead of inventing keys; free text stays
-// possible — picking a suggestion is optional.
+// possible, picking a suggestion is optional.
 const props = defineProps<{
   rows: CustomFieldRow[]
   // Read-only structured root properties (edit dialog only); preserved as-is.
@@ -58,7 +58,7 @@ function setValue(index: number, value: string) {
 
 // A picked term is written the way the crate's @context resolves it: a
 // schema.org property by its plain key (the RO-Crate context covers
-// schema.org), anything else by its full IRI — matching the profile builder's
+// schema.org), anything else by its full IRI, matching the profile builder's
 // baking, where non-schema.org terms are only compacted when a context term
 // maps them (none exists for ad-hoc fields).
 function pickTerm(index: number, term: VocabTerm) {

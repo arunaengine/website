@@ -331,7 +331,7 @@ async function save() {
     </PageHeader>
 
     <!-- Session restore in flight: the admin role is unknown until the user
-         profile resolves — never flash the access-required gate. -->
+         profile resolves, never flash the access-required gate. -->
     <div v-if="authPending" class="container py-8">
       <section class="surface mx-auto max-w-xl space-y-3 p-8">
         <Skeleton class="mx-auto h-8 w-8 rounded-full" />

@@ -96,7 +96,7 @@ function startSignIn() {
     </div>
 
     <!-- Session restore in flight: a stored token exists but the user profile
-         has not resolved yet — never flash the signed-out gate. -->
+         has not resolved yet, never flash the signed-out gate. -->
     <div v-else-if="authPending" class="container py-8">
       <section class="surface mx-auto max-w-xl space-y-3 p-8">
         <Skeleton class="mx-auto h-8 w-8 rounded-full" />
