@@ -22,6 +22,7 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
+import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import QuickRunResult from '@/components/compute/QuickRunResult.vue'
 import { asyncChunkError } from '@/lib/chunk-recovery'
@@ -121,6 +122,11 @@ const stagingBucket = ref('')
 const outputRows = ref<{ bucket: string; path: string; containerPath: string; keyTouched: boolean }[]>([])
 const inputDialogOpen = ref(false)
 const credentialDialogOpen = ref(false)
+// Filesystem-tree view is the default; the row grids stay as the Table view.
+const dataView = ref<'tree' | 'table'>('tree')
+// Container directory the input picker mounts under; the tree's per-folder
+// "add input" affordance retargets it before opening the dialog.
+const inputMountDefault = ref('/work/in/')
 
 // A fresh id per submit attempt keys the uploaded script and the idempotency tag.
 const runId = ref(crypto.randomUUID())
@@ -496,6 +502,40 @@ function outputDestination(row: { bucket: string; path: string }): string {
 }
 function removeOutput(i: number) {
   outputRows.value.splice(i, 1)
+}
+
+// ── Filesystem-tree wiring ───────────────────────────────────────────────────
+const treeOutputs = computed(() =>
+  outputRows.value.map((row) => ({ containerPath: row.containerPath, destination: outputDestination(row) })),
+)
+function onTreeInputPath(index: number, path: string) {
+  const entry = inputs.value[index]
+  if (!entry) return
+  if (entry.kind === 'folder') entry.basePath = path
+  else entry.path = path
+}
+function onTreeOutputPath(index: number, path: string) {
+  const row = outputRows.value[index]
+  if (row) setOutputContainerPath(row, path)
+}
+// Capturing a folder from the tree creates a directory-capture row with the
+// same default destination shape addOutput uses.
+function onTreeAddOutput(containerDir: string) {
+  const base = outputBasename(containerDir)
+  outputRows.value.push({
+    bucket: outputRows.value.at(-1)?.bucket || stagingBucket.value.trim() || buckets.value[0] || '',
+    containerPath: containerDir,
+    path: `quickruns/${base}${base ? '/' : ''}`,
+    keyTouched: false,
+  })
+}
+function onTreeAddInput(containerDir: string) {
+  inputMountDefault.value = containerDir
+  inputDialogOpen.value = true
+}
+function openInputDialog() {
+  inputMountDefault.value = '/work/in/'
+  inputDialogOpen.value = true
 }
 
 // ── Load existing script ─────────────────────────────────────────────────────
@@ -1040,8 +1080,89 @@ function dismissRerun() {
               </p>
             </div>
 
-            <!-- Data references with their resolved container mount paths -->
-            <div class="min-w-0 space-y-4">
+            <!-- Data references: filesystem tree by default, row grids as the
+                 Table alternative; both operate on the same inputs/outputRows. -->
+            <div class="min-w-0 space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-semibold text-foreground">Container data</span>
+                <div class="inline-flex rounded-md border border-border p-0.5">
+                  <button
+                    type="button"
+                    :class="[
+                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                      dataView === 'tree' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    ]"
+                    @click="dataView = 'tree'"
+                  >
+                    Tree
+                  </button>
+                  <button
+                    type="button"
+                    :class="[
+                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                      dataView === 'table' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    ]"
+                    @click="dataView = 'table'"
+                  >
+                    Table
+                  </button>
+                </div>
+              </div>
+
+              <section v-if="dataView === 'tree'" class="surface-muted space-y-2.5 p-3.5">
+                <p class="text-[11px] text-muted-foreground">
+                  The container filesystem as the script will see it. Hover a folder to create subfolders, stage inputs, or capture it as an output.
+                </p>
+                <ContainerFsTree
+                  :inputs="inputs"
+                  :outputs="treeOutputs"
+                  :script="{ path: scriptContainerPath, label: scriptUrl }"
+                  workspace="/work"
+                  @update-input-path="onTreeInputPath"
+                  @remove-input="removeInput"
+                  @update-output-path="onTreeOutputPath"
+                  @remove-output="removeOutput"
+                  @add-output="onTreeAddOutput"
+                  @add-input="onTreeAddInput"
+                >
+                  <template #output-details="{ index }">
+                    <div v-if="outputRows[index]" class="flex items-center gap-1.5">
+                      <span class="shrink-0 text-[10px] font-medium text-muted-foreground">into</span>
+                      <Select
+                        v-if="bucketOptions.length"
+                        v-model="outputRows[index].bucket"
+                        :options="bucketOptions"
+                        placeholder="Bucket"
+                        class="h-7 w-32 shrink-0 text-xs"
+                        aria-label="Destination bucket"
+                      />
+                      <Input v-else v-model="outputRows[index].bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" aria-label="Destination bucket" />
+                      <span class="shrink-0 text-muted-foreground">/</span>
+                      <Input
+                        :model-value="outputRows[index].path"
+                        class="h-7 min-w-0 flex-1 font-mono text-xs"
+                        placeholder="results/output.txt"
+                        aria-label="Destination key"
+                        @update:model-value="setOutputKey(outputRows[index], String($event))"
+                        @blur="onOutputKeyBlur(outputRows[index])"
+                      />
+                    </div>
+                  </template>
+                </ContainerFsTree>
+                <p v-if="!inputsValid" class="text-[11px] text-destructive">
+                  Each input needs an absolute canonical container path (folders a base directory), unique across all staged files.
+                </p>
+                <p v-if="!outputsValid" class="text-[11px] text-destructive">
+                  Each capture needs one of your buckets, a canonical key and an absolute container path; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
+                </p>
+                <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
+                  <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output</Button>
+                </div>
+                <p class="text-[11px] text-muted-foreground">stdout and stderr are always captured.</p>
+              </section>
+
+              <template v-else>
               <section class="surface-muted space-y-2.5 p-3.5">
                 <div>
                   <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
@@ -1084,7 +1205,7 @@ function dismissRerun() {
                   </p>
                 </div>
                 <p v-else class="text-[11px] text-muted-foreground">No input data. Added files are staged into the container, by default under <code class="rounded bg-muted px-1 font-mono">/work/in/</code>.</p>
-                <Button variant="outline" size="sm" @click="inputDialogOpen = true"><ListPlus class="size-3.5" /> Add input</Button>
+                <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
               </section>
 
               <section class="surface-muted space-y-2.5 p-3.5">
@@ -1152,6 +1273,7 @@ function dismissRerun() {
                 </p>
                 <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output</Button>
               </section>
+              </template>
             </div>
               </div>
             </TabsContent>
@@ -1285,7 +1407,7 @@ function dismissRerun() {
       </div>
     </div>
 
-    <TesDataRefDialog v-model:open="inputDialogOpen" mode="input" mount-default="/work/in/" @add="addInput" />
+    <TesDataRefDialog v-model:open="inputDialogOpen" mode="input" :mount-default="inputMountDefault" @add="addInput" />
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />
 
     <Dialog :open="loadScriptOpen" @update:open="(v: boolean) => (loadScriptOpen = v)">
