@@ -146,6 +146,14 @@ const createCredentialOpen = ref(false)
 const revokeError = ref<string | null>(null)
 const selectedGroupId = ref('')
 
+// Revoked/expired credentials linger server-side (soft revoke, no purge
+// endpoint); keep the default view clean and reveal them on demand.
+const showInactiveCredentials = ref(false)
+const inactiveCredentials = computed(() => credentials.value.filter((credential) => credential.status !== 'active'))
+const visibleCredentials = computed(() =>
+  showInactiveCredentials.value ? credentials.value : credentials.value.filter((credential) => credential.status === 'active'),
+)
+
 const groupNames = computed(() => {
   const names = new Map<string, string>()
   for (const group of [...myGroups.value, ...discoverableGroups.value]) names.set(group.id, group.name)
@@ -350,14 +358,32 @@ function toggleGroup(groupId: string) {
 
         <section id="credentials" class="surface overflow-hidden">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2"><KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 credentials</h3><Badge variant="outline">{{ credentials.length }}</Badge></div>
+            <div class="flex items-center gap-2">
+              <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 credentials</h3><Badge variant="outline">{{ visibleCredentials.length }}</Badge>
+              <button
+                v-if="inactiveCredentials.length"
+                type="button"
+                class="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                @click="showInactiveCredentials = !showInactiveCredentials"
+              >
+                {{ showInactiveCredentials ? 'Hide inactive' : `Show inactive (${inactiveCredentials.length})` }}
+              </button>
+            </div>
             <Button size="sm" @click="createCredentialOpen = true"><Plus class="h-4 w-4" /> Create</Button>
           </header>
           <table class="w-full text-sm">
             <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th><th class="px-5 py-2"></th></tr></thead>
             <tbody>
-              <tr v-for="credential in credentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}<Badge v-if="credential.access_key_id === activeKey?.accessKeyId" variant="accent" class="ml-2 text-[9px] uppercase">this device</Badge></td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
-              <tr v-if="!credentials.length"><td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">No S3 credentials for the authenticated user.</td></tr>
+              <tr v-for="credential in visibleCredentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}<Badge v-if="credential.access_key_id === activeKey?.accessKeyId" variant="accent" class="ml-2 text-[9px] uppercase">this device</Badge></td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
+              <tr v-if="!visibleCredentials.length">
+                <td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">
+                  <template v-if="inactiveCredentials.length">
+                    No active S3 credentials.
+                    <button type="button" class="text-primary hover:underline" @click="showInactiveCredentials = true">Show inactive ({{ inactiveCredentials.length }})</button>
+                  </template>
+                  <template v-else>No S3 credentials for the authenticated user.</template>
+                </td>
+              </tr>
             </tbody>
           </table>
           <p v-if="revokeError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ revokeError }}</p>
