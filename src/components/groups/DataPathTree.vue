@@ -94,14 +94,14 @@ onMounted(() => void load(false))
       <Skeleton class="h-5" />
     </div>
     <p v-else-if="status === 'forbidden'" class="text-[11px] text-muted-foreground">
-      Only group members can browse files; use a quick scope above.
+      Only group members can browse files; pick a scope above.
     </p>
     <p v-else-if="status === 'unavailable'" class="text-[11px] text-muted-foreground">
-      File browsing is not available on this node; use a quick scope above.
+      File browsing is not available on this node; pick a scope above.
     </p>
     <p v-else-if="error" class="text-xs text-destructive">{{ error }}</p>
     <p v-else-if="!entries.length" class="text-[11px] text-muted-foreground">
-      {{ prefix ? 'This folder is empty.' : 'This group has no buckets yet; use a quick scope above.' }}
+      {{ prefix ? 'This folder is empty.' : 'This group has no buckets yet; pick a scope above.' }}
     </p>
     <ul v-else class="space-y-0.5">
       <li v-for="entry in entries" :key="entry.permission_path">

@@ -158,15 +158,17 @@ async function submit() {
           </p>
         </div>
 
-        <div class="mt-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Add access</div>
+        <h3 class="mt-6 text-sm font-semibold text-foreground">Add access</h3>
         <PermissionPathPicker
           :group-id="group.group_id"
           :path-prefix="prefix"
           :selected="pending"
-          class="mt-1.5"
+          class="mt-2"
           @select="(suffixes) => ((pending = suffixes), (notice = null))"
         />
-        <div class="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+        <!-- The rule row only exists once a scope is selected; before that a
+             hint sits in its place instead of a disabled control cluster. -->
+        <div v-if="pending.length" class="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
           <Select
             :model-value="pendingLevel"
             :options="LEVEL_OPTIONS"
@@ -174,13 +176,14 @@ async function submit() {
             class="h-8 w-32 shrink-0 text-xs"
             @update:model-value="(value: string) => (pendingLevel = toLevel(value))"
           />
-          <span class="min-w-0 flex-1 text-xs" :class="pending.length ? 'text-foreground' : 'text-muted-foreground'">
-            {{ pending.length ? pendingPreview : 'Nothing selected yet, pick a scope or browse above.' }}
-          </span>
-          <Button variant="outline" size="sm" class="shrink-0" :disabled="!pending.length" @click="commitPending">
+          <span class="min-w-0 flex-1 text-xs text-foreground">{{ pendingPreview }}</span>
+          <Button variant="outline" size="sm" class="shrink-0" @click="commitPending">
             <Plus class="h-3.5 w-3.5" /> Add access rule
           </Button>
         </div>
+        <p v-else class="mt-3 text-xs text-muted-foreground">
+          Nothing selected yet, pick a scope or browse above to add an access rule.
+        </p>
       </div>
 
       <div class="min-w-0 lg:sticky lg:top-20 lg:self-start">

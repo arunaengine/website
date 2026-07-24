@@ -119,7 +119,7 @@ watch(
 
 <template>
   <div>
-    <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Quick scopes</div>
+    <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Scopes</div>
     <div class="mt-1.5 flex flex-wrap gap-1.5">
       <button
         v-for="scope in SCOPES"
@@ -153,7 +153,7 @@ watch(
       </button>
     </div>
     <p class="mt-1.5 text-[11px] text-muted-foreground">
-      {{ activeScope ? activeScope.hint : customOpen ? 'Browse below and pick exactly what this rule covers.' : 'Pick a quick scope, or choose Custom… for something more specific.' }}
+      {{ activeScope ? activeScope.hint : customOpen ? 'Browse below and pick exactly what this rule covers.' : 'Pick a scope, or choose Custom… for something more specific.' }}
     </p>
 
     <div v-if="customOpen" class="mt-3">
@@ -198,7 +198,7 @@ watch(
             </div>
             <p v-else-if="loadError" class="text-xs text-destructive">{{ loadError }}</p>
             <p v-else-if="tree && !tree.folders.length && !tree.documents.length" class="text-xs text-muted-foreground">
-              This group has no metadata documents yet; use a quick scope above.
+              This group has no metadata documents yet; pick a scope above.
             </p>
             <MetaPathTree
               v-else-if="tree"
