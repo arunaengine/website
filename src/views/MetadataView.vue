@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
+import CrateImportExport from '@/components/metadata/CrateImportExport.vue'
 import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import AuthorChips from '@/components/metadata/AuthorChips.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
@@ -30,7 +31,7 @@ import { parseRunCrate } from '@/lib/runCrate'
 import { crateGraph, crateRootId, dataEntitiesOf, stringProp, type DataEntity } from '@/lib/dataEntities'
 import { useCrateReferences } from '@/composables/useCrateReferences'
 import type { CrateObjectReference } from '@/lib/crateReferences'
-import { ArrowLeft, ListChecks, Code2, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Link2, Pencil, Trash2, Star } from '@lucide/vue'
+import { ArrowLeft, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Link2, Pencil, Trash2, Star } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -102,7 +103,6 @@ async function onSaved() {
   await fetchCrate(detailId.value)
 }
 
-const showCrate = ref(false)
 const loadingCrate = ref(false)
 const crateNotReady = ref(false)
 const crateError = ref<string | null>(null)
@@ -206,7 +206,6 @@ watch(
   // during the very first load, so an unknown id must not read as not-found.
   [detailId, bootstrapped],
   async ([id, ready]) => {
-    showCrate.value = false
     crateError.value = null
     crateNotReady.value = false
     if (!id || !ready) {
@@ -463,20 +462,17 @@ function entitySize(row: DataEntity): string {
 
       <!-- Crate + referenced data for any resolved document (keyed on detailId). -->
       <template v-if="docState === 'found'">
-        <section class="surface p-4">
-          <button type="button" class="flex w-full items-center justify-between text-sm font-medium text-foreground/80 hover:text-foreground" @click="showCrate = !showCrate">
-            <span class="inline-flex items-center gap-2"><Code2 class="h-3.5 w-3.5 text-muted-foreground" /> RO-Crate JSON-LD</span>
-            <span class="text-xs text-muted-foreground">{{ showCrate ? 'hide' : 'show' }}</span>
-          </button>
-          <div v-if="loadingCrate && cratePending[detailId]" class="mt-3 text-xs text-muted-foreground">Preparing the crate…</div>
-          <div v-else-if="loadingCrate" class="mt-3 text-xs text-muted-foreground">Loading full RO-Crate…</div>
-          <div v-if="crateNotReady" class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-            <span>The crate is still being prepared.</span>
-            <Button variant="outline" size="sm" @click="fetchCrate(detailId)">Retry</Button>
-          </div>
-          <div v-if="crateError" class="mt-3 text-xs text-destructive">{{ crateError }}</div>
-          <pre v-if="showCrate" class="mt-3 max-h-[560px] overflow-auto whitespace-pre-wrap rounded-md bg-muted/30 p-4 font-mono text-[11.5px] leading-relaxed text-foreground/85 scrollbar-thin"><code>{{ JSON.stringify(currentCrate, null, 2) }}</code></pre>
-        </section>
+        <CrateImportExport
+          :crate="currentCrate"
+          :document-id="detailId"
+          :can-import="Boolean(current) && canWrite"
+          :loading="loadingCrate"
+          :preparing="Boolean(cratePending[detailId])"
+          :not-ready="crateNotReady"
+          :error="crateError"
+          @retry="fetchCrate(detailId)"
+          @imported="onSaved"
+        />
 
         <RunProvenancePanel v-if="runProvenance" :run="runProvenance" />
 
