@@ -73,7 +73,8 @@ const TOKEN_KEY = 'aruna.authToken'
 const API_BASE_KEY = 'aruna.apiBaseUrl'
 
 // The catalog is paged, never walked: a realm can hold hundreds of thousands of
-// documents. Page sizes stay at or below 100, the server-side per-page cap.
+// documents, and page sizes stay at or below 100, the server-side cap.
+// `metadataItems` keeps only the first page: a best-effort enrichment window.
 const CATALOG_PAGE_SIZE = 48
 // Profiles are a small bounded set under profiles/ that several screens need
 // synchronously, so that one prefix stays fully loaded.
@@ -93,14 +94,6 @@ const userInfo = ref<UserInfoResponse | null>(null)
 const apiGroups = ref<ApiGroup[]>([])
 const metadataItems = ref<MetadataDocumentListItem[]>([])
 const profileItems = ref<MetadataDocumentListItem[]>([])
-// Catalog paging state: how many pages of `metadataItems` are loaded, and
-// whether the end was reached (a short page is the only authority).
-const catalogPages = ref(0)
-const catalogExhausted = ref(false)
-const catalogLoadingMore = ref(false)
-// Approximate match count served alongside each page by newer nodes; null when
-// the node does not serve it. Display only — see catalogEstimate.
-const catalogPageEstimate = ref<number | null>(null)
 const credentials = ref<S3CredentialSummary[]>([])
 const fullCrates = ref<Record<string, unknown>>({})
 const cratePending = ref<Record<string, boolean>>({})
@@ -147,11 +140,6 @@ function clearIdentityState(clearPublic = false) {
   credentials.value = []
   metadataItems.value = []
   profileItems.value = []
-  catalogPages.value = 0
-  catalogExhausted.value = false
-  // An in-flight load-more skips its own reset once the epoch moved on.
-  catalogLoadingMore.value = false
-  catalogPageEstimate.value = null
   fullCrates.value = {}
   cratePending.value = {}
   authError.value = null
@@ -237,51 +225,16 @@ async function listMetadataPage(
   throw new Error('unreachable')
 }
 
-function catalogPageQuery(offset: number): Record<string, string | number> {
-  return { include: 'summary', limit: CATALOG_PAGE_SIZE, offset }
-}
-
-// Documents under profiles/ have their own fully loaded list; the catalog keeps
-// excluding them so both stay disjoint.
-function applyCatalogPage(page: ListMetadataResponse, append: boolean) {
-  const documents = page.documents.filter((doc) => !doc.document_path.startsWith('profiles/'))
-  if (append) {
-    const known = new Set(metadataItems.value.map((item) => item.document_id))
-    metadataItems.value = [...metadataItems.value, ...documents.filter((doc) => !known.has(doc.document_id))]
-    catalogPages.value += 1
-  } else {
-    metadataItems.value = documents
-    catalogPages.value = 1
-  }
-  catalogPageEstimate.value = page.total_estimate ?? null
-  // A short page is the ONLY end-of-list authority: total_estimate is an
-  // approximation, and an under-count would strand later pages behind a
-  // disappearing "Load more".
-  catalogExhausted.value = page.total_returned < page.limit
-}
-
-/** Resets the catalog to its first page and reloads the profile set. */
+/** Reloads the shared catalog window and the profile set. */
 async function loadMetadata(context = refreshContext()) {
   const [page] = await Promise.all([
-    listMetadataPage(catalogPageQuery(0), context),
+    listMetadataPage({ include: 'summary', limit: CATALOG_PAGE_SIZE, offset: 0 }, context),
     loadProfiles(context),
   ])
   if (context.epoch !== sessionEpoch) return
-  applyCatalogPage(page, false)
-}
-
-/** Appends the next catalog page; a no-op once the last page was reached. */
-async function loadMoreMetadata(): Promise<void> {
-  if (catalogExhausted.value || catalogLoadingMore.value || !catalogPages.value) return
-  const context = refreshContext()
-  catalogLoadingMore.value = true
-  try {
-    const page = await listMetadataPage(catalogPageQuery(catalogPages.value * CATALOG_PAGE_SIZE), context)
-    if (context.epoch !== sessionEpoch) return
-    applyCatalogPage(page, true)
-  } finally {
-    if (context.epoch === sessionEpoch) catalogLoadingMore.value = false
-  }
+  // Documents under profiles/ have their own fully loaded list; the catalog
+  // window keeps excluding them so both stay disjoint.
+  metadataItems.value = page.documents.filter((doc) => !doc.document_path.startsWith('profiles/'))
 }
 
 // Profiles stay exhaustive but scoped to the profiles/ prefix: the set is small
@@ -480,18 +433,26 @@ async function deleteMetadataDocument(documentId: string): Promise<void> {
   }
 }
 
-// One page of a group's documents. Summaries are opt-in: callers that only need
-// paths must not pay for a per-document graph export.
+// One page of the visible catalog, optionally scoped to a group. Summaries are
+// opt-in: callers that only need paths must not pay for a per-document graph
+// export. `total_estimate` is approximate and absent for small limits, so only
+// a short page (total_returned < limit) proves there is nothing after it.
+async function listCatalogPage(
+  options: { limit?: number; offset?: number; groupId?: string | null; summary?: boolean } = {},
+): Promise<ListMetadataResponse> {
+  return listMetadataPage({
+    limit: options.limit ?? CATALOG_PAGE_SIZE,
+    offset: options.offset ?? 0,
+    ...(options.groupId ? { group_id: options.groupId } : {}),
+    ...(options.summary ? { include: 'summary' } : {}),
+  })
+}
+
 async function listGroupMetadata(
   groupId: string,
   options: { limit?: number; offset?: number; summary?: boolean } = {},
 ): Promise<ListMetadataResponse> {
-  return listMetadataPage({
-    group_id: groupId,
-    limit: options.limit ?? CATALOG_PAGE_SIZE,
-    offset: options.offset ?? 0,
-    ...(options.summary ? { include: 'summary' } : {}),
-  })
+  return listCatalogPage({ ...options, groupId })
 }
 
 /** First document stored under a path prefix, or null. */
@@ -1210,16 +1171,6 @@ const profiles = computed<MetadataProfile[]>(() => {
 })
 const metadata = computed<MetadataDoc[]>(() => metadataItems.value.map(mapMetadataDoc))
 
-// APPROXIMATE catalog size in `metadata` terms: the server estimates per group,
-// so it can over- or under-count, and the fully known profiles/ documents are
-// subtracted because they are held separately. Copy must say "about"; never
-// drive paging or completeness from it. Null on nodes that do not serve it.
-const catalogEstimate = computed<number | null>(() =>
-  catalogPageEstimate.value === null
-    ? null
-    : Math.max(metadataItems.value.length, catalogPageEstimate.value - profileItems.value.length),
-)
-
 function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
   const entity = primaryEntity(item.rocrate_summary)
   const title = textValue(entity?.name) || textValue(entity?.title) || item.document_path || item.document_id
@@ -1465,16 +1416,11 @@ export function useAruna() {
     profiles,
     metadataItems,
     profileItems,
-    catalogPages,
-    catalogExhausted,
-    catalogLoadingMore,
-    catalogEstimate,
     fullCrates,
     cratePending,
     refresh,
     loadInfo,
     loadMetadata,
-    loadMoreMetadata,
     toMetadataDoc: mapMetadataDoc,
     loadRoCrate,
     createMetadata,
@@ -1485,6 +1431,7 @@ export function useAruna() {
     invalidateCrate,
     replaceMetadataRoCrate,
     deleteMetadataDocument,
+    listCatalogPage,
     listGroupMetadata,
     toggleFavourite,
     updateUserProfile,

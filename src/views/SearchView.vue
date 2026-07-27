@@ -5,6 +5,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
 import SearchFilterBar, { type Facet, type FilterModel } from '@/components/search/SearchFilterBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Pagination from '@/components/ui/Pagination.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
@@ -32,7 +33,6 @@ const {
   metadata,
   profiles,
   currentUser,
-  loading,
   error,
   bootstrapped,
   refresh,
@@ -42,11 +42,8 @@ const {
   discoverableGroups,
   searchUsers,
   searchUnified,
-  catalogExhausted,
-  catalogLoadingMore,
-  catalogEstimate,
-  loadMoreMetadata,
-  listGroupMetadata,
+  profileItems,
+  listCatalogPage,
   getMetadataItem,
   toMetadataDoc,
 } = useAruna()
@@ -61,6 +58,11 @@ function queryFilter(value: unknown): string | null {
   return queryString(value) || null
 }
 
+function queryPage(value: unknown): number {
+  const parsed = Number.parseInt(queryString(value), 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
+}
+
 const q = ref(queryString(route.query.q))
 const profileFilter = ref<string | null>(queryFilter(route.query.profile))
 // Search push-down: the group filter maps to the server group_id and the profile
@@ -68,9 +70,12 @@ const profileFilter = ref<string | null>(queryFilter(route.query.profile))
 // group filter pages a group-scoped listing instead of the shared catalog.
 const groupFilter = ref<string | null>(queryFilter(route.query.group))
 // Entity/resource type facet, derived from the RO-Crate @type of the documents
-// loaded so far. Applied client-side in both the browse and the search branches.
+// on screen. Applied client-side in both the browse and the search branches.
 const typeFilter = ref<string | null>(queryFilter(route.query.type))
 const favouritesOnly = ref(false)
+// 1-based browse page, kept in the URL so a page can be shared and the browser
+// back button steps through it.
+const browsePage = ref(queryPage(route.query.page))
 
 // A local profile carries the conformsTo IRI that documents reference; a filter
 // that resolves to one is pushed to the server, otherwise it stays client-side.
@@ -117,18 +122,27 @@ const running = ref(false)
 // (e.g. clearFilters): vue-router only updates route.query after the async
 // navigation settles, so the second replace would resurrect a param the first
 // meant to drop.
-watch([q, profileFilter, groupFilter, typeFilter, expertMode], ([nq, np, ng, nt, ne]) => {
+watch([q, profileFilter, groupFilter, typeFilter, expertMode, browsePage], ([nq, np, ng, nt, ne, npage]) => {
   if (
     queryString(route.query.q) === nq &&
     queryFilter(route.query.profile) === np &&
     queryFilter(route.query.group) === ng &&
     queryFilter(route.query.type) === nt &&
-    (queryString(route.query.expert) === '1') === ne
+    (queryString(route.query.expert) === '1') === ne &&
+    queryPage(route.query.page) === npage
   ) {
     return
   }
   void router.replace({
-    query: { ...route.query, q: nq || undefined, profile: np || undefined, group: ng || undefined, type: nt || undefined, expert: ne ? '1' : undefined },
+    query: {
+      ...route.query,
+      q: nq || undefined,
+      profile: np || undefined,
+      group: ng || undefined,
+      type: nt || undefined,
+      expert: ne ? '1' : undefined,
+      page: npage > 1 ? String(npage) : undefined,
+    },
   })
 })
 
@@ -141,6 +155,7 @@ watch(
     groupFilter.value = queryFilter(query.group)
     typeFilter.value = queryFilter(query.type)
     expertMode.value = queryString(query.expert) === '1'
+    browsePage.value = queryPage(query.page)
   },
 )
 
@@ -150,48 +165,49 @@ const filtering = computed(() => Boolean(profileFilter.value || groupFilter.valu
 const favouriteIds = computed(() => currentUser.value?.favouriteMetadataIds ?? [])
 
 // ── Browse paging ───────────────────────────────────────────────────────────
-// Three sources, all bounded: the shared catalog pages, a group-scoped listing
-// when the group facet is set (pushed down to the server), and the user's own
-// favourite ids fetched one by one. None of them ever walks the realm.
+// Browse renders ONE page at a time: GET /metadata takes limit and offset, so
+// any page is reachable directly and the group facet rides the same request.
+// Favourites are a small curated id list, fetched whole and sliced client-side.
 const BROWSE_PAGE_SIZE = 48
 const FAVOURITE_FETCH_CAP = 100
 // Each favourite costs two requests, so they are fetched in bounded batches.
 const FAVOURITE_FETCH_BATCH = 6
 
-const groupDocs = ref<MetadataDoc[]>([])
-const groupOffset = ref(0)
-const groupExhausted = ref(false)
-const groupLoading = ref(false)
-const groupEstimate = ref<number | null>(null)
+const browseDocs = ref<MetadataDoc[]>([])
+const browseReturned = ref(0)
+// The page size the server actually applied; a page shorter than it is the end.
+const browseLimit = ref(BROWSE_PAGE_SIZE)
+const browseEstimateRaw = ref<number | null>(null)
+const browseLoading = ref(false)
 const browseError = ref<string | null>(null)
-let groupSeq = 0
+let browseSeq = 0
 
-async function loadGroupPage(append: boolean) {
-  const groupId = groupFilter.value
-  if (!groupId) return
-  const seq = ++groupSeq
-  groupLoading.value = true
+async function loadBrowsePage() {
+  const seq = ++browseSeq
+  browseLoading.value = true
   browseError.value = null
   try {
-    const response = await listGroupMetadata(groupId, {
+    const response = await listCatalogPage({
       limit: BROWSE_PAGE_SIZE,
-      offset: append ? groupOffset.value : 0,
+      offset: (browsePage.value - 1) * BROWSE_PAGE_SIZE,
+      groupId: groupFilter.value,
       summary: true,
     })
-    if (seq !== groupSeq) return
-    const docs = response.documents
+    if (seq !== browseSeq) return
+    browseDocs.value = response.documents
       .filter((item) => !item.document_path.startsWith('profiles/'))
       .map(toMetadataDoc)
-    groupDocs.value = append ? [...groupDocs.value, ...docs] : docs
-    groupOffset.value = response.offset + response.total_returned
-    groupEstimate.value = response.total_estimate ?? null
-    // Only a short page ends the listing; the estimate is display copy.
-    groupExhausted.value = response.total_returned < response.limit
+    browseReturned.value = response.total_returned
+    browseLimit.value = response.limit
+    browseEstimateRaw.value = response.total_estimate ?? null
   } catch (err) {
-    if (seq !== groupSeq) return
+    if (seq !== browseSeq) return
+    // A stale page under a new page number would be a lie; drop it.
+    browseDocs.value = []
+    browseReturned.value = 0
     browseError.value = err instanceof Error ? err.message : String(err)
   } finally {
-    if (seq === groupSeq) groupLoading.value = false
+    if (seq === browseSeq) browseLoading.value = false
   }
 }
 
@@ -229,18 +245,21 @@ async function loadFavourites() {
   }
 }
 
+// The visible page depends on the session too: signing in or out changes which
+// documents the offset window contains.
 watch(
-  [groupFilter, () => searchActive.value, favouritesOnly],
-  ([groupId, searching, favourites]) => {
-    if (searching || favourites || !groupId) {
-      ++groupSeq
-      groupDocs.value = []
-      groupOffset.value = 0
-      groupEstimate.value = null
-      groupExhausted.value = false
+  [browsePage, groupFilter, () => searchActive.value, favouritesOnly, () => currentUser.value?.id ?? ''],
+  ([, , searching, favourites]) => {
+    if (searching || favourites) {
+      ++browseSeq
+      browseDocs.value = []
+      browseReturned.value = 0
+      browseEstimateRaw.value = null
+      browseLoading.value = false
+      browseError.value = null
       return
     }
-    void loadGroupPage(false)
+    void loadBrowsePage()
   },
   { immediate: true },
 )
@@ -254,45 +273,65 @@ watch([favouritesOnly, favouriteIds], ([only]) => {
   void loadFavourites()
 })
 
-const browseSource = computed<MetadataDoc[]>(() => {
-  if (favouritesOnly.value) return favouriteDocs.value
-  return groupFilter.value ? groupDocs.value : metadata.value
-})
-// Favourites are fetched whole; the other two sources page.
-const browseExhausted = computed(() => {
-  if (favouritesOnly.value) return true
-  return groupFilter.value ? groupExhausted.value : catalogExhausted.value
-})
-const browseLoading = computed(
-  () => favouritesLoading.value || groupLoading.value || catalogLoadingMore.value,
+const favouritePages = computed(() =>
+  Math.max(1, Math.ceil(favouriteDocs.value.length / BROWSE_PAGE_SIZE)),
 )
-// Newer nodes serve an APPROXIMATE match count with every page (estimated per
-// group, so it can over- or under-count). Copy only: paging never reads it.
-// Favourites are fetched by id, so that count is exact.
-const browseEstimate = computed<number | null>(() => {
-  if (favouritesOnly.value) return null
-  return groupFilter.value ? groupEstimate.value : catalogEstimate.value
+
+const browseSource = computed<MetadataDoc[]>(() => {
+  if (!favouritesOnly.value) return browseDocs.value
+  const start = (browsePage.value - 1) * BROWSE_PAGE_SIZE
+  return favouriteDocs.value.slice(start, start + BROWSE_PAGE_SIZE)
 })
-const browseSummary = computed(() => {
-  const shown = formatNumber(hits.value.length)
-  if (browseEstimate.value !== null) {
-    // "you can see" keeps this apart from the dashboard's realm-wide total.
-    return `Showing ${shown} of about ${formatNumber(browseEstimate.value)} documents you can see.`
-  }
-  return browseExhausted.value ? `Showing all ${shown} documents.` : `Showing ${shown} documents so far.`
+const browseBusy = computed(() => browseLoading.value || favouritesLoading.value)
+
+// A FULL page is the only proof that another one follows: total_estimate is an
+// approximation, and an under-count must never hide a page the server serves.
+const hasNextPage = computed(() => {
+  if (favouritesOnly.value) return browsePage.value < favouritePages.value
+  return browseReturned.value >= browseLimit.value
 })
 
-async function loadMoreBrowse() {
-  browseError.value = null
-  if (groupFilter.value) {
-    await loadGroupPage(true)
-    return
-  }
-  try {
-    await loadMoreMetadata()
-  } catch (err) {
-    browseError.value = err instanceof Error ? err.message : String(err)
-  }
+// APPROXIMATE match count from the server (estimated per group, so it can over-
+// or under-count) and absent on small limits or older nodes. profiles/ documents
+// never browse here and are held separately, so the unfiltered count drops them.
+const browseEstimate = computed<number | null>(() => {
+  if (favouritesOnly.value) return favouriteDocs.value.length
+  if (browseEstimateRaw.value === null) return null
+  const raw = groupFilter.value
+    ? browseEstimateRaw.value
+    : browseEstimateRaw.value - profileItems.value.length
+  return Math.max(0, raw)
+})
+
+// Approximate page count; null without an estimate, which degrades the pager to
+// Previous/Next. A proven short page outranks an over-counting estimate, and a
+// proven next page outranks an under-counting one.
+const pageCount = computed<number | null>(() => {
+  if (favouritesOnly.value) return favouritePages.value
+  if (browseEstimate.value === null) return null
+  const estimated = Math.max(1, Math.ceil(browseEstimate.value / BROWSE_PAGE_SIZE))
+  if (hasNextPage.value) return Math.max(estimated, browsePage.value + 1)
+  return browseReturned.value > 0 ? browsePage.value : estimated
+})
+
+const browseSummary = computed(() => {
+  const shown = formatNumber(hits.value.length)
+  const page = formatNumber(browsePage.value)
+  if (pageCount.value === null) return `Page ${page} · ${shown} documents on this page.`
+  // Favourites are fetched by id, so only the server estimate reads "about".
+  const about = favouritesOnly.value ? '' : 'about '
+  return `Page ${page} of ${about}${formatNumber(pageCount.value)} · ${shown} documents on this page.`
+})
+
+function goToPage(page: number) {
+  if (browseBusy.value || page < 1 || page === browsePage.value) return
+  browsePage.value = page
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function retryBrowse() {
+  if (favouritesOnly.value) void loadFavourites()
+  else void loadBrowsePage()
 }
 
 // The RO-Crate @type is stored comma-joined (e.g. "Dataset, SoftwareSourceCode");
@@ -397,6 +436,8 @@ const filterModel = computed<FilterModel>({
     typeFilter.value = typeof next.type === 'string' ? next.type : null
     groupFilter.value = typeof next.group === 'string' ? next.group : null
     favouritesOnly.value = next.favourites === true
+    // A different filter means a different listing; page numbers do not carry.
+    browsePage.value = 1
   },
 })
 
@@ -546,6 +587,7 @@ function clearFilters() {
   groupFilter.value = null
   typeFilter.value = null
   favouritesOnly.value = false
+  browsePage.value = 1
 }
 
 async function runQuery() {
@@ -596,7 +638,7 @@ async function runQuery() {
           </div>
           <SearchFilterBar v-model="filterModel" :facets="filterFacets" aria-label="Discover filters" class="mt-3" />
           <p v-if="showTypeFilter || typeFilter" class="mt-2 text-[11px] text-muted-foreground">
-            Profile and group filters are applied by the server; Type covers the documents loaded so far.
+            Profile and group filters are applied by the server; Type covers the documents on this page.
           </p>
         </div>
 
@@ -809,12 +851,14 @@ async function runQuery() {
           </template>
         </template>
 
-        <!-- Browse path: one page at a time, extended on demand. The realm is
-             never enumerated; group and favourites browsing fetch their own. -->
+        <!-- Browse path: one page at a time, navigated by page number. The realm
+             is never enumerated; favourites browse the user's own id list. -->
         <template v-else>
-          <section v-if="!bootstrapped || (browseLoading && !browseSource.length) || (loading && !metadata.length)" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <section v-if="!bootstrapped || (browseBusy && !browseSource.length)" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Skeleton v-for="n in 6" :key="n" class="h-36" />
           </section>
+
+          <ErrorPanel v-else-if="browseError" :message="browseError" @retry="retryBrowse" />
 
           <ErrorPanel v-else-if="error" :message="error" @retry="refresh" />
 
@@ -861,12 +905,25 @@ async function runQuery() {
               </section>
             </template>
 
+            <!-- Past the end: the estimate can under- or over-count, so a page
+                 number can outrun the listing. Never strand the user there. -->
+            <EmptyState
+              v-else-if="browsePage > 1 && !browseSource.length"
+              title="Nothing on this page"
+              :description="`Page ${browsePage} is past the end of this listing.`"
+            >
+              <div class="flex flex-wrap items-center justify-center gap-2">
+                <Button variant="outline" @click="goToPage(browsePage - 1)">Previous page</Button>
+                <Button variant="outline" @click="goToPage(1)">First page</Button>
+              </div>
+            </EmptyState>
+
             <EmptyState
               v-else-if="filtering"
-              title="No matches here yet"
-              :description="browseExhausted
-                ? `Nothing in ${realm.shortName} matches the active filters.`
-                : 'Nothing on the documents loaded so far matches the active filters. Load more, or search by name.'"
+              title="No matches on this page"
+              :description="hasNextPage
+                ? 'No document on this page matches the active filters. Try the next page, or search by name.'
+                : `Nothing in ${realm.shortName} matches the active filters.`"
             >
               <Button variant="outline" @click="clearFilters">Clear filters</Button>
             </EmptyState>
@@ -879,19 +936,22 @@ async function runQuery() {
               <Button v-if="currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
             </EmptyState>
 
-            <p v-if="browseError" class="text-center text-xs text-destructive">{{ browseError }}</p>
-            <!-- Paging is load-more, driven only by the page size; a node that
-                 serves an estimate adds an "about N" to the copy. -->
-            <div v-if="hits.length || !browseExhausted" class="flex flex-col items-center gap-2">
+            <!-- The page count is derived from an approximate estimate, so it is
+                 shown as "about"; only a short page ends the listing. -->
+            <div v-if="browseSource.length || browsePage > 1 || hasNextPage" class="flex flex-col items-center gap-2">
               <p
                 class="text-[11px] text-muted-foreground"
-                :title="browseEstimate !== null ? 'The server estimates this count per group, so it is approximate.' : undefined"
+                :title="pageCount !== null && !favouritesOnly ? 'The server estimates this count per group, so the number of pages is approximate.' : undefined"
               >
                 {{ browseSummary }}
               </p>
-              <Button v-if="!browseExhausted" variant="outline" :disabled="browseLoading" @click="loadMoreBrowse">
-                {{ browseLoading ? 'Loading…' : 'Load more' }}
-              </Button>
+              <Pagination
+                :page="browsePage"
+                :page-count="pageCount"
+                :has-next="hasNextPage"
+                :disabled="browseBusy"
+                @update:page="goToPage"
+              />
             </div>
           </template>
         </template>
