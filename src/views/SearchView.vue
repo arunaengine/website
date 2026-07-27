@@ -107,7 +107,7 @@ const {
   cursorEnabled,
   goToPage: goToSearchPage,
   retry: retrySearch,
-} = useMetadataSearch(q, { groupId: groupFilter, conformsTo: conformsToIri })
+} = useMetadataSearch(q, { groupId: groupFilter, conformsTo: conformsToIri }, { cached: true })
 const expertMode = ref(queryString(route.query.expert) === '1')
 const favBusy = ref<Set<string>>(new Set())
 const favError = ref<string | null>(null)
@@ -513,6 +513,9 @@ const searchBusy = computed(
 )
 // Results from the previous request are still on screen while a new one runs.
 const searchStale = computed(() => searchBusy.value && visibleResults.value.length > 0)
+// A refresh failed over results it could not replace: they stay on screen and
+// the error rides beside them instead of taking the whole area.
+const keptResults = computed(() => Boolean(searchError.value) && searchResults.value.length > 0)
 
 const groupMatches = computed(() => {
   const term = q.value.trim().toLowerCase()
@@ -805,7 +808,12 @@ async function runQuery() {
           />
 
           <template v-if="showKind('datasets')">
-          <ErrorPanel v-if="searchError" :message="searchError" @retry="retrySearch" />
+          <div v-if="keptResults" class="flex flex-wrap items-center justify-center gap-2 text-xs text-destructive">
+            {{ searchError }}
+            <Button variant="outline" size="sm" @click="retrySearch">Try again</Button>
+          </div>
+
+          <ErrorPanel v-if="searchError && !keptResults" :message="searchError" @retry="retrySearch" />
 
           <!-- Skeletons cover the debounce window too (!searched), and the walk
                to a page past the cached ones, so the area never goes blank. -->
@@ -874,7 +882,9 @@ async function runQuery() {
           <!-- Paging stays outside the visible-results branch so filters cannot
                strand matches on later server pages: a fully filtered page still
                offers Next. Numbers cover the pages reached so far only. -->
-          <template v-if="cursorEnabled && searched && !searchError">
+          <!-- Kept results still carry the cursor of the page they came from,
+               so a failed refresh does not take the pager with it. -->
+          <template v-if="cursorEnabled && searched && (!searchError || keptResults)">
             <div v-if="searchPageError" class="mt-3 flex items-center justify-center gap-2 text-xs text-destructive">
               {{ searchPageError }}
               <Button variant="outline" size="sm" @click="showSearchPage(searchPage + 1)">Try again</Button>

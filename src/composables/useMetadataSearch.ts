@@ -5,10 +5,12 @@
 // in-flight AbortController and the paging cursors are bound to the lifetime
 // of the view that owns the search box, and two views must never share a
 // cursor. Must be called during component setup (uses onBeforeUnmount).
+// Only the FIRST page is cached module-side, so a revisit repaints it.
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { ApiError, type MetadataSearchHit, type MetadataSearchResponse } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
 import { useAruna } from '@/composables/useAruna'
+import { createSwrCache, type SwrFailure } from '@/lib/swr'
 import type { MetadataDoc } from '@/data/types'
 
 export const SEARCH_DEBOUNCE_MS = 300
@@ -21,6 +23,34 @@ const CURSOR_PAGE_SIZE = 25
 // this depth can ever be served. Mirrored here as a walk bound.
 const SEARCH_MAX_DEPTH = 1000
 const SEARCH_REQUEST_TIMEOUT_MS = 30_000
+
+// Everything needed to repaint the first page without a request. Deeper pages
+// are deliberately absent: they only exist as an opaque cursor chain walked
+// from this page, and a chain the server may expire belongs to one visit.
+interface SearchPage {
+  hits: MetadataSearchHit[]
+  cursor: string | null
+  nodesQueried: number
+  nodesFailed: number
+  truncated: boolean
+}
+
+const EMPTY_PAGE: SearchPage = { hits: [], cursor: null, nodesQueried: 0, nodesFailed: 0, truncated: false }
+
+// Documents are created and indexed while people work, so a search answer ages
+// far faster than the bucket list: 4s covers opening a result and coming back
+// with no request, and is short enough that a new document is not hidden.
+const SEARCH_FRESH_MS = 4_000
+
+// Module singleton for the view that owns the search box: its first page
+// outlives the view, so returning to it paints the previous results at once and
+// revalidates behind them. One live consumer only, see the `cached` option.
+const sharedCache = createSwrCache<SearchPage>(EMPTY_PAGE, SEARCH_FRESH_MS)
+
+const { sessionEpoch } = useAruna()
+
+// Another identity must never see these hits, even with no view mounted.
+watch(sessionEpoch, () => sharedCache.reset())
 
 export interface SearchResultLine {
   hit: MetadataSearchHit
@@ -55,8 +85,16 @@ export interface MetadataSearchFilters {
   conformsTo?: Ref<string | null>
 }
 
-export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFilters = {}) {
+export function useMetadataSearch(
+  query: Ref<string>,
+  filters: MetadataSearchFilters = {},
+  // `cached` claims the module-level slot, so the first page survives unmount.
+  // At most one live consumer may claim it; every other search gets its own
+  // slot and behaves exactly as it did before, never evicting the shared page.
+  { cached = false }: { cached?: boolean } = {},
+) {
   const { metadata, searchMetadata, authToken, apiBaseUrl } = useAruna()
+  const cache = cached ? sharedCache : createSwrCache<SearchPage>(EMPTY_PAGE, SEARCH_FRESH_MS)
   const cursorEnabled = featureEnabled('searchCursor')
   const pageSize = cursorEnabled ? CURSOR_PAGE_SIZE : SEARCH_PAGE_CAP
   // Highest page the server can serve at this page size; without cursor paging
@@ -148,6 +186,56 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
     }
   }
 
+  // Everything the first-page request depends on: the identity it was answered
+  // for, the page size and both push-down filters, plus the term. JSON encoding
+  // keeps free-form values from running into each other.
+  function cacheKey(term: string): string {
+    return JSON.stringify([
+      sessionEpoch.value,
+      pageSize,
+      filters.groupId?.value ?? null,
+      filters.conformsTo?.value ?? null,
+      term,
+    ])
+  }
+
+  function onFailure(err: unknown): SwrFailure {
+    // An abort is this search superseding itself, not a failure: the empty
+    // message keeps it off screen, and the request that replaced it reports.
+    if (err instanceof DOMException && err.name === 'AbortError') return { message: '' }
+    // Nothing a search can fail with makes the last answer for this exact key
+    // wrong, so the page is never discarded; the message rides beside it.
+    return { message: err instanceof Error ? err.message : String(err) }
+  }
+
+  function hasCached(key: string): boolean {
+    return cache.scope.value === key && cache.loaded.value
+  }
+
+  /** Paints the cached page as page one, exactly as a fresh response would. */
+  function paintCached(term: string) {
+    const snapshot = cache.data.value
+    pages.value = [snapshot.hits]
+    cursors.value = [null, snapshot.cursor]
+    page.value = 1
+    cursorQuery = term
+    nodesQueried.value = snapshot.nodesQueried
+    nodesFailed.value = snapshot.nodesFailed
+    truncated.value = snapshot.truncated
+    searched.value = true
+  }
+
+  async function loadFirst(term: string, signal: AbortSignal): Promise<SearchPage> {
+    const response = await searchMetadata(term, { limit: pageSize, ...filterValues(), signal })
+    return {
+      hits: dedupeByDocument(response.hits),
+      cursor: nextCursorOf(response),
+      nodesQueried: response.nodes_queried ?? 0,
+      nodesFailed: response.nodes_failed ?? 0,
+      truncated: response.truncated === true,
+    }
+  }
+
   // A cursor is bound to the query AND the filters, so any change discards
   // every cached page with its cursors and starts over at page one.
   function clearPages() {
@@ -178,37 +266,39 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
     return cursorEnabled ? (response.next_cursor ?? null) : null
   }
 
-  async function runSearch(term: string) {
+  async function runSearch(term: string, force = false) {
     const mySeq = ++seq
     ++nav
     pageController?.abort()
     pageController = null
     paging.value = false
     controller?.abort()
-    controller = new AbortController()
+    const request = new AbortController()
+    controller = request
     pending.value = true
     error.value = null
     pageError.value = null
-    nodesQueried.value = 0
-    nodesFailed.value = 0
-    truncated.value = false
-    clearPages()
-    try {
-      const response = await searchMetadata(term, {
-        limit: pageSize,
-        ...filterValues(),
-        signal: controller.signal,
-      })
-      if (mySeq !== seq) return // superseded
-      pages.value = [dedupeByDocument(response.hits)]
-      cursors.value = [null, nextCursorOf(response)]
-      cursorQuery = term
-      applyMeta(response)
-      searched.value = true
-    } catch (err) {
-      if (mySeq !== seq) return // superseded or aborted
+    const key = cacheKey(term)
+    if (hasCached(key)) {
+      // Cached page stays on screen and revalidates behind the dim treatment.
+      paintCached(term)
+    } else {
+      nodesQueried.value = 0
+      nodesFailed.value = 0
+      truncated.value = false
+      searched.value = false
       clearPages()
-      error.value = err instanceof Error ? err.message : String(err)
+    }
+    try {
+      await cache.revalidate(key, () => loadFirst(term, request.signal), onFailure, force)
+      if (mySeq !== seq) return // superseded
+      // A page walked while the revalidation ran belongs to the older cursor
+      // chain, so a landed first page is only taken while the walk is still
+      // on it; the cache keeps it for the next visit either way.
+      if (hasCached(key) && page.value === 1 && pages.value.length <= 1) paintCached(term)
+      // A failed revalidation keeps the page it could not replace, so the
+      // message is surfaced beside the results instead of clearing them.
+      error.value = cache.error.value?.message || null
     } finally {
       if (mySeq === seq) pending.value = false
     }
@@ -255,11 +345,11 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
       if (mySeq !== seq || myNav !== nav) return false
       if (err instanceof ApiError && [400, 409, 410].includes(err.status) && restartedFor !== term) {
         // Server rejected the cursor (query changed / cursor expired, per the
-        // aruna#258 contract): restart transparently from the first page — but
-        // only once per query. A backend that keeps rejecting falls through to
-        // pageError below instead of looping.
+        // aruna#258 contract): restart transparently from the first page, forced
+        // past the cache that issued the rejected cursor — but only once per
+        // query. A backend that keeps rejecting falls through to pageError.
         restartedFor = term
-        void runSearch(term)
+        void runSearch(term, true)
       } else {
         // A failed page must not wipe the page already on screen; surface it
         // via the manual "Try again".
@@ -311,7 +401,8 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
   }
 
   function retry() {
-    if (active.value) void runSearch(query.value.trim())
+    // An explicit retry always reaches the server, freshness window or not.
+    if (active.value) void runSearch(query.value.trim(), true)
   }
 
   // A filter change re-binds the cursor, so the watched deps include the server
