@@ -307,7 +307,7 @@ export function liftShapes(turtle: string): LiftResult {
     return { entities: [], notes: notes.list(), shapeCount: 0, fieldCount: 0 }
   }
 
-  const index = buildShapeIndex(store, nodeShapes)
+  const index = buildShapeIndex(store, nodeShapes, notes)
   const groups = new Map<string, ShapeGroup>()
 
   for (const shape of nodeShapes.values()) {
@@ -960,7 +960,7 @@ function unresolvedShapeMessage(index: ShapeIndex, node: Term): string {
 // the class its values belong to (the form this projection emits, including for
 // the crate root), so only a BARE reference makes its target a shape in its own
 // right; an `sh:class` that points at a shape rather than a class is one too.
-function buildShapeIndex(store: Store, nodeShapes: Map<string, Quad_Subject>): ShapeIndex {
+function buildShapeIndex(store: Store, nodeShapes: Map<string, Quad_Subject>, notes: Notes): ShapeIndex {
   // A PROPERTY naming a shape says its values must conform to it. A node-level
   // sh:node is composition, not a value reference, so it never lands here.
   const valueShapes = new Set<string>()
@@ -992,9 +992,10 @@ function buildShapeIndex(store: Store, nodeShapes: Map<string, Quad_Subject>): S
     baseShapes.set(key, own)
   }
 
+  const walk: BaseWalk = { store, nodeShapes, baseShapes, chains: new Map(), notes }
   const properties = new Map<string, Quad_Subject[]>()
   for (const key of nodeShapes.keys()) {
-    properties.set(key, composedProperties(store, key, nodeShapes, baseShapes, properties))
+    properties.set(key, composedProperties(walk, key))
   }
 
   const types = new Map<string, string[]>()
@@ -1017,37 +1018,65 @@ function buildShapeIndex(store: Store, nodeShapes: Map<string, Quad_Subject>): S
   return { types, derived, valueShapes, values, properties, bases, known: new Set(nodeShapes.keys()) }
 }
 
-// A shape's own property shapes with every base shape's folded in ahead of them,
-// so its own constraint on a path merges over the one it inherits. Cycles are
-// cut by the visited set; the depth cap is a second backstop.
-function composedProperties(
-  store: Store,
-  key: string,
-  nodeShapes: Map<string, Quad_Subject>,
-  baseShapes: Map<string, Quad_Subject[]>,
-  cache: Map<string, Quad_Subject[]>,
-  seen = new Set<string>(),
-  depth = 0,
-): Quad_Subject[] {
-  const cached = cache.get(key)
+// Shared state of the base-composition walk. One walk per lift, so every shape
+// chain is resolved once and reused by both the property and the type reads.
+interface BaseWalk {
+  store: Store
+  nodeShapes: Map<string, Quad_Subject>
+  baseShapes: Map<string, Quad_Subject[]>
+  chains: Map<string, Quad_Subject[]>
+  notes: Notes
+}
+
+// Every shape a shape composes through sh:node, transitively, bases first and
+// the shape itself last, so what a shape states always follows what it
+// inherits. Memoized per shape: an uncached walk re-explores every path through
+// a wide, deep base lattice, which a crafted file turns into a hang. Cycles are
+// cut where they close and the cut chain is what gets memoized, so the walk
+// stays linear; the depth cap is a second backstop and reports itself.
+function baseChain(walk: BaseWalk, key: string, seen = new Set<string>(), depth = 0): Quad_Subject[] {
+  const cached = walk.chains.get(key)
   if (cached) return cached
-  const shape = nodeShapes.get(key)
-  if (!shape || seen.has(key) || depth > MAX_BASE_DEPTH) return []
+  const shape = walk.nodeShapes.get(key)
+  if (!shape || seen.has(key)) return []
+  if (depth > MAX_BASE_DEPTH) {
+    walk.notes.add(
+      'partial',
+      `Shapes composed more than ${MAX_BASE_DEPTH} levels deep were not read, so rules inherited through them are missing.`,
+      shortTerm(shape),
+    )
+    return []
+  }
   seen.add(key)
-  const collected: Quad_Subject[] = []
-  for (const base of baseShapes.get(key) ?? []) {
-    collected.push(...composedProperties(store, termKey(base), nodeShapes, baseShapes, cache, seen, depth + 1))
-  }
-  collected.push(...store.getQuads(shape, `${SH}property`, null, null).map((quad) => quad.object as Quad_Subject))
-  seen.delete(key)
-  const unique: Quad_Subject[] = []
+  const chain: Quad_Subject[] = []
   const taken = new Set<string>()
-  for (const item of collected) {
-    if (taken.has(termKey(item))) continue
-    taken.add(termKey(item))
-    unique.push(item)
+  for (const base of walk.baseShapes.get(key) ?? []) {
+    for (const item of baseChain(walk, termKey(base), seen, depth + 1)) {
+      if (taken.has(termKey(item))) continue
+      taken.add(termKey(item))
+      chain.push(item)
+    }
   }
-  return unique
+  seen.delete(key)
+  chain.push(shape)
+  walk.chains.set(key, chain)
+  return chain
+}
+
+// A shape's own property shapes with every base shape's folded in ahead of them,
+// so its own constraint on a path merges over the one it inherits.
+function composedProperties(walk: BaseWalk, key: string): Quad_Subject[] {
+  const collected: Quad_Subject[] = []
+  const taken = new Set<string>()
+  for (const shape of baseChain(walk, key)) {
+    for (const quad of walk.store.getQuads(shape, `${SH}property`, null, null)) {
+      const propertyShape = quad.object as Quad_Subject
+      if (taken.has(termKey(propertyShape))) continue
+      taken.add(termKey(propertyShape))
+      collected.push(propertyShape)
+    }
+  }
+  return collected
 }
 
 // True when a shape says nothing about an entity, only about a literal: no
