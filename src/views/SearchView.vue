@@ -618,8 +618,15 @@ async function runQuery() {
     >
       <template #actions>
         <Button :disabled="!currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
-        <Button v-if="currentUser && jobsEnabled" variant="outline" title="Upload an RO-Crate zip and import it" @click="showCrateImport = true">
-          <FileArchive class="h-4 w-4" /> Import ZIP
+        <!-- Importing an archive registers a NEW document, so it lives here next
+             to "New metadata" rather than on a single crate's page. -->
+        <Button
+          v-if="currentUser && jobsEnabled"
+          variant="outline"
+          title="Upload an RO-Crate zip or eln archive and register it as a new metadata document"
+          @click="showCrateImport = true"
+        >
+          <FileArchive class="h-4 w-4" /> Import archive
         </Button>
         <div class="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
           <Code2 class="h-3.5 w-3.5 text-muted-foreground" />

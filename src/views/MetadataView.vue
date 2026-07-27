@@ -20,6 +20,12 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
+import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import { computed, ref, watch } from 'vue'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
@@ -37,7 +43,7 @@ import { useCrateReferences } from '@/composables/useCrateReferences'
 import type { CrateObjectReference } from '@/lib/crateReferences'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { useJobs } from '@/composables/useJobs'
-import { ArrowLeft, Download, FileArchive, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star, Upload } from '@lucide/vue'
+import { ArrowDownUp, ArrowLeft, ChevronDown, FileArchive, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star, Upload } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -402,26 +408,55 @@ function entitySize(row: DataEntity): string {
           event-kind="metadata_created"
           :resource-label="currentPath"
         />
-        <Button
-          v-if="docState === 'found'"
-          variant="outline"
-          :disabled="!crateHasEntities"
-          title="Download ro-crate-metadata.json"
-          @click="downloadCrateJson(currentCrate)"
-        >
-          <Download class="h-4 w-4" /> Export
-        </Button>
-        <Button
-          v-if="docState === 'found' && currentUser && jobsEnabled"
-          variant="outline"
-          title="Package this document and its data into an RO-Crate zip"
-          @click="showCrateExport = true"
-        >
-          <FileArchive class="h-4 w-4" /> Export ZIP
-        </Button>
-        <Button v-if="docState === 'found' && canWrite" variant="outline" title="Replace this document's crate with an imported one" @click="crateSection?.openImport()">
-          <Upload class="h-4 w-4" /> Import
-        </Button>
+        <!-- One entry point for every crate transfer; each entry names what it
+             moves, so "the description" and "the whole crate" stay apart. -->
+        <DropdownMenu v-if="docState === 'found'">
+          <DropdownMenuTrigger as-child>
+            <Button variant="outline">
+              <ArrowDownUp class="h-4 w-4" /> Import / export
+              <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-80 p-1.5">
+            <DropdownMenuLabel>Export</DropdownMenuLabel>
+            <DropdownMenuItem
+              class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
+              :disabled="!crateHasEntities"
+              @click="downloadCrateJson(currentCrate)"
+            >
+              <FileJson2 class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-foreground">Metadata file only</span>
+                <span class="block text-xs leading-relaxed text-muted-foreground">Downloads ro-crate-metadata.json, the description on its own, without any data files.</span>
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              v-if="currentUser && jobsEnabled"
+              class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
+              @click="showCrateExport = true"
+            >
+              <FileArchive class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-foreground">Whole crate as a zip archive</span>
+                <span class="block text-xs leading-relaxed text-muted-foreground">Packages the metadata together with the data files it references. Prepared by a job.</span>
+              </span>
+            </DropdownMenuItem>
+            <template v-if="canWrite">
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Import</DropdownMenuLabel>
+              <DropdownMenuItem
+                class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
+                @click="crateSection?.openImport()"
+              >
+                <Upload class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <span class="min-w-0">
+                  <span class="block text-sm font-medium text-foreground">Replace this metadata from a file</span>
+                  <span class="block text-xs leading-relaxed text-muted-foreground">Overwrites this document's crate with an uploaded ro-crate-metadata.json, previewed first.</span>
+                </span>
+              </DropdownMenuItem>
+            </template>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
         <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
         <RouterLink :to="{ name: 'search' }">
