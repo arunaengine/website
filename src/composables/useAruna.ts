@@ -80,8 +80,13 @@ const CATALOG_PAGE_SIZE = 48
 // synchronously, so that one prefix stays fully loaded.
 const PROFILE_PAGE_SIZE = 100
 const RECENT_METADATA_LIMIT = 5
-// Nodes without recency ordering answer 400; probe once, then stop asking.
-let recentOrderRejected = false
+// The recent tile over-fetches so excluding profiles/ cannot shrink it, and
+// walks at most this many pages before giving up on filling it.
+const RECENT_PAGE_FACTOR = 2
+const RECENT_MAX_PAGES = 3
+// A node that does not know `order=recent` ignores the parameter rather than
+// rejecting it, so the response itself is the probe (see isRecencyOrdered).
+let recentOrderUnsupported = false
 
 const apiBaseUrl = ref(readStored(API_BASE_KEY) || defaultApiBaseUrl())
 const authToken = ref(readStored(TOKEN_KEY))
@@ -471,25 +476,67 @@ async function listCatalogPage(
   })
 }
 
+// Whether a page can be a recency-ordered one. A node that does not know
+// `order=recent` ignores the unknown parameter and answers 200 with the
+// creation-ASCENDING first page, so the oldest documents would render as the
+// newest; a page whose updated_at timestamps climb is that page. Fewer than two
+// documents carry no ordering evidence and count as ordered, which is harmless:
+// both orders return the same list.
+export function isRecencyOrdered(documents: Pick<MetadataDocumentListItem, 'updated_at'>[]): boolean {
+  let previous = Number.POSITIVE_INFINITY
+  for (const doc of documents) {
+    const stamp = Date.parse(doc.updated_at)
+    if (Number.isNaN(stamp)) continue
+    if (stamp > previous) return false
+    previous = stamp
+  }
+  return true
+}
+
+/** Outcome of the recent-tile page walk; `ordered` false latches the fallback. */
+export interface RecentWalk {
+  ordered: boolean
+  documents: MetadataDocumentListItem[]
+}
+
+// Walks recency-ordered pages until `limit` non-profile documents are found.
+// Filtering profiles/ out of a page can leave the tile short (a window holding
+// only profiles empties it), so a full raw page that came up short is followed
+// by the next one, bounded by RECENT_MAX_PAGES.
+export async function walkRecentPages(
+  fetchPage: (offset: number, size: number) => Promise<ListMetadataResponse>,
+  limit: number,
+): Promise<RecentWalk> {
+  const size = limit * RECENT_PAGE_FACTOR
+  const documents: MetadataDocumentListItem[] = []
+  for (let page = 0; page < RECENT_MAX_PAGES; page++) {
+    const response = await fetchPage(page * size, size)
+    if (!isRecencyOrdered(response.documents)) return { ordered: false, documents: [] }
+    for (const doc of response.documents) {
+      if (!doc.document_path.startsWith('profiles/')) documents.push(doc)
+    }
+    // Only a full raw page can hide more documents behind it.
+    if (documents.length >= limit || response.total_returned < size) break
+  }
+  return { ordered: true, documents: documents.slice(0, limit) }
+}
+
 // Newest documents first, straight from the registry, so the dashboard never
 // derives recency from the creation-ordered catalog window. Null means the node
-// cannot order by recency and the caller should fall back to that window.
+// cannot order by recency, or the walk found nothing to show, and the caller
+// should fall back to that window.
 async function listRecentMetadata(limit = RECENT_METADATA_LIMIT): Promise<MetadataDoc[] | null> {
-  if (recentOrderRejected) return null
-  try {
-    // Over-fetch so excluding profiles/ cannot shrink the tile below `limit`.
-    const page = await listCatalogPage({ limit: limit * 2, summary: true, order: 'recent' })
-    return page.documents
-      .filter((doc) => !doc.document_path.startsWith('profiles/'))
-      .slice(0, limit)
-      .map(mapMetadataDoc)
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 400) {
-      recentOrderRejected = true
-      return null
-    }
-    throw err
+  if (recentOrderUnsupported) return null
+  const walk = await walkRecentPages(
+    (offset, size) => listCatalogPage({ limit: size, offset, summary: true, order: 'recent' }),
+    limit,
+  )
+  if (!walk.ordered) {
+    recentOrderUnsupported = true
+    return null
   }
+  if (!walk.documents.length) return null
+  return walk.documents.map(mapMetadataDoc)
 }
 
 async function listGroupMetadata(
@@ -1056,7 +1103,7 @@ function setApiBaseUrl(url: string) {
   loading.value = false
   bootstrapped.value = false
   // A different node has to be probed for recency ordering again.
-  recentOrderRejected = false
+  recentOrderUnsupported = false
 }
 
 const realm = computed<Realm>(() => {
