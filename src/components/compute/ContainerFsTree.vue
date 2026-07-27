@@ -204,6 +204,12 @@ const editing = ref<{ path: string; marker: Marker | null; value: string } | nul
 function markerFor(row: Row): Marker | null {
   return row.markers.find((marker) => marker.index !== undefined) ?? null
 }
+// The model rebuilds its markers on every evaluation, so the marker captured
+// when editing started is never the same object at render time; match on the
+// identity it carries instead.
+function sameMarker(a: Marker | null | undefined, b: Marker | null | undefined): boolean {
+  return !!a && !!b && a.kind === b.kind && a.index !== undefined && a.index === b.index
+}
 // The script path and the workspace mount are owned by the host form; a folder
 // above the script must not be renamed either, the executor command points at
 // the fixed script path.
@@ -385,7 +391,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
             @blur="commitEdit"
           />
         </template>
-        <template v-else-if="editing && editing.marker && markerFor(row) === editing.marker">
+        <template v-else-if="editing && editing.marker && sameMarker(markerFor(row), editing.marker)">
           <Input
             v-model="editing.value"
             class="h-6 min-w-0 flex-1 font-mono text-xs"
@@ -517,7 +523,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
       <p class="text-[11px] font-medium text-amber-800 dark:text-amber-300">Not placed, not an absolute container path:</p>
       <div v-for="(marker, i) in model.unplaced" :key="i" class="flex items-center gap-1.5">
         <Badge :variant="MARKER_VARIANT[marker.kind]" class="shrink-0 px-1.5 text-[9px] uppercase">{{ MARKER_LABEL[marker.kind] }}</Badge>
-        <template v-if="editing && editing.marker === marker">
+        <template v-if="editing && sameMarker(marker, editing.marker)">
           <Input
             v-model="editing.value"
             class="h-6 min-w-0 flex-1 font-mono text-xs"
