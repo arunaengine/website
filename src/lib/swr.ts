@@ -26,6 +26,7 @@ export interface SwrCache<T> {
   /** Cached data on screen while a revalidation runs behind it. */
   refreshing: ComputedRef<boolean>
   reset(): void
+  /** Resolves once the load for `scope` settled, including one it collapsed onto. */
   revalidate(
     scope: string,
     load: () => Promise<T>,
@@ -47,10 +48,13 @@ export function createSwrCache<T>(empty: T, freshMs: number): SwrCache<T> {
   const scope = ref<string | null>(null)
   let fetchedAt = 0
   let requestId = 0
+  // The load a collapsed caller awaits, so it sees the same completion.
+  let inflight: Promise<void> | null = null
 
   function reset() {
     // Invalidates any in-flight load so its result cannot land on the new scope.
     requestId++
+    inflight = null
     scope.value = null
     fetchedAt = 0
     data.value = empty
@@ -59,19 +63,10 @@ export function createSwrCache<T>(empty: T, freshMs: number): SwrCache<T> {
     pending.value = false
   }
 
-  async function revalidate(
-    nextScope: string,
+  async function run(
     load: () => Promise<T>,
     onFailure: (err: unknown) => SwrFailure,
-    force = false,
   ): Promise<void> {
-    if (nextScope !== scope.value) {
-      reset()
-      scope.value = nextScope
-    }
-    if (!force && loaded.value && Date.now() - fetchedAt < freshMs) return
-    // Collapse the mount-time fan-out; a forced reload still supersedes it.
-    if (!force && pending.value) return
     const id = ++requestId
     pending.value = true
     try {
@@ -91,8 +86,31 @@ export function createSwrCache<T>(empty: T, freshMs: number): SwrCache<T> {
         fetchedAt = 0
       }
     } finally {
-      if (id === requestId) pending.value = false
+      if (id === requestId) {
+        pending.value = false
+        inflight = null
+      }
     }
+  }
+
+  function revalidate(
+    nextScope: string,
+    load: () => Promise<T>,
+    onFailure: (err: unknown) => SwrFailure,
+    force = false,
+  ): Promise<void> {
+    if (nextScope !== scope.value) {
+      reset()
+      scope.value = nextScope
+    }
+    if (!force && loaded.value && Date.now() - fetchedAt < freshMs) return Promise.resolve()
+    // Collapse the mount-time fan-out onto the load already running, so the
+    // collapsed caller awaits its completion instead of returning to an empty
+    // cache. A forced reload still supersedes it.
+    if (!force && inflight) return inflight
+    const started = run(load, onFailure)
+    inflight = started
+    return started
   }
 
   return {
