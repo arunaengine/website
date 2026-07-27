@@ -43,6 +43,8 @@ function errorMessage(err: unknown): string {
 }
 
 const task = ref<TesTask | null>(null)
+const runCrate = ref<MetadataDocumentListItem | null>(null)
+const runCrateLoading = ref(false)
 const loadState = ref<'idle' | 'loading' | 'ready' | 'error' | 'unsupported'>('idle')
 const loadError = ref<string | null>(null)
 const lastPollError = ref<string | null>(null)
@@ -216,8 +218,6 @@ const capturedOutputs = computed<OutRow[]>(() =>
 )
 
 // ── Process Run crate (targeted lookup at runs/{taskId}) ─────────────────────
-const runCrate = ref<MetadataDocumentListItem | null>(null)
-const runCrateLoading = ref(false)
 async function findRunCrate() {
   if (runCrateLoading.value) return
   runCrateLoading.value = true
