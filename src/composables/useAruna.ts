@@ -257,6 +257,12 @@ async function loadProfiles(context = refreshContext()) {
   profileItems.value = documents
 }
 
+// Revalidates the profile list in the background; the rendered set stays on
+// screen until the fresh walk lands (loadProfiles swaps atomically).
+async function refreshProfiles() {
+  await loadProfiles().catch(() => undefined)
+}
+
 async function loadAuthenticated(context = refreshContext()) {
   // /users/info is the authentication authority. Optional group and credential
   // capabilities must not turn a valid session into a signed-out one.
@@ -1424,6 +1430,7 @@ export function useAruna() {
     refresh,
     loadInfo,
     loadMetadata,
+    refreshProfiles,
     toMetadataDoc: mapMetadataDoc,
     loadRoCrate,
     createMetadata,

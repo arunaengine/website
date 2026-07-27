@@ -11,7 +11,7 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import NewProfileDialog from '@/components/metadata/NewProfileDialog.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { ListChecks, Pencil, Plus, Star, Lock, Download, Trash2 } from '@lucide/vue'
@@ -31,7 +31,11 @@ import type { ProfilePropertyRule } from '@/lib/profiles/types'
 
 const route = useRoute()
 const router = useRouter()
-const { profiles, profileItems, currentUser, userInfo, updateUserProfile, saving, loadRoCrate, deleteMetadataDocument, fullCrates } = useAruna()
+const { profiles, profileItems, currentUser, userInfo, updateUserProfile, saving, loadRoCrate, deleteMetadataDocument, fullCrates, refreshProfiles } = useAruna()
+
+// Profiles can appear from other nodes or sessions; entering the tab
+// revalidates in the background while the current set stays rendered.
+onMounted(() => void refreshProfiles())
 const showNewProfile = ref(false)
 // Set while the dialog edits an existing profile; null keeps it in create mode.
 const editingProfile = ref<MetadataProfile | null>(null)
