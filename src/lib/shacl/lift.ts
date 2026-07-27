@@ -12,7 +12,14 @@ import { ALL_ENTITY_SOURCES } from '../profiles/sources'
 import { CURATED_ENTITY_TYPES } from '../profiles/entityTypes'
 import { CURATED_PROPERTY_TERMS, type PropertyTermOption } from '../profiles/propertyCatalog'
 import { isHasPartUri } from '../profiles/emit'
-import { isDatasetType, isValidPropertyTermName, sameSchemaOrgType, SCHEMA_ORG, termNameFromUri } from '../profiles/uri'
+import {
+  ARUNA_PROFILE_PREFIX,
+  isDatasetType,
+  isValidPropertyTermName,
+  sameSchemaOrgType,
+  SCHEMA_ORG,
+  termNameFromUri,
+} from '../profiles/uri'
 import type {
   ProfileEntityRule,
   ProfileObligation,
@@ -57,6 +64,14 @@ import type {
 //   type and its rules become that type's own form; where the file names no
 //   type, the shape's name and then the term's documented range are used, and
 //   only a term neither describes falls back to a reference to any Thing.
+// - sh:node BETWEEN two node shapes is composition ("values must also conform to
+//   the base shape"), the SHACL idiom for a shared base. The base's property
+//   shapes, sh:class and node kind are folded into every shape that names it,
+//   transitively, so a chain shape -> shape -> shape resolves to one form per
+//   referenced type instead of a reference to a type with no rules.
+// - a referenced shape that only constrains a LITERAL (sh:datatype, sh:in, or an
+//   sh:or whose branches only pick datatypes) is the value itself, not an entity:
+//   its facets are inlined into the referencing rule and the chain ends there.
 
 export interface LiftNote {
   kind: 'partial' | 'no-field'
@@ -80,6 +95,18 @@ const RDF_NIL = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#nil'
 const SCHEMA_DATASET = `${SCHEMA_ORG}Dataset`
 const DCT_CONFORMS_TO = 'http://purl.org/dc/terms/conformsTo'
 const HTTPS_SCHEMA_ORG = 'https://schema.org/'
+// Namespace for a type minted from a shape name when the shape's own IRI has no
+// http(s) namespace to mint into. A file written with a relative base resolves
+// against CRATE_BASE_IRI, so minting beside the shape would leak arcp:// types
+// (which are not classes of anything) into the exported profile.
+const IMPORTED_TYPE_NS = `${ARUNA_PROFILE_PREFIX}imported#`
+// Composition chains are walked with a visited set, so a cycle terminates; the
+// depth cap is a second backstop against a pathological generated file.
+const MAX_BASE_DEPTH = 32
+// A profile with more entity rules than this would render an unusable outline.
+// Real files sit far below it (the Bioschemas ChemicalSubstance binding yields
+// nine), so the cap only ever fires on generated input.
+const MAX_ENTITIES = 50
 
 // schema.org is written both http and https in the wild, and a file may mix the
 // two. The portal's own form is http (uri.ts SCHEMA_ORG), and a profile holding
@@ -113,6 +140,8 @@ const NODE_SHAPE_KNOWN = new Set([
   `${SH}description`,
   `${SH}order`,
   `${SH}message`,
+  // Composition: the base shape's rules are folded into this one (buildShapeIndex).
+  `${SH}node`,
   // Read separately: sh:or is checked for the projection's entry-count form,
   // sh:sparql always reports its own note.
   `${SH}or`,
@@ -195,14 +224,26 @@ interface ShapeGroup {
 // shape into an entity and resolving a reference TO that shape can never
 // disagree about which type it describes. Keys are termKey values.
 interface ShapeIndex {
-  // The type each node shape describes.
-  types: Map<string, string>
+  // The types each node shape describes. Several when the file states a union
+  // (an rdf:type sh:in list, or an sh:or over rdf:type alternatives); the FIRST
+  // is the type its own form is built for, the rest travel as extra targets.
+  types: Map<string, string[]>
   // Shapes whose type had to be read off their own name because the file names
   // no class for them.
   derived: Set<string>
   // Shapes a property references as the shape its VALUES must conform to, rather
   // than as a class those values belong to.
   valueShapes: Set<string>
+  // Shapes that only constrain a literal value; a reference to one of these is
+  // the value itself, so its facets are inlined and the chain ends there.
+  values: Set<string>
+  // Property shapes each node shape contributes, base shapes first (sh:node
+  // composition, resolved transitively) and its own last, so a shape's own
+  // constraint on a path merges over the one it inherits.
+  properties: Map<string, Quad_Subject[]>
+  // Shapes named as a base by another shape. One that describes no type of its
+  // own is a mixin: it is fully absorbed into the shapes that name it.
+  bases: Set<string>
   // Every node shape this file declares, so a reference to a shape that is not
   // here is reported instead of silently resolving to nothing.
   known: Set<string>
@@ -241,12 +282,13 @@ export function liftShapes(turtle: string): LiftResult {
 
   // Shapes used as a member of another shape (a property, an sh:or branch, a
   // negation, a qualified value shape) describe part of something else, never
-  // the crate root. sh:node is deliberately NOT in this list: the projection
-  // emits `sh:node <root shape>` for any rule whose target type is the crate's
-  // own Dataset, and that must not stop the root shape being recognized. A
-  // value shape that pins a class is grouped under that class anyway, so it
-  // never reaches the root fallback. validate.ts binds root targets by the same
-  // rule, so the two cannot disagree about which shape is the root.
+  // the crate root. A PROPERTY-level sh:node is deliberately NOT in this list:
+  // the projection emits `sh:node <root shape>` for any rule whose target type
+  // is the crate's own Dataset, and that must not stop the root shape being
+  // recognized. A value shape that pins a class is grouped under that class
+  // anyway, so it never reaches the root fallback. validate.ts binds root
+  // targets by the same rule, so the two cannot disagree about which shape is
+  // the root.
   const referenced = new Set<string>()
   for (const predicate of [`${SH}property`, `${SH}qualifiedValueShape`, `${SH}not`, RDF_FIRST]) {
     for (const quad of store.getQuads(null, predicate, null, null)) referenced.add(termKey(quad.object))
@@ -269,7 +311,18 @@ export function liftShapes(turtle: string): LiftResult {
   const groups = new Map<string, ShapeGroup>()
 
   for (const shape of nodeShapes.values()) {
+    const shapeKey = termKey(shape)
     const name = shortTerm(shape)
+
+    // A shape that only constrains a literal IS a value: it is inlined wherever
+    // it is referenced (readFacets) and never becomes a form of its own.
+    if (index.values.has(shapeKey)) continue
+
+    // A base shape that describes no type of its own is a mixin: every shape
+    // naming it already carries its rules, so it contributes nothing separately.
+    if (index.bases.has(shapeKey) && !index.types.get(shapeKey)?.length && !index.valueShapes.has(shapeKey)) {
+      continue
+    }
 
     for (const quad of store.getQuads(shape, null, null, null)) {
       if (!NODE_SHAPE_KNOWN.has(quad.predicate.value)) {
@@ -309,24 +362,28 @@ export function liftShapes(turtle: string): LiftResult {
       hasTargetNode,
       referenced: referenced.has(termKey(shape)),
       shapeLabel: literalValue(store, shape, `${SH}name`),
-      propertyShapes: store.getQuads(shape, `${SH}property`, null, null).map((quad) => quad.object as Quad_Subject),
-    }
-
-    // A shape pinned to one specific node describes that node, not a class of
-    // entities an author fills in.
-    if (hasTargetNode && !targetClass) {
-      notes.add('no-field', 'Shape applies to one specific node rather than a type of entity, so it generates no input.', name)
-      continue
+      // Base shapes first, own last: composition (sh:node between node shapes)
+      // means the base's rules apply here too.
+      propertyShapes: index.properties.get(shapeKey) ?? [],
     }
 
     // A shape another property points at describes the entities that property
     // references, so it becomes their own form — never the crate root, which is
     // what a target-less shape falls back to.
-    const indexed = index.types.get(termKey(shape))
-    if (indexed && index.derived.has(termKey(shape))) {
+    const indexed = index.types.get(shapeKey)?.[0]
+    if (indexed && index.derived.has(shapeKey)) {
       notes.add('partial', `${name} names no class for the entities it describes, so its rules were imported as ${shortIri(indexed)}, taken from the shape name.`, name)
     }
     const key = targetClass ?? nodeClass ?? indexed ?? (info.referenced ? undefined : ROOT_KEY)
+
+    // A shape pinned to one specific node describes that node, not a class of
+    // entities an author fills in — unless the file does say which type that node
+    // is, in which case the rules belong to that type's form (the usual "this one
+    // entity must conform to the shape for its class" binding).
+    if (hasTargetNode && (!key || key === ROOT_KEY)) {
+      notes.add('no-field', 'Shape applies to one specific node rather than a type of entity, so it generates no input.', name)
+      continue
+    }
     if (!key) {
       notes.add('no-field', 'Shape is referenced from another shape but names no class, so its rules could not be attached to a form.', name)
       continue
@@ -348,7 +405,11 @@ export function liftShapes(turtle: string): LiftResult {
     for (const quad of store.getQuads(shape, `${SH}or`, null, null)) {
       const entryCount = readEntryCountOr(store, quad.object as Quad_Subject)
       if (entryCount) group.entryCounts.set(entryCount.path, entryCount.minItems)
-      else notes.add('partial', 'A shape-level sh:or alternative has no builder equivalent and only applies while the file stays attached.', name)
+      // An alternative whose branches only pin an rdf:type states the entity's
+      // type; it was already read into the shape's target types.
+      else if (!typeUnionOr(store, listItems(store, quad.object as Quad_Subject))?.length) {
+        notes.add('partial', 'A shape-level sh:or alternative has no builder equivalent and only applies while the file stays attached.', name)
+      }
     }
   }
 
@@ -372,12 +433,22 @@ export function liftShapes(turtle: string): LiftResult {
 
   const entities: ProfileEntityRule[] = []
   const usedIds = new Set<string>()
+  // The builder blocks two rules sharing a class name, so a second type whose
+  // local name collides is suffixed here rather than importing an unsaveable draft.
+  const usedClassNames = new Set<string>()
 
   for (const group of ordered) {
+    if (entities.length >= MAX_ENTITIES) {
+      notes.add('no-field', `The file describes more than ${MAX_ENTITIES} types of entity; rules were imported for the first ${MAX_ENTITIES}.`, group.shapes[0]?.name)
+      break
+    }
     const isRoot = group === rootGroup
     const type = isRoot ? SCHEMA_DATASET : group.key
     const className = classNameFor(type)
     const scopeName = isRoot ? 'Root Dataset' : className
+    // Every type the group's shapes state, so an rdf:type constraint naming any
+    // member of a union is recognized as the type marker it is.
+    const groupTypes = [type, ...group.shapes.flatMap((shape) => index.types.get(termKey(shape.subject)) ?? [])]
 
     // Group every property shape in the group by path, so the presence / value /
     // recommended shapes a generator splits a single field across merge back
@@ -385,8 +456,13 @@ export function liftShapes(turtle: string): LiftResult {
     // share a target class.
     const byPath = new Map<string, Quad_Subject[]>()
     const pathOrder: string[] = []
+    // Two shapes of one group can inherit the SAME base, so the base's property
+    // shapes arrive twice; reading one twice would double its fixed values.
+    const seenPropertyShapes = new Set<string>()
     for (const shape of group.shapes) {
       for (const propertyShape of shape.propertyShapes) {
+        if (seenPropertyShapes.has(termKey(propertyShape))) continue
+        seenPropertyShapes.add(termKey(propertyShape))
         const paths = store.getQuads(propertyShape, `${SH}path`, null, null).map((quad) => quad.object)
         const path = paths.length === 1 && paths[0].termType === 'NamedNode' ? canonicalIri(paths[0].value) : undefined
         if (!path) {
@@ -398,8 +474,8 @@ export function liftShapes(turtle: string): LiftResult {
         // An rdf:type constraint states what the entity IS; it became the entity's
         // type above and would only render as a field the author must not edit.
         if (path === RDF_TYPE) {
-          const asserted = typeFromRdfProperty(store, propertyShape)
-          if (!asserted || !sameSchemaOrgType(asserted, type)) {
+          const asserted = typesFromRdfProperty(store, propertyShape)
+          if (!asserted.length || !asserted.some((candidate) => groupTypes.some((known) => sameSchemaOrgType(candidate, known)))) {
             notes.add('partial', 'A required rdf:type value has no input of its own; entities carry the type of the shape they were imported into.', shape.name)
           }
           continue
@@ -423,19 +499,22 @@ export function liftShapes(turtle: string): LiftResult {
     rules.sort(compareRuleOrder)
     dedupeValueNames(rules)
 
+    // An entity rule with no rules of its own is rejected by the builder, so a
+    // shape that describes nothing editable stays out of the draft entirely.
     if (!rules.length) continue
 
-    const baseId = className.toLowerCase()
+    const uniqueClassName = uniqueName(className, usedClassNames)
+    const baseId = uniqueClassName.toLowerCase()
     let id = baseId
     for (let n = 2; usedIds.has(id); n++) id = `${baseId}-${n}`
     usedIds.add(id)
 
     entities.push({
       id,
-      label: isRoot ? 'Root Dataset' : group.label || humanLabel(className),
+      label: isRoot ? 'Root Dataset' : group.label || humanLabel(uniqueClassName),
       description: '',
       type,
-      className,
+      className: uniqueClassName,
       propertyRules: rules,
     })
   }
@@ -543,7 +622,7 @@ function liftRuleGroup(
     const shapeMax = intValue(objectValue(store, shape, `${SH}maxCount`))
     if (shapeMax !== undefined) maxCount = maxCount === undefined ? shapeMax : Math.min(maxCount, shapeMax)
 
-    readFacets(store, shape, facets, scope, notes, false)
+    readFacets(store, shape, facets, scope, notes, index, false)
 
     for (const quad of store.getQuads(shape, `${SH}hasValue`, null, null)) hasValues.push(quad.object)
     for (const quad of store.getQuads(shape, `${SH}qualifiedValueShape`, null, null)) {
@@ -554,7 +633,7 @@ function liftRuleGroup(
       } else if (objectValue(store, qualified, `${SH}class`) || store.getQuads(qualified, `${SH}node`, null, null).length) {
         // The usual form only pins the TYPE of the qualifying entries, which is
         // exactly this rule's target type; only the "some of them" part is lost.
-        readFacets(store, qualified, facets, scope, notes, true)
+        readFacets(store, qualified, facets, scope, notes, index, true)
         notes.add('partial', 'Only some of the values have to match the referenced type; the builder applies it to every value.', scope)
       } else {
         notes.add('partial', 'A qualified value shape restricts part of a list in a way the builder cannot edit; it stays in the attached file.', scope)
@@ -626,13 +705,23 @@ function readFacets(
   facets: Facets,
   scope: string,
   notes: Notes,
+  index: ShapeIndex,
   branch: boolean,
 ) {
   const datatype = objectValue(store, shape, `${SH}datatype`)
   if (datatype) facets.datatype ??= datatype
   const classIri = objectValue(store, shape, `${SH}class`)
   if (classIri) facets.classIri ??= classIri
-  for (const quad of store.getQuads(shape, `${SH}node`, null, null)) facets.nodeTargets.push(quad.object)
+  for (const quad of store.getQuads(shape, `${SH}node`, null, null)) {
+    // A referenced shape that only constrains a literal IS the value: its facets
+    // belong to this rule and the chain ends there (a value shape never names a
+    // base of its own, so this cannot recurse further).
+    if (index.values.has(termKey(quad.object))) {
+      readFacets(store, quad.object as Quad_Subject, facets, scope, notes, index, true)
+      continue
+    }
+    facets.nodeTargets.push(quad.object)
+  }
 
   const nodeKind = objectValue(store, shape, `${SH}nodeKind`)
   if (nodeKind === `${SH}IRI` || nodeKind === `${SH}IRIOrLiteral` || nodeKind === `${SH}BlankNodeOrIRI`) {
@@ -655,26 +744,33 @@ function readFacets(
   facets.minValue ??= floatValue(objectValue(store, shape, `${SH}minInclusive`))
   facets.maxValue ??= floatValue(objectValue(store, shape, `${SH}maxInclusive`))
 
-  if (branch) return
-
   // sh:not excludes values; there is no "everything except" input.
-  if (store.getQuads(shape, `${SH}not`, null, null).length) {
+  if (!branch && store.getQuads(shape, `${SH}not`, null, null).length) {
     notes.add('partial', 'Some values are explicitly excluded (sh:not); the exclusion only applies while the file stays attached.', scope)
   }
 
   for (const quad of store.getQuads(shape, `${SH}or`, null, null)) {
     const branches = listItems(store, quad.object as Quad_Subject)
     if (!branches?.length) {
-      notes.add('partial', 'An sh:or alternative is malformed and was skipped.', scope)
+      if (!branch) notes.add('partial', 'An sh:or alternative is malformed and was skipped.', scope)
       continue
     }
     if (isNumberOr(store, branches)) {
       facets.numberOr = true
       continue
     }
+    // An alternative over datatypes alone (the usual "plain or language-tagged
+    // string" form) is one value with several literal types; the first is the one
+    // the input is built for and nothing is lost, so no note.
+    const alternation = datatypeAlternation(store, branches)
+    if (alternation) {
+      facets.datatype ??= alternation
+      continue
+    }
+    if (branch) continue
     // An alternative whose branches only pick a type is a union of target types,
     // which an entity rule holds in full — no branch is lost, so no note.
-    const union = unionTargets(store, branches)
+    const union = unionTargets(store, branches, index)
     if (union) {
       facets.unionClasses.push(...union.classes)
       facets.unionNodes.push(...union.nodes)
@@ -685,7 +781,7 @@ function readFacets(
     // fallbacks such as "missing" tokens listed after it) and say so.
     const first = branches[0]
     if (first.termType === 'BlankNode' || first.termType === 'NamedNode') {
-      readFacets(store, first as Quad_Subject, facets, scope, notes, true)
+      readFacets(store, first as Quad_Subject, facets, scope, notes, index, true)
     }
     notes.add('partial', `The value may also take ${branches.length - 1} alternative ${branches.length === 2 ? 'form' : 'forms'} (for example an "unknown" placeholder); the input follows the first form only.`, scope)
   }
@@ -741,20 +837,20 @@ function resolveKind(
     }
     // A class IRI names the class — unless it points at a shape, which says which
     // type its values are instead.
-    const classTarget = (uri: string) => index.types.get(termKey(namedNode(uri))) ?? uri
+    const classTarget = (uri: string) => index.types.get(termKey(namedNode(uri))) ?? [uri]
     if (facets.classIri) {
       // Projection emits class+node for describe-new rules; absent entitySources
       // is the stored form of ['new'].
-      addTarget(classTarget(facets.classIri))
+      classTarget(facets.classIri).forEach(addTarget)
     } else {
       // A bare sh:node / sh:nodeKind sh:IRI is the reuse-allowing form; the
       // original single-source policy is not recoverable (documented lossy).
       entitySources = [...ALL_ENTITY_SOURCES]
     }
-    for (const uri of facets.unionClasses) addTarget(classTarget(uri))
+    for (const uri of facets.unionClasses) classTarget(uri).forEach(addTarget)
     for (const node of [...facets.nodeTargets, ...facets.unionNodes]) {
       const resolved = index.types.get(termKey(node))
-      if (resolved) addTarget(resolved)
+      if (resolved?.length) resolved.forEach(addTarget)
       // A shape reference alongside sh:class only repeats the class, so an
       // unresolvable one there says nothing extra and needs no note.
       else if (!facets.classIri) notes.add('partial', unresolvedShapeMessage(index, node), scope)
@@ -865,70 +961,200 @@ function unresolvedShapeMessage(index: ShapeIndex, node: Term): string {
 // the crate root), so only a BARE reference makes its target a shape in its own
 // right; an `sh:class` that points at a shape rather than a class is one too.
 function buildShapeIndex(store: Store, nodeShapes: Map<string, Quad_Subject>): ShapeIndex {
+  // A PROPERTY naming a shape says its values must conform to it. A node-level
+  // sh:node is composition, not a value reference, so it never lands here.
   const valueShapes = new Set<string>()
   for (const quad of store.getQuads(null, `${SH}node`, null, null)) {
+    if (nodeShapes.has(termKey(quad.subject))) continue
     if (!store.getQuads(quad.subject, `${SH}class`, null, null).length) valueShapes.add(termKey(quad.object))
   }
   for (const quad of store.getQuads(null, `${SH}class`, null, null)) {
     if (nodeShapes.has(termKey(quad.object))) valueShapes.add(termKey(quad.object))
   }
 
-  const types = new Map<string, string>()
+  const values = new Set<string>()
+  for (const [key, shape] of nodeShapes) {
+    if (isValueShape(store, shape)) values.add(key)
+  }
+
+  // sh:node between two node shapes composes them: the base's rules apply to
+  // every shape naming it. Bases are resolved first so the chain is walked once.
+  const bases = new Set<string>()
+  const baseShapes = new Map<string, Quad_Subject[]>()
+  for (const [key, shape] of nodeShapes) {
+    const own: Quad_Subject[] = []
+    for (const quad of store.getQuads(shape, `${SH}node`, null, null)) {
+      const base = nodeShapes.get(termKey(quad.object))
+      if (!base || values.has(termKey(quad.object))) continue
+      bases.add(termKey(quad.object))
+      own.push(base)
+    }
+    baseShapes.set(key, own)
+  }
+
+  const properties = new Map<string, Quad_Subject[]>()
+  for (const key of nodeShapes.keys()) {
+    properties.set(key, composedProperties(store, key, nodeShapes, baseShapes, properties))
+  }
+
+  const types = new Map<string, string[]>()
   const derived = new Set<string>()
   for (const [key, shape] of nodeShapes) {
-    const asserted = assertedShapeType(store, shape, nodeShapes)
-    if (asserted) {
-      types.set(key, canonicalIri(asserted))
+    if (values.has(key)) continue
+    const asserted = shapeTypes(store, shape, nodeShapes, baseShapes, properties.get(key) ?? [])
+    if (asserted.length) {
+      types.set(key, asserted.map(canonicalIri))
       continue
     }
     // Only a shape something references as a value shape may fall back to its
     // own name: every other target-less shape is the crate root candidate.
     const named = valueShapes.has(key) && shape.termType === 'NamedNode' ? typeFromShapeName(shape.value) : undefined
     if (named) {
-      types.set(key, canonicalIri(named))
+      types.set(key, [canonicalIri(named)])
       derived.add(key)
     }
   }
-  return { types, derived, valueShapes, known: new Set(nodeShapes.keys()) }
+  return { types, derived, valueShapes, values, properties, bases, known: new Set(nodeShapes.keys()) }
 }
 
-// The class a node shape says its entities are: its target class, the class it
-// requires of them, or an rdf:type its own property shapes pin.
-function assertedShapeType(
+// A shape's own property shapes with every base shape's folded in ahead of them,
+// so its own constraint on a path merges over the one it inherits. Cycles are
+// cut by the visited set; the depth cap is a second backstop.
+function composedProperties(
+  store: Store,
+  key: string,
+  nodeShapes: Map<string, Quad_Subject>,
+  baseShapes: Map<string, Quad_Subject[]>,
+  cache: Map<string, Quad_Subject[]>,
+  seen = new Set<string>(),
+  depth = 0,
+): Quad_Subject[] {
+  const cached = cache.get(key)
+  if (cached) return cached
+  const shape = nodeShapes.get(key)
+  if (!shape || seen.has(key) || depth > MAX_BASE_DEPTH) return []
+  seen.add(key)
+  const collected: Quad_Subject[] = []
+  for (const base of baseShapes.get(key) ?? []) {
+    collected.push(...composedProperties(store, termKey(base), nodeShapes, baseShapes, cache, seen, depth + 1))
+  }
+  collected.push(...store.getQuads(shape, `${SH}property`, null, null).map((quad) => quad.object as Quad_Subject))
+  seen.delete(key)
+  const unique: Quad_Subject[] = []
+  const taken = new Set<string>()
+  for (const item of collected) {
+    if (taken.has(termKey(item))) continue
+    taken.add(termKey(item))
+    unique.push(item)
+  }
+  return unique
+}
+
+// True when a shape says nothing about an entity, only about a literal: no
+// properties, no class, no target, no base and no IRI node kind, but a datatype,
+// an allowed-value list, or an sh:or over datatypes. A reference to one of these
+// is the value itself, which is where a chain of shape references bottoms out.
+function isValueShape(store: Store, shape: Quad_Subject): boolean {
+  for (const predicate of [`${SH}property`, `${SH}targetClass`, `${SH}targetNode`, `${SH}class`, `${SH}node`]) {
+    if (store.getQuads(shape, predicate, null, null).length) return false
+  }
+  if (objectValue(store, shape, `${SH}nodeKind`) === `${SH}IRI`) return false
+  if (store.getQuads(shape, `${SH}datatype`, null, null).length) return true
+  if (store.getQuads(shape, `${SH}in`, null, null).length) return true
+  for (const quad of store.getQuads(shape, `${SH}or`, null, null)) {
+    const branches = listItems(store, quad.object as Quad_Subject)
+    if (branches && (isNumberOr(store, branches) || datatypeAlternation(store, branches))) return true
+  }
+  return false
+}
+
+// The classes a node shape says its entities are: its own target class, the
+// class it (or a base) requires of them, or the rdf:type its composed property
+// shapes pin. Several when the file states a union; the first drives the form.
+function shapeTypes(
   store: Store,
   shape: Quad_Subject,
   nodeShapes: Map<string, Quad_Subject>,
-): string | undefined {
+  baseShapes: Map<string, Quad_Subject[]>,
+  properties: Quad_Subject[],
+): string[] {
   const targetClass = store.getQuads(shape, `${SH}targetClass`, null, null)
     .find((quad) => quad.object.termType === 'NamedNode')?.object.value
-  if (targetClass) return targetClass
-  const nodeClass = store.getQuads(shape, `${SH}class`, null, null)
-    .find((quad) => quad.object.termType === 'NamedNode' && !nodeShapes.has(termKey(quad.object)))?.object.value
-  if (nodeClass) return nodeClass
-  for (const quad of store.getQuads(shape, `${SH}property`, null, null)) {
-    const asserted = typeFromRdfProperty(store, quad.object as Quad_Subject)
-    if (asserted) return asserted
+  if (targetClass) return [targetClass]
+  // sh:class is a constraint, so a base's applies here too; sh:targetClass is a
+  // target and is never inherited.
+  const withBases = [shape, ...(baseShapes.get(termKey(shape)) ?? [])]
+  for (const candidate of withBases) {
+    const nodeClass = store.getQuads(candidate, `${SH}class`, null, null)
+      .find((quad) => quad.object.termType === 'NamedNode' && !nodeShapes.has(termKey(quad.object)))?.object.value
+    if (nodeClass) return [nodeClass]
   }
-  return undefined
+  const asserted: string[] = []
+  for (const propertyShape of properties) asserted.push(...typesFromRdfProperty(store, propertyShape))
+  for (const quad of store.getQuads(shape, `${SH}or`, null, null)) {
+    asserted.push(...(typeUnionOr(store, listItems(store, quad.object as Quad_Subject)) ?? []))
+  }
+  return [...new Set(asserted)]
 }
 
-// `sh:property [ sh:path rdf:type ; sh:hasValue X ]` (or a single-entry sh:in),
-// the standard way a shape states the type of the entities it describes.
-function typeFromRdfProperty(store: Store, propertyShape: Quad_Subject): string | undefined {
-  if (objectValue(store, propertyShape, `${SH}path`) !== RDF_TYPE) return undefined
-  const hasValue = store.getQuads(propertyShape, `${SH}hasValue`, null, null)
-    .find((quad) => quad.object.termType === 'NamedNode')?.object.value
-  if (hasValue) return hasValue
-  for (const quad of store.getQuads(propertyShape, `${SH}in`, null, null)) {
-    const items = listItems(store, quad.object as Quad_Subject)
-    if (items?.length === 1 && items[0].termType === 'NamedNode') return items[0].value
+// `sh:property [ sh:path rdf:type ; sh:hasValue X ]`, an sh:in list, or a
+// qualified value shape over an sh:in list — the ways a shape states the type
+// (or the accepted types) of the entities it describes.
+function typesFromRdfProperty(store: Store, propertyShape: Quad_Subject): string[] {
+  if (objectValue(store, propertyShape, `${SH}path`) !== RDF_TYPE) return []
+  const found: string[] = []
+  for (const quad of store.getQuads(propertyShape, `${SH}hasValue`, null, null)) {
+    if (quad.object.termType === 'NamedNode') found.push(quad.object.value)
   }
-  return undefined
+  const heads = [
+    ...store.getQuads(propertyShape, `${SH}in`, null, null).map((quad) => quad.object),
+    ...store.getQuads(propertyShape, `${SH}qualifiedValueShape`, null, null)
+      .flatMap((quad) => store.getQuads(quad.object as Quad_Subject, `${SH}in`, null, null))
+      .map((quad) => quad.object),
+  ]
+  for (const head of heads) {
+    const items = listItems(store, head as Quad_Subject)
+    if (items?.every((item) => item.termType === 'NamedNode')) found.push(...items.map((item) => item.value))
+  }
+  return found
+}
+
+// The types a shape-level sh:or states, when EVERY branch does nothing but pin
+// an rdf:type ("an ImageObject or a MediaObject"). Any other branch means the
+// alternative says more than which type the entity is.
+function typeUnionOr(store: Store, branches: Quad_Object[] | undefined): string[] | undefined {
+  if (!branches?.length) return undefined
+  const found: string[] = []
+  for (const branch of branches) {
+    if (branch.termType !== 'BlankNode' && branch.termType !== 'NamedNode') return undefined
+    const quads = store.getQuads(branch as Quad_Subject, null, null, null)
+    if (!quads.length || quads.some((quad) => quad.predicate.value !== `${SH}property`)) return undefined
+    const branchTypes = quads.flatMap((quad) => typesFromRdfProperty(store, quad.object as Quad_Subject))
+    if (branchTypes.length !== quads.length) return undefined
+    found.push(...branchTypes)
+  }
+  return found.length ? found : undefined
+}
+
+// The single datatype an sh:or over datatypes alone offers (the first branch's).
+// The usual form is "a plain string or a language-tagged one"; the rule model
+// has one literal type per field, and the first branch is the primary form.
+function datatypeAlternation(store: Store, branches: Quad_Object[]): string | undefined {
+  const datatypes: string[] = []
+  for (const branch of branches) {
+    if (branch.termType !== 'BlankNode' && branch.termType !== 'NamedNode') return undefined
+    const quads = store.getQuads(branch as Quad_Subject, null, null, null)
+    if (!quads.length || quads.some((quad) => quad.predicate.value !== `${SH}datatype`)) return undefined
+    datatypes.push(...quads.map((quad) => quad.object.value))
+  }
+  return datatypes[0]
 }
 
 // Last resort for a value shape that names no class: its own name. A curated
 // type of that name wins (PersonShape describes schema.org Persons), otherwise
-// the type is minted beside the shape in the same namespace.
+// the type is minted beside the shape — but only when the shape's own namespace
+// is an http(s) one. A file written against a relative base resolves under the
+// crate base IRI, and an arcp:// "class" would travel into the exported profile.
 const SHAPE_NAME_SUFFIX = /[-_]?(node)?shape$/i
 
 function typeFromShapeName(iri: string): string | undefined {
@@ -937,7 +1163,8 @@ function typeFromShapeName(iri: string): string | undefined {
   if (!base || !/^[A-Za-z]/.test(base)) return undefined
   const curated = CURATED_ENTITY_TYPES.find((type) => type.label.toLowerCase() === base.toLowerCase())
   if (curated) return curated.uri
-  return `${iri.slice(0, iri.length - local.length)}${base}`
+  const namespace = iri.slice(0, iri.length - local.length)
+  return /^https?:\/\//.test(namespace) ? `${namespace}${base}` : `${IMPORTED_TYPE_NS}${base}`
 }
 
 // The target types an sh:or offers, when EVERY branch only picks one: sh:class,
@@ -945,13 +1172,23 @@ function typeFromShapeName(iri: string): string | undefined {
 // alternative says more than "one of these types" and is not a plain union.
 const TARGET_BRANCH_KNOWN = new Set([RDF_TYPE, `${SH}class`, `${SH}node`, `${SH}nodeKind`])
 
-function unionTargets(store: Store, branches: Quad_Object[]): { classes: string[]; nodes: Term[] } | undefined {
+function unionTargets(
+  store: Store,
+  branches: Quad_Object[],
+  index: ShapeIndex,
+): { classes: string[]; nodes: Term[] } | undefined {
   const classes: string[] = []
   const nodes: Term[] = []
   for (const branch of branches) {
     if (branch.termType !== 'BlankNode' && branch.termType !== 'NamedNode') return undefined
     const quads = store.getQuads(branch as Quad_Subject, null, null, null)
     if (!quads.length || quads.some((quad) => !TARGET_BRANCH_KNOWN.has(quad.predicate.value))) return undefined
+    // A branch offering a plain literal ("text, or a PropertyValue entity") is
+    // not a union of types: no single input holds both, so the alternative falls
+    // through to the first-branch rule, which says so in a note.
+    if (quads.some((quad) => quad.predicate.value === `${SH}node` && index.values.has(termKey(quad.object)))) {
+      return undefined
+    }
     // Within one branch a shape reference alongside sh:class only repeats the
     // class it already names (the form this projection emits).
     const branchClasses = quads.filter((quad) => quad.predicate.value === `${SH}class` && quad.object.termType === 'NamedNode')
@@ -1043,6 +1280,14 @@ function dedupeValueNames(rules: ProfilePropertyRule[]) {
     rule.id = rule.valueName
     taken.add(rule.valueName)
   }
+}
+
+// A name unique within `taken`, suffixing 2,3,… on collision. The set is updated.
+function uniqueName(base: string, taken: Set<string>): string {
+  let name = base
+  for (let n = 2; taken.has(name); n++) name = `${base}${n}`
+  taken.add(name)
+  return name
 }
 
 function classNameFor(type: string): string {

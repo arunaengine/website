@@ -28,13 +28,14 @@ export function termNameFromUri(uri: string): string {
   return segment || uri
 }
 
-// Plain names map to schema.org; absolute URIs (any scheme) pass through
-// unchanged; empty input yields an empty string.
+// Plain names map to schema.org; absolute URIs (ANY scheme) pass through
+// unchanged; empty input yields an empty string. The scheme must not be limited
+// to http(s): a lifted SHACL file can mint a type under another scheme, and
+// prefixing schema.org onto it would emit a type URI that resolves to nothing.
 export function normalizeTypeUri(value: unknown): string {
   const text = value === undefined || value === null ? '' : String(value).trim()
   if (!text) return ''
-  if (text.startsWith('http://') || text.startsWith('https://')) return text
-  return `${SCHEMA_ORG}${text}`
+  return isAbsoluteUri(text) ? text : `${SCHEMA_ORG}${text}`
 }
 
 // An absolute URI (any scheme) — property term URIs must resolve in a crate
