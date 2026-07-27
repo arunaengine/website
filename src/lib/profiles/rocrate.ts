@@ -251,9 +251,14 @@ export function parseProfileCrate(rocrate: unknown): ParsedProfileCrate {
 // private profiles) pass through untouched. Only entities referenced by a
 // DX-PROF ResourceDescriptor are fetched — a dataset crate's data files never
 // qualify. Throws when a referenced artifact cannot be fetched.
+// `baseUrl` is the location the crate itself was read from. A crate authored as
+// a directory names its artifacts by crate-relative path ("constraints/x.ttl"),
+// which is only fetchable when that location is known; an uploaded file has none,
+// so those artifacts stay unresolved and the caller reports which are missing.
 export async function resolveProfileArtifacts(
   rocrate: unknown,
   fetchText: (url: string) => Promise<string> = fetchArtifactText,
+  baseUrl?: string,
 ): Promise<unknown> {
   const entries = graph(rocrate)
   const artifactIds = new Set<string>()
@@ -262,20 +267,33 @@ export async function resolveProfileArtifacts(
     for (const id of idValues(descriptor[DX_HAS_ARTIFACT] ?? descriptor.hasArtifact)) artifactIds.add(id)
   }
 
-  const pending: Array<{ id: string; url: string }> = []
+  const pending: Array<{ id: string; url: string; required: boolean }> = []
   for (const id of artifactIds) {
     const entity = entityById(entries, id)
     if (!entity || typeof entity.text === 'string' || isRecord(entity.text)) continue
-    const url = artifactFetchUrl(entity)
-    if (url) pending.push({ id, url })
+    const resolved = artifactFetchUrl(entity, baseUrl)
+    if (resolved) pending.push({ id, ...resolved })
   }
   if (!pending.length) return rocrate
 
-  const texts = await Promise.all(pending.map(async (item) => ({ ...item, text: await fetchText(item.url) })))
+  // An artifact the crate addresses directly must resolve — a published profile
+  // is incomplete without it. One found only by resolving a relative path against
+  // the crate's location is best effort: a directory crate lists its prose and
+  // licence files too, and a missing or CORS-blocked one of those must not stop
+  // the rules being read.
+  const texts = await Promise.all(pending.map(async (item) => {
+    if (item.required) return { ...item, text: await fetchText(item.url) }
+    try {
+      return { ...item, text: await fetchText(item.url) }
+    } catch {
+      return { ...item, text: undefined }
+    }
+  }))
 
   const copy = JSON.parse(JSON.stringify(rocrate)) as Record<string, unknown>
   const copyEntries = graph(copy)
   for (const item of texts) {
+    if (item.text === undefined) continue
     const entity = entityById(copyEntries, item.id)
     if (entity) entity.text = item.text
   }
@@ -297,12 +315,31 @@ function publishedArtifactUrl(entries: Array<Record<string, unknown>>): string |
   return undefined
 }
 
-// contentUrl (the S3 https URL) first; a fetchable absolute @id second.
-function artifactFetchUrl(entity: Record<string, unknown>): string | undefined {
+// contentUrl (the S3 https URL) first, a fetchable absolute @id second, and a
+// crate-relative @id resolved against the crate's own location last. `required`
+// marks the first two: an address the crate states itself, whose failure is a
+// real error rather than a file the crate merely sits next to.
+function artifactFetchUrl(
+  entity: Record<string, unknown>,
+  baseUrl?: string,
+): { url: string; required: boolean } | undefined {
   const contentUrl = idValue(entity.contentUrl) || textValue(entity.contentUrl)
-  if (/^https?:\/\//.test(contentUrl)) return contentUrl
+  if (/^https?:\/\//.test(contentUrl)) return { url: contentUrl, required: true }
   const id = typeof entity['@id'] === 'string' ? entity['@id'] : ''
-  return /^https?:\/\//.test(id) ? id : undefined
+  if (/^https?:\/\//.test(id)) return { url: id, required: true }
+  const relative = id && baseUrl ? relativeArtifactUrl(id, baseUrl) : undefined
+  return relative ? { url: relative, required: false } : undefined
+}
+
+// A crate-relative artifact path against the URL the crate was read from. Only
+// http(s) bases resolve: a relative id under any other scheme is not fetchable.
+function relativeArtifactUrl(id: string, baseUrl: string): string | undefined {
+  if (id.startsWith('#') || !/^https?:\/\//.test(baseUrl)) return undefined
+  try {
+    return new URL(id, baseUrl).toString()
+  } catch {
+    return undefined
+  }
 }
 
 async function fetchArtifactText(url: string): Promise<string> {
@@ -313,13 +350,20 @@ async function fetchArtifactText(url: string): Promise<string> {
 
 // The SHACL artifact's Turtle text, split back into its generated and preserved
 // sections so re-editing can regenerate the former without duplicating the latter.
+// The DX-PROF roles a SHACL artifact is published under: the portal writes
+// `constraints`, and the vocabulary's own term for the same thing is
+// `validation`, which is what externally authored profile crates use.
+function isShapesRole(role: string): boolean {
+  return role.includes('/constraints') || role.includes('/validation')
+}
+
 export function extractShapesTexts(rocrate: unknown): { shapesText?: string; customShapesText?: string } {
   const entries = graph(rocrate)
   const candidates: Array<Record<string, unknown>> = []
   for (const descriptor of entries) {
     if (!typeContains(descriptor, DX_RESOURCE_DESCRIPTOR)) continue
     const roles = idValues(descriptor[DX_HAS_ROLE] ?? descriptor.hasRole)
-    if (!roles.some((role) => role.includes('/constraints'))) continue
+    if (!roles.some(isShapesRole)) continue
     const artifactRef = idValues(descriptor[DX_HAS_ARTIFACT] ?? descriptor.hasArtifact)[0]
     const artifact = artifactRef ? entityById(entries, artifactRef) : undefined
     if (artifact) candidates.push(artifact)
@@ -343,6 +387,25 @@ export function extractShapesTexts(rocrate: unknown): { shapesText?: string; cus
     }
   }
   return { shapesText, customShapesText }
+}
+
+// Ids of SHACL artifacts the crate names but whose content is not available: a
+// crate authored as a directory references its shapes by relative path, which is
+// unfetchable from a single uploaded ro-crate-metadata.json. Reported so the
+// import says which file is missing instead of silently generating no fields.
+export function missingShapesArtifacts(rocrate: unknown): string[] {
+  const entries = graph(rocrate)
+  const missing: string[] = []
+  for (const descriptor of entries) {
+    if (!typeContains(descriptor, DX_RESOURCE_DESCRIPTOR)) continue
+    if (!idValues(descriptor[DX_HAS_ROLE] ?? descriptor.hasRole).some(isShapesRole)) continue
+    for (const id of idValues(descriptor[DX_HAS_ARTIFACT] ?? descriptor.hasArtifact)) {
+      const artifact = entityById(entries, id)
+      if (artifact && typeof artifact.text === 'string' && artifact.text.trim()) continue
+      if (!missing.includes(id)) missing.push(id)
+    }
+  }
+  return missing
 }
 
 function splitCombinedShapesText(text: string): { shapesText: string; customShapesText?: string } {
@@ -627,8 +690,14 @@ function idMatches(value: unknown, id: string): boolean {
   return value === id || value.endsWith(id)
 }
 
+// Matches whichever way round the crate wrote the type: an expanded IRI against
+// a compact expectation ("Dataset"), and a COMPACT `@type` against an expanded
+// one — externally authored crates map the DX-PROF terms in their `@context` and
+// write `"@type": "ResourceDescriptor"`, which an IRI-only test never matched.
 function typeContains(entity: Record<string, unknown>, expected: string): boolean {
-  return idValues(entity['@type']).some((type) => type === expected || type.endsWith(expected))
+  return idValues(entity['@type']).some(
+    (type) => type === expected || type.endsWith(expected) || expected.endsWith(`/${type}`),
+  )
 }
 
 function idValues(value: unknown): string[] {

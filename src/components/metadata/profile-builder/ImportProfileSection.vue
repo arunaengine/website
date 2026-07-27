@@ -6,7 +6,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import { Upload, Globe, FileJson, FileCode2, CheckCircle2, AlertTriangle, Loader2, ListChecks } from '@lucide/vue'
 import { isModeFile, MODELED_MODE_KEYS, modeBasics, modeToEntityRules } from '@/lib/profiles/mode'
-import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
+import { missingShapesArtifacts, parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
 import { isRecord } from '@/lib/profiles/uri'
 import { useAruna } from '@/composables/useAruna'
 import { useArtifactFetch } from './useArtifactFetch'
@@ -93,7 +93,7 @@ async function fromStored() {
 // summary lives on the builder (importSummary) so it survives tab navigation.
 // Async because a public profile crate may reference its artifacts on S3
 // (resolveProfileArtifacts fetches them before parsing).
-async function ingest(json: unknown) {
+async function ingest(json: unknown, baseUrl?: string) {
   let result: ProfileImportResult
   if (isModeFile(json)) {
     result = {
@@ -104,7 +104,8 @@ async function ingest(json: unknown) {
       preservedKeys: preservedKeys(json),
     }
   } else if (isRecord(json) && Array.isArray(json['@graph'])) {
-    const parsed = parseProfileCrate(await resolveProfileArtifacts(json, fetchArtifact))
+    const resolved = await resolveProfileArtifacts(json, fetchArtifact, baseUrl)
+    const parsed = parseProfileCrate(resolved)
     const basics: Partial<ProfileBasics> = {
       name: parsed.name,
       description: parsed.description,
@@ -112,14 +113,27 @@ async function ingest(json: unknown) {
       datePublished: parsed.datePublished,
       license: parsed.license,
     }
+    // A crate whose only machine-readable artifact is SHACL (an externally
+    // authored profile, which carries no Describo mode file) still describes
+    // every field; lift its shapes rather than importing an empty draft.
+    const lifted = parsed.entityRules.length || !parsed.shapesText
+      ? undefined
+      : await liftText(parsed.shapesText)
     result = {
       basics,
-      entityRules: parsed.entityRules,
+      entityRules: lifted?.entities ?? parsed.entityRules,
       mode: parsed.mode ?? null,
       kind: 'crate',
       preservedKeys: preservedKeys(parsed.mode),
       // An attached shapes.custom.ttl survives import verbatim.
       customShapesText: parsed.customShapesText,
+      liftNotes: lifted?.notes,
+    }
+    if (!result.entityRules.length) {
+      const missing = missingShapesArtifacts(resolved)
+      if (missing.length) {
+        throw new Error(`That profile crate keeps its rules in ${missing.join(', ')}, which is not part of the file you opened. Import the crate by URL so the file can be read alongside it, or upload the shapes file on its own.`)
+      }
     }
   } else {
     throw new Error('Unrecognized file, expected a Describo/Crate-O mode file, an RO-Crate profile crate (with @graph), or a SHACL shapes file (.ttl).')
@@ -134,25 +148,28 @@ async function ingest(json: unknown) {
 
 // Route raw text: JSON documents go through the JSON ingest; anything else is
 // treated as a SHACL Turtle file (plan 6.6).
-async function ingestText(text: string, fileName: string) {
+async function ingestText(text: string, fileName: string, baseUrl?: string) {
   if (text.trim().startsWith('{')) {
-    await ingest(JSON.parse(text))
+    await ingest(JSON.parse(text), baseUrl)
     return
   }
   await ingestTurtle(text, fileName)
 }
 
-// Bare SHACL file: lift whatever the rule model can express and offer the
-// choice, falling straight through to attach-only when nothing lifted.
 // lift.ts is loaded on demand so the Turtle parser stays out of the main bundle.
-async function ingestTurtle(text: string, fileName: string) {
+async function liftText(text: string): Promise<LiftResult> {
   const { liftShapes } = await import('@/lib/shacl/lift')
-  let lift: LiftResult
   try {
-    lift = liftShapes(text)
+    return liftShapes(text)
   } catch (err) {
     throw new Error(`Not parseable as Turtle: ${err instanceof Error ? err.message : String(err)}`)
   }
+}
+
+// Bare SHACL file: lift whatever the rule model can express and offer the
+// choice, falling straight through to attach-only when nothing lifted.
+async function ingestTurtle(text: string, fileName: string) {
+  const lift = await liftText(text)
   shaclNotice.value = null
   if (!lift.shapeCount) throw new Error('No SHACL node shapes found in that file.')
   if (!lift.fieldCount) {
@@ -249,7 +266,7 @@ async function fromUrl() {
   busy.value = true
   error.value = ''
   try {
-    await ingestText(await fetchArtifact(target), target.split('/').pop() || target)
+    await ingestText(await fetchArtifact(target), target.split('/').pop() || target, target)
   } catch (err) {
     // A cross-origin browser fetch the remote host refuses surfaces as an opaque
     // TypeError. Portal-owned URLs are read through an authenticated GetObject
