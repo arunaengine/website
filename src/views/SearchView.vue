@@ -89,9 +89,9 @@ const profilePushedDown = computed(() => conformsToIri.value !== null)
 const {
   active: searchActive,
   pending: searchPending,
-  loadingMore,
+  paging: searchPaging,
   error: searchError,
-  moreError,
+  pageError: searchPageError,
   searched,
   results: searchResults,
   nodesQueried,
@@ -99,10 +99,12 @@ const {
   truncated,
   partial,
   capped,
-  nextCursor,
+  page: searchPage,
+  pageCount: searchPageCount,
+  hasNextPage: searchHasNext,
+  depthCapped: searchDepthCapped,
   cursorEnabled,
-  sentinel,
-  loadMore,
+  goToPage: goToSearchPage,
   retry: retrySearch,
 } = useMetadataSearch(q, { groupId: groupFilter, conformsTo: conformsToIri })
 const expertMode = ref(queryString(route.query.expert) === '1')
@@ -461,6 +463,21 @@ const hiddenByProfile = computed(() =>
     : 0,
 )
 
+// ── Search paging ───────────────────────────────────────────────────────────
+// Search pages one opaque cursor at a time, so unlike browse there is no match
+// total and no addressable offset: the summary states the page number only, the
+// pager offers the pages already reached, and the page stays out of the URL
+// because a cursor cannot be reconstructed from it.
+const searchSummary = computed(() => {
+  const count = visibleResults.value.length
+  return `Page ${formatNumber(searchPage.value)} · ${formatNumber(count)} result${count === 1 ? '' : 's'} on this page.`
+})
+
+function showSearchPage(page: number) {
+  goToSearchPage(page)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 // Beyond metadata, an active query also discovers groups (client-side over the
 // loaded group lists, like the top bar), people (server /users/search) and
 // buckets across the realm's nodes (the `buckets` section of the unified
@@ -772,9 +789,9 @@ async function runQuery() {
           <template v-if="showKind('datasets')">
           <ErrorPanel v-if="searchError" :message="searchError" @retry="retrySearch" />
 
-          <!-- Skeletons cover the debounce window too (!searched), so the area
-               never goes blank between the filter surface and the footer. -->
-          <section v-else-if="(searchPending || !searched) && !searchResults.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <!-- Skeletons cover the debounce window too (!searched), and the walk
+               to a page past the cached ones, so the area never goes blank. -->
+          <section v-else-if="(searchPending || searchPaging || !searched) && !searchResults.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Skeleton v-for="n in 6" :key="n" class="h-36" />
           </section>
 
@@ -825,7 +842,7 @@ async function runQuery() {
           </section>
 
           <EmptyState
-            v-else-if="!cursorEnabled || (searched && !searchPending && !nextCursor && !loadingMore)"
+            v-else-if="!cursorEnabled || (searched && !searchPending && !searchPaging)"
             :title="searchResults.length ? 'No matches after filters' : 'No matches'"
             :description="searchResults.length
               ? 'Results were hidden by the active group, profile or favourites filters.'
@@ -837,20 +854,28 @@ async function runQuery() {
           </EmptyState>
 
           <!-- Paging stays outside the visible-results branch so filters cannot
-               strand matches on later server pages. Re-keying the sentinel
-               continues paging while a fully filtered page is on screen. -->
+               strand matches on later server pages: a fully filtered page still
+               offers Next. Numbers cover the pages reached so far only. -->
           <template v-if="cursorEnabled && searched && !searchError">
-            <div v-if="loadingMore" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Skeleton v-for="n in 3" :key="n" class="h-36" />
+            <div v-if="searchPageError" class="mt-3 flex items-center justify-center gap-2 text-xs text-destructive">
+              {{ searchPageError }}
+              <Button variant="outline" size="sm" @click="showSearchPage(searchPage + 1)">Try again</Button>
             </div>
-            <div v-if="moreError" class="mt-3 flex items-center justify-center gap-2 text-xs text-destructive">
-              {{ moreError }}
-              <Button variant="outline" size="sm" @click="loadMore">Try again</Button>
+            <div class="mt-4 flex flex-col items-center gap-2">
+              <p
+                v-if="searchPageCount > 1 || searchHasNext"
+                class="text-[11px] text-muted-foreground"
+                title="Search pages are walked with an opaque cursor and the server counts no matches, so there is no page total."
+              >
+                {{ searchSummary }}
+              </p>
+              <Pagination :page="searchPage" :page-count="searchPageCount" :has-next="searchHasNext" @update:page="showSearchPage" />
+              <p v-if="!searchHasNext && !searchPaging && !searchPageError" class="py-2 text-center text-[11px] text-muted-foreground">
+                {{ truncated || searchDepthCapped
+                  ? 'End of the first results, refine the query to reach matches past the server depth cap.'
+                  : 'End of results.' }}
+              </p>
             </div>
-            <div v-if="nextCursor && !moreError && !loadingMore" :key="nextCursor" ref="sentinel" class="h-1" aria-hidden="true" />
-            <p v-else-if="!moreError && !searchPending && !loadingMore" class="py-2 text-center text-[11px] text-muted-foreground">
-              {{ truncated ? 'End of the first results, refine the query to reach matches past the server depth cap.' : 'End of results.' }}
-            </p>
           </template>
           <p v-else-if="!cursorEnabled && capped" class="py-2 text-center text-[11px] text-muted-foreground">
             Showing the first 100 matches by relevance, refine the query to narrow results.

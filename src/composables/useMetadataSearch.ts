@@ -2,7 +2,7 @@
 // (portal part of aruna#258).
 //
 // Per-view FACTORY, not a module singleton like useAruna: debounce timer,
-// in-flight AbortController and the paging cursor are bound to the lifetime
+// in-flight AbortController and the paging cursors are bound to the lifetime
 // of the view that owns the search box, and two views must never share a
 // cursor. Must be called during component setup (uses onBeforeUnmount).
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
@@ -16,6 +16,10 @@ export const SEARCH_DEBOUNCE_MS = 300
 export const SEARCH_PAGE_CAP = 100
 // Page size under cursor paging (backend default page size).
 const CURSOR_PAGE_SIZE = 25
+// Backend METADATA_SEARCH_MAX_PAGINATION_DEPTH: the server withholds the next
+// cursor once the deepest per-node resume position reaches it, so no page past
+// this depth can ever be served. Mirrored here as a walk bound.
+const SEARCH_MAX_DEPTH = 1000
 const SEARCH_REQUEST_TIMEOUT_MS = 30_000
 
 export interface SearchResultLine {
@@ -55,17 +59,25 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
   const { metadata, searchMetadata, authToken, apiBaseUrl } = useAruna()
   const cursorEnabled = featureEnabled('searchCursor')
   const pageSize = cursorEnabled ? CURSOR_PAGE_SIZE : SEARCH_PAGE_CAP
+  // Highest page the server can serve at this page size; without cursor paging
+  // there is exactly one (capped) page.
+  const maxPage = cursorEnabled ? Math.max(1, Math.floor(SEARCH_MAX_DEPTH / pageSize)) : 1
 
-  const hits = ref<MetadataSearchHit[]>([])
+  // One entry per page reached so far, so Previous and every visited page
+  // number render from cache instead of refetching.
+  const pages = ref<MetadataSearchHit[][]>([])
+  // cursors[i] is the cursor that fetches page i + 1; index 0 is the cursorless
+  // first page. A null entry means the server offered no continuation.
+  const cursors = ref<Array<string | null>>([null])
+  const page = ref(1)
   const pending = ref(false) // first page in flight
-  const loadingMore = ref(false) // cursor page in flight
+  const paging = ref(false) // walking cursors towards a later page
   const error = ref<string | null>(null)
-  const moreError = ref<string | null>(null)
+  const pageError = ref<string | null>(null)
   const searched = ref(false) // at least one response for the current query
   const nodesQueried = ref(0)
   const nodesFailed = ref(0)
   const truncated = ref(false)
-  const nextCursor = ref<string | null>(null)
 
   // Two-character minimum, aligned with useUnifiedSearch (the backend rejects
   // shorter queries with 400 anyway) — except with a conformsTo filter, which
@@ -74,9 +86,27 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
   // The backend signals partial results through nodes_failed (a per-node id list
   // is not served); a non-zero count means matches on failed nodes are missing.
   const partial = computed(() => nodesFailed.value > 0)
+
+  // The hits of the page on screen; empty while a walk towards it is in flight.
+  const pageHits = computed(() => pages.value[page.value - 1] ?? [])
   // Without cursor paging we get exactly one page (cap 100); a full page
   // means more matches may exist that we cannot fetch.
-  const capped = computed(() => !cursorEnabled && hits.value.length >= SEARCH_PAGE_CAP)
+  const capped = computed(() => !cursorEnabled && pageHits.value.length >= SEARCH_PAGE_CAP)
+  // Pages proven to exist: the ones cached plus the one being walked to. Search
+  // has no match total, so this is a floor, never a page count to advertise.
+  const pageCount = computed(() => Math.max(pages.value.length, page.value))
+  // Only a served cursor proves another page exists; a short page does not,
+  // because a saturated node can return few hits and still continue.
+  const hasNextPage = computed(
+    () =>
+      cursorEnabled &&
+      page.value < maxPage &&
+      (page.value < pages.value.length || Boolean(cursors.value[page.value])),
+  )
+  // The server still offers a continuation we refuse to follow.
+  const depthCapped = computed(
+    () => cursorEnabled && page.value >= maxPage && Boolean(cursors.value[page.value]),
+  )
 
   // Loaded catalog pages only; enrichment, never a filter.
   const docById = computed(() => {
@@ -85,9 +115,9 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
     return map
   })
 
-  // Kept as a computed so hits enrich retroactively as more pages load.
+  // Kept as a computed so hits enrich retroactively as the catalog loads.
   const results = computed<SearchResultLine[]>(() =>
-    hits.value.map((hit) => {
+    pageHits.value.map((hit) => {
       const doc = docById.value.get(hit.document_id) ?? null
       return {
         hit,
@@ -100,14 +130,15 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
 
   let timer: number | undefined
   let seq = 0
+  let nav = 0
   let controller: AbortController | null = null
-  let moreController: AbortController | null = null
-  // The query the current cursor was issued for. aruna#258 binds the opaque
+  let pageController: AbortController | null = null
+  // The query the current cursors were issued for. aruna#258 binds the opaque
   // cursor to the query, so it is only ever valid for exactly this string.
   let cursorQuery = ''
   // The query we have already transparently restarted once after a cursor
   // rejection. A second rejection for the same query surfaces the error instead
-  // of looping (restart → sentinel remount → loadMore → reject → …).
+  // of looping (restart → next page → reject → …).
   let restartedFor = ''
 
   function filterValues(): { group_id?: string; conforms_to?: string } {
@@ -117,40 +148,51 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
     }
   }
 
+  // A cursor is bound to the query AND the filters, so any change discards
+  // every cached page with its cursors and starts over at page one.
+  function clearPages() {
+    pages.value = []
+    cursors.value = [null]
+    page.value = 1
+  }
+
   function reset() {
-    hits.value = []
+    clearPages()
     error.value = null
-    moreError.value = null
+    pageError.value = null
     searched.value = false
     pending.value = false
-    loadingMore.value = false
+    paging.value = false
     nodesQueried.value = 0
     nodesFailed.value = 0
     truncated.value = false
-    nextCursor.value = null
   }
 
   function applyMeta(response: MetadataSearchResponse) {
     nodesQueried.value = Math.max(nodesQueried.value, response.nodes_queried ?? 0)
     nodesFailed.value = Math.max(nodesFailed.value, response.nodes_failed ?? 0)
     if (response.truncated) truncated.value = true
-    nextCursor.value = cursorEnabled ? (response.next_cursor ?? null) : null
+  }
+
+  function nextCursorOf(response: MetadataSearchResponse): string | null {
+    return cursorEnabled ? (response.next_cursor ?? null) : null
   }
 
   async function runSearch(term: string) {
     const mySeq = ++seq
-    moreController?.abort()
-    moreController = null
-    loadingMore.value = false
+    ++nav
+    pageController?.abort()
+    pageController = null
+    paging.value = false
     controller?.abort()
     controller = new AbortController()
     pending.value = true
     error.value = null
-    moreError.value = null
+    pageError.value = null
     nodesQueried.value = 0
     nodesFailed.value = 0
     truncated.value = false
-    nextCursor.value = null
+    clearPages()
     try {
       const response = await searchMetadata(term, {
         limit: pageSize,
@@ -158,36 +200,31 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
         signal: controller.signal,
       })
       if (mySeq !== seq) return // superseded
-      hits.value = dedupeByDocument(response.hits)
+      pages.value = [dedupeByDocument(response.hits)]
+      cursors.value = [null, nextCursorOf(response)]
       cursorQuery = term
       applyMeta(response)
       searched.value = true
     } catch (err) {
       if (mySeq !== seq) return // superseded or aborted
-      hits.value = []
+      clearPages()
       error.value = err instanceof Error ? err.message : String(err)
     } finally {
       if (mySeq === seq) pending.value = false
     }
   }
 
-  async function loadMore() {
-    if (!cursorEnabled || loadingMore.value || pending.value) return
-    const cursor = nextCursor.value
-    const term = query.value.trim()
-    if (!cursor || !active.value) return
-    // Never reuse a cursor across queries; the debounced watcher refetches.
-    if (term !== cursorQuery) {
-      nextCursor.value = null
-      return
-    }
+  // Fetches the page at `index` (0-based) with the cursor stored for it. Returns
+  // false when the walk must stop: end of results, rejection or failure.
+  async function fetchPage(index: number, term: string, myNav: number): Promise<boolean> {
+    const cursor = cursors.value[index]
+    if (!cursor || term !== cursorQuery) return false
     const mySeq = seq
-    const pageController = new AbortController()
-    moreController = pageController
-    loadingMore.value = true
-    moreError.value = null
+    const request = new AbortController()
+    pageController = request
+    pageError.value = null
     const timeout = window.setTimeout(
-      () => pageController.abort(new DOMException('Request timed out.', 'TimeoutError')),
+      () => request.abort(new DOMException('Request timed out.', 'TimeoutError')),
       SEARCH_REQUEST_TIMEOUT_MS,
     )
     try {
@@ -195,38 +232,82 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
         limit: pageSize,
         cursor,
         ...filterValues(),
-        signal: pageController.signal,
+        signal: request.signal,
       })
-      if (mySeq !== seq || moreController !== pageController) return
+      if (mySeq !== seq || myNav !== nav) return false
+      if (!response.hits.length) {
+        // An empty continuation is the end; never cache it as a reachable page.
+        cursors.value = [...cursors.value.slice(0, index), null]
+        applyMeta(response)
+        return false
+      }
       // Collapse per document across pages (see dedupeByDocument): the server
       // dedups per (graph_iri, subject_iri), so a later page can repeat a
-      // document already shown from an earlier one.
-      const known = new Set(hits.value.map((hit) => hit.document_id))
-      hits.value = [...hits.value, ...dedupeByDocument(response.hits, known)]
+      // document already shown on an earlier one. Pages are always walked in
+      // order, so the set of earlier documents is the same on every visit.
+      const known = new Set(pages.value.slice(0, index).flat().map((hit) => hit.document_id))
+      pages.value = [...pages.value.slice(0, index), dedupeByDocument(response.hits, known)]
+      cursors.value = [...cursors.value.slice(0, index + 1), nextCursorOf(response)]
       applyMeta(response)
       restartedFor = ''
+      return true
     } catch (err) {
-      if (mySeq !== seq || moreController !== pageController) return
+      if (mySeq !== seq || myNav !== nav) return false
       if (err instanceof ApiError && [400, 409, 410].includes(err.status) && restartedFor !== term) {
         // Server rejected the cursor (query changed / cursor expired, per the
         // aruna#258 contract): restart transparently from the first page — but
         // only once per query. A backend that keeps rejecting falls through to
-        // moreError below instead of looping (restart → sentinel → loadMore → …).
+        // pageError below instead of looping.
         restartedFor = term
-        nextCursor.value = null
         void runSearch(term)
       } else {
-        // A failed "more" page (or a repeated cursor rejection) must not wipe
-        // already-rendered results; surface it via the manual "Try again".
-        moreError.value = err instanceof Error ? err.message : String(err)
+        // A failed page must not wipe the page already on screen; surface it
+        // via the manual "Try again".
+        pageError.value = err instanceof Error ? err.message : String(err)
       }
+      return false
     } finally {
       window.clearTimeout(timeout)
-      if (moreController === pageController) {
-        moreController = null
-        loadingMore.value = false
+      if (pageController === request) pageController = null
+    }
+  }
+
+  // A cursor cannot be skipped, so reaching a page means fetching every page
+  // between the cached frontier and the target, one stored cursor at a time.
+  async function walkTo(target: number, myNav: number) {
+    const term = query.value.trim()
+    const mySeq = seq
+    paging.value = true
+    try {
+      while (pages.value.length < target && pages.value.length < maxPage) {
+        if (!(await fetchPage(pages.value.length, term, myNav))) break
+        if (mySeq !== seq || myNav !== nav) return
+      }
+    } finally {
+      if (mySeq === seq && myNav === nav) {
+        paging.value = false
+        // Stopped short (end of results, depth cap or failure): stay on the
+        // last page that actually exists rather than on an empty one.
+        page.value = Math.min(page.value, Math.max(1, pages.value.length))
       }
     }
+  }
+
+  function goToPage(target: number) {
+    if (!cursorEnabled || !active.value) return
+    const wanted = Math.max(1, Math.min(Math.trunc(target), maxPage))
+    if (wanted === page.value) return
+    const myNav = ++nav
+    pageController?.abort()
+    pageController = null
+    pageError.value = null
+    page.value = wanted
+    // Cached pages render instantly, including every step back.
+    if (pages.value.length >= wanted) {
+      paging.value = false
+      return
+    }
+    void walkTo(wanted, myNav)
   }
 
   function retry() {
@@ -241,10 +322,11 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
   watch(watchDeps, () => {
     window.clearTimeout(timer)
     ++seq
+    ++nav
     controller?.abort()
     controller = null
-    moreController?.abort()
-    moreController = null
+    pageController?.abort()
+    pageController = null
     cursorQuery = ''
     restartedFor = ''
     reset()
@@ -257,36 +339,20 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
   // undebounced.
   if (active.value) void runSearch(query.value.trim())
 
-  // Infinite-scroll sentinel; only observed when cursor paging is enabled.
-  const sentinel = ref<HTMLElement | null>(null)
-  let observer: IntersectionObserver | null = null
-  if (cursorEnabled && typeof IntersectionObserver !== 'undefined') {
-    observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) void loadMore()
-      },
-      { rootMargin: '400px 0px' },
-    )
-    watch(sentinel, (el, previous) => {
-      if (previous) observer?.unobserve(previous)
-      if (el) observer?.observe(el)
-    })
-  }
-
   onBeforeUnmount(() => {
     window.clearTimeout(timer)
     seq++
+    nav++
     controller?.abort()
-    moreController?.abort()
-    observer?.disconnect()
+    pageController?.abort()
   })
 
   return {
     active,
     pending,
-    loadingMore,
+    paging,
     error,
-    moreError,
+    pageError,
     searched,
     results,
     nodesQueried,
@@ -294,10 +360,13 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
     truncated,
     partial,
     capped,
-    nextCursor,
+    page,
+    pageCount,
+    hasNextPage,
+    depthCapped,
+    maxPage,
     cursorEnabled,
-    sentinel,
-    loadMore,
+    goToPage,
     retry,
   }
 }

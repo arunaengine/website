@@ -89,7 +89,7 @@ function reload() {
   void list.load()
 }
 
-// Infinite-scroll sentinel (SearchView's cursor pattern).
+// Infinite-scroll sentinel over the job list cursor.
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 if (typeof IntersectionObserver !== 'undefined') {
@@ -222,7 +222,7 @@ onMounted(() => void list.load())
         {{ moreError }}
         <Button variant="outline" size="sm" @click="list.loadMore()">Try again</Button>
       </div>
-      <!-- IntersectionObserver sentinel (SearchView pattern). -->
+      <!-- IntersectionObserver sentinel. -->
       <div v-if="nextCursor && !moreError" ref="sentinel" class="h-1" aria-hidden="true" />
     </template>
 
