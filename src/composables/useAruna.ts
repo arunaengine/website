@@ -101,6 +101,8 @@ const bootstrapped = ref(false)
 // Monotonic identity counter: bumped whenever the token or API base changes,
 // so in-flight work and module-singleton caches can tell sessions apart.
 const sessionEpoch = ref(0)
+// Orders the paged profile walks within one session; only the newest may swap.
+let profileWalk = 0
 
 function readStored(key: string): string {
   if (typeof window === 'undefined') return ''
@@ -242,6 +244,9 @@ async function loadMetadata(context = refreshContext()) {
 // Profiles stay exhaustive but scoped to the profiles/ prefix: the set is small
 // and screens (profile pickers, validation) need it synchronously.
 async function loadProfiles(context = refreshContext()) {
+  // A multi-page walk started earlier must never overwrite a newer one, or a
+  // create or delete refresh loses to the mount revalidation it raced.
+  const walk = ++profileWalk
   const documents: MetadataDocumentListItem[] = []
   let offset = 0
   let last: ListMetadataResponse
@@ -253,7 +258,7 @@ async function loadProfiles(context = refreshContext()) {
     documents.push(...last.documents)
     offset = last.offset + last.total_returned
   } while (last.total_returned > 0 && last.total_returned >= last.limit)
-  if (context.epoch !== sessionEpoch.value) return
+  if (context.epoch !== sessionEpoch.value || walk !== profileWalk) return
   profileItems.value = documents
 }
 
