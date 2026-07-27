@@ -9,6 +9,7 @@ import {
   XSD,
 } from './projection'
 import { ALL_ENTITY_SOURCES } from '../profiles/sources'
+import { CURATED_ENTITY_TYPES } from '../profiles/entityTypes'
 import { isHasPartUri } from '../profiles/emit'
 import { isDatasetType, isValidPropertyTermName, sameSchemaOrgType, SCHEMA_ORG, termNameFromUri } from '../profiles/uri'
 import type {
@@ -168,6 +169,23 @@ interface ShapeGroup {
   entryCounts: Map<string, number>
 }
 
+// What the file says about the node shapes it declares, built once so grouping a
+// shape into an entity and resolving a reference TO that shape can never
+// disagree about which type it describes. Keys are termKey values.
+interface ShapeIndex {
+  // The type each node shape describes.
+  types: Map<string, string>
+  // Shapes whose type had to be read off their own name because the file names
+  // no class for them.
+  derived: Set<string>
+  // Shapes a property references as the shape its VALUES must conform to, rather
+  // than as a class those values belong to.
+  valueShapes: Set<string>
+  // Every node shape this file declares, so a reference to a shape that is not
+  // here is reported instead of silently resolving to nothing.
+  known: Set<string>
+}
+
 // Throws on unparseable Turtle (the caller reports a file error); every
 // parseable file yields a result, even when nothing at all could be lifted.
 export function liftShapes(turtle: string): LiftResult {
@@ -225,6 +243,7 @@ export function liftShapes(turtle: string): LiftResult {
     return { entities: [], notes: notes.list(), shapeCount: 0, fieldCount: 0 }
   }
 
+  const index = buildShapeIndex(store, nodeShapes)
   const groups = new Map<string, ShapeGroup>()
 
   for (const shape of nodeShapes.values()) {
@@ -276,7 +295,14 @@ export function liftShapes(turtle: string): LiftResult {
       continue
     }
 
-    const key = targetClass ?? nodeClass ?? (info.referenced ? undefined : ROOT_KEY)
+    // A shape another property points at describes the entities that property
+    // references, so it becomes their own form — never the crate root, which is
+    // what a target-less shape falls back to.
+    const indexed = index.types.get(termKey(shape))
+    if (indexed && index.derived.has(termKey(shape))) {
+      notes.add('partial', `${name} names no class for the entities it describes, so its rules were imported as ${shortIri(indexed)}, taken from the shape name.`, name)
+    }
+    const key = targetClass ?? nodeClass ?? indexed ?? (info.referenced ? undefined : ROOT_KEY)
     if (!key) {
       notes.add('no-field', 'Shape is referenced from another shape but names no class, so its rules could not be attached to a form.', name)
       continue
@@ -345,6 +371,15 @@ export function liftShapes(turtle: string): LiftResult {
             : 'A property shape has no sh:path, so no input could be derived from it.', shape.name)
           continue
         }
+        // An rdf:type constraint states what the entity IS; it became the entity's
+        // type above and would only render as a field the author must not edit.
+        if (path === RDF_TYPE) {
+          const asserted = typeFromRdfProperty(store, propertyShape)
+          if (!asserted || !sameSchemaOrgType(asserted, type)) {
+            notes.add('partial', 'A required rdf:type value has no input of its own; entities carry the type of the shape they were imported into.', shape.name)
+          }
+          continue
+        }
         if (!byPath.has(path)) {
           byPath.set(path, [])
           pathOrder.push(path)
@@ -355,7 +390,7 @@ export function liftShapes(turtle: string): LiftResult {
 
     const rules: ProfilePropertyRule[] = []
     for (const path of pathOrder) {
-      const rule = liftRuleGroup(store, path, byPath.get(path) ?? [], scopeName, notes, prefixes)
+      const rule = liftRuleGroup(store, path, byPath.get(path) ?? [], scopeName, notes, prefixes, index)
       if (!rule) continue
       const minItems = group.entryCounts.get(path)
       if (minItems !== undefined && rule.multipleValues) rule.minItems = minItems
@@ -409,7 +444,9 @@ function compareRuleOrder(a: ProfilePropertyRule, b: ProfilePropertyRule): numbe
 interface Facets {
   datatype?: string
   classIri?: string
-  nodeIris: string[]
+  // sh:node objects kept as terms, so an inline (blank) value shape stays
+  // distinguishable from a named one.
+  nodeTargets: Term[]
   nodeKindIri: boolean
   inOptions?: string[]
   patterns: string[]
@@ -421,7 +458,7 @@ interface Facets {
 }
 
 function emptyFacets(): Facets {
-  return { nodeIris: [], nodeKindIri: false, patterns: [], numberOr: false }
+  return { nodeTargets: [], nodeKindIri: false, patterns: [], numberOr: false }
 }
 
 function liftRuleGroup(
@@ -431,6 +468,7 @@ function liftRuleGroup(
   ownerName: string,
   notes: Notes,
   prefixes: Record<string, string>,
+  index: ShapeIndex,
 ): ProfilePropertyRule | undefined {
   const label = labelForPath(path, prefixes)
   const scope = `${ownerName} / ${label}`
@@ -499,7 +537,7 @@ function liftRuleGroup(
         : 'MUST'
       : 'MAY'
 
-  const { kind, entityTypes, entitySources, enumOptions, pattern } = resolveKind(store, path, facets, scope, notes)
+  const { kind, entityTypes, entitySources, enumOptions, pattern } = resolveKind(path, facets, index, scope, notes)
 
   const valueName = propertyNameFor(path)
   const multipleValues = maxCount === undefined || maxCount > 1
@@ -556,7 +594,7 @@ function readFacets(
   if (datatype) facets.datatype ??= datatype
   const classIri = objectValue(store, shape, `${SH}class`)
   if (classIri) facets.classIri ??= classIri
-  for (const quad of store.getQuads(shape, `${SH}node`, null, null)) facets.nodeIris.push(quad.object.value)
+  for (const quad of store.getQuads(shape, `${SH}node`, null, null)) facets.nodeTargets.push(quad.object)
 
   const nodeKind = objectValue(store, shape, `${SH}nodeKind`)
   if (nodeKind === `${SH}IRI` || nodeKind === `${SH}IRIOrLiteral` || nodeKind === `${SH}BlankNodeOrIRI`) {
@@ -616,9 +654,9 @@ interface ResolvedKind {
 }
 
 function resolveKind(
-  store: Store,
   path: string,
   facets: Facets,
+  index: ShapeIndex,
   scope: string,
   notes: Notes,
 ): ResolvedKind {
@@ -630,23 +668,32 @@ function resolveKind(
   let entitySources: ProfilePropertyRule['entitySources']
   let enumOptions: string[] | undefined
 
-  const referencesEntity = Boolean(facets.classIri) || facets.nodeIris.length > 0 || facets.nodeKindIri
+  const referencesEntity = Boolean(facets.classIri) || facets.nodeTargets.length > 0 || facets.nodeKindIri
 
   if (referencesEntity && !facets.datatype && !facets.inOptions) {
     kind = 'entity'
+    const targets: string[] = []
+    const addTarget = (uri: string | undefined) => {
+      if (uri && !targets.some((target) => sameSchemaOrgType(target, uri))) targets.push(uri)
+    }
     if (facets.classIri) {
-      entityTypes = [facets.classIri]
-      // Projection emits class+node for describe-new rules; absent
-      // entitySources is the stored form of ['new'].
+      // sh:class names the class — unless it points at a shape, which says which
+      // type its values are instead. Projection emits class+node for describe-new
+      // rules; absent entitySources is the stored form of ['new'].
+      addTarget(index.types.get(termKey(namedNode(facets.classIri))) ?? facets.classIri)
     } else {
       // A bare sh:node / sh:nodeKind sh:IRI is the reuse-allowing form; the
       // original single-source policy is not recoverable (documented lossy).
       entitySources = [...ALL_ENTITY_SOURCES]
-      const nodeTargets = facets.nodeIris
-        .map((node) => targetTypeOfShape(store, node))
-        .filter((value): value is string => Boolean(value))
-      if (nodeTargets.length) entityTypes = [nodeTargets[0]]
     }
+    for (const node of facets.nodeTargets) {
+      const resolved = index.types.get(termKey(node))
+      if (resolved) addTarget(resolved)
+      // A shape reference alongside sh:class only repeats the class, so an
+      // unresolvable one there says nothing extra and needs no note.
+      else if (!facets.classIri) notes.add('partial', unresolvedShapeMessage(index, node), scope)
+    }
+    if (targets.length) entityTypes = targets
   } else if (facets.numberOr) {
     kind = 'number'
   } else if (facets.inOptions) {
@@ -714,11 +761,96 @@ function baselineKind(path: string): ProfileValueKind | undefined {
   return BASELINE_KINDS.find(([uri]) => sameSchemaOrgType(path, uri))?.[1]
 }
 
-// The type a referenced node shape describes: its target class, else the class
-// it requires of its values.
-function targetTypeOfShape(store: Store, shapeIri: string): string | undefined {
-  const subject = namedOrBlank(shapeIri)
-  return objectValue(store, subject, `${SH}targetClass`) ?? objectValue(store, subject, `${SH}class`)
+// Why a shape reference could not be pointed at a type.
+function unresolvedShapeMessage(index: ShapeIndex, node: Term): string {
+  if (node.termType === 'BlankNode') {
+    return 'A referenced shape is written inline, so the rules it describes could not be imported as their own form.'
+  }
+  if (!index.known.has(termKey(node))) {
+    return `The shape ${shortIri(node.value)} these values must match is not in this file, so its rules could not be imported.`
+  }
+  return `The shape ${shortIri(node.value)} these values must match names no type, so the reference points at no entity.`
+}
+
+// Which shapes describe the values of a property, and what type each node shape
+// describes. `sh:node` paired with `sh:class` on the same property shape states
+// the class its values belong to (the form this projection emits, including for
+// the crate root), so only a BARE reference makes its target a shape in its own
+// right; an `sh:class` that points at a shape rather than a class is one too.
+function buildShapeIndex(store: Store, nodeShapes: Map<string, Quad_Subject>): ShapeIndex {
+  const valueShapes = new Set<string>()
+  for (const quad of store.getQuads(null, `${SH}node`, null, null)) {
+    if (!store.getQuads(quad.subject, `${SH}class`, null, null).length) valueShapes.add(termKey(quad.object))
+  }
+  for (const quad of store.getQuads(null, `${SH}class`, null, null)) {
+    if (nodeShapes.has(termKey(quad.object))) valueShapes.add(termKey(quad.object))
+  }
+
+  const types = new Map<string, string>()
+  const derived = new Set<string>()
+  for (const [key, shape] of nodeShapes) {
+    const asserted = assertedShapeType(store, shape, nodeShapes)
+    if (asserted) {
+      types.set(key, asserted)
+      continue
+    }
+    // Only a shape something references as a value shape may fall back to its
+    // own name: every other target-less shape is the crate root candidate.
+    const named = valueShapes.has(key) && shape.termType === 'NamedNode' ? typeFromShapeName(shape.value) : undefined
+    if (named) {
+      types.set(key, named)
+      derived.add(key)
+    }
+  }
+  return { types, derived, valueShapes, known: new Set(nodeShapes.keys()) }
+}
+
+// The class a node shape says its entities are: its target class, the class it
+// requires of them, or an rdf:type its own property shapes pin.
+function assertedShapeType(
+  store: Store,
+  shape: Quad_Subject,
+  nodeShapes: Map<string, Quad_Subject>,
+): string | undefined {
+  const targetClass = store.getQuads(shape, `${SH}targetClass`, null, null)
+    .find((quad) => quad.object.termType === 'NamedNode')?.object.value
+  if (targetClass) return targetClass
+  const nodeClass = store.getQuads(shape, `${SH}class`, null, null)
+    .find((quad) => quad.object.termType === 'NamedNode' && !nodeShapes.has(termKey(quad.object)))?.object.value
+  if (nodeClass) return nodeClass
+  for (const quad of store.getQuads(shape, `${SH}property`, null, null)) {
+    const asserted = typeFromRdfProperty(store, quad.object as Quad_Subject)
+    if (asserted) return asserted
+  }
+  return undefined
+}
+
+// `sh:property [ sh:path rdf:type ; sh:hasValue X ]` (or a single-entry sh:in),
+// the standard way a shape states the type of the entities it describes.
+function typeFromRdfProperty(store: Store, propertyShape: Quad_Subject): string | undefined {
+  if (objectValue(store, propertyShape, `${SH}path`) !== RDF_TYPE) return undefined
+  const hasValue = store.getQuads(propertyShape, `${SH}hasValue`, null, null)
+    .find((quad) => quad.object.termType === 'NamedNode')?.object.value
+  if (hasValue) return hasValue
+  for (const quad of store.getQuads(propertyShape, `${SH}in`, null, null)) {
+    const items = listItems(store, quad.object as Quad_Subject)
+    if (items?.length === 1 && items[0].termType === 'NamedNode') return items[0].value
+  }
+  return undefined
+}
+
+// Last resort for a value shape that names no class: its own name. A curated
+// type of that name wins (PersonShape describes schema.org Persons), otherwise
+// the type is minted beside the shape in the same namespace.
+const SHAPE_NAME_SUFFIX = /[-_]?(node)?shape$/i
+
+function typeFromShapeName(iri: string): string | undefined {
+  const local = termNameFromUri(iri)
+  const base = local.replace(SHAPE_NAME_SUFFIX, '')
+  if (!base || !/^[A-Za-z]/.test(base)) return undefined
+  const curated = CURATED_ENTITY_TYPES.find((type) => type.label.toLowerCase() === base.toLowerCase())
+  if (curated) return curated.uri
+  return `${iri.slice(0, iri.length - local.length)}${base}`
 }
 
 // True when the sh:or branches are exactly the projection's number form:
@@ -885,10 +1017,6 @@ function addTerm(map: Map<string, Quad_Subject>, term: Quad_Subject) {
 
 function termKey(term: Term): string {
   return `${term.termType}:${term.value}`
-}
-
-function namedOrBlank(value: string): Quad_Subject {
-  return value.startsWith('_:') ? DataFactory.blankNode(value.slice(2)) : DataFactory.namedNode(value)
 }
 
 function namedNode(value: string) {
