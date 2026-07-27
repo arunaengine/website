@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Popover from '@/components/ui/Popover.vue'
+import { isArunaUserId, orcidOf } from '@/lib/identifiers'
 import { Building2, ExternalLink, User as UserIcon } from '@lucide/vue'
 
 // Renders the crate's author/creator/contributor references as chips with an
@@ -20,9 +21,6 @@ interface AuthorEntry {
   email?: string
   userId?: string
 }
-
-const ARUNA_USER_ID = /^[0-9A-HJKMNP-TV-Z]{26}@[A-Za-z0-9_-]{43}$/
-const ORCID = /(?:^|orcid\.org\/)(\d{4}-\d{4}-\d{4}-\d{3}[\dX])$/
 
 type Entity = Record<string, unknown>
 
@@ -71,8 +69,8 @@ const authors = computed<AuthorEntry[]>(() => {
       const name = typeof entity?.name === 'string' && entity.name ? entity.name : id
       const types = strings(entity?.['@type'] ?? (typeof entity?.['@type'] === 'string' ? entity['@type'] : []))
       const identifiers = [id, ...strings(entity?.identifier)]
-      const orcid = identifiers.map((v) => ORCID.exec(v)?.[1]).find(Boolean)
-      const userId = identifiers.find((v) => ARUNA_USER_ID.test(v))
+      const orcid = identifiers.map((v) => orcidOf(v)).find(Boolean)
+      const userId = identifiers.find((v) => isArunaUserId(v))
       const affiliationRef = entity?.affiliation
       const affiliationId = refId(affiliationRef)
       const affiliation =

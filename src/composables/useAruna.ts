@@ -1385,12 +1385,7 @@ function idValues(value: unknown): string[] {
   return []
 }
 
-// Human-readable tail of an IRI (last path/fragment segment) for chips that surface an
-// external profile conformsTo id which does not resolve to a local profile.
-export function readableIri(iri: string): string {
-  const withoutQuery = iri.split('?')[0].replace(/\/+$/, '')
-  return withoutQuery.split(/[/#]/).filter(Boolean).pop() || iri
-}
+export { readableIri } from '@/lib/identifiers'
 
 export function colorFor(value: string): string {
   const colors = ['#335DC6', '#24A9E6', '#16a34a', '#0d9488', '#a855f7', '#f97316', '#dc2626']

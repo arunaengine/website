@@ -8,6 +8,7 @@ import { useUserDirectory } from '@/composables/useUserDirectory'
 import { useS3 } from '@/composables/useS3'
 import { featureEnabled } from '@/lib/config'
 import { drsDownloadHref, drsObjectHref, isDrsReference, parseS3Url } from '@/lib/tes'
+import { isArunaUserId } from '@/lib/identifiers'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
 import { formatBytes, isHttpUrl, relativeTime, shortUserId, truncateMiddle } from '@/lib/utils'
 import { Cpu, Download, ExternalLink as ExternalLinkIcon, FileInput, FileOutput, HardDrive, Play, Terminal } from '@lucide/vue'
@@ -46,10 +47,9 @@ const agentLabel = computed(() => {
 // Where "Submitted by" points: an Aruna `{ulid}@{realm}` id resolves to the
 // in-portal user profile (same form AuthorChips links); an http(s) identifier
 // (e.g. an ORCID URL) opens externally; otherwise the name stays plain text.
-const ARUNA_USER_ID = /^[0-9A-HJKMNP-TV-Z]{26}@[A-Za-z0-9_-]{43}$/
 const agentLink = computed(() => {
   const id = props.run.agent?.identifier
-  if (id && ARUNA_USER_ID.test(id)) return { kind: 'user' as const, id }
+  if (isArunaUserId(id)) return { kind: 'user' as const, id }
   if (isHttpUrl(id)) return { kind: 'external' as const, href: id }
   return { kind: 'plain' as const }
 })
