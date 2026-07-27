@@ -36,6 +36,8 @@ export interface RunCrateContainer {
 
 export interface RunCrateModel {
   runId?: string
+  /** The CreateAction's @id, so other sections can skip run-owned entities. */
+  actionId?: string
   name?: string
   actionName?: string
   command?: string
@@ -199,6 +201,7 @@ export function parseRunCrate(crate: unknown, documentPath: string): RunCrateMod
 
   return {
     runId,
+    actionId: actionId || undefined,
     name: stringOf(root?.name),
     actionName: stringOf(action.name),
     command: stringOf(action.description),
@@ -213,4 +216,11 @@ export function parseRunCrate(crate: unknown, documentPath: string): RunCrateMod
     inputs: refIdsOf(action.object).map((id) => fileRef(id, byId)),
     outputs: refIdsOf(action.result).map((id) => fileRef(id, byId)),
   }
+}
+
+/** Ids of the entities the run provenance panel already presents itself. */
+export function runClaimedIds(run: RunCrateModel): string[] {
+  const ids = [run.actionId, run.agent?.id, run.instrument?.id, run.container?.id]
+  for (const file of [...run.inputs, ...run.outputs]) ids.push(file.id)
+  return ids.filter((id): id is string => Boolean(id))
 }
