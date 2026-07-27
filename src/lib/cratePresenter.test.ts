@@ -292,6 +292,48 @@ describe('presentCrate', () => {
     expect(fieldByKey(entity?.fields ?? [], 'comment')?.values[0]?.long).toBe(true)
   })
 
+  it('collapses url prose', () => {
+    // URL parsing tolerates spaces, so prose merely starting with a URL, and any
+    // over-long value, must collapse instead of becoming one giant link chip.
+    const prose = `https://example.com/data ${'word '.repeat(80)}`.trim()
+    const result = presentCrate(
+      crate({}, [
+        {
+          '@id': '#e',
+          '@type': 'Thing',
+          name: 'E',
+          comment: prose,
+          url: 'https://example.com/x',
+          sameAs: `https://example.com/${'a'.repeat(300)}`,
+        },
+      ]),
+    )
+    const fields = contextById(result.entities, '#e')?.fields ?? []
+    expect(fieldByKey(fields, 'comment')?.values[0]).toEqual({ text: prose, long: true })
+    expect(fieldByKey(fields, 'url')?.values[0]).toEqual({ text: 'https://example.com/x', href: 'https://example.com/x' })
+    expect(fieldByKey(fields, 'sameAs')?.values[0]?.href).toBeUndefined()
+    expect(fieldByKey(fields, 'sameAs')?.values[0]?.long).toBe(true)
+  })
+
+  it('derives shared values once', () => {
+    // Two root properties referencing one PropertyValue must not repeat it.
+    const result = presentCrate(
+      crate({ variableMeasured: { '@id': '#pv' }, subjectOf: { '@id': '#pv' } }, [
+        { '@id': '#pv', '@type': 'PropertyValue', propertyID: 'depth', value: '2.5', unitText: 'm' },
+      ]),
+    )
+    expect(fieldByKey(result.fields, 'depth')?.values).toEqual([{ text: '2.5 m' }])
+  })
+
+  it('keeps field ids stable', () => {
+    // Distinct properties sharing a term tail need distinct ids, and the id must
+    // survive a re-presentation so collapse state can key on it.
+    const source = crate({ version: '1.2', 'https://schema.org/version': '2.0' })
+    const ids = presentCrate(source).fields.map((field) => field.id)
+    expect(ids).toEqual(['version', 'https://schema.org/version'])
+    expect(presentCrate(structuredClone(source)).fields.map((field) => field.id)).toEqual(ids)
+  })
+
   it('aliases profile types', () => {
     // A className alias over schema.org/Person still routes to the people cards.
     const profile: ProfileEntityRule[] = [

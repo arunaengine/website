@@ -35,6 +35,8 @@ export interface PresentedValue {
 }
 
 export interface PresentedField {
+  /** Full JSON-LD property key or term IRI; unique within one field list. */
+  id: string
   /** Compact machine term (JSON-LD key tail). */
   key: string
   label: string
@@ -212,7 +214,9 @@ function literalValue(text: string): PresentedValue {
     if (Number.isFinite(parsed)) return { text: `${dateTimeFormat.format(parsed)} UTC`, title: text }
   }
   const long = text.length > LONG_TEXT
-  if (isHttpUrl(text)) return { text, href: text }
+  // URL parsing accepts embedded spaces, so only a short, whitespace-free value
+  // becomes a link; prose merely starting with http(s):// stays collapsed text.
+  if (!long && !/\s/.test(text) && isHttpUrl(text)) return { text, href: text }
   return long ? { text, long: true } : { text }
 }
 
@@ -254,6 +258,7 @@ function entityFields(
   homes: Map<string, Home>,
   skip: Set<string>,
   refMode: 'pointer' | 'drop',
+  derived: Set<string>,
 ): PresentedField[] {
   const rows = new Map<string, FieldRow>()
   const push = (key: string, explicitLabel: string | undefined, value: PresentedValue) => {
@@ -261,6 +266,7 @@ function entityFields(
     let row = rows.get(key)
     if (!row) {
       row = {
+        id: key,
         key: termNameFromUri(key),
         label: rule?.label ?? explicitLabel ?? prettifyKey(key),
         profiled: Boolean(rule),
@@ -282,7 +288,12 @@ function entityFields(
   }
   const pushRef = (key: string, id: string, target: Record<string, unknown> | undefined) => {
     if (target && typesOf(target).includes('PropertyValue')) {
-      pushDerived(target)
+      // One row per PropertyValue: several properties may reference the same
+      // node, and its derived row must not repeat the value.
+      if (!derived.has(id)) {
+        derived.add(id)
+        pushDerived(target)
+      }
       return
     }
     // Root mode: refs into the graph became relation chips or live in other
@@ -434,6 +445,9 @@ export function presentCrate(crate: unknown, options: PresentOptions = {}): Crat
     else organizations.push(row)
   }
 
+  const derived = new Set<string>()
+  const fields = root ? entityFields(root, rules.root, byId, homes, ROOT_SKIP, 'drop', derived) : []
+
   const entities = contextIds.map((id): PresentedEntity => {
     const entity = byId.get(id)
     const types = typesOf(entity)
@@ -445,7 +459,7 @@ export function presentCrate(crate: unknown, options: PresentOptions = {}): Crat
       kind: entityKind(effectiveTypes(types, rules)),
       profileLabel: match?.label,
       relations: relationIndex.get(id) ?? [],
-      fields: entity ? entityFields(entity, match?.fields, byId, homes, CONTEXT_SKIP, 'pointer') : [],
+      fields: entity ? entityFields(entity, match?.fields, byId, homes, CONTEXT_SKIP, 'pointer', derived) : [],
       unresolved: isStub(entity),
     }
   })
@@ -456,7 +470,7 @@ export function presentCrate(crate: unknown, options: PresentOptions = {}): Crat
   })
 
   return {
-    fields: root ? entityFields(root, rules.root, byId, homes, ROOT_SKIP, 'drop') : [],
+    fields,
     people,
     organizations,
     entities,
