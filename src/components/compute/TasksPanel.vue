@@ -163,18 +163,32 @@ function taskGroup(task: TesTask): { text: string; mono: boolean } | null {
   return name ? { text: name, mono: false } : { text: truncateMiddle(id), mono: true }
 }
 
+// The facade always emits a `resources` object (`preemptible` is filled in even
+// when the submitter asked for nothing), so an empty summary means no ceilings
+// were requested, not that the field is missing.
 function taskResources(task: TesTask): string {
   const r = task.resources
   if (!r) return ''
   const parts: string[] = []
-  if (r.cpu_cores) parts.push(`${r.cpu_cores} cpu`)
-  if (r.ram_gb) parts.push(`${r.ram_gb} GB RAM`)
-  if (r.disk_gb) parts.push(`${r.disk_gb} GB disk`)
+  if (r.cpu_cores != null) parts.push(`${r.cpu_cores} cpu`)
+  if (r.ram_gb != null) parts.push(`${r.ram_gb} GB RAM`)
+  if (r.disk_gb != null) parts.push(`${r.disk_gb} GB disk`)
   return parts.join(' · ')
 }
 
+function resourcesHint(task: TesTask): string | undefined {
+  if (taskResources(task)) return undefined
+  return 'No resource limits requested, the node decides what to apply.'
+}
+
+// Latest attempt, matching TaskDetailPanel; the facade currently emits one log.
+function taskLog(task: TesTask) {
+  const logs = task.logs
+  return logs?.length ? logs[logs.length - 1] : undefined
+}
+
 function taskDuration(task: TesTask): string {
-  const log = task.logs?.[0]
+  const log = taskLog(task)
   if (!log?.start_time) return ''
   const start = Date.parse(log.start_time)
   const end = log.end_time ? Date.parse(log.end_time) : isActiveTesState(task.state) ? Date.now() : NaN
@@ -182,6 +196,14 @@ function taskDuration(task: TesTask): string {
   const label = formatDuration(end - start)
   if (!label) return ''
   return log.end_time ? label : `${label} so far`
+}
+
+// A task the node has not started yet has no start time by design; one that is
+// already past that point and still reports none cannot be timed here.
+const NOT_STARTED: readonly (TesState | undefined)[] = [undefined, 'UNKNOWN', 'QUEUED', 'INITIALIZING']
+function durationHint(task: TesTask): string | undefined {
+  if (taskLog(task)?.start_time) return undefined
+  return NOT_STARTED.includes(task.state) ? 'Not started yet.' : 'This node reported no start time for the run.'
 }
 
 // No session: drop any in-flight response and land on a terminal state, never
@@ -396,11 +418,15 @@ onUnmounted(() => {
               <span v-if="taskGroup(task)" :class="taskGroup(task)!.mono ? 'font-mono' : ''">{{ taskGroup(task)!.text }}</span>
               <span v-else>-</span>
             </td>
-            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground lg:table-cell">{{ taskResources(task) || '-' }}</td>
+            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground lg:table-cell" :title="resourcesHint(task)">
+              {{ taskResources(task) || '-' }}
+            </td>
             <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="task.creation_time">
               {{ task.creation_time ? relativeTime(task.creation_time) : '-' }}
             </td>
-            <td class="hidden px-5 py-2.5 text-[11px] tabular-nums text-muted-foreground sm:table-cell">{{ taskDuration(task) || '-' }}</td>
+            <td class="hidden px-5 py-2.5 text-[11px] tabular-nums text-muted-foreground sm:table-cell" :title="durationHint(task)">
+              {{ taskDuration(task) || '-' }}
+            </td>
             <td class="px-5 py-2.5 text-right">
               <div class="flex items-center justify-end gap-1">
                 <Button
