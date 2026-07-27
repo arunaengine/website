@@ -16,6 +16,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
+import { useCatalogBrowse, type CatalogPageParams } from '@/composables/useCatalogBrowse'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useJobs } from '@/composables/useJobs'
 import { useDebounceFn } from '@vueuse/core'
@@ -24,7 +25,7 @@ import { isWorkspaceBucket } from '@/lib/workspaces'
 import { conformsToProcessRun } from '@/lib/profiles/builtinProfiles'
 import { Search, FileArchive, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound } from '@lucide/vue'
 import type { MetadataDoc, SparqlResult } from '@/data/types'
-import type { BucketSearchHit, MetadataDocumentListItem, UserSearchHit } from '@/lib/api'
+import type { BucketSearchHit, ListMetadataResponse, MetadataDocumentListItem, UserSearchHit } from '@/lib/api'
 import type { RouteLocationRaw } from 'vue-router'
 
 const route = useRoute()
@@ -44,7 +45,6 @@ const {
   searchUsers,
   searchUnified,
   profileItems,
-  listCatalogPage,
   getMetadataItem,
   toMetadataDoc,
 } = useAruna()
@@ -184,28 +184,50 @@ const browseEstimateRaw = ref<number | null>(null)
 const browseLoading = ref(false)
 const browseError = ref<string | null>(null)
 let browseSeq = 0
+const browseCache = useCatalogBrowse()
 
-async function loadBrowsePage() {
+function browseParams(): CatalogPageParams {
+  return {
+    limit: BROWSE_PAGE_SIZE,
+    offset: (browsePage.value - 1) * BROWSE_PAGE_SIZE,
+    groupId: groupFilter.value,
+    summary: true,
+  }
+}
+
+/** Paints a cached window exactly as a fresh response would. */
+function paintWindow(response: ListMetadataResponse) {
+  browseDocs.value = response.documents
+    .filter((item) => !item.document_path.startsWith('profiles/'))
+    .map(toMetadataDoc)
+  browseReturned.value = response.total_returned
+  browseLimit.value = response.limit
+  browseEstimateRaw.value = response.total_estimate ?? null
+}
+
+async function loadBrowsePage(force = false) {
   const seq = ++browseSeq
+  const params = browseParams()
+  const key = browseCache.key(params)
   browseLoading.value = true
   browseError.value = null
+  // A window cached for this exact page paints at once and revalidates behind
+  // the dim treatment; the skeleton stays reserved for a page never loaded.
+  if (browseCache.hasCached(key)) paintWindow(browseCache.page.value)
   try {
-    const response = await listCatalogPage({
-      limit: BROWSE_PAGE_SIZE,
-      offset: (browsePage.value - 1) * BROWSE_PAGE_SIZE,
-      groupId: groupFilter.value,
-      summary: true,
-    })
+    await browseCache.load(params, force)
     if (seq !== browseSeq) return
-    browseDocs.value = response.documents
-      .filter((item) => !item.document_path.startsWith('profiles/'))
-      .map(toMetadataDoc)
-    browseReturned.value = response.total_returned
-    browseLimit.value = response.limit
-    browseEstimateRaw.value = response.total_estimate ?? null
+    if (browseCache.hasCached(key)) paintWindow(browseCache.page.value)
+    else {
+      // A stale page under a new page number would be a lie; drop it.
+      browseDocs.value = []
+      browseReturned.value = 0
+    }
+    // A failed revalidation keeps the window it could not replace, so the
+    // message is surfaced beside the documents instead of clearing them.
+    browseError.value = browseCache.error.value
   } catch (err) {
     if (seq !== browseSeq) return
-    // A stale page under a new page number would be a lie; drop it.
     browseDocs.value = []
     browseReturned.value = 0
     browseError.value = err instanceof Error ? err.message : String(err)
@@ -289,6 +311,9 @@ const browseBusy = computed(() => browseLoading.value || favouritesLoading.value
 // The outgoing page stays on screen while the next one loads, so it is dimmed
 // and marked busy instead of reading as the page that was just requested.
 const browseStale = computed(() => browseBusy.value && browseSource.value.length > 0)
+// A refresh failed over documents it could not replace: they stay on screen and
+// the error rides beside them instead of taking the whole area.
+const keptBrowse = computed(() => Boolean(browseError.value) && browseSource.value.length > 0)
 
 // A FULL page is the only proof that another one follows: total_estimate is an
 // approximation, and an under-count must never hide a page the server serves.
@@ -336,8 +361,9 @@ function goToPage(page: number) {
 }
 
 function retryBrowse() {
+  // An explicit retry always reaches the server, freshness window or not.
   if (favouritesOnly.value) void loadFavourites()
-  else void loadBrowsePage()
+  else void loadBrowsePage(true)
 }
 
 // The RO-Crate @type is stored comma-joined (e.g. "Dataset, SoftwareSourceCode");
@@ -918,11 +944,17 @@ async function runQuery() {
             <Skeleton v-for="n in 6" :key="n" class="h-36" />
           </section>
 
-          <ErrorPanel v-else-if="browseError" :message="browseError" @retry="retryBrowse" />
+          <ErrorPanel v-else-if="browseError && !keptBrowse" :message="browseError" @retry="retryBrowse" />
 
-          <ErrorPanel v-else-if="error" :message="error" @retry="refresh" />
+          <ErrorPanel v-else-if="error && !keptBrowse" :message="error" @retry="refresh" />
 
           <template v-else>
+            <!-- Kept documents: the failed refresh reports next to them. -->
+            <div v-if="keptBrowse" class="flex flex-wrap items-center justify-center gap-2 text-xs text-destructive">
+              {{ browseError }}
+              <Button variant="outline" size="sm" @click="retryBrowse">Try again</Button>
+            </div>
+
             <Spinner v-if="browseStale" show-label :label="`Loading page ${browsePage}…`" class="flex" />
 
             <!-- Paging keeps the outgoing page on screen; it dims and is marked
