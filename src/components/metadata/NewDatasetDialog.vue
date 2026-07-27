@@ -75,6 +75,10 @@ const MINIMAL_ENTITY_RULE: ProfilePropertyRule = {
 // rather than their array index (mirrors the builder draft uid discipline).
 let entityEntryUid = 0
 
+// radix-vue reserves the empty string for a SelectItem's cleared state, so the
+// "no profile" choice travels as this sentinel and maps back to '' on write.
+const NO_PROFILE_VALUE = '__no_profile__'
+
 const props = defineProps<{
   open: boolean
   defaultProfileId?: string
@@ -144,7 +148,7 @@ const reservedDatasetKeys = new Set(['@id', '@type', 'conformsTo'])
 
 const groupOptions = computed(() => groups.value.map((group) => ({ value: group.id, label: group.name })))
 const profileOptions = computed(() => [
-  { value: '', label: 'No profile reference' },
+  { value: NO_PROFILE_VALUE, label: 'No profile reference' },
   ...profiles.value.map((profile) => {
     // Count every entity rule's properties — the same total ProfilesView shows —
     // not just the root Dataset rules.
@@ -154,6 +158,12 @@ const profileOptions = computed(() => [
     return { value: profile.id, label: `${profile.name}${count ? ` (${count} properties)` : ''}` }
   }),
 ])
+const profileSelection = computed({
+  get: () => profileId.value || NO_PROFILE_VALUE,
+  set: (next: string) => {
+    profileId.value = next === NO_PROFILE_VALUE ? '' : next
+  },
+})
 const selectedProfile = computed(() => profiles.value.find((profile) => profile.id === profileId.value))
 
 const keywordList = computed(() => keywords.value.split(',').map((keyword) => keyword.trim()).filter(Boolean))
@@ -1297,7 +1307,7 @@ async function submit() {
           </div>
           <div>
             <label class="text-xs font-medium text-foreground">Profile reference</label>
-            <Select v-model="profileId" :options="profileOptions" placeholder="Optional profile" class="mt-1" />
+            <Select v-model="profileSelection" :options="profileOptions" placeholder="Optional profile" class="mt-1" />
             <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
               <template v-if="profileLoading">Loading profile rules…</template>
               <template v-else-if="profileInputCount">Adds {{ profileInputCount }} {{ profileInputCount === 1 ? 'field' : 'fields' }} below, <span class="text-destructive">*</span> marks required. The RO-Crate references {{ selectedProfile.name }} by its saved graph IRI.</template>
