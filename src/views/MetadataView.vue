@@ -23,6 +23,7 @@ import { computed, ref, watch } from 'vue'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
+import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
 import { useS3 } from '@/composables/useS3'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
@@ -41,17 +42,16 @@ const router = useRouter()
 const s3 = useS3()
 const {
   metadata,
-  metadataItems,
   profiles,
   currentUser,
   userInfo,
   bootstrapped,
   saving,
   loadRoCrate,
-  loadMetadata,
   getMetadataDocument,
   deleteMetadataDocument,
   toggleFavourite,
+  toMetadataDoc,
   fullCrates,
   cratePending,
 } = useAruna()
@@ -74,9 +74,7 @@ const showEdit = ref(false)
 const showDelete = ref(false)
 const deleteError = ref<string | null>(null)
 // The document's S3 key path, for the delete confirmation copy.
-const currentPath = computed(
-  () => metadataItems.value.find((i) => i.document_id === detailId.value)?.document_path ?? fetchedSummary.value?.document_path ?? '',
-)
+const currentPath = computed(() => fetchedSummary.value?.document_path ?? '')
 
 async function confirmDelete() {
   if (!current.value) return
@@ -106,7 +104,10 @@ const watchPathPrefix = computed(() => {
   return metaWatchPathPrefix(groupId, currentPath.value)
 })
 
-async function onSaved() {
+// The edit dialog returns the stored summary; adopt it so visibility and
+// timestamps update without another catalog round trip.
+async function onSaved(summary?: MetadataDocumentSummary) {
+  if (summary) fetchedSummary.value = summary
   await fetchCrate(detailId.value)
 }
 
@@ -122,13 +123,14 @@ const docError = ref<string | null>(null)
 const fetchedSummary = ref<MetadataDocumentSummary | null>(null)
 
 const detailId = computed(() => (route.params.id as string) || '')
-const current = computed(() => metadata.value.find((doc) => doc.ulid === detailId.value))
-// Reconcile the two independent v-if chains: once the doc resolves via the
-// catalog (e.g. a retry after a transient error repopulates `metadata`), flip
-// docState to 'found' so a stale error/not-found/forbidden panel can't render
-// alongside the rich article.
-watch(current, (c) => {
-  if (c && docState.value !== 'found') docState.value = 'found'
+// Built from this document's own fetch (registry summary plus its crate), not
+// from the catalog listing: the catalog is paged, so most documents are never
+// in it. A loaded catalog row only serves as a placeholder until the fetch
+// lands, so the header does not flash an empty title.
+const current = computed(() => {
+  const summary = fetchedSummary.value
+  if (!summary) return metadata.value.find((doc) => doc.ulid === detailId.value)
+  return toMetadataDoc({ ...summary, rocrate_summary: fullCrates.value[summary.document_id] })
 })
 const currentCrate = computed(() => fullCrates.value[detailId.value] ?? current.value?.roCrate ?? {})
 // Header export/import: export is enabled once the crate has entities; import
@@ -177,28 +179,18 @@ async function fetchCrate(id: string) {
 
 let resolveToken = 0
 
+// The document's own registry entry is the authority: it tells missing,
+// private and error apart, which a catalog listing never could.
 async function resolveDoc(id: string) {
   const token = ++resolveToken
   docError.value = null
   fetchedSummary.value = null
   docState.value = 'loading'
   if (!id) return
-  // Already in the catalog: render the rich article and fetch its crate.
-  if (metadata.value.some((doc) => doc.ulid === id)) {
-    docState.value = 'found'
-    await fetchCrate(id)
-    return
-  }
-  // Otherwise ask the backend directly so we can tell missing/private/error
-  // apart from a merely stale catalog list.
   try {
     const summary = await getMetadataDocument(id)
     if (token !== resolveToken) return
     fetchedSummary.value = summary
-    // The list may be stale right after a create; refresh so the rich article
-    // can appear. A failing refresh must not flip us out of 'found'.
-    await loadMetadata().catch(() => undefined)
-    if (token !== resolveToken) return
     docState.value = 'found'
     await fetchCrate(id)
   } catch (err) {
@@ -326,6 +318,20 @@ interface RelatedDocRow {
   label: string
   documentId?: string
 }
+// Portal-internal targets are recognised by their graph IRI alone; the label
+// falls back to a targeted fetch when the crate carries no stub name.
+const relatedPaths = ref<Record<string, string>>({})
+
+async function ensureRelatedPath(documentId: string) {
+  if (relatedPaths.value[documentId]) return
+  try {
+    const summary = await getMetadataDocument(documentId)
+    relatedPaths.value = { ...relatedPaths.value, [documentId]: summary.document_path }
+  } catch {
+    // Deleted or unreadable: the row keeps its IRI as the label.
+  }
+}
+
 const relatedDocs = computed<RelatedDocRow[]>(() => {
   const crate = fullCrates.value[detailId.value] ?? current.value?.roCrate
   const g = crateGraph(crate)
@@ -343,17 +349,22 @@ const relatedDocs = computed<RelatedDocRow[]>(() => {
       // wiring; related documents have in-graph stubs and must still render.
       if (!iri || seen.has(iri) || iri.startsWith('#')) continue
       seen.add(iri)
-      const item = metadataItems.value.find((entry) => entry.graph_iri === iri || entry.document_id === iri)
+      const documentId = documentIdFromIri(iri) ?? (isDocumentId(iri) ? iri : null)
       const entity = g.find((e) => e['@id'] === iri)
-      const catalogDoc = item ? metadata.value.find((doc) => doc.ulid === item.document_id) : undefined
       rows.push({
         iri,
-        documentId: item?.document_id,
-        label: catalogDoc?.title || stringProp(entity?.name) || item?.document_path || iri,
+        documentId: documentId ?? undefined,
+        label: stringProp(entity?.name) || (documentId ? relatedPaths.value[documentId] : '') || iri,
       })
     }
   }
   return rows
+})
+
+watch(relatedDocs, (rows) => {
+  for (const row of rows) {
+    if (row.documentId && row.label === row.iri) void ensureRelatedPath(row.documentId)
+  }
 })
 
 function entitySize(row: DataEntity): string {
@@ -463,35 +474,6 @@ function entitySize(row: DataEntity): string {
           </dl>
         </article>
       </template>
-
-      <!-- Resolved directly but not (yet) in the catalog listing: registry summary. -->
-      <article v-else-if="docState === 'found' && fetchedSummary" class="surface p-6">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div class="min-w-0 flex-1">
-            <h1 class="break-all font-display text-xl font-semibold tracking-tight text-aruna-navy">{{ fetchedSummary.document_path }}</h1>
-            <p class="mt-2 text-sm text-muted-foreground">Showing this document's registry summary; it is not in the catalog listing yet.</p>
-          </div>
-          <Badge :variant="fetchedSummary.public ? 'success' : 'secondary'" class="text-[10px] uppercase">{{ fetchedSummary.public ? 'public' : 'private' }}</Badge>
-        </div>
-        <dl class="mt-6 grid gap-3 sm:grid-cols-4">
-          <div class="surface-muted p-3">
-            <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Document ID</dt>
-            <dd class="mt-1 break-all font-mono text-[11px] text-foreground">{{ fetchedSummary.document_id }}</dd>
-          </div>
-          <div class="surface-muted p-3">
-            <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Group</dt>
-            <dd class="mt-1 break-all font-mono text-[11px] text-foreground">{{ fetchedSummary.group_id }}</dd>
-          </div>
-          <div class="surface-muted p-3">
-            <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Created</dt>
-            <dd class="mt-1 text-sm font-medium text-foreground">{{ relativeTime(fetchedSummary.created_at) }}</dd>
-          </div>
-          <div class="surface-muted p-3">
-            <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Updated</dt>
-            <dd class="mt-1 text-sm font-medium text-foreground">{{ relativeTime(fetchedSummary.updated_at) }}</dd>
-          </div>
-        </dl>
-      </article>
 
       <!-- Crate + referenced data for any resolved document (keyed on detailId). -->
       <template v-if="docState === 'found'">

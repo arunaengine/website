@@ -4,7 +4,6 @@ import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
 import SearchFilterBar, { type Facet, type FilterModel } from '@/components/search/SearchFilterBar.vue'
-import Pagination from '@/components/ui/Pagination.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -16,18 +15,39 @@ import { useAruna } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useDebounceFn } from '@vueuse/core'
-import { shortUserId, truncateMiddle } from '@/lib/utils'
+import { formatNumber, shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { conformsToProcessRun } from '@/lib/profiles/builtinProfiles'
 import { Search, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound } from '@lucide/vue'
 import type { MetadataDoc, SparqlResult } from '@/data/types'
-import type { BucketSearchHit, UserSearchHit } from '@/lib/api'
+import type { BucketSearchHit, MetadataDocumentListItem, UserSearchHit } from '@/lib/api'
 import type { RouteLocationRaw } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
-const { realm, metadata, profiles, currentUser, loading, error, bootstrapped, refresh, runSparql, toggleFavourite, myGroups, discoverableGroups, searchUsers, searchUnified } =
-  useAruna()
+const {
+  realm,
+  metadata,
+  profiles,
+  currentUser,
+  loading,
+  error,
+  bootstrapped,
+  refresh,
+  runSparql,
+  toggleFavourite,
+  myGroups,
+  discoverableGroups,
+  searchUsers,
+  searchUnified,
+  catalogExhausted,
+  catalogLoadingMore,
+  catalogEstimate,
+  loadMoreMetadata,
+  listGroupMetadata,
+  getMetadataItem,
+  toMetadataDoc,
+} = useAruna()
 const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
 
 function queryString(value: unknown): string {
@@ -42,11 +62,11 @@ function queryFilter(value: unknown): string | null {
 const q = ref(queryString(route.query.q))
 const profileFilter = ref<string | null>(queryFilter(route.query.profile))
 // Search push-down: the group filter maps to the server group_id and the profile
-// filter to conforms_to when it resolves to a local profile IRI. Browse (no
-// active query) still filters the loaded catalog client-side.
+// filter to conforms_to when it resolves to a local profile IRI. Browsing with a
+// group filter pages a group-scoped listing instead of the shared catalog.
 const groupFilter = ref<string | null>(queryFilter(route.query.group))
-// Entity/resource type facet, derived from the RO-Crate @type of the loaded
-// catalog. Applied client-side in both the browse and the search branches.
+// Entity/resource type facet, derived from the RO-Crate @type of the documents
+// loaded so far. Applied client-side in both the browse and the search branches.
 const typeFilter = ref<string | null>(queryFilter(route.query.type))
 const favouritesOnly = ref(false)
 
@@ -120,16 +140,156 @@ watch(
   },
 )
 
-const PAGE_SIZE = 12
-const page = ref(1)
-watch([q, profileFilter, groupFilter, typeFilter, favouritesOnly], () => {
-  page.value = 1
-})
-
 // The active search query switches the whole branch, so the browse "filtering"
 // state only tracks the client-side filters.
 const filtering = computed(() => Boolean(profileFilter.value || groupFilter.value || typeFilter.value || favouritesOnly.value))
 const favouriteIds = computed(() => currentUser.value?.favouriteMetadataIds ?? [])
+
+// ── Browse paging ───────────────────────────────────────────────────────────
+// Three sources, all bounded: the shared catalog pages, a group-scoped listing
+// when the group facet is set (pushed down to the server), and the user's own
+// favourite ids fetched one by one. None of them ever walks the realm.
+const BROWSE_PAGE_SIZE = 48
+const FAVOURITE_FETCH_CAP = 100
+// Each favourite costs two requests, so they are fetched in bounded batches.
+const FAVOURITE_FETCH_BATCH = 6
+
+const groupDocs = ref<MetadataDoc[]>([])
+const groupOffset = ref(0)
+const groupExhausted = ref(false)
+const groupLoading = ref(false)
+const groupEstimate = ref<number | null>(null)
+const browseError = ref<string | null>(null)
+let groupSeq = 0
+
+async function loadGroupPage(append: boolean) {
+  const groupId = groupFilter.value
+  if (!groupId) return
+  const seq = ++groupSeq
+  groupLoading.value = true
+  browseError.value = null
+  try {
+    const response = await listGroupMetadata(groupId, {
+      limit: BROWSE_PAGE_SIZE,
+      offset: append ? groupOffset.value : 0,
+      summary: true,
+    })
+    if (seq !== groupSeq) return
+    const docs = response.documents
+      .filter((item) => !item.document_path.startsWith('profiles/'))
+      .map(toMetadataDoc)
+    groupDocs.value = append ? [...groupDocs.value, ...docs] : docs
+    groupOffset.value = response.offset + response.total_returned
+    groupEstimate.value = response.total_estimate ?? null
+    // Only a short page ends the listing; the estimate is display copy.
+    groupExhausted.value = response.total_returned < response.limit
+  } catch (err) {
+    if (seq !== groupSeq) return
+    browseError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    if (seq === groupSeq) groupLoading.value = false
+  }
+}
+
+const favouriteDocs = ref<MetadataDoc[]>([])
+const favouritesLoading = ref(false)
+let favouriteSeq = 0
+
+// Favourites are a small, user-curated id list, so they are fetched directly
+// instead of being searched for in the catalog.
+async function loadFavourites() {
+  const ids = favouriteIds.value.slice(0, FAVOURITE_FETCH_CAP)
+  const seq = ++favouriteSeq
+  if (!ids.length) {
+    favouriteDocs.value = []
+    return
+  }
+  favouritesLoading.value = true
+  browseError.value = null
+  try {
+    const items: Array<MetadataDocumentListItem | null> = []
+    for (let start = 0; start < ids.length; start += FAVOURITE_FETCH_BATCH) {
+      const batch = ids.slice(start, start + FAVOURITE_FETCH_BATCH)
+      const loaded = await Promise.all(batch.map((id) => getMetadataItem(id).catch(() => null)))
+      if (seq !== favouriteSeq) return
+      items.push(...loaded)
+    }
+    favouriteDocs.value = items
+      .filter((item): item is MetadataDocumentListItem => item !== null)
+      .map(toMetadataDoc)
+  } catch (err) {
+    if (seq !== favouriteSeq) return
+    browseError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    if (seq === favouriteSeq) favouritesLoading.value = false
+  }
+}
+
+watch(
+  [groupFilter, () => searchActive.value, favouritesOnly],
+  ([groupId, searching, favourites]) => {
+    if (searching || favourites || !groupId) {
+      ++groupSeq
+      groupDocs.value = []
+      groupOffset.value = 0
+      groupEstimate.value = null
+      groupExhausted.value = false
+      return
+    }
+    void loadGroupPage(false)
+  },
+  { immediate: true },
+)
+
+watch([favouritesOnly, favouriteIds], ([only]) => {
+  if (!only) {
+    ++favouriteSeq
+    favouriteDocs.value = []
+    return
+  }
+  void loadFavourites()
+})
+
+const browseSource = computed<MetadataDoc[]>(() => {
+  if (favouritesOnly.value) return favouriteDocs.value
+  return groupFilter.value ? groupDocs.value : metadata.value
+})
+// Favourites are fetched whole; the other two sources page.
+const browseExhausted = computed(() => {
+  if (favouritesOnly.value) return true
+  return groupFilter.value ? groupExhausted.value : catalogExhausted.value
+})
+const browseLoading = computed(
+  () => favouritesLoading.value || groupLoading.value || catalogLoadingMore.value,
+)
+// Newer nodes serve an APPROXIMATE match count with every page (estimated per
+// group, so it can over- or under-count). Copy only: paging never reads it.
+// Favourites are fetched by id, so that count is exact.
+const browseEstimate = computed<number | null>(() => {
+  if (favouritesOnly.value) return null
+  return groupFilter.value ? groupEstimate.value : catalogEstimate.value
+})
+const browseSummary = computed(() => {
+  const shown = formatNumber(hits.value.length)
+  if (browseEstimate.value !== null) {
+    // "you can see" keeps this apart from the dashboard's realm-wide total.
+    return `Showing ${shown} of about ${formatNumber(browseEstimate.value)} documents you can see.`
+  }
+  return browseExhausted.value ? `Showing all ${shown} documents.` : `Showing ${shown} documents so far.`
+})
+
+async function loadMoreBrowse() {
+  browseError.value = null
+  if (groupFilter.value) {
+    await loadGroupPage(true)
+    return
+  }
+  try {
+    await loadMoreMetadata()
+  } catch (err) {
+    browseError.value = err instanceof Error ? err.message : String(err)
+  }
+}
 
 // The RO-Crate @type is stored comma-joined (e.g. "Dataset, SoftwareSourceCode");
 // split it so a doc matches a facet when any of its types equals the selection.
@@ -138,8 +298,10 @@ function docTypes(doc?: MetadataDoc | null): string[] {
   return doc.type.split(',').map((entry) => entry.trim()).filter(Boolean)
 }
 
+// The group filter is served by the source itself; profile, type and favourites
+// still narrow what the source returned.
 const hits = computed(() =>
-  metadata.value.filter((doc) => {
+  browseSource.value.filter((doc) => {
     if (profileFilter.value && !(doc.profileIds ?? []).includes(profileFilter.value)) return false
     if (groupFilter.value && doc.realmId !== groupFilter.value) return false
     if (typeFilter.value && !docTypes(doc).includes(typeFilter.value)) return false
@@ -157,7 +319,6 @@ const catalogSplit = computed(() => {
   for (const doc of hits.value) (isRunCrateDoc(doc) ? runs : datasets).push(doc)
   return { runs, datasets }
 })
-const paged = computed(() => catalogSplit.value.datasets.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
 
 // Group labels: names for groups the caller can see, honest truncated id otherwise.
 const groupNames = computed(() => {
@@ -165,7 +326,7 @@ const groupNames = computed(() => {
   for (const group of [...myGroups.value, ...discoverableGroups.value]) names.set(group.id, group.name)
   return names
 })
-// Stable option set from the loaded catalog and known groups, plus the active
+// Stable option set from the loaded documents and known groups, plus the active
 // filter, so a server-side group filter never hides the option it selected.
 const groupOptions = computed(() => {
   const labels = new Map<string, string>()
@@ -179,12 +340,12 @@ const groupOptions = computed(() => {
     .sort((a, b) => a.label.localeCompare(b.label))
 })
 
-// Distinct entity/resource types actually present in the loaded catalog, plus the
-// active filter so a value carried in from the URL is never dropped. The type
+// Distinct entity/resource types present in the documents loaded so far, plus
+// the active filter so a value carried in from the URL is never dropped. The
 // facet only appears when the data offers a real choice (more than one type).
 const typeOptions = computed(() => {
   const types = new Set<string>()
-  for (const doc of metadata.value) for (const type of docTypes(doc)) types.add(type)
+  for (const doc of browseSource.value) for (const type of docTypes(doc)) types.add(type)
   if (typeFilter.value) types.add(typeFilter.value)
   return [...types].sort((a, b) => a.localeCompare(b))
 })
@@ -218,8 +379,8 @@ const filterFacets = computed<Facet[]>(() => {
   return facets
 })
 
-// Bridge the facet record to the existing filter refs so all URL-sync and
-// page-reset watchers keep firing exactly as before.
+// Bridge the facet record to the existing filter refs so the URL-sync and
+// paging watchers keep firing exactly as before.
 const filterModel = computed<FilterModel>({
   get: () => ({
     profile: profileFilter.value,
@@ -268,7 +429,11 @@ const KIND_OPTIONS: Array<{ id: SearchKind; label: string }> = [
   { id: 'groups', label: 'Groups' },
   { id: 'people', label: 'People' },
 ]
+const textQuery = computed(() => q.value.trim())
 function showKind(kind: Exclude<SearchKind, 'all'>): boolean {
+  // A profile filter alone lists documents server-side; buckets, groups and
+  // people need an actual query term.
+  if (!textQuery.value) return kind === 'datasets'
   return kindFilter.value === 'all' || kindFilter.value === kind
 }
 
@@ -423,6 +588,9 @@ async function runQuery() {
             <input v-model="q" placeholder="Search datasets, groups and people…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring" />
           </div>
           <SearchFilterBar v-model="filterModel" :facets="filterFacets" aria-label="Discover filters" class="mt-3" />
+          <p v-if="showTypeFilter || typeFilter" class="mt-2 text-[11px] text-muted-foreground">
+            Profile and group filters are applied by the server; Type covers the documents loaded so far.
+          </p>
         </div>
 
         <p v-if="favError" class="text-xs text-destructive">{{ favError }}</p>
@@ -443,7 +611,7 @@ async function runQuery() {
 
           <!-- Entity-kind chips: metadata stays the primary result set; groups and
                people render as extra sections like the top-bar quick search. -->
-          <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Result types">
+          <div v-if="textQuery" class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Result types">
             <button
               v-for="kind in KIND_OPTIONS"
               :key="kind.id"
@@ -530,19 +698,19 @@ async function runQuery() {
           </section>
 
           <EmptyState
-            v-if="kindFilter === 'buckets' && !bucketsSearching && !bucketResults.length && !bucketsError"
+            v-if="textQuery && kindFilter === 'buckets' && !bucketsSearching && !bucketResults.length && !bucketsError"
             title="No matching buckets"
-            :description="currentUser ? `No bucket on the realm's nodes matched “${q.trim()}”.` : 'Sign in to search for buckets.'"
+            :description="currentUser ? `No bucket on the realm's nodes matched “${textQuery}”.` : 'Sign in to search for buckets.'"
           />
           <EmptyState
-            v-else-if="kindFilter === 'groups' && !groupMatches.length"
+            v-else-if="textQuery && kindFilter === 'groups' && !groupMatches.length"
             title="No matching groups"
-            :description="`No loaded group in ${realm.shortName} matched “${q.trim()}”.`"
+            :description="`No loaded group in ${realm.shortName} matched “${textQuery}”.`"
           />
           <EmptyState
-            v-else-if="kindFilter === 'people' && !peopleSearching && !peopleResults.length"
+            v-else-if="textQuery && kindFilter === 'people' && !peopleSearching && !peopleResults.length"
             title="No matching people"
-            :description="currentUser ? `No user in ${realm.shortName} matched “${q.trim()}”.` : 'Sign in to search for people.'"
+            :description="currentUser ? `No user in ${realm.shortName} matched “${textQuery}”.` : 'Sign in to search for people.'"
           />
 
           <template v-if="showKind('datasets')">
@@ -557,7 +725,7 @@ async function runQuery() {
           <section v-else-if="visibleResults.length">
             <div class="mb-3 flex items-center gap-2">
               <FileJson2 class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Search results</h2>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ textQuery ? 'Search results' : 'Documents with this profile' }}</h2>
               <span class="text-xs text-muted-foreground">{{ visibleResults.length }}</span>
               <span v-if="searchPending" class="text-xs text-muted-foreground">· Searching…</span>
             </div>
@@ -566,14 +734,15 @@ async function runQuery() {
                 <CatalogCard
                   v-if="line.doc"
                   :doc="line.doc"
-                  :score="line.hit.score"
+                  :score="textQuery ? line.hit.score : undefined"
                   :favourite="isFavourite(line.doc.ulid)"
                   :can-favourite="Boolean(currentUser)"
                   :favourite-busy="favBusy.has(line.doc.ulid)"
                   @toggle-favourite="toggleFav"
                 />
-                <!-- Honest id-only hit: not in the loaded catalog. #275's metadata detail
-                     states (found/not-found/forbidden) handle unknown or private ids. -->
+                <!-- Server-side hit outside the loaded pages: title and snippet
+                     come from the answering node, the rest opens on the detail
+                     page (which handles unknown or private ids honestly). -->
                 <RouterLink
                   v-else
                   :to="{ name: 'metadata-detail', params: { id: line.hit.document_id } }"
@@ -583,12 +752,11 @@ async function runQuery() {
                     <h3 v-if="line.title" class="font-display text-sm font-semibold text-aruna-navy">{{ line.title }}</h3>
                     <h3 v-else class="break-all font-mono text-xs font-semibold text-aruna-navy">{{ line.hit.document_path }}</h3>
                     <p v-if="line.snippet" class="mt-1 line-clamp-2 text-xs text-muted-foreground">{{ line.snippet }}</p>
-                    <p class="mt-1 text-[11px] text-muted-foreground">Not in the loaded catalog, open for details.</p>
                   </div>
                   <div class="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                     <span class="truncate font-mono">{{ truncateMiddle(line.hit.document_id) }}</span>
                     <div class="flex shrink-0 items-center gap-1.5">
-                      <Badge variant="outline" class="text-[10px]">score {{ line.hit.score.toFixed(2) }}</Badge>
+                      <Badge v-if="textQuery" variant="outline" class="text-[10px]">score {{ line.hit.score.toFixed(2) }}</Badge>
                       <span class="truncate">{{ groupNames.get(line.hit.group_id) ?? truncateMiddle(line.hit.group_id) }}</span>
                     </div>
                   </div>
@@ -605,7 +773,9 @@ async function runQuery() {
             :title="searchResults.length ? 'No matches after filters' : 'No matches'"
             :description="searchResults.length
               ? 'Results were hidden by the active group, profile or favourites filters.'
-              : `No metadata in ${realm.shortName} matched “${q.trim()}”.`"
+              : textQuery
+                ? `No metadata in ${realm.shortName} matched “${textQuery}”.`
+                : `No document in ${realm.shortName} conforms to this profile.`"
           >
             <Button v-if="searchResults.length" variant="outline" @click="clearFilters">Clear filters</Button>
           </EmptyState>
@@ -632,74 +802,91 @@ async function runQuery() {
           </template>
         </template>
 
-        <!-- Browse path: client-side catalog browsing, unchanged apart from the group filter. -->
+        <!-- Browse path: one page at a time, extended on demand. The realm is
+             never enumerated; group and favourites browsing fetch their own. -->
         <template v-else>
-          <section v-if="!bootstrapped || (loading && !metadata.length)" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <section v-if="!bootstrapped || (browseLoading && !browseSource.length) || (loading && !metadata.length)" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Skeleton v-for="n in 6" :key="n" class="h-36" />
           </section>
 
           <ErrorPanel v-else-if="error" :message="error" @retry="refresh" />
 
-          <template v-else-if="hits.length">
-            <section v-if="catalogSplit.datasets.length">
-              <div class="mb-3 flex items-center gap-2">
-                <FileJson2 class="h-4 w-4 text-primary" />
-                <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ filtering ? 'Matching metadata' : 'Catalog' }}</h2>
-                <span class="text-xs text-muted-foreground">{{ catalogSplit.datasets.length }}</span>
-              </div>
-              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <CatalogCard
-                  v-for="doc in paged"
-                  :key="doc.ulid"
-                  :doc="doc"
-                  :favourite="isFavourite(doc.ulid)"
-                  :can-favourite="Boolean(currentUser)"
-                  :favourite-busy="favBusy.has(doc.ulid)"
-                  @toggle-favourite="toggleFav"
-                />
-              </div>
-              <div v-if="catalogSplit.datasets.length > PAGE_SIZE" class="surface mt-4 overflow-hidden">
-                <Pagination v-model:page="page" :page-size="PAGE_SIZE" :total="catalogSplit.datasets.length" label="metadata documents" />
-              </div>
-            </section>
+          <template v-else>
+            <template v-if="hits.length">
+              <section v-if="catalogSplit.datasets.length">
+                <div class="mb-3 flex items-center gap-2">
+                  <FileJson2 class="h-4 w-4 text-primary" />
+                  <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ filtering ? 'Matching metadata' : 'Catalog' }}</h2>
+                  <span class="text-xs text-muted-foreground">{{ catalogSplit.datasets.length }}</span>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <CatalogCard
+                    v-for="doc in catalogSplit.datasets"
+                    :key="doc.ulid"
+                    :doc="doc"
+                    :favourite="isFavourite(doc.ulid)"
+                    :can-favourite="Boolean(currentUser)"
+                    :favourite-busy="favBusy.has(doc.ulid)"
+                    @toggle-favourite="toggleFav"
+                  />
+                </div>
+              </section>
 
-            <!-- Process Run crates get their own
-                 section so compute runs never mix with ordinary datasets. -->
-            <section v-if="catalogSplit.runs.length">
-              <div class="mb-3 flex items-center gap-2">
-                <Play class="h-4 w-4 text-primary" />
-                <h2 class="font-display text-sm font-semibold text-aruna-navy">Compute runs</h2>
-                <span class="text-xs text-muted-foreground">{{ catalogSplit.runs.length }}</span>
-              </div>
-              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <CatalogCard
-                  v-for="doc in catalogSplit.runs"
-                  :key="doc.ulid"
-                  :doc="doc"
-                  :favourite="isFavourite(doc.ulid)"
-                  :can-favourite="Boolean(currentUser)"
-                  :favourite-busy="favBusy.has(doc.ulid)"
-                  @toggle-favourite="toggleFav"
-                />
-              </div>
-            </section>
+              <!-- Process Run crates get their own
+                   section so compute runs never mix with ordinary datasets. -->
+              <section v-if="catalogSplit.runs.length">
+                <div class="mb-3 flex items-center gap-2">
+                  <Play class="h-4 w-4 text-primary" />
+                  <h2 class="font-display text-sm font-semibold text-aruna-navy">Compute runs</h2>
+                  <span class="text-xs text-muted-foreground">{{ catalogSplit.runs.length }}</span>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <CatalogCard
+                    v-for="doc in catalogSplit.runs"
+                    :key="doc.ulid"
+                    :doc="doc"
+                    :favourite="isFavourite(doc.ulid)"
+                    :can-favourite="Boolean(currentUser)"
+                    :favourite-busy="favBusy.has(doc.ulid)"
+                    @toggle-favourite="toggleFav"
+                  />
+                </div>
+              </section>
+            </template>
+
+            <EmptyState
+              v-else-if="filtering"
+              title="No matches here yet"
+              :description="browseExhausted
+                ? `Nothing in ${realm.shortName} matches the active filters.`
+                : 'Nothing on the documents loaded so far matches the active filters. Load more, or search by name.'"
+            >
+              <Button variant="outline" @click="clearFilters">Clear filters</Button>
+            </EmptyState>
+
+            <EmptyState
+              v-else
+              :title="`No visible metadata in ${realm.shortName}`"
+              description="No RO-Crate metadata documents are visible here yet."
+            >
+              <Button v-if="currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
+            </EmptyState>
+
+            <p v-if="browseError" class="text-center text-xs text-destructive">{{ browseError }}</p>
+            <!-- Paging is load-more, driven only by the page size; a node that
+                 serves an estimate adds an "about N" to the copy. -->
+            <div v-if="hits.length || !browseExhausted" class="flex flex-col items-center gap-2">
+              <p
+                class="text-[11px] text-muted-foreground"
+                :title="browseEstimate !== null ? 'The server estimates this count per group, so it is approximate.' : undefined"
+              >
+                {{ browseSummary }}
+              </p>
+              <Button v-if="!browseExhausted" variant="outline" :disabled="browseLoading" @click="loadMoreBrowse">
+                {{ browseLoading ? 'Loading…' : 'Load more' }}
+              </Button>
+            </div>
           </template>
-
-          <EmptyState
-            v-else-if="filtering"
-            title="No matches"
-            :description="`Nothing in ${realm.shortName} matches the active filters.`"
-          >
-            <Button variant="outline" @click="clearFilters">Clear filters</Button>
-          </EmptyState>
-
-          <EmptyState
-            v-else
-            :title="`No visible metadata in ${realm.shortName}`"
-            description="No RO-Crate metadata documents are visible here yet."
-          >
-            <Button v-if="currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
-          </EmptyState>
         </template>
       </template>
 

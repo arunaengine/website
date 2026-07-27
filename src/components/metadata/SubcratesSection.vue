@@ -9,6 +9,7 @@ import { Layers, Loader2, Plus, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentListItem } from '@/lib/api'
 import { addSubcrateLink, isProjectCrate, removeSubcrateLink, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
+import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
 import { isHttpUrl } from '@/lib/utils'
 
 const props = defineProps<{
@@ -19,7 +20,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
-const { metadata, metadataItems, apiBaseUrl, saving, fetchRoCrateRaw, replaceMetadataRoCrate } = useAruna()
+const { toMetadataDoc, apiBaseUrl, saving, fetchRoCrateRaw, replaceMetadataRoCrate } = useAruna()
 
 // The spec's subjectOf fallback needs a URL that resolves to the child's crate
 // JSON; the portal serves it at GET /metadata/{id}/rocrate.
@@ -30,17 +31,16 @@ function crateJsonUrl(documentId: string): string {
 const links = computed(() => subcrateLinksOf(props.crate))
 const isProject = computed(() => isProjectCrate(props.crate))
 
-// In-portal resolution: the identifier (document id) wins, the graph IRI is
-// the fallback; anything else renders as an external entry, never an error.
+// In-portal resolution is a pure decision on the link itself: the identifier
+// (a document id) wins, the Aruna graph IRI is the fallback; anything else
+// renders as an external entry, never an error.
 function resolveDocumentId(link: SubcrateLink): string | undefined {
-  if (link.identifier && metadataItems.value.some((item) => item.document_id === link.identifier)) {
-    return link.identifier
-  }
-  return metadataItems.value.find((item) => item.graph_iri === link.iri)?.document_id
+  if (link.identifier && isDocumentId(link.identifier)) return link.identifier
+  return documentIdFromIri(link.iri) ?? undefined
 }
 
 function titleOf(item: MetadataDocumentListItem): string {
-  return metadata.value.find((doc) => doc.ulid === item.document_id)?.title || item.document_path
+  return toMetadataDoc(item).title
 }
 
 const error = ref<string | null>(null)

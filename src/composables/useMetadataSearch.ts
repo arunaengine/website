@@ -20,7 +20,11 @@ const SEARCH_REQUEST_TIMEOUT_MS = 30_000
 
 export interface SearchResultLine {
   hit: MetadataSearchHit
-  /** Catalog join on document_id; null when the doc is not in the loaded catalog. */
+  /**
+   * Catalog join on document_id, over the loaded catalog pages only; null for
+   * every hit outside them. Cosmetic: the server always serves a title and
+   * usually a snippet, so a null doc never hides a result.
+   */
   doc: MetadataDoc | null
   /** Best known display title — catalog title, else server title (aruna#258), else null. Never fabricated. */
   title: string | null
@@ -64,8 +68,9 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
   const nextCursor = ref<string | null>(null)
 
   // Two-character minimum, aligned with useUnifiedSearch (the backend rejects
-  // shorter queries with 400 anyway).
-  const active = computed(() => query.value.trim().length >= 2)
+  // shorter queries with 400 anyway) — except with a conformsTo filter, which
+  // the backend accepts on its own as a profile listing.
+  const active = computed(() => query.value.trim().length >= 2 || Boolean(filters.conformsTo?.value))
   // The backend signals partial results through nodes_failed (a per-node id list
   // is not served); a non-zero count means matches on failed nodes are missing.
   const partial = computed(() => nodesFailed.value > 0)
@@ -73,13 +78,14 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
   // means more matches may exist that we cannot fetch.
   const capped = computed(() => !cursorEnabled && hits.value.length >= SEARCH_PAGE_CAP)
 
+  // Loaded catalog pages only; enrichment, never a filter.
   const docById = computed(() => {
     const map = new Map<string, MetadataDoc>()
     for (const doc of metadata.value) map.set(doc.ulid, doc)
     return map
   })
 
-  // Kept as a computed so hits enrich retroactively once the catalog loads.
+  // Kept as a computed so hits enrich retroactively as more pages load.
   const results = computed<SearchResultLine[]>(() =>
     hits.value.map((hit) => {
       const doc = docById.value.get(hit.document_id) ?? null
@@ -169,7 +175,7 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
     if (!cursorEnabled || loadingMore.value || pending.value) return
     const cursor = nextCursor.value
     const term = query.value.trim()
-    if (!cursor || !term) return
+    if (!cursor || !active.value) return
     // Never reuse a cursor across queries; the debounced watcher refetches.
     if (term !== cursorQuery) {
       nextCursor.value = null
@@ -224,8 +230,7 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
   }
 
   function retry() {
-    const term = query.value.trim()
-    if (term) void runSearch(term)
+    if (active.value) void runSearch(query.value.trim())
   }
 
   // A filter change re-binds the cursor, so the watched deps include the server
@@ -243,13 +248,14 @@ export function useMetadataSearch(query: Ref<string>, filters: MetadataSearchFil
     cursorQuery = ''
     restartedFor = ''
     reset()
+    if (!active.value) return
     const term = query.value.trim()
-    if (!term) return
     timer = window.setTimeout(() => void runSearch(term), SEARCH_DEBOUNCE_MS)
   })
 
-  // Deep links (?q= from the router / top bar) search immediately, undebounced.
-  if (query.value.trim()) void runSearch(query.value.trim())
+  // Deep links (?q= / ?profile= from the router or top bar) search immediately,
+  // undebounced.
+  if (active.value) void runSearch(query.value.trim())
 
   // Infinite-scroll sentinel; only observed when cursor paging is enabled.
   const sentinel = ref<HTMLElement | null>(null)

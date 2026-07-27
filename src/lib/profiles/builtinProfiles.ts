@@ -147,7 +147,6 @@ export const PROCESS_RUN_CRATE_PROFILE: MetadataProfile = {
   suggestedKeywords: ['process', 'provenance', 'run'],
   managed: true,
   builtIn: true,
-  usedCount: 0,
 }
 
 // Match the full profile IRI; conformsTo ordering carries no meaning.

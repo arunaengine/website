@@ -14,6 +14,7 @@ import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { useS3 } from '@/composables/useS3'
+import type { MetadataDocumentListItem } from '@/lib/api'
 import { detectQuickRun } from '@/lib/quickRuntimes'
 import {
   TES_GROUP_TAG,
@@ -33,7 +34,7 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled')
 
 const router = useRouter()
 const { getTask, cancelTask, busy } = useTes()
-const { myGroups, apiBaseUrl, metadataItems, loadMetadata } = useAruna()
+const { myGroups, apiBaseUrl, metadataAtPath } = useAruna()
 const { hide } = useHiddenTasks()
 const s3 = useS3()
 
@@ -98,8 +99,10 @@ watch(
   ([open, id]) => {
     stopPolling()
     task.value = null
+    runCrate.value = null
     if (!open || !id) return
     void initialLoad()
+    void findRunCrate()
   },
   { immediate: true },
 )
@@ -212,8 +215,22 @@ const capturedOutputs = computed<OutRow[]>(() =>
     .map((o) => ({ url: o.url, path: o.path, size: Number(o.size_bytes), link: resolveUrl(o.url) })),
 )
 
-// ── Process Run crate (cache-only honest lookup) ─────────────────────────────
-const runCrate = computed(() => metadataItems.value.find((d) => d.document_path.includes(`runs/${props.taskId}`)))
+// ── Process Run crate (targeted lookup at runs/{taskId}) ─────────────────────
+const runCrate = ref<MetadataDocumentListItem | null>(null)
+const runCrateLoading = ref(false)
+async function findRunCrate() {
+  if (runCrateLoading.value) return
+  runCrateLoading.value = true
+  try {
+    runCrate.value = await metadataAtPath(`runs/${props.taskId}`)
+  } catch {
+    // The crate is written when the run completes; a failed lookup just keeps
+    // the section in its "not found yet" state.
+    runCrate.value = null
+  } finally {
+    runCrateLoading.value = false
+  }
+}
 
 const systemLogsOpen = ref(false)
 
@@ -421,8 +438,10 @@ async function confirmDelete() {
             <FileText class="h-3.5 w-3.5" /> Open Process Run crate
           </RouterLink>
           <div v-else class="flex flex-wrap items-center gap-2">
-            <p class="text-xs text-muted-foreground">No Process Run crate found in the loaded catalog yet (expected under the group's <code class="rounded bg-muted px-1">runs/&lt;task-id&gt;</code> path once the run completes).</p>
-            <Button variant="ghost" size="sm" @click="loadMetadata()"><RefreshCw class="h-3.5 w-3.5" /> Refresh catalog</Button>
+            <p class="text-xs text-muted-foreground">No Process Run crate at <code class="rounded bg-muted px-1">runs/&lt;task-id&gt;</code> yet; it is written once the run completes.</p>
+            <Button variant="ghost" size="sm" :disabled="runCrateLoading" @click="findRunCrate">
+              <RefreshCw class="h-3.5 w-3.5" :class="runCrateLoading ? 'animate-spin' : ''" /> Check again
+            </Button>
           </div>
         </section>
 

@@ -56,13 +56,27 @@ const loading = ref(false)
 const loadError = ref<string | null>(null)
 const tree = ref<MetaPathFolder | null>(null)
 const expanded = ref(new Set<string>())
+// Paths only: the tree needs document_path, never an RO-Crate summary.
+const PATH_PAGE_SIZE = 100
+const paths = ref<string[]>([])
+const pathsExhausted = ref(true)
+// Approximate count served by newer nodes; null keeps the plain "loaded" copy.
+const pathsEstimate = ref<number | null>(null)
 
-async function load() {
+async function load(append = false) {
   loading.value = true
   loadError.value = null
   try {
-    const response = await listGroupMetadata(props.groupId)
-    tree.value = buildMetaPathTree(response.documents.map((doc) => doc.document_path))
+    const response = await listGroupMetadata(props.groupId, {
+      limit: PATH_PAGE_SIZE,
+      offset: append ? paths.value.length : 0,
+    })
+    const page = response.documents.map((doc) => doc.document_path)
+    paths.value = append ? [...paths.value, ...page] : page
+    pathsEstimate.value = response.total_estimate ?? null
+    // A short page is the only end-of-list authority; the estimate is copy.
+    pathsExhausted.value = response.total_returned < response.limit
+    tree.value = buildMetaPathTree(paths.value)
     // Open the first level so the tree reads as a browser, not a blank box.
     expanded.value = new Set(tree.value.folders.map((folder) => folder.path))
   } catch (err) {
@@ -183,7 +197,7 @@ watch(
       <section v-if="customMode === 'meta'" class="mt-2 rounded-lg border border-border bg-background">
         <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
           <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Metadata documents</div>
-          <Button variant="ghost" size="sm" class="h-6 px-1.5 text-[10px]" :disabled="loading" @click="load">
+          <Button variant="ghost" size="sm" class="h-6 px-1.5 text-[10px]" :disabled="loading" @click="load()">
             <RefreshCw class="h-3 w-3" :class="loading ? 'animate-spin' : ''" /> Reload
           </Button>
         </div>
@@ -208,6 +222,14 @@ watch(
               @toggle="toggle"
               @select="emit('select', [$event])"
             />
+          </div>
+          <div v-if="tree && !pathsExhausted" class="mt-1.5 flex items-center gap-2">
+            <Button variant="outline" size="sm" class="h-7 text-[11px]" :disabled="loading" @click="load(true)">
+              Load more paths
+            </Button>
+            <span class="text-[11px] text-muted-foreground">
+              {{ pathsEstimate === null ? `${paths.length} loaded` : `${paths.length} of about ${pathsEstimate}` }}; a folder scope covers everything under it.
+            </span>
           </div>
         </div>
       </section>

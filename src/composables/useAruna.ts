@@ -72,6 +72,13 @@ import {
 const TOKEN_KEY = 'aruna.authToken'
 const API_BASE_KEY = 'aruna.apiBaseUrl'
 
+// The catalog is paged, never walked: a realm can hold hundreds of thousands of
+// documents. Page sizes stay at or below 100, the server-side per-page cap.
+const CATALOG_PAGE_SIZE = 48
+// Profiles are a small bounded set under profiles/ that several screens need
+// synchronously, so that one prefix stays fully loaded.
+const PROFILE_PAGE_SIZE = 100
+
 const apiBaseUrl = ref(readStored(API_BASE_KEY) || defaultApiBaseUrl())
 const authToken = ref(readStored(TOKEN_KEY))
 const loading = ref(false)
@@ -86,6 +93,14 @@ const userInfo = ref<UserInfoResponse | null>(null)
 const apiGroups = ref<ApiGroup[]>([])
 const metadataItems = ref<MetadataDocumentListItem[]>([])
 const profileItems = ref<MetadataDocumentListItem[]>([])
+// Catalog paging state: how many pages of `metadataItems` are loaded, and
+// whether the end was reached (a short page is the only authority).
+const catalogPages = ref(0)
+const catalogExhausted = ref(false)
+const catalogLoadingMore = ref(false)
+// Approximate match count served alongside each page by newer nodes; null when
+// the node does not serve it. Display only — see catalogEstimate.
+const catalogPageEstimate = ref<number | null>(null)
 const credentials = ref<S3CredentialSummary[]>([])
 const fullCrates = ref<Record<string, unknown>>({})
 const cratePending = ref<Record<string, boolean>>({})
@@ -132,6 +147,11 @@ function clearIdentityState(clearPublic = false) {
   credentials.value = []
   metadataItems.value = []
   profileItems.value = []
+  catalogPages.value = 0
+  catalogExhausted.value = false
+  // An in-flight load-more skips its own reset once the epoch moved on.
+  catalogLoadingMore.value = false
+  catalogPageEstimate.value = null
   fullCrates.value = {}
   cratePending.value = {}
   authError.value = null
@@ -200,11 +220,7 @@ async function listMetadataPage(
   const attempts = 3
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      return await apiRequest<ListMetadataResponse>(
-        '/metadata',
-        { query: { include: 'summary', limit: 1000, ...query } },
-        context.client,
-      )
+      return await apiRequest<ListMetadataResponse>('/metadata', { query }, context.client)
     } catch (err) {
       const transient = err instanceof ApiError && err.status >= 500
       if (transient && attempt < attempts - 1) {
@@ -212,11 +228,8 @@ async function listMetadataPage(
         continue
       }
       if (transient) {
-        return apiRequest<ListMetadataResponse>(
-          '/metadata',
-          { query: { limit: 1000, ...query } },
-          context.client,
-        )
+        const { include: _summary, ...withoutSummary } = query
+        return apiRequest<ListMetadataResponse>('/metadata', { query: withoutSummary }, context.client)
       }
       throw err
     }
@@ -224,32 +237,69 @@ async function listMetadataPage(
   throw new Error('unreachable')
 }
 
-async function listMetadata(
-  query: Record<string, string | number>,
-  context = refreshContext(),
-): Promise<ListMetadataResponse> {
-  const documents: MetadataDocumentListItem[] = []
-  let offset = 0
-  let last: ListMetadataResponse | null = null
-  do {
-    last = await listMetadataPage({ ...query, offset }, context)
-    documents.push(...last.documents)
-    offset = last.offset + last.total_returned
-  } while (last.total_returned > 0 && last.total_returned >= last.limit)
+function catalogPageQuery(offset: number): Record<string, string | number> {
+  return { include: 'summary', limit: CATALOG_PAGE_SIZE, offset }
+}
 
-  return {
-    documents,
-    limit: last?.limit ?? 1000,
-    offset: 0,
-    total_returned: documents.length,
+// Documents under profiles/ have their own fully loaded list; the catalog keeps
+// excluding them so both stay disjoint.
+function applyCatalogPage(page: ListMetadataResponse, append: boolean) {
+  const documents = page.documents.filter((doc) => !doc.document_path.startsWith('profiles/'))
+  if (append) {
+    const known = new Set(metadataItems.value.map((item) => item.document_id))
+    metadataItems.value = [...metadataItems.value, ...documents.filter((doc) => !known.has(doc.document_id))]
+    catalogPages.value += 1
+  } else {
+    metadataItems.value = documents
+    catalogPages.value = 1
+  }
+  catalogPageEstimate.value = page.total_estimate ?? null
+  // A short page is the ONLY end-of-list authority: total_estimate is an
+  // approximation, and an under-count would strand later pages behind a
+  // disappearing "Load more".
+  catalogExhausted.value = page.total_returned < page.limit
+}
+
+/** Resets the catalog to its first page and reloads the profile set. */
+async function loadMetadata(context = refreshContext()) {
+  const [page] = await Promise.all([
+    listMetadataPage(catalogPageQuery(0), context),
+    loadProfiles(context),
+  ])
+  if (context.epoch !== sessionEpoch) return
+  applyCatalogPage(page, false)
+}
+
+/** Appends the next catalog page; a no-op once the last page was reached. */
+async function loadMoreMetadata(): Promise<void> {
+  if (catalogExhausted.value || catalogLoadingMore.value || !catalogPages.value) return
+  const context = refreshContext()
+  catalogLoadingMore.value = true
+  try {
+    const page = await listMetadataPage(catalogPageQuery(catalogPages.value * CATALOG_PAGE_SIZE), context)
+    if (context.epoch !== sessionEpoch) return
+    applyCatalogPage(page, true)
+  } finally {
+    if (context.epoch === sessionEpoch) catalogLoadingMore.value = false
   }
 }
 
-async function loadMetadata(context = refreshContext()) {
-  const catalog = await listMetadata({}, context)
+// Profiles stay exhaustive but scoped to the profiles/ prefix: the set is small
+// and screens (profile pickers, validation) need it synchronously.
+async function loadProfiles(context = refreshContext()) {
+  const documents: MetadataDocumentListItem[] = []
+  let offset = 0
+  let last: ListMetadataResponse
+  do {
+    last = await listMetadataPage(
+      { include: 'summary', limit: PROFILE_PAGE_SIZE, path_prefix: 'profiles/', offset },
+      context,
+    )
+    documents.push(...last.documents)
+    offset = last.offset + last.total_returned
+  } while (last.total_returned > 0 && last.total_returned >= last.limit)
   if (context.epoch !== sessionEpoch) return
-  metadataItems.value = catalog.documents.filter((doc) => !doc.document_path.startsWith('profiles/'))
-  profileItems.value = catalog.documents.filter((doc) => doc.document_path.startsWith('profiles/'))
+  profileItems.value = documents
 }
 
 async function loadAuthenticated(context = refreshContext()) {
@@ -430,8 +480,40 @@ async function deleteMetadataDocument(documentId: string): Promise<void> {
   }
 }
 
-async function listGroupMetadata(groupId: string): Promise<ListMetadataResponse> {
-  return listMetadata({ group_id: groupId })
+// One page of a group's documents. Summaries are opt-in: callers that only need
+// paths must not pay for a per-document graph export.
+async function listGroupMetadata(
+  groupId: string,
+  options: { limit?: number; offset?: number; summary?: boolean } = {},
+): Promise<ListMetadataResponse> {
+  return listMetadataPage({
+    group_id: groupId,
+    limit: options.limit ?? CATALOG_PAGE_SIZE,
+    offset: options.offset ?? 0,
+    ...(options.summary ? { include: 'summary' } : {}),
+  })
+}
+
+/** First document stored under a path prefix, or null. */
+async function metadataAtPath(pathPrefix: string): Promise<MetadataDocumentListItem | null> {
+  const page = await listMetadataPage({ path_prefix: pathPrefix, limit: 1 })
+  return page.documents[0] ?? null
+}
+
+// Registry summary plus the document's summary crate: the per-document
+// equivalent of one `include=summary` list row, for ids known up front.
+async function getMetadataItem(documentId: string): Promise<MetadataDocumentListItem> {
+  const context = refreshContext()
+  const [summary, crate] = await Promise.all([
+    getMetadataDocument(documentId),
+    apiRequest<MetadataRoCrateResponse>(
+      `/metadata/${encodeURIComponent(documentId)}/rocrate`,
+      { query: { view: 'summary' } },
+      context.client,
+    ).catch(() => null),
+  ])
+  assertCurrentSession(context.epoch)
+  return { ...summary, rocrate_summary: crate?.rocrate }
 }
 
 // Favourites live in the user attribute ui.favourite_metadata_ids as a
@@ -1128,6 +1210,16 @@ const profiles = computed<MetadataProfile[]>(() => {
 })
 const metadata = computed<MetadataDoc[]>(() => metadataItems.value.map(mapMetadataDoc))
 
+// APPROXIMATE catalog size in `metadata` terms: the server estimates per group,
+// so it can over- or under-count, and the fully known profiles/ documents are
+// subtracted because they are held separately. Copy must say "about"; never
+// drive paging or completeness from it. Null on nodes that do not serve it.
+const catalogEstimate = computed<number | null>(() =>
+  catalogPageEstimate.value === null
+    ? null
+    : Math.max(metadataItems.value.length, catalogPageEstimate.value - profileItems.value.length),
+)
+
 function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
   const entity = primaryEntity(item.rocrate_summary)
   const title = textValue(entity?.name) || textValue(entity?.title) || item.document_path || item.document_id
@@ -1217,7 +1309,6 @@ function mapProfile(item: MetadataDocumentListItem): MetadataProfile {
     artifactUrl: parsed.artifactUrl,
     suggestedKeywords: arrayText(entity?.keywords ?? entity?.keyword),
     managed: item.public,
-    usedCount: metadataItems.value.filter((doc) => mapMetadataDoc(doc).profileIds?.includes(pathId)).length,
   }
 }
 
@@ -1374,14 +1465,22 @@ export function useAruna() {
     profiles,
     metadataItems,
     profileItems,
+    catalogPages,
+    catalogExhausted,
+    catalogLoadingMore,
+    catalogEstimate,
     fullCrates,
     cratePending,
     refresh,
     loadInfo,
     loadMetadata,
+    loadMoreMetadata,
+    toMetadataDoc: mapMetadataDoc,
     loadRoCrate,
     createMetadata,
     getMetadataDocument,
+    getMetadataItem,
+    metadataAtPath,
     fetchRoCrateRaw,
     invalidateCrate,
     replaceMetadataRoCrate,

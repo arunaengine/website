@@ -348,7 +348,9 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 <span class="text-sm font-normal text-muted-foreground">/ {{ allPropertyRules.length }} total</span>
               </div>
             </div>
-            <div class="surface-muted p-3">
+            <!-- "Used by" needs a server-side count: the catalog is paged, so it
+                 cannot be counted client-side. Hidden until one is served. -->
+            <div v-if="selected.usedCount !== undefined" class="surface-muted p-3">
               <div class="text-[11px] uppercase tracking-wider text-muted-foreground">Used by</div>
               <div class="mt-1 font-display text-lg font-semibold text-aruna-navy">{{ selected.usedCount }} <span class="text-sm font-normal text-muted-foreground">metadata docs</span></div>
             </div>

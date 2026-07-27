@@ -24,7 +24,7 @@ const q = ref('')
 const showResults = ref(false)
 const showNewDataset = ref(false)
 const { realm, role } = useRealm()
-const { currentUser, metadata, groups, authError, loading } = useAruna()
+const { currentUser, authError, loading } = useAruna()
 const { hasSession, signIn, signOut, stage, authPending } = useAuth()
 const { isDark, toggleTheme } = useTheme()
 const route = useRoute()
@@ -51,44 +51,16 @@ interface QuickItem {
   routeParams: Record<string, string>
 }
 
+// Quick search is server-backed only: the catalog is paged, so a client-side
+// filter over it would silently answer from the first pages.
 const {
   documents: quickDocuments,
   groups: quickGroups,
   users: quickUsers,
-  searched: quickSearched,
+  pending: quickPending,
 } = useUnifiedSearch(q, { limit: 5 })
 
-// First paint: an instant filter over the already-loaded catalog and groups,
-// shown until the server search answers (quickSearched flips true per query).
-const instantItems = computed<QuickItem[]>(() => {
-  const needle = q.value.trim().toLowerCase()
-  if (!needle) return []
-  const datasets = metadata.value
-    .filter((doc) => `${doc.title} ${doc.description} ${doc.keywords.join(' ')}`.toLowerCase().includes(needle))
-    .slice(0, 5)
-    .map((doc): QuickItem => ({
-      key: `d:${doc.ulid}`,
-      section: 'datasets',
-      title: doc.title,
-      subtitle: doc.description || doc.ulid,
-      routeName: 'metadata-detail',
-      routeParams: { id: doc.ulid },
-    }))
-  const groupHits = groups.value
-    .filter((group) => `${group.name} ${group.description}`.toLowerCase().includes(needle))
-    .slice(0, 5)
-    .map((group): QuickItem => ({
-      key: `g:${group.id}`,
-      section: 'groups',
-      title: group.name,
-      subtitle: group.description || group.id,
-      routeName: 'groups',
-      routeParams: { id: group.id },
-    }))
-  return [...datasets, ...groupHits]
-})
-
-const serverItems = computed<QuickItem[]>(() => [
+const items = computed<QuickItem[]>(() => [
   ...quickDocuments.value.map((hit): QuickItem => ({
     key: `d:${hit.document_id}`,
     section: 'datasets',
@@ -112,8 +84,6 @@ const serverItems = computed<QuickItem[]>(() => [
     routeParams: { id: user.user_id },
   })),
 ])
-
-const items = computed<QuickItem[]>(() => (quickSearched.value ? serverItems.value : instantItems.value))
 
 const SECTION_META: Array<{ id: QuickSection; label: string }> = [
   { id: 'datasets', label: 'Datasets' },
@@ -225,6 +195,7 @@ function scheduleHide() {
               </div>
             </button>
           </div>
+          <div v-if="quickPending && !items.length" class="px-3 py-2.5 text-xs text-muted-foreground">Searching…</div>
           <button
             v-if="q"
             @mousedown.prevent="openSearchPage"

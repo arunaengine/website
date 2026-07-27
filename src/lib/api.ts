@@ -419,6 +419,8 @@ export interface ListMetadataResponse {
   limit: number
   offset: number
   total_returned: number
+  /** Approximate match count (estimated per group, may over- or under-count); absent on older nodes. */
+  total_estimate?: number
 }
 
 export interface MetadataRoCrateResponse {

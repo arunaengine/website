@@ -24,6 +24,7 @@ import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentListItem, type MetadataDocumentSummary } from '@/lib/api'
 import { applyDataEntities, dataEntitiesOf, type DataEntity } from '@/lib/dataEntities'
 import { addSubcrateLink, removeSubcrateLink, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
+import { documentIdFromIri } from '@/lib/graphIri'
 import { groupCustomFieldRows, seedCustomFieldRows, type CustomFieldRow, type PreservedFieldRow } from '@/lib/customFields'
 import { licenseEntity } from '@/lib/profiles/rocrate'
 import { validateProfileData } from '@/lib/profiles/validate'
@@ -41,7 +42,15 @@ const emit = defineEmits<{
   (e: 'saved', summary: MetadataDocumentSummary): void
 }>()
 
-const { saving, fetchRoCrateRaw, getMetadataDocument, replaceMetadataRoCrate, metadata, metadataItems, apiBaseUrl } = useAruna()
+const {
+  saving,
+  fetchRoCrateRaw,
+  getMetadataDocument,
+  replaceMetadataRoCrate,
+  toMetadataDoc,
+  metadataItems,
+  apiBaseUrl,
+} = useAruna()
 
 const loading = ref(false)
 const loadError = ref<string | null>(null)
@@ -91,7 +100,7 @@ function crateJsonUrl(documentId: string): string {
 }
 
 function subcrateTitleOf(item: MetadataDocumentListItem): string {
-  return metadata.value.find((doc) => doc.ulid === item.document_id)?.title || item.document_path
+  return toMetadataDoc(item).title
 }
 
 function onSubcratesPicked(items: MetadataDocumentListItem[]) {
@@ -243,16 +252,18 @@ function seedFields(crate: unknown) {
   const subcrateIris = new Set(subcrates.value.map((link) => link.iri))
   files.value = dataEntitiesOf(crate).filter((row) => !subcrateIris.has(row.id))
 
+  // A mention is one of our documents iff its @id is an Aruna graph IRI; that
+  // is a pure decision on the IRI, not a catalog lookup.
   const mentions = Array.isArray(root?.mentions) ? root.mentions : root?.mentions ? [root.mentions] : []
-  const catalogIris = new Set(metadataItems.value.map((item) => item.graph_iri))
   relatedIds.value = []
   preservedMentions = []
   for (const mention of mentions) {
     const id = refIdOf(mention)
-    if (id && catalogIris.has(id)) relatedIds.value.push(id)
+    if (id && documentIdFromIri(id)) relatedIds.value.push(id)
     else preservedMentions.push(mention)
   }
   relatedPick.value = ''
+  for (const iri of relatedIds.value) void ensureRelatedLabel(iri)
 }
 
 function buildFromFields(): unknown {
@@ -338,31 +349,52 @@ function upsertRelatedEntity(crate: unknown, graphIri: string) {
   if (!isRecord(crate)) return
   const g = Array.isArray(crate['@graph']) ? (crate['@graph'] as unknown[]) : []
   if (g.some((entity) => isRecord(entity) && entity['@id'] === graphIri)) return
-  const item = metadataItems.value.find((entry) => entry.graph_iri === graphIri)
+  const documentId = documentIdFromIri(graphIri)
   g.push({
     '@id': graphIri,
     '@type': 'Dataset',
     name: relatedLabel(graphIri),
-    ...(item ? { identifier: item.document_id } : {}),
+    ...(documentId ? { identifier: documentId } : {}),
   })
   crate['@graph'] = g
 }
 
-function relatedLabel(graphIri: string): string {
-  const item = metadataItems.value.find((entry) => entry.graph_iri === graphIri)
-  if (!item) return graphIri
-  return metadata.value.find((doc) => doc.ulid === item.document_id)?.title || item.document_path
+// Labels for linked documents outside the loaded pages come from a targeted
+// fetch, cached per IRI so the template stays synchronous.
+const relatedLabels = ref<Record<string, string>>({})
+
+async function ensureRelatedLabel(graphIri: string) {
+  const documentId = documentIdFromIri(graphIri)
+  if (!documentId || relatedLabels.value[graphIri]) return
+  const loaded = metadataItems.value.find((entry) => entry.document_id === documentId)
+  if (loaded) {
+    relatedLabels.value = { ...relatedLabels.value, [graphIri]: toMetadataDoc(loaded).title }
+    return
+  }
+  try {
+    const summary = await getMetadataDocument(documentId)
+    relatedLabels.value = { ...relatedLabels.value, [graphIri]: summary.document_path }
+  } catch {
+    // A deleted or unreadable target keeps its IRI as the label.
+  }
 }
 
+function relatedLabel(graphIri: string): string {
+  return relatedLabels.value[graphIri] || graphIri
+}
+
+// Options come from the loaded catalog pages; the realm is too large to
+// enumerate here, so linking a document further out goes through its IRI.
 const relatedOptions = computed(() =>
   metadataItems.value
     .filter((item) => item.document_id !== props.documentId && !relatedIds.value.includes(item.graph_iri))
-    .map((item) => ({ value: item.graph_iri, label: relatedLabel(item.graph_iri) })),
+    .map((item) => ({ value: item.graph_iri, label: toMetadataDoc(item).title })),
 )
 
 function addRelated() {
   if (relatedPick.value && !relatedIds.value.includes(relatedPick.value)) {
     relatedIds.value = [...relatedIds.value, relatedPick.value]
+    void ensureRelatedLabel(relatedPick.value)
   }
   relatedPick.value = ''
 }
@@ -481,7 +513,7 @@ async function save() {
             <div>
               <label class="text-xs font-medium text-foreground">Related datasets</label>
               <div class="mt-1.5 flex items-center gap-2">
-                <Select v-model="relatedPick" :options="relatedOptions" placeholder="Pick a dataset from the catalog" class="flex-1" />
+                <Select v-model="relatedPick" :options="relatedOptions" placeholder="Pick a loaded catalog dataset" class="flex-1" />
                 <Button variant="outline" size="sm" :disabled="!relatedPick" @click="addRelated"><Plus class="h-3.5 w-3.5" /> Link</Button>
               </div>
               <ul v-if="relatedIds.length" class="mt-2 space-y-1">

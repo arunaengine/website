@@ -217,8 +217,9 @@ export interface MetadataProfile {
   managed: boolean
   // Bundled with the portal (e.g. Process Run Crate): read-only, no stored document.
   builtIn?: boolean
-  // Derived count used for sorting/popularity.
-  usedCount: number
+  // How many documents conform to this profile. Absent until a server-side
+  // derived view supplies it: it cannot be counted over a paged catalog.
+  usedCount?: number
 }
 
 export interface MetadataContributor {

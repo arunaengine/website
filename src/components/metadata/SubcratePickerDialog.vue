@@ -11,6 +11,8 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import { Check, Layers, Loader2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
+import { useMetadataSearch } from '@/composables/useMetadataSearch'
+import { graphIriFor } from '@/lib/graphIri'
 import type { MetadataDocumentListItem } from '@/lib/api'
 
 // Catalog picker for subcrate linking, shared by the detail page's Subcrates
@@ -30,10 +32,16 @@ const emit = defineEmits<{
   (e: 'select', items: MetadataDocumentListItem[]): void
 }>()
 
-const { metadata, metadataItems } = useAruna()
+const { metadataItems, toMetadataDoc, getMetadataItem } = useAruna()
 
 const filter = ref('')
 const selected = ref<Set<string>>(new Set())
+const resolving = ref(false)
+const resolveError = ref<string | null>(null)
+
+// Typing searches the whole realm server-side; the empty-query state lists the
+// catalog pages already loaded (the realm is far too large to enumerate).
+const { results: searchResults, pending: searching, error: searchError } = useMetadataSearch(filter)
 
 watch(
   () => props.open,
@@ -41,22 +49,41 @@ watch(
     if (!open) return
     filter.value = ''
     selected.value = new Set()
+    resolveError.value = null
   },
 )
 
-function titleOf(item: MetadataDocumentListItem): string {
-  return metadata.value.find((doc) => doc.ulid === item.document_id)?.title || item.document_path
+interface Candidate {
+  documentId: string
+  graphIri: string
+  path: string
+  title: string
 }
 
-const candidates = computed(() => {
-  const query = filter.value.trim().toLowerCase()
+function toCandidate(item: MetadataDocumentListItem): Candidate {
+  return {
+    documentId: item.document_id,
+    graphIri: item.graph_iri,
+    path: item.document_path,
+    title: toMetadataDoc(item).title,
+  }
+}
+
+const searchable = computed(() => filter.value.trim().length >= 2)
+
+const candidates = computed<Candidate[]>(() => {
   const excluded = new Set(props.excludedIris ?? [])
-  return metadataItems.value.filter((item) => {
-    if (item.document_id === props.excludeDocumentId || !item.graph_iri) return false
-    if (excluded.has(item.graph_iri)) return false
-    if (!query) return true
-    return titleOf(item).toLowerCase().includes(query) || item.document_path.toLowerCase().includes(query)
-  })
+  const rows = searchable.value
+    ? searchResults.value.map((line) => ({
+        documentId: line.hit.document_id,
+        graphIri: line.hit.graph_iri || graphIriFor(line.hit.document_id),
+        path: line.hit.document_path,
+        title: line.title || line.hit.document_path,
+      }))
+    : metadataItems.value.map(toCandidate)
+  return rows.filter(
+    (row) => row.documentId !== props.excludeDocumentId && row.graphIri && !excluded.has(row.graphIri),
+  )
 })
 
 function toggle(documentId: string) {
@@ -66,11 +93,25 @@ function toggle(documentId: string) {
   selected.value = next
 }
 
-function confirm() {
-  const items = [...selected.value]
-    .map((documentId) => metadataItems.value.find((item) => item.document_id === documentId))
-    .filter((item): item is MetadataDocumentListItem => Boolean(item))
-  if (items.length) emit('select', items)
+// A selected hit is usually outside the loaded pages, so unknown ids are
+// resolved with a targeted fetch before the host writes the crate.
+async function confirm() {
+  if (!selected.value.size || resolving.value) return
+  resolveError.value = null
+  resolving.value = true
+  try {
+    const items = await Promise.all(
+      [...selected.value].map(async (documentId) => {
+        const loaded = metadataItems.value.find((item) => item.document_id === documentId)
+        return loaded ?? (await getMetadataItem(documentId))
+      }),
+    )
+    emit('select', items)
+  } catch (err) {
+    resolveError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    resolving.value = false
+  }
 }
 </script>
 
@@ -84,34 +125,40 @@ function confirm() {
         </DialogDescription>
       </DialogHeader>
 
-      <Input v-model="filter" placeholder="Filter by title or path" />
+      <Input v-model="filter" placeholder="Search the realm by title or path" />
 
       <div class="max-h-72 space-y-1 overflow-y-auto pr-1 scrollbar-thin">
         <button
           v-for="item in candidates"
-          :key="item.document_id"
+          :key="item.documentId"
           type="button"
           class="flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors"
-          :class="selected.has(item.document_id) ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted/40'"
-          @click="toggle(item.document_id)"
+          :class="selected.has(item.documentId) ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted/40'"
+          @click="toggle(item.documentId)"
         >
           <span class="min-w-0">
-            <span class="block truncate font-medium text-foreground">{{ titleOf(item) }}</span>
-            <span class="block truncate font-mono text-[11px] text-muted-foreground">{{ item.document_path }}</span>
+            <span class="block truncate font-medium text-foreground">{{ item.title }}</span>
+            <span class="block truncate font-mono text-[11px] text-muted-foreground">{{ item.path }}</span>
           </span>
-          <Check v-if="selected.has(item.document_id)" class="h-4 w-4 shrink-0 text-primary" />
+          <Check v-if="selected.has(item.documentId)" class="h-4 w-4 shrink-0 text-primary" />
         </button>
-        <p v-if="!candidates.length" class="px-1 py-4 text-center text-xs text-muted-foreground">
-          {{ filter.trim() ? 'No documents match the filter.' : 'Every other catalog document is already linked (or none exist yet).' }}
+        <p v-if="searching && !candidates.length" class="px-1 py-4 text-center text-xs text-muted-foreground">Searching…</p>
+        <p v-else-if="!candidates.length" class="px-1 py-4 text-center text-xs text-muted-foreground">
+          {{ searchable ? 'No documents match the search.' : 'Type at least two characters to search the realm.' }}
         </p>
       </div>
+      <p v-if="!searchable" class="text-[11px] text-muted-foreground">
+        Showing the catalog pages loaded so far. Search to reach every document in the realm.
+      </p>
 
-      <p v-if="error" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ error }}</p>
+      <p v-if="searchError || resolveError || error" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        {{ searchError || resolveError || error }}
+      </p>
 
       <DialogFooter>
         <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
-        <Button :disabled="!selected.size || busy" @click="confirm">
-          <Loader2 v-if="busy" class="size-3.5 animate-spin" />
+        <Button :disabled="!selected.size || busy || resolving" @click="confirm">
+          <Loader2 v-if="busy || resolving" class="size-3.5 animate-spin" />
           <template v-else>Link {{ selected.size || '' }} {{ selected.size === 1 ? 'subcrate' : 'subcrates' }}</template>
         </Button>
       </DialogFooter>

@@ -58,6 +58,15 @@ const usage = ref<UsageResponse | null>(null)
 const docs = ref<MetadataDocumentListItem[] | null>(null)
 const docsError = ref<string | null>(null)
 const docsLoading = ref(false)
+// Approximate count served by newer nodes (estimated per group); shown with a
+// "~" so it never reads as exact. Without it a full page only proves "more
+// exist", so the badge degrades to "8+".
+const docsEstimate = ref<number | null>(null)
+const moreDocs = computed(() => (docs.value?.length ?? 0) > DOC_LIMIT)
+const docsCountLabel = computed(() => {
+  if (docsEstimate.value !== null) return `~${formatNumber(docsEstimate.value)}`
+  return moreDocs.value ? `${DOC_LIMIT}+` : String(docs.value?.length ?? 0)
+})
 
 const quotaStatus = computed(() => usage.value?.quota ?? null)
 // The counter the backend QuotaGate enforces against (realm-wide logical bytes).
@@ -186,9 +195,13 @@ async function reload() {
       }
     }
     // Documents are loaded separately: a failure here must not blank the panel.
+    // One bounded page, never a walk — the panel only previews DOC_LIMIT rows
+    // and links to Discover for the rest.
     docsLoading.value = true
     try {
-      docs.value = (await listGroupMetadata(props.groupId)).documents
+      const page = await listGroupMetadata(props.groupId, { limit: DOC_LIMIT + 1 })
+      docs.value = page.documents
+      docsEstimate.value = page.total_estimate ?? null
     } catch (err) {
       docsError.value = err instanceof Error ? err.message : String(err)
     } finally {
@@ -372,7 +385,14 @@ async function leave() {
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <FileJson2 class="h-3.5 w-3.5 text-primary" />
           <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Documents</span>
-          <Badge v-if="docs" variant="outline" class="tabular-nums">{{ docs.length }}</Badge>
+          <Badge
+            v-if="docs"
+            variant="outline"
+            class="tabular-nums"
+            :title="docsEstimate !== null ? 'Approximate: the server estimates this count per group.' : undefined"
+          >
+            {{ docsCountLabel }}
+          </Badge>
         </div>
         <div class="px-5 py-3">
           <p v-if="docsLoading && !docs" class="text-xs text-muted-foreground">Loading documents…</p>
@@ -388,11 +408,11 @@ async function leave() {
             </li>
           </ul>
           <RouterLink
-            v-if="docs && docs.length > DOC_LIMIT"
-            :to="{ name: 'search' }"
+            v-if="moreDocs"
+            :to="{ name: 'search', query: { group: group.group_id } }"
             class="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
           >
-            View all {{ docs.length }} in Discover →
+            View all in Discover{{ docsEstimate !== null ? ` (about ${formatNumber(docsEstimate)})` : '' }} →
           </RouterLink>
         </div>
       </div>

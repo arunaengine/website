@@ -6,6 +6,10 @@ import { buildCrateReferenceIndex, toBucketKey, type CrateObjectReference } from
 // Reactive reverse index of "bucket/key" -> referencing documents, fed only from
 // crates already in the client caches (never issues a request). Exposed so any
 // view (data manager, metadata detail) can show what references an object.
+//
+// Best-effort by construction: coverage is the crates cached this session plus
+// the catalog pages loaded so far, never the whole realm. A missing entry means
+// "not seen here", not "not referenced".
 export function useCrateReferences() {
   const { fullCrates, metadataItems } = useAruna()
   const s3 = useS3()

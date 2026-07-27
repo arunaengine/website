@@ -306,7 +306,6 @@ async function submit() {
       mode: entityRulesToMode(basics, entityRules, builder.importedMode ?? undefined),
       suggestedKeywords: [],
       managed: builder.isPublic,
-      usedCount: 0,
     }
     emit('created', profile)
     emit('update:open', false)
