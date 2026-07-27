@@ -116,6 +116,8 @@ export interface UsageResponse {
   logical_bytes?: number
   referenced_bytes: number
   realm?: UsageTotals
+  // Realm-wide total of live metadata documents; only on GET /info/usage.
+  metadata_documents?: number
   // Present on GET /groups/{id}/usage from quota-aware backends.
   quota?: GroupQuotaStatus
 }

@@ -15,6 +15,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useNotifications } from '@/composables/useNotifications'
 import { storedReferencedHint } from '@/lib/quota'
+import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
@@ -65,10 +66,14 @@ const docsHeld = computed(() => {
   return { total, nodes: reporting.length }
 })
 
+// Realm-wide total of live documents, not a per-caller figure. The loaded
+// catalog is a paged subset, so it must never stand in as the realm total.
+const realmDocuments = computed(() => usageInfo.value?.metadata_documents ?? null)
+
 const stats = computed(() => [
   {
-    label: 'Metadata documents',
-    value: metadata.value.length,
+    label: 'Realm documents',
+    value: realmDocuments.value === null ? '—' : formatCount(realmDocuments.value),
     icon: FileJson2,
     tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
   },
