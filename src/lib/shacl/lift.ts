@@ -361,7 +361,7 @@ export function liftShapes(turtle: string): LiftResult {
       if (minItems !== undefined && rule.multipleValues) rule.minItems = minItems
       rules.push(rule)
     }
-    rules.sort((a, b) => (ruleOrder.get(a) ?? 0) - (ruleOrder.get(b) ?? 0))
+    rules.sort(compareRuleOrder)
     dedupeValueNames(rules)
 
     if (!rules.length) continue
@@ -394,6 +394,15 @@ export function liftShapes(turtle: string): LiftResult {
 
 // Emission order recovered from sh:order, applied before the rules are stored.
 const ruleOrder = new WeakMap<ProfilePropertyRule, number>()
+
+// sh:order decides; ties — including every rule of a file that declares no order
+// at all — fall back to label then term, so an unordered import is stable and
+// predictable instead of following RDF-store insertion order.
+function compareRuleOrder(a: ProfilePropertyRule, b: ProfilePropertyRule): number {
+  const byOrder = (ruleOrder.get(a) ?? Number.MAX_SAFE_INTEGER) - (ruleOrder.get(b) ?? Number.MAX_SAFE_INTEGER)
+  if (byOrder) return byOrder
+  return a.label.localeCompare(b.label) || a.valueName.localeCompare(b.valueName)
+}
 
 // The facets a value constraint can contribute, gathered across every property
 // shape that shares a path (and, for sh:or, from the first branch).

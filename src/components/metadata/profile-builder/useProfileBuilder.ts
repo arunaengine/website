@@ -755,6 +755,15 @@ export function useProfileBuilder() {
     selectedEntityIndex.value = entities.value.length - 1
   }
 
+  // Reorder a rule inside its entity. Array order IS the authored order: it
+  // drives the form, the mode inputs and the emitted sh:order (see projection.ts).
+  function moveProperty(entity: DraftEntityRule, from: number, to: number) {
+    const list = entity.properties
+    if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return
+    const [moved] = list.splice(from, 1)
+    list.splice(to, 0, moved)
+  }
+
   function removeProperty(entity: DraftEntityRule, index: number) {
     // Defense in depth: locked (RO-Crate baseline) rules are never removable.
     if (entity.properties[index]?.lock) return
@@ -1208,6 +1217,7 @@ export function useProfileBuilder() {
     removeEntity,
     addProperty,
     addPropertyTemplate,
+    moveProperty,
     removeProperty,
     profileBasics,
   })

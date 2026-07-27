@@ -27,6 +27,15 @@ const props = defineProps<{
 
 const showDetails = ref(false)
 
+// Index of the rule being dragged. Rows reorder as the pointer passes over them,
+// so the list itself is the drop preview and no separate indicator is needed.
+const dragIndex = ref<number | null>(null)
+function dragOver(index: number) {
+  if (dragIndex.value === null || dragIndex.value === index) return
+  props.builder.moveProperty(props.entity, dragIndex.value, index)
+  dragIndex.value = index
+}
+
 const isRoot = computed(() => props.entity.lock === 'full')
 const isCustomType = computed(() => !isSchemaOrgUri(normalizeTypeUri(props.entity.type)))
 
@@ -158,7 +167,14 @@ function changeType(choice: { uri: string; label: string }) {
         :builder="builder"
         :entity="entity"
         :property="property"
+        :index="index"
+        :total="entity.properties.length"
+        :dragging="dragIndex === index"
         @remove="builder.removeProperty(entity, index)"
+        @move="(to: number) => builder.moveProperty(entity, index, to)"
+        @grab="dragIndex = index"
+        @over="dragOver(index)"
+        @drop="dragIndex = null"
       />
       <p v-if="!entity.properties.length" class="rounded-md border border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
         No rules yet. Add the properties a {{ entity.label || entityTypeLabel(entity.type) }} must, should or may carry.
