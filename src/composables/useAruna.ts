@@ -79,6 +79,9 @@ const CATALOG_PAGE_SIZE = 48
 // Profiles are a small bounded set under profiles/ that several screens need
 // synchronously, so that one prefix stays fully loaded.
 const PROFILE_PAGE_SIZE = 100
+const RECENT_METADATA_LIMIT = 5
+// Nodes without recency ordering answer 400; probe once, then stop asking.
+let recentOrderRejected = false
 
 const apiBaseUrl = ref(readStored(API_BASE_KEY) || defaultApiBaseUrl())
 const authToken = ref(readStored(TOKEN_KEY))
@@ -451,14 +454,42 @@ async function deleteMetadataDocument(documentId: string): Promise<void> {
 // export. `total_estimate` is approximate and absent for small limits, so only
 // a short page (total_returned < limit) proves there is nothing after it.
 async function listCatalogPage(
-  options: { limit?: number; offset?: number; groupId?: string | null; summary?: boolean } = {},
+  options: {
+    limit?: number
+    offset?: number
+    groupId?: string | null
+    summary?: boolean
+    order?: 'created' | 'recent'
+  } = {},
 ): Promise<ListMetadataResponse> {
   return listMetadataPage({
     limit: options.limit ?? CATALOG_PAGE_SIZE,
     offset: options.offset ?? 0,
     ...(options.groupId ? { group_id: options.groupId } : {}),
     ...(options.summary ? { include: 'summary' } : {}),
+    ...(options.order ? { order: options.order } : {}),
   })
+}
+
+// Newest documents first, straight from the registry, so the dashboard never
+// derives recency from the creation-ordered catalog window. Null means the node
+// cannot order by recency and the caller should fall back to that window.
+async function listRecentMetadata(limit = RECENT_METADATA_LIMIT): Promise<MetadataDoc[] | null> {
+  if (recentOrderRejected) return null
+  try {
+    // Over-fetch so excluding profiles/ cannot shrink the tile below `limit`.
+    const page = await listCatalogPage({ limit: limit * 2, summary: true, order: 'recent' })
+    return page.documents
+      .filter((doc) => !doc.document_path.startsWith('profiles/'))
+      .slice(0, limit)
+      .map(mapMetadataDoc)
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 400) {
+      recentOrderRejected = true
+      return null
+    }
+    throw err
+  }
 }
 
 async function listGroupMetadata(
@@ -1024,6 +1055,8 @@ function setApiBaseUrl(url: string) {
   clearIdentityState(true)
   loading.value = false
   bootstrapped.value = false
+  // A different node has to be probed for recency ordering again.
+  recentOrderRejected = false
 }
 
 const realm = computed<Realm>(() => {
@@ -1448,6 +1481,7 @@ export function useAruna() {
     deleteMetadataDocument,
     listCatalogPage,
     listGroupMetadata,
+    listRecentMetadata,
     toggleFavourite,
     updateUserProfile,
     setRealmQuota,

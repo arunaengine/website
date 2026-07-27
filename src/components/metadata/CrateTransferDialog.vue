@@ -22,6 +22,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useBuckets } from '@/composables/useBuckets'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useJobDetail } from '@/composables/useJobs'
+import { useNotifications } from '@/composables/useNotifications'
 import { useS3 } from '@/composables/useS3'
 import { formatJobProgress, isTerminalJobState, jobProgressPercent } from '@/lib/jobs'
 import { formatBytes } from '@/lib/utils'
@@ -54,6 +55,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 const { apiBaseUrl, authToken, groups } = useAruna()
+const { bumpDashboard } = useNotifications()
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
@@ -244,7 +246,11 @@ function retryReport() {
 // The report is frozen at the terminal transition, so fetch it exactly once the
 // polled job settles.
 watch(terminal, (settled) => {
-  if (!settled || rows.value.length || reportLoading.value) return
+  if (!settled) return
+  // An import creates a document the notification stream only reports to
+  // watchers, so tell the dashboard itself that its data moved.
+  if (createdDocumentId.value) bumpDashboard()
+  if (rows.value.length || reportLoading.value) return
   reportAttempts = 0
   void loadReport()
 })

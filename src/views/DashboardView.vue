@@ -7,6 +7,7 @@ import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import type { MetadataDoc } from '@/data/types'
 import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
@@ -19,13 +20,20 @@ import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, nodes, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh, loadInfo } = useAruna()
+const { currentUser, metadata, profiles, nodes, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh, loadInfo, listRecentMetadata } = useAruna()
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const showNewDataset = ref(false)
 const refreshing = ref(false)
 const quotaRevision = ref(0)
+const recentDocs = ref<MetadataDoc[] | null>(null)
 let refreshQueued = false
+
+// Null keeps the tile on the window-derived list, so a node that cannot order
+// by recency degrades to the old behaviour instead of an empty panel.
+async function loadRecent() {
+  recentDocs.value = await listRecentMetadata().catch(() => null)
+}
 
 async function refreshDashboard() {
   if (refreshing.value) {
@@ -36,7 +44,7 @@ async function refreshDashboard() {
   try {
     do {
       refreshQueued = false
-      await refresh()
+      await Promise.all([refresh(), loadRecent()])
     } while (refreshQueued)
   } finally {
     refreshing.value = false
@@ -97,8 +105,10 @@ const stats = computed(() => [
   },
 ])
 
-const recentMetadata = computed(() =>
-  [...metadata.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5),
+const recentMetadata = computed(
+  () =>
+    recentDocs.value ??
+    [...metadata.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5),
 )
 
 // While a stored session restores, keep the copy neutral instead of flashing

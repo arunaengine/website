@@ -337,6 +337,12 @@ if (typeof window !== 'undefined') {
   window.addEventListener('offline', stopStream)
 }
 
+// Forces a dashboard refetch after a change the notification stream does not
+// report, such as a background job that created a document.
+function bumpDashboard() {
+  dashboardRevision.value++
+}
+
 export function useNotifications() {
   return {
     available,
@@ -350,6 +356,7 @@ export function useNotifications() {
     loadingMore,
     listError,
     dashboardRevision,
+    bumpDashboard,
     marking,
     fetchUnread,
     loadNotifications,
