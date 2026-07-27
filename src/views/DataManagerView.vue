@@ -13,6 +13,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import Popover from '@/components/ui/Popover.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
@@ -24,13 +25,14 @@ import SyncStatusPanel from '@/components/data/SyncStatusPanel.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useBuckets } from '@/composables/useBuckets'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStaging } from '@/composables/useStaging'
 import { useStagingReferences } from '@/composables/useStagingReferences'
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import { featureEnabled } from '@/lib/config'
-import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3BucketNotEmptyError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
+import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3BucketNotEmptyError, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
@@ -190,7 +192,7 @@ function openSyncFromHit(hit: BucketSearchHit) {
 }
 
 function onSyncChanged() {
-  void refreshBuckets()
+  void bucketList.refresh()
   void loadSyncOverview()
 }
 
@@ -233,10 +235,15 @@ function referenceGroupLabel(group: ReferenceSourceGroup): string {
   )
 }
 
-const buckets = ref<BucketEntry[]>([])
-const bucketsLoading = ref(false)
-const bucketsError = ref<string | null>(null)
-const bucketsAuthError = ref(false)
+// The list lives in the composable, not here, so leaving the view and coming
+// back re-renders the previous buckets instead of reloading from empty.
+const bucketList = useBuckets()
+const buckets = bucketList.buckets
+const bucketsLoaded = bucketList.loaded
+const bucketsLoading = bucketList.loading
+const bucketsRefreshing = bucketList.refreshing
+const bucketsError = bucketList.error
+const bucketsAuthError = bucketList.authError
 
 // Per-run ws-<jobId> scratch buckets stay out of the main list; they live in a
 // collapsed "System workspaces" group at the bottom of the sidebar. Deep links
@@ -380,7 +387,6 @@ const newFolderInvalid = computed(() => {
   return !name || name.includes('/')
 })
 
-let bucketRequestId = 0
 let listRequestId = 0
 
 function clearObjectListing() {
@@ -393,27 +399,6 @@ function clearObjectListing() {
   listAuthError.value = false
   remoteBrowseBlocked.value = false
   deleteTarget.value = null
-}
-
-async function refreshBuckets() {
-  if (!s3.hasActiveKey.value || !s3.endpoint.value) return
-  const requestId = ++bucketRequestId
-  bucketsLoading.value = true
-  bucketsError.value = null
-  bucketsAuthError.value = false
-  try {
-    const entries = await s3.listBuckets()
-    if (requestId !== bucketRequestId) return
-    buckets.value = entries
-  } catch (err) {
-    if (requestId === bucketRequestId) {
-      bucketsError.value = s3ErrorMessage(err)
-      bucketsAuthError.value = isS3AuthError(err)
-      buckets.value = []
-    }
-  } finally {
-    if (requestId === bucketRequestId) bucketsLoading.value = false
-  }
 }
 
 async function loadObjects(more = false) {
@@ -449,13 +434,18 @@ async function loadObjects(more = false) {
   }
 }
 
-function refreshAll() {
-  void refreshBuckets()
+// Everything except the bucket list, which has its own cache-aware entry points.
+function reloadContext() {
   void loadSyncOverview()
   if (bucket.value) {
     void loadObjects()
     void references.reload()
   }
+}
+
+function refreshAll() {
+  void bucketList.refresh()
+  reloadContext()
 }
 
 // On a fresh page load the S3 endpoint arrives asynchronously (from the
@@ -464,15 +454,13 @@ function refreshAll() {
 watch(
   [() => s3.activeKey.value, () => s3.endpoint.value],
   ([key, endpoint]) => {
-    ++bucketRequestId
-    buckets.value = []
-    bucketsLoading.value = false
-    bucketsError.value = null
-    bucketsAuthError.value = false
     clearObjectListing()
     if (!key) return
     if (!endpoint) return
-    refreshAll()
+    // Cached buckets show at once; useBuckets drops them itself when this key
+    // or endpoint belongs to another identity.
+    void bucketList.ensure()
+    reloadContext()
   },
   { immediate: true },
 )
@@ -559,7 +547,7 @@ async function createBucket() {
   try {
     await s3.createBucket(name)
     newBucketName.value = ''
-    await refreshBuckets()
+    await bucketList.refresh()
     openBucket(name)
   } catch (err) {
     createBucketError.value = s3ErrorMessage(err)
@@ -967,7 +955,7 @@ async function confirmDeleteBucket() {
     bucketDeleteConfirm.value = ''
     // Leave the dead bucket's route before refreshing so the listing is clean.
     if (wasOpen) await router.push({ name: 'buckets' })
-    await refreshBuckets()
+    await bucketList.refresh()
     void loadSyncOverview()
   } catch (err) {
     bucketDeleteError.value = isS3BucketNotEmptyError(err)
@@ -1055,10 +1043,14 @@ const isEmpty = computed(
             <BucketSearchBox :sync-by-bucket="syncByBucket" @open="openSearchHit" @sync="openSyncFromHit" />
           </div>
 
-          <div class="surface overflow-hidden">
+          <div class="surface overflow-hidden" :aria-busy="bucketsRefreshing">
             <header class="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 class="text-sm font-semibold text-foreground">Buckets</h2>
-              <Badge variant="outline">{{ sidebarBuckets.length }}</Badge>
+              <div class="flex items-center gap-2">
+                <!-- Background revalidation only: the cached list stays readable behind it. -->
+                <Spinner v-if="bucketsRefreshing" label="Refreshing buckets…" />
+                <Badge variant="outline">{{ sidebarBuckets.length }}</Badge>
+              </div>
             </header>
             <div v-if="bucketsLoading" class="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
               <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading buckets…
@@ -1071,8 +1063,10 @@ const isEmpty = computed(
                 <Button variant="outline" size="sm" @click="s3.clearActiveKey()"><KeyRound class="h-3.5 w-3.5" /> Clear active key</Button>
               </div>
             </div>
-            <p v-else-if="bucketsError" class="px-4 py-3 text-xs text-destructive">{{ bucketsError }}</p>
+            <p v-else-if="bucketsError && !bucketsLoaded" class="px-4 py-3 text-xs text-destructive">{{ bucketsError }}</p>
             <template v-else>
+              <!-- A failed revalidation keeps the last good list and reports itself above it. -->
+              <p v-if="bucketsError" class="border-b border-border/70 px-4 py-2 text-xs text-destructive">{{ bucketsError }}</p>
               <ul v-if="sidebarBuckets.length" class="max-h-[420px] overflow-y-auto py-1">
                 <li
                   v-for="entry in sidebarBuckets"

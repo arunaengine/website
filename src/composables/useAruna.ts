@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, readonly, ref } from 'vue'
 import type { Group, MetadataDoc, MetadataProfile, Node, Realm, SparqlResult, User } from '@/data/types'
 import {
   ApiError,
@@ -98,7 +98,9 @@ const credentials = ref<S3CredentialSummary[]>([])
 const fullCrates = ref<Record<string, unknown>>({})
 const cratePending = ref<Record<string, boolean>>({})
 const bootstrapped = ref(false)
-let sessionEpoch = 0
+// Monotonic identity counter: bumped whenever the token or API base changes,
+// so in-flight work and module-singleton caches can tell sessions apart.
+const sessionEpoch = ref(0)
 
 function readStored(key: string): string {
   if (typeof window === 'undefined') return ''
@@ -131,7 +133,7 @@ async function request<T>(path: string, options = {}) {
 }
 
 function refreshContext() {
-  return { epoch: sessionEpoch, client: client() }
+  return { epoch: sessionEpoch.value, client: client() }
 }
 
 function clearIdentityState(clearPublic = false) {
@@ -160,7 +162,7 @@ async function refresh() {
       Promise.all([loadInfo(context), loadMetadata(context)]),
       context.client.token ? loadAuthenticated(context) : Promise.resolve(),
     ])
-    if (context.epoch !== sessionEpoch) return
+    if (context.epoch !== sessionEpoch.value) return
     if (publicResult.status === 'rejected') error.value = errorMessage(publicResult.reason)
     if (authResult.status === 'rejected') {
       if (context.client.token) {
@@ -176,9 +178,9 @@ async function refresh() {
       credentials.value = []
     }
   } catch (err) {
-    if (context.epoch === sessionEpoch) error.value = errorMessage(err)
+    if (context.epoch === sessionEpoch.value) error.value = errorMessage(err)
   } finally {
-    if (context.epoch === sessionEpoch) {
+    if (context.epoch === sessionEpoch.value) {
       loading.value = false
       bootstrapped.value = true
     }
@@ -192,7 +194,7 @@ async function loadInfo(context = refreshContext()) {
     apiRequest<RealmInfoResponse>('/info/realm', {}, context.client),
     apiRequest<UsageResponse>('/info/usage', {}, context.client).catch(() => null),
   ])
-  if (context.epoch !== sessionEpoch) return
+  if (context.epoch !== sessionEpoch.value) return
   nodeInfo.value = info
   realmInfo.value = realm
   usageInfo.value = usage
@@ -231,7 +233,7 @@ async function loadMetadata(context = refreshContext()) {
     listMetadataPage({ include: 'summary', limit: CATALOG_PAGE_SIZE, offset: 0 }, context),
     loadProfiles(context),
   ])
-  if (context.epoch !== sessionEpoch) return
+  if (context.epoch !== sessionEpoch.value) return
   // Documents under profiles/ have their own fully loaded list; the catalog
   // window keeps excluding them so both stay disjoint.
   metadataItems.value = page.documents.filter((doc) => !doc.document_path.startsWith('profiles/'))
@@ -251,7 +253,7 @@ async function loadProfiles(context = refreshContext()) {
     documents.push(...last.documents)
     offset = last.offset + last.total_returned
   } while (last.total_returned > 0 && last.total_returned >= last.limit)
-  if (context.epoch !== sessionEpoch) return
+  if (context.epoch !== sessionEpoch.value) return
   profileItems.value = documents
 }
 
@@ -259,13 +261,13 @@ async function loadAuthenticated(context = refreshContext()) {
   // /users/info is the authentication authority. Optional group and credential
   // capabilities must not turn a valid session into a signed-out one.
   const me = await apiRequest<UserInfoResponse>('/users/info', {}, context.client)
-  if (context.epoch !== sessionEpoch) return
+  if (context.epoch !== sessionEpoch.value) return
   userInfo.value = me
   const [groups, credentialList] = await Promise.allSettled([
     listGroups(context),
     apiRequest<ListS3CredentialsResponse>('/users/credentials', {}, context.client),
   ])
-  if (context.epoch !== sessionEpoch) return
+  if (context.epoch !== sessionEpoch.value) return
   apiGroups.value = groups.status === 'fulfilled' ? groups.value.groups : []
   credentials.value = credentialList.status === 'fulfilled' ? credentialList.value.credentials : []
 }
@@ -284,7 +286,7 @@ async function listGroups(context = refreshContext()): Promise<ListGroupsRespons
     if (page.groups.length < limit) break
     offset += page.groups.length
   }
-  if (context.epoch === sessionEpoch) apiGroups.value = groups
+  if (context.epoch === sessionEpoch.value) apiGroups.value = groups
   return { groups }
 }
 
@@ -298,7 +300,7 @@ export class CrateNotReadyError extends Error {
 }
 
 function assertCurrentSession(epoch: number) {
-  if (epoch !== sessionEpoch) throw new DOMException('The API session changed.', 'AbortError')
+  if (epoch !== sessionEpoch.value) throw new DOMException('The API session changed.', 'AbortError')
 }
 
 // Backoff while the graph projection materializes right after a create.
@@ -351,7 +353,7 @@ async function loadRoCrate(documentId: string): Promise<unknown> {
       }
     }
   } finally {
-    if (context.epoch === sessionEpoch) setCratePending(documentId, false)
+    if (context.epoch === sessionEpoch.value) setCratePending(documentId, false)
   }
 }
 
@@ -993,7 +995,7 @@ async function resolveUsers(userIds: string[]): Promise<ResolveUserResult[]> {
 function setAuthToken(token: string) {
   const next = token.trim()
   if (next === authToken.value) return
-  sessionEpoch++
+  sessionEpoch.value++
   authToken.value = next
   storeValue(TOKEN_KEY, authToken.value)
   clearIdentityState()
@@ -1003,7 +1005,7 @@ function setAuthToken(token: string) {
 function setApiBaseUrl(url: string) {
   const next = url.trim() || defaultApiBaseUrl()
   if (next === apiBaseUrl.value) return
-  sessionEpoch++
+  sessionEpoch.value++
   apiBaseUrl.value = next
   storeValue(API_BASE_KEY, apiBaseUrl.value === defaultApiBaseUrl() ? '' : apiBaseUrl.value)
   authToken.value = ''
@@ -1397,6 +1399,7 @@ export function useAruna() {
     error,
     authError,
     bootstrapped,
+    sessionEpoch: readonly(sessionEpoch),
     nodeInfo,
     realmInfo,
     usageInfo,
