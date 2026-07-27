@@ -2,6 +2,7 @@
 import Button from '@/components/ui/Button.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
@@ -85,6 +86,10 @@ const items = computed<QuickItem[]>(() => [
   })),
 ])
 
+// The previous matches stay listed while a new request runs, so they are dimmed
+// rather than read as the answer to what was just typed.
+const quickStale = computed(() => quickPending.value && items.value.length > 0)
+
 const SECTION_META: Array<{ id: QuickSection; label: string }> = [
   { id: 'datasets', label: 'Datasets' },
   { id: 'groups', label: 'Groups' },
@@ -156,9 +161,11 @@ function scheduleHide() {
           role="combobox"
           aria-controls="quick-search-results"
           :aria-expanded="showResults"
+          :aria-busy="quickPending"
           class="h-9 w-full rounded-md border border-input bg-field pl-8 pr-16 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :placeholder="`Search ${realm.shortName}, datasets, groups and people…`"
         />
+        <Spinner v-if="quickPending" label="Searching…" class="absolute right-11 top-1/2 -translate-y-1/2 text-primary" />
         <kbd
           class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-flex"
         >
@@ -169,9 +176,15 @@ function scheduleHide() {
           v-if="showResults && (items.length || q)"
           id="quick-search-results"
           role="listbox"
+          :aria-busy="quickPending"
           class="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-md border border-border bg-popover shadow-xl"
         >
-          <div v-for="section in sections" :key="section.id">
+          <div
+            v-for="section in sections"
+            :key="section.id"
+            class="transition-opacity"
+            :class="quickStale ? 'opacity-40' : ''"
+          >
             <div class="flex items-center gap-1.5 border-b border-border/70 bg-muted/30 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               <FileJson2 v-if="section.id === 'datasets'" class="h-3 w-3" />
               <Users v-else-if="section.id === 'groups'" class="h-3 w-3" />

@@ -9,6 +9,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { Check, Layers, Loader2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
@@ -125,9 +126,16 @@ async function confirm() {
         </DialogDescription>
       </DialogHeader>
 
-      <Input v-model="filter" placeholder="Search the realm by title or path" />
+      <div class="relative">
+        <Input v-model="filter" :aria-busy="searching" placeholder="Search the realm by title or path" class="pr-9" />
+        <Spinner v-if="searching" label="Searching the realm…" class="absolute right-3 top-1/2 -translate-y-1/2 text-primary" />
+      </div>
 
-      <div class="max-h-72 space-y-1 overflow-y-auto pr-1 scrollbar-thin">
+      <div
+        class="max-h-72 space-y-1 overflow-y-auto pr-1 transition-opacity scrollbar-thin"
+        :class="searching && candidates.length ? 'opacity-40' : ''"
+        :aria-busy="searching"
+      >
         <button
           v-for="item in candidates"
           :key="item.documentId"

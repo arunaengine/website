@@ -5,6 +5,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
 import SearchFilterBar, { type Facet, type FilterModel } from '@/components/search/SearchFilterBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -285,6 +286,9 @@ const browseSource = computed<MetadataDoc[]>(() => {
   return favouriteDocs.value.slice(start, start + BROWSE_PAGE_SIZE)
 })
 const browseBusy = computed(() => browseLoading.value || favouritesLoading.value)
+// The outgoing page stays on screen while the next one loads, so it is dimmed
+// and marked busy instead of reading as the page that was just requested.
+const browseStale = computed(() => browseBusy.value && browseSource.value.length > 0)
 
 // A FULL page is the only proof that another one follows: total_estimate is an
 // approximation, and an under-count must never hide a page the server serves.
@@ -499,6 +503,17 @@ function showKind(kind: Exclude<SearchKind, 'all'>): boolean {
   return kindFilter.value === 'all' || kindFilter.value === kind
 }
 
+// A metadata request is in flight, including the debounce window before it
+// leaves: `searched` flips back to false on every query and filter change.
+const searchBusy = computed(
+  () =>
+    searchActive.value &&
+    !searchError.value &&
+    (searchPending.value || searchPaging.value || !searched.value),
+)
+// Results from the previous request are still on screen while a new one runs.
+const searchStale = computed(() => searchBusy.value && visibleResults.value.length > 0)
+
 const groupMatches = computed(() => {
   const term = q.value.trim().toLowerCase()
   if (!term) return []
@@ -658,7 +673,8 @@ async function runQuery() {
         <div class="surface p-4">
           <div class="relative">
             <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input v-model="q" placeholder="Search datasets, groups and people…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring" />
+            <input v-model="q" :aria-busy="searchBusy" placeholder="Search datasets, groups and people…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring" />
+            <Spinner v-if="searchBusy" label="Searching…" class="absolute right-3 top-1/2 -translate-y-1/2 text-primary" />
           </div>
           <SearchFilterBar v-model="filterModel" :facets="filterFacets" aria-label="Discover filters" class="mt-3" />
           <p v-if="showTypeFilter || typeFilter" class="mt-2 text-[11px] text-muted-foreground">
@@ -720,18 +736,19 @@ async function runQuery() {
             </div>
           </section>
 
-          <section v-if="showKind('buckets') && (bucketResults.length || bucketsSearching || bucketsError)">
+          <section v-if="showKind('buckets') && (bucketResults.length || bucketsSearching || bucketsError)" :aria-busy="bucketsSearching">
             <div class="mb-3 flex flex-wrap items-center gap-2">
               <Boxes class="h-4 w-4 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">Buckets</h2>
-              <span class="text-xs text-muted-foreground">{{ bucketsSearching ? 'Searching…' : bucketResults.length }}</span>
+              <Spinner v-if="bucketsSearching" show-label label="Searching…" />
+              <span v-else class="text-xs text-muted-foreground">{{ bucketResults.length }}</span>
               <span v-if="bucketsPartial && !bucketsSearching" role="status" class="flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
                 <AlertTriangle class="h-3.5 w-3.5" />
                 {{ bucketNodesQueried - bucketNodesFailed }} of {{ bucketNodesQueried }} nodes answered
               </span>
             </div>
             <p v-if="bucketsError" class="mb-3 text-xs text-destructive">{{ bucketsError }}</p>
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2 transition-opacity" :class="bucketsSearching && bucketResults.length ? 'opacity-40' : ''">
               <RouterLink
                 v-for="hit in bucketResults"
                 :key="hit.arn"
@@ -750,13 +767,14 @@ async function runQuery() {
             </div>
           </section>
 
-          <section v-if="showKind('people') && (peopleResults.length || peopleSearching)">
+          <section v-if="showKind('people') && (peopleResults.length || peopleSearching)" :aria-busy="peopleSearching">
             <div class="mb-3 flex items-center gap-2">
               <UserRound class="h-4 w-4 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">People</h2>
-              <span class="text-xs text-muted-foreground">{{ peopleSearching ? 'Searching…' : peopleResults.length }}</span>
+              <Spinner v-if="peopleSearching" show-label label="Searching…" />
+              <span v-else class="text-xs text-muted-foreground">{{ peopleResults.length }}</span>
             </div>
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2 transition-opacity" :class="peopleSearching && peopleResults.length ? 'opacity-40' : ''">
               <RouterLink
                 v-for="hit in peopleResults"
                 :key="hit.user_id"
@@ -795,14 +813,14 @@ async function runQuery() {
             <Skeleton v-for="n in 6" :key="n" class="h-36" />
           </section>
 
-          <section v-else-if="visibleResults.length">
+          <section v-else-if="visibleResults.length" :aria-busy="searchBusy">
             <div class="mb-3 flex items-center gap-2">
               <FileJson2 class="h-4 w-4 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ textQuery ? 'Search results' : 'Documents with this profile' }}</h2>
               <span class="text-xs text-muted-foreground">{{ visibleResults.length }}</span>
-              <span v-if="searchPending" class="text-xs text-muted-foreground">· Searching…</span>
+              <span v-if="searchStale" class="text-xs text-muted-foreground">· previous results</span>
             </div>
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="grid gap-4 transition-opacity sm:grid-cols-2 lg:grid-cols-3" :class="searchStale ? 'opacity-40' : ''">
               <template v-for="line in visibleResults" :key="line.hit.document_id">
                 <CatalogCard
                   v-if="line.doc"
@@ -895,7 +913,16 @@ async function runQuery() {
           <ErrorPanel v-else-if="error" :message="error" @retry="refresh" />
 
           <template v-else>
-            <template v-if="hits.length">
+            <Spinner v-if="browseStale" show-label :label="`Loading page ${browsePage}…`" class="flex" />
+
+            <!-- Paging keeps the outgoing page on screen; it dims and is marked
+                 busy so it never reads as the page that was just requested. -->
+            <div
+              v-if="hits.length"
+              class="space-y-6 transition-opacity"
+              :class="browseStale ? 'opacity-40' : ''"
+              :aria-busy="browseBusy"
+            >
               <section v-if="catalogSplit.datasets.length">
                 <div class="mb-3 flex items-center gap-2">
                   <FileJson2 class="h-4 w-4 text-primary" />
@@ -935,7 +962,7 @@ async function runQuery() {
                   />
                 </div>
               </section>
-            </template>
+            </div>
 
             <!-- Past the end: the estimate can under- or over-count, so a page
                  number can outrun the listing. Never strand the user there. -->
