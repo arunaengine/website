@@ -1002,7 +1002,7 @@ function buildShapeIndex(store: Store, nodeShapes: Map<string, Quad_Subject>, no
   const derived = new Set<string>()
   for (const [key, shape] of nodeShapes) {
     if (values.has(key)) continue
-    const asserted = shapeTypes(store, shape, nodeShapes, baseShapes, properties.get(key) ?? [])
+    const asserted = shapeTypes(store, shape, nodeShapes, baseChain(walk, key), properties.get(key) ?? [])
     if (asserted.length) {
       types.set(key, asserted.map(canonicalIri))
       continue
@@ -1104,16 +1104,16 @@ function shapeTypes(
   store: Store,
   shape: Quad_Subject,
   nodeShapes: Map<string, Quad_Subject>,
-  baseShapes: Map<string, Quad_Subject[]>,
+  chain: Quad_Subject[],
   properties: Quad_Subject[],
 ): string[] {
   const targetClass = store.getQuads(shape, `${SH}targetClass`, null, null)
     .find((quad) => quad.object.termType === 'NamedNode')?.object.value
   if (targetClass) return [targetClass]
-  // sh:class is a constraint, so a base's applies here too; sh:targetClass is a
-  // target and is never inherited.
-  const withBases = [shape, ...(baseShapes.get(termKey(shape)) ?? [])]
-  for (const candidate of withBases) {
+  // sh:class is a constraint, so a base's applies here too, transitively;
+  // sh:targetClass is a target and is never inherited. The composition chain is
+  // read back to front, so a shape's own class wins over an inherited one.
+  for (const candidate of [...chain].reverse()) {
     const nodeClass = store.getQuads(candidate, `${SH}class`, null, null)
       .find((quad) => quad.object.termType === 'NamedNode' && !nodeShapes.has(termKey(quad.object)))?.object.value
     if (nodeClass) return [nodeClass]
