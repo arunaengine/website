@@ -110,6 +110,7 @@ export function useMetadataSearch(
   const page = ref(1)
   const pending = ref(false) // first page in flight
   const paging = ref(false) // walking cursors towards a later page
+  const restarting = ref(false) // forced refetch after a rejected cursor
   const error = ref<string | null>(null)
   const pageError = ref<string | null>(null)
   const searched = ref(false) // at least one response for the current query
@@ -138,6 +139,7 @@ export function useMetadataSearch(
   const hasNextPage = computed(
     () =>
       cursorEnabled &&
+      !restarting.value &&
       page.value < maxPage &&
       (page.value < pages.value.length || Boolean(cursors.value[page.value])),
   )
@@ -251,6 +253,7 @@ export function useMetadataSearch(
     searched.value = false
     pending.value = false
     paging.value = false
+    restarting.value = false
     nodesQueried.value = 0
     nodesFailed.value = 0
     truncated.value = false
@@ -266,7 +269,10 @@ export function useMetadataSearch(
     return cursorEnabled ? (response.next_cursor ?? null) : null
   }
 
-  async function runSearch(term: string, force = false) {
+  // `restart` marks the forced refetch that follows a rejected cursor: the
+  // cached first page belongs to the chain the server refused, so it is dropped
+  // instead of repainted, and the page on screen stays until fresh hits land.
+  async function runSearch(term: string, force = false, restart = false) {
     const mySeq = ++seq
     ++nav
     pageController?.abort()
@@ -276,10 +282,13 @@ export function useMetadataSearch(
     const request = new AbortController()
     controller = request
     pending.value = true
+    restarting.value = restart
     error.value = null
     pageError.value = null
     const key = cacheKey(term)
-    if (hasCached(key)) {
+    if (restart) {
+      if (cache.scope.value === key) cache.reset()
+    } else if (hasCached(key)) {
       // Cached page stays on screen and revalidates behind the dim treatment.
       paintCached(term)
     } else {
@@ -294,13 +303,19 @@ export function useMetadataSearch(
       if (mySeq !== seq) return // superseded
       // A page walked while the revalidation ran belongs to the older cursor
       // chain, so a landed first page is only taken while the walk is still
-      // on it; the cache keeps it for the next visit either way.
-      if (hasCached(key) && page.value === 1 && pages.value.length <= 1) paintCached(term)
+      // on it; the cache keeps it for the next visit either way. A restart
+      // always takes it: every page on screen came from the rejected chain.
+      if (hasCached(key) && (restart || (page.value === 1 && pages.value.length <= 1))) {
+        paintCached(term)
+      }
       // A failed revalidation keeps the page it could not replace, so the
       // message is surfaced beside the results instead of clearing them.
       error.value = cache.error.value?.message || null
     } finally {
-      if (mySeq === seq) pending.value = false
+      if (mySeq === seq) {
+        pending.value = false
+        restarting.value = false
+      }
     }
   }
 
@@ -349,7 +364,7 @@ export function useMetadataSearch(
         // past the cache that issued the rejected cursor — but only once per
         // query. A backend that keeps rejecting falls through to pageError.
         restartedFor = term
-        void runSearch(term, true)
+        void runSearch(term, true, true)
       } else {
         // A failed page must not wipe the page already on screen; surface it
         // via the manual "Try again".
@@ -384,7 +399,8 @@ export function useMetadataSearch(
   }
 
   function goToPage(target: number) {
-    if (!cursorEnabled || !active.value) return
+    // Every stored cursor was rejected while a restart is in flight.
+    if (!cursorEnabled || !active.value || restarting.value) return
     const wanted = Math.max(1, Math.min(Math.trunc(target), maxPage))
     if (wanted === page.value) return
     const myNav = ++nav
@@ -442,6 +458,7 @@ export function useMetadataSearch(
     active,
     pending,
     paging,
+    restarting,
     error,
     pageError,
     searched,

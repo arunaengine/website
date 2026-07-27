@@ -91,6 +91,7 @@ const {
   active: searchActive,
   pending: searchPending,
   paging: searchPaging,
+  restarting: searchRestarting,
   error: searchError,
   pageError: searchPageError,
   searched,
@@ -923,8 +924,16 @@ async function runQuery() {
               >
                 {{ searchSummary }}
               </p>
-              <Pagination :page="searchPage" :page-count="searchPageCount" :has-next="searchHasNext" @update:page="showSearchPage" />
-              <p v-if="!searchHasNext && !searchPaging && !searchPageError" class="py-2 text-center text-[11px] text-muted-foreground">
+              <!-- A rejected cursor forces a refetch from page one, so every
+                   stored cursor is dead until it lands. -->
+              <Pagination
+                :page="searchPage"
+                :page-count="searchPageCount"
+                :has-next="searchHasNext"
+                :disabled="searchRestarting"
+                @update:page="showSearchPage"
+              />
+              <p v-if="!searchHasNext && !searchPaging && !searchRestarting && !searchPageError" class="py-2 text-center text-[11px] text-muted-foreground">
                 {{ truncated || searchDepthCapped
                   ? 'End of the first results, refine the query to reach matches past the server depth cap.'
                   : 'End of results.' }}
