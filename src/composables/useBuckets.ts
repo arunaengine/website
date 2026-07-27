@@ -30,7 +30,13 @@ const scope = computed(() => {
 // Drop the list the moment identity changes, even with no view mounted: a
 // sign-out clears the active key, which empties the scope.
 watch(scope, (key) => {
-  if (key !== cache.scope.value) cache.reset()
+  if (key === cache.scope.value) return
+  // A token refresh keeps the same credentials, so nothing would call ensure()
+  // again and the sidebar would stay blank until a manual Refresh. Refill only
+  // a list that was already in use: a signed-out or never-opened view waits.
+  const wasInUse = cache.scope.value !== null
+  cache.reset()
+  if (key && wasInUse) void ensure()
 })
 
 function onFailure(err: unknown) {

@@ -60,13 +60,23 @@ const serviceInfo = ref<TesServiceInfo | null>(null)
 const serviceState = ref<'idle' | 'loading' | 'ready' | 'unsupported' | 'error'>('idle')
 const serviceError = ref<string | null>(null)
 
-async function loadServiceInfo() {
+// Guards the service-info and init sequence the way `listRequestId` guards the
+// list: a sign-out or an account swap mid-flight must not land on the session
+// that replaced it.
+let initRequestId = 0
+
+/** Returns the request id it ran under, so a caller can drop a stale sequence. */
+async function loadServiceInfo(): Promise<number> {
+  const requestId = ++initRequestId
   serviceState.value = 'loading'
   serviceError.value = null
   try {
-    serviceInfo.value = await getTesServiceInfo()
+    const info = await getTesServiceInfo()
+    if (requestId !== initRequestId) return requestId
+    serviceInfo.value = info
     serviceState.value = 'ready'
   } catch (err) {
+    if (requestId !== initRequestId) return requestId
     if (isTesUnsupported(err)) {
       serviceState.value = 'unsupported'
     } else {
@@ -74,6 +84,7 @@ async function loadServiceInfo() {
       serviceError.value = errorMessage(err)
     }
   }
+  return requestId
 }
 
 // ── State filter ─────────────────────────────────────────────────────────────
@@ -210,6 +221,7 @@ function durationHint(task: TesTask): string | undefined {
 // on the pre-fetch skeleton. A session that is still resolving keeps loading.
 function clearNoUser() {
   listRequestId++
+  initRequestId++
   tasks.value = []
   nextPageToken.value = undefined
   pagesLoaded.value = 0
@@ -261,7 +273,10 @@ function reload() {
 }
 
 async function init() {
-  await loadServiceInfo()
+  const requestId = await loadServiceInfo()
+  // A sign-out or another account took over while the service info was in
+  // flight: its state is the current one.
+  if (requestId !== initRequestId) return
   // Skip the initial list fetch when service-info reports no TES backend, to
   // avoid a second failing request; the list area shows its own honest panel
   // and the Refresh button still allows a manual retry.
