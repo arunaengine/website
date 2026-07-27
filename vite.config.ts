@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
@@ -51,6 +52,12 @@ export default defineConfig({
       '@codemirror/legacy-modes/mode/properties',
       '@lezer/highlight',
     ],
+  },
+  test: {
+    // Node environment only: the suites under test are the pure profile/SHACL
+    // libraries, so no DOM shim is needed and startup stays fast.
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
   },
   server: {
     host: process.env.ARUNA_DEV_HOST || '127.0.0.1',

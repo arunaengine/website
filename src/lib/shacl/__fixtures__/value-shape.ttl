@@ -1,0 +1,18 @@
+# Distilled from cs:TextValueShape and the ChemicalSubstance rules that use it.
+# A referenced shape constraining only a literal is the value, not an entity.
+@prefix ex:     <http://example.org/> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix schema: <http://schema.org/> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+ex:TextValueShape a sh:NodeShape ;
+    sh:or ( [ sh:datatype xsd:string ] [ sh:datatype rdf:langString ] ) .
+
+ex:CountValueShape a sh:NodeShape ;
+    sh:datatype xsd:integer .
+
+ex:SubstanceShape a sh:NodeShape ;
+    sh:targetClass schema:ChemicalSubstance ;
+    sh:property [ sh:path schema:name ; sh:minCount 1 ; sh:maxCount 1 ; sh:node ex:TextValueShape ] ;
+    sh:property [ sh:path schema:position ; sh:maxCount 1 ; sh:node ex:CountValueShape ] .

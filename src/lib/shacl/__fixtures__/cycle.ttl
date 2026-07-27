@@ -1,0 +1,20 @@
+# Mutually referencing shapes plus a self-reference: the resolution must
+# terminate and still produce one entity rule per referenced type.
+@prefix ex:     <http://example.org/> .
+@prefix schema: <http://schema.org/> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+ex:PersonShape a sh:NodeShape ;
+    sh:targetClass schema:Person ;
+    sh:property [ sh:path schema:name ; sh:minCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path schema:affiliation ; sh:node ex:OrgShape ] ;
+    sh:property [ sh:path schema:knows ; sh:node ex:PersonShape ] .
+
+ex:OrgShape a sh:NodeShape ;
+    sh:targetClass schema:Organization ;
+    sh:property [ sh:path schema:name ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path schema:founder ; sh:node ex:PersonShape ] .
+
+ex:RootShape a sh:NodeShape ;
+    sh:property [ sh:path schema:creator ; sh:node ex:PersonShape ] .

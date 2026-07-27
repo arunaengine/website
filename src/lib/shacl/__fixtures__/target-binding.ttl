@@ -1,0 +1,25 @@
+# Distilled from cs:ChemicalSubstanceCrateRootTargetShape and
+# cs:ProfileContextualEntityShape: shapes that only bind an existing shape to a
+# target contribute no form of their own and must merge into it.
+@prefix ex:     <http://example.org/> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix prof:   <http://www.w3.org/ns/dx/prof/> .
+@prefix schema: <http://schema.org/> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+ex:ProfileEntityShape a sh:NodeShape ;
+    sh:property [ sh:path rdf:type ; sh:hasValue prof:Profile ] ;
+    sh:property [ sh:path schema:version ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+ex:ProfileContextualEntityShape a sh:NodeShape ;
+    sh:targetNode <https://example.org/profiles/demo> ;
+    sh:node ex:ProfileEntityShape .
+
+ex:CrateRootShape a sh:NodeShape ;
+    sh:class schema:Dataset ;
+    sh:property [ sh:path schema:mainEntity ; sh:minCount 1 ; sh:node ex:ProfileEntityShape ] .
+
+ex:CrateRootTargetShape a sh:NodeShape ;
+    sh:targetNode <https://example.org/crate/> ;
+    sh:node ex:CrateRootShape .

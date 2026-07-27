@@ -1,0 +1,21 @@
+# Distilled from cs:DefinedTermReferenceShape -> cs:InCrateEntityShape.
+# A node-level sh:node composes the base shape's rules into the naming shape.
+@prefix ex:     <http://example.org/> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix schema: <http://schema.org/> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+ex:InCrateEntityShape a sh:NodeShape ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path rdf:type ; sh:minCount 1 ] ;
+    sh:property [ sh:path schema:name ; sh:minCount 1 ; sh:datatype xsd:string ] .
+
+ex:DefinedTermReferenceShape a sh:NodeShape ;
+    sh:node ex:InCrateEntityShape ;
+    sh:property [ sh:path rdf:type ; sh:hasValue schema:DefinedTerm ] ;
+    sh:property [ sh:path schema:termCode ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+ex:SubstanceShape a sh:NodeShape ;
+    sh:targetClass schema:ChemicalSubstance ;
+    sh:property [ sh:path schema:chemicalRole ; sh:node ex:DefinedTermReferenceShape ] .

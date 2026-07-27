@@ -1,0 +1,31 @@
+# Distilled from cs:BioChemEntityReferenceShape (rdf:type sh:in over five
+# classes) and cs:ImageReferenceShape (a shape-level sh:or over rdf:type).
+@prefix ex:     <http://example.org/> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix schema: <http://schema.org/> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+ex:InCrateEntityShape a sh:NodeShape ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path schema:name ; sh:minCount 1 ; sh:datatype xsd:string ] .
+
+ex:BioChemEntityReferenceShape a sh:NodeShape ;
+    sh:node ex:InCrateEntityShape ;
+    sh:property [
+        sh:path rdf:type ;
+        sh:qualifiedValueShape [ sh:in ( schema:BioChemEntity schema:Gene schema:Protein ) ] ;
+        sh:qualifiedMinCount 1
+    ] .
+
+ex:ImageReferenceShape a sh:NodeShape ;
+    sh:node ex:InCrateEntityShape ;
+    sh:or (
+        [ sh:property [ sh:path rdf:type ; sh:hasValue schema:ImageObject ] ]
+        [ sh:property [ sh:path rdf:type ; sh:hasValue schema:MediaObject ] ]
+    ) .
+
+ex:SubstanceShape a sh:NodeShape ;
+    sh:targetClass schema:ChemicalSubstance ;
+    sh:property [ sh:path schema:hasBioChemEntityPart ; sh:node ex:BioChemEntityReferenceShape ] ;
+    sh:property [ sh:path schema:image ; sh:node ex:ImageReferenceShape ] .

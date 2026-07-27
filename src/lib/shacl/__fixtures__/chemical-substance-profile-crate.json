@@ -1,0 +1,1601 @@
+{
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "dct": "http://purl.org/dc/terms/",
+    "prof": "http://www.w3.org/ns/dx/prof/",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "File": "http://schema.org/MediaObject",
+    "Profile": "prof:Profile",
+    "ResourceDescriptor": "prof:ResourceDescriptor",
+    "ResourceRole": "prof:ResourceRole",
+    "conformsTo": {
+      "@id": "dct:conformsTo",
+      "@type": "@id"
+    },
+    "about": {
+      "@id": "http://schema.org/about",
+      "@type": "@id"
+    },
+    "hasPart": {
+      "@id": "http://schema.org/hasPart",
+      "@type": "@id"
+    },
+    "mainEntity": {
+      "@id": "http://schema.org/mainEntity",
+      "@type": "@id"
+    },
+    "creator": {
+      "@id": "http://schema.org/creator",
+      "@type": "@id"
+    },
+    "license": {
+      "@id": "http://schema.org/license",
+      "@type": "@id"
+    },
+    "sameAs": {
+      "@id": "http://schema.org/sameAs",
+      "@type": "@id"
+    },
+    "url": {
+      "@id": "http://schema.org/url",
+      "@type": "@id"
+    },
+    "image": {
+      "@id": "http://schema.org/image",
+      "@type": "@id"
+    },
+    "subjectOf": {
+      "@id": "http://schema.org/subjectOf",
+      "@type": "@id"
+    },
+    "distribution": {
+      "@id": "http://schema.org/distribution",
+      "@type": "@id"
+    },
+    "isProfileOf": {
+      "@id": "prof:isProfileOf",
+      "@type": "@id"
+    },
+    "hasResource": {
+      "@id": "prof:hasResource",
+      "@type": "@id"
+    },
+    "hasRole": {
+      "@id": "prof:hasRole",
+      "@type": "@id"
+    },
+    "hasArtifact": {
+      "@id": "prof:hasArtifact",
+      "@type": "@id"
+    },
+    "profileProperty": {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#profileProperty",
+      "@type": "@id"
+    },
+    "requirementLevel": {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#requirementLevel",
+      "@type": "@id"
+    },
+    "cardinality": {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#cardinality",
+      "@type": "@id"
+    },
+    "expectedType": {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#expectedType",
+      "@type": "@id"
+    },
+    "sourceConcept": {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#sourceConcept",
+      "@type": "@id"
+    },
+    "sha256": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#sha256"
+  },
+  "@graph": [
+    {
+      "@id": "ro-crate-metadata.json",
+      "@type": "CreativeWork",
+      "name": "RO-Crate metadata descriptor",
+      "about": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT"
+      },
+      "conformsTo": {
+        "@id": "https://w3id.org/ro/crate/1.2"
+      }
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT",
+      "@type": [
+        "Dataset",
+        "Profile"
+      ],
+      "name": "Bioschemas ChemicalSubstance RO-Crate Profile — self-contained 0.5-DRAFT binding",
+      "description": "An offline-capable RO-Crate Profile binding for Bioschemas ChemicalSubstance 0.5-DRAFT. Canonical external identifiers are retained, while their metadata and all validation resources are embedded in the crate.",
+      "version": "0.5-DRAFT+rocrate-self-contained.1",
+      "identifier": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT",
+      "datePublished": "2026-07-27",
+      "isProfileOf": [
+        {
+          "@id": "https://w3id.org/ro/crate/1.2"
+        }
+      ],
+      "hasPart": [
+        {
+          "@id": "index.html"
+        },
+        {
+          "@id": "constraints/chemical-substance.shacl.ttl"
+        },
+        {
+          "@id": "profile/resolved-profile.jsonld"
+        },
+        {
+          "@id": "profile/original-bioschemas-profile-snapshot.json"
+        },
+        {
+          "@id": "guidance/offline-embedding.md"
+        },
+        {
+          "@id": "LICENSE.txt"
+        },
+        {
+          "@id": "MANIFEST.sha256"
+        },
+        {
+          "@id": "BUILD-REPORT.json"
+        }
+      ],
+      "hasResource": [
+        {
+          "@id": "#resource-specification"
+        },
+        {
+          "@id": "#resource-validation"
+        },
+        {
+          "@id": "#resource-schema"
+        },
+        {
+          "@id": "#resource-source-snapshot"
+        },
+        {
+          "@id": "#resource-guidance"
+        },
+        {
+          "@id": "#resource-vocabulary"
+        }
+      ],
+      "creator": [
+        {
+          "@id": "#egon-willighagen"
+        },
+        {
+          "@id": "#steffen-neumann"
+        },
+        {
+          "@id": "#anna-gaulton"
+        },
+        {
+          "@id": "#ricardo-arcila"
+        },
+        {
+          "@id": "#david-mendez"
+        }
+      ],
+      "license": {
+        "@id": "LICENSE.txt"
+      },
+      "profileProperty": [
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-identifier"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-name"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-url"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-chemicalComposition"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-hasBioChemEntityPart"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-sameAs"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-alternateName"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-bioChemInteraction"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-bioChemSimilarity"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-biologicalRole"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-chemicalRole"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-description"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-disambiguatingDescription"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-image"
+        },
+        {
+          "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-potentialUse"
+        }
+      ],
+      "sourceConcept": {
+        "@id": "http://purl.obolibrary.org/obo/CHEBI_59999"
+      }
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#profileProperty",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "Profile property",
+      "description": "Links a profile to one of its property specifications."
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#requirementLevel",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "Requirement level",
+      "description": "The minimum, recommended, or optional requirement level assigned by the profile."
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#cardinality",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "Cardinality",
+      "description": "The permitted cardinality of the property."
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#expectedType",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "Expected type",
+      "description": "A type accepted for values of the property."
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#sourceConcept",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "Source concept",
+      "description": "A concept used as a source for the profile definition."
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Minimum",
+      "@type": "DefinedTerm",
+      "name": "Minimum",
+      "description": "A property required for conformance; absence is a SHACL violation.",
+      "termCode": "minimum"
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Recommended",
+      "@type": "DefinedTerm",
+      "name": "Recommended",
+      "description": "A property recommended for interoperability; absence is a SHACL warning.",
+      "termCode": "recommended"
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Optional",
+      "@type": "DefinedTerm",
+      "name": "Optional",
+      "description": "A property that may be supplied; values are validated when present.",
+      "termCode": "optional"
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#One",
+      "@type": "DefinedTerm",
+      "name": "One",
+      "description": "Exactly one value.",
+      "termCode": "one"
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many",
+      "@type": "DefinedTerm",
+      "name": "Many",
+      "description": "One or more values are permitted where the property is present.",
+      "termCode": "many"
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-identifier",
+      "@type": "PropertyValue",
+      "name": "identifier",
+      "description": "Any kind of identifier for the substance. It may be represented as text, an IRI, or a PropertyValue contextual entity.",
+      "propertyID": {
+        "@id": "http://schema.org/identifier"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Minimum"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#One"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/PropertyValue"
+        },
+        {
+          "@id": "http://schema.org/Text"
+        },
+        {
+          "@id": "http://schema.org/URL"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-name",
+      "@type": "PropertyValue",
+      "name": "name",
+      "description": "The name of the substance.",
+      "propertyID": {
+        "@id": "http://schema.org/name"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Minimum"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#One"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/Text"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-url",
+      "@type": "PropertyValue",
+      "name": "url",
+      "description": "A URL for the substance. In this offline profile, every URL node must also be described in the crate graph.",
+      "propertyID": {
+        "@id": "http://schema.org/url"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Minimum"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/URL"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-chemicalComposition",
+      "@type": "PropertyValue",
+      "name": "chemicalComposition",
+      "description": "The identity and relative ratio of the chemical elements that make up the substance; an approximation is acceptable.",
+      "propertyID": {
+        "@id": "http://schema.org/chemicalComposition"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Recommended"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#One"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/Text"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-hasBioChemEntityPart",
+      "@type": "PropertyValue",
+      "name": "hasBioChemEntityPart",
+      "description": "A BioChemEntity that is a part of this substance. Every referenced entity must be described in the crate graph.",
+      "propertyID": {
+        "@id": "http://schema.org/hasBioChemEntityPart"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Recommended"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/BioChemEntity"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-sameAs",
+      "@type": "PropertyValue",
+      "name": "sameAs",
+      "description": "A reference page that unambiguously indicates the item identity. Every referenced page must be described in the crate graph.",
+      "propertyID": {
+        "@id": "http://schema.org/sameAs"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Recommended"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/URL"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-alternateName",
+      "@type": "PropertyValue",
+      "name": "alternateName",
+      "description": "An alias for the item.",
+      "propertyID": {
+        "@id": "http://schema.org/alternateName"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Optional"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/Text"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-bioChemInteraction",
+      "@type": "PropertyValue",
+      "name": "bioChemInteraction",
+      "description": "A BioChemEntity known to interact with this item. Every referenced entity must be described in the crate graph.",
+      "propertyID": {
+        "@id": "http://schema.org/bioChemInteraction"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Optional"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/BioChemEntity"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-bioChemSimilarity",
+      "@type": "PropertyValue",
+      "name": "bioChemSimilarity",
+      "description": "A similar biochemical entity. Every referenced entity must be described in the crate graph.",
+      "propertyID": {
+        "@id": "http://schema.org/bioChemSimilarity"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Optional"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/BioChemEntity"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-biologicalRole",
+      "@type": "PropertyValue",
+      "name": "biologicalRole",
+      "description": "A role played by the entity in a biological context. Terms must be embedded as contextual entities.",
+      "propertyID": {
+        "@id": "http://schema.org/biologicalRole"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Optional"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/DefinedTerm"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-chemicalRole",
+      "@type": "PropertyValue",
+      "name": "chemicalRole",
+      "description": "A role played by the entity in a chemical context. Terms must be embedded as contextual entities.",
+      "propertyID": {
+        "@id": "http://schema.org/chemicalRole"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Optional"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/DefinedTerm"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-description",
+      "@type": "PropertyValue",
+      "name": "description",
+      "description": "A description of the item.",
+      "propertyID": {
+        "@id": "http://schema.org/description"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Optional"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#One"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/Text"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-disambiguatingDescription",
+      "@type": "PropertyValue",
+      "name": "disambiguatingDescription",
+      "description": "A short description used to distinguish the item from similar items.",
+      "propertyID": {
+        "@id": "http://schema.org/disambiguatingDescription"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Optional"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#One"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/Text"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-image",
+      "@type": "PropertyValue",
+      "name": "image",
+      "description": "An image of the item. Every referenced image or media object must be represented in the crate graph.",
+      "propertyID": {
+        "@id": "http://schema.org/image"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Optional"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/URL"
+        },
+        {
+          "@id": "http://schema.org/ImageObject"
+        }
+      ]
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#property-potentialUse",
+      "@type": "PropertyValue",
+      "name": "potentialUse",
+      "description": "An intended use of the BioChemEntity by humans. Terms must be embedded as contextual entities.",
+      "propertyID": {
+        "@id": "http://schema.org/potentialUse"
+      },
+      "requirementLevel": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Optional"
+      },
+      "cardinality": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#Many"
+      },
+      "expectedType": [
+        {
+          "@id": "http://schema.org/DefinedTerm"
+        }
+      ]
+    },
+    {
+      "@id": "https://w3id.org/ro/crate/1.2",
+      "@type": [
+        "CreativeWork",
+        "Profile"
+      ],
+      "name": "RO-Crate 1.2",
+      "version": "1.2",
+      "description": "The base RO-Crate specification against which this profile is defined. This contextual description is embedded for offline processing."
+    },
+    {
+      "@id": "https://www.w3.org/TR/shacl/",
+      "@type": [
+        "CreativeWork",
+        "Profile",
+        "Standard"
+      ],
+      "name": "Shapes Constraint Language (SHACL)",
+      "description": "W3C SHACL specification. This contextual description is embedded so the constraint file does not require dereferencing the identifier."
+    },
+    {
+      "@id": "http://purl.obolibrary.org/obo/CHEBI_59999",
+      "@type": "DefinedTerm",
+      "name": "chemical substance",
+      "termCode": "CHEBI:59999",
+      "description": "A portion of matter of constant composition, composed of molecular entities of the same type or of different types.",
+      "inDefinedTermSet": {
+        "@id": "#chebi"
+      }
+    },
+    {
+      "@id": "#chebi",
+      "@type": "DefinedTermSet",
+      "name": "Chemical Entities of Biological Interest (ChEBI)",
+      "description": "Embedded minimal contextual description of the vocabulary source used by the profile definition."
+    },
+    {
+      "@id": "http://www.w3.org/1999/02/22-rdf-syntax-ns#Property",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "RDF Property",
+      "description": "The class of RDF properties."
+    },
+    {
+      "@id": "http://www.w3.org/2000/01/rdf-schema#Class",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "RDFS Class",
+      "description": "The class of RDF classes."
+    },
+    {
+      "@id": "http://purl.org/dc/terms/conformsTo",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "conformsTo",
+      "description": "An established standard to which the described resource conforms."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/Profile",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "Profile",
+      "description": "A profile of one or more standards or specifications."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/ResourceDescriptor",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "ResourceDescriptor",
+      "description": "A descriptor linking a profile resource to its role and artifact."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/ResourceRole",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "ResourceRole",
+      "description": "A role played by a resource in relation to a profile."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/isProfileOf",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "isProfileOf",
+      "description": "Relates a profile to a specification or profile that it profiles."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/hasResource",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "hasResource",
+      "description": "Relates a profile to a resource descriptor."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/hasRole",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "hasRole",
+      "description": "Relates a resource descriptor to a resource role."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/hasArtifact",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "hasArtifact",
+      "description": "Relates a resource descriptor to its concrete artifact."
+    },
+    {
+      "@id": "http://schema.org/BioChemEntity",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "BioChemEntity",
+      "termCode": "BioChemEntity",
+      "description": "A biological, chemical or biochemical entity.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/ChemicalSubstance",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "ChemicalSubstance",
+      "termCode": "ChemicalSubstance",
+      "description": "A portion of matter of constant composition, composed of molecular entities of the same type or of different types.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/CreativeWork",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "CreativeWork",
+      "termCode": "CreativeWork",
+      "description": "The most generic kind of creative work.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/Dataset",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "Dataset",
+      "termCode": "Dataset",
+      "description": "A body of structured information describing some topic or topics of interest.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/DefinedTerm",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "DefinedTerm",
+      "termCode": "DefinedTerm",
+      "description": "A word, name, acronym, phrase, or other term from a defined vocabulary.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/DefinedTermSet",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "DefinedTermSet",
+      "termCode": "DefinedTermSet",
+      "description": "A set of defined terms, such as a controlled vocabulary or term catalogue.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/Gene",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "Gene",
+      "termCode": "Gene",
+      "description": "A gene.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/ImageObject",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "ImageObject",
+      "termCode": "ImageObject",
+      "description": "An image file or image resource.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/MediaObject",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "MediaObject",
+      "termCode": "MediaObject",
+      "description": "A media object, encoded as a file or other media resource.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/MolecularEntity",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "MolecularEntity",
+      "termCode": "MolecularEntity",
+      "description": "A molecular entity.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/Person",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "Person",
+      "termCode": "Person",
+      "description": "A person.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/PropertyValue",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "PropertyValue",
+      "termCode": "PropertyValue",
+      "description": "A property-value pair used to represent identifiers and other structured values.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/Protein",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "Protein",
+      "termCode": "Protein",
+      "description": "A protein.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/Standard",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "Standard",
+      "termCode": "Standard",
+      "description": "A standard or specification.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/Text",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "Text",
+      "termCode": "Text",
+      "description": "Textual data.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/Thing",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "Thing",
+      "termCode": "Thing",
+      "description": "The most generic type of item.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/URL",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "URL",
+      "termCode": "URL",
+      "description": "A URL or IRI identifying a resource.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/WebPage",
+      "@type": [
+        "DefinedTerm",
+        "rdfs:Class"
+      ],
+      "name": "WebPage",
+      "termCode": "WebPage",
+      "description": "A web page.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/about",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "about",
+      "termCode": "about",
+      "description": "The subject matter of a creative work.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/alternateName",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "alternateName",
+      "termCode": "alternateName",
+      "description": "An alias for the item.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/bioChemInteraction",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "bioChemInteraction",
+      "termCode": "bioChemInteraction",
+      "description": "A BioChemEntity known to interact with this item. Every referenced entity must be described in the crate graph.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/bioChemSimilarity",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "bioChemSimilarity",
+      "termCode": "bioChemSimilarity",
+      "description": "A similar biochemical entity. Every referenced entity must be described in the crate graph.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/biologicalRole",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "biologicalRole",
+      "termCode": "biologicalRole",
+      "description": "A role played by the entity in a biological context. Terms must be embedded as contextual entities.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/chemicalComposition",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "chemicalComposition",
+      "termCode": "chemicalComposition",
+      "description": "The identity and relative ratio of the chemical elements that make up the substance; an approximation is acceptable.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/chemicalRole",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "chemicalRole",
+      "termCode": "chemicalRole",
+      "description": "A role played by the entity in a chemical context. Terms must be embedded as contextual entities.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/contentSize",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "contentSize",
+      "termCode": "contentSize",
+      "description": "The size of a file or media object.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/creator",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "creator",
+      "termCode": "creator",
+      "description": "The creator or author of this resource.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/datePublished",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "datePublished",
+      "termCode": "datePublished",
+      "description": "The date on which the resource was first published.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/description",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "description",
+      "termCode": "description",
+      "description": "A description of the item.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/disambiguatingDescription",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "disambiguatingDescription",
+      "termCode": "disambiguatingDescription",
+      "description": "A short description used to distinguish the item from similar items.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/encodingFormat",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "encodingFormat",
+      "termCode": "encodingFormat",
+      "description": "The media type or file format of a resource.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/hasBioChemEntityPart",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "hasBioChemEntityPart",
+      "termCode": "hasBioChemEntityPart",
+      "description": "A BioChemEntity that is a part of this substance. Every referenced entity must be described in the crate graph.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/hasPart",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "hasPart",
+      "termCode": "hasPart",
+      "description": "A resource that is included in this item.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/identifier",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "identifier",
+      "termCode": "identifier",
+      "description": "Any kind of identifier for the substance. It may be represented as text, an IRI, or a PropertyValue contextual entity.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/image",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "image",
+      "termCode": "image",
+      "description": "An image of the item. Every referenced image or media object must be represented in the crate graph.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/inDefinedTermSet",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "inDefinedTermSet",
+      "termCode": "inDefinedTermSet",
+      "description": "The DefinedTermSet that contains this term.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/license",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "license",
+      "termCode": "license",
+      "description": "A licence document that applies to this content.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/mainEntity",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "mainEntity",
+      "termCode": "mainEntity",
+      "description": "The primary entity described by a creative work or dataset.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/name",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "name",
+      "termCode": "name",
+      "description": "The name of the substance.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/potentialUse",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "potentialUse",
+      "termCode": "potentialUse",
+      "description": "An intended use of the BioChemEntity by humans. Terms must be embedded as contextual entities.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/propertyID",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "propertyID",
+      "termCode": "propertyID",
+      "description": "The property identifier represented by a PropertyValue.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/sameAs",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "sameAs",
+      "termCode": "sameAs",
+      "description": "A reference page that unambiguously indicates the item identity. Every referenced page must be described in the crate graph.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/source",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "source",
+      "termCode": "source",
+      "description": "A resource from which this information was derived.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/termCode",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "termCode",
+      "termCode": "termCode",
+      "description": "A code identifying a DefinedTerm within its term set.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/url",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "url",
+      "termCode": "url",
+      "description": "A URL for the substance. In this offline profile, every URL node must also be described in the crate graph.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "http://schema.org/version",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "version",
+      "termCode": "version",
+      "description": "The version of a creative work, product, or software item.",
+      "inDefinedTermSet": {
+        "@id": "#schema-org"
+      }
+    },
+    {
+      "@id": "#schema-org",
+      "@type": "DefinedTermSet",
+      "name": "Schema.org terms used by this profile",
+      "description": "An embedded catalogue of the Schema.org classes and properties used by the ChemicalSubstance profile and SHACL constraints."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/role/specification",
+      "@type": [
+        "DefinedTerm",
+        "ResourceRole"
+      ],
+      "name": "Specification",
+      "description": "Defines the profile in human-readable form."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/role/guidance",
+      "@type": [
+        "DefinedTerm",
+        "ResourceRole"
+      ],
+      "name": "Guidance",
+      "description": "Documents how to use the profile."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/role/schema",
+      "@type": [
+        "DefinedTerm",
+        "ResourceRole"
+      ],
+      "name": "Schema",
+      "description": "Provides a machine-readable structural description of the profile."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/role/validation",
+      "@type": [
+        "DefinedTerm",
+        "ResourceRole"
+      ],
+      "name": "Validation",
+      "description": "Supplies constraints for verifying conformance."
+    },
+    {
+      "@id": "http://www.w3.org/ns/dx/prof/role/vocabulary",
+      "@type": [
+        "DefinedTerm",
+        "ResourceRole"
+      ],
+      "name": "Vocabulary",
+      "description": "Defines or catalogues terms used by the profile."
+    },
+    {
+      "@id": "#egon-willighagen",
+      "@type": "Person",
+      "name": "Egon Willighagen",
+      "description": "Group leader for the Bioschemas Chemicals group profile."
+    },
+    {
+      "@id": "#steffen-neumann",
+      "@type": "Person",
+      "name": "Steffen Neumann",
+      "description": "Group leader for the Bioschemas Chemicals group profile."
+    },
+    {
+      "@id": "#anna-gaulton",
+      "@type": "Person",
+      "name": "Anna Gaulton",
+      "description": "Contributor for the Bioschemas Chemicals group profile."
+    },
+    {
+      "@id": "#ricardo-arcila",
+      "@type": "Person",
+      "name": "Ricardo Arcila",
+      "description": "Contributor for the Bioschemas Chemicals group profile."
+    },
+    {
+      "@id": "#david-mendez",
+      "@type": "Person",
+      "name": "David Mendez",
+      "description": "Contributor for the Bioschemas Chemicals group profile."
+    },
+    {
+      "@id": "#resource-specification",
+      "@type": "ResourceDescriptor",
+      "name": "Resource descriptor for index.html",
+      "hasRole": {
+        "@id": "http://www.w3.org/ns/dx/prof/role/specification"
+      },
+      "hasArtifact": {
+        "@id": "index.html"
+      }
+    },
+    {
+      "@id": "#resource-validation",
+      "@type": "ResourceDescriptor",
+      "name": "Resource descriptor for constraints/chemical-substance.shacl.ttl",
+      "hasRole": {
+        "@id": "http://www.w3.org/ns/dx/prof/role/validation"
+      },
+      "hasArtifact": {
+        "@id": "constraints/chemical-substance.shacl.ttl"
+      }
+    },
+    {
+      "@id": "#resource-schema",
+      "@type": "ResourceDescriptor",
+      "name": "Resource descriptor for profile/resolved-profile.jsonld",
+      "hasRole": {
+        "@id": "http://www.w3.org/ns/dx/prof/role/schema"
+      },
+      "hasArtifact": {
+        "@id": "profile/resolved-profile.jsonld"
+      }
+    },
+    {
+      "@id": "#resource-source-snapshot",
+      "@type": "ResourceDescriptor",
+      "name": "Resource descriptor for profile/original-bioschemas-profile-snapshot.json",
+      "hasRole": {
+        "@id": "http://www.w3.org/ns/dx/prof/role/schema"
+      },
+      "hasArtifact": {
+        "@id": "profile/original-bioschemas-profile-snapshot.json"
+      }
+    },
+    {
+      "@id": "#resource-guidance",
+      "@type": "ResourceDescriptor",
+      "name": "Resource descriptor for guidance/offline-embedding.md",
+      "hasRole": {
+        "@id": "http://www.w3.org/ns/dx/prof/role/guidance"
+      },
+      "hasArtifact": {
+        "@id": "guidance/offline-embedding.md"
+      }
+    },
+    {
+      "@id": "#resource-vocabulary",
+      "@type": "ResourceDescriptor",
+      "name": "Resource descriptor for profile/resolved-profile.jsonld",
+      "hasRole": {
+        "@id": "http://www.w3.org/ns/dx/prof/role/vocabulary"
+      },
+      "hasArtifact": {
+        "@id": "profile/resolved-profile.jsonld"
+      }
+    },
+    {
+      "@id": "index.html",
+      "@type": "File",
+      "name": "Self-contained ChemicalSubstance profile description",
+      "encodingFormat": "text/html",
+      "about": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT"
+      },
+      "contentSize": "5844",
+      "sha256": "4edcf7fd5defba6cf1f18f4f2f3fb345bd022149e1dfd7477e898169f1f5219a"
+    },
+    {
+      "@id": "constraints/chemical-substance.shacl.ttl",
+      "@type": "File",
+      "name": "SHACL constraints for the self-contained ChemicalSubstance RO-Crate Profile",
+      "encodingFormat": "text/turtle",
+      "about": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT"
+      },
+      "conformsTo": {
+        "@id": "https://www.w3.org/TR/shacl/"
+      },
+      "contentSize": "19879",
+      "sha256": "8b24c7d17eee6d7f4d376df5c1623bb19126f80af8f81f02e2c1db4ddc1c5c27"
+    },
+    {
+      "@id": "profile/resolved-profile.jsonld",
+      "@type": "File",
+      "name": "Resolved machine-readable ChemicalSubstance profile",
+      "encodingFormat": "application/ld+json",
+      "about": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT"
+      },
+      "contentSize": "45442",
+      "sha256": "2306e9e0a1695d23026ac18163d4972700442449e37024444292f1a89e782cde"
+    },
+    {
+      "@id": "profile/original-bioschemas-profile-snapshot.json",
+      "@type": "File",
+      "name": "Normalised snapshot of the supplied Bioschemas profile",
+      "encodingFormat": "application/json",
+      "about": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT"
+      },
+      "contentSize": "7168",
+      "sha256": "4e547f5b9d72b6f4ce23dce2710dbbd1dbd318f292d2591e153d9ddd44db2f67"
+    },
+    {
+      "@id": "guidance/offline-embedding.md",
+      "@type": "File",
+      "name": "Guidance for embedding contextual entities and validating offline",
+      "encodingFormat": "text/markdown",
+      "about": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT"
+      },
+      "contentSize": "2490",
+      "sha256": "83e9c828139073065e59616b897dbc831e710087a47027aa69b82c05d6ebf57e"
+    },
+    {
+      "@id": "LICENSE.txt",
+      "@type": "File",
+      "name": "Licence and attribution information",
+      "encodingFormat": "text/plain",
+      "about": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT"
+      },
+      "contentSize": "734",
+      "sha256": "dcb1caf75f113ab8abc0b70ccba924b35810c4acfb6f5eeb61a00eae9b29384b"
+    },
+    {
+      "@id": "MANIFEST.sha256",
+      "@type": "File",
+      "name": "SHA-256 manifest",
+      "encodingFormat": "text/plain",
+      "about": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT"
+      },
+      "contentSize": "656",
+      "sha256": "616cc65ea19e462a87c7d95e5fabe6a574d8b7415b5db8e78cd40017745f121d"
+    },
+    {
+      "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT#sha256",
+      "@type": [
+        "DefinedTerm",
+        "rdf:Property"
+      ],
+      "name": "SHA-256",
+      "description": "Lower-case hexadecimal SHA-256 checksum of an in-crate file."
+    },
+    {
+      "@id": "BUILD-REPORT.json",
+      "@type": "File",
+      "name": "Build and syntax-validation report",
+      "encodingFormat": "application/json",
+      "about": {
+        "@id": "https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT"
+      },
+      "contentSize": "614",
+      "sha256": "fcd2d8a5285816e16ff4643d39b9c616e66786adab31ac0c64a878e7db100ab0"
+    }
+  ]
+}

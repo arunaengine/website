@@ -1,0 +1,272 @@
+@base <./> .
+@prefix cs:     <#> .
+@prefix dct:    <http://purl.org/dc/terms/> .
+@prefix prof:   <http://www.w3.org/ns/dx/prof/> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <http://schema.org/> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+# Self-contained SHACL constraints for the Bioschemas ChemicalSubstance 0.5-DRAFT
+# RO-Crate binding. Shape identifiers are local fragments of this file.
+#
+# Identity IRIs from Bioschemas, RO-Crate, Schema.org, ChEBI and W3C are retained,
+# but their contextual descriptions are embedded at the end of this shape graph.
+# No network dereferencing is required for validation.
+#
+# Requirement mapping:
+#   Minimum     -> sh:Violation
+#   Recommended -> sh:Warning when absent; malformed values are violations
+#   Optional    -> validate values only when present
+#
+# Offline embedding rule:
+#   Every object-valued profile property MUST reference an entity that occurs as
+#   a subject in the same data graph and has at least one rdf:type.
+
+cs:MinimumProperties a sh:PropertyGroup ; rdfs:label "Minimum properties" ; sh:order 1 .
+cs:RecommendedProperties a sh:PropertyGroup ; rdfs:label "Recommended properties" ; sh:order 2 .
+cs:OptionalProperties a sh:PropertyGroup ; rdfs:label "Optional properties" ; sh:order 3 .
+
+#################################################################
+# Reusable value and embedding shapes
+#################################################################
+
+cs:TextValueShape a sh:NodeShape ;
+    sh:or ( [ sh:datatype xsd:string ] [ sh:datatype rdf:langString ] ) .
+
+cs:InCrateEntityShape a sh:NodeShape ;
+    sh:nodeKind sh:IRI ;
+    sh:property [
+        sh:path rdf:type ;
+        sh:minCount 1 ;
+        sh:severity sh:Violation ;
+        sh:message "The referenced IRI must be represented as an entity in the same RO-Crate graph and have at least one rdf:type."
+    ] ;
+    sh:property [
+        sh:path schema:name ;
+        sh:minCount 1 ;
+        sh:severity sh:Warning ;
+        sh:message "An embedded contextual or data entity should have schema:name."
+    ] .
+
+cs:DefinedTermReferenceShape a sh:NodeShape ;
+    sh:node cs:InCrateEntityShape ;
+    sh:property [
+        sh:path rdf:type ;
+        sh:hasValue schema:DefinedTerm ;
+        sh:message "The embedded referenced entity must be typed schema:DefinedTerm."
+    ] .
+
+cs:PropertyValueReferenceShape a sh:NodeShape ;
+    sh:node cs:InCrateEntityShape ;
+    sh:property [
+        sh:path rdf:type ;
+        sh:hasValue schema:PropertyValue ;
+        sh:message "The embedded identifier entity must be typed schema:PropertyValue."
+    ] .
+
+cs:BioChemEntityReferenceShape a sh:NodeShape ;
+    sh:node cs:InCrateEntityShape ;
+    sh:property [
+        sh:path rdf:type ;
+        sh:qualifiedValueShape [
+            sh:in ( schema:BioChemEntity schema:ChemicalSubstance schema:Gene schema:MolecularEntity schema:Protein )
+        ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:message "The embedded referenced entity must be typed schema:BioChemEntity or an accepted direct subtype."
+    ] .
+
+cs:ImageReferenceShape a sh:NodeShape ;
+    sh:node cs:InCrateEntityShape ;
+    sh:or (
+        [ sh:property [ sh:path rdf:type ; sh:hasValue schema:ImageObject ] ]
+        [ sh:property [ sh:path rdf:type ; sh:hasValue schema:MediaObject ] ]
+    ) ;
+    sh:message "An image reference must be an embedded schema:ImageObject or schema:MediaObject entity."
+    .
+
+cs:EmbeddedProfileEntityShape a sh:NodeShape ;
+    sh:node cs:InCrateEntityShape ;
+    sh:property [ sh:path rdf:type ; sh:hasValue prof:Profile ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path rdf:type ; sh:hasValue schema:Dataset ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:version ; sh:minCount 1 ; sh:maxCount 1 ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:hasPart ; sh:minCount 1 ; sh:node cs:InCrateEntityShape ; sh:severity sh:Violation ;
+                  sh:message "The embedded profile must include at least one in-crate profile artifact through schema:hasPart." ] ;
+    sh:property [ sh:path prof:hasResource ; sh:minCount 1 ; sh:severity sh:Violation ;
+                  sh:message "The embedded profile must include at least one prof:ResourceDescriptor." ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "Profile artifacts linked by prof:hasResource must be in-crate resources, not unresolved HTTP(S) artifacts." ;
+        sh:select """
+            SELECT $this ?artifact
+            WHERE {
+                $this prof:hasResource ?descriptor .
+                ?descriptor prof:hasArtifact ?artifact .
+                FILTER(REGEX(STR(?artifact), "^https?://", "i"))
+            }
+        """
+    ] .
+
+cs:ResourceDescriptorShape a sh:NodeShape ;
+    sh:targetClass prof:ResourceDescriptor ;
+    sh:node cs:InCrateEntityShape ;
+    sh:property [ sh:path prof:hasRole ; sh:minCount 1 ; sh:maxCount 1 ; sh:node cs:DefinedTermReferenceShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path prof:hasArtifact ; sh:minCount 1 ; sh:maxCount 1 ; sh:node cs:InCrateEntityShape ; sh:severity sh:Violation ] .
+
+#################################################################
+# Bioschemas ChemicalSubstance entity
+#################################################################
+
+cs:ChemicalSubstanceShape a sh:NodeShape ;
+    sh:targetClass schema:ChemicalSubstance ;
+    sh:nodeKind sh:IRI ;
+
+    sh:property [
+        sh:path dct:conformsTo ; sh:group cs:MinimumProperties ; sh:order 1 ;
+        sh:minCount 1 ; sh:maxCount 1 ; sh:hasValue <https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT> ;
+        sh:node cs:EmbeddedProfileEntityShape ; sh:severity sh:Violation ;
+        sh:message "dct:conformsTo must identify the embedded ChemicalSubstance 0.5-DRAFT profile entity exactly once."
+    ] ;
+    sh:property [
+        sh:path schema:identifier ; sh:group cs:MinimumProperties ; sh:order 2 ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:or (
+            [ sh:node cs:TextValueShape ]
+            [ sh:node cs:PropertyValueReferenceShape ]
+            [ sh:node cs:InCrateEntityShape ]
+        ) ;
+        sh:severity sh:Violation ;
+        sh:message "identifier is required exactly once; IRI values must resolve to an embedded entity."
+    ] ;
+    sh:property [
+        sh:path schema:name ; sh:group cs:MinimumProperties ; sh:order 3 ;
+        sh:minCount 1 ; sh:maxCount 1 ; sh:node cs:TextValueShape ; sh:severity sh:Violation ;
+        sh:message "name is required exactly once and must be text."
+    ] ;
+    sh:property [
+        sh:path schema:url ; sh:group cs:MinimumProperties ; sh:order 4 ;
+        sh:minCount 1 ; sh:node cs:InCrateEntityShape ; sh:severity sh:Violation ;
+        sh:message "url is required and every IRI must be represented as an embedded contextual or data entity."
+    ] ;
+
+    sh:property [ sh:path schema:chemicalComposition ; sh:group cs:RecommendedProperties ; sh:order 1 ; sh:minCount 1 ; sh:severity sh:Warning ; sh:message "chemicalComposition is recommended." ] ;
+    sh:property [ sh:path schema:hasBioChemEntityPart ; sh:group cs:RecommendedProperties ; sh:order 2 ; sh:minCount 1 ; sh:severity sh:Warning ; sh:message "hasBioChemEntityPart is recommended." ] ;
+    sh:property [ sh:path schema:sameAs ; sh:group cs:RecommendedProperties ; sh:order 3 ; sh:minCount 1 ; sh:severity sh:Warning ; sh:message "sameAs is recommended." ] ;
+
+    sh:property [ sh:path schema:chemicalComposition ; sh:group cs:RecommendedProperties ; sh:order 1.1 ; sh:maxCount 1 ; sh:node cs:TextValueShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:hasBioChemEntityPart ; sh:group cs:RecommendedProperties ; sh:order 2.1 ; sh:node cs:BioChemEntityReferenceShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:sameAs ; sh:group cs:RecommendedProperties ; sh:order 3.1 ; sh:node cs:InCrateEntityShape ; sh:severity sh:Violation ] ;
+
+    sh:property [ sh:path schema:alternateName ; sh:group cs:OptionalProperties ; sh:order 1 ; sh:node cs:TextValueShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:bioChemInteraction ; sh:group cs:OptionalProperties ; sh:order 2 ; sh:node cs:BioChemEntityReferenceShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:bioChemSimilarity ; sh:group cs:OptionalProperties ; sh:order 3 ; sh:node cs:BioChemEntityReferenceShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:biologicalRole ; sh:group cs:OptionalProperties ; sh:order 4 ; sh:node cs:DefinedTermReferenceShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:chemicalRole ; sh:group cs:OptionalProperties ; sh:order 5 ; sh:node cs:DefinedTermReferenceShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:description ; sh:group cs:OptionalProperties ; sh:order 6 ; sh:maxCount 1 ; sh:node cs:TextValueShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:disambiguatingDescription ; sh:group cs:OptionalProperties ; sh:order 7 ; sh:maxCount 1 ; sh:node cs:TextValueShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:image ; sh:group cs:OptionalProperties ; sh:order 8 ; sh:node cs:ImageReferenceShape ; sh:severity sh:Violation ] ;
+    sh:property [ sh:path schema:potentialUse ; sh:group cs:OptionalProperties ; sh:order 9 ; sh:node cs:DefinedTermReferenceShape ; sh:severity sh:Violation ] .
+
+#################################################################
+# RO-Crate binding
+#################################################################
+
+cs:ChemicalSubstanceCrateRootShape a sh:NodeShape ;
+    sh:class schema:Dataset ;
+    sh:property [
+        sh:path dct:conformsTo ; sh:hasValue <https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT> ; sh:node cs:EmbeddedProfileEntityShape ; sh:severity sh:Violation ;
+        sh:message "The Root Data Entity must declare conformance to the fully embedded ChemicalSubstance profile entity."
+    ] ;
+    sh:property [
+        sh:path schema:mainEntity ;
+        sh:qualifiedValueShape [ sh:class schema:ChemicalSubstance ; sh:node cs:ChemicalSubstanceShape ] ;
+        sh:qualifiedMinCount 1 ; sh:severity sh:Violation ;
+        sh:message "The crate must identify at least one conforming ChemicalSubstance as mainEntity."
+    ] .
+
+cs:ChemicalSubstanceCrateRootTargetShape a sh:NodeShape ;
+    sh:target [
+        a sh:SPARQLTarget ; sh:prefixes cs:Prefixes ;
+        sh:select """
+            SELECT DISTINCT ?this
+            WHERE {
+                ?metadata schema:about ?this ; a schema:CreativeWork .
+                FILTER(REGEX(STR(?metadata), "(^|/)ro-crate-metadata\\.json$"))
+            }
+        """
+    ] ;
+    sh:node cs:ChemicalSubstanceCrateRootShape .
+
+cs:ProfileContextualEntityShape a sh:NodeShape ;
+    sh:targetNode <https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT> ;
+    sh:node cs:EmbeddedProfileEntityShape .
+
+#################################################################
+# Prefix declarations for SHACL-SPARQL
+#################################################################
+
+cs:Prefixes a owl:Ontology ;
+    sh:declare [ a sh:PrefixDeclaration ; sh:prefix "schema" ; sh:namespace "http://schema.org/"^^xsd:anyURI ] ;
+    sh:declare [ a sh:PrefixDeclaration ; sh:prefix "prof" ; sh:namespace "http://www.w3.org/ns/dx/prof/"^^xsd:anyURI ] .
+
+#################################################################
+# Embedded contextual catalogue — no dereferencing required
+#################################################################
+
+<https://bioschemas.org/profiles/ChemicalSubstance/0.5-DRAFT> a prof:Profile, schema:Dataset ;
+    schema:name "Bioschemas ChemicalSubstance RO-Crate Profile — self-contained 0.5-DRAFT binding" ;
+    schema:version "0.5-DRAFT+rocrate-self-contained.1" ;
+    prof:isProfileOf <https://w3id.org/ro/crate/1.2> ;
+    schema:hasPart <../index.html>, <chemical-substance.shacl.ttl>, <../profile/resolved-profile.jsonld>, <../profile/original-bioschemas-profile-snapshot.json>, <../guidance/offline-embedding.md> .
+
+<https://w3id.org/ro/crate/1.2> a prof:Profile, schema:CreativeWork ; schema:name "RO-Crate 1.2" ; schema:version "1.2" .
+<https://www.w3.org/TR/shacl/> a prof:Profile, schema:CreativeWork, schema:Standard ; schema:name "Shapes Constraint Language (SHACL)" .
+rdf:Property a rdfs:Class, schema:DefinedTerm ; schema:name "RDF Property" .
+rdfs:Class a rdfs:Class, schema:DefinedTerm ; schema:name "RDFS Class" .
+dct:conformsTo a rdf:Property, schema:DefinedTerm ; schema:name "conformsTo" .
+prof:Profile a rdfs:Class, schema:DefinedTerm ; schema:name "Profile" .
+prof:ResourceDescriptor a rdfs:Class, schema:DefinedTerm ; schema:name "ResourceDescriptor" .
+prof:ResourceRole a rdfs:Class, schema:DefinedTerm ; schema:name "ResourceRole" .
+prof:isProfileOf a rdf:Property, schema:DefinedTerm ; schema:name "isProfileOf" .
+prof:hasResource a rdf:Property, schema:DefinedTerm ; schema:name "hasResource" .
+prof:hasRole a rdf:Property, schema:DefinedTerm ; schema:name "hasRole" .
+prof:hasArtifact a rdf:Property, schema:DefinedTerm ; schema:name "hasArtifact" .
+<http://purl.obolibrary.org/obo/CHEBI_59999> a schema:DefinedTerm ; schema:name "chemical substance" ; schema:termCode "CHEBI:59999" ; schema:description "A portion of matter of constant composition, composed of molecular entities of the same type or of different types." .
+<http://www.w3.org/ns/dx/prof/role/specification> a schema:DefinedTerm, prof:ResourceRole ; schema:name "Specification" ; schema:description "Defines the profile in human-readable form." .
+<http://www.w3.org/ns/dx/prof/role/guidance> a schema:DefinedTerm, prof:ResourceRole ; schema:name "Guidance" ; schema:description "Documents how to use the profile." .
+<http://www.w3.org/ns/dx/prof/role/schema> a schema:DefinedTerm, prof:ResourceRole ; schema:name "Schema" ; schema:description "Provides a machine-readable structural description of the profile." .
+<http://www.w3.org/ns/dx/prof/role/validation> a schema:DefinedTerm, prof:ResourceRole ; schema:name "Validation" ; schema:description "Supplies constraints for verifying conformance." .
+<http://www.w3.org/ns/dx/prof/role/vocabulary> a schema:DefinedTerm, prof:ResourceRole ; schema:name "Vocabulary" ; schema:description "Defines or catalogues terms used by the profile." .
+schema:BioChemEntity a rdfs:Class, schema:DefinedTerm ; schema:name "BioChemEntity" ; schema:description "A biological, chemical or biochemical entity." .
+schema:ChemicalSubstance a rdfs:Class, schema:DefinedTerm ; schema:name "ChemicalSubstance" ; schema:description "A portion of matter of constant composition, composed of molecular entities of the same type or of different types." .
+schema:CreativeWork a rdfs:Class, schema:DefinedTerm ; schema:name "CreativeWork" ; schema:description "The most generic kind of creative work." .
+schema:Dataset a rdfs:Class, schema:DefinedTerm ; schema:name "Dataset" ; schema:description "A body of structured information describing some topic or topics of interest." .
+schema:DefinedTerm a rdfs:Class, schema:DefinedTerm ; schema:name "DefinedTerm" ; schema:description "A word, name, acronym, phrase, or other term from a defined vocabulary." .
+schema:Gene a rdfs:Class, schema:DefinedTerm ; schema:name "Gene" ; schema:description "A gene." .
+schema:ImageObject a rdfs:Class, schema:DefinedTerm ; schema:name "ImageObject" ; schema:description "An image file or image resource." .
+schema:MediaObject a rdfs:Class, schema:DefinedTerm ; schema:name "MediaObject" ; schema:description "A media object, encoded as a file or other media resource." .
+schema:MolecularEntity a rdfs:Class, schema:DefinedTerm ; schema:name "MolecularEntity" ; schema:description "A molecular entity." .
+schema:PropertyValue a rdfs:Class, schema:DefinedTerm ; schema:name "PropertyValue" ; schema:description "A property-value pair used to represent identifiers and other structured values." .
+schema:Protein a rdfs:Class, schema:DefinedTerm ; schema:name "Protein" ; schema:description "A protein." .
+schema:WebPage a rdfs:Class, schema:DefinedTerm ; schema:name "WebPage" ; schema:description "A web page." .
+schema:about a rdf:Property, schema:DefinedTerm ; schema:name "about" ; schema:description "The subject matter of a creative work." .
+schema:alternateName a rdf:Property, schema:DefinedTerm ; schema:name "alternateName" ; schema:description "An alias for the item." .
+schema:bioChemInteraction a rdf:Property, schema:DefinedTerm ; schema:name "bioChemInteraction" ; schema:description "A BioChemEntity known to interact with this item. Every referenced entity must be described in the crate graph." .
+schema:bioChemSimilarity a rdf:Property, schema:DefinedTerm ; schema:name "bioChemSimilarity" ; schema:description "A similar biochemical entity. Every referenced entity must be described in the crate graph." .
+schema:biologicalRole a rdf:Property, schema:DefinedTerm ; schema:name "biologicalRole" ; schema:description "A role played by the entity in a biological context. Terms must be embedded as contextual entities." .
+schema:chemicalComposition a rdf:Property, schema:DefinedTerm ; schema:name "chemicalComposition" ; schema:description "The identity and relative ratio of the chemical elements that make up the substance; an approximation is acceptable." .
+schema:chemicalRole a rdf:Property, schema:DefinedTerm ; schema:name "chemicalRole" ; schema:description "A role played by the entity in a chemical context. Terms must be embedded as contextual entities." .
+schema:description a rdf:Property, schema:DefinedTerm ; schema:name "description" ; schema:description "A description of the item." .
+schema:disambiguatingDescription a rdf:Property, schema:DefinedTerm ; schema:name "disambiguatingDescription" ; schema:description "A short description used to distinguish the item from similar items." .
+schema:hasBioChemEntityPart a rdf:Property, schema:DefinedTerm ; schema:name "hasBioChemEntityPart" ; schema:description "A BioChemEntity that is a part of this substance. Every referenced entity must be described in the crate graph." .
+schema:hasPart a rdf:Property, schema:DefinedTerm ; schema:name "hasPart" ; schema:description "A resource that is included in this item." .
+schema:identifier a rdf:Property, schema:DefinedTerm ; schema:name "identifier" ; schema:description "Any kind of identifier for the substance. It may be represented as text, an IRI, or a PropertyValue contextual entity." .
+schema:image a rdf:Property, schema:DefinedTerm ; schema:name "image" ; schema:description "An image of the item. Every referenced image or media object must be represented in the crate graph." .
+schema:mainEntity a rdf:Property, schema:DefinedTerm ; schema:name "mainEntity" ; schema:description "The primary entity described by a creative work or dataset." .
+schema:name a rdf:Property, schema:DefinedTerm ; schema:name "name" ; schema:description "The name of the substance." .
+schema:potentialUse a rdf:Property, schema:DefinedTerm ; schema:name "potentialUse" ; schema:description "An intended use of the BioChemEntity by humans. Terms must be embedded as contextual entities." .
+schema:sameAs a rdf:Property, schema:DefinedTerm ; schema:name "sameAs" ; schema:description "A reference page that unambiguously indicates the item identity. Every referenced page must be described in the crate graph." .
+schema:url a rdf:Property, schema:DefinedTerm ; schema:name "url" ; schema:description "A URL for the substance. In this offline profile, every URL node must also be described in the crate graph." .
+schema:version a rdf:Property, schema:DefinedTerm ; schema:name "version" ; schema:description "The version of a creative work, product, or software item." .

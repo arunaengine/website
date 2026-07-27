@@ -1,0 +1,15 @@
+# Distilled from cs:InCrateEntityShape, which eleven shapes reference. One
+# referenced shape reached by many paths must yield exactly one entity rule.
+@prefix ex:     <http://example.org/> .
+@prefix schema: <http://schema.org/> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+ex:PersonShape a sh:NodeShape ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path schema:name ; sh:minCount 1 ; sh:datatype xsd:string ] .
+
+ex:DatasetShape a sh:NodeShape ;
+    sh:property [ sh:path schema:creator ; sh:minCount 1 ; sh:node ex:PersonShape ] ;
+    sh:property [ sh:path schema:contributor ; sh:node ex:PersonShape ] ;
+    sh:property [ sh:path schema:editor ; sh:node ex:PersonShape ] .
