@@ -1,35 +1,22 @@
 <script setup lang="ts">
-import { computed, type Component } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { orcidOf, rorOf } from '@/lib/identifiers'
 import { isHttpUrl } from '@/lib/utils'
-import type { ContextualEntity, ContextualGroupKey } from '@/lib/contextualEntities'
-import { AppWindow, BookOpen, Building2, MapPin, MessageSquare, Scale, Shapes, Tag, User } from '@lucide/vue'
+import type { ContextualEntity } from '@/lib/contextualEntities'
+import { Building2, User } from '@lucide/vue'
 
 // Fixed three-slot layout (identity / context / identifiers): the context line
 // keeps a minimum height even when empty so the identifier row aligns across
 // every card of a grid. Non-HTTP ids never link; they live in the name tooltip.
 const props = defineProps<{
   entity: ContextualEntity
-  group: ContextualGroupKey
+  kind: 'people' | 'organizations'
   highlight?: boolean
 }>()
 const emit = defineEmits<{ (e: 'jump', id: string): void }>()
-
-const ICONS: Record<ContextualGroupKey, Component> = {
-  people: User,
-  organizations: Building2,
-  publications: BookOpen,
-  licenses: Scale,
-  software: AppWindow,
-  places: MapPin,
-  terms: Tag,
-  comments: MessageSquare,
-  other: Shapes,
-}
-const icon = computed(() => ICONS[props.group])
 
 function hostOf(url: string): string {
   try {
@@ -44,7 +31,6 @@ const contextText = computed(() => {
   if (entity.address) return entity.address
   if (entity.url) return hostOf(entity.url)
   if (entity.description) return entity.description
-  if (props.group === 'licenses') return entity.id
   return ''
 })
 
@@ -63,7 +49,7 @@ const idLink = computed(() => {
     :class="highlight ? 'ring-2 ring-primary/40' : ''"
   >
     <div class="flex min-w-0 items-center gap-1.5">
-      <component :is="icon" class="h-3.5 w-3.5 shrink-0 text-primary/70" />
+      <component :is="kind === 'people' ? User : Building2" class="h-3.5 w-3.5 shrink-0 text-primary/70" />
       <span class="min-w-0 truncate text-sm font-medium text-foreground" :title="entity.id">{{ entity.name }}</span>
       <span v-if="entity.version" class="shrink-0 text-xs text-muted-foreground">{{ entity.version }}</span>
       <span v-if="entity.roles.length" class="ml-auto flex shrink-0 gap-1">

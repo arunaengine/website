@@ -5,7 +5,9 @@ import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
-import ContextualEntitiesSection from '@/components/metadata/ContextualEntitiesSection.vue'
+import DetailsSection from '@/components/metadata/DetailsSection.vue'
+import PeopleSection from '@/components/metadata/PeopleSection.vue'
+import ContextSection from '@/components/metadata/ContextSection.vue'
 import CrateImportExport from '@/components/metadata/CrateImportExport.vue'
 import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
 import SubcratesSection from '@/components/metadata/SubcratesSection.vue'
@@ -27,7 +29,7 @@ import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
@@ -37,7 +39,9 @@ import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { formatBytes, isHttpUrl, relativeTime } from '@/lib/utils'
 import { metaWatchPathPrefix } from '@/lib/watches'
-import { parseRunCrate } from '@/lib/runCrate'
+import { parseRunCrate, runClaimedIds } from '@/lib/runCrate'
+import { presentCrate } from '@/lib/cratePresenter'
+import { licenseLabelOf } from '@/lib/licenses'
 import { crateGraph, crateRootId, dataEntitiesOf, stringProp, type DataEntity } from '@/lib/dataEntities'
 import { isProjectCrate, subcrateLinksOf } from '@/lib/subcrates'
 import { useCrateReferences } from '@/composables/useCrateReferences'
@@ -237,25 +241,59 @@ watch(
 const subcrateIris = computed(() => new Set(subcrateLinksOf(currentCrate.value).map((link) => link.iri)))
 const projectCrate = computed(() => isProjectCrate(currentCrate.value))
 
-// The Subcrates section owns the whole linking mechanism, so the contextual
-// listing skips the linked iris and their subjectOf CreativeWork stubs.
+// Ids other sections own: the Subcrates section's linked iris (plus their
+// subjectOf CreativeWork stubs) and the run provenance panel's entities.
 const contextualExclude = computed(() => {
   const ids = new Set<string>()
   for (const link of subcrateLinksOf(currentCrate.value)) {
     ids.add(link.iri)
     if (link.subjectOf) ids.add(link.subjectOf)
   }
+  const run = runProvenance.value
+  if (run) for (const id of runClaimedIds(run)) ids.add(id)
   return ids
 })
 
-// The hero License tile prefers the in-crate license entity's display name
-// (e.g. kadi4mat's CC license node) over the bare IRI.
+// Hero License tile: the in-crate license entity's display name, then a
+// well-known SPDX / CC label, then the readable IRI tail — never a bare URL.
 const licenseLabel = computed(() => {
   const iri = current.value?.license
   if (!iri) return ''
   const entity = crateGraph(currentCrate.value).find((e) => e['@id'] === iri)
-  return stringProp(entity?.name) || ''
+  return licenseLabelOf(iri, stringProp(entity?.name))
 })
+
+// The document's profile rules label and order the presented fields. The
+// catalog summary parse is applied immediately; loading the profile's own
+// crate refines it in place (fullCrates is reactive, so labels upgrade live).
+watch(
+  () => currentProfile.value?.documentId,
+  (id) => {
+    if (id) void loadRoCrate(id).catch(() => undefined)
+  },
+  { immediate: true },
+)
+
+const presentation = computed(() =>
+  presentCrate(currentCrate.value, {
+    excludeIds: contextualExclude.value,
+    profile: currentProfile.value?.entityRules ?? [],
+  }),
+)
+
+// Cross-section entity jump with a transient highlight ring; sections expand
+// their capped lists when the target is hidden behind a cap.
+const highlightId = ref('')
+let highlightTimer: number | undefined
+function jumpEntity(id: string) {
+  highlightId.value = id
+  void nextTick(() => {
+    document.getElementById(`ctx-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    window.clearTimeout(highlightTimer)
+    highlightTimer = window.setTimeout(() => (highlightId.value = ''), 1800)
+  })
+}
+watch(detailId, () => (highlightId.value = ''))
 
 // The union of entities referenced from the root's hasPart and every File/Dataset
 // entity (excluding the root, the metadata descriptor and subcrate links).
@@ -542,8 +580,8 @@ function entitySize(row: DataEntity): string {
             <div class="surface-muted p-3">
               <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">License</dt>
               <dd class="mt-1 truncate text-sm">
-                <ExternalLink v-if="current.license && isHttpUrl(current.license)" :href="current.license" :label="licenseLabel || 'License'" class="font-medium" :title="current.license" />
-                <span v-else-if="current.license" class="font-medium text-foreground" :title="current.license">{{ licenseLabel || current.license }}</span>
+                <ExternalLink v-if="current.license && isHttpUrl(current.license)" :href="current.license" :label="licenseLabel" class="font-medium" :title="current.license" />
+                <span v-else-if="current.license" class="font-medium text-foreground" :title="current.license">{{ licenseLabel }}</span>
                 <span v-else class="text-muted-foreground">Not set</span>
               </dd>
             </div>
@@ -557,15 +595,28 @@ function entitySize(row: DataEntity): string {
 
       <!-- Crate + referenced data for any resolved document (keyed on detailId). -->
       <template v-if="docState === 'found'">
-        <ContextualEntitiesSection
-          :crate="currentCrate"
-          :document-id="detailId"
-          :exclude-ids="contextualExclude"
+        <DetailsSection
+          :fields="presentation.fields"
           :loading="loadingCrate"
           :preparing="Boolean(cratePending[detailId])"
           :not-ready="crateNotReady"
           :error="crateError"
           @retry="fetchCrate(detailId)"
+          @jump="jumpEntity"
+        />
+
+        <PeopleSection
+          :people="presentation.people"
+          :organizations="presentation.organizations"
+          :highlight-id="highlightId"
+          @jump="jumpEntity"
+        />
+
+        <ContextSection
+          :entities="presentation.entities"
+          :comments="presentation.comments"
+          :highlight-id="highlightId"
+          @jump="jumpEntity"
         />
 
         <SubcratesSection
