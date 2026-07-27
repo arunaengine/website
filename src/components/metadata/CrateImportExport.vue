@@ -25,12 +25,8 @@ const props = defineProps<{
   documentId: string
   // Write permission heuristic from the parent; the backend still enforces it.
   canImport: boolean
-  loading?: boolean
-  preparing?: boolean
-  notReady?: boolean
-  error?: string | null
 }>()
-const emit = defineEmits<{ (e: 'retry'): void; (e: 'imported'): void }>()
+const emit = defineEmits<{ (e: 'imported'): void }>()
 
 const { saving, replaceMetadataRoCrate } = useAruna()
 
@@ -45,14 +41,19 @@ const importing = ref(false)
 const pendingImport = ref<CrateImportPreview | null>(null)
 const importedSummary = ref<{ rootName: string; entityCount: number } | null>(null)
 
-// The page header's Import action opens the panel from outside; the section
-// sits mid-page, so scroll it into view.
+// The page header's dropdown opens this panel from outside; the section sits
+// at the bottom of the page, so scroll it into view.
 function openImport() {
   if (!props.canImport) return
   importOpen.value = true
   requestAnimationFrame(() => sectionEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
 }
-defineExpose({ openImport })
+
+function openRaw() {
+  showCrate.value = true
+  requestAnimationFrame(() => sectionEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+}
+defineExpose({ openImport, openRaw })
 
 // Navigating to another document resets the whole surface; stale previews must
 // never replace a different crate.
@@ -154,14 +155,6 @@ async function confirmImport() {
         <Copy v-else class="size-3.5" />
       </Button>
     </div>
-
-    <div v-if="loading && preparing" class="mt-3 text-xs text-muted-foreground">Preparing the crate…</div>
-    <div v-else-if="loading" class="mt-3 text-xs text-muted-foreground">Loading full RO-Crate…</div>
-    <div v-if="notReady" class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-      <span>The crate is still being prepared.</span>
-      <Button variant="outline" size="sm" @click="emit('retry')">Retry</Button>
-    </div>
-    <div v-if="error" class="mt-3 text-xs text-destructive">{{ error }}</div>
 
     <pre
       v-if="showCrate"

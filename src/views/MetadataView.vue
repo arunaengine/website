@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
+import ContextualEntitiesSection from '@/components/metadata/ContextualEntitiesSection.vue'
 import CrateImportExport from '@/components/metadata/CrateImportExport.vue'
 import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
 import SubcratesSection from '@/components/metadata/SubcratesSection.vue'
@@ -43,7 +44,7 @@ import { useCrateReferences } from '@/composables/useCrateReferences'
 import type { CrateObjectReference } from '@/lib/crateReferences'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { useJobs } from '@/composables/useJobs'
-import { ArrowDownUp, ArrowLeft, ChevronDown, FileArchive, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star, Upload } from '@lucide/vue'
+import { ArrowDownUp, ArrowLeft, ChevronDown, Code2, FileArchive, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star, Upload } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -235,6 +236,26 @@ watch(
 // their own section; the Referenced data table below excludes them.
 const subcrateIris = computed(() => new Set(subcrateLinksOf(currentCrate.value).map((link) => link.iri)))
 const projectCrate = computed(() => isProjectCrate(currentCrate.value))
+
+// The Subcrates section owns the whole linking mechanism, so the contextual
+// listing skips the linked iris and their subjectOf CreativeWork stubs.
+const contextualExclude = computed(() => {
+  const ids = new Set<string>()
+  for (const link of subcrateLinksOf(currentCrate.value)) {
+    ids.add(link.iri)
+    if (link.subjectOf) ids.add(link.subjectOf)
+  }
+  return ids
+})
+
+// The hero License tile prefers the in-crate license entity's display name
+// (e.g. kadi4mat's CC license node) over the bare IRI.
+const licenseLabel = computed(() => {
+  const iri = current.value?.license
+  if (!iri) return ''
+  const entity = crateGraph(currentCrate.value).find((e) => e['@id'] === iri)
+  return stringProp(entity?.name) || ''
+})
 
 // The union of entities referenced from the root's hasPart and every File/Dataset
 // entity (excluding the root, the metadata descriptor and subcrate links).
@@ -455,6 +476,17 @@ function entitySize(row: DataEntity): string {
                 </span>
               </DropdownMenuItem>
             </template>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
+              @click="crateSection?.openRaw()"
+            >
+              <Code2 class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-foreground">View raw JSON-LD</span>
+                <span class="block text-xs leading-relaxed text-muted-foreground">Jumps to the raw RO-Crate JSON at the bottom of the page and expands it.</span>
+              </span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
@@ -510,8 +542,8 @@ function entitySize(row: DataEntity): string {
             <div class="surface-muted p-3">
               <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">License</dt>
               <dd class="mt-1 truncate text-sm">
-                <ExternalLink v-if="current.license && isHttpUrl(current.license)" :href="current.license" label="License" class="font-medium" />
-                <span v-else-if="current.license" class="font-medium text-foreground">{{ current.license }}</span>
+                <ExternalLink v-if="current.license && isHttpUrl(current.license)" :href="current.license" :label="licenseLabel || 'License'" class="font-medium" :title="current.license" />
+                <span v-else-if="current.license" class="font-medium text-foreground" :title="current.license">{{ licenseLabel || current.license }}</span>
                 <span v-else class="text-muted-foreground">Not set</span>
               </dd>
             </div>
@@ -525,17 +557,15 @@ function entitySize(row: DataEntity): string {
 
       <!-- Crate + referenced data for any resolved document (keyed on detailId). -->
       <template v-if="docState === 'found'">
-        <CrateImportExport
-          ref="crateSection"
+        <ContextualEntitiesSection
           :crate="currentCrate"
           :document-id="detailId"
-          :can-import="canWrite"
+          :exclude-ids="contextualExclude"
           :loading="loadingCrate"
           :preparing="Boolean(cratePending[detailId])"
           :not-ready="crateNotReady"
           :error="crateError"
           @retry="fetchCrate(detailId)"
-          @imported="onSaved"
         />
 
         <SubcratesSection
@@ -645,6 +675,14 @@ function entitySize(row: DataEntity): string {
             </li>
           </ul>
         </section>
+
+        <CrateImportExport
+          ref="crateSection"
+          :crate="currentCrate"
+          :document-id="detailId"
+          :can-import="canWrite"
+          @imported="onSaved"
+        />
       </template>
 
       <div v-else-if="docState === 'loading'" class="surface p-12 text-center text-sm text-muted-foreground">
