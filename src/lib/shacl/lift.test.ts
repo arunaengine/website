@@ -6,6 +6,13 @@ import { shapesFromEntityRules } from './projection'
 import { normalizeTypeUri, sameSchemaOrgType } from '../profiles/uri'
 import type { ProfileEntityRule } from '../profiles/types'
 
+const PREFIXES = [
+  '@prefix ex: <http://example.org/> .',
+  '@prefix schema: <http://schema.org/> .',
+  '@prefix sh: <http://www.w3.org/ns/shacl#> .',
+  '@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .',
+]
+
 function fixture(name: string): string {
   return readFileSync(fileURLToPath(new URL(`./__fixtures__/${name}`, import.meta.url)), 'utf8')
 }
@@ -117,6 +124,74 @@ describe('diamonds and cycles', () => {
     const result = lift('cycle.ttl')
     expect(result.entities.map((entity) => entity.className).sort()).toEqual(['Dataset', 'Organization', 'Person'])
     expect(ruleFor(entityFor(result, 'http://schema.org/Person'), 'knows')?.entityTypes)
+      .toEqual(['http://schema.org/Person'])
+    expect(danglingRules(result)).toEqual([])
+  })
+})
+
+// A base lattice: every shape on a level composes every shape on the next one.
+// Composition that is not memoized walks width^depth distinct paths through it.
+function lattice(width: number, depth: number): string {
+  const level = (index: number) => Array.from({ length: width }, (_, node) => `ex:L${index}N${node}`).join(', ')
+  const lines = [
+    ...PREFIXES,
+    `ex:TopShape a sh:NodeShape ; sh:class schema:Person ; sh:node ${level(0)} ;`,
+    '    sh:property [ sh:path schema:name ; sh:datatype xsd:string ] .',
+  ]
+  for (let index = 0; index < depth; index++) {
+    for (let node = 0; node < width; node++) {
+      const bases = index + 1 < depth ? `sh:node ${level(index + 1)} ;` : ''
+      lines.push(`ex:L${index}N${node} a sh:NodeShape ; ${bases}`)
+      lines.push(`    sh:property [ sh:path schema:p${index}x${node} ; sh:datatype xsd:string ] .`)
+    }
+  }
+  return lines.join('\n')
+}
+
+// One straight composition chain, deeper than the inheritance cap allows.
+function deepChain(depth: number): string {
+  const lines = [
+    ...PREFIXES,
+    'ex:TopShape a sh:NodeShape ; sh:class schema:Person ; sh:node ex:D0 ;',
+    '    sh:property [ sh:path schema:name ; sh:datatype xsd:string ] .',
+  ]
+  for (let index = 0; index < depth; index++) {
+    const base = index + 1 < depth ? `sh:node ex:D${index + 1} ;` : ''
+    lines.push(`ex:D${index} a sh:NodeShape ; ${base}`)
+    lines.push(`    sh:property [ sh:path schema:d${index} ; sh:datatype xsd:string ] .`)
+  }
+  return lines.join('\n')
+}
+
+describe('wide base lattices', () => {
+  it('composes each shape once', { timeout: 10_000 }, () => {
+    // Without memoization this walks 4^12 paths, which hangs the tab.
+    const result = liftShapes(lattice(4, 12))
+    const person = entityFor(result, 'http://schema.org/Person')
+    expect(person?.propertyRules).toHaveLength(4 * 12 + 1)
+    expect(ruleFor(person, 'p11x3')).toBeDefined()
+  })
+})
+
+describe('the inheritance depth cap', () => {
+  it('reports where it cut', () => {
+    const result = liftShapes(deepChain(40))
+    const person = entityFor(result, 'http://schema.org/Person')
+    expect(ruleFor(person, 'd0')).toBeDefined()
+    expect(ruleFor(person, 'd39')).toBeUndefined()
+    const capped = result.notes.find((note) => note.message.includes('levels deep'))
+    expect(capped?.kind).toBe('partial')
+    expect(capped?.scopes).toEqual(['http://example.org/D32'])
+  })
+})
+
+describe('inherited sh:class', () => {
+  it('reaches through the whole chain', () => {
+    const result = lift('class-chain.ttl')
+    expect(result.entities.map((entity) => entity.className).sort()).toEqual(['Dataset', 'Person'])
+    const person = entityFor(result, 'http://schema.org/Person')
+    expect(person?.propertyRules.map((rule) => rule.valueName).sort()).toEqual(['email', 'jobTitle', 'name'])
+    expect(ruleFor(entityFor(result, 'http://schema.org/Dataset'), 'author')?.entityTypes)
       .toEqual(['http://schema.org/Person'])
     expect(danglingRules(result)).toEqual([])
   })

@@ -1,0 +1,22 @@
+# A three-shape composition chain where only the DEEPEST shape names the class.
+# sh:class is a constraint, so it reaches every shape composing that base.
+@prefix ex:     <http://example.org/> .
+@prefix schema: <http://schema.org/> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+ex:PersonBaseShape a sh:NodeShape ;
+    sh:class schema:Person ;
+    sh:property [ sh:path schema:name ; sh:minCount 1 ; sh:datatype xsd:string ] .
+
+ex:ContactShape a sh:NodeShape ;
+    sh:node ex:PersonBaseShape ;
+    sh:property [ sh:path schema:email ; sh:datatype xsd:string ] .
+
+ex:AuthorShape a sh:NodeShape ;
+    sh:node ex:ContactShape ;
+    sh:property [ sh:path schema:jobTitle ; sh:datatype xsd:string ] .
+
+ex:RootShape a sh:NodeShape ;
+    sh:targetClass schema:Dataset ;
+    sh:property [ sh:path schema:author ; sh:node ex:AuthorShape ] .
