@@ -34,7 +34,9 @@ export interface JobErrorResponse {
 
 export interface JobStatusResponse {
   job_id: string // ULID
-  kind: string // JobPayload discriminant; only 'probe' exists today
+  // JobPayload::kind(): probe | execution | staging | import_rocrate |
+  // export_rocrate | write_run_crate | terminal_cleanup. Kept open for new kinds.
+  kind: string
   state: JobState
   attempts: number
   cancel_requested: boolean

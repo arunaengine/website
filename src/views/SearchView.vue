@@ -8,17 +8,19 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
+import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
 import CatalogCard from '@/components/metadata/CatalogCard.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useJobs } from '@/composables/useJobs'
 import { useDebounceFn } from '@vueuse/core'
 import { formatNumber, shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { conformsToProcessRun } from '@/lib/profiles/builtinProfiles'
-import { Search, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound } from '@lucide/vue'
+import { Search, FileArchive, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound } from '@lucide/vue'
 import type { MetadataDoc, SparqlResult } from '@/data/types'
 import type { BucketSearchHit, MetadataDocumentListItem, UserSearchHit } from '@/lib/api'
 import type { RouteLocationRaw } from 'vue-router'
@@ -102,6 +104,8 @@ const expertMode = ref(queryString(route.query.expert) === '1')
 const favBusy = ref<Set<string>>(new Set())
 const favError = ref<string | null>(null)
 const showNewDataset = ref(false)
+const showCrateImport = ref(false)
+const { jobsEnabled } = useJobs()
 const sparql = ref(`SELECT DISTINCT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 25`)
 const sparqlDistributed = ref(true)
 const sparqlResult = ref<SparqlResult | null>(null)
@@ -572,6 +576,9 @@ async function runQuery() {
     >
       <template #actions>
         <Button :disabled="!currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
+        <Button v-if="currentUser && jobsEnabled" variant="outline" title="Upload an RO-Crate zip and import it" @click="showCrateImport = true">
+          <FileArchive class="h-4 w-4" /> Import ZIP
+        </Button>
         <div class="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
           <Code2 class="h-3.5 w-3.5 text-muted-foreground" />
           <span class="text-xs text-foreground/80">SPARQL</span>
@@ -935,5 +942,6 @@ async function runQuery() {
     </div>
 
     <NewDatasetDialog v-model:open="showNewDataset" @created="(doc) => router.push({ name: 'metadata-detail', params: { id: doc.ulid } })" />
+    <CrateTransferDialog v-model:open="showCrateImport" mode="import" />
   </div>
 </template>

@@ -6,6 +6,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
 import CrateImportExport from '@/components/metadata/CrateImportExport.vue'
+import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
 import SubcratesSection from '@/components/metadata/SubcratesSection.vue'
 import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import AuthorChips from '@/components/metadata/AuthorChips.vue'
@@ -35,7 +36,8 @@ import { isProjectCrate, subcrateLinksOf } from '@/lib/subcrates'
 import { useCrateReferences } from '@/composables/useCrateReferences'
 import type { CrateObjectReference } from '@/lib/crateReferences'
 import { downloadCrateJson } from '@/lib/crateImport'
-import { ArrowLeft, Download, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star, Upload } from '@lucide/vue'
+import { useJobs } from '@/composables/useJobs'
+import { ArrowLeft, Download, FileArchive, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star, Upload } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,6 +57,9 @@ const {
   fullCrates,
   cratePending,
 } = useAruna()
+
+const { jobsEnabled } = useJobs()
+const showCrateExport = ref(false)
 
 const isFav = computed(() => Boolean(currentUser.value?.favouriteMetadataIds?.includes(detailId.value)))
 const favBusy = ref(false)
@@ -406,6 +411,14 @@ function entitySize(row: DataEntity): string {
         >
           <Download class="h-4 w-4" /> Export
         </Button>
+        <Button
+          v-if="docState === 'found' && currentUser && jobsEnabled"
+          variant="outline"
+          title="Package this document and its data into an RO-Crate zip"
+          @click="showCrateExport = true"
+        >
+          <FileArchive class="h-4 w-4" /> Export ZIP
+        </Button>
         <Button v-if="docState === 'found' && canWrite" variant="outline" title="Replace this document's crate with an imported one" @click="crateSection?.openImport()">
           <Upload class="h-4 w-4" /> Import
         </Button>
@@ -639,6 +652,8 @@ function entitySize(row: DataEntity): string {
     />
 
     <EditMetadataDialog v-if="current" v-model:open="showEdit" :document-id="current.ulid" :profile="currentProfile" @saved="onSaved" />
+
+    <CrateTransferDialog v-model:open="showCrateExport" mode="export" :document-id="detailId" :document-path="currentPath" />
 
     <Dialog :open="showDelete" @update:open="(v: boolean) => (showDelete = v)">
       <DialogContent class="max-w-md">
