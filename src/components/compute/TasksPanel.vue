@@ -96,6 +96,7 @@ const GROUP_LABELS: Record<StateFilterGroup, string> = {
 }
 const stateGroup = ref<StateGroup>('all')
 
+const tasks = ref<TesTask[]>([])
 const { hide, unhide, isHidden } = useHiddenTasks()
 const hiddenTasks = computed(() => tasks.value.filter((task) => isHidden(task.id)))
 const shownTasks = computed(() => tasks.value.filter((task) => !isHidden(task.id)))
@@ -144,7 +145,6 @@ function confirmRowDelete(id: string) {
 }
 
 // ── Task list ────────────────────────────────────────────────────────────────
-const tasks = ref<TesTask[]>([])
 const listState = ref<'idle' | 'loading' | 'ready' | 'error' | 'unsupported' | 'signed-out'>('idle')
 const listError = ref<string | null>(null)
 const nextPageToken = ref<string | undefined>(undefined)
