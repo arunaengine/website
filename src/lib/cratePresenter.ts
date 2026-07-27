@@ -203,8 +203,9 @@ function literalValue(text: string): PresentedValue {
     const parsed = Date.parse(text)
     if (Number.isFinite(parsed)) return { text: `${dateTimeFormat.format(parsed)} UTC`, title: text }
   }
+  const long = text.length > LONG_TEXT
   if (isHttpUrl(text)) return { text, href: text }
-  return text.length > LONG_TEXT ? { text, long: true } : { text }
+  return long ? { text, long: true } : { text }
 }
 
 function pointerValue(id: string, target: Record<string, unknown> | undefined, homes: Map<string, Home>): PresentedValue {
