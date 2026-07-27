@@ -9,6 +9,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
+import Switch from '@/components/ui/Switch.vue'
 import { computed, ref, useId, watch } from 'vue'
 import { Cable, CheckCircle2, Loader2, PlugZap, ShieldAlert, XCircle } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
@@ -36,12 +37,19 @@ interface FieldSpec {
   placeholder?: string
 }
 
+// A kind's optional boolean public-config key, written as "true" or omitted.
+interface ToggleSpec {
+  key: string
+  label: string
+  hint: string
+}
+
 // Mirrors the backend allowlists in aruna operations/src/connectors/
 // validation.rs (rules_for_kind). `aruna_native` is rejected by
 // validate_connector_input, so it is not offered here.
 const KIND_SCHEMAS: Record<
   Exclude<SourceConnectorKind, 'aruna_native'>,
-  { label: string; public: FieldSpec[]; secret: FieldSpec[] }
+  { label: string; public: FieldSpec[]; secret: FieldSpec[]; toggle?: ToggleSpec }
 > = {
   http: {
     label: 'HTTP(S)',
@@ -67,6 +75,13 @@ const KIND_SCHEMAS: Record<
       { key: 'access_key_id', label: 'Access key ID' },
       { key: 'secret_access_key', label: 'Secret access key' },
     ],
+    // skip_signature="true" sends unsigned requests; the backend rejects it
+    // together with any secret credentials.
+    toggle: {
+      key: 'skip_signature',
+      label: 'Public bucket (no authentication)',
+      hint: 'Requests are sent unsigned; only works for buckets that allow anonymous access.',
+    },
   },
   webdav: {
     label: 'WebDAV',
@@ -106,10 +121,14 @@ const kind = ref<EditableKind>('http')
 // survive a kind switch; the payload only picks the active schema's keys.
 const publicValues = ref<Record<string, string>>({})
 const secretValues = ref<Record<string, string>>({})
+const toggleOn = ref(false)
 const submitError = ref<string | null>(null)
 
 const isEdit = computed(() => Boolean(props.connector))
 const schema = computed(() => KIND_SCHEMAS[kind.value])
+const toggleSpec = computed(() => schema.value.toggle ?? null)
+// An active toggle drops the credentials: the backend rejects the combination.
+const toggleActive = computed(() => toggleSpec.value !== null && toggleOn.value)
 
 const missingRequired = computed(() =>
   schema.value.public.some((field) => field.required && !publicValues.value[field.key]?.trim()),
@@ -118,8 +137,10 @@ const submitDisabled = computed(
   () => saving.value || writesDisabled.value || !name.value.trim() || missingRequired.value,
 )
 
-const secretsEntered = computed(() =>
-  schema.value.secret.some((field) => secretValues.value[field.key]?.trim()),
+const secretsEntered = computed(
+  () =>
+    !toggleActive.value &&
+    schema.value.secret.some((field) => secretValues.value[field.key]?.trim()),
 )
 // PUT is a full replace: stored secrets cannot be read back, so leaving the
 // credential fields blank on an edit removes them.
@@ -136,6 +157,8 @@ watch(
     kind.value = source && source.kind !== 'aruna_native' ? source.kind : 'http'
     publicValues.value = { ...(source?.public_config ?? {}) }
     secretValues.value = {}
+    const toggleKey = KIND_SCHEMAS[kind.value].toggle?.key
+    toggleOn.value = toggleKey !== undefined && source?.public_config[toggleKey] === 'true'
     submitError.value = null
     testResult.value = null
     testError.value = null
@@ -152,11 +175,16 @@ function pick(spec: FieldSpec[], values: Record<string, string>): Record<string,
 }
 
 function requestBody() {
+  const publicConfig = pick(schema.value.public, publicValues.value)
+  const spec = toggleSpec.value
+  // PUT replaces the whole config, so an off toggle omits the key instead of
+  // sending "false".
+  if (spec && toggleOn.value) publicConfig[spec.key] = 'true'
   return {
     name: name.value.trim() || 'connection-test',
     kind: kind.value,
-    public_config: pick(schema.value.public, publicValues.value),
-    secret_config: pick(schema.value.secret, secretValues.value),
+    public_config: publicConfig,
+    secret_config: toggleActive.value ? {} : pick(schema.value.secret, secretValues.value),
   }
 }
 
@@ -187,7 +215,7 @@ async function testConnection() {
 }
 
 // A stale verdict is worse than none: editing any field clears the result.
-watch([kind, publicValues, secretValues], () => {
+watch([kind, publicValues, secretValues, toggleOn], () => {
   testResult.value = null
   testError.value = null
 }, { deep: true })
@@ -255,28 +283,49 @@ async function submit() {
             />
           </div>
 
+          <label v-if="schema.toggle" class="flex items-center justify-between gap-3 text-xs">
+            <span>
+              <span class="font-medium text-foreground">{{ schema.toggle.label }}</span>
+              <span class="block text-[11px] text-muted-foreground">{{ schema.toggle.hint }}</span>
+            </span>
+            <Switch
+              :checked="toggleOn"
+              :aria-label="schema.toggle.label"
+              @update:checked="(v: boolean) => (toggleOn = v)"
+            />
+          </label>
+
           <fieldset class="space-y-3 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">Credentials (optional)</legend>
-            <p class="text-[11px] text-muted-foreground">
-              Stored write-only, the server never returns them.
+            <p v-if="toggleActive" class="text-[11px] text-muted-foreground">
+              A public bucket is read anonymously, so no credentials are sent.
             </p>
-            <div v-for="field in schema.secret" :key="field.key">
-              <label :for="`${uid}-sec-${field.key}`" class="text-xs font-medium text-foreground">{{ field.label }}</label>
-              <Input
-                :id="`${uid}-sec-${field.key}`"
-                :model-value="secretValues[field.key] ?? ''"
-                type="password"
-                autocomplete="new-password"
-                class="mt-1 font-mono text-xs"
-                @update:model-value="(v: string | number) => (secretValues[field.key] = String(v))"
-              />
-            </div>
+            <template v-else>
+              <p class="text-[11px] text-muted-foreground">
+                Stored write-only, the server never returns them.
+              </p>
+              <div v-for="field in schema.secret" :key="field.key">
+                <label :for="`${uid}-sec-${field.key}`" class="text-xs font-medium text-foreground">{{ field.label }}</label>
+                <Input
+                  :id="`${uid}-sec-${field.key}`"
+                  :model-value="secretValues[field.key] ?? ''"
+                  type="password"
+                  autocomplete="new-password"
+                  class="mt-1 font-mono text-xs"
+                  @update:model-value="(v: string | number) => (secretValues[field.key] = String(v))"
+                />
+              </div>
+            </template>
             <div
               v-if="secretsWillBeRemoved"
               class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
             >
               <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
+              <span v-if="toggleActive">
+                This connector has stored credentials that cannot be shown. Saving it as a public
+                bucket removes them.
+              </span>
+              <span v-else>
                 This connector has stored credentials that cannot be shown. Saving replaces the whole
                 secret configuration, leave the fields blank to remove them, or re-enter values to keep
                 credentials on the connector.
