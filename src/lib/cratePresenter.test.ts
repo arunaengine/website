@@ -338,4 +338,10 @@ describe('prettifyKey', () => {
   it('uses uri tails', () => {
     expect(prettifyKey('https://w3id.org/ro/terms/workflow-run#containerImage')).toBe('Container image')
   })
+
+  it('uppercases acronyms', () => {
+    expect(prettifyKey('doi')).toBe('DOI')
+    expect(prettifyKey('url')).toBe('URL')
+    expect(prettifyKey('source_url')).toBe('Source URL')
+  })
 })

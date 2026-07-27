@@ -126,6 +126,13 @@ interface RuleIndex {
   alias: Map<string, string>
 }
 
+// Identifier and format acronyms a lowercase key cannot signal on its own, so
+// `doi` reads "DOI" rather than "Doi". Profile labels always win over this.
+const ACRONYMS = new Set([
+  'api', 'csv', 'doi', 'html', 'id', 'iri', 'isbn', 'issn', 'json', 'md5',
+  'orcid', 'pdf', 'ror', 'sha256', 'uri', 'url', 'xml',
+])
+
 /** Sentence-case display label for a raw JSON-LD key or term URI. */
 export function prettifyKey(key: string): string {
   const spaced = termNameFromUri(key)
@@ -134,11 +141,12 @@ export function prettifyKey(key: string): string {
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
     .trim()
   if (!spaced) return key
-  const words = spaced
-    .split(/\s+/)
-    .map((word, i) => (i > 0 && /^[A-Z][a-z]/.test(word) ? word.charAt(0).toLowerCase() + word.slice(1) : word))
+  const words = spaced.split(/\s+/).map((word, i) => {
+    if (ACRONYMS.has(word.toLowerCase())) return word.toUpperCase()
+    return i > 0 && /^[A-Z][a-z]/.test(word) ? word.charAt(0).toLowerCase() + word.slice(1) : word
+  })
   const joined = words.join(' ')
-  return joined.charAt(0).toUpperCase() + joined.slice(1)
+  return /^[a-z]/.test(joined) ? joined.charAt(0).toUpperCase() + joined.slice(1) : joined
 }
 
 function buildRuleIndex(rules: ProfileEntityRule[]): RuleIndex {
