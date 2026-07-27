@@ -8,11 +8,25 @@ import type { PresentedField, PresentedValue } from '@/lib/cratePresenter'
 const props = defineProps<{ fields: PresentedField[] }>()
 const emit = defineEmits<{ (e: 'jump', id: string): void }>()
 
-const expanded = ref<Record<string, boolean>>({})
+// Expansion is keyed by property identity, not array identity: a poll refresh
+// rebuilds the field array and must not collapse what the reader opened.
+const expanded = ref(new Set<string>())
 watch(
   () => props.fields,
-  () => (expanded.value = {}),
+  (fields) => {
+    const live = new Set(fields.flatMap((field) => field.values.map((_, i) => valueKey(field, i))))
+    for (const key of expanded.value) if (!live.has(key)) expanded.value.delete(key)
+  },
 )
+
+function valueKey(field: PresentedField, index: number): string {
+  return `${field.id}@${index}`
+}
+
+function toggle(key: string): void {
+  if (expanded.value.has(key)) expanded.value.delete(key)
+  else expanded.value.add(key)
+}
 
 function chips(field: PresentedField): boolean {
   return field.values.length > 1 && field.values.every((value) => !value.long)
@@ -27,7 +41,7 @@ function plainTitle(value: PresentedValue): string | undefined {
   <dl class="text-sm">
     <div
       v-for="field in fields"
-      :key="field.key + field.label"
+      :key="field.id"
       class="mb-3 last:mb-0 sm:mb-0 sm:grid sm:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)] sm:gap-x-6 sm:border-b sm:border-border/50 sm:py-2 sm:last:border-b-0"
     >
       <dt class="mb-0.5 flex flex-wrap items-baseline gap-x-1.5 sm:mb-0 sm:pt-px" :title="field.description">
@@ -62,12 +76,12 @@ function plainTitle(value: PresentedValue): string | undefined {
             >{{ value.text }}</button>
             <ExternalLink v-else-if="value.href" :href="value.href" :label="value.text" class="max-w-full truncate" :title="plainTitle(value)" />
             <template v-else-if="value.long">
-              <p class="whitespace-pre-wrap leading-relaxed text-foreground/85" :class="expanded[field.key + i] ? '' : 'line-clamp-3'">{{ value.text }}</p>
+              <p class="whitespace-pre-wrap leading-relaxed text-foreground/85" :class="expanded.has(valueKey(field, i)) ? '' : 'line-clamp-3'">{{ value.text }}</p>
               <button
                 type="button"
                 class="mt-0.5 text-xs font-medium text-primary hover:underline"
-                @click="expanded = { ...expanded, [field.key + i]: !expanded[field.key + i] }"
-              >{{ expanded[field.key + i] ? 'Show less' : 'Show more' }}</button>
+                @click="toggle(valueKey(field, i))"
+              >{{ expanded.has(valueKey(field, i)) ? 'Show less' : 'Show more' }}</button>
             </template>
             <span v-else class="break-words text-foreground/90" :title="plainTitle(value)">{{ value.text }}</span>
           </div>
