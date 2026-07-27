@@ -10,6 +10,7 @@ import {
 } from './projection'
 import { ALL_ENTITY_SOURCES } from '../profiles/sources'
 import { CURATED_ENTITY_TYPES } from '../profiles/entityTypes'
+import { CURATED_PROPERTY_TERMS, type PropertyTermOption } from '../profiles/propertyCatalog'
 import { isHasPartUri } from '../profiles/emit'
 import { isDatasetType, isValidPropertyTermName, sameSchemaOrgType, SCHEMA_ORG, termNameFromUri } from '../profiles/uri'
 import type {
@@ -49,8 +50,13 @@ import type {
 //   repeatable text rule and longtext as text.
 // - sh:in over strings -> enum (select-url serializes identically).
 // - the projection's number form, sh:or ( xsd:double xsd:integer ), is
-//   recognized as one 'number' rule; any other sh:or contributes its FIRST
-//   branch's facets and reports the alternatives as a note.
+//   recognized as one 'number' rule; an sh:or whose branches only pick a type
+//   becomes one rule with every branch as a target type; any other sh:or
+//   contributes its FIRST branch's facets and reports the alternatives as a note.
+// - a value shape (sh:node, or an sh:class naming a shape) supplies the target
+//   type and its rules become that type's own form; where the file names no
+//   type, the shape's name and then the term's documented range are used, and
+//   only a term neither describes falls back to a reference to any Thing.
 
 export interface LiftNote {
   kind: 'partial' | 'no-field'
@@ -73,6 +79,22 @@ const RDF_REST = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#rest'
 const RDF_NIL = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#nil'
 const SCHEMA_DATASET = `${SCHEMA_ORG}Dataset`
 const DCT_CONFORMS_TO = 'http://purl.org/dc/terms/conformsTo'
+const HTTPS_SCHEMA_ORG = 'https://schema.org/'
+
+// schema.org is written both http and https in the wild, and a file may mix the
+// two. The portal's own form is http (uri.ts SCHEMA_ORG), and a profile holding
+// both would bind one compact term to two different URIs, so every term and type
+// IRI is canonicalized as it enters the rule model.
+function canonicalIri(value: string): string {
+  return value.startsWith(HTTPS_SCHEMA_ORG) ? `${SCHEMA_ORG}${value.slice(HTTPS_SCHEMA_ORG.length)}` : value
+}
+
+// The portal's own catalogue entry for a property term: the same value kind and
+// target types the builder applies when an author picks the term by hand, used
+// only where the file itself states nothing.
+function catalogTerm(path: string): PropertyTermOption | undefined {
+  return CURATED_PROPERTY_TERMS.find((term) => sameSchemaOrgType(term.uri, path))
+}
 
 // Key for the group of shapes that describe the crate root: no target and no
 // class of their own, which is the form the projection emits and the form
@@ -269,12 +291,14 @@ export function liftShapes(turtle: string): LiftResult {
     if (targetClasses.length > 1) {
       notes.add('partial', 'Shape targets several classes; rules were imported for the first one only.', name)
     }
-    const targetClass = targetClasses.find((term) => term.termType === 'NamedNode')?.value
+    const targetIri = targetClasses.find((term) => term.termType === 'NamedNode')?.value
+    const targetClass = targetIri ? canonicalIri(targetIri) : undefined
     if (targetClasses.length && !targetClass) {
       notes.add('no-field', 'Shape target class is not a plain IRI, so its rules could not be imported.', name)
     }
-    const nodeClass = store.getQuads(shape, `${SH}class`, null, null)
+    const classIri = store.getQuads(shape, `${SH}class`, null, null)
       .find((quad) => quad.object.termType === 'NamedNode')?.object.value
+    const nodeClass = classIri ? canonicalIri(classIri) : undefined
     const hasTargetNode = store.getQuads(shape, `${SH}targetNode`, null, null).length > 0
 
     const info: ShapeInfo = {
@@ -364,7 +388,7 @@ export function liftShapes(turtle: string): LiftResult {
     for (const shape of group.shapes) {
       for (const propertyShape of shape.propertyShapes) {
         const paths = store.getQuads(propertyShape, `${SH}path`, null, null).map((quad) => quad.object)
-        const path = paths.length === 1 && paths[0].termType === 'NamedNode' ? paths[0].value : undefined
+        const path = paths.length === 1 && paths[0].termType === 'NamedNode' ? canonicalIri(paths[0].value) : undefined
         if (!path) {
           notes.add('no-field', paths.length
             ? 'A property uses a SHACL path expression (a sequence, alternative or inverse path) that no single input can represent.'
@@ -447,6 +471,11 @@ interface Facets {
   // sh:node objects kept as terms, so an inline (blank) value shape stays
   // distinguishable from a named one.
   nodeTargets: Term[]
+  // Classes and shapes an sh:or offers as ALTERNATIVE targets — a genuine union
+  // the rule model expresses as several target types, unlike the conjunctive
+  // facets above.
+  unionClasses: string[]
+  unionNodes: Term[]
   nodeKindIri: boolean
   inOptions?: string[]
   patterns: string[]
@@ -458,7 +487,7 @@ interface Facets {
 }
 
 function emptyFacets(): Facets {
-  return { nodeTargets: [], nodeKindIri: false, patterns: [], numberOr: false }
+  return { nodeTargets: [], unionClasses: [], unionNodes: [], nodeKindIri: false, patterns: [], numberOr: false }
 }
 
 function liftRuleGroup(
@@ -518,9 +547,18 @@ function liftRuleGroup(
 
     for (const quad of store.getQuads(shape, `${SH}hasValue`, null, null)) hasValues.push(quad.object)
     for (const quad of store.getQuads(shape, `${SH}qualifiedValueShape`, null, null)) {
-      const name = readQualifiedName(store, quad.object as Quad_Subject)
-      if (name !== undefined) requiredInstances.push({ name })
-      else notes.add('partial', 'A qualified value shape restricts part of a list in a way the builder cannot edit; it stays in the attached file.', scope)
+      const qualified = quad.object as Quad_Subject
+      const name = readQualifiedName(store, qualified)
+      if (name !== undefined) {
+        requiredInstances.push({ name })
+      } else if (objectValue(store, qualified, `${SH}class`) || store.getQuads(qualified, `${SH}node`, null, null).length) {
+        // The usual form only pins the TYPE of the qualifying entries, which is
+        // exactly this rule's target type; only the "some of them" part is lost.
+        readFacets(store, qualified, facets, scope, notes, true)
+        notes.add('partial', 'Only some of the values have to match the referenced type; the builder applies it to every value.', scope)
+      } else {
+        notes.add('partial', 'A qualified value shape restricts part of a list in a way the builder cannot edit; it stays in the attached file.', scope)
+      }
     }
 
     ruleLabel ||= literalValue(store, shape, `${SH}name`) ?? ''
@@ -634,6 +672,14 @@ function readFacets(
       facets.numberOr = true
       continue
     }
+    // An alternative whose branches only pick a type is a union of target types,
+    // which an entity rule holds in full — no branch is lost, so no note.
+    const union = unionTargets(store, branches)
+    if (union) {
+      facets.unionClasses.push(...union.classes)
+      facets.unionNodes.push(...union.nodes)
+      continue
+    }
     // Any other alternative: take the first branch as the field's shape (it is
     // the primary form in every generator we have seen — the real value, with
     // fallbacks such as "missing" tokens listed after it) and say so.
@@ -668,25 +714,45 @@ function resolveKind(
   let entitySources: ProfilePropertyRule['entitySources']
   let enumOptions: string[] | undefined
 
-  const referencesEntity = Boolean(facets.classIri) || facets.nodeTargets.length > 0 || facets.nodeKindIri
+  const namesTarget =
+    Boolean(facets.classIri) ||
+    facets.nodeTargets.length > 0 ||
+    facets.unionClasses.length > 0 ||
+    facets.unionNodes.length > 0
+  // A term the catalogue describes as holding a URL and referencing nothing
+  // (license, identifier, url, sameAs), with nothing said about it beyond "the
+  // value is an IRI", is that URL — not a reference to an entity of unknown
+  // type. Trade-off: an entity rule on one of those terms that allowed only
+  // external reuse comes back as a URL field, the same form it emitted.
+  const urlCatalog = catalogTerm(path)
+  const urlTerm =
+    !namesTarget &&
+    facets.nodeKindIri &&
+    urlCatalog?.suggestedKind === 'url' &&
+    !urlCatalog.suggestedEntityTypes?.length
+  const referencesEntity = namesTarget || (facets.nodeKindIri && !urlTerm)
 
   if (referencesEntity && !facets.datatype && !facets.inOptions) {
     kind = 'entity'
     const targets: string[] = []
     const addTarget = (uri: string | undefined) => {
-      if (uri && !targets.some((target) => sameSchemaOrgType(target, uri))) targets.push(uri)
+      const canonical = uri && canonicalIri(uri)
+      if (canonical && !targets.some((target) => sameSchemaOrgType(target, canonical))) targets.push(canonical)
     }
+    // A class IRI names the class — unless it points at a shape, which says which
+    // type its values are instead.
+    const classTarget = (uri: string) => index.types.get(termKey(namedNode(uri))) ?? uri
     if (facets.classIri) {
-      // sh:class names the class — unless it points at a shape, which says which
-      // type its values are instead. Projection emits class+node for describe-new
-      // rules; absent entitySources is the stored form of ['new'].
-      addTarget(index.types.get(termKey(namedNode(facets.classIri))) ?? facets.classIri)
+      // Projection emits class+node for describe-new rules; absent entitySources
+      // is the stored form of ['new'].
+      addTarget(classTarget(facets.classIri))
     } else {
       // A bare sh:node / sh:nodeKind sh:IRI is the reuse-allowing form; the
       // original single-source policy is not recoverable (documented lossy).
       entitySources = [...ALL_ENTITY_SOURCES]
     }
-    for (const node of facets.nodeTargets) {
+    for (const uri of facets.unionClasses) addTarget(classTarget(uri))
+    for (const node of [...facets.nodeTargets, ...facets.unionNodes]) {
       const resolved = index.types.get(termKey(node))
       if (resolved) addTarget(resolved)
       // A shape reference alongside sh:class only repeats the class, so an
@@ -720,8 +786,20 @@ function resolveKind(
     else if (takePattern(DATETIME_PATTERN)) kind = 'datetime'
     // A file that only says "the root Dataset must have a license" says nothing
     // about the input; the RO-Crate baseline terms have one obvious form each,
-    // and the builder locks these four rules anyway.
-    else kind = baselineKind(path) ?? 'text'
+    // and the builder locks these four rules anyway. Beyond those, a term the
+    // portal's own catalogue describes is imported the way the builder would
+    // create it — but only when the file states nothing about the value at all.
+    else {
+      const catalog = facets.datatype === undefined && !facets.patterns.length ? catalogTerm(path) : undefined
+      kind = baselineKind(path) ?? catalog?.suggestedKind ?? 'text'
+      if (kind === 'entity') {
+        entityTypes = catalog?.suggestedEntityTypes ? [...catalog.suggestedEntityTypes] : undefined
+        entitySources = [...ALL_ENTITY_SOURCES]
+      }
+      if (catalog && kind !== 'text' && kind !== baselineKind(path)) {
+        notes.add('partial', 'The file states no value type here, so the term was imported in its usual form.', scope)
+      }
+    }
   } else {
     notes.add('partial', `Values are typed ${shortIri(facets.datatype)}, which the builder has no input for; a text input was used instead.`, scope)
     kind = 'text'
@@ -736,8 +814,17 @@ function resolveKind(
     notes.add('partial', 'hasPart lists the files attached to the crate, so it was imported as a file reference.', scope)
   }
   if (kind === 'entity' && !entityTypes?.length) {
-    entityTypes = [`${SCHEMA_ORG}Thing`]
-    notes.add('partial', 'A reference does not say which type it points at; it was imported as a reference to any Thing.', scope)
+    // The file names no type for the reference. The term's own documented range
+    // is the next best statement of what it points at; only a term the catalogue
+    // does not describe falls back to any Thing.
+    const range = catalogTerm(path)?.suggestedEntityTypes?.filter((type) => type !== `${SCHEMA_ORG}Thing`)
+    if (range?.length) {
+      entityTypes = [...range]
+      notes.add('partial', 'The reference does not say which type it points at; the term’s usual target types were used.', scope)
+    } else {
+      entityTypes = [`${SCHEMA_ORG}Thing`]
+      notes.add('partial', 'A reference does not say which type it points at; it was imported as a reference to any Thing.', scope)
+    }
   }
 
   const leftovers = [...patternSet]
@@ -791,14 +878,14 @@ function buildShapeIndex(store: Store, nodeShapes: Map<string, Quad_Subject>): S
   for (const [key, shape] of nodeShapes) {
     const asserted = assertedShapeType(store, shape, nodeShapes)
     if (asserted) {
-      types.set(key, asserted)
+      types.set(key, canonicalIri(asserted))
       continue
     }
     // Only a shape something references as a value shape may fall back to its
     // own name: every other target-less shape is the crate root candidate.
     const named = valueShapes.has(key) && shape.termType === 'NamedNode' ? typeFromShapeName(shape.value) : undefined
     if (named) {
-      types.set(key, named)
+      types.set(key, canonicalIri(named))
       derived.add(key)
     }
   }
@@ -851,6 +938,27 @@ function typeFromShapeName(iri: string): string | undefined {
   const curated = CURATED_ENTITY_TYPES.find((type) => type.label.toLowerCase() === base.toLowerCase())
   if (curated) return curated.uri
   return `${iri.slice(0, iri.length - local.length)}${base}`
+}
+
+// The target types an sh:or offers, when EVERY branch only picks one: sh:class,
+// sh:node and sh:nodeKind sh:IRI. Any branch carrying another facet means the
+// alternative says more than "one of these types" and is not a plain union.
+const TARGET_BRANCH_KNOWN = new Set([RDF_TYPE, `${SH}class`, `${SH}node`, `${SH}nodeKind`])
+
+function unionTargets(store: Store, branches: Quad_Object[]): { classes: string[]; nodes: Term[] } | undefined {
+  const classes: string[] = []
+  const nodes: Term[] = []
+  for (const branch of branches) {
+    if (branch.termType !== 'BlankNode' && branch.termType !== 'NamedNode') return undefined
+    const quads = store.getQuads(branch as Quad_Subject, null, null, null)
+    if (!quads.length || quads.some((quad) => !TARGET_BRANCH_KNOWN.has(quad.predicate.value))) return undefined
+    // Within one branch a shape reference alongside sh:class only repeats the
+    // class it already names (the form this projection emits).
+    const branchClasses = quads.filter((quad) => quad.predicate.value === `${SH}class` && quad.object.termType === 'NamedNode')
+    if (branchClasses.length) classes.push(...branchClasses.map((quad) => quad.object.value))
+    else nodes.push(...quads.filter((quad) => quad.predicate.value === `${SH}node`).map((quad) => quad.object))
+  }
+  return classes.length || nodes.length ? { classes, nodes } : undefined
 }
 
 // True when the sh:or branches are exactly the projection's number form:
