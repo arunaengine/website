@@ -10,6 +10,7 @@ import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import TaskDetailPanel from '@/components/compute/TaskDetailPanel.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
+import { useAuth } from '@/composables/useAuth'
 import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import {
@@ -22,12 +23,14 @@ import {
 } from '@/lib/tes'
 import { ArchiveRestore, ChevronRight, ListPlus, RefreshCw, Trash2, Zap } from '@lucide/vue'
 
-// Task list section of the unified Compute view. Mounted only when the tes
-// feature is enabled and a user is signed in (ComputeView gates both).
+// Task list section of the unified Compute view. ComputeView gates the feature
+// flag and sign-in, but the panel tracks the session itself so a late or lost
+// login never strands the list in its pre-fetch state.
 const router = useRouter()
 const route = useRoute()
 const { getTesServiceInfo, listTasks } = useTes()
 const { currentUser, myGroups } = useAruna()
+const { authPending } = useAuth()
 
 function goNew() {
   void router.push({ name: 'compute-new' })
@@ -142,7 +145,7 @@ function confirmRowDelete(id: string) {
 
 // ── Task list ────────────────────────────────────────────────────────────────
 const tasks = ref<TesTask[]>([])
-const listState = ref<'idle' | 'loading' | 'ready' | 'error' | 'unsupported'>('idle')
+const listState = ref<'idle' | 'loading' | 'ready' | 'error' | 'unsupported' | 'signed-out'>('idle')
 const listError = ref<string | null>(null)
 const nextPageToken = ref<string | undefined>(undefined)
 const pagesLoaded = ref(0)
@@ -181,8 +184,23 @@ function taskDuration(task: TesTask): string {
   return log.end_time ? label : `${label} so far`
 }
 
+// No session: drop any in-flight response and land on a terminal state, never
+// on the pre-fetch skeleton. A session that is still resolving keeps loading.
+function clearNoUser() {
+  listRequestId++
+  tasks.value = []
+  nextPageToken.value = undefined
+  pagesLoaded.value = 0
+  listError.value = null
+  lastPollError.value = null
+  listState.value = authPending.value ? 'loading' : 'signed-out'
+}
+
 async function fetchList({ more = false, silent = false } = {}) {
-  if (!currentUser.value) return
+  if (!currentUser.value) {
+    clearNoUser()
+    return
+  }
   const requestId = ++listRequestId
   if (!silent) refreshing.value = true
   if (!more && !silent && !tasks.value.length) listState.value = 'loading'
@@ -232,6 +250,14 @@ async function init() {
   await fetchList()
 }
 
+// onMounted loads once, so authentication resolving (or dropping) afterwards
+// has to drive the list: a new account reloads, a lost one clears immediately
+// so the previous user's tasks cannot stay on screen.
+watch([currentUser, authPending], ([user], [previous]) => {
+  if (!user) clearNoUser()
+  else if (user.id !== previous?.id) void init()
+})
+
 let pollTimer: number | undefined
 onMounted(() => {
   void init()
@@ -277,8 +303,9 @@ onUnmounted(() => {
     </p>
     <ErrorPanel v-else-if="serviceState === 'error'" :message="serviceError || 'Failed to load the TES service info.'" @retry="loadServiceInfo" />
 
-    <!-- List. 'idle' is the pre-fetch gap while init() awaits service info,
-         show the same skeleton instead of a blank area. -->
+    <!-- List. 'idle' is the pre-fetch gap while init() awaits service info and
+         'loading' also covers a session that has not resolved yet, show the
+         same skeleton instead of a blank area. -->
     <div v-if="listState === 'idle' || listState === 'loading'" class="surface divide-y divide-border overflow-hidden">
       <div v-for="n in 5" :key="n" class="px-5 py-3"><Skeleton class="h-6 w-full" /></div>
     </div>
@@ -292,10 +319,20 @@ onUnmounted(() => {
       Tasks cannot be listed until this node exposes the GA4GH TES endpoint.
     </p>
 
+    <p
+      v-else-if="listState === 'signed-out'"
+      class="surface px-5 py-8 text-center text-sm text-muted-foreground"
+    >
+      Sign in to see the tasks you submitted to this node.
+    </p>
+
     <!-- First-run empty state doubles as the run-mode chooser. Branch on the
-         SHOWN list so hiding every task brings the chooser back, but keep the
-         Deleted chip view reachable via the stateGroup escape below. -->
-    <section v-else-if="listState === 'ready' && !shownTasks.length && stateGroup !== 'deleted'" class="surface px-5 py-10 text-center">
+         SHOWN list so hiding every task brings the chooser back, and only stand
+         aside for the Deleted chip view while it still has something to show. -->
+    <section
+      v-else-if="listState === 'ready' && !shownTasks.length && (stateGroup !== 'deleted' || !hiddenTasks.length)"
+      class="surface px-5 py-10 text-center"
+    >
       <p class="text-sm font-medium text-foreground">No compute tasks yet</p>
       <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Start your first run, submissions appear here.</p>
       <div class="mx-auto mt-5 grid max-w-xl gap-3 text-left sm:grid-cols-2">

@@ -2,6 +2,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { ApiError } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
 import { useAruna } from '@/composables/useAruna'
+import { useAuth } from '@/composables/useAuth'
 import {
   cancelJob as requestCancelJob,
   getJob,
@@ -51,7 +52,14 @@ export async function cancelJob(jobId: string): Promise<JobStatusResponse> {
   return requestCancelJob(jobId, client())
 }
 
-export type JobsListState = 'idle' | 'loading' | 'ready' | 'error' | 'unsupported' | 'forbidden'
+export type JobsListState =
+  | 'idle'
+  | 'loading'
+  | 'ready'
+  | 'error'
+  | 'unsupported'
+  | 'forbidden'
+  | 'signed-out'
 
 export interface JobsListOptions {
   pageSize?: number
@@ -66,6 +74,7 @@ export interface JobsListOptions {
 export function useJobsList(options: JobsListOptions = {}) {
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
   const { currentUser } = useAruna()
+  const { authPending } = useAuth()
 
   const jobs = ref<JobStatusResponse[]>([])
   const listState = ref<JobsListState>('idle')
@@ -82,8 +91,25 @@ export function useJobsList(options: JobsListOptions = {}) {
 
   const hasActive = computed(() => jobs.value.some((job) => !isTerminalJobState(job.state)))
 
+  // Nothing to serve: drop any in-flight response and land on a terminal state,
+  // never on the pre-fetch 'idle'. A session still resolving keeps loading.
+  function clearNoUser() {
+    requestId++
+    jobs.value = []
+    nextCursor.value = null
+    pagesLoaded.value = 0
+    listError.value = null
+    moreError.value = null
+    lastPollError.value = null
+    if (!jobsEnabled.value) listState.value = 'unsupported'
+    else listState.value = authPending.value ? 'loading' : 'signed-out'
+  }
+
   async function load({ silent = false } = {}) {
-    if (!jobsEnabled.value || !currentUser.value) return
+    if (!jobsEnabled.value || !currentUser.value) {
+      clearNoUser()
+      return
+    }
     const id = ++requestId
     if (!silent) refreshing.value = true
     if (!silent && !jobs.value.length) listState.value = 'loading'
@@ -113,7 +139,10 @@ export function useJobsList(options: JobsListOptions = {}) {
   }
 
   async function loadMore() {
-    if (!jobsEnabled.value || !currentUser.value) return
+    if (!jobsEnabled.value || !currentUser.value) {
+      clearNoUser()
+      return
+    }
     if (!nextCursor.value || loadingMore.value || refreshing.value) return
     const id = ++requestId
     loadingMore.value = true
@@ -138,6 +167,14 @@ export function useJobsList(options: JobsListOptions = {}) {
 
   // Re-filtering starts a fresh page-one query.
   watch(stateFilter, () => void load())
+
+  // The consumer's initial load() runs once, so a session resolving (or
+  // dropping) afterwards has to drive the list: a new account reloads, a lost
+  // one clears immediately so the previous user's jobs cannot stay on screen.
+  watch([currentUser, authPending], ([user], [previous]) => {
+    if (!user) clearNoUser()
+    else if (user.id !== previous?.id) void load()
+  })
 
   // Auto-refresh re-fetches page one only (a multi-page list must not silently
   // truncate) and only while some listed job is still active.

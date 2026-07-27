@@ -20,8 +20,9 @@ import {
 import { relativeTime, truncateMiddle } from '@/lib/utils'
 import { ChevronRight, ListTodo, RefreshCw } from '@lucide/vue'
 
-// System-jobs section of the unified Compute view. Mounted only when the jobs
-// feature is enabled and a user is signed in (ComputeView gates both).
+// System-jobs section of the unified Compute view. ComputeView gates the
+// feature flag and sign-in, but useJobsList tracks the session itself so a late
+// or lost login never strands the list in its pre-fetch state.
 const router = useRouter()
 const route = useRoute()
 
@@ -115,7 +116,9 @@ onMounted(() => void list.load())
       System jobs are durable background jobs <span class="font-medium text-foreground">the node runs for your account</span>, staging, provenance and maintenance. They cannot be submitted here, only monitored and cancelled.
     </p>
 
-    <div v-if="listState === 'loading'" class="surface divide-y divide-border overflow-hidden">
+    <!-- 'idle' is the gap before the first load lands, 'loading' also covers a
+         session that has not resolved yet. -->
+    <div v-if="listState === 'idle' || listState === 'loading'" class="surface divide-y divide-border overflow-hidden">
       <div v-for="n in 5" :key="n" class="px-5 py-3"><Skeleton class="h-6 w-full" /></div>
     </div>
 
@@ -133,6 +136,13 @@ onMounted(() => void list.load())
       class="surface px-5 py-8 text-center text-sm text-muted-foreground"
     >
       This token cannot list jobs, path-restricted tokens have no access to the job surface.
+    </p>
+
+    <p
+      v-else-if="listState === 'signed-out'"
+      class="surface px-5 py-8 text-center text-sm text-muted-foreground"
+    >
+      Sign in to see the background jobs this node runs for your account.
     </p>
 
     <EmptyState
