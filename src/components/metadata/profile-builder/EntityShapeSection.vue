@@ -8,7 +8,7 @@ import PropertyRuleRow from './PropertyRuleRow.vue'
 import PropertyTermPicker from './PropertyTermPicker.vue'
 import ClassPropertyChecklist from './ClassPropertyChecklist.vue'
 import EntityTypePicker from './EntityTypePicker.vue'
-import { Settings2, Trash2, TriangleAlert } from '@lucide/vue'
+import { ChevronDown, ChevronRight, Settings2, Trash2, TriangleAlert } from '@lucide/vue'
 import { PROFILE_OBLIGATION_LABELS, obligationBadgeVariant } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { isSchemaOrgUri } from '@/lib/profiles/propertyCatalog'
@@ -23,9 +23,13 @@ import type { DraftEntityRule, ProfileBuilder } from './useProfileBuilder'
 const props = defineProps<{
   builder: ProfileBuilder
   entity: DraftEntityRule
+  // Whether the rules start visible. An imported profile can define a dozen
+  // shapes, and every one expanded turns the step into an unreadable scroll.
+  defaultOpen?: boolean
 }>()
 
 const showDetails = ref(false)
+const open = ref(props.defaultOpen ?? true)
 
 // Index of the rule being dragged. Rows reorder as the pointer passes over them,
 // so the list itself is the drop preview and no separate indicator is needed.
@@ -46,6 +50,11 @@ const isUnreferenced = computed(
 )
 
 const rootEntity = computed(() => props.builder.entities.find((entity) => entity.lock === 'full') ?? props.builder.entities[0])
+
+// A shape needing attention is never hidden: an empty one blocks saving, and an
+// unreferenced one is the trap the warning below exists to surface.
+const needsAttention = computed(() => !props.entity.properties.length || isUnreferenced.value)
+const expanded = computed(() => open.value || needsAttention.value)
 
 function referenceFromRoot() {
   if (rootEntity.value && rootEntity.value !== props.entity) {
@@ -86,8 +95,20 @@ function changeType(choice: { uri: string; label: string }) {
 <template>
   <section :id="`shape-${entity.uid}`" class="scroll-mt-20 rounded-xl border border-border bg-card">
     <header class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-4 py-2.5">
-      <h4 class="text-sm font-semibold text-foreground">{{ entity.label || 'Untitled entity' }}</h4>
+      <button
+        type="button"
+        class="flex items-center gap-2 text-left"
+        :aria-expanded="expanded"
+        :aria-label="`${expanded ? 'Collapse' : 'Expand'} ${entity.label || 'this shape'}`"
+        @click="open = !expanded"
+      >
+        <component :is="expanded ? ChevronDown : ChevronRight" class="size-3.5 shrink-0 text-muted-foreground" />
+        <h4 class="text-sm font-semibold text-foreground">{{ entity.label || 'Untitled entity' }}</h4>
+      </button>
       <span class="text-[11px] text-muted-foreground">{{ entityTypeLabel(entity.type) }}</span>
+      <span class="text-[11px] text-muted-foreground">
+        {{ entity.properties.length }} {{ entity.properties.length === 1 ? 'rule' : 'rules' }}
+      </span>
       <Badge v-if="isRoot" variant="royal">Root Dataset</Badge>
       <Badge
         v-else-if="!isUnreferenced"
@@ -104,7 +125,7 @@ function changeType(choice: { uri: string; label: string }) {
         via {{ reference.valueName }} on {{ reference.entityLabel }}
       </span>
       <span class="flex-1"></span>
-      <Button type="button" variant="ghost" size="sm" class="text-muted-foreground" :aria-expanded="showDetails" @click="showDetails = !showDetails">
+      <Button v-if="expanded" type="button" variant="ghost" size="sm" class="text-muted-foreground" :aria-expanded="showDetails" @click="showDetails = !showDetails">
         <Settings2 class="size-3.5" /> Details
       </Button>
       <Button
@@ -120,11 +141,11 @@ function changeType(choice: { uri: string; label: string }) {
       </Button>
     </header>
 
-    <p v-if="!isRoot" class="border-b border-border px-4 py-1.5 text-[11px] text-muted-foreground">
+    <p v-if="!isRoot && expanded" class="border-b border-border px-4 py-1.5 text-[11px] text-muted-foreground">
       Applied when a {{ entity.label || entityTypeLabel(entity.type) }} is described; it does not require one to exist on its own.
     </p>
 
-    <div v-if="showDetails" class="grid gap-3 border-b border-border px-4 py-3 sm:grid-cols-2">
+    <div v-if="showDetails && expanded" class="grid gap-3 border-b border-border px-4 py-3 sm:grid-cols-2">
       <div>
         <label class="text-[11px] font-medium text-muted-foreground">Label</label>
         <Input v-model="entity.label" class="mt-0.5" :disabled="isRoot" />
@@ -160,7 +181,7 @@ function changeType(choice: { uri: string; label: string }) {
       </Button>
     </div>
 
-    <div class="space-y-1.5 p-3">
+    <div v-if="expanded" class="space-y-1.5 p-3">
       <PropertyRuleRow
         v-for="(property, index) in entity.properties"
         :key="property.uid"

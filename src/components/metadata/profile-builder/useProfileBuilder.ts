@@ -125,6 +125,10 @@ export interface DraftEntityRule {
   properties: DraftPropertyRule[]
   // Builder-session only: the fixed Root Dataset entity (`full`). Never serialized.
   lock?: DraftLock
+  // Builder-session only: the rule arrived with an import rather than being added
+  // here. An imported shape that nothing references is the source file's own
+  // structure, not the "you forgot to link it" mistake the hint warns about.
+  imported?: boolean
 }
 
 // Shape ImportProfileSection hands to applyImport: basics + strict lib entity
@@ -396,16 +400,19 @@ function draftRequiredInstance(instance: ProfileRequiredInstance): DraftRequired
 }
 
 export function draftFromEntityRule(rule: ProfileEntityRule, isRoot = false): DraftEntityRule {
-  return draftEntity({
-    id: rule.id,
-    label: rule.label,
-    description: rule.description,
-    type: rule.type,
-    // Keep the imported class alias so it round-trips instead of being re-derived.
-    className: rule.className,
-    // L2: forward the root flag so the Dataset root's baseline rules re-lock.
-    properties: rule.propertyRules.map((property) => draftFromPropertyRule(property, isRoot)),
-  })
+  return {
+    ...draftEntity({
+      id: rule.id,
+      label: rule.label,
+      description: rule.description,
+      type: rule.type,
+      // Keep the imported class alias so it round-trips instead of being re-derived.
+      className: rule.className,
+      // L2: forward the root flag so the Dataset root's baseline rules re-lock.
+      properties: rule.propertyRules.map((property) => draftFromPropertyRule(property, isRoot)),
+    }),
+    imported: true,
+  }
 }
 
 // Seeded starting point: only the fixed RO-Crate Root Data Entity and its four
@@ -932,20 +939,29 @@ export function useProfileBuilder() {
           const canonical = curatedByLower.get(rule.valueName.toLowerCase())
           if (canonical) hints.push(`${entity.label} / ${rule.label}: "${rule.valueName}" resembles the schema.org "${canonical}" term, consider using it.`)
         }
-        if (rule.kind === 'entity') {
-          for (const target of rule.entityTypes ?? []) {
-            if (!normalizedEntities.value.some((candidate) => sameSchemaOrgType(candidate.type, target))) {
-              hints.push(`${entity.label} / ${rule.label} references ${entityTypeLabel(target)}, but no entity rule defines it, no sub-form will be generated for ${entityTypeLabel(target)}.`)
-            }
+        // A reference is only fieldless when NONE of its target types has a rule:
+        // the sub-form resolves to the first that does (see resolveEntityRule), so
+        // the extra members of a union ("a Gene or a Protein") cost nothing.
+        if (rule.kind === 'entity' && (rule.entityTypes ?? []).length) {
+          const targets = rule.entityTypes ?? []
+          const resolves = targets.some((target) =>
+            normalizedEntities.value.some((candidate) => sameSchemaOrgType(candidate.type, target)),
+          )
+          if (!resolves) {
+            const names = targets.map(entityTypeLabel).join(' or ')
+            hints.push(`${entity.label} / ${rule.label} references ${names}, but no entity rule defines it, no sub-form will be generated for ${names}.`)
           }
         }
       }
     }
     // H1: an entity rule that nothing references is inert — it generates no dataset
     // inputs and no validation. Surface each unreferenced non-Dataset rule loudly so
-    // the "entity rule ignored" trap is unmissable at review.
+    // the "entity rule ignored" trap is unmissable at review. An IMPORTED rule is
+    // exempt: a class-targeted shape stands on its own in the file it came from,
+    // and flagging every one of them would bury the hints that are real mistakes.
+    const importedTypes = new Set(entities.value.filter((draft) => draft.imported).map((draft) => normalizeTypeUri(draft.type)))
     for (const entity of normalizedEntities.value) {
-      if (isDatasetType(entity.type)) continue
+      if (isDatasetType(entity.type) || importedTypes.has(entity.type)) continue
       if (!referencesToType(entity.type, normalizedEntities.value).length) {
         hints.push(`"${entity.label}" is not referenced by any property, it will generate no dataset inputs or validation. Open it and use "Add reference", or add an entity-reference property that targets it.`)
       }
