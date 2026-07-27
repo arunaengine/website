@@ -21,12 +21,14 @@ const props = withDefaults(
   defineProps<{
     /** Controlled mode: browse exactly this bucket and hide the bucket sidebar. */
     bucket?: string
+    /** Folder the browser opens on; read once, later navigation owns the location. */
+    prefix?: string
     /** Node hosting the browsed bucket; null = the connected node. */
     nodeId?: string | null
     /** Checkbox multi-select of objects and folders (emits `add`). */
     selectable?: boolean
   }>(),
-  { bucket: undefined, nodeId: null, selectable: false },
+  { bucket: undefined, prefix: '', nodeId: null, selectable: false },
 )
 
 const emit = defineEmits<{
@@ -43,7 +45,7 @@ const s3 = useS3()
 
 const controlled = computed(() => props.bucket !== undefined)
 const activeBucket = ref(props.bucket ?? '')
-const prefix = ref('')
+const prefix = ref(props.prefix.replace(/^\/+|\/+$/g, ''))
 const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
 
 // The endpoint actually serving the browsed bucket (local or remote).
