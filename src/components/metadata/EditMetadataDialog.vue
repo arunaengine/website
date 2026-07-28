@@ -22,7 +22,7 @@ import { Layers, Pencil, Plus, X } from '@lucide/vue'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentListItem, type MetadataDocumentSummary } from '@/lib/api'
-import { applyDataEntities, dataEntitiesOf, type DataEntity } from '@/lib/dataEntities'
+import { applyDataEntities, dataEntityTreeOf, type DataEntity } from '@/lib/dataEntities'
 import { addSubcrateLink, removeSubcrateLink, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
 import { documentIdFromIri } from '@/lib/graphIri'
 import { groupCustomFieldRows, seedCustomFieldRows, type CustomFieldRow, type PreservedFieldRow } from '@/lib/customFields'
@@ -248,10 +248,12 @@ function seedFields(crate: unknown) {
   seededCustomKeys = [...new Set(seeded.rows.map((row) => row.key))]
 
   // Subcrate references (RO-Crate 1.2) are managed in their own list, not the
-  // files editor; they must not seed as file rows.
+  // files editor; they must not seed as file rows. Only depth-zero entities
+  // seed: a nested sub-dataset's parts belong to that sub-dataset, and seeding
+  // them here would hoist them into the root's hasPart on save.
   subcrates.value = subcrateLinksOf(crate)
   const subcrateIris = new Set(subcrates.value.map((link) => link.iri))
-  files.value = dataEntitiesOf(crate).filter((row) => !subcrateIris.has(row.id))
+  files.value = dataEntityTreeOf(crate).filter((row) => row.depth === 0 && !subcrateIris.has(row.id))
 
   // A mention is one of our documents iff its @id is an Aruna graph IRI; that
   // is a pure decision on the IRI, not a catalog lookup.
@@ -573,7 +575,7 @@ async function save() {
           </TabsContent>
 
           <TabsContent value="files">
-            <DatasetFilesEditor v-model="files" />
+            <DatasetFilesEditor v-model="files" :crate="pristine" />
             <p class="mt-2 text-[11px] text-muted-foreground">
               Reference identifiers are kept verbatim. Removing a file drops it from the crate unless another entity still references it.
             </p>

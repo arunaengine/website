@@ -3,6 +3,8 @@
 // editor list, plus the write-back that keeps @ids verbatim and only drops a
 // removed entity when nothing else in the crate still references it.
 
+import { formatBytes } from '@/lib/utils'
+
 export interface DataEntity {
   id: string
   name: string
@@ -87,6 +89,92 @@ export function dataEntitiesOf(crate: unknown): DataEntity[] {
   return rows
 }
 
+// Data-entity detection accepts both compact and full-URI types. MediaObject
+// and its media subtypes count as files; Dataset marks a sub-directory whose
+// own hasPart may nest further data entities.
+export const DATA_ENTITY_TYPES = new Set(['File', 'MediaObject', 'Dataset', 'ImageObject', 'AudioObject', 'VideoObject'])
+
+function typeShortName(type: string): string {
+  return type.split(/[#/]/).filter(Boolean).pop() ?? type
+}
+
+function isDataType(types: string[]): boolean {
+  return types.some((type) => DATA_ENTITY_TYPES.has(typeShortName(type)))
+}
+
+function isDirectoryType(types: string[]): boolean {
+  return types.some((type) => typeShortName(type) === 'Dataset')
+}
+
+export interface DataEntityNode extends DataEntity {
+  depth: number
+  parentId: string
+  // Dataset-typed part (a sub-directory); may carry its own hasPart.
+  directory: boolean
+  childIds: string[]
+}
+
+// Depth-first walk of the root's hasPart in list order: files stay leaves,
+// Dataset-typed parts recurse into their own hasPart. Data entities the walk
+// never reaches (graph strays without a hasPart chain) are appended at depth
+// zero, so nothing the flat union used to list disappears. Cycles terminate on
+// the visited set; each id is listed once, at its first position.
+export function dataEntityTreeOf(crate: unknown, maxDepth = 8): DataEntityNode[] {
+  const g = crateGraph(crate)
+  if (!g.length) return []
+  const rootId = crateRootId(crate)
+  const byId = new Map(g.map((e) => [typeof e['@id'] === 'string' ? (e['@id'] as string) : '', e]))
+  const rows: DataEntityNode[] = []
+  const seen = new Set<string>()
+
+  const partIds = (entity: Record<string, unknown> | undefined): string[] =>
+    (Array.isArray(entity?.hasPart) ? entity.hasPart : entity?.hasPart ? [entity.hasPart] : [])
+      .map((ref) => stringProp(ref) ?? '')
+      .filter((id) => id && id !== 'ro-crate-metadata.json' && id !== rootId)
+
+  const walk = (id: string, depth: number, parentId: string) => {
+    if (seen.has(id)) return
+    seen.add(id)
+    const entity = byId.get(id)
+    const types = entity ? typesOf(entity) : []
+    const node: DataEntityNode = {
+      id,
+      name: stringProp(entity?.name) || id,
+      types: types.length ? types : ['File'],
+      encodingFormat: stringProp(entity?.encodingFormat),
+      contentSize: stringProp(entity?.contentSize),
+      contentUrl: stringProp(entity?.contentUrl),
+      description: stringProp(entity?.description),
+      depth,
+      parentId,
+      directory: isDirectoryType(types),
+      childIds: [],
+    }
+    rows.push(node)
+    if (!node.directory || depth >= maxDepth) return
+    for (const childId of partIds(entity)) {
+      node.childIds.push(childId)
+      walk(childId, depth + 1, id)
+    }
+  }
+
+  for (const id of partIds(rootId ? byId.get(rootId) : undefined)) walk(id, 0, rootId ?? '')
+  for (const entity of g) {
+    const id = typeof entity['@id'] === 'string' ? (entity['@id'] as string) : ''
+    if (!id || id === 'ro-crate-metadata.json' || id === rootId || seen.has(id)) continue
+    if (isDataType(typesOf(entity))) walk(id, 0, rootId ?? '')
+  }
+  return rows
+}
+
+// A crate's contentSize is spec-wise a string: numeric values format as bytes,
+// anything else renders verbatim.
+export function formatContentSize(value?: string): string {
+  if (!value || value.trim() === '') return '-'
+  const bytes = Number(value)
+  return Number.isFinite(bytes) ? formatBytes(bytes) : value
+}
+
 function setOrDelete(entity: Record<string, unknown>, key: string, value: string | undefined) {
   const trimmed = typeof value === 'string' ? value.trim() : ''
   if (trimmed) entity[key] = trimmed
@@ -124,7 +212,11 @@ export function applyDataEntities(crate: unknown, files: DataEntity[]): void {
   const graph = crateGraph(crate)
   const root = rootId ? graph.find((e) => e['@id'] === rootId) : graph.find((e) => e['@id'] !== 'ro-crate-metadata.json')
   if (!root) return
-  const originalIds = new Set(dataEntitiesOf(crate).map((entity) => entity.id))
+  // Only the root's own hasPart is under the editor's control: a nested
+  // entity (a sub-dataset's part) is neither hoisted into the root nor pruned
+  // when the editor list, which shows depth-zero rows, is written back.
+  const rootParts = Array.isArray(root.hasPart) ? root.hasPart : root.hasPart ? [root.hasPart] : []
+  const originalIds = new Set(rootParts.map((ref) => stringProp(ref) ?? '').filter(Boolean))
   const newIds = new Set(files.map((file) => file.id))
 
   if (files.length) root.hasPart = files.map((file) => ({ '@id': file.id }))
