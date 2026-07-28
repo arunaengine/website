@@ -15,7 +15,7 @@ import {
   Upload,
 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
-import { ApiError } from '@/lib/api'
+import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { crateGraph } from '@/lib/dataEntities'
 import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
 import { copyToClipboard } from '@/lib/utils'
@@ -26,7 +26,9 @@ const props = defineProps<{
   // Write permission heuristic from the parent; the backend still enforces it.
   canImport: boolean
 }>()
-const emit = defineEmits<{ (e: 'imported'): void }>()
+// The imported event carries the summary the write returned, so the host view
+// can adopt the new updated_at without a second fetch.
+const emit = defineEmits<{ (e: 'imported', summary: MetadataDocumentSummary): void }>()
 
 const { saving, replaceMetadataRoCrate } = useAruna()
 
@@ -124,11 +126,11 @@ async function confirmImport() {
   importError.value = ''
   try {
     // `public` omitted keeps the document's current visibility.
-    await replaceMetadataRoCrate(props.documentId, { rocrate: pending.crate })
+    const summary = await replaceMetadataRoCrate(props.documentId, { rocrate: pending.crate })
     importedSummary.value = { rootName: pending.rootName, entityCount: pending.entityCount }
     pendingImport.value = null
     pasteText.value = ''
-    emit('imported')
+    emit('imported', summary)
   } catch (err) {
     if (err instanceof ApiError && err.status === 403) importError.value = 'You need write permission in the owning group.'
     else importError.value = err instanceof Error ? err.message : String(err)

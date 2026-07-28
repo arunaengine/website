@@ -7,7 +7,7 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
 import { Layers, Loader2, Plus, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
-import { ApiError, type MetadataDocumentListItem } from '@/lib/api'
+import { ApiError, type MetadataDocumentListItem, type MetadataDocumentSummary } from '@/lib/api'
 import { addSubcrateLink, isProjectCrate, removeSubcrateLink, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
 import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
 import { isHttpUrl } from '@/lib/utils'
@@ -18,7 +18,9 @@ const props = defineProps<{
   documentId: string
   canWrite: boolean
 }>()
-const emit = defineEmits<{ (e: 'changed'): void }>()
+// The changed event carries the summary the write returned, so the host view
+// can adopt the new updated_at without a second fetch.
+const emit = defineEmits<{ (e: 'changed', summary: MetadataDocumentSummary): void }>()
 
 const { toMetadataDoc, apiBaseUrl, saving, fetchRoCrateRaw, replaceMetadataRoCrate } = useAruna()
 
@@ -72,9 +74,9 @@ async function linkSelected(items: MetadataDocumentListItem[]) {
         subjectOf: crateJsonUrl(item.document_id),
       })
     }
-    await replaceMetadataRoCrate(props.documentId, { rocrate: clone })
+    const summary = await replaceMetadataRoCrate(props.documentId, { rocrate: clone })
     pickerOpen.value = false
-    emit('changed')
+    emit('changed', summary)
   } catch (err) {
     if (err instanceof ApiError && err.status === 403) error.value = 'You need write permission in the owning group.'
     else error.value = err instanceof Error ? err.message : String(err)
@@ -90,8 +92,8 @@ async function unlink(link: SubcrateLink) {
   try {
     const clone = structuredClone(await fetchRoCrateRaw(props.documentId)) as unknown
     removeSubcrateLink(clone, link.iri)
-    await replaceMetadataRoCrate(props.documentId, { rocrate: clone })
-    emit('changed')
+    const summary = await replaceMetadataRoCrate(props.documentId, { rocrate: clone })
+    emit('changed', summary)
   } catch (err) {
     if (err instanceof ApiError && err.status === 403) error.value = 'You need write permission in the owning group.'
     else error.value = err instanceof Error ? err.message : String(err)
