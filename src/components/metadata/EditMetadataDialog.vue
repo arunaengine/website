@@ -46,6 +46,7 @@ const {
   saving,
   fetchRoCrateRaw,
   getMetadataDocument,
+  getMetadataItem,
   replaceMetadataRoCrate,
   toMetadataDoc,
   metadataItems,
@@ -344,16 +345,23 @@ function restoreSubcrates(clone: unknown) {
 }
 
 // Each related document gets a resolvable contextual entity so the reference
-// stays meaningful outside this portal.
+// stays meaningful outside this portal. A resolved title refreshes an existing
+// stub; the bare IRI is never written as a name, so an unresolved label leaves
+// the stub nameless rather than permanently wrong.
 function upsertRelatedEntity(crate: unknown, graphIri: string) {
   if (!isRecord(crate)) return
   const g = Array.isArray(crate['@graph']) ? (crate['@graph'] as unknown[]) : []
-  if (g.some((entity) => isRecord(entity) && entity['@id'] === graphIri)) return
+  const label = relatedLabels.value[graphIri]
+  const existing = g.find((entity) => isRecord(entity) && entity['@id'] === graphIri)
+  if (isRecord(existing)) {
+    if (label) existing.name = label
+    return
+  }
   const documentId = documentIdFromIri(graphIri)
   g.push({
     '@id': graphIri,
     '@type': 'Dataset',
-    name: relatedLabel(graphIri),
+    ...(label ? { name: label } : {}),
     ...(documentId ? { identifier: documentId } : {}),
   })
   crate['@graph'] = g
@@ -372,8 +380,9 @@ async function ensureRelatedLabel(graphIri: string) {
     return
   }
   try {
-    const summary = await getMetadataDocument(documentId)
-    relatedLabels.value = { ...relatedLabels.value, [graphIri]: summary.document_path }
+    const item = await getMetadataItem(documentId)
+    const title = toMetadataDoc(item).title || item.document_path
+    relatedLabels.value = { ...relatedLabels.value, [graphIri]: title }
   } catch {
     // A deleted or unreadable target keeps its IRI as the label.
   }

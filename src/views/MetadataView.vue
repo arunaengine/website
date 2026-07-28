@@ -62,6 +62,7 @@ const {
   saving,
   loadRoCrate,
   getMetadataDocument,
+  getMetadataItem,
   deleteMetadataDocument,
   toggleFavourite,
   toMetadataDoc,
@@ -392,13 +393,18 @@ interface RelatedDocRow {
 // falls back to a targeted fetch when the crate carries no stub name.
 const relatedPaths = ref<Record<string, string>>({})
 
+// One attempt per document and page visit: a failed lookup must not retrigger
+// every time another row's resolution recomputes the related list.
+const relatedAttempted = new Set<string>()
 async function ensureRelatedPath(documentId: string) {
-  if (relatedPaths.value[documentId]) return
+  if (relatedPaths.value[documentId] || relatedAttempted.has(documentId)) return
+  relatedAttempted.add(documentId)
   try {
-    const summary = await getMetadataDocument(documentId)
-    relatedPaths.value = { ...relatedPaths.value, [documentId]: summary.document_path }
+    const item = await getMetadataItem(documentId)
+    const title = toMetadataDoc(item).title || item.document_path
+    relatedPaths.value = { ...relatedPaths.value, [documentId]: title }
   } catch {
-    // Deleted or unreadable: the row keeps its IRI as the label.
+    // Deleted or unreadable: the row keeps its stub name or IRI as the label.
   }
 }
 
@@ -424,7 +430,10 @@ const relatedDocs = computed<RelatedDocRow[]>(() => {
       rows.push({
         iri,
         documentId: documentId ?? undefined,
-        label: stringProp(entity?.name) || (documentId ? relatedPaths.value[documentId] : '') || iri,
+        // The in-graph stub name is frozen at link time; the live document's
+        // title wins, and the stub only fills in while the fetch is pending
+        // or when the document is gone.
+        label: (documentId ? relatedPaths.value[documentId] : '') || stringProp(entity?.name) || iri,
       })
     }
   }
@@ -433,7 +442,7 @@ const relatedDocs = computed<RelatedDocRow[]>(() => {
 
 watch(relatedDocs, (rows) => {
   for (const row of rows) {
-    if (row.documentId && row.label === row.iri) void ensureRelatedPath(row.documentId)
+    if (row.documentId && !relatedPaths.value[row.documentId]) void ensureRelatedPath(row.documentId)
   }
 })
 

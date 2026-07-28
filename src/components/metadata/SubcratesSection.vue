@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -22,7 +22,7 @@ const props = defineProps<{
 // can adopt the new updated_at without a second fetch.
 const emit = defineEmits<{ (e: 'changed', summary: MetadataDocumentSummary): void }>()
 
-const { toMetadataDoc, apiBaseUrl, saving, fetchRoCrateRaw, replaceMetadataRoCrate } = useAruna()
+const { toMetadataDoc, apiBaseUrl, saving, fetchRoCrateRaw, replaceMetadataRoCrate, metadataItems, getMetadataItem } = useAruna()
 
 // The spec's subjectOf fallback needs a URL that resolves to the child's crate
 // JSON; the portal serves it at GET /metadata/{id}/rocrate.
@@ -43,6 +43,36 @@ function resolveDocumentId(link: SubcrateLink): string | undefined {
 
 function titleOf(item: MetadataDocumentListItem): string {
   return toMetadataDoc(item).title
+}
+
+// A stored subcrate stub freezes the child's name at link time. Resolve the
+// display name from the live document instead, so a renamed child shows its
+// current title; the stored stub stays untouched as the offline fallback.
+const liveNames = ref<Record<string, string>>({})
+watch(
+  links,
+  (entries) => {
+    for (const link of entries) {
+      const documentId = resolveDocumentId(link)
+      if (!documentId || liveNames.value[documentId] !== undefined) continue
+      const listed = metadataItems.value.find((item) => item.document_id === documentId)
+      if (listed) {
+        liveNames.value = { ...liveNames.value, [documentId]: titleOf(listed) }
+        continue
+      }
+      getMetadataItem(documentId)
+        .then((item) => {
+          liveNames.value = { ...liveNames.value, [documentId]: titleOf(item) }
+        })
+        .catch(() => undefined)
+    }
+  },
+  { immediate: true },
+)
+
+function displayName(link: SubcrateLink): string {
+  const documentId = resolveDocumentId(link)
+  return (documentId && liveNames.value[documentId]) || link.name
 }
 
 const error = ref<string | null>(null)
@@ -125,7 +155,7 @@ async function unlink(link: SubcrateLink) {
               class="block truncate font-medium text-primary hover:underline"
               :title="link.iri"
             >
-              {{ link.name }}
+              {{ displayName(link) }}
             </RouterLink>
             <ExternalLink v-else-if="isHttpUrl(link.iri)" :href="link.iri" :label="link.name" class="block truncate font-medium" :title="link.iri" />
             <span v-else class="block truncate font-medium text-foreground" :title="link.iri">{{ link.name }}</span>
