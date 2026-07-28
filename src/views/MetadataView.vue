@@ -37,18 +37,20 @@ import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
 import { useS3 } from '@/composables/useS3'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
-import { formatBytes, isHttpUrl, relativeTime } from '@/lib/utils'
+import { isHttpUrl, relativeTime } from '@/lib/utils'
 import { metaWatchPathPrefix } from '@/lib/watches'
 import { parseRunCrate, runClaimedIds } from '@/lib/runCrate'
 import { presentCrate } from '@/lib/cratePresenter'
 import { licenseLabelOf } from '@/lib/licenses'
-import { crateGraph, crateRootId, dataEntitiesOf, stringProp, type DataEntity } from '@/lib/dataEntities'
+import { crateGraph, crateRootId, dataEntityTreeOf, formatContentSize, stringProp, type DataEntity, type DataEntityNode } from '@/lib/dataEntities'
+import { termNameFromUri } from '@/lib/profiles/uri'
 import { isProjectCrate, subcrateLinksOf } from '@/lib/subcrates'
 import { useCrateReferences } from '@/composables/useCrateReferences'
 import type { CrateObjectReference } from '@/lib/crateReferences'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { useJobs } from '@/composables/useJobs'
-import { ArrowDownUp, ArrowLeft, ChevronDown, Code2, FileArchive, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star, Upload } from '@lucide/vue'
+import { ArrowDownUp, ArrowLeft, ChevronDown, Code2, FileArchive, Folder, Info, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star, Upload } from '@lucide/vue'
+import DataEntityDialog from '@/components/metadata/DataEntityDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -296,13 +298,25 @@ function jumpEntity(id: string) {
 }
 watch(detailId, () => (highlightId.value = ''))
 
-// The union of entities referenced from the root's hasPart and every File/Dataset
-// entity (excluding the root, the metadata descriptor and subcrate links).
-const dataEntities = computed<DataEntity[]>(() =>
-  dataEntitiesOf(fullCrates.value[detailId.value] ?? current.value?.roCrate).filter(
+// The depth-first hasPart tree (a sub-dataset's parts render indented under
+// it), excluding the root, the metadata descriptor and subcrate links.
+const dataEntities = computed<DataEntityNode[]>(() =>
+  dataEntityTreeOf(fullCrates.value[detailId.value] ?? current.value?.roCrate).filter(
     (row) => !subcrateIris.value.has(row.id),
   ),
 )
+
+// The info dialog shows one entity's full stored metadata.
+const infoEntityId = ref('')
+const infoOpen = ref(false)
+function openInfo(row: DataEntity) {
+  infoEntityId.value = row.id
+  infoOpen.value = true
+}
+
+function rowTypes(row: DataEntity): string {
+  return row.types.map(termNameFromUri).join(', ') || '-'
+}
 
 // Which OTHER catalog documents reference each file entity here, from the cache-fed
 // reverse index (keyed by the row's @id, so self-references are dropped).
@@ -446,11 +460,6 @@ watch(relatedDocs, (rows) => {
   }
 })
 
-function entitySize(row: DataEntity): string {
-  if (!row.contentSize) return '-'
-  const n = Number(row.contentSize)
-  return row.contentSize.trim() !== '' && Number.isFinite(n) ? formatBytes(n) : row.contentSize
-}
 </script>
 
 <template>
@@ -673,7 +682,10 @@ function entitySize(row: DataEntity): string {
                 @click="canPreview(row) && openPreview(row)"
               >
                 <td class="px-5 py-2.5 font-medium text-foreground" :title="row.id">
-                  {{ row.name }}
+                  <span class="flex min-w-0 items-center gap-1.5" :style="row.depth ? { paddingLeft: `${row.depth * 1.25}rem` } : undefined">
+                    <Folder v-if="row.directory" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span class="truncate">{{ row.name }}</span>
+                  </span>
                   <span v-if="referencedBy.get(row.id)?.length" class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] font-normal text-muted-foreground">
                     <Link2 class="h-3 w-3 shrink-0" /> Referenced by
                     <template v-for="(ref, i) in referencedBy.get(row.id) ?? []" :key="ref.documentId">
@@ -681,18 +693,20 @@ function entitySize(row: DataEntity): string {
                     </template>
                   </span>
                 </td>
-                <td class="px-5 py-2.5 text-muted-foreground">{{ row.types.join(', ') || '-' }}</td>
+                <td class="px-5 py-2.5 text-muted-foreground">{{ rowTypes(row) }}</td>
                 <td class="px-5 py-2.5 text-muted-foreground">{{ row.encodingFormat || '-' }}</td>
-                <td class="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ entitySize(row) }}</td>
+                <td class="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ formatContentSize(row.contentSize) }}</td>
                 <td class="px-5 py-2.5 text-right">
                   <div class="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="icon-sm" :aria-label="`Show metadata of ${row.name}`" title="File metadata" @click.stop="openInfo(row)">
+                      <Info class="size-3.5" />
+                    </Button>
                     <Button v-if="canPreview(row)" variant="ghost" size="icon-sm" aria-label="Preview" @click.stop="openPreview(row)">
                       <Eye class="size-3.5" />
                     </Button>
                     <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener noreferrer" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open ${row.name} in a new tab`" @click.stop>
                       <ExternalLinkIcon class="h-3.5 w-3.5" />
                     </a>
-                    <span v-if="!canPreview(row) && !entityLink(row)" class="text-muted-foreground">-</span>
                   </div>
                 </td>
               </tr>
@@ -785,6 +799,14 @@ function entitySize(row: DataEntity): string {
     />
 
     <EditMetadataDialog v-if="current" v-model:open="showEdit" :document-id="current.ulid" :profile="currentProfile" @saved="onSaved" />
+
+    <DataEntityDialog
+      v-model:open="infoOpen"
+      :crate="fullCrates[detailId] ?? current?.roCrate"
+      :entity-id="infoEntityId"
+      :profile="currentProfile"
+      @jump="jumpEntity"
+    />
 
     <CrateTransferDialog v-model:open="showCrateExport" mode="export" :document-id="detailId" :document-path="currentPath" />
 
