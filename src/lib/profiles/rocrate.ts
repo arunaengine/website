@@ -2,6 +2,7 @@ import { parseSchemaText, schemaFromEntityRules } from './schema'
 import { effectiveEntitySources } from './sources'
 import { entityRulesToMode, isModeFile, modeToEntityRules, type ModeFile } from './mode'
 import { buildProfileContext } from './propertyCatalog'
+import { collectContextObjects, contextTermsOf } from './contextTerms'
 import { shapesFromEntityRules } from '../shacl/projection'
 import { ARUNA_PROFILE_PREFIX, isDatasetType, isRecord, normalizeTypeUri, termNameFromUri } from './uri'
 import {
@@ -496,26 +497,10 @@ function artifactByRole(
 // className), and the base context does not define it.
 function contextTermsFromCrate(rocrate: unknown, mode: ModeFile | undefined): Record<string, string> | undefined {
   const collected: Record<string, string> = {}
-  const contextValue = isRecord(rocrate) ? rocrate['@context'] : undefined
-  collectContextObjects(contextValue, collected)
+  collectContextObjects(isRecord(rocrate) ? rocrate['@context'] : undefined, collected)
   collectContextObjects(mode?.context, collected)
-  const terms: Record<string, string> = {}
-  for (const [term, uri] of Object.entries(collected)) {
-    if (/^https?:\/\/schema\.org\//.test(uri) && termNameFromUri(uri) === term) continue
-    terms[term] = uri
-  }
+  const terms = contextTermsOf([collected])
   return Object.keys(terms).length ? terms : undefined
-}
-
-function collectContextObjects(value: unknown, out: Record<string, string>) {
-  if (Array.isArray(value)) {
-    for (const entry of value) collectContextObjects(entry, out)
-  } else if (isRecord(value)) {
-    for (const [key, entry] of Object.entries(value)) {
-      if (typeof entry === 'string' && key !== '@id') out[key] = entry
-      else if (isRecord(entry) && typeof entry['@id'] === 'string') out[key] = entry['@id'] as string
-    }
-  }
 }
 
 function normalizeEntityRules(entityRules: ProfileEntityRule[]): ProfileEntityRule[] {
