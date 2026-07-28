@@ -35,45 +35,35 @@ import { controlsFromRules, defaultControlValues, normalizeProfileValues } from 
 import { emitEntityEntries, emitSelectObject, isHasPartUri, slugify, uniqueId } from '@/lib/profiles/emit'
 import {
   effectiveEntryValues,
-  entryRefInvalid,
   entrySourcePolicy,
   type EntityEntry,
 } from '@/lib/profiles/entityEntries'
+import {
+  countEntryErrors,
+  entityTypeLabelFor,
+  newEntityEntry,
+  newRefEntry,
+  seedEntries,
+  subControlsFor,
+  validateEntries,
+  type EntryViolationNode,
+} from '@/lib/profiles/entityTree'
 import { licenseEntity, parseProfileCrate } from '@/lib/profiles/rocrate'
-import { schemaFromPropertyRules } from '@/lib/profiles/schema'
 import { mapShaclFindings } from '@/lib/shacl/mapFindings'
 import { useShaclValidation } from '@/lib/shacl/useShaclValidation'
 import type { ShaclFinding } from '@/lib/shacl/findings'
-import { buildProfileContext, isSchemaOrgUri } from '@/lib/profiles/propertyCatalog'
-import { entityTypeLabel } from '@/lib/profiles/entityTypes'
-import { isAbsoluteUri, isInvalidReferenceUri, REFERENCE_URI_MESSAGE, termNameFromUri } from '@/lib/profiles/uri'
+import { buildProfileContext } from '@/lib/profiles/propertyCatalog'
+import { isAbsoluteUri, termNameFromUri } from '@/lib/profiles/uri'
 import { validateProfileData, validateRequiredInstances } from '@/lib/profiles/validate'
 import {
   DX_PROFILE,
   RO_CRATE_PROFILE,
   type JsonSchema,
-  type ProfileBasics,
   type ProfileControl,
   type ProfileEntityRule,
   type ProfilePropertyRule,
   type ProfileViolation,
 } from '@/lib/profiles/types'
-
-// The sub-form seeded for an entity reference whose target type has no entity
-// rule in the profile — a single Name (Text) field so instances aren't fieldless.
-const MINIMAL_ENTITY_RULE: ProfilePropertyRule = {
-  id: 'name',
-  label: 'Name',
-  description: '',
-  kind: 'text',
-  propertyUri: 'http://schema.org/name',
-  valueName: 'name',
-  obligation: 'MAY',
-}
-
-// Monotonic per-entry identity so entity-entry cards key on a stable uid
-// rather than their array index (mirrors the builder draft uid discipline).
-let entityEntryUid = 0
 
 // radix-vue reserves the empty string for a SelectItem's cleared state, so the
 // "no profile" choice travels as this sentinel and maps back to '' on write.
@@ -254,25 +244,12 @@ const hasPartRequirements = computed(() =>
       }))
   }),
 )
-// Sub-form controls per entity control, generated from the target entity rule.
-// When the referenced type has no entity rule, fall back to a minimal Name field
-// so instances are never fieldless.
+// Sub-form controls per top-level entity control; nested depths derive theirs
+// through the same subControlsFor inside DatasetEntityInstances.
 const entitySubControls = computed<Record<string, ProfileControl[]>>(() => {
   const map: Record<string, ProfileControl[]> = {}
   for (const control of entityControls.value) {
-    map[control.property] = control.entityRule
-      ? controlsFromRules(control.entityRule.propertyRules, profileEntityRules.value)
-      : controlsFromRules([MINIMAL_ENTITY_RULE], profileEntityRules.value)
-  }
-  return map
-})
-// Per-entity JSON Schema used for per-instance scalar validation.
-const entitySchemas = computed<Record<string, JsonSchema | undefined>>(() => {
-  const map: Record<string, JsonSchema | undefined> = {}
-  for (const control of entityControls.value) {
-    map[control.property] = control.entityRule
-      ? schemaFromPropertyRules(entityBasics(control.entityRule), control.entityRule.propertyRules)
-      : schemaFromPropertyRules({ name: entityTypeLabelFor(control), description: '' }, [MINIMAL_ENTITY_RULE])
+    map[control.property] = subControlsFor(control, profileEntityRules.value)
   }
   return map
 })
@@ -314,69 +291,23 @@ const generatedCreateValues = computed(() => normalizeProfileValues(generatedVal
 const profileViolations = computed(() => validateProfileData(profileSchema.value, normalizedGeneratedValues.value))
 const profileCollisionKeys = computed(() => profileControls.value.map((control) => control.property).filter((property) => reservedDatasetKeys.has(property)))
 
-// Per-entry violations for every entity control, keyed by control property;
-// outer array index aligns with the entry index. Described-new entries get the
-// target shape's scalar validation plus nested reference-format checks; reuse
-// entries get the reference-format check ONLY (reuse-by-URI is never
+// Per-entry violation trees for every entity control, keyed by control
+// property; outer array index aligns with the entry index. validateEntries
+// recurses through nested sub-forms: described-new entries get the target
+// shape's scalar validation, flat reference-format checks and nested trees;
+// reuse entries get the reference-format check ONLY (reuse-by-URI is never
 // re-validated against the shape — plan 5.4, stated in the UI).
-const entityEntryViolations = computed<Record<string, ProfileViolation[][]>>(() => {
-  const map: Record<string, ProfileViolation[][]> = {}
+const entityEntryViolations = computed<Record<string, EntryViolationNode[]>>(() => {
+  const ctx = { entityRules: profileEntityRules.value, crateIds: crateIdSet.value }
+  const map: Record<string, EntryViolationNode[]> = {}
   for (const control of entityControls.value) {
-    const policy = entrySourcePolicy(control.entitySources)
-    const subControls = entitySubControls.value[control.property] ?? []
-    const schema = entitySchemas.value[control.property]
-    const entries = entityEntries.value[control.property] ?? []
-    map[control.property] = entries.map((entry) => {
-      if (entry.source === 'new') {
-        return [
-          ...validateProfileData(schema, instanceValidationValues(entry.instance ?? {}, subControls)),
-          ...referenceUriViolations(entry.instance ?? {}, subControls),
-        ]
-      }
-      return entryRefInvalid(entry, policy, crateIdSet.value)
-        ? [{
-            ruleId: 'format.uri',
-            pointer: `/${control.property}`,
-            fieldId: control.property,
-            message: REFERENCE_URI_MESSAGE,
-            severity: 'error' as const,
-          }]
-        : []
-    })
+    map[control.property] = validateEntries(entityEntries.value[control.property] ?? [], control, ctx, 1)
   }
   return map
 })
-
-// Nested (depth-1) entity references are plain URI inputs; a non-empty value that
-// is not an absolute URI is a blocking field error (it would emit a broken
-// `{"@id"}` reference). Surfaced inline via entityInstanceViolations and counted
-// in entityInstanceErrorCount so it gates submit.
-function referenceUriViolations(instance: Record<string, unknown>, subControls: ProfileControl[]): ProfileViolation[] {
-  const violations: ProfileViolation[] = []
-  for (const control of subControls) {
-    if (control.control !== 'entity') continue
-    const raw = instance[control.property]
-    // Multiple references validate every entry; single validates the one value.
-    const entries = control.multiple ? (Array.isArray(raw) ? raw : []) : [raw]
-    entries.forEach((entry, entryIndex) => {
-      if (typeof entry === 'string' && isInvalidReferenceUri(entry)) {
-        violations.push({
-          ruleId: 'format.uri',
-          pointer: control.multiple ? `/${control.property}/${entryIndex}` : `/${control.property}`,
-          fieldId: control.property,
-          message: REFERENCE_URI_MESSAGE,
-          severity: 'error',
-        })
-      }
-    })
-  }
-  return violations
-}
 const entityEntryErrorCount = computed(() => {
   let count = 0
-  for (const perEntry of Object.values(entityEntryViolations.value)) {
-    for (const violations of perEntry) count += violations.filter((violation) => violation.severity === 'error').length
-  }
+  for (const nodes of Object.values(entityEntryViolations.value)) count += countEntryErrors(nodes)
   return count
 })
 
@@ -861,27 +792,13 @@ function applyParsedProfile(
   // hasPart rule is a blocking collision, not a sub-form); scalar hasPart controls
   // must NOT be treated as bound here (M5).
   const hasPartProps = new Set(datasetPropertyRules.filter((rule) => isHasPartUri(rule.propertyUri) && rule.kind === 'entity').map((rule) => rule.valueName))
-  // Seeding: a required (MUST) rule that allows describing a new entity starts
-  // with one described-new entry so its sub-form shows up immediately; the
-  // entry's own required sub-fields then flag inline what still needs filling.
-  // SHOULD/MAY rules keep the explicit Add so an untouched form never emits (or
-  // silently satisfies a recommendation with) an empty entity. Reuse-only
-  // single-valued rules seed one empty reference entry (the input shows right
-  // away; a blank never emits); reuse-only lists start empty. hasPart rules
-  // bind to Data references and are never seeded here.
+  // Seeding policy lives in seedEntries (shared with every nested depth);
+  // hasPart rules bind to Data references and are never seeded here.
   const seeded: Record<string, EntityEntry[]> = {}
   for (const control of controls) {
     if (control.control !== 'entity' || builtInDatasetKeys.has(control.property) || hasPartProps.has(control.property)) continue
-    const policy = entrySourcePolicy(control.entitySources)
-    if (policy.allowNew) {
-      if (!control.required) continue
-      const subControls = control.entityRule
-        ? controlsFromRules(control.entityRule.propertyRules, entityRules)
-        : controlsFromRules([MINIMAL_ENTITY_RULE], entityRules)
-      seeded[control.property] = [newEntityEntry(subControls)]
-    } else if (!control.multiple) {
-      seeded[control.property] = [newRefEntry()]
-    }
+    const entries = seedEntries(control, entityRules, 1)
+    if (entries.length) seeded[control.property] = entries
   }
   entityEntries.value = seeded
 }
@@ -899,80 +816,8 @@ function setGeneratedValue(property: string, value: unknown) {
   generatedValues.value = { ...generatedValues.value, [property]: value }
 }
 
-// Display label of an entity reference: the resolved entity rule's type, else the
-// first target type URI — never the literal 'entity' unless nothing is set.
-function entityTypeLabelFor(control: ProfileControl): string {
-  const type = control.entityRule?.type ?? control.entityTypes?.[0] ?? ''
-  return entityTypeLabel(type) || 'entity'
-}
-
-// @type of an EMITTED entity instance: the resolved entity rule's canonical
-// className — the JSON-LD compact alias mapped in the crate @context (D3), so an
-// imported alias (e.g. `Specimen` over an OBO PURL) survives instead of being
-// re-derived from the type URI. For a ruleless target: a schema.org type emits its
-// bare label (resolvable via the base context); a custom type emits its context
-// token when one is mapped, else the FULL type URI (M1) so @type is never an
-// undefined JSON-LD term. No literal 'entity' fallback.
-function entityTypeName(control: ProfileControl): string {
-  if (control.entityRule?.className) return control.entityRule.className
-  const target = control.entityTypes?.[0] ?? ''
-  if (!target) return 'Thing'
-  if (isSchemaOrgUri(target)) return entityTypeLabel(target)
-  const token = Object.keys(profileContextTerms.value).find((key) => profileContextTerms.value[key] === target)
-  return token || target
-}
-
-// A minimal ProfileBasics carrier so schemaFromPropertyRules can title the
-// per-entity schema; only name/description are read.
-function entityBasics(rule: ProfileEntityRule): Pick<ProfileBasics, 'name' | 'description'> {
-  return { name: rule.label, description: rule.description }
-}
-
-// A fresh instance record for a described-new entry: scalar controls seeded
-// from defaults, nested entity references seeded as empty URI strings (depth-1
-// reference input).
-function newEntityInstance(subControls: ProfileControl[]): Record<string, unknown> {
-  const values = defaultControlValues(subControls)
-  for (const control of subControls) {
-    // Single reference → one URI string; multiple → a list of URI strings (D5).
-    if (control.control === 'entity') values[control.property] = control.multiple ? [] : ''
-  }
-  return values
-}
-
-function newEntityEntry(subControls: ProfileControl[]): EntityEntry {
-  return { __uid: ++entityEntryUid, source: 'new', instance: newEntityInstance(subControls) }
-}
-
-function newRefEntry(): EntityEntry {
-  return { __uid: ++entityEntryUid, source: 'existing', ref: '' }
-}
-
-// Values for per-instance validation: scalar controls normalized (keeping empty
-// keys so presence checks fire), nested entity references kept as their raw URI
-// string so their required/recommended membership is checked.
-function instanceValidationValues(instance: Record<string, unknown>, subControls: ProfileControl[]): Record<string, unknown> {
-  const values = normalizeProfileValues(instance, subControls)
-  for (const control of subControls) {
-    // Entity refs and select-object choices are skipped by normalizeProfileValues
-    // (they are references, not scalars); surface their raw value so presence
-    // checks fire. Multiple entity refs stay an array so an empty list = missing.
-    if (control.control === 'entity') {
-      const raw = instance[control.property]
-      values[control.property] = control.multiple
-        // M5: drop blank rows before the presence check so an empty repeatable row
-        // cannot satisfy a required nested-multiple reference.
-        ? (Array.isArray(raw) ? raw.map((entry) => String(entry).trim()).filter(Boolean) : [])
-        : (typeof raw === 'string' ? raw : '')
-    } else if (control.control === 'select-object') {
-      values[control.property] = instance[control.property]
-    }
-  }
-  return values
-}
-
 function addEntityEntry(control: ProfileControl, source: 'new' | 'existing') {
-  const entry = source === 'new' ? newEntityEntry(entitySubControls.value[control.property] ?? []) : newRefEntry()
+  const entry = source === 'new' ? newEntityEntry(control, profileEntityRules.value, 1) : newRefEntry()
   const list = [...(entityEntries.value[control.property] ?? []), entry]
   entityEntries.value = { ...entityEntries.value, [control.property]: list }
 }
@@ -990,7 +835,7 @@ function switchEntityEntrySource(control: ProfileControl, index: number, source:
   const list = [...(entityEntries.value[control.property] ?? [])]
   const current = list[index]
   if (!current || current.source === source) return
-  list[index] = source === 'new' ? newEntityEntry(entitySubControls.value[control.property] ?? []) : newRefEntry()
+  list[index] = source === 'new' ? newEntityEntry(control, profileEntityRules.value, 1) : newRefEntry()
   entityEntries.value = { ...entityEntries.value, [control.property]: list }
 }
 
@@ -1089,25 +934,22 @@ function buildRoCrate() {
   }
 
   // Entity entries → described-new entries flatten into contextual entities +
-  // {"@id"} refs; reuse entries contribute bare {"@id"} refs (no inline
-  // entity). Repeated @ids dedupe within the property (emitEntityEntries) and
-  // shared contextual entities collapse crate-wide via addEntity, so reusing
-  // and describing the same entity never duplicates it.
+  // {"@id"} refs, recursing through nested sub-forms; reuse entries contribute
+  // bare {"@id"} refs (no inline entity). Repeated @ids dedupe within the
+  // property (emitEntityEntries) and shared contextual entities collapse
+  // crate-wide via addEntity, so reusing and describing the same entity never
+  // duplicates it.
+  const emitCtx = {
+    entityRules: profileEntityRules.value,
+    contextTerms: profileContextTerms.value,
+    validCrateIds: crateIdSet.value,
+    usedSyntheticIds,
+    addEntity,
+  }
   for (const control of entityControls.value) {
     const entries = entityEntries.value[control.property] ?? []
     if (!entries.length) continue
-    const refs = emitEntityEntries(
-      entries,
-      entrySourcePolicy(control.entitySources),
-      crateIdSet.value,
-      entitySubControls.value[control.property] ?? [],
-      // The emitted @type; the label slugs the synthetic @id (typeName may be a
-      // full URI, M1, which would make an ugly @id).
-      entityTypeName(control),
-      entityTypeLabelFor(control),
-      usedSyntheticIds,
-      addEntity,
-    )
+    const refs = emitEntityEntries(control, entries, emitCtx, 1)
     if (!refs.length) continue
     dataset[control.property] = control.multiple ? refs : refs[0]
   }
@@ -1438,6 +1280,8 @@ async function submit() {
               :presence-violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...shaclViolationsFor(control.property)]"
               :type-label="entityTypeLabelFor(control)"
               :crate-options="crateOptions"
+              :entity-rules="profileEntityRules"
+              :depth="1"
               @add-new="addEntityEntry(control, 'new')"
               @add-existing="addEntityEntry(control, 'existing')"
               @remove="(index: number) => removeEntityEntry(control.property, index)"

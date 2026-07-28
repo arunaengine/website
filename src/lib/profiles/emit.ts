@@ -1,8 +1,9 @@
 import { normalizeProfileValues } from './controls'
 import { isAbsoluteUri, isRecord, sameSchemaOrgType, SCHEMA_ORG } from './uri'
-import type { EntityEntry, EntrySourcePolicy } from './entityEntries'
-import { effectiveEntryRef, normalizedCustomId } from './entityEntries'
-import type { ProfileControl } from './types'
+import type { EntityEntry } from './entityEntries'
+import { effectiveEntryRef, entrySourcePolicy, normalizedCustomId } from './entityEntries'
+import { entriesOf, entityTypeLabelFor, entityTypeName, nestsSubForm, subControlsFor } from './entityTree'
+import type { ProfileControl, ProfileEntityRule } from './types'
 
 // Emission helpers for profile-driven dataset crates, shared with
 // NewDatasetDialog.buildRoCrate: entity instances and select-object choices
@@ -27,18 +28,32 @@ export function uniqueId(base: string, used: Set<string>): string {
   return candidate
 }
 
+// The shared emission context threaded through the recursion: the profile's
+// entity rules (nested sub-controls and type names derive from them), the crate
+// @context term map, the currently valid crate reference ids, plus the
+// crate-wide synthetic-id set and entity sink.
+export interface EntityEmitContext {
+  entityRules: ProfileEntityRule[]
+  contextTerms: Record<string, string>
+  validCrateIds: ReadonlySet<string>
+  usedSyntheticIds: Set<string>
+  addEntity: AddEntity
+}
+
 // One entity instance → a flattened contextual entity. @id: an identifier value
 // that is an absolute URI (e.g. an ORCID) becomes the @id; otherwise a
-// uniquified `#<type-slug>-<slug(name|index)>`. Nested entity references (depth
-// 1) emit as {"@id": uri} from their URI string.
+// uniquified `#<type-slug>-<slug(name|index)>`. Nesting entity fields (their
+// value an EntityEntry[]) recurse through emitEntityEntries into contextual
+// entities + {"@id"} refs; flat (cap-level or ruleless) references emit
+// {"@id": uri} from their URI string.
 export function buildEntityInstance(
   instance: Record<string, unknown>,
   subControls: ProfileControl[],
   typeName: string,
   typeLabel: string,
   index: number,
-  usedSyntheticIds: Set<string>,
-  addEntity: AddEntity,
+  ctx: EntityEmitContext,
+  depth: number,
   // Author-chosen @id (already normalized, see normalizedCustomId): wins over
   // both the identifier-derived and the synthetic id.
   overrideId?: string,
@@ -52,10 +67,11 @@ export function buildEntityInstance(
   const props = normalizeProfileValues(instance, scalarControls, { omitEmpty: true })
   for (const control of subControls) {
     if (control.control === 'entity') {
-      // Depth-1 nested reference(s): a URI string → {"@id"}, or an array of URIs →
-      // an array of {"@id"} when the sub-control is `multiple` (D5).
       const raw = instance[control.property]
-      if (control.multiple) {
+      if (nestsSubForm(control, depth)) {
+        const refs = emitEntityEntries(control, entriesOf(raw), ctx, depth + 1)
+        if (refs.length) props[control.property] = control.multiple ? refs : refs[0]
+      } else if (control.multiple) {
         const refs = (Array.isArray(raw) ? raw : [])
           .map((entry) => String(entry).trim())
           .filter(Boolean)
@@ -67,7 +83,7 @@ export function buildEntityInstance(
     } else if (control.control === 'select-object') {
       // The chosen option(s) are emitted verbatim as contextual entities +
       // {"@id"} ref(s) — an array of refs when the sub-control is `multiple`.
-      const ref = emitSelectObject(control, instance[control.property], addEntity)
+      const ref = emitSelectObject(control, instance[control.property], ctx.addEntity)
       if (ref) props[control.property] = ref
     }
   }
@@ -80,7 +96,7 @@ export function buildEntityInstance(
     id = identifierValue.trim()
   } else {
     const nameForSlug = typeof props.name === 'string' ? props.name : firstStringValue(props)
-    id = uniqueId(`#${slugify(typeLabel) || 'entity'}-${slugify(nameForSlug) || String(index + 1)}`, usedSyntheticIds)
+    id = uniqueId(`#${slugify(typeLabel) || 'entity'}-${slugify(nameForSlug) || String(index + 1)}`, ctx.usedSyntheticIds)
   }
   return { '@id': id, '@type': typeName, ...props }
 }
@@ -172,33 +188,35 @@ function firstStringValue(props: Record<string, unknown>): string {
 }
 
 // One entity control's combined reuse-or-create entries → the {"@id"}
-// reference list for the owning dataset property (plan Phase 4). Described-new
-// entries flatten through buildEntityInstance into contextual entities (added
-// via addEntity, which dedupes by @id across the whole crate); reuse entries
-// contribute a bare {"@id"} with NO inline entity. Repeated @ids within the
-// property are deduped order-preserving, so a reuse reference pointing at the
-// same @id an instance produced (or two identical reuse rows) emits once.
-// Blank/stale reuse refs contribute nothing (effectiveEntryRef).
+// reference list for the owning property (plan Phase 4), at any depth (`depth`
+// is the entries' sub-form depth; nesting fields inside recurse at depth + 1).
+// Described-new entries flatten through buildEntityInstance into contextual
+// entities (added via ctx.addEntity, which dedupes by @id across the whole
+// crate); reuse entries contribute a bare {"@id"} with NO inline entity.
+// Repeated @ids within the property are deduped order-preserving, so a reuse
+// reference pointing at the same @id an instance produced (or two identical
+// reuse rows) emits once. Blank/stale reuse refs contribute nothing
+// (effectiveEntryRef).
 export function emitEntityEntries(
+  control: ProfileControl,
   entries: EntityEntry[],
-  policy: EntrySourcePolicy,
-  validCrateIds: ReadonlySet<string>,
-  subControls: ProfileControl[],
-  typeName: string,
-  typeLabel: string,
-  usedSyntheticIds: Set<string>,
-  addEntity: AddEntity,
+  ctx: EntityEmitContext,
+  depth: number,
 ): Array<{ '@id': string }> {
+  const policy = entrySourcePolicy(control.entitySources)
+  const subControls = subControlsFor(control, ctx.entityRules)
+  const typeName = entityTypeName(control, ctx.contextTerms)
+  const typeLabel = entityTypeLabelFor(control)
   const refs: Array<{ '@id': string }> = []
   const seen = new Set<string>()
   entries.forEach((entry, index) => {
     let id: string
     if (entry.source === 'new') {
-      const entity = buildEntityInstance(entry.instance ?? {}, subControls, typeName, typeLabel, index, usedSyntheticIds, addEntity, normalizedCustomId(entry))
-      addEntity(entity)
+      const entity = buildEntityInstance(entry.instance ?? {}, subControls, typeName, typeLabel, index, ctx, depth, normalizedCustomId(entry))
+      ctx.addEntity(entity)
       id = String(entity['@id'])
     } else {
-      id = effectiveEntryRef(entry, policy, validCrateIds)
+      id = effectiveEntryRef(entry, policy, ctx.validCrateIds)
       if (!id) return
     }
     if (seen.has(id)) return

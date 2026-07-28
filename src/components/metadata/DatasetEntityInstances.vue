@@ -9,13 +9,29 @@ import { ChevronDown, ChevronRight, Link2, Plus, X } from '@lucide/vue'
 import { isInvalidReferenceUri, REFERENCE_URI_MESSAGE } from '@/lib/profiles/uri'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { entrySourcePolicy, type EntityEntry } from '@/lib/profiles/entityEntries'
-import type { ProfileControl, ProfileViolation } from '@/lib/profiles/types'
+import {
+  countEntryErrors,
+  entriesOf,
+  entityTypeLabelFor,
+  nestsSubForm,
+  newEntityEntry,
+  newRefEntry,
+  removedEntry,
+  subControlsFor,
+  updatedEntries,
+  type EntryViolationNode,
+} from '@/lib/profiles/entityTree'
+import type { ProfileControl, ProfileEntityRule, ProfileViolation } from '@/lib/profiles/types'
 
 // The combined reuse-or-create editor for one entity-valued dataset field
 // (plan Phase 4): one ordered entry list where each entry either describes a
 // new instance (sub-form) or reuses an existing entity (reference input and/or
 // crate picker, per the rule's entitySources policy). Single-valued rules hold
 // exactly one entry with a source toggle; multi-valued rules mix freely.
+// Entity fields inside a sub-form whose target type has an entity rule render
+// this component RECURSIVELY (up to MAX_ENTITY_DEPTH); nested ops are folded
+// into a single `update(index, property, newEntries)` emit, so only the
+// top-level owner (NewDatasetDialog) holds entry state.
 
 const props = defineProps<{
   // The entity-ref control on the parent form (carries label/required/multiple
@@ -25,14 +41,18 @@ const props = defineProps<{
   subControls: ProfileControl[]
   // The combined entry list (described-new + reuse entries).
   entries: EntityEntry[]
-  // Per-entry violations (outer index = entry): sub-form scalar violations for
-  // described-new entries, reference-format violations for reuse entries.
-  entryViolations: ProfileViolation[][]
+  // Per-entry violation nodes (outer index = entry): own sub-form scalar /
+  // reference-format violations plus nested trees keyed by sub-control property.
+  entryViolations: EntryViolationNode[]
   // Presence violations (required/recommended) raised on the entity control itself.
   presenceViolations: ProfileViolation[]
   typeLabel: string
   // Crate-local pick options (the dialog's current data references).
   crateOptions: Array<{ value: string; label: string }>
+  // All profile entity rules, so nested sub-controls resolve at every depth.
+  entityRules: ProfileEntityRule[]
+  // The depth of the sub-forms this instance renders (1 = top level).
+  depth: number
 }>()
 
 const emit = defineEmits<{
@@ -67,16 +87,23 @@ function summary(entry: EntityEntry, index: number): string {
 }
 
 function violationsFor(index: number, property: string): ProfileViolation[] {
-  return (props.entryViolations[index] ?? []).filter((violation) => violation.fieldId === property)
+  return (props.entryViolations[index]?.own ?? []).filter((violation) => violation.fieldId === property)
 }
 
+// Nested errors count too, so a collapsed card still shows its error dot.
 function entryHasError(index: number): boolean {
-  return (props.entryViolations[index] ?? []).some((violation) => violation.severity === 'error')
+  const node = props.entryViolations[index]
+  if (!node) return false
+  return node.own.some((violation) => violation.severity === 'error') || countEntryErrors(Object.values(node.nested).flat()) > 0
 }
 
 // Reuse-entry violations carry the control's own property as fieldId.
 function refViolationsFor(index: number): ProfileViolation[] {
-  return props.entryViolations[index] ?? []
+  return props.entryViolations[index]?.own ?? []
+}
+
+function nestedNodes(index: number, property: string): EntryViolationNode[] {
+  return props.entryViolations[index]?.nested[property] ?? []
 }
 
 // The crate option a reuse entry currently resolves to ('' when it is a URI or
@@ -86,11 +113,12 @@ function crateValueOf(entry: EntityEntry): string {
   return props.crateOptions.some((option) => option.value === ref) ? ref : ''
 }
 
-// D5: a nested entity reference with multiple:true is a repeatable list of
-// absolute-URI inputs, each emitted as a `{"@id"}` reference. The list lives on
-// the instance value keyed by the sub-control property; we edit it by emitting
-// the whole array back through `update`. Single references stay a plain
-// ProfileControlField URI input.
+// D5: a FLAT entity reference (target without an entity rule, or at the depth
+// cap) with multiple:true is a repeatable list of absolute-URI inputs, each
+// emitted as a `{"@id"}` reference. The list lives on the instance value keyed
+// by the sub-control property; we edit it by emitting the whole array back
+// through `update`. Single flat references stay a plain ProfileControlField
+// URI input.
 function refList(entry: EntityEntry, property: string): string[] {
   const raw = entry.instance?.[property]
   return Array.isArray(raw) ? raw.map((value) => String(value)) : []
@@ -112,6 +140,47 @@ function removeRef(index: number, property: string, refIndex: number) {
 // NewDatasetDialog's gating violations (via uri.ts, L7) so display and gating agree.
 function rowRefError(value: string): boolean {
   return isInvalidReferenceUri(value)
+}
+
+// Nested sub-form ops: each computes the entry's NEW nested entry list and
+// folds it into one `update(index, property, list)` emit, so every level above
+// applies the same immutable rebuild and only the dialog owns state.
+function nestedEntries(index: number, property: string): EntityEntry[] {
+  return entriesOf(props.entries[index]?.instance?.[property])
+}
+function setNested(index: number, property: string, list: EntityEntry[]) {
+  emit('update', index, property, list)
+}
+function nestedAdd(index: number, field: ProfileControl, source: 'new' | 'existing') {
+  const created = source === 'new' ? newEntityEntry(field, props.entityRules, props.depth + 1) : newRefEntry()
+  setNested(index, field.property, [...nestedEntries(index, field.property), created])
+}
+function nestedRemove(index: number, field: ProfileControl, nestedIndex: number) {
+  setNested(index, field.property, removedEntry(nestedEntries(index, field.property), nestedIndex))
+}
+// The replaced entry's values are dropped deliberately (a fresh start per
+// source keeps the emission unambiguous) — mirrors the top-level switch.
+function nestedSwitch(index: number, field: ProfileControl, nestedIndex: number, source: 'new' | 'existing') {
+  const list = nestedEntries(index, field.property)
+  const current = list[nestedIndex]
+  if (!current || current.source === source) return
+  const fresh = source === 'new' ? newEntityEntry(field, props.entityRules, props.depth + 1) : newRefEntry()
+  setNested(index, field.property, updatedEntries(list, nestedIndex, () => fresh))
+}
+function nestedValue(index: number, field: ProfileControl, nestedIndex: number, property: string, value: unknown) {
+  setNested(index, field.property, updatedEntries(nestedEntries(index, field.property), nestedIndex, (entry) =>
+    entry.source === 'new' ? { ...entry, instance: { ...(entry.instance ?? {}), [property]: value } } : undefined,
+  ))
+}
+function nestedRef(index: number, field: ProfileControl, nestedIndex: number, value: string) {
+  setNested(index, field.property, updatedEntries(nestedEntries(index, field.property), nestedIndex, (entry) =>
+    entry.source === 'existing' ? { ...entry, ref: value } : undefined,
+  ))
+}
+function nestedCustomId(index: number, field: ProfileControl, nestedIndex: number, value: string) {
+  setNested(index, field.property, updatedEntries(nestedEntries(index, field.property), nestedIndex, (entry) =>
+    entry.source === 'new' ? { ...entry, customId: value } : undefined,
+  ))
 }
 
 // Target-aware placeholder for a reference URI input (ORCID for a Person, ROR
@@ -252,13 +321,35 @@ function emptyStateText(): string {
         </template>
       </div>
 
-      <!-- Described-new entry: the target shape's sub-form. Nested entity
-           references are capped at depth 1: a single reference is a plain URI
-           input via ProfileControlField; a multiple reference (D5) is a
-           repeatable add/remove list of URI inputs, each emitted as a {"@id"} ref. -->
+      <!-- Described-new entry: the target shape's sub-form. Entity fields whose
+           target type has an entity rule recurse into this component (up to
+           MAX_ENTITY_DEPTH); at the cap or without a rule they stay flat URI
+           references — a single one a plain URI input via ProfileControlField, a
+           multiple one (D5) a repeatable add/remove list of URI inputs, each
+           emitted as a {"@id"} ref. -->
       <div v-else-if="isOpen(entry.__uid)" class="grid gap-3 border-t border-border p-3 sm:grid-cols-2">
         <template v-for="field in subControls" :key="field.property">
-          <div v-if="field.control === 'entity' && field.multiple" class="sm:col-span-2">
+          <div v-if="field.control === 'entity' && nestsSubForm(field, depth)" class="rounded-md border-l-2 border-border pl-3 sm:col-span-2">
+            <DatasetEntityInstances
+              :control="field"
+              :sub-controls="subControlsFor(field, entityRules)"
+              :entries="nestedEntries(index, field.property)"
+              :entry-violations="nestedNodes(index, field.property)"
+              :presence-violations="violationsFor(index, field.property)"
+              :type-label="entityTypeLabelFor(field)"
+              :crate-options="crateOptions"
+              :entity-rules="entityRules"
+              :depth="depth + 1"
+              @add-new="nestedAdd(index, field, 'new')"
+              @add-existing="nestedAdd(index, field, 'existing')"
+              @remove="(nestedIndex: number) => nestedRemove(index, field, nestedIndex)"
+              @switch-source="(nestedIndex: number, source: 'new' | 'existing') => nestedSwitch(index, field, nestedIndex, source)"
+              @update="(nestedIndex: number, property: string, value: unknown) => nestedValue(index, field, nestedIndex, property, value)"
+              @update-ref="(nestedIndex: number, value: string) => nestedRef(index, field, nestedIndex, value)"
+              @update-custom-id="(nestedIndex: number, value: string) => nestedCustomId(index, field, nestedIndex, value)"
+            />
+          </div>
+          <div v-else-if="field.control === 'entity' && field.multiple" class="sm:col-span-2">
             <div class="flex items-center justify-between gap-3">
               <label class="text-xs font-medium text-foreground">
                 {{ field.label }} <span v-if="field.required" class="text-destructive">*</span>
