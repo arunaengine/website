@@ -342,8 +342,10 @@ function relativeArtifactUrl(id: string, baseUrl: string): string | undefined {
   }
 }
 
+// Published artifacts keep their contentUrl across profile updates, so the
+// HTTP cache must revalidate instead of serving a heuristically fresh copy.
 async function fetchArtifactText(url: string): Promise<string> {
-  const response = await fetch(url)
+  const response = await fetch(url, { cache: 'no-cache' })
   if (!response.ok) throw new Error(`Fetching profile artifact failed (${response.status} ${response.statusText}): ${url}`)
   return await response.text()
 }

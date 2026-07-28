@@ -578,7 +578,9 @@ export async function fetchUrlText(target: string): Promise<string> {
   const object = hasActiveKey.value ? resolveObjectUrl(target) : null
   if (object) return getObjectText(object.bucket, object.key, object.nodeId)
   if (isDrsReference(target) && !/^drs:\/\//i.test(target)) return fetchDrsText(target)
-  const response = await fetch(target)
+  // Published profile artifacts keep their URL across updates, so revalidate
+  // instead of trusting the HTTP cache's heuristic freshness.
+  const response = await fetch(target, { cache: 'no-cache' })
   if (!response.ok) throw new Error(`Fetch failed (${response.status} ${response.statusText}).`)
   return response.text()
 }

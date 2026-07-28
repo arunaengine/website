@@ -403,6 +403,25 @@ async function getMetadataDocument(documentId: string): Promise<MetadataDocument
   return summary
 }
 
+// An accepted update re-materializes the graph asynchronously, and until it
+// lands the document GET answers 503 while the catalog listing still exports
+// the pre-update summaries. Polling the (cheap, registry-only) GET is the
+// barrier that keeps the refresh after a replace from re-reading — and then
+// rendering — the state the update just replaced. Gives up quietly after the
+// poll window; the refresh then behaves no worse than without the barrier.
+async function awaitCrateMaterialized(documentId: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await getMetadataDocument(documentId)
+      return
+    } catch (err) {
+      const materializing = err instanceof ApiError && err.status === 503
+      if (!materializing || attempt >= CRATE_POLL_DELAYS_MS.length) return
+      await new Promise((resolve) => setTimeout(resolve, CRATE_POLL_DELAYS_MS[attempt]))
+    }
+  }
+}
+
 // Uncached, unresolved crate for editing (loadRoCrate caches and resolves
 // profile artifacts, which must never be written back).
 async function fetchRoCrateRaw(documentId: string): Promise<unknown> {
@@ -432,6 +451,7 @@ async function replaceMetadataRoCrate(
       body: JSON.stringify(input),
     })
     invalidateCrate(documentId)
+    await awaitCrateMaterialized(documentId)
     // The update is accepted; a failing catalog refresh (projection race) must
     // not surface as a save failure.
     await loadMetadata().catch(() => undefined)
