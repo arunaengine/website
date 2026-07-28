@@ -207,16 +207,20 @@ async function refresh() {
 }
 
 async function loadInfo(context = refreshContext()) {
+  // Partial tolerance: one endpoint failing or degrading (e.g. realm
+  // discovery with offline nodes) must not blank the others' data — keep the
+  // last-known values and only fail when both core calls are down.
   // /info/usage is not deployed everywhere yet; hide the stats on failure.
-  const [info, realm, usage] = await Promise.all([
+  const [info, realm, usage] = await Promise.allSettled([
     apiRequest<InfoResponse>('/info', {}, context.client),
     apiRequest<RealmInfoResponse>('/info/realm', {}, context.client),
-    apiRequest<UsageResponse>('/info/usage', {}, context.client).catch(() => null),
+    apiRequest<UsageResponse>('/info/usage', {}, context.client),
   ])
   if (context.epoch !== sessionEpoch.value) return
-  nodeInfo.value = info
-  realmInfo.value = realm
-  usageInfo.value = usage
+  if (info.status === 'fulfilled') nodeInfo.value = info.value
+  if (realm.status === 'fulfilled') realmInfo.value = realm.value
+  usageInfo.value = usage.status === 'fulfilled' ? usage.value : null
+  if (info.status === 'rejected' && realm.status === 'rejected') throw info.reason
 }
 
 // Right after a create, the RO-Crate graph projection can lag behind the

@@ -38,16 +38,24 @@ async function refreshStatus() {
   if (refreshing.value) return
   refreshing.value = true
   try {
-    await loadInfo()
-    statusError.value = null
-    lastUpdated.value = new Date()
+    // Info refresh and browser probes run independently: a failing backend
+    // answer must not suppress the per-node reachability probes.
+    const infoRefresh = loadInfo().then(
+      () => {
+        statusError.value = null
+        lastUpdated.value = new Date()
+      },
+      (err) => {
+        statusError.value = err instanceof ApiError || err instanceof Error ? err.message : String(err)
+      },
+    )
+    // The first round needs a node list; later rounds probe the last-known one.
+    if (!realmInfo.value?.nodes?.length) await infoRefresh
     if (!probedOnce) {
       await new Promise((resolve) => setTimeout(resolve, INITIAL_PROBE_DELAY_MS))
       probedOnce = true
     }
-    await probeRealmNodes()
-  } catch (err) {
-    statusError.value = err instanceof ApiError || err instanceof Error ? err.message : String(err)
+    await Promise.all([infoRefresh, probeRealmNodes()])
   } finally {
     refreshing.value = false
   }
@@ -63,10 +71,18 @@ async function probeRealmNodes() {
   const targets = (realmInfo.value?.nodes ?? [])
     .map((node) => ({ id: node.node_id, base: probeBase(node) }))
     .filter((target): target is { id: string; base: string } => !!target.base)
-  const results = await Promise.all(
-    targets.map(async ({ id, base }) => [id, await probeNode(base)] as const),
+  // Drop probes of nodes that left the realm; current nodes keep their last
+  // result until the fresh one lands (no flicker back to "measuring").
+  const keep = new Set(targets.map((target) => target.id))
+  probes.value = Object.fromEntries(Object.entries(probes.value).filter(([id]) => keep.has(id)))
+  // Each probe commits as it settles, so a healthy node's latency shows
+  // immediately instead of waiting out an offline node's timeout.
+  await Promise.all(
+    targets.map(async ({ id, base }) => {
+      const probe = await probeNode(base)
+      probes.value = { ...probes.value, [id]: probe }
+    }),
   )
-  probes.value = Object.fromEntries(results)
 }
 
 onMounted(() => void refreshStatus())
