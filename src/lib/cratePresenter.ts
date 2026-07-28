@@ -6,6 +6,7 @@
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 import { readableIri } from '@/lib/identifiers'
 import { isHttpUrl } from '@/lib/utils'
+import { contextTermsOf } from '@/lib/profiles/contextTerms'
 import { isDatasetType, termNameFromUri } from '@/lib/profiles/uri'
 import type { ProfileEntityRule } from '@/lib/profiles/types'
 import {
@@ -42,6 +43,8 @@ export interface PresentedField {
   label: string
   profiled: boolean
   description?: string
+  /** Resolved property IRI (crate @context mapping, or the key itself). */
+  termUri?: string
   values: PresentedValue[]
 }
 
@@ -259,18 +262,35 @@ function entityFields(
   skip: Set<string>,
   refMode: 'pointer' | 'drop',
   derived: Set<string>,
+  terms: Record<string, string> = {},
 ): PresentedField[] {
   const rows = new Map<string, FieldRow>()
   const push = (key: string, explicitLabel: string | undefined, value: PresentedValue) => {
     const rule = ruleFields?.get(key)
     let row = rows.get(key)
     if (!row) {
+      // A custom key resolves through the crate's own @context; an absolute
+      // URI key is its own term. When neither profile nor caller supply a
+      // label, an in-graph term definition (DefinedTerm/Property entity at
+      // the term URI) may, which is the RO-Crate idiom for ad-hoc terms.
+      const termUri = terms[key] ?? (isHttpUrl(key) ? key : undefined)
+      let label = rule?.label ?? explicitLabel
+      let description = rule?.description
+      if (!label) {
+        const definition = byId.get(termUri ?? key)
+        const defTypes = definition ? typesOf(definition).map(termNameFromUri) : []
+        if (defTypes.includes('DefinedTerm') || defTypes.includes('Property')) {
+          label = stringProp(definition?.name)
+          description ??= stringProp(definition?.description)
+        }
+      }
       row = {
         id: key,
         key: termNameFromUri(key),
-        label: rule?.label ?? explicitLabel ?? prettifyKey(key),
+        label: label ?? prettifyKey(key),
         profiled: Boolean(rule),
-        description: rule?.description,
+        description,
+        termUri,
         values: [],
         order: rule?.order ?? UNPROFILED,
       }
@@ -343,15 +363,25 @@ function entityFields(
 
 const EMPTY: CratePresentation = { fields: [], people: [], organizations: [], entities: [], comments: [] }
 
-export function presentCrate(crate: unknown, options: PresentOptions = {}): CratePresentation {
-  const graph = crateGraph(crate)
-  if (!graph.length) return EMPTY
-  const rootId = crateRootId(crate)
+function indexGraph(graph: Array<Record<string, unknown>>): EntityIndex {
   const byId: EntityIndex = new Map()
   for (const entity of graph) {
     const id = entity['@id']
     if (typeof id === 'string' && !byId.has(id)) byId.set(id, entity)
   }
+  return byId
+}
+
+function crateTerms(crate: unknown): Record<string, string> {
+  return contextTermsOf(isRecord(crate) ? crate['@context'] : undefined)
+}
+
+export function presentCrate(crate: unknown, options: PresentOptions = {}): CratePresentation {
+  const graph = crateGraph(crate)
+  if (!graph.length) return EMPTY
+  const rootId = crateRootId(crate)
+  const byId = indexGraph(graph)
+  const terms = crateTerms(crate)
   const root = rootId ? byId.get(rootId) : undefined
   const rules = buildRuleIndex(options.profile ?? [])
 
@@ -446,7 +476,7 @@ export function presentCrate(crate: unknown, options: PresentOptions = {}): Crat
   }
 
   const derived = new Set<string>()
-  const fields = root ? entityFields(root, rules.root, byId, homes, ROOT_SKIP, 'drop', derived) : []
+  const fields = root ? entityFields(root, rules.root, byId, homes, ROOT_SKIP, 'drop', derived, terms) : []
 
   const entities = contextIds.map((id): PresentedEntity => {
     const entity = byId.get(id)
@@ -459,7 +489,7 @@ export function presentCrate(crate: unknown, options: PresentOptions = {}): Crat
       kind: entityKind(effectiveTypes(types, rules)),
       profileLabel: match?.label,
       relations: relationIndex.get(id) ?? [],
-      fields: entity ? entityFields(entity, match?.fields, byId, homes, CONTEXT_SKIP, 'pointer', derived) : [],
+      fields: entity ? entityFields(entity, match?.fields, byId, homes, CONTEXT_SKIP, 'pointer', derived, terms) : [],
       unresolved: isStub(entity),
     }
   })
@@ -475,5 +505,69 @@ export function presentCrate(crate: unknown, options: PresentOptions = {}): Crat
     organizations,
     entities,
     comments,
+  }
+}
+
+export interface PresentedDataEntity extends PresentedEntity {
+  /** Full @type values, for chips and external ontology links. */
+  typeUris: string[]
+  contentUrl?: string
+  encodingFormat?: string
+  contentSize?: string
+  /** Direct hasPart children (a sub-dataset's own listing). */
+  children: Array<{ id: string; name: string; directory: boolean }>
+}
+
+// Identity-strip properties the data-entity dialog shows outside the ledger,
+// plus hasPart, which renders as the children list.
+const DATA_ENTITY_SKIP = new Set(['name', 'contentSize', 'encodingFormat', 'contentUrl', 'hasPart'])
+
+// One data entity (file or sub-dataset) presented for the info dialog. Unlike
+// presentCrate, every in-graph reference target is jumpable: the dialog drills
+// into whatever the entity points at, while out-of-graph absolute ids stay
+// external links.
+export function presentDataEntity(
+  crate: unknown,
+  entityId: string,
+  options: PresentOptions = {},
+): PresentedDataEntity | null {
+  const graph = crateGraph(crate)
+  if (!graph.length) return null
+  const byId = indexGraph(graph)
+  const entity = byId.get(entityId)
+  if (!entity) return null
+  const rules = buildRuleIndex(options.profile ?? [])
+  const terms = crateTerms(crate)
+  const types = typesOf(entity)
+  const match = ruleFor([...types, ...effectiveTypes(types, rules)], rules)
+  const homes = new Map<string, Home>()
+  for (const id of byId.keys()) homes.set(id, 'context')
+
+  const children: PresentedDataEntity['children'] = []
+  for (const value of toArray(entity.hasPart)) {
+    const id = refId(value)
+    if (!id || id === 'ro-crate-metadata.json') continue
+    const target = byId.get(id)
+    children.push({
+      id,
+      name: stringProp(target?.name) || readableIri(id),
+      directory: target ? typesOf(target).some((type) => termNameFromUri(type) === 'Dataset') : false,
+    })
+  }
+
+  return {
+    id: entityId,
+    name: stringProp(entity.name) || readableIri(entityId),
+    types: types.map(termNameFromUri),
+    typeUris: types,
+    kind: entityKind(effectiveTypes(types, rules)),
+    profileLabel: match?.label,
+    relations: [],
+    fields: entityFields(entity, match?.fields, byId, homes, DATA_ENTITY_SKIP, 'pointer', new Set(), terms),
+    unresolved: isStub(entity),
+    contentUrl: stringProp(entity.contentUrl),
+    encodingFormat: stringProp(entity.encodingFormat),
+    contentSize: stringProp(entity.contentSize),
+    children,
   }
 }

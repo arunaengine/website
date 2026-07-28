@@ -49,7 +49,18 @@ function plainTitle(value: PresentedValue): string | undefined {
           class="text-[11px] font-medium uppercase tracking-wider"
           :class="field.profiled ? 'text-foreground/80' : 'text-muted-foreground'"
         >{{ field.label }}</span>
-        <span v-if="field.key.toLowerCase() !== field.label.toLowerCase()" class="font-mono text-[10px] text-muted-foreground/60">{{ field.key }}</span>
+        <!-- The mono token also shows when key and label coincide but a term
+             URI resolves it (a context-mapped custom key like p0000010): the
+             link to the ontology is then the only honest explanation. -->
+        <ExternalLink
+          v-if="field.termUri"
+          :href="field.termUri"
+          :label="field.key"
+          :show-icon="false"
+          class="font-mono text-[10px] text-muted-foreground/60"
+          :title="field.termUri"
+        />
+        <span v-else-if="field.key.toLowerCase() !== field.label.toLowerCase()" class="font-mono text-[10px] text-muted-foreground/60">{{ field.key }}</span>
       </dt>
       <dd class="min-w-0">
         <div v-if="chips(field)" class="flex flex-wrap gap-1.5">
