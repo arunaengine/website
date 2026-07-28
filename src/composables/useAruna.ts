@@ -105,6 +105,13 @@ const profileItems = ref<MetadataDocumentListItem[]>([])
 const credentials = ref<S3CredentialSummary[]>([])
 const fullCrates = ref<Record<string, unknown>>({})
 const cratePending = ref<Record<string, boolean>>({})
+// Invalidation fence for the crate cache: a load captures its document's
+// generation before the first request and commits only when it still matches,
+// so a fetch already in flight when a write invalidated the document cannot
+// re-cache the replaced graph. The loads map keeps concurrent consumers on one
+// shared request instead of stacking their own materialization polls.
+const crateGenerations = new Map<string, number>()
+const crateLoads = new Map<string, Promise<unknown>>()
 const bootstrapped = ref(false)
 // Monotonic identity counter: bumped whenever the token or API base changes,
 // so in-flight work and module-singleton caches can tell sessions apart.
@@ -154,6 +161,8 @@ function clearIdentityState(clearPublic = false) {
   profileItems.value = []
   fullCrates.value = {}
   cratePending.value = {}
+  crateGenerations.clear()
+  crateLoads.clear()
   authError.value = null
   if (clearPublic) {
     nodeInfo.value = null
@@ -342,8 +351,25 @@ async function fetchProfileArtifact(url: string): Promise<string> {
 // A 503 from the rocrate export means the graph projection is still
 // materializing (expected right after create), so poll with backoff instead
 // of surfacing an error, and give up with CrateNotReadyError after ~20s.
-async function loadRoCrate(documentId: string): Promise<unknown> {
-  if (fullCrates.value[documentId]) return fullCrates.value[documentId]
+// `force` skips the cache read and replaces any shared in-flight load, so a
+// caller that just invalidated the document always gets a fresh fetch.
+async function loadRoCrate(documentId: string, options: { force?: boolean } = {}): Promise<unknown> {
+  if (!options.force) {
+    if (fullCrates.value[documentId]) return fullCrates.value[documentId]
+    const inFlight = crateLoads.get(documentId)
+    if (inFlight) return inFlight
+  }
+  const load = fetchAndCacheCrate(documentId)
+  crateLoads.set(documentId, load)
+  try {
+    return await load
+  } finally {
+    if (crateLoads.get(documentId) === load) crateLoads.delete(documentId)
+  }
+}
+
+async function fetchAndCacheCrate(documentId: string): Promise<unknown> {
+  const generation = crateGenerations.get(documentId) ?? 0
   const context = refreshContext()
   try {
     for (let attempt = 0; ; attempt++) {
@@ -361,7 +387,12 @@ async function loadRoCrate(documentId: string): Promise<unknown> {
         // Crates without external artifacts pass through untouched.
         const resolved = await resolveProfileArtifacts(response.rocrate, fetchProfileArtifact)
         assertCurrentSession(context.epoch)
-        fullCrates.value = { ...fullCrates.value, [documentId]: resolved }
+        // Commit only when no invalidation happened while this load was in
+        // flight; the caller still gets the value it asked for, but a graph
+        // superseded by a write never re-enters the shared cache.
+        if ((crateGenerations.get(documentId) ?? 0) === generation) {
+          fullCrates.value = { ...fullCrates.value, [documentId]: resolved }
+        }
         return resolved
       } catch (err) {
         const materializing = err instanceof ApiError && err.status === 503
@@ -406,8 +437,8 @@ async function getMetadataDocument(documentId: string): Promise<MetadataDocument
 // An accepted update re-materializes the graph asynchronously, and until it
 // lands the document GET answers 503 while the catalog listing still exports
 // the pre-update summaries. Polling the (cheap, registry-only) GET is the
-// barrier that keeps the refresh after a replace from re-reading — and then
-// rendering — the state the update just replaced. Gives up quietly after the
+// barrier that keeps the refresh after a replace from re-reading and then
+// rendering the state the update just replaced. Gives up quietly after the
 // poll window; the refresh then behaves no worse than without the barrier.
 async function awaitCrateMaterialized(documentId: string): Promise<void> {
   for (let attempt = 0; ; attempt++) {
@@ -436,6 +467,9 @@ async function fetchRoCrateRaw(documentId: string): Promise<unknown> {
 }
 
 function invalidateCrate(documentId: string) {
+  // The generation bump fences loads already in flight: whatever they were
+  // fetching predates this invalidation and must not be re-cached.
+  crateGenerations.set(documentId, (crateGenerations.get(documentId) ?? 0) + 1)
   const { [documentId]: _removed, ...rest } = fullCrates.value
   fullCrates.value = rest
 }
@@ -450,10 +484,14 @@ async function replaceMetadataRoCrate(
       method: 'PUT',
       body: JSON.stringify(input),
     })
+    const wasCached = documentId in fullCrates.value
     invalidateCrate(documentId)
     await awaitCrateMaterialized(documentId)
-    // The update is accepted; a failing catalog refresh (projection race) must
-    // not surface as a save failure.
+    // A document someone had on screen must come back as the new full crate,
+    // not as a summary-parsed downgrade of it; re-prime before the catalog
+    // refresh remaps. The update is accepted at this point, so neither a
+    // failing re-prime nor a failing refresh may surface as a save failure.
+    if (wasCached) await loadRoCrate(documentId, { force: true }).catch(() => undefined)
     await loadMetadata().catch(() => undefined)
     return summary
   } finally {

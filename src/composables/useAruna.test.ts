@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest'
-import { isRecencyOrdered, walkRecentPages } from './useAruna'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { isRecencyOrdered, useAruna, walkRecentPages } from './useAruna'
+import { apiRequest } from '@/lib/api'
 import type { ListMetadataResponse, MetadataDocumentListItem } from '@/lib/api'
+
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return { ...actual, apiRequest: vi.fn() }
+})
 
 const HOUR = 3_600_000
 const START = Date.UTC(2026, 6, 27)
@@ -107,5 +113,49 @@ describe('the recent page walk', () => {
     }, 5)
     expect(offsets).toEqual([0])
     expect(walk).toEqual({ ordered: false, documents: [] })
+  })
+})
+
+describe('the crate cache fence', () => {
+  afterEach(() => {
+    vi.mocked(apiRequest).mockReset()
+  })
+
+  it('does not re-cache a crate superseded while its load was in flight', async () => {
+    const { loadRoCrate, invalidateCrate, fullCrates } = useAruna()
+    let release!: (value: unknown) => void
+    vi.mocked(apiRequest).mockReturnValueOnce(new Promise((resolve) => (release = resolve)))
+
+    const inFlight = loadRoCrate('doc-race')
+    // The write lands while the fetch above is still on the wire.
+    invalidateCrate('doc-race')
+    release({ rocrate: { '@graph': [{ '@id': 'old' }] } })
+
+    await expect(inFlight).resolves.toEqual({ '@graph': [{ '@id': 'old' }] })
+    expect(fullCrates.value['doc-race']).toBeUndefined()
+
+    vi.mocked(apiRequest).mockResolvedValueOnce({ rocrate: { '@graph': [{ '@id': 'new' }] } })
+    await loadRoCrate('doc-race')
+    expect(fullCrates.value['doc-race']).toEqual({ '@graph': [{ '@id': 'new' }] })
+  })
+
+  it('shares one request between concurrent consumers', async () => {
+    const { loadRoCrate } = useAruna()
+    vi.mocked(apiRequest).mockImplementation(async () => ({ rocrate: { '@graph': [] } }))
+
+    const [first, second] = await Promise.all([loadRoCrate('doc-shared'), loadRoCrate('doc-shared')])
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(1)
+    expect(first).toBe(second)
+  })
+
+  it('forces a fresh fetch past cache and in-flight load', async () => {
+    const { loadRoCrate, fullCrates } = useAruna()
+    vi.mocked(apiRequest).mockResolvedValueOnce({ rocrate: { '@graph': [{ '@id': 'first' }] } })
+    await loadRoCrate('doc-force')
+    expect(fullCrates.value['doc-force']).toEqual({ '@graph': [{ '@id': 'first' }] })
+
+    vi.mocked(apiRequest).mockResolvedValueOnce({ rocrate: { '@graph': [{ '@id': 'second' }] } })
+    await loadRoCrate('doc-force', { force: true })
+    expect(fullCrates.value['doc-force']).toEqual({ '@graph': [{ '@id': 'second' }] })
   })
 })
