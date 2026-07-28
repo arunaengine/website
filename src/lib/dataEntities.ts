@@ -212,11 +212,15 @@ export function applyDataEntities(crate: unknown, files: DataEntity[]): void {
   const graph = crateGraph(crate)
   const root = rootId ? graph.find((e) => e['@id'] === rootId) : graph.find((e) => e['@id'] !== 'ro-crate-metadata.json')
   if (!root) return
-  // Only the root's own hasPart is under the editor's control: a nested
-  // entity (a sub-dataset's part) is neither hoisted into the root nor pruned
-  // when the editor list, which shows depth-zero rows, is written back.
-  const rootParts = Array.isArray(root.hasPart) ? root.hasPart : root.hasPart ? [root.hasPart] : []
-  const originalIds = new Set(rootParts.map((ref) => stringProp(ref) ?? '').filter(Boolean))
+  // What the editor was showing, which is exactly the depth-zero rows: the
+  // root's own parts plus any stray data entity no hasPart chain reaches.
+  // Mirroring the caller's seeding is what makes removal honest both ways. A
+  // nested entity (a sub-dataset's part) was never on the list, so it is
+  // neither hoisted into the root nor pruned; a stray that WAS on the list is
+  // pruned when the author deletes its row.
+  const originalIds = new Set(
+    dataEntityTreeOf(crate).filter((node) => node.depth === 0).map((node) => node.id),
+  )
   const newIds = new Set(files.map((file) => file.id))
 
   if (files.length) root.hasPart = files.map((file) => ({ '@id': file.id }))
