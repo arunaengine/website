@@ -293,12 +293,20 @@ const outputsValid = computed(() => {
     new Set(destinations).size === destinations.length
   )
 })
+// The facade takes cpu_cores as a whole positive count; a fractional value is
+// rejected by the JSON extractor with a plain-text 422 the UI cannot explain.
+const cpuCoresValid = computed(() => {
+  const raw = cpuCores.value.trim()
+  if (!raw) return true
+  const cpu = Number(raw)
+  return Number.isInteger(cpu) && cpu > 0
+})
 const canContinue = computed(() => {
   switch (step.value) {
     case 0:
       return groupId.value.length > 0
     case 1:
-      return executorsValid.value && outputsValid.value && workspaceValid.value
+      return executorsValid.value && outputsValid.value && workspaceValid.value && cpuCoresValid.value
     default:
       return true
   }
@@ -591,6 +599,7 @@ async function submit() {
               <div>
                 <label class="text-xs font-medium text-foreground">CPU cores</label>
                 <Input v-model="cpuCores" type="number" min="1" step="1" class="mt-1" placeholder="1" />
+                <p v-if="!cpuCoresValid" class="mt-1 text-[11px] text-destructive">Whole cores only, at least 1.</p>
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">RAM (GB)</label>
@@ -661,7 +670,7 @@ async function submit() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || !workspaceValid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
+        <Button v-else size="sm" :disabled="busy || !workspaceValid || !cpuCoresValid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
       </div>
     </div>
 

@@ -89,7 +89,7 @@ export interface TesCreateTaskResult extends TesCreateTaskResponse {
 // validated here before the request leaves the browser.
 async function createTask(task: TesTask): Promise<TesCreateTaskResult> {
   assertEnabled()
-  if (!task.tags?.[TES_GROUP_TAG]) {
+  if (!task?.tags?.[TES_GROUP_TAG]) {
     throw new Error(`A task must carry the owning group tag (${TES_GROUP_TAG}).`)
   }
   if (!task.executors?.some((e) => e.image.trim() && e.command.some((arg) => arg.trim()))) {

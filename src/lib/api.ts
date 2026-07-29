@@ -56,7 +56,8 @@ export async function apiRequest<T>(
     let message = `${response.status} ${response.statusText}`
     try {
       const body = await response.json()
-      message = body.message || body.error || message
+      // `msg` is the GA4GH TES error shape (api/src/routes/tes.rs).
+      message = body.message || body.error || body.msg || message
     } catch {
       // Keep the HTTP status message if the body is not JSON.
     }

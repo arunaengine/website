@@ -168,7 +168,7 @@ let listRequestId = 0
 const groupNameById = computed(() => new Map(myGroups.value.map((g) => [g.id, g.name] as const)))
 
 function taskGroup(task: TesTask): { text: string; mono: boolean } | null {
-  const id = task.tags?.[TES_GROUP_TAG]
+  const id = task?.tags?.[TES_GROUP_TAG]
   if (!id) return null
   const name = groupNameById.value.get(id)
   return name ? { text: name, mono: false } : { text: truncateMiddle(id), mono: true }
