@@ -562,6 +562,11 @@ const importFileInput = ref<HTMLInputElement | null>(null)
 const importPaste = ref('')
 const importError = ref('')
 const importPreview = ref<CrateImportPreview | null>(null)
+const unrecognizedImportProfiles = computed(() =>
+  (importPreview.value?.conformsToIds ?? []).filter(
+    (iri) => !profiles.value.some((profile) => profile.profileUri === iri || profile.graphIri === iri),
+  ),
+)
 const importPath = ref('')
 const importPathTouched = ref(false)
 
@@ -1103,6 +1108,13 @@ async function submit() {
               {{ importPreview.entityCount }} {{ importPreview.entityCount === 1 ? 'entity' : 'entities' }} in the graph,
               {{ importPreview.fileCount }} referenced data {{ importPreview.fileCount === 1 ? 'file' : 'files' }}.
             </p>
+          </div>
+          <div v-if="unrecognizedImportProfiles.length" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              This crate declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
+              <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. You can still import it.
+            </span>
           </div>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>

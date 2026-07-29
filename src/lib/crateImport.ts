@@ -12,10 +12,18 @@ export interface CrateImportPreview {
   rootName: string
   entityCount: number
   fileCount: number
+  conformsToIds: string[]
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+function idValues(value: unknown): string[] {
+  if (typeof value === 'string') return [value]
+  if (Array.isArray(value)) return value.flatMap(idValues)
+  if (isRecord(value)) return idValues(value['@id'])
+  return []
 }
 
 // Sanity checks before anything is written: parseable JSON that structurally
@@ -40,6 +48,9 @@ export function analyzeCrateJson(text: string, source: string): CrateImportPrevi
     rootName: stringProp(root.name) || rootId || 'Untitled dataset',
     entityCount: graph.length,
     fileCount: dataEntitiesOf(json).length,
+    conformsToIds: [...new Set(idValues(root.conformsTo))].filter(
+      (id) => id !== 'https://w3id.org/ro/crate/1.1' && id !== 'https://w3id.org/ro/crate/1.2',
+    ),
   }
 }
 

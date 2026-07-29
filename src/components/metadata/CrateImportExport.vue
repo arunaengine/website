@@ -30,7 +30,7 @@ const props = defineProps<{
 // can adopt the new updated_at without a second fetch.
 const emit = defineEmits<{ (e: 'imported', summary: MetadataDocumentSummary): void }>()
 
-const { saving, replaceMetadataRoCrate } = useAruna()
+const { profiles, saving, replaceMetadataRoCrate } = useAruna()
 
 const showCrate = ref(false)
 const importOpen = ref(false)
@@ -41,6 +41,11 @@ const importError = ref('')
 const importing = ref(false)
 
 const pendingImport = ref<CrateImportPreview | null>(null)
+const unrecognizedImportProfiles = computed(() =>
+  (pendingImport.value?.conformsToIds ?? []).filter(
+    (iri) => !profiles.value.some((profile) => profile.profileUri === iri || profile.graphIri === iri),
+  ),
+)
 const importedSummary = ref<{ rootName: string; entityCount: number } | null>(null)
 
 // The page header's dropdown opens this panel from outside; the section sits
@@ -203,6 +208,13 @@ async function confirmImport() {
           {{ pendingImport.entityCount }} {{ pendingImport.entityCount === 1 ? 'entity' : 'entities' }} in the graph,
           {{ pendingImport.fileCount }} referenced data {{ pendingImport.fileCount === 1 ? 'file' : 'files' }}.
         </p>
+        <div v-if="unrecognizedImportProfiles.length" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300">
+          <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            This crate declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
+            <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. You can still import it.
+          </span>
+        </div>
         <div class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300">
           <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>Importing replaces this document's current metadata, every field and file reference. This cannot be undone.</span>
