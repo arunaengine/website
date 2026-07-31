@@ -23,6 +23,7 @@ import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import SyncStatusPanel from '@/components/data/SyncStatusPanel.vue'
 import BucketRoutingDialog from '@/components/data/BucketRoutingDialog.vue'
+import ObjectLocationsDialog from '@/components/data/ObjectLocationsDialog.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -51,6 +52,7 @@ import {
   Download,
   Eye,
   FolderPlus,
+  HardDrive,
   HardDriveDownload,
   History,
   KeyRound,
@@ -102,6 +104,9 @@ const remoteBlocked = computed(() => remoteEndpointMissing.value || remoteBrowse
 // Per-bucket write routing; local buckets only, like the bucket delete
 // affordance, because the rules are read and written on the connected node.
 const routingDialogOpen = ref(false)
+
+// Per-version copy list; the connected node answers for its own objects only.
+const locationsKey = ref<string | null>(null)
 
 // ── Bucket sync ─────────────────────────────────────────────────────────────
 const syncDialogOpen = ref(false)
@@ -1394,6 +1399,14 @@ const isEmpty = computed(
                       <div class="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon-sm" aria-label="Preview" @click.stop="openPreview(object)"><Eye class="size-3.5" /></Button>
                         <Button variant="ghost" size="icon-sm" aria-label="Download" @click.stop="download(object)"><Download class="size-3.5" /></Button>
+                        <Button
+                          v-if="!remoteNodeId"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Storage locations"
+                          title="Where the copies of this object are stored"
+                          @click.stop="locationsKey = object.key"
+                        ><HardDrive class="size-3.5" /></Button>
                         <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click.stop="openDeleteObject(object)"><Trash2 class="size-3.5" /></Button>
                       </div>
                     </td>
@@ -1446,6 +1459,14 @@ const isEmpty = computed(
     <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />
 
     <BucketRoutingDialog v-model:open="routingDialogOpen" :bucket="bucket" :group-id="activeGroupId" />
+
+    <ObjectLocationsDialog
+      :open="locationsKey !== null"
+      :bucket="bucket"
+      :object-key="locationsKey ?? ''"
+      :group-id="activeGroupId"
+      @update:open="(v: boolean) => { if (!v) locationsKey = null }"
+    />
 
     <SyncBucketDialog
       v-model:open="syncDialogOpen"
