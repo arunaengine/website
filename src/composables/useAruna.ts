@@ -29,6 +29,15 @@ import {
   type RealmInfoResponse,
   type RealmQuotaConfig,
   type S3CredentialSummary,
+  type BlobLocationsResponse,
+  type BucketRoutingResponse,
+  type GroupBackendRequest,
+  type GroupBackendResponse,
+  type GroupRoutingResponse,
+  type ListGroupBackendsResponse,
+  type RotateBackendSecretRequest,
+  type RoutingTarget,
+  type StorageRoutingRule,
   type ListSourceConnectorsResponse,
   type ListStagingJobsResponse,
   type CreateStagingJobResponse,
@@ -838,6 +847,146 @@ export function isUnsupportedEndpoint(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 404 || err.status === 405 || err.status === 501)
 }
 
+// ── Group storage backends (GET/POST /groups/{gid}/storage-backends) ────────
+// Every route takes group ADMIN. Secrets are write-only: no response echoes
+// them back, so a caller can only replace them, never read them.
+
+async function listGroupBackends(groupId: string): Promise<ListGroupBackendsResponse> {
+  return request<ListGroupBackendsResponse>(`/groups/${groupId}/storage-backends`)
+}
+
+async function createGroupBackend(
+  groupId: string,
+  input: GroupBackendRequest,
+): Promise<GroupBackendResponse> {
+  saving.value = true
+  try {
+    return await request<GroupBackendResponse>(`/groups/${groupId}/storage-backends`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  } finally {
+    saving.value = false
+  }
+}
+
+// PUT rotates name and credentials; the keys naming the physical store are
+// immutable after create and a retired backend refuses the call.
+async function replaceGroupBackend(
+  groupId: string,
+  backendId: string,
+  input: GroupBackendRequest,
+): Promise<GroupBackendResponse> {
+  saving.value = true
+  try {
+    return await request<GroupBackendResponse>(
+      `/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+    )
+  } finally {
+    saving.value = false
+  }
+}
+
+// DELETE is the retire action: stored objects stay readable and the record
+// survives. On a node that predates Phase A it is still a hard delete and can
+// answer 409 while the backend holds data.
+async function retireGroupBackend(groupId: string, backendId: string): Promise<void> {
+  saving.value = true
+  try {
+    await request<void>(`/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}`, {
+      method: 'DELETE',
+    })
+  } finally {
+    saving.value = false
+  }
+}
+
+// Phase A routes; 404 on nodes that predate them (isUnsupportedEndpoint).
+async function reinstateGroupBackend(
+  groupId: string,
+  backendId: string,
+): Promise<GroupBackendResponse> {
+  saving.value = true
+  try {
+    return await request<GroupBackendResponse>(
+      `/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}/reinstate`,
+      { method: 'POST' },
+    )
+  } finally {
+    saving.value = false
+  }
+}
+
+async function rotateBackendSecret(
+  groupId: string,
+  backendId: string,
+  input: RotateBackendSecretRequest,
+): Promise<GroupBackendResponse> {
+  saving.value = true
+  try {
+    return await request<GroupBackendResponse>(
+      `/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}/credentials`,
+      { method: 'POST', body: JSON.stringify(input) },
+    )
+  } finally {
+    saving.value = false
+  }
+}
+
+// ── Storage routing (group default and per-bucket rules) ────────────────────
+
+async function getGroupRouting(groupId: string): Promise<GroupRoutingResponse> {
+  return request<GroupRoutingResponse>(`/groups/${groupId}/storage-routing`)
+}
+
+// An omitted target clears the group default, falling back to node routing.
+async function putGroupRouting(
+  groupId: string,
+  target: RoutingTarget | null,
+): Promise<GroupRoutingResponse> {
+  saving.value = true
+  try {
+    return await request<GroupRoutingResponse>(`/groups/${groupId}/storage-routing`, {
+      method: 'PUT',
+      body: JSON.stringify(target ? { default_target: target } : {}),
+    })
+  } finally {
+    saving.value = false
+  }
+}
+
+async function getBucketRouting(bucket: string): Promise<BucketRoutingResponse> {
+  return request<BucketRoutingResponse>(`/buckets/${encodeURIComponent(bucket)}/storage-routing`)
+}
+
+async function putBucketRouting(
+  bucket: string,
+  rules: StorageRoutingRule[],
+): Promise<BucketRoutingResponse> {
+  saving.value = true
+  try {
+    return await request<BucketRoutingResponse>(
+      `/buckets/${encodeURIComponent(bucket)}/storage-routing`,
+      { method: 'PUT', body: JSON.stringify({ rules }) },
+    )
+  } finally {
+    saving.value = false
+  }
+}
+
+// Where the copies of one object version physically live. Omitting versionId
+// asks about the current version; the response names the one it resolved.
+async function getBlobLocations(
+  bucket: string,
+  path: string,
+  versionId?: string,
+): Promise<BlobLocationsResponse> {
+  return request<BlobLocationsResponse>('/blobs/locations', {
+    query: { bucket, path, version_id: versionId },
+  })
+}
+
 // Synchronous one-shot staging: the node pulls source_path from the connector
 // and materializes it as bucket/key (201 on success). Slow for big blobs —
 // callers must show a running state. The axum route is literally "/staging/".
@@ -1602,6 +1751,17 @@ export function useAruna() {
     checkConnectorConfig,
     checkGroupConnector,
     listConnectorEntries,
+    listGroupBackends,
+    createGroupBackend,
+    replaceGroupBackend,
+    retireGroupBackend,
+    reinstateGroupBackend,
+    rotateBackendSecret,
+    getGroupRouting,
+    putGroupRouting,
+    getBucketRouting,
+    putBucketRouting,
+    getBlobLocations,
     stageBlob,
     stageBatch,
     listStagingJobs,

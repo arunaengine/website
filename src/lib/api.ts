@@ -85,7 +85,7 @@ export interface InfoResponse {
     interfaces: InterfaceServicesStatus
     database?: { status: string }
     network?: { status: string }
-    blob?: { status: string }
+    blob?: BlobServiceStatus
   }
   warnings: string[]
 }
@@ -105,6 +105,37 @@ export interface InterfaceStatus {
   status: string
   bind?: string | null
   url?: string | null
+}
+
+// /info services.blob — verified against aruna api/src/routes/info.rs
+// (BlobServiceStatus / BackendStatus). `backends` lists every registered
+// backend; the headline `status` is the default backend's. Nodes that predate
+// configurable storage omit `backends` entirely.
+export interface BlobServiceStatus {
+  status: string
+  backend?: string | null
+  max_bucket_size?: number | null
+  multipart_bucket?: string | null
+  backends?: BackendStatus[]
+}
+
+export interface BackendStatus {
+  name: string
+  /** Driver type (s3, filesystem, …), not the tenant-facing kind. */
+  backend: string
+  /** Storage class label tenant routing rules may prefer; null when unlabelled. */
+  class?: string | null
+  allow_tenants: boolean
+  /** Operator allowance for user data; null/absent means unlimited. */
+  quota_bytes?: number | null
+  default: boolean
+  status: string
+  /**
+   * Bytes stored on this backend. Served only once per-backend quota
+   * enforcement ships (consolidation plan B9); while it is absent
+   * `quota_bytes` is a declared allowance that no write is rejected against.
+   */
+  used_bytes?: number
 }
 
 // GET /info/usage; may grow extra fields, unknown ones are ignored.
@@ -1091,6 +1122,123 @@ export interface RealmPlacementConfigResponse {
   default_strategy_id: string | null
   bindings: RealmPlacementBinding[]
   overrides: RealmPlacementOverride[]
+}
+
+// ── Group storage backends ──────────────────────────────────────────────────
+// GET/POST /groups/{gid}/storage-backends, GET/PUT/DELETE .../{bid} — verified
+// against aruna api/src/routes/group_backends.rs, with the per-kind key
+// allowlists in operations/src/group_backends/validation.rs. Every route takes
+// group ADMIN. Secrets live in their own keyspace and are never returned.
+//
+// Three fields/routes are the consolidation plan's Phase A delta and are gated
+// on presence: `retiring` (absent on older nodes), the reinstate route and the
+// credentials route (both 404 there). DELETE retires logically once Phase A
+// lands; before it, DELETE is the old hard delete and can answer 409.
+export type GroupBackendKind = 's3' | 'gcs' | 'azblob' | 'azdls' | 'b2'
+
+export interface GroupBackendResponse {
+  backend_id: string
+  group_id: string
+  /** Open string: a node may report a kind this portal does not know. */
+  kind: string
+  name: string
+  public_config: Record<string, string>
+  retiring?: boolean
+}
+
+export interface ListGroupBackendsResponse {
+  backends: GroupBackendResponse[]
+}
+
+// Shared body of POST (register) and PUT (replace). PUT rotates name and
+// credentials only: the keys naming the physical store are immutable after
+// create, and a retired backend refuses it.
+export interface GroupBackendRequest {
+  name: string
+  kind: GroupBackendKind
+  public_config: Record<string, string>
+  secret_config: Record<string, string>
+}
+
+// POST .../{bid}/credentials — writes the secret keyspace alone, allowed while
+// the backend is retiring so a leaked key can still be invalidated.
+export interface RotateBackendSecretRequest {
+  secret_config: Record<string, string>
+}
+
+// ── Storage routing ─────────────────────────────────────────────────────────
+// GET/PUT /buckets/{bucket}/storage-routing and /groups/{gid}/storage-routing —
+// verified against aruna api/src/routes/storage_routing.rs. Group ADMIN.
+// A target names exactly one of `backend_id` (binds that group backend) or
+// `class` (a preference that may fall through to the node default); operator
+// backend names are rejected. `warnings` is advisory only: rules are stored
+// regardless, because the record replicates to nodes with other class tables.
+export interface RoutingTarget {
+  backend_id?: string
+  class?: string
+}
+
+export interface StorageRoutingRule {
+  key_prefix: string
+  /** Whole-key match instead of a prefix match. */
+  exact: boolean
+  target: RoutingTarget
+}
+
+export interface BucketRoutingResponse {
+  bucket: string
+  rules: StorageRoutingRule[]
+  warnings: string[]
+}
+
+export interface GroupRoutingResponse {
+  group_id: string
+  default_target?: RoutingTarget | null
+  warnings: string[]
+}
+
+// ── Object storage locations ────────────────────────────────────────────────
+// GET /blobs/locations?bucket=&path=&version_id= — verified against aruna
+// api/src/routes/blobs.rs. Reports where the copies of ONE version physically
+// live. `not-stored` and `holder-path-unknown` are the Phase A delta; a node
+// that predates them simply never sends them.
+export type BlobCopyState =
+  | 'present'
+  | 'pending'
+  | 'unreachable'
+  | 'denied'
+  /** The version resolves but carries no bytes: delete marker or reference. */
+  | 'not-stored'
+
+export type BlobCopyStorage = 'node-managed' | 'group-backend'
+
+export type LocationScanLimit =
+  | 'queued-scan-truncated'
+  | 'queued-scan-failed'
+  | 'queued-record-unreadable'
+  | 'candidate-cap-reached'
+  | 'holder-lookup-failed'
+  | 'holder-path-unknown'
+
+export interface BlobCopyResponse {
+  node_id: string
+  local: boolean
+  state: BlobCopyState
+  storage?: BlobCopyStorage | null
+  /** Node-managed copies only: the operator's storage class label. */
+  storage_class?: string | null
+  group_backend_id?: string | null
+  group_backend_name?: string | null
+}
+
+export interface BlobLocationsResponse {
+  bucket: string
+  key: string
+  version_id: string
+  copies: BlobCopyResponse[]
+  /** False means a copy may be missing from `copies`, not that none exists. */
+  complete: boolean
+  limits: LocationScanLimit[]
 }
 
 export type RealmPlacementMutationRequest =
