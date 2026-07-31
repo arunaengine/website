@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
+import QuotaBar from '@/components/ui/QuotaBar.vue'
 import { statusVariant } from './node-display'
+import { backendQuota } from '@/lib/storage'
+import { formatBytes } from '@/lib/utils'
 import type { InfoResponse } from '@/lib/api'
 import { TriangleAlert } from '@lucide/vue'
 
@@ -58,6 +61,15 @@ const services = computed(() =>
     .map((name) => ({ name, status: props.info.services[name]?.status }))
     .filter((service) => service.status),
 )
+
+// Every registered write backend, each with its capacity reading. Absent on
+// nodes that predate configurable storage, so the block is presence-gated.
+const backends = computed(() =>
+  (props.info.services.blob?.backends ?? []).map((backend) => ({
+    ...backend,
+    quota: backendQuota(backend),
+  })),
+)
 </script>
 
 <template>
@@ -98,6 +110,50 @@ const services = computed(() =>
           <Badge :variant="statusVariant(service.status)" class="text-[10px] uppercase">{{ service.status }}</Badge>
         </span>
       </div>
+    </div>
+
+    <div v-if="backends.length">
+      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Storage backends</div>
+      <ul class="mt-1.5 space-y-1.5">
+        <li
+          v-for="backend in backends"
+          :key="backend.name"
+          class="rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5"
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-medium text-foreground">{{ backend.name }}</span>
+            <Badge variant="secondary" class="text-[10px] uppercase">{{ backend.backend }}</Badge>
+            <Badge v-if="backend.default" variant="royal" class="text-[10px] uppercase">default</Badge>
+            <Badge v-if="backend.class" variant="outline" class="text-[10px]">class {{ backend.class }}</Badge>
+            <Badge
+              v-if="backend.allow_tenants"
+              variant="accent"
+              class="text-[10px] uppercase"
+              title="Group routing rules may prefer this backend's class"
+            >
+              tenant routable
+            </Badge>
+            <span class="flex-1" />
+            <Badge :variant="statusVariant(backend.status)" class="text-[10px] uppercase">{{ backend.status }}</Badge>
+          </div>
+          <div class="mt-1">
+            <QuotaBar
+              v-if="backend.quota.enforced"
+              :used="backend.quota.usedBytes ?? 0"
+              :quota="backend.quota.quotaBytes"
+              compact
+              label="Stored"
+            />
+            <p
+              v-else-if="backend.quota.quotaBytes != null"
+              class="text-[11px] text-muted-foreground"
+              title="This node does not report usage for the backend, so no write is rejected for exceeding the allowance."
+            >
+              Allowance {{ formatBytes(backend.quota.quotaBytes) }} · declared by the operator, not yet enforced
+            </p>
+          </div>
+        </li>
+      </ul>
     </div>
 
     <div v-if="info.warnings.length">
