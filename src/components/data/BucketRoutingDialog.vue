@@ -182,7 +182,7 @@ async function save() {
           </p>
         </div>
 
-        <Button variant="outline" size="sm" class="self-start" @click="addRule">
+        <Button variant="outline" size="sm" class="justify-self-start" @click="addRule">
           <Plus class="h-3.5 w-3.5" /> Add rule
         </Button>
 

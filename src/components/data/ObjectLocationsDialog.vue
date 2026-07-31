@@ -36,6 +36,15 @@ const storedCount = computed(
   () => (summary.value?.copies ?? []).filter((copy) => copy.state === 'present').length,
 )
 
+// Answers first: where the file actually is, then what is on its way, then the
+// nodes that could not say.
+const ORDER: Record<string, number> = { present: 0, pending: 1, 'not-stored': 2 }
+const copies = computed(() =>
+  [...(summary.value?.copies ?? [])].sort(
+    (left, right) => (ORDER[left.state] ?? 3) - (ORDER[right.state] ?? 3),
+  ),
+)
+
 let loadSeq = 0
 async function load() {
   const seq = ++loadSeq
@@ -106,7 +115,7 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
 
         <ul class="space-y-1">
           <li
-            v-for="copy in summary.copies"
+            v-for="copy in copies"
             :key="`${copy.node_id}-${copy.group_backend_id ?? copy.storage_class ?? ''}`"
             class="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2"
           >
@@ -133,7 +142,7 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
               <template v-else>{{ copyState(copy.state).description }}</template>
             </span>
           </li>
-          <li v-if="!summary.copies.length" class="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+          <li v-if="!copies.length" class="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
             No node reported a copy of this file.
           </li>
         </ul>
