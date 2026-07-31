@@ -7,6 +7,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ConnectorsSection from '@/components/groups/ConnectorsSection.vue'
 import StorageBackendsSection from '@/components/groups/StorageBackendsSection.vue'
+import GroupRoutingSection from '@/components/groups/GroupRoutingSection.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
@@ -18,7 +19,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
+import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Route, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { assessQuota, quotaCountedBytes, referencedBytes, storedReferencedHint, QUOTA_STATE_BADGES } from '@/lib/quota'
@@ -27,6 +28,7 @@ import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 import {
   ApiError,
   type GroupDetailResponse,
+  type GroupBackendResponse,
   type GroupMember,
   type MetadataDocumentListItem,
   type UsageHistoryPoint,
@@ -136,6 +138,7 @@ const canManage = computed(() =>
 )
 const connectorCount = ref<number | null>(null)
 const backendCount = ref<number | null>(null)
+const groupBackends = ref<GroupBackendResponse[]>([])
 
 // Mirrors the backend permission gates. Public roles apply to every principal,
 // so they count too.
@@ -245,6 +248,7 @@ watch(
     leaveError.value = null
     connectorCount.value = null
     backendCount.value = null
+    groupBackends.value = []
     joinRequestCount.value = 0
     storageAnchorPending = true
     void reload()
@@ -481,11 +485,34 @@ async function leave() {
         </TabsContent>
 
         <TabsContent v-if="canAdminStorage" value="storage" class="mt-0">
-          <StorageBackendsSection
-            :group-id="group.group_id"
-            :can-admin="canAdminStorage"
-            @count="backendCount = $event"
-          />
+          <div class="border-b border-border">
+            <div class="flex items-center gap-2 px-5 pb-1 pt-4">
+              <Database class="h-3.5 w-3.5 text-primary" />
+              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Storage backends</span>
+            </div>
+            <StorageBackendsSection
+              :group-id="group.group_id"
+              :can-admin="canAdminStorage"
+              @count="backendCount = $event"
+              @backends="groupBackends = $event"
+            />
+          </div>
+          <div>
+            <div class="flex items-center gap-2 px-5 pb-1 pt-4">
+              <Route class="h-3.5 w-3.5 text-primary" />
+              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Write routing</span>
+            </div>
+            <div class="px-5 py-3">
+              <GroupRoutingSection
+                :group-id="group.group_id"
+                :backends="groupBackends"
+                :can-admin="canAdminStorage"
+              />
+              <p class="mt-2 text-[11px] text-muted-foreground">
+                Per-bucket rules live on the bucket: open it in the Data manager and use Routing.
+              </p>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </template>

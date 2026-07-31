@@ -22,6 +22,7 @@ import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import SyncStatusPanel from '@/components/data/SyncStatusPanel.vue'
+import BucketRoutingDialog from '@/components/data/BucketRoutingDialog.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -58,6 +59,7 @@ import {
   LogIn,
   Plus,
   RefreshCw,
+  Route,
   ShieldAlert,
   Trash2,
   Upload,
@@ -96,6 +98,10 @@ const effectiveEndpoint = computed(() => s3.endpointForNode(remoteNodeId.value))
 const remoteEndpointMissing = computed(() => Boolean(remoteNodeId.value) && !effectiveEndpoint.value)
 const remoteBrowseBlocked = ref(false)
 const remoteBlocked = computed(() => remoteEndpointMissing.value || remoteBrowseBlocked.value)
+
+// Per-bucket write routing; local buckets only, like the bucket delete
+// affordance, because the rules are read and written on the connected node.
+const routingDialogOpen = ref(false)
 
 // ── Bucket sync ─────────────────────────────────────────────────────────────
 const syncDialogOpen = ref(false)
@@ -1197,6 +1203,15 @@ const isEmpty = computed(
                   size="sm"
                 />
                 <Button
+                  v-if="!remoteNodeId"
+                  variant="outline"
+                  size="sm"
+                  title="Where new objects in this bucket are stored"
+                  @click="routingDialogOpen = true"
+                >
+                  <Route class="h-4 w-4" /> Routing
+                </Button>
+                <Button
                   v-if="showSyncButton"
                   variant="outline"
                   size="sm"
@@ -1429,6 +1444,8 @@ const isEmpty = computed(
     />
 
     <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />
+
+    <BucketRoutingDialog v-model:open="routingDialogOpen" :bucket="bucket" :group-id="activeGroupId" />
 
     <SyncBucketDialog
       v-model:open="syncDialogOpen"
