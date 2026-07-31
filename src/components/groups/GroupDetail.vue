@@ -6,6 +6,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ConnectorsSection from '@/components/groups/ConnectorsSection.vue'
+import StorageBackendsSection from '@/components/groups/StorageBackendsSection.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
@@ -17,7 +18,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { Cable, ChartArea, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
+import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { assessQuota, quotaCountedBytes, referencedBytes, storedReferencedHint, QUOTA_STATE_BADGES } from '@/lib/quota'
@@ -134,14 +135,11 @@ const canManage = computed(() =>
   ),
 )
 const connectorCount = ref<number | null>(null)
-// Mirrors the backend gate for connector management: WRITE on
-// /{realm}/g/{gid}/data/** (api/src/routes/connectors.rs). Public roles apply
-// to every principal, so they count too.
-const canWriteData = computed(() => {
-  const detail = group.value
-  if (!detail) return false
-  const userId = currentUser.value?.id ?? ''
-  const target = `/${detail.realm_id}/g/${detail.group_id}/data/**`
+const backendCount = ref<number | null>(null)
+
+// Mirrors the backend permission gates. Public roles apply to every principal,
+// so they count too.
+function hasWrite(detail: GroupDetailResponse, target: string, userId: string): boolean {
   return detail.roles.some((role) => {
     if (!(role.public || role.assigned_users?.includes(userId))) return false
     return Object.entries(role.permissions).some(([key, value]) => {
@@ -152,15 +150,31 @@ const canWriteData = computed(() => {
       return target === base || target.startsWith(`${base}/`)
     })
   })
+}
+
+// Connector management: WRITE on /{realm}/g/{gid}/data/**.
+const canWriteData = computed(() => {
+  const detail = group.value
+  if (!detail) return false
+  return hasWrite(detail, `/${detail.realm_id}/g/${detail.group_id}/data/**`, currentUser.value?.id ?? '')
+})
+
+// Storage backends and routing decide where bytes land, so they take group
+// admin (api ensure_group_admin), not the write rights objects need.
+const canAdminStorage = computed(() => {
+  const detail = group.value
+  if (!detail) return false
+  return hasWrite(detail, `/${detail.realm_id}/g/${detail.group_id}/admin/**`, currentUser.value?.id ?? '')
 })
 
 // Route-driven tab state (?tab=…) so sections deep-link like ComputeView.
-const TAB_NAMES = ['stats', 'members', 'roles', 'sources']
+const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage']
 const tab = computed(() => {
   const value = typeof route.query.tab === 'string' ? route.query.tab : ''
   // Bare ?connector=<id> deep links land on the Data sources tab.
   if (!value && typeof route.query.connector === 'string' && isMember.value) return 'sources'
   if (value === 'sources' && !isMember.value) return 'stats'
+  if (value === 'storage' && !canAdminStorage.value) return 'stats'
   return TAB_NAMES.includes(value) ? value : 'stats'
 })
 function setTab(next: string) {
@@ -230,6 +244,7 @@ watch(
   () => {
     leaveError.value = null
     connectorCount.value = null
+    backendCount.value = null
     joinRequestCount.value = 0
     storageAnchorPending = true
     void reload()
@@ -286,6 +301,10 @@ async function leave() {
             <TabsTrigger v-if="isMember" value="sources" class="gap-1.5">
               <Cable class="h-3.5 w-3.5" /> Data sources
               <Badge v-if="connectorCount !== null" variant="outline" class="tabular-nums">{{ connectorCount }}</Badge>
+            </TabsTrigger>
+            <TabsTrigger v-if="canAdminStorage" value="storage" class="gap-1.5">
+              <Database class="h-3.5 w-3.5" /> Storage
+              <Badge v-if="backendCount !== null" variant="outline" class="tabular-nums">{{ backendCount }}</Badge>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -458,6 +477,14 @@ async function leave() {
             :group-id="group.group_id"
             :can-write="canWriteData"
             @count="connectorCount = $event"
+          />
+        </TabsContent>
+
+        <TabsContent v-if="canAdminStorage" value="storage" class="mt-0">
+          <StorageBackendsSection
+            :group-id="group.group_id"
+            :can-admin="canAdminStorage"
+            @count="backendCount = $event"
           />
         </TabsContent>
       </Tabs>
