@@ -101,7 +101,7 @@ const remoteEndpointMissing = computed(() => Boolean(remoteNodeId.value) && !eff
 const remoteBrowseBlocked = ref(false)
 const remoteBlocked = computed(() => remoteEndpointMissing.value || remoteBrowseBlocked.value)
 
-// Per-bucket write routing; local buckets only, like the bucket delete
+// Per-bucket storage rules; local buckets only, like the bucket delete
 // affordance, because the rules are read and written on the connected node.
 const routingDialogOpen = ref(false)
 
@@ -1211,10 +1211,10 @@ const isEmpty = computed(
                   v-if="!remoteNodeId"
                   variant="outline"
                   size="sm"
-                  title="Where new objects in this bucket are stored"
+                  title="Where new files in this bucket are stored"
                   @click="routingDialogOpen = true"
                 >
-                  <Route class="h-4 w-4" /> Routing
+                  <Route class="h-4 w-4" /> Storage
                 </Button>
                 <Button
                   v-if="showSyncButton"
@@ -1403,8 +1403,8 @@ const isEmpty = computed(
                           v-if="!remoteNodeId"
                           variant="ghost"
                           size="icon-sm"
-                          aria-label="Storage locations"
-                          title="Where the copies of this object are stored"
+                          aria-label="Where this file is stored"
+                          title="Where this file is stored"
                           @click.stop="locationsKey = object.key"
                         ><HardDrive class="size-3.5" /></Button>
                         <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click.stop="openDeleteObject(object)"><Trash2 class="size-3.5" /></Button>

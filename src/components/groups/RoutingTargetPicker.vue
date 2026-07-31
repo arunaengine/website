@@ -9,7 +9,7 @@ const props = withDefaults(
   defineProps<{
     modelValue: RoutingTarget | null
     backends: GroupBackendResponse[]
-    /** Offer the empty target, i.e. leave the decision to node routing. */
+    /** Offer the empty target, i.e. leave the choice to this node. */
     allowDefault?: boolean
     ariaLabel?: string
   }>(),
@@ -31,12 +31,12 @@ const current = computed(() => {
 
 const options = computed(() => {
   const list: { value: string; label: string }[] = []
-  if (props.allowDefault) list.push({ value: DEFAULT_VALUE, label: 'Node default' })
+  if (props.allowDefault) list.push({ value: DEFAULT_VALUE, label: "This node's own storage" })
   for (const backend of props.backends) {
     const value = `backend:${backend.backend_id}`
-    // A retiring backend refuses writes; keep it listed only while it is stored.
-    if (backend.retiring && current.value !== value) continue
-    list.push({ value, label: backend.retiring ? `${backend.name} (retiring)` : backend.name })
+    // Disabled storage refuses new uploads; keep it listed only while stored.
+    if (backend.disabled && current.value !== value) continue
+    list.push({ value, label: backend.disabled ? `${backend.name} (disabled)` : backend.name })
   }
   for (const name of tenantClasses(nodeInfo?.value?.services.blob?.backends)) {
     list.push({ value: `class:${name}`, label: `Class ${name}` })
@@ -44,7 +44,7 @@ const options = computed(() => {
   // A stored target naming a backend this group no longer lists must stay
   // visible rather than silently reading as something else.
   if (current.value !== DEFAULT_VALUE && !list.some((option) => option.value === current.value)) {
-    list.push({ value: current.value, label: `${props.modelValue?.backend_id ?? ''} (unknown)` })
+    list.push({ value: current.value, label: 'Storage that no longer exists' })
   }
   return list
 })

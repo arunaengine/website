@@ -64,12 +64,12 @@ async function save() {
 <template>
   <div class="space-y-2">
     <p class="text-[11px] text-muted-foreground">
-      Where this group's uploads land when no bucket rule matches. A named backend binds: a write
-      that cannot reach it fails instead of landing elsewhere. A class is a preference: on a node
-      that offers none, the write falls through to the node's own default storage.
+      Where new uploads go when no bucket rule says otherwise. Picking your own storage is binding:
+      an upload that cannot reach it fails instead of quietly landing somewhere else. Picking a
+      storage class is only a preference: a node without that class stores the upload itself.
     </p>
     <div v-if="hidden" class="text-xs text-muted-foreground">
-      Storage routing is only visible to group admins.
+      This is only visible to group admins.
     </div>
     <Skeleton v-else-if="loading && !draft && !stored" class="h-9" />
     <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
@@ -80,7 +80,7 @@ async function save() {
             :model-value="draft"
             :backends="props.backends"
             allow-default
-            aria-label="Group default storage target"
+            aria-label="Where new uploads go"
             @update:model-value="(v: RoutingTarget | null) => (draft = v)"
           />
         </div>
@@ -90,11 +90,11 @@ async function save() {
           :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
           @click="save"
         >
-          {{ saving ? 'Saving…' : 'Save default' }}
+          {{ saving ? 'Saving…' : 'Save' }}
         </Button>
         <Button v-if="dirty" variant="ghost" size="sm" :disabled="saving" @click="draft = stored">Reset</Button>
       </div>
-      <p v-else class="text-xs text-foreground">Default target: {{ targetLabel(stored, props.backends) }}</p>
+      <p v-else class="text-xs text-foreground">New uploads go to: {{ targetLabel(stored, props.backends) }}</p>
       <p v-if="saveError" class="text-xs text-destructive">{{ saveError }}</p>
       <p
         v-for="warning in warnings"

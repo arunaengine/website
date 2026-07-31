@@ -5,9 +5,8 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StorageBackendDialog from '@/components/groups/StorageBackendDialog.vue'
-import RotateSecretDialog from '@/components/groups/RotateSecretDialog.vue'
 import { computed, ref, watch } from 'vue'
-import { Archive, Database, KeyRound, Pencil, Plus, Undo2 } from '@lucide/vue'
+import { Ban, CirclePlay, Database, Pencil, Plus } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { backendSchema, backendSummary } from '@/lib/storage'
@@ -19,7 +18,7 @@ const emit = defineEmits<{
   (e: 'backends', backends: GroupBackendResponse[]): void
 }>()
 
-const { listGroupBackends, retireGroupBackend, reinstateGroupBackend, saving } = useAruna()
+const { listGroupBackends, disableGroupBackend, enableGroupBackend, saving } = useAruna()
 const { writesDisabled } = useConnectivity()
 
 const backends = ref<GroupBackendResponse[] | null>(null)
@@ -28,17 +27,15 @@ const loadError = ref<string | null>(null)
 const hidden = ref(false)
 const dialogOpen = ref(false)
 const editing = ref<GroupBackendResponse | null>(null)
-const rotating = ref<GroupBackendResponse | null>(null)
 const confirmingId = ref<string | null>(null)
 const actionError = ref<string | null>(null)
-// Latched once a Phase A route answers 404: the node predates it.
-const reinstateUnsupported = ref(false)
-const rotateUnsupported = ref(false)
+// Latched once the enable route answers 404: the node predates it.
+const enableUnsupported = ref(false)
 
-// Presence of the flag is the signal that this node retires logically instead
-// of deleting the registration outright.
-const retireIsLogical = computed(() =>
-  (backends.value ?? []).some((backend) => typeof backend.retiring === 'boolean'),
+// Presence of the flag is the signal that this node disables the entry instead
+// of deleting it outright.
+const canDisable = computed(() =>
+  (backends.value ?? []).some((backend) => typeof backend.disabled === 'boolean'),
 )
 
 let loadSeq = 0
@@ -84,10 +81,10 @@ function openEdit(backend: GroupBackendResponse) {
   dialogOpen.value = true
 }
 
-async function retire(backend: GroupBackendResponse) {
+async function disable(backend: GroupBackendResponse) {
   actionError.value = null
   try {
-    await retireGroupBackend(props.groupId, backend.backend_id)
+    await disableGroupBackend(props.groupId, backend.backend_id)
     confirmingId.value = null
     await load()
   } catch (err) {
@@ -95,13 +92,13 @@ async function retire(backend: GroupBackendResponse) {
   }
 }
 
-async function reinstate(backend: GroupBackendResponse) {
+async function enable(backend: GroupBackendResponse) {
   actionError.value = null
   try {
-    await reinstateGroupBackend(props.groupId, backend.backend_id)
+    await enableGroupBackend(props.groupId, backend.backend_id)
     await load()
   } catch (err) {
-    if (isUnsupportedEndpoint(err)) reinstateUnsupported.value = true
+    if (isUnsupportedEndpoint(err)) enableUnsupported.value = true
     else actionError.value = err instanceof Error ? err.message : String(err)
   }
 }
@@ -114,14 +111,14 @@ function kindLabel(backend: GroupBackendResponse): string {
 <template>
   <div class="px-5 py-3">
     <div v-if="hidden" class="text-xs text-muted-foreground">
-      Storage backends are only visible to group admins.
+      Storage is only visible to group admins.
     </div>
     <Skeleton v-else-if="loading && !backends" class="h-16" />
     <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
     <EmptyState
       v-else-if="backends && !backends.length"
-      title="No storage backends"
-      description="Register your own object store to have this group's uploads written there instead of the node's storage."
+      title="No storage of your own"
+      description="Add your own object storage to have this group's uploads written there instead of on this node."
     >
       <Button
         v-if="canAdmin"
@@ -130,7 +127,7 @@ function kindLabel(backend: GroupBackendResponse): string {
         :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
         @click="openCreate"
       >
-        <Plus class="h-3.5 w-3.5" /> Register backend
+        <Plus class="h-3.5 w-3.5" /> Add storage
       </Button>
     </EmptyState>
     <template v-else-if="backends">
@@ -144,12 +141,12 @@ function kindLabel(backend: GroupBackendResponse): string {
           <span class="text-sm font-medium text-foreground">{{ backend.name }}</span>
           <Badge variant="secondary" class="text-[10px] uppercase">{{ kindLabel(backend) }}</Badge>
           <Badge
-            v-if="backend.retiring"
+            v-if="backend.disabled"
             variant="warn"
             class="text-[10px] uppercase"
-            title="Writes are refused; stored objects stay readable"
+            title="New uploads no longer go here; files already stored stay readable"
           >
-            <Archive class="mr-0.5 h-3 w-3" /> retiring
+            disabled
           </Badge>
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" :title="backendSummary(backend)">
             {{ backendSummary(backend) }}
@@ -157,76 +154,63 @@ function kindLabel(backend: GroupBackendResponse): string {
           <template v-if="canAdmin">
             <template v-if="confirmingId === backend.backend_id">
               <span class="w-full text-xs text-foreground sm:w-auto">
-                <template v-if="retireIsLogical">
-                  Retire this backend? Writes stop routing to it, stored objects stay readable, and
-                  the registration is removed automatically once the last copy is gone.
+                <template v-if="canDisable">
+                  Stop using this storage? New uploads go elsewhere, files already stored stay
+                  readable, and you can switch it back on at any time.
                 </template>
                 <template v-else>
-                  Remove this registration? This node deletes it outright and refuses while objects
-                  still live on the backend.
+                  Remove this storage? This node deletes the entry outright, and refuses while files
+                  are still stored there.
                 </template>
               </span>
-              <Button variant="destructive" size="sm" :disabled="saving" @click="retire(backend)">
-                {{ retireIsLogical ? 'Retire' : 'Remove' }}
+              <Button variant="destructive" size="sm" :disabled="saving" @click="disable(backend)">
+                {{ canDisable ? 'Disable' : 'Remove' }}
               </Button>
               <Button variant="ghost" size="sm" :disabled="saving" @click="confirmingId = null">Cancel</Button>
             </template>
             <template v-else>
               <Button
-                v-if="!rotateUnsupported"
+                v-if="backend.disabled && !enableUnsupported"
                 variant="ghost"
                 size="sm"
                 class="h-6 px-2 text-xs text-muted-foreground"
-                :aria-label="`Rotate credentials of ${backend.name}`"
-                :disabled="writesDisabled"
-                :title="writesDisabled ? OFFLINE_WRITE_HINT : 'Replace the stored credentials'"
-                @click="rotating = backend"
-              >
-                <KeyRound class="h-3 w-3" /> Rotate
-              </Button>
-              <Button
-                v-if="backend.retiring && !reinstateUnsupported"
-                variant="ghost"
-                size="sm"
-                class="h-6 px-2 text-xs text-muted-foreground"
-                :aria-label="`Reinstate ${backend.name}`"
+                :aria-label="`Enable ${backend.name}`"
                 :disabled="writesDisabled || saving"
-                :title="writesDisabled ? OFFLINE_WRITE_HINT : 'Accept writes on this backend again'"
-                @click="reinstate(backend)"
+                :title="writesDisabled ? OFFLINE_WRITE_HINT : 'Send new uploads here again'"
+                @click="enable(backend)"
               >
-                <Undo2 class="h-3 w-3" /> Reinstate
+                <CirclePlay class="h-3 w-3" /> Enable
               </Button>
               <Button
-                v-if="!backend.retiring"
                 variant="ghost"
                 size="icon-sm"
                 class="text-muted-foreground"
                 :aria-label="`Edit ${backend.name}`"
                 :disabled="writesDisabled"
-                :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+                :title="writesDisabled ? OFFLINE_WRITE_HINT : 'Change the name, settings or credentials'"
                 @click="openEdit(backend)"
               >
                 <Pencil class="h-3.5 w-3.5" />
               </Button>
               <Button
-                v-if="!backend.retiring"
+                v-if="!backend.disabled"
                 variant="ghost"
                 size="icon-sm"
                 class="text-muted-foreground"
-                :aria-label="`Retire ${backend.name}`"
+                :aria-label="`Disable ${backend.name}`"
                 :disabled="writesDisabled"
-                :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+                :title="writesDisabled ? OFFLINE_WRITE_HINT : 'Stop sending new uploads here'"
                 @click="((confirmingId = backend.backend_id), (actionError = null))"
               >
-                <Archive class="h-3.5 w-3.5" />
+                <Ban class="h-3.5 w-3.5" />
               </Button>
             </template>
           </template>
         </li>
       </ul>
       <p v-if="actionError" class="mt-2 text-xs text-destructive">{{ actionError }}</p>
-      <p v-if="reinstateUnsupported" class="mt-2 text-[11px] text-muted-foreground">
-        This node cannot reinstate a retired backend yet.
+      <p v-if="enableUnsupported" class="mt-2 text-[11px] text-muted-foreground">
+        This node cannot switch a disabled storage back on yet.
       </p>
       <Button
         v-if="canAdmin"
@@ -237,7 +221,7 @@ function kindLabel(backend: GroupBackendResponse): string {
         :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
         @click="openCreate"
       >
-        <Plus class="h-3.5 w-3.5" /> Register backend
+        <Plus class="h-3.5 w-3.5" /> Add storage
       </Button>
     </template>
 
@@ -246,15 +230,6 @@ function kindLabel(backend: GroupBackendResponse): string {
       :group-id="props.groupId"
       :backend="editing"
       @saved="load"
-    />
-
-    <RotateSecretDialog
-      :open="rotating !== null"
-      :group-id="props.groupId"
-      :backend="rotating"
-      @update:open="(v: boolean) => { if (!v) rotating = null }"
-      @rotated="load"
-      @unsupported="rotateUnsupported = true"
     />
   </div>
 </template>

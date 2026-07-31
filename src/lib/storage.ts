@@ -113,7 +113,7 @@ export function backendSchema(kind: string): BackendKindSchema | null {
   return BACKEND_KIND_SCHEMAS[kind as GroupBackendKind] ?? null
 }
 
-/** Where the backend points, from the keys that identify the physical store. */
+/** Where this storage points, from the fields that identify it. */
 export function backendSummary(backend: GroupBackendResponse): string {
   const schema = backendSchema(backend.kind)
   const keys = schema ? schema.identity : Object.keys(backend.public_config)
@@ -123,7 +123,7 @@ export function backendSummary(backend: GroupBackendResponse): string {
   return parts.join(' · ')
 }
 
-/** Storage classes this node offers to tenant routing rules. */
+/** Storage classes this node lets groups choose. */
 export function tenantClasses(backends?: BackendStatus[]): string[] {
   const classes = new Set<string>()
   for (const backend of backends ?? []) {
@@ -132,24 +132,24 @@ export function tenantClasses(backends?: BackendStatus[]): string[] {
   return [...classes].sort()
 }
 
-/** Human label for a routing target; group backend ids resolve to their name. */
+/** Human label for a target; a group's own storage resolves to its name. */
 export function targetLabel(
   target: RoutingTarget | null | undefined,
   backends: GroupBackendResponse[] = [],
 ): string {
-  if (!target) return 'Node default'
+  if (!target) return "This node's own storage"
   if (target.backend_id) {
     const known = backends.find((backend) => backend.backend_id === target.backend_id)
     return known ? known.name : target.backend_id
   }
   if (target.class) return `Class ${target.class}`
-  return 'Node default'
+  return "This node's own storage"
 }
 
 export interface BackendQuota {
   quotaBytes: number | null
   usedBytes: number | null
-  /** True only when the node serves usage, which is what makes the quota a cap. */
+  /** True only when the node reports usage, which is what makes the limit real. */
   enforced: boolean
 }
 
@@ -162,22 +162,22 @@ export function backendQuota(status: BackendStatus): BackendQuota {
 }
 
 const COPY_STATES: Record<BlobCopyState, { label: string; description: string }> = {
-  present: { label: 'stored', description: 'This node holds the bytes of this version.' },
+  present: { label: 'stored', description: 'This node has the file.' },
   pending: {
-    label: 'pending',
-    description: 'A copy is queued or being transferred to this node; the bytes are not there yet.',
+    label: 'copying',
+    description: 'A copy is on its way to this node; the file is not there yet.',
   },
   unreachable: {
-    label: 'unreachable',
-    description: 'The node did not answer, so whether it holds a copy is unknown.',
+    label: 'no answer',
+    description: 'This node did not answer, so we cannot tell whether it has a copy.',
   },
   denied: {
-    label: 'denied',
-    description: 'The node holds this bucket under access rules you do not pass and refused to answer.',
+    label: 'no access',
+    description: 'This node keeps the bucket under rules you do not pass, so it would not say.',
   },
   'not-stored': {
-    label: 'not stored',
-    description: 'The version exists but carries no bytes anywhere: a delete marker or a reference.',
+    label: 'no data',
+    description: 'This version holds no data anywhere: it marks a deletion or points at data elsewhere.',
   },
 }
 
@@ -186,12 +186,12 @@ export function copyState(state: string): { label: string; description: string }
 }
 
 const SCAN_LIMITS: Record<string, string> = {
-  'queued-scan-truncated': 'The list of queued replications was too long to read completely.',
-  'queued-scan-failed': 'The queued-replication list could not be read, so transfers in flight are unknown.',
-  'queued-record-unreadable': 'Some queued replication records could not be decoded and were skipped.',
-  'candidate-cap-reached': 'More nodes could hold a copy than one request contacts; the rest were not asked.',
-  'holder-lookup-failed': 'The index of nodes holding this data could not be queried.',
-  'holder-path-unknown': 'A node known to hold a copy could not be asked under a path it recognises.',
+  'queued-scan-truncated': 'The list of copies still being made was too long to read to the end.',
+  'queued-scan-failed': 'The list of copies still being made could not be read.',
+  'queued-record-unreadable': 'Some entries in that list could not be read and were skipped.',
+  'candidate-cap-reached': 'More nodes could have a copy than one request asks; the rest were not contacted.',
+  'holder-lookup-failed': 'The index of nodes that have this file could not be searched.',
+  'holder-path-unknown': 'A node that has a copy could not be asked in a way it understood.',
 }
 
 export function scanLimitText(limit: string): string {

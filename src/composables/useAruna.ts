@@ -35,7 +35,7 @@ import {
   type GroupBackendResponse,
   type GroupRoutingResponse,
   type ListGroupBackendsResponse,
-  type RotateBackendSecretRequest,
+  type BackendCredentialsRequest,
   type RoutingTarget,
   type StorageRoutingRule,
   type ListSourceConnectorsResponse,
@@ -870,8 +870,8 @@ async function createGroupBackend(
   }
 }
 
-// PUT rotates name and credentials; the keys naming the physical store are
-// immutable after create and a retired backend refuses the call.
+// PUT changes name and credentials; the keys naming the physical store are
+// fixed after create and a disabled backend refuses the call.
 async function replaceGroupBackend(
   groupId: string,
   backendId: string,
@@ -888,10 +888,10 @@ async function replaceGroupBackend(
   }
 }
 
-// DELETE is the retire action: stored objects stay readable and the record
-// survives. On a node that predates Phase A it is still a hard delete and can
-// answer 409 while the backend holds data.
-async function retireGroupBackend(groupId: string, backendId: string): Promise<void> {
+// DELETE disables the backend: stored objects stay readable and the record
+// survives. On an older node it is still a hard delete and can answer 409
+// while the backend holds data.
+async function disableGroupBackend(groupId: string, backendId: string): Promise<void> {
   saving.value = true
   try {
     await request<void>(`/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}`, {
@@ -902,15 +902,15 @@ async function retireGroupBackend(groupId: string, backendId: string): Promise<v
   }
 }
 
-// Phase A routes; 404 on nodes that predate them (isUnsupportedEndpoint).
-async function reinstateGroupBackend(
+// Newer routes; 404 on nodes that predate them (isUnsupportedEndpoint).
+async function enableGroupBackend(
   groupId: string,
   backendId: string,
 ): Promise<GroupBackendResponse> {
   saving.value = true
   try {
     return await request<GroupBackendResponse>(
-      `/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}/reinstate`,
+      `/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}/enable`,
       { method: 'POST' },
     )
   } finally {
@@ -918,10 +918,10 @@ async function reinstateGroupBackend(
   }
 }
 
-async function rotateBackendSecret(
+async function replaceBackendCredentials(
   groupId: string,
   backendId: string,
-  input: RotateBackendSecretRequest,
+  input: BackendCredentialsRequest,
 ): Promise<GroupBackendResponse> {
   saving.value = true
   try {
@@ -1754,9 +1754,9 @@ export function useAruna() {
     listGroupBackends,
     createGroupBackend,
     replaceGroupBackend,
-    retireGroupBackend,
-    reinstateGroupBackend,
-    rotateBackendSecret,
+    disableGroupBackend,
+    enableGroupBackend,
+    replaceBackendCredentials,
     getGroupRouting,
     putGroupRouting,
     getBucketRouting,

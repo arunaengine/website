@@ -27,9 +27,8 @@ const loading = ref(false)
 const loadError = ref<string | null>(null)
 const missing = ref(false)
 
-// Copies on a group backend live on infrastructure the tenant operates, so the
-// node cannot vouch for their durability. That distinction is the point of
-// this panel.
+// A copy on the group's own storage sits on machines the node does not run, so
+// it cannot vouch for it. Saying that plainly is the point of this panel.
 const onGroupBackend = computed(() =>
   (summary.value?.copies ?? []).some((copy) => copy.storage === 'group-backend' && copy.state === 'present'),
 )
@@ -85,26 +84,24 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
     <DialogContent class="max-w-2xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
-          <HardDrive class="h-4 w-4 text-primary" /> Storage locations
+          <HardDrive class="h-4 w-4 text-primary" /> Where this file is stored
         </DialogTitle>
         <DialogDescription>
-          Where the bytes of <span class="font-mono">{{ props.bucket }}/{{ props.objectKey }}</span>
-          physically live.
+          Which storage actually holds <span class="font-mono">{{ props.bucket }}/{{ props.objectKey }}</span>.
         </DialogDescription>
       </DialogHeader>
 
       <Skeleton v-if="loading && !summary" class="h-24" />
       <p v-else-if="missing" class="text-xs text-muted-foreground">
-        No copy record for this object. Either this node does not know it, or it does not report
-        storage locations yet.
+        Nothing recorded for this file. Either this node does not know it, or it cannot say where
+        files are stored yet.
       </p>
       <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
       <template v-else-if="summary">
         <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-          <span>Version</span>
-          <span class="font-mono text-foreground/80">{{ summary.version_id }}</span>
+          <span :title="`Version ${summary.version_id}`">Newest version</span>
           <span>·</span>
-          <span>{{ storedCount }} stored {{ storedCount === 1 ? 'copy' : 'copies' }}</span>
+          <span>{{ storedCount }} {{ storedCount === 1 ? 'copy' : 'copies' }} stored</span>
         </div>
 
         <ul class="space-y-1">
@@ -127,18 +124,17 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
             </Badge>
             <span class="min-w-0 flex-1 truncate text-right text-[11px] text-muted-foreground">
               <template v-if="copy.storage === 'group-backend'">
-                Group backend
-                <span class="font-mono text-foreground/80">{{ copy.group_backend_name || copy.group_backend_id }}</span>
+                Your own storage ·
+                <span class="font-mono text-foreground/80">{{ copy.group_backend_name || 'unnamed' }}</span>
               </template>
               <template v-else-if="copy.storage === 'node-managed'">
-                Node storage<template v-if="copy.storage_class">, class
-                  <span class="font-mono text-foreground/80">{{ copy.storage_class }}</span></template>
+                This node's storage<template v-if="copy.storage_class"> ({{ copy.storage_class }})</template>
               </template>
               <template v-else>{{ copyState(copy.state).description }}</template>
             </span>
           </li>
           <li v-if="!summary.copies.length" class="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-            No node reported a copy of this version.
+            No node reported a copy of this file.
           </li>
         </ul>
 
@@ -148,15 +144,14 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
         >
           <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
-            A copy sits on storage your group operates, not on the node's own storage. Its
-            durability, backups and availability are yours to guarantee; the node only writes and
-            reads it.
+            A copy is on storage your group runs, not on this node. Keeping it safe, backed up and
+            reachable is up to you: the node only writes and reads it.
             <RouterLink
               v-if="props.groupId"
               :to="{ name: 'groups', params: { id: props.groupId }, query: { tab: 'storage' } }"
               class="font-medium underline"
             >
-              Manage storage backends
+              Your group's storage
             </RouterLink>
           </span>
         </div>
@@ -167,7 +162,7 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
         >
           <p class="flex items-start gap-2 text-foreground">
             <TriangleAlert class="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-            <span>This list may be incomplete: a copy could exist that was not found.</span>
+            <span>This list may be incomplete: there could be a copy it did not find.</span>
           </p>
           <p v-for="limit in summary.limits" :key="limit" class="pl-6">{{ scanLimitText(limit) }}</p>
         </div>

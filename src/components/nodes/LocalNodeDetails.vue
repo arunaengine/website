@@ -129,9 +129,9 @@ const backends = computed(() =>
               v-if="backend.allow_tenants"
               variant="accent"
               class="text-[10px] uppercase"
-              title="Group routing rules may prefer this backend's class"
+              title="Groups can send their uploads to this storage class"
             >
-              tenant routable
+              groups can use
             </Badge>
             <span class="flex-1" />
             <Badge :variant="statusVariant(backend.status)" class="text-[10px] uppercase">{{ backend.status }}</Badge>
@@ -147,9 +147,9 @@ const backends = computed(() =>
             <p
               v-else-if="backend.quota.quotaBytes != null"
               class="text-[11px] text-muted-foreground"
-              title="This node does not report usage for the backend, so no write is rejected for exceeding the allowance."
+              title="This node does not report how much is stored here, so nothing is rejected for going over."
             >
-              Allowance {{ formatBytes(backend.quota.quotaBytes) }} · declared by the operator, not yet enforced
+              Limit {{ formatBytes(backend.quota.quotaBytes) }} · set by the operator, not enforced yet
             </p>
           </div>
         </li>

@@ -126,14 +126,14 @@ export interface BackendStatus {
   /** Storage class label tenant routing rules may prefer; null when unlabelled. */
   class?: string | null
   allow_tenants: boolean
-  /** Operator allowance for user data; null/absent means unlimited. */
+  /** Operator limit for user data; null/absent means no limit. */
   quota_bytes?: number | null
   default: boolean
   status: string
   /**
    * Bytes stored on this backend. Served only once per-backend quota
-   * enforcement ships (consolidation plan B9); while it is absent
-   * `quota_bytes` is a declared allowance that no write is rejected against.
+   * enforcement ships (consolidation plan B9); while it is absent nothing is
+   * rejected for going over `quota_bytes`.
    */
   used_bytes?: number
 }
@@ -1130,10 +1130,10 @@ export interface RealmPlacementConfigResponse {
 // allowlists in operations/src/group_backends/validation.rs. Every route takes
 // group ADMIN. Secrets live in their own keyspace and are never returned.
 //
-// Three fields/routes are the consolidation plan's Phase A delta and are gated
-// on presence: `retiring` (absent on older nodes), the reinstate route and the
-// credentials route (both 404 there). DELETE retires logically once Phase A
-// lands; before it, DELETE is the old hard delete and can answer 409.
+// Three fields/routes are gated on presence: `disabled` (absent on older
+// nodes), the enable route and the credentials route (both 404 there). DELETE
+// disables the backend once that lands; before it, DELETE is a hard delete and
+// can answer 409 while the backend still holds data.
 export type GroupBackendKind = 's3' | 'gcs' | 'azblob' | 'azdls' | 'b2'
 
 export interface GroupBackendResponse {
@@ -1143,16 +1143,17 @@ export interface GroupBackendResponse {
   kind: string
   name: string
   public_config: Record<string, string>
-  retiring?: boolean
+  /** Disabled backends refuse new writes; stored objects stay readable. */
+  disabled?: boolean
 }
 
 export interface ListGroupBackendsResponse {
   backends: GroupBackendResponse[]
 }
 
-// Shared body of POST (register) and PUT (replace). PUT rotates name and
-// credentials only: the keys naming the physical store are immutable after
-// create, and a retired backend refuses it.
+// Shared body of POST (add) and PUT (replace). PUT changes name and
+// credentials only: the keys naming the physical store are fixed after create,
+// and a disabled backend refuses it.
 export interface GroupBackendRequest {
   name: string
   kind: GroupBackendKind
@@ -1160,9 +1161,9 @@ export interface GroupBackendRequest {
   secret_config: Record<string, string>
 }
 
-// POST .../{bid}/credentials — writes the secret keyspace alone, allowed while
-// the backend is retiring so a leaked key can still be invalidated.
-export interface RotateBackendSecretRequest {
+// POST .../{bid}/credentials — writes the credentials alone, allowed on a
+// disabled backend too so a leaked key can always be invalidated.
+export interface BackendCredentialsRequest {
   secret_config: Record<string, string>
 }
 
