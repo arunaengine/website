@@ -93,10 +93,10 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
     <DialogContent class="max-w-2xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
-          <HardDrive class="h-4 w-4 text-primary" /> Where this file is stored
+          <HardDrive class="h-4 w-4 text-primary" /> Storage locations
         </DialogTitle>
         <DialogDescription>
-          Which storage actually holds <span class="font-mono">{{ props.bucket }}/{{ props.objectKey }}</span>.
+          Where <span class="font-mono">{{ props.bucket }}/{{ props.objectKey }}</span> is stored.
         </DialogDescription>
       </DialogHeader>
 
@@ -133,11 +133,12 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
             </Badge>
             <span class="min-w-0 flex-1 truncate text-right text-[11px] text-muted-foreground">
               <template v-if="copy.storage === 'group-backend'">
-                Your own storage ·
+                Group backend ·
                 <span class="font-mono text-foreground/80">{{ copy.group_backend_name || 'unnamed' }}</span>
               </template>
               <template v-else-if="copy.storage === 'node-managed'">
-                This node's storage<template v-if="copy.storage_class"> ({{ copy.storage_class }})</template>
+                Node storage<template v-if="copy.storage_class"> · class
+                  <span class="font-mono text-foreground/80">{{ copy.storage_class }}</span></template>
               </template>
               <template v-else>{{ copyState(copy.state).description }}</template>
             </span>

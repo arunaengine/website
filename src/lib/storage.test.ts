@@ -83,7 +83,7 @@ describe('targetLabel', () => {
 
   it('marks classes and the empty default', () => {
     expect(targetLabel({ class: 'hot' }, backends)).toBe('Class hot')
-    expect(targetLabel(null, backends)).toBe("This node's own storage")
+    expect(targetLabel(null, backends)).toBe('Node default')
   })
 })
 
@@ -117,7 +117,7 @@ describe('wording fallbacks', () => {
   })
 
   it('labels known and unknown copy states', () => {
-    expect(copyState('not-stored').label).toBe('no data')
+    expect(copyState('not-stored').label).toBe('not stored')
     expect(copyState('future')).toEqual({ label: 'future', description: '' })
   })
 })

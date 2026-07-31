@@ -111,14 +111,14 @@ function kindLabel(backend: GroupBackendResponse): string {
 <template>
   <div class="px-5 py-3">
     <div v-if="hidden" class="text-xs text-muted-foreground">
-      Storage is only visible to group admins.
+      Storage backends are only visible to group admins.
     </div>
     <Skeleton v-else-if="loading && !backends" class="h-16" />
     <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
     <EmptyState
       v-else-if="backends && !backends.length"
-      title="No storage of your own"
-      description="Add your own object storage to have this group's uploads written there instead of on this node."
+      title="No storage backends"
+      description="Register your own object storage to have this group's uploads written there instead of on this node."
     >
       <Button
         v-if="canAdmin"
@@ -127,7 +127,7 @@ function kindLabel(backend: GroupBackendResponse): string {
         :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
         @click="openCreate"
       >
-        <Plus class="h-3.5 w-3.5" /> Add storage
+        <Plus class="h-3.5 w-3.5" /> Add backend
       </Button>
     </EmptyState>
     <template v-else-if="backends">
@@ -155,11 +155,11 @@ function kindLabel(backend: GroupBackendResponse): string {
             <template v-if="confirmingId === backend.backend_id">
               <span class="w-full text-xs text-foreground sm:w-auto">
                 <template v-if="canDisable">
-                  Stop using this storage? New uploads go elsewhere, files already stored stay
-                  readable, and you can switch it back on at any time.
+                  Disable this backend? New uploads go elsewhere, files already stored stay
+                  readable, and you can enable it again at any time.
                 </template>
                 <template v-else>
-                  Remove this storage? This node deletes the entry outright, and refuses while files
+                  Remove this backend? This node deletes the entry outright, and refuses while files
                   are still stored there.
                 </template>
               </span>
@@ -210,7 +210,7 @@ function kindLabel(backend: GroupBackendResponse): string {
       </ul>
       <p v-if="actionError" class="mt-2 text-xs text-destructive">{{ actionError }}</p>
       <p v-if="enableUnsupported" class="mt-2 text-[11px] text-muted-foreground">
-        This node cannot switch a disabled storage back on yet.
+        This node cannot enable a disabled backend yet.
       </p>
       <Button
         v-if="canAdmin"
@@ -221,7 +221,7 @@ function kindLabel(backend: GroupBackendResponse): string {
         :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
         @click="openCreate"
       >
-        <Plus class="h-3.5 w-3.5" /> Add storage
+        <Plus class="h-3.5 w-3.5" /> Add backend
       </Button>
     </template>
 

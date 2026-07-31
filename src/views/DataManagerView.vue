@@ -1214,7 +1214,7 @@ const isEmpty = computed(
                   title="Where new files in this bucket are stored"
                   @click="routingDialogOpen = true"
                 >
-                  <Route class="h-4 w-4" /> Storage
+                  <Route class="h-4 w-4" /> Routing
                 </Button>
                 <Button
                   v-if="showSyncButton"
@@ -1403,8 +1403,8 @@ const isEmpty = computed(
                           v-if="!remoteNodeId"
                           variant="ghost"
                           size="icon-sm"
-                          aria-label="Where this file is stored"
-                          title="Where this file is stored"
+                          aria-label="Storage locations"
+                          title="Storage locations: where this file is stored"
                           @click.stop="locationsKey = object.key"
                         ><HardDrive class="size-3.5" /></Button>
                         <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click.stop="openDeleteObject(object)"><Trash2 class="size-3.5" /></Button>

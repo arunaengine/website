@@ -167,7 +167,7 @@ async function changeCredentials(existing: GroupBackendResponse): Promise<GroupB
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Database class="h-4 w-4 text-primary" />
-          {{ isEdit ? 'Edit storage' : 'Add storage' }}
+          {{ isEdit ? 'Edit storage backend' : 'Add storage backend' }}
         </DialogTitle>
         <DialogDescription>
           Files routed here are written to storage your group runs, not to this node's own storage.
@@ -180,7 +180,7 @@ async function changeCredentials(existing: GroupBackendResponse): Promise<GroupB
             v-if="settingsLocked"
             class="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
           >
-            This storage is disabled. You can still change its credentials; other settings can only
+            This backend is disabled. You can still change its credentials; other settings can only
             change after you enable it again.
           </p>
 
@@ -211,9 +211,9 @@ async function changeCredentials(existing: GroupBackendResponse): Promise<GroupB
           <p v-if="isEdit" class="flex items-start gap-2 text-[11px] text-muted-foreground">
             <Lock class="mt-0.5 h-3 w-3 shrink-0" />
             <span>
-              The type and the fields that say where this storage lives cannot change: files already
+              The type and the fields that say where this backend lives cannot change: files already
               stored there are recorded against them, and pointing this entry somewhere else would
-              make that data unreadable. Add a second storage entry instead.
+              make that data unreadable. Add a second backend instead.
             </span>
           </p>
 
@@ -270,14 +270,14 @@ async function changeCredentials(existing: GroupBackendResponse): Promise<GroupB
             {{ submitError }}
           </p>
           <p class="text-[11px] text-muted-foreground">
-            The node tries the credentials against the storage before it saves them.
+            The node tries the credentials against the backend before it saves them.
           </p>
         </div>
 
         <DialogFooter>
           <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
           <Button type="submit" :disabled="submitDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined">
-            {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add storage' }}
+            {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add backend' }}
           </Button>
         </DialogFooter>
       </form>

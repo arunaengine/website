@@ -31,10 +31,10 @@ const current = computed(() => {
 
 const options = computed(() => {
   const list: { value: string; label: string }[] = []
-  if (props.allowDefault) list.push({ value: DEFAULT_VALUE, label: "This node's own storage" })
+  if (props.allowDefault) list.push({ value: DEFAULT_VALUE, label: 'Node default' })
   for (const backend of props.backends) {
     const value = `backend:${backend.backend_id}`
-    // Disabled storage refuses new uploads; keep it listed only while stored.
+    // A disabled backend refuses new uploads; keep it listed only while stored.
     if (backend.disabled && current.value !== value) continue
     list.push({ value, label: backend.disabled ? `${backend.name} (disabled)` : backend.name })
   }
@@ -44,7 +44,7 @@ const options = computed(() => {
   // A stored target naming a backend this group no longer lists must stay
   // visible rather than silently reading as something else.
   if (current.value !== DEFAULT_VALUE && !list.some((option) => option.value === current.value)) {
-    list.push({ value: current.value, label: 'Storage that no longer exists' })
+    list.push({ value: current.value, label: 'Backend that no longer exists' })
   }
   return list
 })

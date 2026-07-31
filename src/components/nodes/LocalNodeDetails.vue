@@ -131,7 +131,7 @@ const backends = computed(() =>
               class="text-[10px] uppercase"
               title="Groups can send their uploads to this storage class"
             >
-              groups can use
+              available to groups
             </Badge>
             <span class="flex-1" />
             <Badge :variant="statusVariant(backend.status)" class="text-[10px] uppercase">{{ backend.status }}</Badge>

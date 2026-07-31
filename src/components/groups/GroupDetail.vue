@@ -488,7 +488,7 @@ async function leave() {
           <div class="border-b border-border">
             <div class="flex items-center gap-2 px-5 pb-1 pt-4">
               <Database class="h-3.5 w-3.5 text-primary" />
-              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Your own storage</span>
+              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Storage backends</span>
             </div>
             <StorageBackendsSection
               :group-id="group.group_id"
@@ -500,7 +500,7 @@ async function leave() {
           <div>
             <div class="flex items-center gap-2 px-5 pb-1 pt-4">
               <Route class="h-3.5 w-3.5 text-primary" />
-              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Where new uploads go</span>
+              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Storage routing</span>
             </div>
             <div class="px-5 py-3">
               <GroupRoutingSection
@@ -510,7 +510,7 @@ async function leave() {
               />
               <p class="mt-2 text-[11px] text-muted-foreground">
                 Rules for a single bucket live with that bucket: open it in the Data manager and
-                choose Storage.
+                choose Routing.
               </p>
             </div>
           </div>

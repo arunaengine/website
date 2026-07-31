@@ -113,7 +113,7 @@ export function backendSchema(kind: string): BackendKindSchema | null {
   return BACKEND_KIND_SCHEMAS[kind as GroupBackendKind] ?? null
 }
 
-/** Where this storage points, from the fields that identify it. */
+/** Where this backend points, from the fields that identify it. */
 export function backendSummary(backend: GroupBackendResponse): string {
   const schema = backendSchema(backend.kind)
   const keys = schema ? schema.identity : Object.keys(backend.public_config)
@@ -123,7 +123,7 @@ export function backendSummary(backend: GroupBackendResponse): string {
   return parts.join(' · ')
 }
 
-/** Storage classes this node lets groups choose. */
+/** Storage classes this node makes available to groups. */
 export function tenantClasses(backends?: BackendStatus[]): string[] {
   const classes = new Set<string>()
   for (const backend of backends ?? []) {
@@ -132,18 +132,18 @@ export function tenantClasses(backends?: BackendStatus[]): string[] {
   return [...classes].sort()
 }
 
-/** Human label for a target; a group's own storage resolves to its name. */
+/** Human label for a routing target; a group backend resolves to its name. */
 export function targetLabel(
   target: RoutingTarget | null | undefined,
   backends: GroupBackendResponse[] = [],
 ): string {
-  if (!target) return "This node's own storage"
+  if (!target) return 'Node default'
   if (target.backend_id) {
     const known = backends.find((backend) => backend.backend_id === target.backend_id)
     return known ? known.name : target.backend_id
   }
   if (target.class) return `Class ${target.class}`
-  return "This node's own storage"
+  return 'Node default'
 }
 
 export interface BackendQuota {
@@ -161,22 +161,24 @@ export function backendQuota(status: BackendStatus): BackendQuota {
   }
 }
 
+// Labels are the states the API reports; the description is the plain reading
+// shown beside or under them.
 const COPY_STATES: Record<BlobCopyState, { label: string; description: string }> = {
-  present: { label: 'stored', description: 'This node has the file.' },
+  present: { label: 'present', description: 'This node has the file.' },
   pending: {
-    label: 'copying',
+    label: 'pending',
     description: 'A copy is on its way to this node; the file is not there yet.',
   },
   unreachable: {
-    label: 'no answer',
+    label: 'unreachable',
     description: 'This node did not answer, so we cannot tell whether it has a copy.',
   },
   denied: {
-    label: 'no access',
+    label: 'denied',
     description: 'This node keeps the bucket under rules you do not pass, so it would not say.',
   },
   'not-stored': {
-    label: 'no data',
+    label: 'not stored',
     description: 'This version holds no data anywhere: it marks a deletion or points at data elsewhere.',
   },
 }

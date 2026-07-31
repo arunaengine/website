@@ -64,12 +64,12 @@ async function save() {
 <template>
   <div class="space-y-2">
     <p class="text-[11px] text-muted-foreground">
-      Where new uploads go when no bucket rule says otherwise. Picking your own storage is binding:
-      an upload that cannot reach it fails instead of quietly landing somewhere else. Picking a
-      storage class is only a preference: a node without that class stores the upload itself.
+      Where new uploads go when no bucket rule says otherwise. Naming a backend is binding: an
+      upload that cannot reach it fails instead of quietly landing somewhere else. Naming a storage
+      class is only a preference: a node without that class stores the upload itself.
     </p>
     <div v-if="hidden" class="text-xs text-muted-foreground">
-      This is only visible to group admins.
+      Storage routing is only visible to group admins.
     </div>
     <Skeleton v-else-if="loading && !draft && !stored" class="h-9" />
     <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />

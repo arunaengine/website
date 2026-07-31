@@ -116,26 +116,25 @@ async function save() {
     <DialogContent class="max-w-2xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
-          <Route class="h-4 w-4 text-primary" /> Where new files in {{ props.bucket }} are stored
+          <Route class="h-4 w-4 text-primary" /> Storage routing for {{ props.bucket }}
         </DialogTitle>
         <DialogDescription>
-          Rules decide which storage new files are written to. Files already in the bucket stay
-          where they are.
+          Where new files in this bucket are stored. Files already in the bucket stay where they
+          are.
         </DialogDescription>
       </DialogHeader>
 
       <div v-if="hidden" class="text-xs text-muted-foreground">
-        This is only visible to admins of the group that owns this bucket.
+        Storage routing is only visible to admins of the group that owns this bucket.
       </div>
       <Skeleton v-else-if="loading && !rules.length" class="h-24" />
       <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
       <template v-else>
         <p class="text-[11px] text-muted-foreground">
-          The most specific rule wins: a rule for one exact name first, then the longest matching
-          prefix, then a rule with an empty prefix, then the group's setting, then this node's own
-          storage. Picking your own storage is binding, so an upload that cannot reach it fails;
-          picking a storage class is only a preference, and a node without that class stores the
-          file itself.
+          The most specific rule wins: a rule for one exact key first, then the longest matching
+          prefix, then a rule with an empty prefix, then the group default, then this node's own
+          routing. Naming a backend is binding, so an upload that cannot reach it fails; naming a
+          storage class is only a preference, and a node without that class stores the file itself.
         </p>
 
         <div class="max-h-[50vh] space-y-2 overflow-y-auto px-1 scrollbar-thin">
@@ -148,22 +147,22 @@ async function save() {
               :model-value="rule.key_prefix"
               class="h-8 min-w-[10rem] flex-1 font-mono text-xs"
               :placeholder="rule.exact ? 'reads/sample.fastq' : 'raw/ (empty matches everything)'"
-              :aria-label="`File ${rule.exact ? 'name' : 'prefix'} of rule ${index + 1}`"
+              :aria-label="`Key ${rule.exact ? 'match' : 'prefix'} of rule ${index + 1}`"
               @update:model-value="(v: string | number) => patchRule(index, { key_prefix: String(v) })"
             />
             <label class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <Switch
                 :checked="rule.exact"
-                :aria-label="`Match one exact name for rule ${index + 1}`"
+                :aria-label="`Match the exact key for rule ${index + 1}`"
                 @update:checked="(v: boolean) => patchRule(index, { exact: v })"
               />
-              exact name
+              exact key
             </label>
             <div class="min-w-[12rem] flex-1">
               <RoutingTargetPicker
                 :model-value="rule.target.backend_id || rule.target.class ? rule.target : null"
                 :backends="backends"
-                :aria-label="`Storage for rule ${index + 1}`"
+                :aria-label="`Target of rule ${index + 1}`"
                 @update:model-value="(v: RoutingTarget | null) => setTarget(index, v)"
               />
             </div>
@@ -178,7 +177,7 @@ async function save() {
             </Button>
           </div>
           <p v-if="!rules.length" class="px-1 text-xs text-muted-foreground">
-            No rules yet. New files follow the group's setting, and then this node's own storage.
+            No rules yet. New files follow the group default, and then this node's own routing.
           </p>
         </div>
 
@@ -187,7 +186,7 @@ async function save() {
         </Button>
 
         <p v-if="duplicate" class="text-xs text-destructive">
-          Two rules use the same name and match type; the node rejects that.
+          Two rules use the same key and match type; the node rejects that.
         </p>
         <p v-if="incomplete" class="text-xs text-destructive">Every rule needs a target.</p>
         <p v-if="saveError" class="text-xs text-destructive">{{ saveError }}</p>
