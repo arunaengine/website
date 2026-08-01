@@ -1216,10 +1216,12 @@ export type BlobCopyStorage = 'node-managed' | 'group-backend'
 export type LocationScanLimit =
   | 'queued-scan-truncated'
   | 'queued-scan-failed'
+  | 'relationship-scan-failed'
   | 'queued-record-unreadable'
   | 'candidate-cap-reached'
   | 'holder-lookup-failed'
   | 'holder-path-unknown'
+  | 'holder-unreachable'
 
 export interface BlobCopyResponse {
   node_id: string

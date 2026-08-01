@@ -190,10 +190,12 @@ export function copyState(state: string): { label: string; description: string }
 const SCAN_LIMITS: Record<string, string> = {
   'queued-scan-truncated': 'The list of copies still being made was too long to read to the end.',
   'queued-scan-failed': 'The list of copies still being made could not be read.',
+  'relationship-scan-failed': 'The sync rules that place copies on other nodes could not be read.',
   'queued-record-unreadable': 'Some entries in that list could not be read and were skipped.',
   'candidate-cap-reached': 'More nodes could have a copy than one request asks; the rest were not contacted.',
   'holder-lookup-failed': 'The index of nodes that have this file could not be searched.',
   'holder-path-unknown': 'A node that has a copy could not be asked in a way it understood.',
+  'holder-unreachable': 'A node did not answer, so whether it has a copy is unknown.',
 }
 
 export function scanLimitText(limit: string): string {
