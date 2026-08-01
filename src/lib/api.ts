@@ -1201,8 +1201,8 @@ export interface GroupRoutingResponse {
 // ── Object storage locations ────────────────────────────────────────────────
 // GET /blobs/locations?bucket=&path=&version_id= — verified against aruna
 // api/src/routes/blobs.rs. Reports where the copies of ONE version physically
-// live. `not-stored` and `holder-path-unknown` are the Phase A delta; a node
-// that predates them simply never sends them.
+// live, one entry per destination: `node_id` repeats when a node holds the
+// version under several paths, so only `(node_id, bucket, key)` identifies one.
 export type BlobCopyState =
   | 'present'
   | 'pending'
@@ -1224,6 +1224,10 @@ export type LocationScanLimit =
 export interface BlobCopyResponse {
   node_id: string
   local: boolean
+  /** Bucket on that node, which a sync relationship can map away from the requested one. */
+  bucket: string
+  /** Key on that node, likewise remapped by a sync relationship. */
+  key: string
   state: BlobCopyState
   storage?: BlobCopyStorage | null
   /** Node-managed copies only: the operator's storage class label. */
