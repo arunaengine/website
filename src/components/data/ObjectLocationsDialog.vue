@@ -80,8 +80,8 @@ function nodeLabel(copy: BlobCopyResponse): string {
   return realmNodes.displayName(copy.node_id)
 }
 
-// A node can hold several copies, so rows repeat the node name; the path tells
-// them apart. Only when a sync rule stored it elsewhere than what was asked.
+// A node can hold several copies, so rows repeat the node name and the path
+// tells them apart. Shown only when it differs from the requested path.
 function otherPath(copy: BlobCopyResponse): string | null {
   if (!copy.bucket || !copy.key) return null
   if (copy.bucket === props.bucket && copy.key === props.objectKey) return null
