@@ -80,6 +80,14 @@ function nodeLabel(copy: BlobCopyResponse): string {
   return realmNodes.displayName(copy.node_id)
 }
 
+// A node can hold several copies, so rows repeat the node name; the path tells
+// them apart. Only when a sync rule stored it elsewhere than what was asked.
+function otherPath(copy: BlobCopyResponse): string | null {
+  if (!copy.bucket || !copy.key) return null
+  if (copy.bucket === props.bucket && copy.key === props.objectKey) return null
+  return `${copy.bucket}/${copy.key}`
+}
+
 function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outline' {
   if (state === 'present') return 'success'
   if (state === 'pending' || state === 'unreachable') return 'warn'
@@ -116,7 +124,7 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
         <ul class="space-y-1">
           <li
             v-for="copy in copies"
-            :key="`${copy.node_id}-${copy.group_backend_id ?? copy.storage_class ?? ''}`"
+            :key="`${copy.node_id}-${copy.bucket}-${copy.key}`"
             class="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2"
           >
             <Server class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -127,6 +135,13 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
             >
               {{ nodeLabel(copy) }}
             </RouterLink>
+            <span
+              v-if="otherPath(copy)"
+              class="max-w-[14rem] truncate font-mono text-[11px] text-muted-foreground"
+              :title="otherPath(copy) ?? undefined"
+            >
+              {{ otherPath(copy) }}
+            </span>
             <Badge v-if="copy.local" variant="outline" class="text-[10px] uppercase">this node</Badge>
             <Badge :variant="stateVariant(copy.state)" class="text-[10px] uppercase" :title="copyState(copy.state).description">
               {{ copyState(copy.state).label }}
