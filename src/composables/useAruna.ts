@@ -1351,39 +1351,34 @@ const currentUser = computed<User | null>(() => {
   }
 })
 
-// The backend authorizes quota edits with WRITE on exactly /{realm_id}/admin/config.
-const isRealmAdmin = computed<boolean>(() => {
+// Does a realm role grant `need` on `suffix`, directly or via a /** grant?
+// Mirrors the backend's permission matching for /{realm_id}/... admin paths.
+function hasRealmGrant(suffix: string, need: 'Read' | 'Write'): boolean {
   const info = userInfo.value
   if (!info) return false
-  const target = `/${info.realm.realm_id}/admin/config`
+  const target = `/${info.realm.realm_id}/${suffix}`
   return info.realm.roles.some((role) =>
     Object.entries(role.permissions).some(([key, value]) => {
-      if (value !== 'Write') return false
+      if (value !== 'Write' && !(need === 'Read' && value === 'Read')) return false
       if (key === target) return true
       if (!key.endsWith('/**')) return false
       const base = key.slice(0, -3)
       return target === base || target.startsWith(`${base}/`)
     }),
   )
-})
+}
+
+// The backend authorizes quota edits with WRITE on exactly /{realm_id}/admin/config.
+const isRealmAdmin = computed<boolean>(() => hasRealmGrant('admin/config', 'Write'))
 
 // The backend gates the user directory on READ of /{realm_id}/admin/u/**
 // (operations list_users / get_user); the seeded realm_admin Write grant on
 // /{realm_id}/admin/** covers it.
-const canInspectUsers = computed<boolean>(() => {
-  const info = userInfo.value
-  if (!info) return false
-  const target = `/${info.realm.realm_id}/admin/u`
-  return info.realm.roles.some((role) =>
-    Object.entries(role.permissions).some(([key, value]) => {
-      if (value !== 'Read' && value !== 'Write') return false
-      if (key === target) return true
-      if (!key.endsWith('/**')) return false
-      const base = key.slice(0, -3)
-      return target === base || target.startsWith(`${base}/`)
-    }),
-  )
-})
+const canInspectUsers = computed<boolean>(() => hasRealmGrant('admin/u', 'Read'))
+
+// Onboarding admin needs WRITE on /{realm_id}/admin/onboarding, and the
+// endpoints only exist on a management node (api/src/routes/onboarding.rs).
+const canManageOnboarding = computed<boolean>(() => hasRealmGrant('admin/onboarding', 'Write'))
 
 // Quota edits are only accepted by a management node; server/local nodes 403.
 const isManagementNode = computed<boolean>(() => nodeInfo.value?.node.capabilities === 'management')
@@ -1707,6 +1702,7 @@ export function useAruna() {
     currentUser,
     isRealmAdmin,
     canInspectUsers,
+    canManageOnboarding,
     isManagementNode,
     nodes,
     groups,
