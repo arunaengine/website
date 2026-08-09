@@ -21,7 +21,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { Database, HardDrive, Layers, Link2, Boxes, RefreshCw, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
 
-const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, isManagementNode, nodeInfo, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
+const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, canManageOnboarding, isManagementNode, nodeInfo, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
 const { isAuthenticated, authPending } = useAuth()
 // Shared realm directory: resolves saved user-cap ids to display names so rows
 // show a handle instead of the raw {ulid}@{realm} identity.
@@ -396,6 +396,13 @@ async function save() {
         <a href="#group-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Group overrides</a>
         <a href="#user-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">User caps</a>
         <RouterLink v-if="canInspectUsers" :to="{ name: 'admin-users' }" class="mt-1 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Users &rarr;</RouterLink>
+        <RouterLink
+          v-if="canManageOnboarding && isManagementNode"
+          :to="{ name: 'admin-onboarding' }"
+          class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          Node onboarding &rarr;
+        </RouterLink>
       </nav>
 
       <div class="space-y-6">

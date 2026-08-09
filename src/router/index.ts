@@ -52,6 +52,12 @@ const routes: RouteRecordRaw[] = [
       { path: 'admin/placement', redirect: { path: '/app/admin', query: { tab: 'placement' } } },
       // Realm admin — read-only user directory
       { path: 'admin/users', name: 'admin-users', component: () => import('@/views/AdminUsersView.vue') },
+      // Realm admin — node onboarding secrets (management nodes only)
+      {
+        path: 'admin/onboarding',
+        name: 'admin-onboarding',
+        component: () => import('@/views/AdminOnboardingView.vue'),
+      },
       // Compute — GA4GH TES tasks and durable system jobs in one surface
       // (each half is feature-gated in-view)
       { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
