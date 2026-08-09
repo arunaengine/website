@@ -139,8 +139,15 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
-function scheduleHide() {
-  window.setTimeout(() => (showResults.value = false), 120)
+const wrapperEl = ref<HTMLElement | null>(null)
+
+// Hide results only when focus leaves the whole search wrapper (input plus the
+// result buttons), so keyboard users can Tab into a result. A blur-timeout
+// would pull the list away mid-Tab. Mouse clicks use @mousedown.prevent on the
+// buttons, so focus never leaves the input for them.
+function onSearchFocusOut(event: FocusEvent) {
+  const next = event.relatedTarget as Node | null
+  if (!next || !wrapperEl.value?.contains(next)) showResults.value = false
 }
 </script>
 
@@ -149,14 +156,14 @@ function scheduleHide() {
     <div class="container flex h-14 items-center gap-3">
       <RealmSwitcher />
 
-      <div class="relative min-w-0 max-w-xl flex-1">
+      <div ref="wrapperEl" class="relative min-w-0 max-w-xl flex-1" @focusout="onSearchFocusOut">
         <Search
           class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
         />
         <input
           v-model="q"
+          aria-label="Search this realm — metadata and groups"
           @focus="showResults = true"
-          @blur="scheduleHide"
           @keydown="onKeydown"
           role="combobox"
           aria-controls="quick-search-results"
@@ -167,6 +174,7 @@ function scheduleHide() {
         />
         <Spinner v-if="quickPending" label="Searching…" class="absolute right-11 top-1/2 -translate-y-1/2 text-primary" />
         <kbd
+          aria-hidden="true"
           class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-flex"
         >
           ⌘K
@@ -211,7 +219,8 @@ function scheduleHide() {
           <div v-if="quickPending && !items.length" class="px-3 py-2.5 text-xs text-muted-foreground">Searching…</div>
           <button
             v-if="q"
-            @mousedown.prevent="openSearchPage"
+            @mousedown.prevent
+            @click="openSearchPage"
             class="flex w-full items-center gap-2 border-t border-border bg-muted/30 px-3 py-2.5 text-left text-xs font-medium text-primary hover:bg-muted"
           >
             See all results for "{{ q }}" in Search →

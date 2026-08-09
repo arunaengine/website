@@ -593,14 +593,14 @@ async function save() {
             <div class="text-sm font-medium text-foreground">Public</div>
             <div class="text-[11px] text-muted-foreground">Anyone can read this document when public.</div>
           </div>
-          <Switch :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
+          <Switch aria-label="Public" :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
         </div>
 
         <p v-if="saveError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ saveError }}</p>
       </template>
 
       <DialogFooter>
-        <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+        <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <Button :disabled="loading || Boolean(loadError) || saving" @click="save">{{ saving ? 'Saving…' : 'Save changes' }}</Button>
       </DialogFooter>
 

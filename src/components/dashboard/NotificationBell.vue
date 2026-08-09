@@ -152,9 +152,19 @@ function onLoadMore(event: Event) {
               <div v-if="display.detail" class="truncate text-xs text-muted-foreground">{{ display.detail }}</div>
             </div>
             <span v-if="!n.read" class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+            <!--
+              Inline mark-as-read: kept always visible via opacity (not hidden/group-hover)
+              so touch users can reach it, and given tabindex="-1" so it is not a *tabbable*
+              interactive nested inside role=menuitem — the menu stays a single tab stop per
+              WAI-ARIA menu semantics. Keyboard/SR users retain two equivalent paths: selecting
+              the row marks it read then navigates, and "Mark all read" in the header is a real
+              tab stop. Strict-axe fallback (if nested-interactive must be zero): delete this
+              button outright. Resolves review 251 F7.
+            -->
             <button
               v-if="!n.read"
-              class="mt-0.5 hidden shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground group-hover:block"
+              tabindex="-1"
+              class="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground opacity-60 hover:text-foreground hover:opacity-100 group-hover:opacity-100"
               aria-label="Mark as read"
               @click="markOnly($event, n)"
             >
