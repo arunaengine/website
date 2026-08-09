@@ -161,7 +161,7 @@ async function copyId() {
       <p v-else class="py-6 text-sm text-muted-foreground">This entity is not part of the loaded crate.</p>
 
       <DialogFooter>
-        <DialogClose><Button variant="outline" size="sm">Close</Button></DialogClose>
+        <DialogClose as-child><Button variant="outline" size="sm">Close</Button></DialogClose>
       </DialogFooter>
     </DialogContent>
   </Dialog>

@@ -1455,7 +1455,7 @@ async function submit() {
       </div>
 
       <DialogFooter>
-        <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+        <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <Button v-if="startTab === 'import'" :disabled="!canSubmitImport || saving" @click="submitImport">
           {{ saving ? 'Importing…' : 'Import crate' }}
         </Button>

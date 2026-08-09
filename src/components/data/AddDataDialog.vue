@@ -820,7 +820,7 @@ watch(
       </div>
 
       <DialogFooter class="sm:justify-between">
-        <DialogClose><Button variant="outline">Close</Button></DialogClose>
+        <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
         <Button
           :disabled="!basket.canSubmit.value || writesDisabled"
           :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"

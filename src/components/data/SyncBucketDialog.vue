@@ -307,7 +307,7 @@ async function submit() {
       </div>
 
       <DialogFooter>
-        <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+        <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <Button :disabled="!canSubmit" @click="submit">
           <Loader2 v-if="busy" class="h-4 w-4 animate-spin" />
           {{ busy ? 'Creating…' : mode === 'once' ? 'Sync now' : 'Create sync' }}

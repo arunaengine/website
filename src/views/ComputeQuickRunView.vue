@@ -1535,7 +1535,7 @@ function dismissRerun() {
         </p>
         <p v-if="loadScriptError" class="text-[11px] text-destructive">{{ loadScriptError }}</p>
         <DialogFooter>
-          <DialogClose><Button variant="outline">Close</Button></DialogClose>
+          <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

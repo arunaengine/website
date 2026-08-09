@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { DialogClose } from 'radix-vue'
+import { DialogClose, type DialogCloseProps, useForwardProps } from 'radix-vue'
+const props = defineProps<DialogCloseProps>()
+const forwarded = useForwardProps(props)
 </script>
 <template>
-  <DialogClose><slot /></DialogClose>
+  <DialogClose v-bind="forwarded"><slot /></DialogClose>
 </template>

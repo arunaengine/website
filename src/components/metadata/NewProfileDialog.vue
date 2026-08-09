@@ -480,7 +480,7 @@ async function submit() {
       </div>
 
       <DialogFooter class="sm:justify-between">
-        <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+        <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <div class="flex items-center gap-2">
           <Button v-if="step > 1" variant="outline" @click="goBack">
             <ArrowLeft class="h-3.5 w-3.5" /> Back

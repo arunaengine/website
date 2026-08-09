@@ -164,7 +164,7 @@ async function confirm() {
       </p>
 
       <DialogFooter>
-        <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+        <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <Button :disabled="!selected.size || busy || resolving" @click="confirm">
           <Loader2 v-if="busy || resolving" class="size-3.5 animate-spin" />
           <template v-else>Link {{ selected.size || '' }} {{ selected.size === 1 ? 'subcrate' : 'subcrates' }}</template>

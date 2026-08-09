@@ -202,11 +202,11 @@ function activate() {
 
       <DialogFooter>
         <template v-if="!created">
-          <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+          <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
           <Button :disabled="saving || !groupId" @click="submit">{{ saving ? 'Creating…' : 'Create' }}</Button>
         </template>
         <template v-else>
-          <DialogClose><Button variant="outline">Close</Button></DialogClose>
+          <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
           <Button @click="activate">Use in browser</Button>
         </template>
       </DialogFooter>

@@ -1510,7 +1510,7 @@ const isEmpty = computed(
           <p v-if="newFolderError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ newFolderError }}</p>
         </div>
         <DialogFooter>
-          <DialogClose><Button variant="outline">Cancel</Button></DialogClose>
+          <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
           <Button :disabled="newFolderInvalid || newFolderBusy" @click="createFolder">{{ newFolderBusy ? 'Creating…' : 'Create' }}</Button>
         </DialogFooter>
       </DialogContent>
@@ -1546,7 +1546,7 @@ const isEmpty = computed(
         </div>
         <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
         <DialogFooter>
-          <DialogClose><Button variant="outline" :disabled="deleteBusy">Cancel</Button></DialogClose>
+          <DialogClose as-child><Button variant="outline" :disabled="deleteBusy">Cancel</Button></DialogClose>
           <Button variant="destructive" :disabled="deleteBusy" @click="confirmDelete">{{ deleteBusy ? 'Deleting…' : 'Delete' }}</Button>
         </DialogFooter>
       </DialogContent>
@@ -1592,7 +1592,7 @@ const isEmpty = computed(
         </div>
         <p v-if="bucketDeleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ bucketDeleteError }}</p>
         <DialogFooter>
-          <DialogClose><Button variant="outline" :disabled="bucketDeleteBusy">Cancel</Button></DialogClose>
+          <DialogClose as-child><Button variant="outline" :disabled="bucketDeleteBusy">Cancel</Button></DialogClose>
           <Button
             variant="destructive"
             :disabled="!bucketDeleteConfirmed || bucketDeleteBusy"
