@@ -133,7 +133,7 @@ try {
   await visit('/', 'guest: landing')
   await visit('/app', 'guest: dashboard')
   await visit('/app/search', 'guest: discover')
-  await visit('/app/query', 'guest: query')
+  await visit('/app/search?expert=1', 'guest: search expert')
   await visit('/app/status', 'guest: status')
 
   // ── Sign in as realm admin (Keycloak) ──────────────────────────────────────
@@ -165,7 +165,7 @@ try {
   } catch (err) {
     step('a11y: auth: metadata detail', false, String(err))
   }
-  await visit('/app/query', 'auth: query')
+  await visit('/app/search?expert=1', 'auth: search expert')
   await visit('/app/profiles', 'auth: profiles')
   await visit('/app/groups', 'auth: groups')
   await visit('/app/status', 'auth: status')
@@ -241,8 +241,8 @@ try {
     step('keyboard: user menu flow', false, String(err))
   }
 
-  // (d) Query view: the Run button is keyboard-focusable.
-  await page.goto(BASE + '/app/query')
+  // (d) Search expert mode: the SPARQL Run button is keyboard-focusable.
+  await page.goto(BASE + '/app/search?expert=1')
   await settle()
   const runFocusable = await page.evaluate(() => {
     const b = [...document.querySelectorAll('button')].find((x) => /^\s*Run\b/i.test(x.textContent || ''))
@@ -250,7 +250,7 @@ try {
     b.focus()
     return document.activeElement === b
   })
-  step('keyboard: query Run button is focusable', runFocusable)
+  step('keyboard: sparql Run button is focusable', runFocusable)
 
   const unexpected = consoleErrors.filter(
     (e) => !/Failed to load resource: the server responded with a status of (404|500)/.test(e),
