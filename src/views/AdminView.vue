@@ -7,6 +7,8 @@ import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
+import PoliciesSection from '@/components/policies/PoliciesSection.vue'
+import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
@@ -30,13 +32,21 @@ const nodeCapability = computed(() => nodeInfo.value?.node.capabilities ?? 'serv
 // Placement admin is a tab of this view (config-gated); the legacy
 // /app/admin/placement route redirects here with ?tab=placement.
 const placementAdminEnabled = featureEnabled('placementAdmin')
+const policiesEnabled = featureEnabled('policies')
 
 const route = useRoute()
 const router = useRouter()
-type AdminTab = 'realm' | 'placement'
-const tab = computed<AdminTab>(() =>
-  route.query.tab === 'placement' && placementAdminEnabled ? 'placement' : 'realm',
-)
+type AdminTab = 'realm' | 'placement' | 'policies'
+const tab = computed<AdminTab>(() => {
+  if (route.query.tab === 'placement' && placementAdminEnabled) return 'placement'
+  if (route.query.tab === 'policies' && policiesEnabled) return 'policies'
+  return 'realm'
+})
+const adminTabs = computed(() => [
+  { id: 'realm' as const, label: 'Quota & usage' },
+  ...(placementAdminEnabled ? [{ id: 'placement' as const, label: 'Placement' }] : []),
+  ...(policiesEnabled ? [{ id: 'policies' as const, label: 'Policies' }] : []),
+])
 function setTab(next: AdminTab) {
   void router.replace({ query: { ...route.query, tab: next === 'realm' ? undefined : next } })
 }
@@ -351,13 +361,10 @@ async function save() {
     </div>
 
     <template v-else>
-      <div v-if="placementAdminEnabled" class="container pt-6">
+      <div v-if="adminTabs.length > 1" class="container pt-6">
         <div class="flex items-center gap-1 border-b border-border" role="tablist" aria-label="Realm administration sections">
           <button
-            v-for="entry in [
-              { id: 'realm' as const, label: 'Quota & usage' },
-              { id: 'placement' as const, label: 'Placement' },
-            ]"
+            v-for="entry in adminTabs"
             :key="entry.id"
             type="button"
             role="tab"
@@ -376,6 +383,11 @@ async function save() {
       </div>
 
       <PlacementAdminPanel v-if="tab === 'placement'" />
+
+      <div v-else-if="tab === 'policies'" class="container space-y-8 py-8">
+        <PoliciesSection scope="realm" :can-admin="isRealmAdmin" />
+        <EffectivePolicies />
+      </div>
 
       <div v-else class="container grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
       <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">
