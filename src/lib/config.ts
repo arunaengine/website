@@ -29,6 +29,7 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
 const DEFAULT_FEATURES: Record<string, boolean> = {
   jobs: true,
   placementAdmin: true,
+  policies: true,
   searchCursor: true,
   stagingJobs: true,
   tes: true,
