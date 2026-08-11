@@ -11,6 +11,7 @@ import ContextSection from '@/components/metadata/ContextSection.vue'
 import CrateImportExport from '@/components/metadata/CrateImportExport.vue'
 import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
 import SubcratesSection from '@/components/metadata/SubcratesSection.vue'
+import PersistentIdSection from '@/components/metadata/PersistentIdSection.vue'
 import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import AuthorChips from '@/components/metadata/AuthorChips.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
@@ -613,6 +614,13 @@ watch(relatedDocs, (rows) => {
 
       <!-- Crate + referenced data for any resolved document (keyed on detailId). -->
       <template v-if="docState === 'found'">
+        <PersistentIdSection
+          v-if="fetchedSummary"
+          :document-id="detailId"
+          :is-public="fetchedSummary.public"
+          :can-write="Boolean(current) && canWrite"
+        />
+
         <DetailsSection
           :fields="presentation.fields"
           :loading="loadingCrate"
