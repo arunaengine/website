@@ -20,7 +20,7 @@ import { useS3 } from '@/composables/useS3'
 import { RouterLink } from 'vue-router'
 import { relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
-import { ChevronRight, ExternalLink, KeyRound, Palette, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from '@lucide/vue'
+import { ChevronRight, ExternalLink, KeyRound, Palette, Rss, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from '@lucide/vue'
 
 const {
   apiBaseUrl,
@@ -92,6 +92,22 @@ watch(profileDirty, (dirty) => {
 })
 
 const preferredProfile = computed(() => profiles.value.find((profile) => profile.id === preferredProfileId.value))
+
+// The backend advertises {api_base_url}/oai as its OAI-PMH base (aruna
+// api/src/routes/oai.rs base_url): prefer the node's own configured REST base
+// and fall back to resolving this session's API base against the window origin.
+const oaiBaseUrl = computed(() => {
+  let base = nodeInfo.value?.services.interfaces.rest.url ?? ''
+  if (!base) {
+    try {
+      base = new URL(apiBaseUrl.value, window.location.origin).toString()
+    } catch {
+      return ''
+    }
+  }
+  return `${base.replace(/\/+$/, '')}/oai`
+})
+const oaiIdentifyUrl = computed(() => (oaiBaseUrl.value ? `${oaiBaseUrl.value}?verb=Identify` : ''))
 
 // Swagger UI is served from the node's root, not under /api/v1.
 const swaggerUrl = computed(() => {
@@ -200,6 +216,7 @@ function toggleGroup(groupId: string) {
         <a href="#default-profile" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Default profile</a>
         <a href="#groups" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Groups &amp; roles</a>
         <a href="#credentials" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">S3 credentials</a>
+        <a href="#interop" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Interoperability</a>
         <a href="#appearance" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Appearance</a>
         <RouterLink v-if="watchesAvailable" :to="{ name: 'settings-watches' }" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Watched resources &rarr;</RouterLink>
       </nav>
@@ -397,6 +414,36 @@ function toggleGroup(groupId: string) {
           </table>
           <p v-if="revokeError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ revokeError }}</p>
           <CreateCredentialDialog v-model:open="createCredentialOpen" />
+        </section>
+
+        <section id="interop" class="surface">
+          <header class="border-b border-border px-5 py-4">
+            <div class="flex items-center gap-2"><Rss class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Interoperability</h3></div>
+            <p class="text-xs text-muted-foreground">Open protocols external services can consume from this node.</p>
+          </header>
+          <div class="space-y-3 p-5">
+            <div>
+              <div class="text-sm font-medium text-foreground">OAI-PMH data provider</div>
+              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Standard OAI-PMH 2.0 endpoint for metadata harvesters: publicly visible metadata documents are
+                exposed as Dublin Core (<span class="font-mono">oai_dc</span>) records. All six protocol verbs are
+                answered over GET or form-encoded POST; the repository has no set hierarchy. Point a harvester at
+                the base URL below.
+              </p>
+              <div class="mt-2 flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-3 py-2">
+                <code class="min-w-0 break-all font-mono text-[11px] text-foreground">{{ oaiBaseUrl }}</code>
+                <CopyButton :value="oaiBaseUrl" label="Copy OAI-PMH base URL" />
+                <a v-if="oaiIdentifyUrl" :href="oaiIdentifyUrl" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                  <ExternalLink class="h-3 w-3" /> Identify
+                </a>
+              </div>
+            </div>
+            <Separator />
+            <div class="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Harvesting external OAI-PMH sources into this node</span>
+              <Badge variant="outline" class="text-[10px] uppercase">Coming soon</Badge>
+            </div>
+          </div>
         </section>
 
         <section id="appearance" class="surface">
