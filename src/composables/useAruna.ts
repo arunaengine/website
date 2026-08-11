@@ -1380,6 +1380,10 @@ const canInspectUsers = computed<boolean>(() => hasRealmGrant('admin/u', 'Read')
 // endpoints only exist on a management node (api/src/routes/onboarding.rs).
 const canManageOnboarding = computed<boolean>(() => hasRealmGrant('admin/onboarding', 'Write'))
 
+// The quarantine console needs WRITE on /{realm_id}/admin/sync-quarantine
+// (api/src/routes/sync_quarantine.rs); served by every node, not just management.
+const canManageQuarantine = computed<boolean>(() => hasRealmGrant('admin/sync-quarantine', 'Write'))
+
 // Quota edits are only accepted by a management node; server/local nodes 403.
 const isManagementNode = computed<boolean>(() => nodeInfo.value?.node.capabilities === 'management')
 
@@ -1703,6 +1707,7 @@ export function useAruna() {
     isRealmAdmin,
     canInspectUsers,
     canManageOnboarding,
+    canManageQuarantine,
     isManagementNode,
     nodes,
     groups,

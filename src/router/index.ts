@@ -58,6 +58,12 @@ const routes: RouteRecordRaw[] = [
         name: 'admin-onboarding',
         component: () => import('@/views/AdminOnboardingView.vue'),
       },
+      // Realm admin — rejected replicated sync events held by this node
+      {
+        path: 'admin/quarantine',
+        name: 'admin-quarantine',
+        component: () => import('@/views/AdminQuarantineView.vue'),
+      },
       // Compute — GA4GH TES tasks and durable system jobs in one surface
       // (each half is feature-gated in-view)
       { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
