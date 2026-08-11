@@ -71,11 +71,16 @@ watch(
 
 // Registration is a background job: the 202 only means the authority queued
 // it, so the section stays pending until the polled job lands.
-const { job: mintJob, lastPollError } = useJobDetail(() => (jobsEnabled.value ? mintJobId.value : null))
+const {
+  job: mintJob,
+  loadState: mintJobState,
+  loadError: mintJobError,
+  lastPollError,
+} = useJobDetail(() => (jobsEnabled.value ? mintJobId.value : null))
 const mintPending = computed(() => {
-  if (!mintJobId.value) return false
-  if (!jobsEnabled.value) return false
-  return !mintJob.value || !isTerminalJobState(mintJob.value.state)
+  if (!mintJobId.value || !jobsEnabled.value) return false
+  if (!mintJob.value) return mintJobState.value !== 'error'
+  return !isTerminalJobState(mintJob.value.state)
 })
 watch(mintJob, (job) => {
   if (!job || !isTerminalJobState(job.state)) return
@@ -84,6 +89,9 @@ watch(mintJob, (job) => {
     void probe()
   } else {
     mintError.value = job.error?.message ?? `Mint job ${JOB_STATE_META[job.state].label.toLowerCase()}.`
+    // A terminal non-success leaves nothing in flight; mint is idempotent, so
+    // offer the retry.
+    mintJobId.value = null
   }
 })
 
@@ -202,6 +210,10 @@ const canWithdraw = computed(
       </div>
       <p v-else-if="mintJobId && !jobsEnabled" class="text-xs text-muted-foreground">
         Mint accepted — registration runs as a background job; re-check to see it land.
+      </p>
+      <p v-else-if="mintJobId && mintJobState === 'error'" class="text-xs text-amber-700 dark:text-amber-300">
+        Mint accepted, but its job status could not be read{{ mintJobError ? ` (${mintJobError})` : '' }} —
+        re-check the resolution later.
       </p>
 
       <p v-if="mintError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ mintError }}</p>
