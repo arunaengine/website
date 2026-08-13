@@ -1,7 +1,8 @@
 // Runtime configuration served by the hosting node at /portal-config.json.
-// Today the backend returns only { "apiBaseUrl": "/api/v1" }; the file is
-// forward-extensible, so unknown fields are ignored and missing fields fall
-// back to the typed defaults. Optional surfaces can be switched off per
+// `apiBaseUrl` is same-origin ("/api/v1") when one listener serves both, and an
+// absolute URL when the node serves the portal on a listener of its own. The
+// file is forward-extensible, so unknown fields are ignored and missing fields
+// fall back to the typed defaults. Optional surfaces can be switched off per
 // deployment via the `features` map.
 import { fetchWithTimeout } from './fetch'
 

@@ -44,6 +44,16 @@ export function defaultApiBaseUrl(): string {
   return import.meta.env.VITE_ARUNA_API_BASE_URL || portalConfig().apiBaseUrl || DEFAULT_API_BASE_URL
 }
 
+// Origin the API base points at. The base is absolute when the node serves the
+// portal on its own listener, and relative when portal and API share an origin.
+export function apiOrigin(baseUrl: string): string {
+  try {
+    return new URL(baseUrl, window.location.origin).origin
+  } catch {
+    return window.location.origin
+  }
+}
+
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
