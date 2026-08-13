@@ -18,6 +18,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useWatches } from '@/composables/useWatches'
 import { useS3 } from '@/composables/useS3'
 import { RouterLink } from 'vue-router'
+import { apiOrigin } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { ChevronRight, ExternalLink, KeyRound, Palette, Rss, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from '@lucide/vue'
@@ -109,15 +110,16 @@ const oaiBaseUrl = computed(() => {
 })
 const oaiIdentifyUrl = computed(() => (oaiBaseUrl.value ? `${oaiBaseUrl.value}?verb=Identify` : ''))
 
-// Swagger UI is served from the node's root, not under /api/v1.
+// Swagger UI is served from the API root, not under /api/v1, and not from the
+// portal origin, which is a separate listener when the node splits the two.
 const swaggerUrl = computed(() => {
-  let origin = window.location.origin
+  let origin = apiOrigin(apiBaseUrl.value)
   const restUrl = nodeInfo.value?.services.interfaces.rest.url
   if (restUrl) {
     try {
       origin = new URL(restUrl).origin
     } catch {
-      // keep the window origin
+      // keep the API origin
     }
   }
   return `${origin}/swagger-ui`

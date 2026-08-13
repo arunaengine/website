@@ -19,10 +19,10 @@ import { NEVER_EXPIRES_AFTER, secretStatus, useNodeOnboarding } from '@/composab
 import { buildComposeSnippet, buildEnvBlock, normalizeSeedUrl, type NodeConfigInput } from '@/lib/onboarding-config'
 import { kindVariant } from '@/components/nodes/node-display'
 import { truncateMiddle } from '@/lib/utils'
-import type { CreateOnboardingSecretResponse, OnboardingMode, RealmNodeInfo } from '@/lib/api'
+import { apiOrigin, type CreateOnboardingSecretResponse, type OnboardingMode, type RealmNodeInfo } from '@/lib/api'
 import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw, ServerCog, ServerCrash, ShieldCheck } from '@lucide/vue'
 
-const { bootstrapped, currentUser, canManageOnboarding, isManagementNode, nodeInfo, realmInfo } = useAruna()
+const { apiBaseUrl, bootstrapped, currentUser, canManageOnboarding, isManagementNode, nodeInfo, realmInfo } = useAruna()
 const {
   secrets,
   listError,
@@ -99,7 +99,9 @@ const defaultSeedUrl = computed(() => {
   const localId = nodeInfo.value?.node.peer_id
   const published = realmInfo.value?.nodes.find((n) => n.node_id === localId)?.info?.urls?.api
   const rest = nodeInfo.value?.services.interfaces.rest.url
-  const raw = published || rest || (typeof window !== 'undefined' ? window.location.origin : '')
+  // Last resort is the API origin, not the page origin: the portal may be
+  // served from a listener of its own.
+  const raw = published || rest || (typeof window !== 'undefined' ? apiOrigin(apiBaseUrl.value) : '')
   return normalizeSeedUrl(raw)
 })
 const seedUrl = ref('')
