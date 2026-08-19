@@ -10,25 +10,79 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import Switch from '@/components/ui/Switch.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import Select from '@/components/ui/Select.vue'
 import DatasetFilesEditor from '@/components/metadata/DatasetFilesEditor.vue'
+import DatasetEntityInstances from '@/components/metadata/DatasetEntityInstances.vue'
+import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
+import LiftNotesPanel from '@/components/metadata/profile-builder/LiftNotesPanel.vue'
 import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
-import { Layers, Pencil, Plus, X } from '@lucide/vue'
+import { AlertTriangle, Layers, Pencil, Plus, X } from '@lucide/vue'
 import { computed, ref, shallowRef, watch } from 'vue'
-import { useAruna } from '@/composables/useAruna'
+import { profileRulesLoadState, useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentListItem, type MetadataDocumentSummary } from '@/lib/api'
 import { applyDataEntities, dataEntityTreeOf, type DataEntity } from '@/lib/dataEntities'
 import { addSubcrateLink, removeSubcrateLink, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
 import { documentIdFromIri } from '@/lib/graphIri'
 import { groupCustomFieldRows, seedCustomFieldRows, type CustomFieldRow, type PreservedFieldRow } from '@/lib/customFields'
+import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
+import { emitEntityEntries, emitSelectObject, isHasPartUri } from '@/lib/profiles/emit'
+import type { EntityEntry } from '@/lib/profiles/entityEntries'
+import {
+  entityTypeLabelFor,
+  newEntityEntry,
+  newRefEntry,
+  seedEntries,
+  subControlsFor,
+} from '@/lib/profiles/entityTree'
+import {
+  cloneDraftValue,
+  draftValuePopulated,
+  migrationTarget,
+  type ProfileDraftItem,
+} from '@/lib/profiles/migration'
 import { licenseEntity } from '@/lib/profiles/rocrate'
+import { sameSchemaOrgType } from '@/lib/profiles/uri'
+import { cloneLiftNotes, type LiftNote } from '@/lib/shacl/lift'
 import { validateProfileData } from '@/lib/profiles/validate'
+import { classifyRoCrateSpecIri } from '@/lib/rocrateVersions'
+import {
+  DX_PROFILE,
+  type JsonSchema,
+  type ProfileControl,
+  type ProfileEntityRule,
+  type ProfilePropertyRule,
+} from '@/lib/profiles/types'
 import type { MetadataProfile } from '@/data/types'
+
+const NO_PROFILE_VALUE = '__no_profile__'
+const EXTERNAL_PROFILE_VALUE = '__external_profile__'
+
+interface LoadedProfileDefinition {
+  profile: MetadataProfile
+  entityRules: ProfileEntityRule[]
+  propertyRules: ProfilePropertyRule[]
+  schema?: JsonSchema
+  contextTerms: Record<string, string>
+  additionalRequirements: LiftNote[]
+  complete: boolean
+}
+
+interface ExistingProfileItem extends ProfileDraftItem {
+  rawValue: unknown
+}
+
+interface ProfileTransitionReviewItem {
+  label: string
+  propertyUri: string
+  valuePreview: string
+  targetLabel?: string
+}
 
 const props = defineProps<{
   open: boolean
@@ -51,6 +105,8 @@ const {
   toMetadataDoc,
   metadataItems,
   apiBaseUrl,
+  profiles,
+  loadProfileCrate,
 } = useAruna()
 
 const loading = ref(false)
@@ -76,6 +132,33 @@ const license = ref('')
 const licenseWasString = ref(false)
 const isPublic = ref(false)
 
+const activeProfileValue = ref(NO_PROFILE_VALUE)
+const profileDefinition = shallowRef<LoadedProfileDefinition | null>(null)
+const profileControls = ref<ProfileControl[]>([])
+const profileEntityRules = ref<ProfileEntityRule[]>([])
+const profileContextTerms = ref<Record<string, string>>({})
+const profileAdditionalRequirements = ref<LiftNote[]>([])
+const profileContextConflicts = ref<string[]>([])
+const generatedValues = ref<Record<string, unknown>>({})
+const entityEntries = ref<Record<string, EntityEntry[]>>({})
+const editableProfileKeys = ref<Set<string>>(new Set())
+const profileLoading = ref(false)
+const profileLoadFailed = ref(false)
+const profileLoadError = ref<string | null>(null)
+const profileTransitionApplied = ref(false)
+const externalProfileReferences = ref<string[]>([])
+const transitionReview = ref<ProfileTransitionReviewItem[]>([])
+const transitionMigratedCount = ref(0)
+
+const profileSwitchOpen = ref(false)
+const profileSwitchLoading = ref(false)
+const profileSwitchError = ref<string | null>(null)
+const pendingProfileValue = ref<string | null>(null)
+const pendingProfileDefinition = shallowRef<LoadedProfileDefinition | null>(null)
+const pendingBaseCrate = shallowRef<unknown>(null)
+const pendingItems = ref<ExistingProfileItem[]>([])
+let profileSwitchToken = 0
+
 // Additional typed root properties beyond the managed built-ins. Scalars,
 // {"@id"} references and arrays of those seed as editable rows; deeper
 // structured values are listed read-only and stay untouched in the crate
@@ -88,6 +171,104 @@ const MANAGED_KEYS = new Set([
 const customFields = ref<CustomFieldRow[]>([])
 const preservedFields = ref<PreservedFieldRow[]>([])
 let seededCustomKeys: string[] = []
+const PROFILE_INDEPENDENT_KEYS = new Set(['name', 'description', 'datePublished', 'license'])
+const PROFILE_RESERVED_KEYS = new Set(['@id', '@type', 'conformsTo'])
+
+const availableProfiles = computed(() => {
+  const values = [...profiles.value]
+  if (props.profile && !values.some((profile) => profile.id === props.profile?.id)) values.push(props.profile)
+  return values
+})
+const selectedProfile = computed(() =>
+  availableProfiles.value.find((profile) => profile.id === activeProfileValue.value),
+)
+const pendingProfile = computed(() =>
+  availableProfiles.value.find((profile) => profile.id === pendingProfileValue.value),
+)
+const profileOptions = computed(() => [
+  ...(activeProfileValue.value === EXTERNAL_PROFILE_VALUE
+    ? [{ value: EXTERNAL_PROFILE_VALUE, label: 'Current: External profile reference' }]
+    : []),
+  {
+    value: NO_PROFILE_VALUE,
+    label: activeProfileValue.value === NO_PROFILE_VALUE
+      ? 'Current: No profile reference'
+      : 'No profile reference',
+  },
+  ...availableProfiles.value.map((profile) => ({
+    value: profile.id,
+    label: profile.id === activeProfileValue.value
+      ? `Current: ${profile.name}`
+      : `New: ${profile.name}`,
+  })),
+])
+const profileSelection = computed({
+  get: () => activeProfileValue.value,
+  set: (next: string) => {
+    void requestProfileSwitch(next)
+  },
+})
+const profileHasPartProperties = computed(() => new Set(
+  (profileDefinition.value?.propertyRules ?? [])
+    .filter((rule) => isHasPartUri(rule.propertyUri))
+    .map((rule) => rule.valueName),
+))
+const profileValueNames = computed(() => new Set(profileControls.value.map((control) => control.property)))
+const showKeywordsScaffold = computed(() => !profileValueNames.value.has('keywords'))
+const generatedScalarControls = computed(() =>
+  profileControls.value.filter(
+    (control) =>
+      control.control !== 'entity'
+      && !PROFILE_INDEPENDENT_KEYS.has(control.property)
+      && !profileHasPartProperties.value.has(control.property),
+  ),
+)
+const entityControls = computed(() =>
+  profileControls.value.filter(
+    (control) =>
+      control.control === 'entity'
+      && !PROFILE_INDEPENDENT_KEYS.has(control.property)
+      && !profileHasPartProperties.value.has(control.property),
+  ),
+)
+const entitySubControls = computed<Record<string, ProfileControl[]>>(() =>
+  Object.fromEntries(entityControls.value.map((control) => [
+    control.property,
+    subControlsFor(control, profileEntityRules.value),
+  ])),
+)
+const profileHasRules = computed(() => Boolean(
+  profileDefinition.value?.entityRules.length
+    || profileDefinition.value?.propertyRules.length
+    || profileDefinition.value?.schema
+    || profileDefinition.value?.additionalRequirements.length,
+))
+const profileRuleState = computed(() => profileRulesLoadState({
+  loading: profileLoading.value,
+  unavailable: profileLoadFailed.value,
+  complete: Boolean(profileDefinition.value?.complete),
+  hasRules: profileHasRules.value,
+}))
+const pendingControls = computed(() => controlsFromRules(
+  pendingProfileDefinition.value?.propertyRules ?? [],
+  pendingProfileDefinition.value?.entityRules ?? [],
+))
+const pendingPreview = computed(() => pendingItems.value.map((item) => ({
+  item,
+  target: migrationTarget(item, pendingProfileDefinition.value?.propertyRules ?? [], pendingControls.value),
+})))
+const pendingReplacementCrate = computed(() => {
+  if (!pendingBaseCrate.value || pendingProfileValue.value === null || profileSwitchLoading.value || profileSwitchError.value) return null
+  return buildTransitionCrate(
+    pendingBaseCrate.value,
+    pendingProfileValue.value,
+    pendingProfileDefinition.value,
+    pendingItems.value,
+  )
+})
+const pendingReplacementText = computed(() =>
+  pendingReplacementCrate.value ? JSON.stringify(pendingReplacementCrate.value, null, 2) : '',
+)
 
 // Subcrate links (RO-Crate 1.2), editable as a list: unlink drops the link,
 // the picker adds new ones; the save composes them via the subcrates helpers.
@@ -132,13 +313,25 @@ const relatedPick = ref('')
 // The dataset's data entities, seeded from the crate and written back through
 // buildFromFields so file edits ride the same parsed-crate path as the fields.
 const files = ref<DataEntity[]>([])
+const crateOptions = computed(() => files.value.map((file) => ({ value: file.id, label: file.name || file.id })))
 
 watch(
   [() => props.open, () => props.documentId],
   ([open]) => {
     ++loadToken
+    ++profileSwitchToken
     loadedDocumentId.value = null
     pristine.value = null
+    profileSwitchOpen.value = false
+    profileSwitchLoading.value = false
+    profileSwitchError.value = null
+    pendingProfileValue.value = null
+    pendingProfileDefinition.value = null
+    pendingBaseCrate.value = null
+    pendingItems.value = []
+    profileTransitionApplied.value = false
+    transitionReview.value = []
+    transitionMigratedCount.value = 0
     if (!open) {
       loading.value = false
       return
@@ -171,6 +364,7 @@ async function load(documentId: string, token: number) {
     isPublic.value = summary.public
     seedFields(crate)
     rawText.value = JSON.stringify(crate, null, 2)
+    await initializeProfile(crate, token)
   } catch (err) {
     if (token === loadToken) loadError.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -233,6 +427,189 @@ function refIdOf(value: unknown): string | undefined {
   return undefined
 }
 
+function referenceIdsOf(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(referenceIdsOf)
+  const id = refIdOf(value)
+  return id ? [id] : []
+}
+
+function profileReferencesOf(crate: unknown): string[] {
+  const root = findRoot(crate)
+  return [...new Set(referenceIdsOf(root?.conformsTo))]
+    .filter((iri) => classifyRoCrateSpecIri(iri).kind === 'non-spec')
+}
+
+function profileForReference(iri: string): MetadataProfile | undefined {
+  return availableProfiles.value.find((profile) => profile.profileUri === iri || profile.graphIri === iri)
+}
+
+function summaryProfileDefinition(profile: MetadataProfile): LoadedProfileDefinition {
+  return {
+    profile,
+    entityRules: cloneDraftValue(profile.entityRules),
+    propertyRules: cloneDraftValue(profile.propertyRules),
+    schema: profile.schema ? cloneDraftValue(profile.schema) : undefined,
+    contextTerms: { ...(profile.contextTerms ?? {}) },
+    additionalRequirements: [],
+    complete: !profile.documentId,
+  }
+}
+
+async function fullProfileDefinition(profile: MetadataProfile, force = false): Promise<LoadedProfileDefinition> {
+  const fallback = summaryProfileDefinition(profile)
+  if (!profile.documentId) return fallback
+  const parsed = await loadProfileCrate(profile.documentId, { force })
+  return {
+    profile,
+    entityRules: cloneDraftValue(parsed.entityRules),
+    propertyRules: cloneDraftValue(parsed.datasetPropertyRules),
+    schema: parsed.schema ? cloneDraftValue(parsed.schema) : undefined,
+    contextTerms: { ...(parsed.contextTerms ?? {}) },
+    additionalRequirements: cloneLiftNotes(parsed.liftNotes),
+    complete: true,
+  }
+}
+
+async function initializeProfile(crate: unknown, token: number) {
+  const references = profileReferencesOf(crate)
+  externalProfileReferences.value = references.filter((iri) => !profileForReference(iri))
+  const matched = references.length === 1 ? profileForReference(references[0]) : undefined
+  if (externalProfileReferences.value.length || references.length > 1) {
+    activeProfileValue.value = EXTERNAL_PROFILE_VALUE
+    clearProfileDefinition(crate)
+    return
+  }
+  if (!matched) {
+    activeProfileValue.value = NO_PROFILE_VALUE
+    clearProfileDefinition(crate)
+    return
+  }
+
+  activeProfileValue.value = matched.id
+  const fallback = summaryProfileDefinition(matched)
+  applyProfileDefinition(fallback, crate)
+  if (!matched.documentId) return
+
+  profileLoading.value = true
+  profileLoadFailed.value = false
+  profileLoadError.value = null
+  try {
+    const loaded = await fullProfileDefinition(matched)
+    if (token !== loadToken || !props.open) return
+    applyProfileDefinition(loaded, crate)
+  } catch (err) {
+    if (token !== loadToken) return
+    profileLoadFailed.value = true
+    profileLoadError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    if (token === loadToken) profileLoading.value = false
+  }
+}
+
+function clearProfileDefinition(crate: unknown) {
+  profileDefinition.value = null
+  profileControls.value = []
+  profileEntityRules.value = []
+  profileContextTerms.value = {}
+  profileAdditionalRequirements.value = []
+  profileContextConflicts.value = []
+  generatedValues.value = {}
+  entityEntries.value = {}
+  editableProfileKeys.value = new Set()
+  profileLoading.value = false
+  profileLoadFailed.value = false
+  profileLoadError.value = null
+  seedAdditionalFields(findRoot(crate))
+}
+
+function profileInputValue(value: unknown, control: ProfileControl): { value: unknown; representable: boolean } {
+  if (control.control === 'select-object') {
+    const ids = referenceIdsOf(value)
+    return {
+      value: control.multiple ? ids : ids[0] ?? '',
+      representable: Boolean(ids.length) && (control.multiple || ids.length === 1),
+    }
+  }
+  const entries = Array.isArray(value) ? value : [value]
+  const scalar = entries.map((entry) => {
+    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') return entry
+    if (isRecord(entry) && typeof entry['@id'] === 'string' && Object.keys(entry).length === 1) return entry['@id']
+    return undefined
+  })
+  if (scalar.some((entry) => entry === undefined)) return { value: undefined, representable: false }
+  if (!control.multiple && entries.length > 1) return { value: undefined, representable: false }
+  if (control.control === 'tags') return { value: scalar.map(String).join(', '), representable: true }
+  if (control.multiple) return { value: scalar, representable: true }
+  return { value: scalar[0] ?? '', representable: true }
+}
+
+function applyProfileDefinition(definition: LoadedProfileDefinition, crate: unknown) {
+  profileDefinition.value = definition
+  if (definition.complete) {
+    profileLoading.value = false
+    profileLoadFailed.value = false
+    profileLoadError.value = null
+  }
+  profileEntityRules.value = definition.entityRules
+  profileContextTerms.value = definition.contextTerms
+  profileAdditionalRequirements.value = cloneLiftNotes(definition.additionalRequirements)
+
+  const root = findRoot(crate) ?? {}
+  const controls = controlsFromRules(definition.propertyRules, definition.entityRules)
+  const visibleControls: ProfileControl[] = []
+  const contextTerms = contextTermMappings(crate)
+  const contextConflicts: string[] = []
+  const editable = new Set<string>()
+  const nextGenerated = defaultControlValues(controls.filter((control) => control.control !== 'entity'))
+  const nextEntities: Record<string, EntityEntry[]> = {}
+
+  for (const control of controls) {
+    if (PROFILE_RESERVED_KEYS.has(control.property)) continue
+    const rule = definition.propertyRules.find((candidate) => candidate.valueName === control.property)
+    const mapped = contextTerms[control.property]
+    if (rule && mapped && mapped !== rule.propertyUri && !sameSchemaOrgType(mapped, rule.propertyUri)) {
+      contextConflicts.push(control.property)
+      continue
+    }
+    const hasValue = Object.prototype.hasOwnProperty.call(root, control.property)
+    if (control.control === 'entity') {
+      const ids = hasValue ? referenceIdsOf(root[control.property]) : []
+      if (hasValue && ((!ids.length && draftValuePopulated(root[control.property])) || (!control.multiple && ids.length > 1))) continue
+      const entries = ids.map((id) => ({ ...newRefEntry(), ref: id }))
+      nextEntities[control.property] = entries.length
+        ? entries
+        : seedEntries(control, definition.entityRules, 1)
+    } else if (hasValue) {
+      const seeded = profileInputValue(root[control.property], control)
+      if (!seeded.representable) continue
+      nextGenerated[control.property] = seeded.value
+    }
+    visibleControls.push(control)
+    if (!PROFILE_INDEPENDENT_KEYS.has(control.property) && !profileHasPartRule(definition, control.property)) {
+      editable.add(control.property)
+    }
+  }
+
+  profileControls.value = visibleControls
+  profileContextConflicts.value = contextConflicts
+  generatedValues.value = nextGenerated
+  entityEntries.value = nextEntities
+  editableProfileKeys.value = editable
+  seedAdditionalFields(root)
+}
+
+function profileHasPartRule(definition: LoadedProfileDefinition, property: string): boolean {
+  return definition.propertyRules.some((rule) => rule.valueName === property && isHasPartUri(rule.propertyUri))
+}
+
+function seedAdditionalFields(root: Record<string, unknown> | undefined) {
+  const managed = new Set([...MANAGED_KEYS, ...editableProfileKeys.value])
+  const seeded = seedCustomFieldRows(root ?? {}, managed)
+  customFields.value = seeded.rows
+  preservedFields.value = seeded.preserved
+  seededCustomKeys = [...new Set(seeded.rows.map((row) => row.key))]
+}
+
 function seedFields(crate: unknown) {
   const root = findRoot(crate)
   name.value = stringField(root?.name)
@@ -242,10 +619,7 @@ function seedFields(crate: unknown) {
   licenseWasString.value = typeof root?.license === 'string'
   license.value = licenseIri(root?.license)
 
-  const seeded = seedCustomFieldRows(root ?? {}, MANAGED_KEYS)
-  customFields.value = seeded.rows
-  preservedFields.value = seeded.preserved
-  seededCustomKeys = [...new Set(seeded.rows.map((row) => row.key))]
+  seedAdditionalFields(root)
 
   // Subcrate references (RO-Crate 1.2) are managed in their own list, not the
   // files editor; they must not seed as file rows. Only depth-zero entities
@@ -303,6 +677,8 @@ function buildFromFields(): unknown {
     upsertLicenseEntity(clone, licenseValue)
   }
 
+  applyProfileFields(clone, root)
+
   // Custom fields: rows write typed values (repeated keys merge into arrays);
   // keys removed since seeding are deleted; managed keys are skipped rather
   // than clobbering structured properties. Preserved keys are never touched.
@@ -311,7 +687,7 @@ function buildFromFields(): unknown {
     if (!(key in grouped)) delete root[key]
   }
   for (const [key, value] of Object.entries(grouped)) {
-    if (MANAGED_KEYS.has(key)) continue
+    if (MANAGED_KEYS.has(key) || editableProfileKeys.value.has(key)) continue
     root[key] = value
   }
 
@@ -320,6 +696,128 @@ function buildFromFields(): unknown {
   else delete root.mentions
   for (const id of relatedIds.value) upsertRelatedEntity(clone, id)
   return clone
+}
+
+function applyProfileFields(crate: unknown, root: Record<string, unknown>) {
+  const definition = profileDefinition.value
+  if (definition) {
+    const addEntity = graphEntitySink(crate)
+    const normalized = normalizeProfileValues(generatedValues.value, generatedScalarControls.value, { omitEmpty: true })
+    for (const control of generatedScalarControls.value) {
+      if (!editableProfileKeys.value.has(control.property)) continue
+      delete root[control.property]
+      if (control.control === 'select-object') {
+        const reference = emitSelectObject(control, generatedValues.value[control.property], addEntity)
+        if (reference) root[control.property] = reference
+      } else if (control.property in normalized) {
+        root[control.property] = normalized[control.property]
+      }
+    }
+
+    const emitContext = {
+      entityRules: profileEntityRules.value,
+      contextTerms: profileContextTerms.value,
+      validCrateIds: new Set(files.value.map((file) => file.id)),
+      usedSyntheticIds: new Set<string>(),
+      addEntity,
+    }
+    for (const control of entityControls.value) {
+      if (!editableProfileKeys.value.has(control.property)) continue
+      delete root[control.property]
+      const references: Array<{ '@id': string }> = []
+      const seen = new Set<string>()
+      for (const entry of entityEntries.value[control.property] ?? []) {
+        const emitted = entry.source === 'existing'
+          ? entry.ref?.trim() ? [{ '@id': entry.ref.trim() }] : []
+          : emitEntityEntries(control, [entry], emitContext, 1)
+        for (const reference of emitted) {
+          if (seen.has(reference['@id'])) continue
+          seen.add(reference['@id'])
+          references.push(reference)
+        }
+      }
+      if (references.length) root[control.property] = control.multiple ? references : references[0]
+    }
+    mergeProfileContext(crate, definition.contextTerms)
+  }
+
+  if (profileTransitionApplied.value) {
+    rewriteProfileReference(crate, activeProfileValue.value, definition)
+  }
+}
+
+function graphEntitySink(crate: unknown): (entity: Record<string, unknown>) => void {
+  if (!isRecord(crate)) return () => {}
+  const graph = Array.isArray(crate['@graph']) ? (crate['@graph'] as unknown[]) : []
+  const byId = new Map<string, Record<string, unknown>>()
+  for (const value of graph) {
+    if (isRecord(value) && typeof value['@id'] === 'string') byId.set(value['@id'], value)
+  }
+  crate['@graph'] = graph
+  return (entity) => {
+    const id = typeof entity['@id'] === 'string' ? entity['@id'] : ''
+    if (!id) return
+    const existing = byId.get(id)
+    if (existing) {
+      for (const [key, value] of Object.entries(entity)) {
+        if (existing[key] === undefined) existing[key] = value
+      }
+      return
+    }
+    const added = structuredClone(entity)
+    byId.set(id, added)
+    graph.push(added)
+  }
+}
+
+function mergeProfileContext(crate: unknown, terms: Record<string, string>) {
+  if (!isRecord(crate) || !Object.keys(terms).length) return
+  const current = crate['@context']
+  const items = Array.isArray(current) ? structuredClone(current) : current === undefined ? [] : [structuredClone(current)]
+  const termIndex = items.findIndex((item) => isRecord(item))
+  if (termIndex >= 0) items[termIndex] = { ...terms, ...(items[termIndex] as Record<string, unknown>) }
+  else items.push({ ...terms })
+  crate['@context'] = items.length === 1 ? items[0] : items
+}
+
+function contextTermMappings(crate: unknown): Record<string, string> {
+  if (!isRecord(crate)) return {}
+  const current = crate['@context']
+  const items = Array.isArray(current) ? current : [current]
+  const terms: Record<string, string> = {}
+  for (const item of items) {
+    if (!isRecord(item)) continue
+    for (const [key, value] of Object.entries(item)) {
+      if (!key.startsWith('@') && typeof value === 'string') terms[key] = value
+      else if (!key.startsWith('@') && isRecord(value) && typeof value['@id'] === 'string') terms[key] = value['@id']
+    }
+  }
+  return terms
+}
+
+function rewriteProfileReference(crate: unknown, profileValue: string, definition: LoadedProfileDefinition | null) {
+  const root = findRoot(crate)
+  if (!root) return
+  const current = Array.isArray(root.conformsTo) ? root.conformsTo : root.conformsTo ? [root.conformsTo] : []
+  const specificationReferences = current.filter((value) => {
+    const iri = refIdOf(value)
+    return Boolean(iri && classifyRoCrateSpecIri(iri).kind !== 'non-spec')
+  })
+  if (profileValue === NO_PROFILE_VALUE) {
+    if (specificationReferences.length) root.conformsTo = specificationReferences
+    else delete root.conformsTo
+    return
+  }
+  const profile = definition?.profile
+  const iri = profile?.profileUri || profile?.graphIri
+  if (!profile || !iri) return
+  root.conformsTo = [...specificationReferences, { '@id': iri }]
+  graphEntitySink(crate)({
+    '@id': iri,
+    '@type': ['CreativeWork', DX_PROFILE],
+    name: profile.name,
+    ...(profile.version ? { version: profile.version } : {}),
+  })
 }
 
 // The files rebuild (applyDataEntities) knows nothing about subcrates: it drops
@@ -414,23 +912,294 @@ function removeRelated(graphIri: string) {
   relatedIds.value = relatedIds.value.filter((id) => id !== graphIri)
 }
 
+function snapshotExistingProfileItems(crate: unknown): ExistingProfileItem[] {
+  const definition = profileDefinition.value
+  const root = findRoot(crate)
+  if (!definition || !root) return []
+  const controls = new Map(profileControls.value.map((control) => [control.property, control]))
+  const items: ExistingProfileItem[] = []
+  for (const rule of definition.propertyRules) {
+    if (PROFILE_INDEPENDENT_KEYS.has(rule.valueName) || isHasPartUri(rule.propertyUri)) continue
+    if (!Object.prototype.hasOwnProperty.call(root, rule.valueName)) continue
+    const rawValue = root[rule.valueName]
+    if (!draftValuePopulated(rawValue)) continue
+    const control = controls.get(rule.valueName)
+    if (!control) continue
+    const migrationValue = control.control === 'entity'
+      ? (Array.isArray(rawValue) ? rawValue : [rawValue]).map(() => newRefEntry())
+      : cloneDraftValue(rawValue)
+    items.push({
+      property: rule.valueName,
+      propertyUri: rule.propertyUri,
+      label: control.label,
+      kind: control.control === 'entity' ? 'entity' : 'generated',
+      value: migrationValue,
+      rawValue: cloneDraftValue(rawValue),
+      multiple: control.multiple,
+      valueKind: control.kind,
+    })
+  }
+  return items
+}
+
+function transitionValuePreview(item: ExistingProfileItem): string {
+  const rendered = JSON.stringify(item.rawValue)
+  return rendered.length > 140 ? `${rendered.slice(0, 137)}...` : rendered
+}
+
+async function retryActiveProfile() {
+  const profile = selectedProfile.value
+  if (!profile || profileLoading.value) return
+  let current: unknown
+  try {
+    current = buildFromFields()
+  } catch (err) {
+    profileLoadError.value = err instanceof Error ? err.message : String(err)
+    return
+  }
+  profileLoading.value = true
+  profileLoadFailed.value = false
+  profileLoadError.value = null
+  try {
+    const definition = await fullProfileDefinition(profile, true)
+    applyProfileDefinition(definition, current)
+  } catch (err) {
+    profileLoadFailed.value = true
+    profileLoadError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    profileLoading.value = false
+  }
+}
+
+async function requestProfileSwitch(nextValue: string) {
+  if (nextValue === activeProfileValue.value || nextValue === EXTERNAL_PROFILE_VALUE || profileSwitchOpen.value) return
+  if (nextValue !== NO_PROFILE_VALUE && selectedProfile.value && (profileLoading.value || profileLoadFailed.value)) {
+    saveError.value = 'Retry the current profile rules before switching to another registered profile, or choose No profile reference.'
+    return
+  }
+  let base: unknown
+  try {
+    base = buildFromFields()
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : String(err)
+    return
+  }
+
+  const token = ++profileSwitchToken
+  pendingProfileValue.value = nextValue
+  pendingBaseCrate.value = base
+  pendingItems.value = snapshotExistingProfileItems(base)
+  pendingProfileDefinition.value = null
+  profileSwitchError.value = null
+  profileSwitchOpen.value = true
+
+  if (nextValue === NO_PROFILE_VALUE) {
+    profileSwitchLoading.value = false
+    return
+  }
+  const target = availableProfiles.value.find((profile) => profile.id === nextValue)
+  if (!target) {
+    profileSwitchError.value = 'That registered profile is no longer available.'
+    profileSwitchLoading.value = false
+    return
+  }
+  if (!target.profileUri && !target.graphIri) {
+    profileSwitchError.value = 'That registered profile has no saved reference IRI.'
+    profileSwitchLoading.value = false
+    return
+  }
+
+  profileSwitchLoading.value = true
+  try {
+    const definition = await fullProfileDefinition(target)
+    if (token !== profileSwitchToken) return
+    pendingProfileDefinition.value = definition
+  } catch (err) {
+    if (token !== profileSwitchToken) return
+    profileSwitchError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    if (token === profileSwitchToken) profileSwitchLoading.value = false
+  }
+}
+
+async function retryPendingProfile() {
+  const target = pendingProfile.value
+  if (!target || profileSwitchLoading.value) return
+  const token = ++profileSwitchToken
+  profileSwitchLoading.value = true
+  profileSwitchError.value = null
+  try {
+    const definition = await fullProfileDefinition(target, true)
+    if (token !== profileSwitchToken) return
+    pendingProfileDefinition.value = definition
+  } catch (err) {
+    if (token !== profileSwitchToken) return
+    profileSwitchError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    if (token === profileSwitchToken) profileSwitchLoading.value = false
+  }
+}
+
+function cancelProfileSwitch() {
+  ++profileSwitchToken
+  profileSwitchOpen.value = false
+  profileSwitchLoading.value = false
+  profileSwitchError.value = null
+  pendingProfileValue.value = null
+  pendingProfileDefinition.value = null
+  pendingBaseCrate.value = null
+  pendingItems.value = []
+}
+
+function confirmProfileSwitch() {
+  const nextValue = pendingProfileValue.value
+  const replacement = pendingReplacementCrate.value
+  if (nextValue === null || !replacement || profileSwitchLoading.value || profileSwitchError.value) return
+  const review = pendingPreview.value.map(({ item, target }) => ({
+    label: item.label,
+    propertyUri: item.propertyUri,
+    valuePreview: transitionValuePreview(item),
+    ...(target ? { targetLabel: target.label } : {}),
+  }))
+
+  activeProfileValue.value = nextValue
+  profileTransitionApplied.value = true
+  pristine.value = structuredClone(replacement)
+  rawText.value = JSON.stringify(replacement, null, 2)
+  externalProfileReferences.value = []
+  seedFields(replacement)
+  if (pendingProfileDefinition.value) applyProfileDefinition(pendingProfileDefinition.value, replacement)
+  else clearProfileDefinition(replacement)
+  transitionReview.value = review
+  transitionMigratedCount.value = review.filter((item) => item.targetLabel).length
+  activeTab.value = 'fields'
+  cancelProfileSwitch()
+}
+
+function buildTransitionCrate(
+  base: unknown,
+  nextValue: string,
+  definition: LoadedProfileDefinition | null,
+  items: ExistingProfileItem[],
+): unknown {
+  const clone = structuredClone(base)
+  const root = findRoot(clone)
+  if (!root) throw new Error('This crate has no root dataset entity to edit.')
+  const controls = controlsFromRules(definition?.propertyRules ?? [], definition?.entityRules ?? [])
+  for (const item of items) {
+    const target = migrationTarget(item, definition?.propertyRules ?? [], controls)
+    if (target) {
+      if (target.property === item.property) continue
+      const existing = root[target.property]
+      delete root[item.property]
+      root[target.property] = mergeMetadataValues(existing, item.rawValue)
+      continue
+    }
+    if (item.property !== item.propertyUri) {
+      const existing = root[item.propertyUri]
+      delete root[item.property]
+      root[item.propertyUri] = mergeMetadataValues(existing, item.rawValue)
+    }
+  }
+  if (definition) mergeProfileContext(clone, definition.contextTerms)
+  rewriteProfileReference(clone, nextValue, definition)
+  return clone
+}
+
+function mergeMetadataValues(existing: unknown, incoming: unknown): unknown {
+  if (existing === undefined) return cloneDraftValue(incoming)
+  const values = [
+    ...(Array.isArray(existing) ? existing : [existing]),
+    ...(Array.isArray(incoming) ? incoming : [incoming]),
+  ]
+  const seen = new Set<string>()
+  const merged = values.filter((value) => {
+    const key = JSON.stringify(value)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+  return merged.length === 1 ? cloneDraftValue(merged[0]) : cloneDraftValue(merged)
+}
+
+function setGeneratedValue(property: string, value: unknown) {
+  generatedValues.value = { ...generatedValues.value, [property]: value }
+}
+
+function addEntityEntry(control: ProfileControl, source: 'new' | 'existing') {
+  const entry = source === 'new' ? newEntityEntry(control, profileEntityRules.value, 1) : newRefEntry()
+  entityEntries.value = {
+    ...entityEntries.value,
+    [control.property]: [...(entityEntries.value[control.property] ?? []), entry],
+  }
+}
+
+function removeEntityEntry(property: string, index: number) {
+  const entries = [...(entityEntries.value[property] ?? [])]
+  entries.splice(index, 1)
+  entityEntries.value = { ...entityEntries.value, [property]: entries }
+}
+
+function switchEntityEntrySource(control: ProfileControl, index: number, source: 'new' | 'existing') {
+  const entries = [...(entityEntries.value[control.property] ?? [])]
+  const current = entries[index]
+  if (!current || current.source === source) return
+  entries[index] = source === 'new' ? newEntityEntry(control, profileEntityRules.value, 1) : newRefEntry()
+  entityEntries.value = { ...entityEntries.value, [control.property]: entries }
+}
+
+function setEntityEntryValue(property: string, index: number, subProperty: string, value: unknown) {
+  const entries = [...(entityEntries.value[property] ?? [])]
+  const current = entries[index]
+  if (!current || current.source !== 'new') return
+  entries[index] = { ...current, instance: { ...(current.instance ?? {}), [subProperty]: value } }
+  entityEntries.value = { ...entityEntries.value, [property]: entries }
+}
+
+function setEntityEntryRef(property: string, index: number, value: string) {
+  const entries = [...(entityEntries.value[property] ?? [])]
+  const current = entries[index]
+  if (!current || current.source !== 'existing') return
+  entries[index] = { ...current, ref: value }
+  entityEntries.value = { ...entityEntries.value, [property]: entries }
+}
+
+function setEntityEntryCustomId(property: string, index: number, value: string) {
+  const entries = [...(entityEntries.value[property] ?? [])]
+  const current = entries[index]
+  if (!current || current.source !== 'new') return
+  entries[index] = { ...current, customId: value }
+  entityEntries.value = { ...entityEntries.value, [property]: entries }
+}
+
 // Live, non-blocking profile validation over the Fields tab state. Editing an
 // existing document must stay possible even when it never conformed, so
 // violations inform rather than gate the save.
 const violations = computed(() => {
-  const schema = props.profile?.schema
-  if (!schema || !props.open || loading.value) return []
-  const values: Record<string, unknown> = {
-    name: name.value.trim(),
-    description: description.value.trim(),
-    keywords: keywordsText.value.split(',').map((keyword) => keyword.trim()).filter(Boolean),
-    datePublished: datePublished.value.trim(),
-    license: license.value.trim(),
+  const schema = profileDefinition.value?.schema
+  if (!schema || !props.open || loading.value || !pristine.value) return []
+  try {
+    return validateProfileData(schema, findRoot(buildFromFields()) ?? {})
+  } catch {
+    return []
   }
-  for (const [key, value] of Object.entries(groupCustomFieldRows(customFields.value))) {
-    if (!(key in values)) values[key] = value
+})
+
+function violationsFor(property: string) {
+  return violations.value.filter((violation) => violation.fieldId === property)
+}
+
+function unknownProfileReferences(crate: unknown): string[] {
+  return profileReferencesOf(crate).filter((iri) => !profileForReference(iri))
+}
+
+const replacementPreviewText = computed(() => {
+  if (!profileTransitionApplied.value || !pristine.value) return ''
+  try {
+    return JSON.stringify(buildFromFields(), null, 2)
+  } catch {
+    return ''
   }
-  return validateProfileData(schema, values)
 })
 
 function upsertLicenseEntity(crate: unknown, licenseValue: string) {
@@ -458,6 +1227,13 @@ async function save() {
     else saveError.value = message
     return
   }
+  const externalReferences = unknownProfileReferences(rocrate)
+  if (externalReferences.length) {
+    const message = `Remove the external conformsTo ${externalReferences.length === 1 ? 'reference' : 'references'} before saving, or choose a registered profile. Only registered profile references can be written.`
+    if (activeTab.value === 'raw') rawError.value = message
+    else saveError.value = message
+    return
+  }
   try {
     // The update is accepted into the pipeline; the projection may lag, so the
     // detail view's crate re-fetch (loadRoCrate) polls until it materializes.
@@ -473,7 +1249,7 @@ async function save() {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-2xl">
+    <DialogContent class="relative max-w-2xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2"><Pencil class="h-4 w-4 text-primary" /> Edit metadata</DialogTitle>
         <DialogDescription>
@@ -496,6 +1272,86 @@ async function save() {
           </TabsList>
 
           <TabsContent value="fields" class="space-y-3">
+            <section class="space-y-2 rounded-md border border-border p-3">
+              <div>
+                <label class="text-xs font-medium text-foreground">Profile reference</label>
+                <Select v-model="profileSelection" :options="profileOptions" class="mt-1" aria-label="Profile reference" />
+                <p class="mt-1 text-[11px] text-muted-foreground">
+                  Choose a registered profile or remove the profile reference. Published datasets and datasets with persistent identifiers can transition too.
+                </p>
+              </div>
+
+              <div v-if="externalProfileReferences.length" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div>
+                  <p>This Dataset contains an external conformsTo reference that remains visible for reading but cannot be written back.</p>
+                  <ul class="mt-1 space-y-0.5">
+                    <li v-for="iri in externalProfileReferences" :key="iri"><code class="break-all font-mono">{{ iri }}</code></li>
+                  </ul>
+                  <p class="mt-1">Choose a registered profile or No profile reference before saving.</p>
+                </div>
+              </div>
+
+              <div v-if="selectedProfile && profileRuleState === 'loading'" class="space-y-2">
+                <p class="text-[11px] text-muted-foreground">Loading the selected profile rules...</p>
+                <Skeleton class="h-12" />
+              </div>
+              <div v-else-if="selectedProfile && profileRuleState === 'unavailable'" class="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2">
+                <p class="text-xs font-medium text-destructive">The selected profile rules are unavailable.</p>
+                <p class="mt-1 text-[11px] text-destructive/90">{{ profileLoadError }}</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">The saved summary fields remain visible, but a new transition needs the full stored profile.</p>
+                <Button variant="outline" size="sm" class="mt-2" @click="retryActiveProfile">Retry</Button>
+              </div>
+              <p v-else-if="selectedProfile && profileRuleState === 'empty'" class="text-[11px] text-muted-foreground">
+                No generated rules are defined for this profile. Additional metadata remains allowed unless an explicit SHACL rule restricts it.
+              </p>
+              <p v-else-if="selectedProfile" class="text-[11px] text-muted-foreground">
+                Matching saved values are shown in the generated controls. Additional metadata remains allowed unless an explicit SHACL rule restricts it.
+              </p>
+              <p v-if="profileContextConflicts.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+                These profile field names already map to different property URIs in this crate and are not reinterpreted: {{ profileContextConflicts.join(', ') }}. Their saved values remain custom metadata. Resolve the context conflict in Raw JSON or remove the profile reference before saving if authoritative validation rejects the crate.
+              </p>
+
+              <div v-if="profileAdditionalRequirements.length" class="rounded-md border border-border bg-muted/20 p-2">
+                <p class="mb-1 text-[11px] font-medium text-foreground">Additional requirements</p>
+                <LiftNotesPanel :notes="profileAdditionalRequirements" attached />
+              </div>
+
+              <template v-if="selectedProfile && profileRuleState !== 'loading'">
+                <div v-if="generatedScalarControls.length" class="grid gap-3 sm:grid-cols-2">
+                  <ProfileControlField
+                    v-for="control in generatedScalarControls"
+                    :key="control.property"
+                    :control="control"
+                    :model-value="generatedValues[control.property]"
+                    :violations="violationsFor(control.property)"
+                    :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
+                    @update:model-value="(value: unknown) => setGeneratedValue(control.property, value)"
+                  />
+                </div>
+                <DatasetEntityInstances
+                  v-for="control in entityControls"
+                  :key="control.property"
+                  :control="control"
+                  :sub-controls="entitySubControls[control.property] ?? []"
+                  :entries="entityEntries[control.property] ?? []"
+                  :entry-violations="[]"
+                  :presence-violations="violationsFor(control.property)"
+                  :type-label="entityTypeLabelFor(control)"
+                  :crate-options="crateOptions"
+                  :entity-rules="profileEntityRules"
+                  :depth="1"
+                  @add-new="addEntityEntry(control, 'new')"
+                  @add-existing="addEntityEntry(control, 'existing')"
+                  @remove="(index: number) => removeEntityEntry(control.property, index)"
+                  @switch-source="(index: number, source: 'new' | 'existing') => switchEntityEntrySource(control, index, source)"
+                  @update="(index: number, property: string, value: unknown) => setEntityEntryValue(control.property, index, property, value)"
+                  @update-ref="(index: number, value: string) => setEntityEntryRef(control.property, index, value)"
+                  @update-custom-id="(index: number, value: string) => setEntityEntryCustomId(control.property, index, value)"
+                />
+              </template>
+            </section>
+
             <div>
               <label class="text-xs font-medium text-foreground">Name</label>
               <Input v-model="name" class="mt-1" placeholder="Dataset title" />
@@ -504,7 +1360,7 @@ async function save() {
               <label class="text-xs font-medium text-foreground">Description</label>
               <Textarea v-model="description" rows="4" class="mt-1 font-sans" placeholder="Describe the dataset" />
             </div>
-            <div>
+            <div v-if="showKeywordsScaffold">
               <label class="text-xs font-medium text-foreground">Keywords</label>
               <Input v-model="keywordsText" class="mt-1" placeholder="comma, separated, keywords" />
             </div>
@@ -517,6 +1373,29 @@ async function save() {
                 <label class="text-xs font-medium text-foreground">License (IRI)</label>
                 <Input v-model="license" class="mt-1" placeholder="https://creativecommons.org/licenses/by/4.0" />
               </div>
+            </div>
+
+            <div v-if="transitionReview.length" class="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+              <p class="font-medium text-foreground">Profile transition review</p>
+              <p class="mt-1 text-muted-foreground">
+                {{ transitionMigratedCount }} {{ transitionMigratedCount === 1 ? 'field now uses' : 'fields now use' }} matching controls.
+                {{ transitionReview.length - transitionMigratedCount }} unmatched {{ transitionReview.length - transitionMigratedCount === 1 ? 'field remains' : 'fields remain' }} as custom metadata for review.
+              </p>
+              <ul class="mt-2 space-y-1">
+                <li v-for="item in transitionReview" :key="item.propertyUri" class="rounded border border-border bg-background/70 px-2 py-1.5">
+                  <span class="font-medium text-foreground">{{ item.label }}</span>
+                  <code class="ml-1 break-all font-mono text-[10px] text-muted-foreground">{{ item.propertyUri }}</code>
+                  <span class="mt-0.5 block break-all font-mono text-[10px] text-muted-foreground">{{ item.valuePreview }}</span>
+                  <span class="mt-0.5 block text-muted-foreground">
+                    {{ item.targetLabel ? `Moved into ${item.targetLabel} because the property URI matches.` : 'Preserved as custom metadata in the replacement crate. Nothing was deleted.' }}
+                  </span>
+                </li>
+              </ul>
+              <details v-if="replacementPreviewText" class="mt-2 rounded border border-border bg-background/70 p-2">
+                <summary class="cursor-pointer font-medium text-foreground">Preview exact replacement crate</summary>
+                <p class="mt-1 text-[11px] text-muted-foreground">This is a local preview of the exact Fields-tab replacement. It does not report verified conformance. The server remains authoritative for PUT validation when that support lands.</p>
+                <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[10px] text-foreground">{{ replacementPreviewText }}</pre>
+              </details>
             </div>
 
             <CustomFieldsEditor v-model:rows="customFields" :preserved="preservedFields" />
@@ -564,13 +1443,13 @@ async function save() {
             </div>
 
             <div v-if="violations.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
-              <div class="font-medium text-amber-800 dark:text-amber-300">Profile check: {{ profile?.name }}</div>
+              <div class="font-medium text-amber-800 dark:text-amber-300">Local profile preview: {{ selectedProfile?.name }}</div>
               <ul class="mt-1 list-disc space-y-0.5 pl-4">
                 <li v-for="violation in violations" :key="violation.pointer + violation.message" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
                   <span class="font-mono">{{ violation.fieldId ?? violation.pointer }}</span>: {{ violation.message }}
                 </li>
               </ul>
-              <p class="mt-1 text-muted-foreground">Violations don't block saving an existing document.</p>
+              <p class="mt-1 text-muted-foreground">These browser findings are a preview and do not report verified conformance.</p>
             </div>
           </TabsContent>
 
@@ -603,6 +1482,59 @@ async function save() {
         <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <Button :disabled="loading || Boolean(loadError) || saving" @click="save">{{ saving ? 'Saving…' : 'Save changes' }}</Button>
       </DialogFooter>
+
+      <Transition
+        enter-active-class="transition-opacity duration-150"
+        enter-from-class="opacity-0"
+        leave-active-class="transition-opacity duration-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="profileSwitchOpen"
+          class="absolute inset-0 z-40 flex items-center justify-center rounded-xl bg-background/70 p-4 backdrop-blur-sm"
+          @click.self="cancelProfileSwitch"
+        >
+          <div role="alertdialog" aria-modal="true" aria-labelledby="edit-profile-switch-title" class="w-full max-w-lg rounded-lg border border-border bg-popover p-4 shadow-xl">
+            <h2 id="edit-profile-switch-title" class="text-sm font-semibold text-foreground">Confirm Dataset profile transition</h2>
+            <p class="mt-1 text-xs text-muted-foreground">
+              This changes the Dataset's declared profile from
+              {{ selectedProfile?.name ?? (activeProfileValue === EXTERNAL_PROFILE_VALUE ? 'the external reference' : 'No profile reference') }}
+              to {{ pendingProfile?.name ?? 'No profile reference' }}. Publication and persistent identifiers remain unchanged.
+            </p>
+            <p class="mt-1 text-xs text-muted-foreground">All non-profile metadata stays in the crate. Matching property URI values move to the new controls, and unmatched values remain as custom metadata for review.</p>
+
+            <p v-if="profileSwitchLoading" class="mt-3 text-xs text-muted-foreground">Loading the stored profile and preparing the exact replacement preview...</p>
+            <div v-else-if="profileSwitchError" class="mt-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              <p>The registered profile could not be loaded, so this transition cannot be confirmed yet. {{ profileSwitchError }}</p>
+              <Button variant="outline" size="sm" class="mt-2" @click="retryPendingProfile">Retry</Button>
+            </div>
+            <template v-else>
+              <p v-if="!pendingPreview.length" class="mt-3 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                No populated profile-owned fields need migration. Confirm the semantic profile change below.
+              </p>
+              <ul v-else class="mt-3 max-h-48 space-y-2 overflow-y-auto">
+                <li v-for="({ item, target }, index) in pendingPreview" :key="`${item.propertyUri}:${index}`" class="rounded-md border border-border bg-card px-3 py-2 text-xs">
+                  <p class="font-medium text-foreground">{{ item.label }}</p>
+                  <p class="mt-0.5 break-all font-mono text-[10px] text-muted-foreground">{{ item.propertyUri }}</p>
+                  <p class="mt-1 text-muted-foreground">Saved value: {{ transitionValuePreview(item) }}</p>
+                  <p v-if="target" class="mt-1 text-foreground">Moves into the new {{ target.label }} control because the property URI matches.</p>
+                  <p v-else class="mt-1 text-foreground">Remains as custom metadata for review. Nothing is cleared.</p>
+                </li>
+              </ul>
+              <details v-if="pendingReplacementText" class="mt-3 rounded-md border border-border bg-muted/20 p-2">
+                <summary class="cursor-pointer text-xs font-medium text-foreground">Preview exact replacement crate</summary>
+                <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all text-[10px] text-foreground">{{ pendingReplacementText }}</pre>
+              </details>
+              <p class="mt-2 text-[11px] text-muted-foreground">This local preview does not verify conformance. The existing PUT behavior is unchanged until server validation is available.</p>
+            </template>
+
+            <div class="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" @click="cancelProfileSwitch">Keep current profile</Button>
+              <Button size="sm" :disabled="profileSwitchLoading || Boolean(profileSwitchError) || !pendingReplacementCrate" @click="confirmProfileSwitch">Confirm transition</Button>
+            </div>
+          </div>
+        </div>
+      </Transition>
 
       <SubcratePickerDialog
         v-model:open="subcratePickerOpen"

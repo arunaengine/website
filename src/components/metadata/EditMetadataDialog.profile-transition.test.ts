@@ -7,50 +7,34 @@ import { createRenderer, defineComponent, h, nextTick, ref, type App, type Compo
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { profileRulesLoadState } from '@/composables/useAruna'
 import type { MetadataProfile } from '@/data/types'
-import * as CrateImport from '@/lib/crateImport'
-import * as CustomFields from '@/lib/customFields'
+import * as Api from '@/lib/api'
+import * as DataEntities from '@/lib/dataEntities'
 import * as Subcrates from '@/lib/subcrates'
+import * as GraphIri from '@/lib/graphIri'
+import * as CustomFields from '@/lib/customFields'
 import * as ProfileControls from '@/lib/profiles/controls'
 import * as ProfileEmit from '@/lib/profiles/emit'
 import * as EntityEntries from '@/lib/profiles/entityEntries'
 import * as EntityTree from '@/lib/profiles/entityTree'
 import * as ProfileMigration from '@/lib/profiles/migration'
 import * as ProfileRoCrate from '@/lib/profiles/rocrate'
-import * as ProfileCatalog from '@/lib/profiles/propertyCatalog'
 import * as ProfileUri from '@/lib/profiles/uri'
 import * as ProfileValidate from '@/lib/profiles/validate'
+import * as RoCrateVersions from '@/lib/rocrateVersions'
 import * as ProfileTypes from '@/lib/profiles/types'
+import * as ShaclLift from '@/lib/shacl/lift'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
-import * as MapFindings from '@/lib/shacl/mapFindings'
-import type { ShaclFinding } from '@/lib/shacl/findings'
 
-const groups = ref([{ id: 'group-1', name: 'Research group' }])
-const profiles = ref<MetadataProfile[]>([])
-const metadata = ref([])
 const saving = ref(false)
-const currentUser = ref({
-  id: 'user-1',
-  name: 'Ada Lovelace',
-  affiliation: '',
-  orcid: '',
-  preferredProfileId: '',
-})
+const profiles = ref<MetadataProfile[]>([])
+const metadataItems = ref([])
 const apiBaseUrl = ref('https://api.example.test')
-const profileCrateParses = ref({})
-const createMetadata = vi.fn()
+const dialogOpen = ref(false)
+const fetchRoCrateRaw = vi.fn()
+const getMetadataDocument = vi.fn()
+const getMetadataItem = vi.fn()
+const replaceMetadataRoCrate = vi.fn()
 const loadProfileCrate = vi.fn()
-
-const shaclFindings = ref<ShaclFinding[]>([])
-const shaclRunning = ref(false)
-const shaclUnavailable = ref(false)
-const shaclError = ref<string | null>(null)
-const shaclValidate = vi.fn()
-const shaclValidateNow = vi.fn()
-const shaclReset = vi.fn(() => {
-  shaclFindings.value = []
-  shaclRunning.value = false
-  shaclError.value = null
-})
 
 const SlotStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -79,25 +63,18 @@ const ProfileControlStub = defineComponent({
 })
 const EntityControlStub = defineComponent({
   props: { control: { type: Object, required: true }, entries: { type: Array, default: () => [] } },
-  emits: ['update-ref'],
-  setup(props, { emit }) {
+  setup(props) {
     return () => h('entity-control', {
       property: (props.control as { property: string }).property,
       entries: props.entries,
-      onSetRef: (index: number, value: string) => emit('update-ref', index, value),
     })
   },
 })
 const CustomFieldsStub = defineComponent({
-  props: { rows: { type: Array, default: () => [] } },
-  emits: ['update:rows'],
+  props: { rows: { type: Array, default: () => [] }, preserved: { type: Array, default: () => [] } },
   setup(props) {
-    return () => h('custom-fields', { rows: props.rows })
+    return () => h('custom-fields', { rows: props.rows, preserved: props.preserved })
   },
-})
-const DiscardStub = defineComponent({
-  props: { open: Boolean },
-  setup: (props) => () => props.open ? h('discard-confirm') : null,
 })
 
 const moduleDefault = (component: Component) => ({ __esModule: true, default: component })
@@ -109,10 +86,10 @@ const renderRuntime = new Proxy(VueRuntime, {
 })
 
 function compileDialog(): Component {
-  const url = new URL('./NewDatasetDialog.vue', import.meta.url)
+  const url = new URL('./EditMetadataDialog.vue', import.meta.url)
   const source = readFileSync(url, 'utf8')
   const { descriptor } = parse(source, { filename: url.pathname })
-  if (!descriptor.template) throw new Error('NewDatasetDialog.vue has no template')
+  if (!descriptor.template) throw new Error('EditMetadataDialog.vue has no template')
   const script = compileScript(descriptor, { id: url.pathname, inlineTemplate: false })
   const scriptJavascript = transpileModule(script.content, {
     compilerOptions: { module: ModuleKind.CommonJS, target: ScriptTarget.ES2022 },
@@ -120,10 +97,6 @@ function compileDialog(): Component {
   const modules: Record<string, unknown> = {
     vue: VueRuntime,
     '@lucide/vue': icons,
-    '@/lib/shacl/lift': {
-      cloneLiftNotes: (notes: Array<{ kind: string; message: string; scopes: string[] }>) =>
-        notes.map((note) => ({ ...note, scopes: [...note.scopes] })),
-    },
     '@/components/ui/Dialog.vue': moduleDefault(SlotStub),
     '@/components/ui/DialogContent.vue': moduleDefault(SlotStub),
     '@/components/ui/DialogHeader.vue': moduleDefault(SlotStub),
@@ -131,17 +104,16 @@ function compileDialog(): Component {
     '@/components/ui/DialogDescription.vue': moduleDefault(SlotStub),
     '@/components/ui/DialogFooter.vue': moduleDefault(SlotStub),
     '@/components/ui/DialogClose.vue': moduleDefault(SlotStub),
-    '@/components/ui/DiscardDraftConfirm.vue': moduleDefault(DiscardStub),
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
     '@/components/ui/Input.vue': moduleDefault(SlotStub),
     '@/components/ui/Textarea.vue': moduleDefault(SlotStub),
-    '@/components/ui/Select.vue': moduleDefault(SelectStub),
     '@/components/ui/Switch.vue': moduleDefault(SlotStub),
     '@/components/ui/Skeleton.vue': moduleDefault(SlotStub),
     '@/components/ui/Tabs.vue': moduleDefault(SlotStub),
     '@/components/ui/TabsList.vue': moduleDefault(SlotStub),
     '@/components/ui/TabsTrigger.vue': moduleDefault(SlotStub),
-    '@/components/groups/CreateGroupDialog.vue': moduleDefault(SlotStub),
+    '@/components/ui/TabsContent.vue': moduleDefault(SlotStub),
+    '@/components/ui/Select.vue': moduleDefault(SelectStub),
     '@/components/metadata/DatasetFilesEditor.vue': moduleDefault(SlotStub),
     '@/components/metadata/DatasetEntityInstances.vue': moduleDefault(EntityControlStub),
     '@/components/metadata/ProfileControlField.vue': moduleDefault(ProfileControlStub),
@@ -151,41 +123,33 @@ function compileDialog(): Component {
     '@/composables/useAruna': {
       profileRulesLoadState,
       useAruna: () => ({
-        groups,
-        profiles,
-        metadata,
-        createMetadata,
-        loadProfileCrate,
-        profileCrateParses,
         saving,
-        currentUser,
+        fetchRoCrateRaw,
+        getMetadataDocument,
+        getMetadataItem,
+        replaceMetadataRoCrate,
+        toMetadataDoc: (item: { document_path?: string }) => ({ title: item.document_path ?? '' }),
+        metadataItems,
         apiBaseUrl,
+        profiles,
+        loadProfileCrate,
       }),
     },
-    '@/lib/crateImport': CrateImport,
-    '@/lib/customFields': CustomFields,
+    '@/lib/api': Api,
+    '@/lib/dataEntities': DataEntities,
     '@/lib/subcrates': Subcrates,
+    '@/lib/graphIri': GraphIri,
+    '@/lib/customFields': CustomFields,
     '@/lib/profiles/controls': ProfileControls,
     '@/lib/profiles/emit': ProfileEmit,
     '@/lib/profiles/entityEntries': EntityEntries,
     '@/lib/profiles/entityTree': EntityTree,
     '@/lib/profiles/migration': ProfileMigration,
     '@/lib/profiles/rocrate': ProfileRoCrate,
-    '@/lib/shacl/mapFindings': MapFindings,
-    '@/lib/shacl/useShaclValidation': {
-      useShaclValidation: () => ({
-        findings: shaclFindings,
-        running: shaclRunning,
-        unavailable: shaclUnavailable,
-        error: shaclError,
-        validate: shaclValidate,
-        validateNow: shaclValidateNow,
-        reset: shaclReset,
-      }),
-    },
-    '@/lib/profiles/propertyCatalog': ProfileCatalog,
     '@/lib/profiles/uri': ProfileUri,
+    '@/lib/shacl/lift': ShaclLift,
     '@/lib/profiles/validate': ProfileValidate,
+    '@/lib/rocrateVersions': RoCrateVersions,
     '@/lib/profiles/types': ProfileTypes,
   }
   const cjs = { exports: {} as Record<string, unknown> }
@@ -207,7 +171,7 @@ function compileDialog(): Component {
   return component
 }
 
-const NewDatasetDialog = compileDialog()
+const EditMetadataDialog = compileDialog()
 
 type HostKind = 'root' | 'element' | 'text' | 'comment'
 interface HostNode {
@@ -278,7 +242,7 @@ function content(node: HostNode): string {
 }
 
 async function flush() {
-  for (let index = 0; index < 5; index += 1) {
+  for (let index = 0; index < 6; index += 1) {
     await Promise.resolve()
     await nextTick()
   }
@@ -302,8 +266,12 @@ function profileRule(
 }
 
 function profile(id: string, propertyRules: ProfilePropertyRule[]): MetadataProfile {
+  const profileUri = `https://profiles.example.test/${id}`
   return {
     id,
+    documentId: `${id}-document`,
+    graphIri: profileUri,
+    profileUri,
     name: `${id} profile`,
     shortName: id,
     description: '',
@@ -311,16 +279,74 @@ function profile(id: string, propertyRules: ProfilePropertyRule[]): MetadataProf
     iconColor: '',
     entityRules: [],
     propertyRules,
+    contextTerms: Object.fromEntries(propertyRules.map((rule) => [rule.valueName, rule.propertyUri])),
     suggestedKeywords: [],
     managed: false,
   }
 }
 
-async function mountDialog(): Promise<HostNode> {
+function parsedProfile(profileValue: MetadataProfile) {
+  return {
+    name: profileValue.name,
+    description: '',
+    version: undefined,
+    entityRules: profileValue.entityRules,
+    datasetPropertyRules: profileValue.propertyRules,
+    schema: undefined,
+    contextTerms: profileValue.contextTerms ?? {},
+    shapesText: undefined,
+    customShapesText: undefined,
+    liftNotes: [],
+  }
+}
+
+function crate(conformsTo: string, rootFields: Record<string, unknown> = {}) {
+  return {
+    '@context': ['https://w3id.org/ro/crate/1.2/context', {
+      oldName: 'https://example.test/terms/shared',
+      oldOnly: 'https://example.test/terms/old-only',
+    }],
+    '@graph': [
+      {
+        '@id': 'ro-crate-metadata.json',
+        '@type': 'CreativeWork',
+        conformsTo: { '@id': 'https://w3id.org/ro/crate/1.2' },
+        about: { '@id': './' },
+      },
+      {
+        '@id': './',
+        '@type': 'Dataset',
+        name: 'Saved dataset',
+        description: 'Saved description',
+        datePublished: '2026-08-19',
+        license: 'https://creativecommons.org/licenses/by/4.0/',
+        conformsTo: { '@id': conformsTo },
+        ...rootFields,
+      },
+    ],
+  }
+}
+
+function rootOf(value: unknown): Record<string, unknown> {
+  const graph = (value as { '@graph': Array<Record<string, unknown>> })['@graph']
+  return graph.find((entity) => entity['@id'] === './') ?? {}
+}
+
+async function mountDialog(value: unknown, publicValue = false): Promise<HostNode> {
+  fetchRoCrateRaw.mockResolvedValue(structuredClone(value))
+  getMetadataDocument.mockResolvedValue({ public: publicValue })
   const root = hostNode('root')
-  const app = renderer.createApp(NewDatasetDialog, { open: true, defaultProfileId: 'old' })
+  const Wrapper = defineComponent({
+    setup: () => () => h(EditMetadataDialog, {
+      open: dialogOpen.value,
+      documentId: 'dataset-1',
+      profile: profiles.value[0] ?? null,
+    }),
+  })
+  const app = renderer.createApp(Wrapper)
   app.mount(root)
   mountedApps.push(app)
+  dialogOpen.value = true
   await flush()
   return root
 }
@@ -329,22 +355,14 @@ function profileSelect(root: HostNode): HostNode {
   const select = nodes(root).find((node) =>
     node.tag === 'select'
       && Array.isArray(node.props.options)
-      && (node.props.options as Array<{ value: string }>).some((option) => option.value === 'old'),
+      && (node.props.options as Array<{ value: string }>).some((option) => option.value === '__no_profile__'),
   )
   if (!select) throw new Error('Profile select not found')
   return select
 }
 
-function profileControl(root: HostNode, property: string): HostNode {
-  const control = nodes(root).find((node) => node.tag === 'profile-control' && node.props.property === property)
-  if (!control) throw new Error(`Profile control ${property} not found`)
-  return control
-}
-
-function entityControl(root: HostNode, property: string): HostNode {
-  const control = nodes(root).find((node) => node.tag === 'entity-control' && node.props.property === property)
-  if (!control) throw new Error(`Entity control ${property} not found`)
-  return control
+function selectProfile(root: HostNode, id: string) {
+  ;(profileSelect(root).props.onSelect as (value: string) => void)(id)
 }
 
 function button(root: HostNode, label: string): HostNode {
@@ -353,123 +371,162 @@ function button(root: HostNode, label: string): HostNode {
   return match
 }
 
-function selectProfile(root: HostNode, id: string) {
-  ;(profileSelect(root).props.onSelect as (value: string) => void)(id)
-}
-
 function click(node: HostNode) {
   ;(node.props.onClick as () => void)()
 }
 
+function profileControl(root: HostNode, property: string): HostNode {
+  const control = nodes(root).find((node) => node.tag === 'profile-control' && node.props.property === property)
+  if (!control) throw new Error(`Profile control ${property} not found`)
+  return control
+}
+
+function customRows(root: HostNode): CustomFields.CustomFieldRow[] {
+  return (nodes(root).find((node) => node.tag === 'custom-fields')?.props.rows ?? []) as CustomFields.CustomFieldRow[]
+}
+
 beforeEach(() => {
-  profiles.value = []
-  metadata.value = []
   saving.value = false
-  profileCrateParses.value = {}
-  shaclFindings.value = []
-  shaclRunning.value = false
-  shaclUnavailable.value = false
-  shaclError.value = null
-  createMetadata.mockReset()
+  dialogOpen.value = false
+  profiles.value = []
+  metadataItems.value = []
+  fetchRoCrateRaw.mockReset()
+  getMetadataDocument.mockReset()
+  getMetadataItem.mockReset()
+  replaceMetadataRoCrate.mockReset()
+  replaceMetadataRoCrate.mockResolvedValue({ document_id: 'dataset-1' })
   loadProfileCrate.mockReset()
-  shaclValidate.mockReset()
-  shaclValidateNow.mockReset()
-  shaclReset.mockClear()
+  loadProfileCrate.mockImplementation(async (documentId: string) => {
+    const selected = profiles.value.find((entry) => entry.documentId === documentId)
+    if (!selected) throw new Error('Profile not found')
+    return parsedProfile(selected)
+  })
 })
 
 afterEach(() => {
   for (const app of mountedApps.splice(0)) app.unmount()
 })
 
-describe('New Dataset profile switching', () => {
-  it('migrates a populated matching field by property URI', async () => {
-    const uri = 'https://example.test/terms/shared'
-    profiles.value = [
-      profile('old', [profileRule('oldName', uri)]),
-      profile('new', [profileRule('newName', uri)]),
-    ]
-    const root = await mountDialog()
-
-    ;(profileControl(root, 'oldName').props.onSet as (value: unknown) => void)('kept value')
-    await flush()
-    selectProfile(root, 'new')
-    await flush()
-
-    expect(content(root)).toContain('Moves into the new newName control because the property URI matches.')
-    click(button(root, 'Switch and migrate'))
-    await flush()
-
-    expect(profileControl(root, 'newName').props.modelValue).toBe('kept value')
-    const rows = nodes(root).find((node) => node.tag === 'custom-fields')?.props.rows as CustomFields.CustomFieldRow[]
-    expect(rows).toEqual([])
-  })
-
-  it('preserves unmatched generated and entity values as custom metadata', async () => {
-    const scalarUri = 'https://example.test/terms/old-scalar'
-    const entityUri = 'https://example.test/terms/old-entity'
+describe('existing Dataset profile transition', () => {
+  it('migrates matching property URI values and preserves unmatched values for review', async () => {
+    const shared = 'https://example.test/terms/shared'
+    const oldEntity = 'https://example.test/terms/old-entity'
     profiles.value = [
       profile('old', [
-        profileRule('oldScalar', scalarUri),
-        profileRule('oldEntity', entityUri, {
+        profileRule('oldName', shared),
+        profileRule('oldOnly', 'https://example.test/terms/old-only'),
+        profileRule('oldEntity', oldEntity, {
           kind: 'entity',
           entityTypes: ['http://schema.org/Person'],
           entitySources: ['existing-external'],
         }),
       ]),
-      profile('new', [profileRule('newOnly', 'https://example.test/terms/new-only')]),
+      profile('new', [
+        profileRule('newName', shared),
+        profileRule('oldOnly', 'https://example.test/terms/new-meaning'),
+      ]),
     ]
-    const root = await mountDialog()
+    const root = await mountDialog(crate(profiles.value[0].profileUri!, {
+      oldName: 'matching value',
+      oldOnly: 'unmatched value',
+      oldEntity: { '@id': 'https://orcid.org/0000-0001' },
+    }))
 
-    ;(profileControl(root, 'oldScalar').props.onSet as (value: unknown) => void)('unmatched value')
-    ;(entityControl(root, 'oldEntity').props.onSetRef as (index: number, value: string) => void)(0, 'https://orcid.org/0000-0001')
-    await flush()
     selectProfile(root, 'new')
     await flush()
 
-    expect(content(root)).toContain('Preserved in Additional fields for review. Nothing is cleared.')
-    click(button(root, 'Switch and migrate'))
+    expect(content(root)).toContain('Moves into the new newName control because the property URI matches.')
+    expect(content(root)).toContain('Remains as custom metadata for review. Nothing is cleared.')
+    expect(content(root)).toContain('"newName": "matching value"')
+    click(button(root, 'Confirm transition'))
     await flush()
 
-    const rows = nodes(root).find((node) => node.tag === 'custom-fields')?.props.rows as CustomFields.CustomFieldRow[]
-    expect(rows).toEqual(expect.arrayContaining([
-      { key: scalarUri, type: 'text', value: 'unmatched value' },
-      { key: entityUri, type: 'iri', value: 'https://orcid.org/0000-0001' },
+    expect(profileControl(root, 'newName').props.modelValue).toBe('matching value')
+    expect(content(root)).toContain('already map to different property URIs in this crate and are not reinterpreted: oldOnly')
+    expect(customRows(root)).toEqual(expect.arrayContaining([
+      { key: 'https://example.test/terms/old-only', type: 'text', value: 'unmatched value' },
+      { key: oldEntity, type: 'iri', value: 'https://orcid.org/0000-0001' },
     ]))
-    expect(content(root)).toContain('2 unmatched fields are preserved in Additional fields below for review.')
+    expect(content(root)).toContain('Preserved as custom metadata in the replacement crate. Nothing was deleted.')
+
+    click(button(root, 'Save changes'))
+    await flush()
+    const payload = replaceMetadataRoCrate.mock.calls[0][1] as { rocrate: unknown }
+    const savedRoot = rootOf(payload.rocrate)
+    expect(savedRoot).toMatchObject({
+      newName: 'matching value',
+      conformsTo: [{ '@id': profiles.value[1].profileUri }],
+    })
+    expect(savedRoot['https://example.test/terms/old-only']).toBe('unmatched value')
+    expect(savedRoot[oldEntity]).toEqual({ '@id': 'https://orcid.org/0000-0001' })
+    expect(savedRoot).not.toHaveProperty('oldName')
+    expect(savedRoot).not.toHaveProperty('oldOnly')
+    expect(savedRoot).not.toHaveProperty('oldEntity')
   })
 
-  it('switches an untouched draft without confirmation', async () => {
+  it('keeps profile-owned data as custom metadata when moving to no profile', async () => {
+    profiles.value = [profile('old', [profileRule('oldName', 'https://example.test/terms/shared')])]
+    const root = await mountDialog(crate(profiles.value[0].profileUri!, { oldName: 'keep without a profile' }))
+
+    selectProfile(root, '__no_profile__')
+    await flush()
+    click(button(root, 'Confirm transition'))
+    await flush()
+
+    expect(customRows(root)).toContainEqual({ key: 'https://example.test/terms/shared', type: 'text', value: 'keep without a profile' })
+    click(button(root, 'Save changes'))
+    await flush()
+    const payload = replaceMetadataRoCrate.mock.calls[0][1] as { rocrate: unknown }
+    expect(rootOf(payload.rocrate)['https://example.test/terms/shared']).toBe('keep without a profile')
+    expect(rootOf(payload.rocrate)).not.toHaveProperty('oldName')
+    expect(rootOf(payload.rocrate)).not.toHaveProperty('conformsTo')
+  })
+
+  it('allows a published Dataset with a persistent identifier to transition', async () => {
     profiles.value = [
-      profile('old', [profileRule('oldName', 'https://example.test/terms/old')]),
-      profile('new', [profileRule('newName', 'https://example.test/terms/new')]),
+      profile('old', []),
+      profile('new', []),
     ]
-    const root = await mountDialog()
+    const identifier = 'https://w3id.org/aruna/data/0123456789abcdef'
+    const root = await mountDialog(crate(profiles.value[0].profileUri!, { identifier }), true)
 
     selectProfile(root, 'new')
     await flush()
+    click(button(root, 'Confirm transition'))
+    await flush()
+    click(button(root, 'Save changes'))
+    await flush()
 
-    expect(content(root)).not.toContain('Switch profile and migrate this draft?')
-    expect(profileControl(root, 'newName')).toBeTruthy()
+    expect(replaceMetadataRoCrate).toHaveBeenCalledOnce()
+    const payload = replaceMetadataRoCrate.mock.calls[0][1] as { rocrate: unknown; public: boolean }
+    expect(payload.public).toBe(true)
+    expect(rootOf(payload.rocrate).identifier).toBe(identifier)
+    expect(rootOf(payload.rocrate).conformsTo).toEqual([{ '@id': profiles.value[1].profileUri }])
   })
 
-  it('invalidates pending SHACL validation and findings on switch', async () => {
-    profiles.value = [profile('old', []), profile('new', [])]
-    const root = await mountDialog()
-    shaclRunning.value = true
-    shaclFindings.value = [{
-      focusId: './',
-      message: 'Old profile finding',
-      severity: 'warning',
-      sourceShape: 'https://example.test/old-shape',
-    }]
-    shaclReset.mockClear()
+  it('requires an external conformsTo reference to be removed before save', async () => {
+    profiles.value = [profile('registered', [])]
+    const external = 'https://external.example.test/profile/v1'
+    const root = await mountDialog(crate(external, { customValue: 'preserved' }))
 
-    selectProfile(root, 'new')
+    expect(content(root)).toContain(external)
+    expect(content(root)).toContain('cannot be written back')
+    click(button(root, 'Save changes'))
     await flush()
 
-    expect(shaclReset).toHaveBeenCalled()
-    expect(shaclRunning.value).toBe(false)
-    expect(shaclFindings.value).toEqual([])
-    expect(content(root)).not.toContain('Switch profile and migrate this draft?')
+    expect(replaceMetadataRoCrate).not.toHaveBeenCalled()
+    expect(content(root)).toContain('Remove the external conformsTo reference before saving')
+
+    selectProfile(root, '__no_profile__')
+    await flush()
+    click(button(root, 'Confirm transition'))
+    await flush()
+    click(button(root, 'Save changes'))
+    await flush()
+
+    expect(replaceMetadataRoCrate).toHaveBeenCalledOnce()
+    const payload = replaceMetadataRoCrate.mock.calls[0][1] as { rocrate: unknown }
+    expect(rootOf(payload.rocrate).customValue).toBe('preserved')
+    expect(rootOf(payload.rocrate)).not.toHaveProperty('conformsTo')
   })
 })
