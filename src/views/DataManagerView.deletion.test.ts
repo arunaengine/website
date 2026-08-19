@@ -117,8 +117,8 @@ describe('Data Manager version-aware deletion', () => {
     expect(functionSource('openDeleteBucket')).toContain('openPermanentDelete(')
   })
 
-  it('renders visible, restricted, last-location, and partial coverage warnings in both dialogs', () => {
-    expect(template.match(/aria-label="RDF Dataset references"/g)).toHaveLength(2)
+  it('renders visible, restricted, last-location, and partial coverage warnings in all dialogs', () => {
+    expect(template.match(/aria-label="RDF Dataset references"/g)).toHaveLength(3)
     expect(template).toContain("params: { id: reference.document_id }")
     expect(template).toContain('{{ reference.title }}')
     expect(template).toContain('Other restricted Datasets reference this content')
@@ -150,7 +150,8 @@ describe('Data Manager version-aware deletion', () => {
   it('keeps warnings advisory and uses one confirmation without a typed override', () => {
     const ordinaryConfirm = buttonOpeningTag('confirmDelete')
     const permanentConfirm = buttonOpeningTag('confirmPermanentDelete')
-    for (const button of [ordinaryConfirm, permanentConfirm]) {
+    const bulkConfirm = buttonOpeningTag('confirmBulkDelete')
+    for (const button of [ordinaryConfirm, permanentConfirm, bulkConfirm]) {
       expect(button).not.toContain('backlinkPreflightPartial')
       expect(button).not.toContain('backlinkPreflightError')
       expect(button).not.toContain('hidden_references_exist')
@@ -163,5 +164,69 @@ describe('Data Manager version-aware deletion', () => {
   it('keeps the cache-backed reverse index explicitly labelled as non-authoritative', () => {
     expect(crateReferencesSource).toContain("'Referenced by loaded metadata'")
     expect(crateReferencesSource).toContain('never the whole realm')
+  })
+})
+
+describe('Data Manager explicit multi-file deletion', () => {
+  it('keeps selection in the Data Manager listing and preserves it across refreshes', () => {
+    expect(script).toContain('const selectedObjectKeys = ref<Set<string>>(new Set())')
+    expect(template).toContain('aria-label="Select all listed objects"')
+    expect(template).toContain(':checked="selectedObjectKeys.has(object.key)"')
+    expect(template).toContain('Delete selected ({{ selectedObjectCount }})')
+
+    expect(functionSource('clearObjectListing')).toContain('selectedObjectKeys.value = new Set()')
+    expect(functionSource('loadObjects')).not.toContain('selectedObjectKeys.value = new Set()')
+  })
+
+  it('runs one bounded selection preflight phase and renders every D5 warning class', () => {
+    const open = functionSource('openBulkDelete')
+    const preflight = functionSource('loadBulkBacklinkPreflight')
+    const merge = functionSource('mergeBulkBacklinkPreflights')
+    expect(open).toContain("loadBulkBacklinkPreflight(target, 'latest_version_tombstone')")
+    expect(preflight).toContain('target.keys.slice(offset, offset + BULK_PREFLIGHT_CONCURRENCY)')
+    expect(preflight).toContain("{ kind: 'file', bucket: target.bucket, key }")
+    expect(preflight).toContain('limit: BULK_BACKLINK_LIMIT')
+    expect(merge).toContain('location.bucket === target.bucket && location.key === key')
+    expect(merge).toContain('location.bucket !== target.bucket || location.key === key')
+    expect(template).toContain('Dataset-reference lookup failed for part or all of the selection.')
+    expect(template).toContain('Other restricted Datasets reference this content')
+    expect(template).toContain("This operation would remove this content's last resolvable Aruna location.")
+    expect(template).toContain('Dataset-reference coverage is partial.')
+    expect(template).toContain('backlinkPreflight.coverage.node_freshness')
+    expect(template).toContain('backlinkPreflight.coverage.excluded_forms')
+  })
+
+  it('caps ordinary batches and retains exact mixed-success and transport outcomes', () => {
+    const ordinary = functionSource('deleteSelectedOrdinary')
+    const retain = functionSource('recordBulkDeleteResults')
+    expect(script).toContain('const BULK_DELETE_BATCH_SIZE = 1_000')
+    expect(ordinary).toContain('keys.slice(offset, offset + BULK_DELETE_BATCH_SIZE)')
+    expect(ordinary).toContain('Promise.allSettled(')
+    expect(ordinary).toContain('s3.deleteObject(target.bucket, key, target.nodeId)')
+    expect(ordinary).toContain('status: bulkDeleteFailureStatus(result.reason)')
+    expect(functionSource('bulkDeleteFailureStatus')).toContain("return 'unknown'")
+    expect(retain).toContain("if (result.status === 'committed') nextSelection.delete(result.key)")
+    expect(retain).not.toContain("if (result.status === 'failed') nextSelection.delete(result.key)")
+    expect(retain).not.toContain("if (result.status === 'unknown') nextSelection.delete(result.key)")
+    expect(template).toContain('Committed keys')
+    expect(template).toContain('Failed keys stay selected for review or retry.')
+    expect(template).toContain('Unknown keys stay selected for review or retry.')
+  })
+
+  it('keeps folder deletion separate and offers both selected-file semantics', () => {
+    expect(template).toContain('Delete markers for {{ bulkDeleteTarget.keys.length }} selected key')
+    expect(template).toContain('Permanently purge all versions for {{ bulkDeleteTarget.keys.length }} selected key')
+    expect(functionSource('loadBulkPurgePreflights')).toContain('getStorageDeletionPreflight(')
+    expect(functionSource('loadBulkPurgePreflights')).toContain("{ kind: 'file', bucket: target.bucket, key }")
+    expect(functionSource('deleteSelectedPermanently')).toContain('runBulkPurgeScope(')
+    expect(functionSource('runBulkPurgeScope')).toContain('startStoragePurge(')
+    expect(functionSource('openDeleteFolder')).not.toContain('selectedObjectKeys')
+    expect(functionSource('openPermanentDeleteFolder')).not.toContain('selectedObjectKeys')
+  })
+
+  it('keeps new UI copy free of em dashes and the retired label namespace', () => {
+    const renderedTemplate = template.replace(/<!--[\s\S]*?-->/g, '')
+    expect(renderedTemplate).not.toContain('—')
+    expect(dataManagerSource).not.toMatch(/aruna[.]io/)
   })
 })

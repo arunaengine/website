@@ -393,6 +393,34 @@ const nextToken = ref<string | undefined>(undefined)
 const listLoading = ref(false)
 const listError = ref<string | null>(null)
 const listAuthError = ref(false)
+const selectedObjectKeys = ref<Set<string>>(new Set())
+const selectedObjectCount = computed(() => selectedObjectKeys.value.size)
+const selectableListedObjects = computed(() =>
+  objects.value.filter((object) => s3.canWrite(bucket.value, object.key, remoteNodeId.value)),
+)
+const allListedObjectsSelected = computed(() =>
+  selectableListedObjects.value.length > 0 &&
+  selectableListedObjects.value.every((object) => selectedObjectKeys.value.has(object.key)),
+)
+const someListedObjectsSelected = computed(() =>
+  selectableListedObjects.value.some((object) => selectedObjectKeys.value.has(object.key)),
+)
+
+function setObjectSelected(key: string, selected: boolean) {
+  const next = new Set(selectedObjectKeys.value)
+  if (selected) next.add(key)
+  else next.delete(key)
+  selectedObjectKeys.value = next
+}
+
+function setAllListedObjectsSelected(selected: boolean) {
+  const next = new Set(selectedObjectKeys.value)
+  for (const object of selectableListedObjects.value) {
+    if (selected) next.add(object.key)
+    else next.delete(object.key)
+  }
+  selectedObjectKeys.value = next
+}
 
 const newBucketName = ref('')
 const creatingBucket = ref(false)
@@ -483,6 +511,48 @@ const permanentDeleteRemainingMissing = ref(false)
 const permanentDeleteRemainingError = ref<string | null>(null)
 let permanentDeleteRequestId = 0
 
+const BULK_DELETE_BATCH_SIZE = 1_000
+const BULK_PREFLIGHT_CONCURRENCY = 16
+const BULK_BACKLINK_LIMIT = 100
+
+type BulkDeleteMode = BacklinkPreflightStorageOperation
+
+interface BulkDeleteTarget {
+  bucket: string
+  nodeId: string | null
+  keys: string[]
+}
+
+interface BulkDeleteIssue {
+  key: string
+  message: string
+}
+
+interface BulkDeleteOutcome {
+  committed: string[]
+  failed: BulkDeleteIssue[]
+  unknown: BulkDeleteIssue[]
+}
+
+type BulkDeleteKeyResult =
+  | { key: string; status: 'committed' }
+  | { key: string; status: 'failed' | 'unknown'; message: string }
+
+interface BulkPurgeScopeState {
+  key: string
+  operation: StoragePurgeOperation
+  preflight: StorageDeletionPreflight | null
+  error: string | null
+}
+
+const bulkDeleteTarget = ref<BulkDeleteTarget | null>(null)
+const bulkDeleteMode = ref<BulkDeleteMode>('latest_version_tombstone')
+const bulkDeleteBusy = ref(false)
+const bulkDeleteOutcome = ref<BulkDeleteOutcome | null>(null)
+const bulkPurgeScopes = ref<BulkPurgeScopeState[]>([])
+const bulkPurgePreflightBusy = ref(false)
+let bulkDeleteRequestId = 0
+
 const destructiveScope = computed<StorageDeletionScope | null>(() => {
   const ordinary = deleteTarget.value
   if (ordinary?.type === 'object') {
@@ -534,6 +604,38 @@ const backlinkReferencesReported = computed(() =>
     (target) => target.visible_references.length > 0 || target.hidden_references_exist,
   ) ?? false,
 )
+const bulkDeleteUnresolvedCount = computed(() =>
+  bulkDeleteOutcome.value
+    ? bulkDeleteOutcome.value.failed.length + bulkDeleteOutcome.value.unknown.length
+    : bulkDeleteTarget.value?.keys.length ?? 0,
+)
+const bulkDeleteActionLabel = computed(() => {
+  if (bulkDeleteOutcome.value) return `Retry ${bulkDeleteUnresolvedCount.value} unresolved`
+  const count = bulkDeleteTarget.value?.keys.length ?? 0
+  return bulkDeleteMode.value === 'all_versions_purge'
+    ? `Permanently purge ${count} selected key${count === 1 ? '' : 's'}`
+    : `Delete ${count} selected key${count === 1 ? '' : 's'}`
+})
+const bulkPurgeInventory = computed(() => {
+  const preflights = bulkPurgeScopes.value.flatMap((scope) => scope.preflight ? [scope.preflight] : [])
+  return {
+    current_heads: preflights.reduce((sum, preflight) => sum + preflight.counts.current_heads, 0),
+    noncurrent_versions: preflights.reduce((sum, preflight) => sum + preflight.counts.noncurrent_versions, 0),
+    delete_markers: preflights.reduce((sum, preflight) => sum + preflight.counts.delete_markers, 0),
+    open_multipart_uploads: preflights.reduce((sum, preflight) => sum + preflight.counts.open_multipart_uploads, 0),
+    complete: preflights.length === bulkPurgeScopes.value.length && preflights.every((preflight) => preflight.counts.complete),
+  }
+})
+const bulkPurgePreflightReady = computed(() =>
+  bulkPurgeScopes.value.length === (bulkDeleteTarget.value?.keys.length ?? 0) &&
+  bulkPurgeScopes.value.every((scope) => scope.preflight?.permissions.purge),
+)
+const bulkPurgePreflightErrors = computed(() =>
+  bulkPurgeScopes.value.flatMap((scope) => scope.error ? [{ key: scope.key, message: scope.error }] : []),
+)
+const bulkPurgeDeniedKeys = computed(() =>
+  bulkPurgeScopes.value.flatMap((scope) => scope.preflight && !scope.preflight.permissions.purge ? [scope.key] : []),
+)
 
 const newFolderOpen = ref(false)
 const newFolderName = ref('')
@@ -556,6 +658,8 @@ function clearObjectListing() {
   listAuthError.value = false
   remoteBrowseBlocked.value = false
   deleteTarget.value = null
+  selectedObjectKeys.value = new Set()
+  resetBulkDeleteState()
 }
 
 async function loadObjects(more = false) {
@@ -1105,6 +1209,7 @@ async function confirmDelete() {
   try {
     if (target.type === 'object') {
       await s3.deleteObject(target.bucket, target.object.key, target.nodeId)
+      setObjectSelected(target.object.key, false)
     } else {
       const result = await s3.deletePrefix(target.bucket, target.folder.prefix, target.nodeId)
       // A deleted prefix invalidates any preview under it.
@@ -1202,6 +1307,441 @@ async function loadBacklinkPreflight(
       backlinkPreflightBusy.value = false
       backlinkPreflightController = undefined
     }
+  }
+}
+
+function mergeBulkBacklinkPreflights(
+  target: BulkDeleteTarget,
+  responses: { key: string; response: BacklinkPreflightResponse }[],
+  failed: number,
+  operation: BacklinkPreflightStorageOperation,
+): BacklinkPreflightResponse {
+  const targets = new Map<string, BacklinkPreflightResponse['targets'][number]>()
+  const nodeFreshness = new Map<string, BacklinkPreflightResponse['coverage']['node_freshness'][number]>()
+  const excludedForms = new Map<string, BacklinkPreflightResponse['coverage']['excluded_forms'][number]>()
+  const queriedForms = new Set<string>()
+  const failedPartitions = new Set<string>()
+
+  for (const { key, response } of responses) {
+    for (const result of response.targets) {
+      const targetedVersions = result.targeted_versions.filter(
+        (location) => location.bucket === target.bucket && location.key === key,
+      )
+      if (!targetedVersions.length) continue
+      const existing = targets.get(result.content_w3id)
+      if (!existing) {
+        targets.set(result.content_w3id, { ...result, targeted_versions: targetedVersions })
+        continue
+      }
+      const locations = new Map(
+        existing.targeted_versions.map((location) => [
+          `${location.node_id}\n${location.bucket}\n${location.key}\n${location.version_id}`,
+          location,
+        ]),
+      )
+      for (const location of targetedVersions) {
+        locations.set(
+          `${location.node_id}\n${location.bucket}\n${location.key}\n${location.version_id}`,
+          location,
+        )
+      }
+      const references = new Map(
+        existing.visible_references.map((reference) => [reference.document_id, reference]),
+      )
+      for (const reference of result.visible_references) {
+        references.set(reference.document_id, reference)
+      }
+      const wouldRemoveLast =
+        existing.would_remove_last_resolvable_aruna_location ||
+        result.would_remove_last_resolvable_aruna_location
+      targets.set(result.content_w3id, {
+        ...existing,
+        targeted_versions: [...locations.values()],
+        visible_references: [...references.values()],
+        hidden_references_exist:
+          existing.hidden_references_exist || result.hidden_references_exist,
+        would_remove_last_resolvable_aruna_location: wouldRemoveLast,
+        location_impact_complete:
+          existing.location_impact_complete &&
+          result.location_impact_complete &&
+          (operation !== 'all_versions_purge' || wouldRemoveLast),
+      })
+    }
+    for (const freshness of response.coverage.node_freshness) {
+      const existing = nodeFreshness.get(freshness.node_id)
+      if (!existing || (existing.index_state === 'current' && freshness.index_state !== 'current')) {
+        nodeFreshness.set(freshness.node_id, freshness)
+      }
+    }
+    for (const excluded of response.coverage.excluded_forms) {
+      excludedForms.set(`${excluded.form}\n${excluded.reason}`, excluded)
+    }
+    for (const form of response.coverage.queried_forms) queriedForms.add(form)
+    for (const partition of response.failed_partitions) failedPartitions.add(partition)
+  }
+
+  const exactResponses = responses.every(({ key, response }) =>
+    response.targets.every((result) =>
+      result.targeted_versions.every(
+        (location) => location.bucket !== target.bucket || location.key === key,
+      ),
+    ),
+  )
+  const completeResponses =
+    failed === 0 && responses.length === target.keys.length && exactResponses
+  return {
+    targets: [...targets.values()],
+    next_cursor: responses.find(({ response }) => response.next_cursor)?.response.next_cursor ?? null,
+    truncated: failed > 0 || responses.some(({ response }) => response.truncated),
+    nodes_queried: Math.max(0, ...responses.map(({ response }) => response.nodes_queried)),
+    nodes_failed: Math.max(0, ...responses.map(({ response }) => response.nodes_failed)),
+    complete: completeResponses && responses.every(({ response }) => response.complete),
+    failed_partitions: [...failedPartitions],
+    coverage: {
+      queried_scope: 'selected_bucket_keys',
+      queried_forms: [...queriedForms],
+      excluded_forms: [...excludedForms.values()],
+      node_freshness: [...nodeFreshness.values()],
+      target_resolution_complete:
+        completeResponses && responses.every(({ response }) => response.coverage.target_resolution_complete),
+      path_style_endpoint_coverage_complete:
+        completeResponses && responses.every(({ response }) => response.coverage.path_style_endpoint_coverage_complete),
+      realm_coverage_complete:
+        completeResponses && responses.every(({ response }) => response.coverage.realm_coverage_complete),
+    },
+  }
+}
+
+async function loadBulkBacklinkPreflight(
+  target: BulkDeleteTarget,
+  operation: BacklinkPreflightStorageOperation,
+) {
+  resetBacklinkPreflightState()
+  const requestId = backlinkPreflightRequestId
+  const apiBase = permanentDeleteApiBase(target.nodeId)
+  if (!apiBase) {
+    backlinkPreflightError.value = 'The node API endpoint for the Dataset-reference lookup is unavailable.'
+    return
+  }
+  const controller = new AbortController()
+  backlinkPreflightController = controller
+  backlinkPreflightBusy.value = true
+  const responses: { key: string; response: BacklinkPreflightResponse }[] = []
+  const failures: BulkDeleteIssue[] = []
+  try {
+    // The adapter accepts one bucket/prefix target. One bounded preflight phase
+    // therefore resolves each selected file scope in small concurrent groups.
+    for (let offset = 0; offset < target.keys.length; offset += BULK_PREFLIGHT_CONCURRENCY) {
+      const keys = target.keys.slice(offset, offset + BULK_PREFLIGHT_CONCURRENCY)
+      const settled = await Promise.allSettled(
+        keys.map((key) =>
+          preflightBacklinks(
+            {
+              target: backlinkTargetForScope(
+                { kind: 'file', bucket: target.bucket, key },
+                operation,
+              ),
+              limit: BULK_BACKLINK_LIMIT,
+            },
+            { baseUrl: apiBase, token: authToken.value || undefined },
+            controller.signal,
+          ),
+        ),
+      )
+      if (requestId !== backlinkPreflightRequestId || controller.signal.aborted) return
+      settled.forEach((result, index) => {
+        const key = keys[index]
+        if (result.status === 'fulfilled') responses.push({ key, response: result.value })
+        else failures.push({
+          key,
+          message: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        })
+      })
+    }
+    if (requestId !== backlinkPreflightRequestId) return
+    if (responses.length) {
+      backlinkPreflight.value = mergeBulkBacklinkPreflights(
+        target,
+        responses,
+        failures.length,
+        operation,
+      )
+    }
+    if (failures.length) {
+      const first = failures[0]
+      backlinkPreflightError.value = `${failures.length} of ${target.keys.length} selected key lookups failed. First failure: ${first.key}: ${first.message}`
+    }
+  } finally {
+    if (requestId === backlinkPreflightRequestId) {
+      backlinkPreflightBusy.value = false
+      backlinkPreflightController = undefined
+    }
+  }
+}
+
+function resetBulkDeleteState() {
+  ++bulkDeleteRequestId
+  resetBacklinkPreflightState()
+  bulkDeleteTarget.value = null
+  bulkDeleteMode.value = 'latest_version_tombstone'
+  bulkDeleteBusy.value = false
+  bulkDeleteOutcome.value = null
+  bulkPurgeScopes.value = []
+  bulkPurgePreflightBusy.value = false
+}
+
+function closeBulkDelete() {
+  if (!bulkDeleteBusy.value) resetBulkDeleteState()
+}
+
+function openBulkDelete() {
+  if (!selectedObjectKeys.value.size) return
+  const target: BulkDeleteTarget = {
+    bucket: bucket.value,
+    nodeId: remoteNodeId.value,
+    keys: [...selectedObjectKeys.value],
+  }
+  resetBulkDeleteState()
+  void loadBulkBacklinkPreflight(target, 'latest_version_tombstone')
+  bulkDeleteTarget.value = target
+}
+
+function setBulkDeleteMode(mode: BulkDeleteMode) {
+  const target = bulkDeleteTarget.value
+  if (!target || bulkDeleteBusy.value || bulkDeleteOutcome.value || mode === bulkDeleteMode.value) return
+  ++bulkDeleteRequestId
+  bulkDeleteMode.value = mode
+  bulkPurgeScopes.value = []
+  bulkPurgePreflightBusy.value = false
+  void loadBulkBacklinkPreflight(target, mode)
+  if (mode === 'all_versions_purge') void loadBulkPurgePreflights(target)
+}
+
+async function loadBulkPurgePreflights(target: BulkDeleteTarget) {
+  const requestId = ++bulkDeleteRequestId
+  const apiBase = permanentDeleteApiBase(target.nodeId)
+  const scopes: BulkPurgeScopeState[] = target.keys.map((key) => ({
+    key,
+    operation: createStoragePurgeOperation({ kind: 'file', bucket: target.bucket, key }),
+    preflight: null,
+    error: null,
+  }))
+  bulkPurgeScopes.value = scopes
+  bulkPurgePreflightBusy.value = true
+  if (!apiBase) {
+    bulkPurgeScopes.value = scopes.map((scope) => ({
+      ...scope,
+      error: 'The node API endpoint for this storage location is unavailable.',
+    }))
+    bulkPurgePreflightBusy.value = false
+    return
+  }
+  const client = { baseUrl: apiBase, token: authToken.value || undefined }
+  try {
+    for (let offset = 0; offset < scopes.length; offset += BULK_PREFLIGHT_CONCURRENCY) {
+      const batch = scopes.slice(offset, offset + BULK_PREFLIGHT_CONCURRENCY)
+      const settled = await Promise.allSettled(
+        batch.map((scope) => getStorageDeletionPreflight(scope.operation.scope, client)),
+      )
+      if (requestId !== bulkDeleteRequestId) return
+      settled.forEach((result, index) => {
+        const scope = batch[index]
+        if (result.status === 'fulfilled') scope.preflight = result.value
+        else scope.error = storageDeletionErrorMessage(result.reason)
+      })
+      bulkPurgeScopes.value = [...scopes]
+    }
+  } finally {
+    if (requestId === bulkDeleteRequestId) bulkPurgePreflightBusy.value = false
+  }
+}
+
+function bulkDeleteRunKeys(target: BulkDeleteTarget): string[] {
+  const outcome = bulkDeleteOutcome.value
+  if (!outcome) return target.keys
+  const unresolved = new Set([
+    ...outcome.failed.map((result) => result.key),
+    ...outcome.unknown.map((result) => result.key),
+  ])
+  return target.keys.filter((key) => unresolved.has(key))
+}
+
+function recordBulkDeleteResults(target: BulkDeleteTarget, results: BulkDeleteKeyResult[]) {
+  const retained = new Map<string, BulkDeleteKeyResult>()
+  const previous = bulkDeleteOutcome.value
+  for (const key of previous?.committed ?? []) retained.set(key, { key, status: 'committed' })
+  for (const result of previous?.failed ?? []) {
+    retained.set(result.key, { ...result, status: 'failed' })
+  }
+  for (const result of previous?.unknown ?? []) {
+    retained.set(result.key, { ...result, status: 'unknown' })
+  }
+  for (const result of results) retained.set(result.key, result)
+  const ordered = target.keys.flatMap((key) => retained.has(key) ? [retained.get(key)!] : [])
+  bulkDeleteOutcome.value = {
+    committed: ordered.flatMap((result) => result.status === 'committed' ? [result.key] : []),
+    failed: ordered.flatMap((result) => result.status === 'failed'
+      ? [{ key: result.key, message: result.message }]
+      : []),
+    unknown: ordered.flatMap((result) => result.status === 'unknown'
+      ? [{ key: result.key, message: result.message }]
+      : []),
+  }
+
+  const nextSelection = new Set(selectedObjectKeys.value)
+  for (const result of results) {
+    if (result.status === 'committed') nextSelection.delete(result.key)
+  }
+  selectedObjectKeys.value = nextSelection
+}
+
+function bulkDeleteFailureStatus(error: unknown): 'failed' | 'unknown' {
+  if (isS3NetworkError(error)) return 'unknown'
+  if (!error || typeof error !== 'object') return 'unknown'
+  const response = error as {
+    status?: number
+    statusCode?: number
+    $metadata?: { httpStatusCode?: number }
+  }
+  return typeof (response.$metadata?.httpStatusCode ?? response.statusCode ?? response.status) === 'number'
+    ? 'failed'
+    : 'unknown'
+}
+
+async function deleteSelectedOrdinary(target: BulkDeleteTarget, keys: string[]) {
+  for (let offset = 0; offset < keys.length; offset += BULK_DELETE_BATCH_SIZE) {
+    const batch = keys.slice(offset, offset + BULK_DELETE_BATCH_SIZE)
+    const permitted = batch.map((key) => s3.canWrite(target.bucket, key, target.nodeId))
+    const settled = await Promise.allSettled(
+      batch.map((key, index) =>
+        permitted[index] ? s3.deleteObject(target.bucket, key, target.nodeId) : Promise.resolve(),
+      ),
+    )
+    const results = settled.map<BulkDeleteKeyResult>((result, index) => {
+      const key = batch[index]
+      if (!permitted[index]) {
+        return {
+          key,
+          status: 'failed',
+          message: 'This session no longer allows deleting this key.',
+        }
+      }
+      if (result.status === 'fulfilled') return { key, status: 'committed' }
+      return {
+        key,
+        status: bulkDeleteFailureStatus(result.reason),
+        message: s3ErrorMessage(result.reason),
+      }
+    })
+    recordBulkDeleteResults(target, results)
+  }
+}
+
+async function runBulkPurgeScope(
+  scope: BulkPurgeScopeState,
+  apiBase: string,
+  requestId: number,
+): Promise<BulkDeleteKeyResult> {
+  const client = { baseUrl: apiBase, token: authToken.value || undefined }
+  try {
+    const submission = await startStoragePurge(scope.operation, client)
+    for (;;) {
+      if (requestId !== bulkDeleteRequestId) {
+        return {
+          key: scope.key,
+          status: 'unknown',
+          message: 'The purge result is no longer being tracked.',
+        }
+      }
+      const status = await getStoragePurgeJob(submission.job_id, client)
+      if (status.kind !== 'storage_purge') {
+        return {
+          key: scope.key,
+          status: 'failed',
+          message: `Job ${submission.job_id} is not a storage purge.`,
+        }
+      }
+      if (isTerminalStoragePurgeJob(status.state)) {
+        if (status.state === 'succeeded') return { key: scope.key, status: 'committed' }
+        return {
+          key: scope.key,
+          status: 'failed',
+          message: status.error?.message ?? `The purge job was ${status.state}.`,
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1_000))
+    }
+  } catch (error) {
+    return {
+      key: scope.key,
+      status: bulkDeleteFailureStatus(error),
+      message: storageDeletionErrorMessage(error),
+    }
+  }
+}
+
+async function deleteSelectedPermanently(
+  target: BulkDeleteTarget,
+  keys: string[],
+  requestId: number,
+) {
+  const apiBase = permanentDeleteApiBase(target.nodeId)
+  if (!apiBase) {
+    recordBulkDeleteResults(
+      target,
+      keys.map((key) => ({
+        key,
+        status: 'failed',
+        message: 'The node API endpoint for this storage location is unavailable.',
+      })),
+    )
+    return
+  }
+  const scopes = new Map(bulkPurgeScopes.value.map((scope) => [scope.key, scope]))
+  for (let offset = 0; offset < keys.length; offset += BULK_DELETE_BATCH_SIZE) {
+    const batch = keys.slice(offset, offset + BULK_DELETE_BATCH_SIZE)
+    const results = await Promise.all(
+      batch.map((key) => {
+        const scope = scopes.get(key)
+        return scope
+          ? runBulkPurgeScope(scope, apiBase, requestId)
+          : Promise.resolve<BulkDeleteKeyResult>({
+              key,
+              status: 'failed',
+              message: 'The permanent deletion preflight is unavailable for this key.',
+            })
+      }),
+    )
+    if (requestId !== bulkDeleteRequestId) return
+    recordBulkDeleteResults(target, results)
+  }
+}
+
+async function confirmBulkDelete() {
+  const target = bulkDeleteTarget.value
+  if (!target || bulkDeleteBusy.value) return
+  const keys = bulkDeleteRunKeys(target)
+  if (!keys.length) return
+  if (bulkDeleteMode.value === 'all_versions_purge' && !bulkPurgePreflightReady.value) return
+  const requestId = ++bulkDeleteRequestId
+  bulkDeleteBusy.value = true
+  try {
+    if (bulkDeleteMode.value === 'all_versions_purge') {
+      await deleteSelectedPermanently(target, keys, requestId)
+    } else {
+      await deleteSelectedOrdinary(target, keys)
+    }
+    if (requestId !== bulkDeleteRequestId) return
+    const committed = new Set(bulkDeleteOutcome.value?.committed ?? [])
+    if (target.bucket === bucket.value && target.nodeId === remoteNodeId.value) {
+      await loadObjects()
+      if (previewObject.value && committed.has(previewObject.value.key)) {
+        previewOpen.value = false
+        previewObject.value = null
+      }
+    }
+  } finally {
+    if (requestId === bulkDeleteRequestId) bulkDeleteBusy.value = false
   }
 }
 
@@ -1375,9 +1915,12 @@ async function refreshAfterPermanentDelete(
     return
   }
 
+  const scope = target.operation.scope
+  if (status.state === 'succeeded' && scope.kind === 'file') {
+    setObjectSelected(scope.key, false)
+  }
   if (bucket.value === target.bucket && remoteNodeId.value === target.nodeId) {
     await loadObjects()
-    const scope = target.operation.scope
     if (
       (scope.kind === 'file' && previewObject.value?.key === scope.key) ||
       (scope.kind === 'prefix' && previewObject.value?.key.startsWith(scope.prefix))
@@ -1453,6 +1996,7 @@ async function confirmPermanentDelete() {
 
 onUnmounted(() => {
   ++permanentDeleteRequestId
+  ++bulkDeleteRequestId
   resetBacklinkPreflightState()
 })
 
@@ -1686,6 +2230,16 @@ const isEmpty = computed(
               </div>
               <div class="flex items-center gap-2">
                 <input ref="fileInput" type="file" multiple class="hidden" @change="onFileInput" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="text-destructive hover:text-destructive"
+                  :disabled="selectedObjectCount === 0"
+                  :title="`Delete ${selectedObjectCount} selected key${selectedObjectCount === 1 ? '' : 's'}`"
+                  @click="openBulkDelete"
+                >
+                  <Trash2 class="h-4 w-4" /> Delete selected ({{ selectedObjectCount }})
+                </Button>
                 <!-- Same local-only gating as the sidebar delete: remote S3
                      endpoints are usually CORS-blocked from this origin. -->
                 <Button
@@ -1841,6 +2395,17 @@ const isEmpty = computed(
               <table class="w-full text-sm">
                 <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
                   <tr>
+                    <th class="w-10 px-4 py-2">
+                      <input
+                        type="checkbox"
+                        class="h-3.5 w-3.5 rounded border-border accent-primary"
+                        :checked="allListedObjectsSelected"
+                        :indeterminate="someListedObjectsSelected && !allListedObjectsSelected"
+                        :disabled="selectableListedObjects.length === 0"
+                        aria-label="Select all listed objects"
+                        @change="setAllListedObjectsSelected(($event.target as HTMLInputElement).checked)"
+                      />
+                    </th>
                     <th class="px-4 py-2 text-left font-semibold">Name</th>
                     <th class="px-4 py-2 text-right font-semibold">Size</th>
                     <th class="px-4 py-2 text-left font-semibold">Modified</th>
@@ -1854,6 +2419,7 @@ const isEmpty = computed(
                     class="cursor-pointer border-t border-border hover:bg-muted/50"
                     @click="openFolder(folder)"
                   >
+                    <td class="w-10 px-4 py-2.5"></td>
                     <td class="px-4 py-2.5">
                       <span class="flex items-center gap-2">
                         <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/
@@ -1895,6 +2461,16 @@ const isEmpty = computed(
                     class="cursor-pointer border-t border-border hover:bg-muted/30"
                     @click="openPreview(object)"
                   >
+                    <td class="w-10 px-4 py-2.5" @click.stop>
+                      <input
+                        type="checkbox"
+                        class="h-3.5 w-3.5 rounded border-border accent-primary"
+                        :checked="selectedObjectKeys.has(object.key)"
+                        :disabled="!s3.canWrite(bucket, object.key, remoteNodeId)"
+                        :aria-label="`Select ${object.name}`"
+                        @change="setObjectSelected(object.key, ($event.target as HTMLInputElement).checked)"
+                      />
+                    </td>
                     <td class="px-4 py-2.5">
                       <span class="flex items-center gap-2">
                         <ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span>
@@ -1939,7 +2515,7 @@ const isEmpty = computed(
                     </td>
                   </tr>
                   <tr v-if="isEmpty">
-                    <td colspan="4" class="px-4 py-10 text-center text-xs text-muted-foreground">
+                    <td colspan="5" class="px-4 py-10 text-center text-xs text-muted-foreground">
                       {{ canWriteCurrentPrefix ? 'This prefix is empty. Drop files here or use Add data.' : 'This prefix is empty. This session is read-only here.' }}
                     </td>
                   </tr>
@@ -2042,6 +2618,233 @@ const isEmpty = computed(
         <DialogFooter>
           <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
           <Button :disabled="newFolderInvalid || newFolderBusy || !s3.canWrite(bucket, `${s3Prefix}${newFolderName.trim()}/`, remoteNodeId)" @click="createFolder">{{ newFolderBusy ? 'Creating…' : 'Create' }}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog :open="bulkDeleteTarget !== null" @update:open="(v: boolean) => { if (!v) closeBulkDelete() }">
+      <DialogContent class="max-h-[90vh] max-w-lg overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            Delete {{ bulkDeleteTarget?.keys.length ?? 0 }} selected key{{ bulkDeleteTarget?.keys.length === 1 ? '' : 's' }}
+          </DialogTitle>
+          <DialogDescription v-if="bulkDeleteTarget">
+            Review the exact selected objects in <span class="font-mono text-xs">{{ bulkDeleteTarget.bucket }}</span>, choose the deletion semantics, then confirm once.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div v-if="bulkDeleteTarget" class="space-y-3 text-xs">
+          <section class="space-y-1 rounded-md border border-border px-3 py-2">
+            <h4 class="font-medium text-foreground">Selected keys</h4>
+            <ul class="max-h-28 space-y-1 overflow-y-auto pl-4 font-mono text-[10px] text-muted-foreground">
+              <li v-for="key in bulkDeleteTarget.keys" :key="key" class="list-disc break-all">{{ key }}</li>
+            </ul>
+          </section>
+
+          <fieldset class="space-y-2" :disabled="bulkDeleteBusy || bulkDeleteOutcome !== null">
+            <legend class="font-medium text-foreground">Deletion semantics</legend>
+            <label class="flex cursor-pointer gap-2 rounded-md border border-border px-3 py-2">
+              <input
+                type="radio"
+                class="mt-0.5 accent-primary"
+                name="bulk-delete-mode"
+                value="latest_version_tombstone"
+                :checked="bulkDeleteMode === 'latest_version_tombstone'"
+                @change="setBulkDeleteMode('latest_version_tombstone')"
+              />
+              <span>
+                <span class="block font-medium text-foreground">Delete markers for {{ bulkDeleteTarget.keys.length }} selected key{{ bulkDeleteTarget.keys.length === 1 ? '' : 's' }}</span>
+                <span class="block text-muted-foreground">Writes a version-less delete marker for each selected key. Earlier versions stay retrievable by version ID.</span>
+              </span>
+            </label>
+            <label class="flex cursor-pointer gap-2 rounded-md border border-border px-3 py-2">
+              <input
+                type="radio"
+                class="mt-0.5 accent-primary"
+                name="bulk-delete-mode"
+                value="all_versions_purge"
+                :checked="bulkDeleteMode === 'all_versions_purge'"
+                @change="setBulkDeleteMode('all_versions_purge')"
+              />
+              <span>
+                <span class="block font-medium text-foreground">Permanently purge all versions for {{ bulkDeleteTarget.keys.length }} selected key{{ bulkDeleteTarget.keys.length === 1 ? '' : 's' }}</span>
+                <span class="block text-muted-foreground">Starts one fenced storage purge job per selected key. Every version and delete marker in those file scopes is removed.</span>
+              </span>
+            </label>
+          </fieldset>
+
+          <template v-if="bulkDeleteMode === 'all_versions_purge'">
+            <p v-if="bulkPurgePreflightBusy" class="flex items-center gap-2 text-muted-foreground">
+              <Loader2 class="h-3 w-3 animate-spin" /> Loading permanent deletion preflights…
+            </p>
+            <section v-else class="space-y-2 rounded-md border border-border px-3 py-2">
+              <h4 class="font-medium text-foreground">Preflight inventory</h4>
+              <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+                <dt>Current heads</dt>
+                <dd class="text-right font-mono text-foreground">{{ bulkPurgeInventory.current_heads }}</dd>
+                <dt>Noncurrent versions</dt>
+                <dd class="text-right font-mono text-foreground">{{ bulkPurgeInventory.noncurrent_versions }}</dd>
+                <dt>Delete markers</dt>
+                <dd class="text-right font-mono text-foreground">{{ bulkPurgeInventory.delete_markers }}</dd>
+                <dt>Open multipart uploads</dt>
+                <dd class="text-right font-mono text-foreground">{{ bulkPurgeInventory.open_multipart_uploads }}</dd>
+              </dl>
+              <p v-if="!bulkPurgeInventory.complete" class="text-amber-800 dark:text-amber-300">
+                One or more inventories are incomplete or unavailable. Totals may be more than shown.
+              </p>
+              <div v-if="bulkPurgePreflightErrors.length" class="text-destructive">
+                <p class="font-medium">Preflight failures</p>
+                <ul class="space-y-1 pl-4">
+                  <li v-for="failure in bulkPurgePreflightErrors" :key="failure.key" class="list-disc break-all">
+                    <span class="font-mono">{{ failure.key }}</span>: {{ failure.message }}
+                  </li>
+                </ul>
+              </div>
+              <div v-if="bulkPurgeDeniedKeys.length" class="text-destructive">
+                <p class="font-medium">Permanent purge is not allowed for these keys</p>
+                <ul class="space-y-1 pl-4 font-mono text-[10px]">
+                  <li v-for="key in bulkPurgeDeniedKeys" :key="key" class="list-disc break-all">{{ key }}</li>
+                </ul>
+              </div>
+            </section>
+          </template>
+
+          <section aria-label="RDF Dataset references" class="space-y-2 rounded-md border border-border px-3 py-2">
+            <h4 class="font-medium text-foreground">RDF Dataset references</h4>
+            <p v-if="backlinkPreflightBusy" class="flex items-center gap-2 text-muted-foreground">
+              <Loader2 class="h-3 w-3 animate-spin" /> Checking Dataset references for the selected keys…
+            </p>
+            <div
+              v-if="backlinkPreflightError"
+              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
+            >
+              <p class="font-medium">Dataset-reference lookup failed for part or all of the selection.</p>
+              <p>Reference and last-resolvable-location impact are unknown for those keys.</p>
+              <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ backlinkPreflightError }}</p>
+            </div>
+            <template v-if="backlinkPreflight">
+              <p
+                v-if="backlinkPreflightPartial"
+                class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+              >
+                Dataset-reference coverage is partial. References or remaining locations may be missing.
+              </p>
+              <p v-if="!backlinkReferencesReported" class="text-muted-foreground">
+                No visible or restricted Dataset references were reported for the covered forms.
+              </p>
+              <div
+                v-for="target in backlinkPreflight.targets"
+                :key="target.content_w3id"
+                class="space-y-1 rounded-md bg-muted/40 px-2 py-1.5"
+              >
+                <p class="break-all font-mono text-[10px] text-muted-foreground">{{ target.content_w3id }}</p>
+                <ul v-if="target.visible_references.length" class="space-y-1 pl-4">
+                  <li v-for="reference in target.visible_references" :key="reference.document_id" class="list-disc">
+                    <RouterLink
+                      :to="{ name: 'metadata-detail', params: { id: reference.document_id } }"
+                      class="font-medium text-primary hover:underline"
+                    >{{ reference.title }}</RouterLink>
+                  </li>
+                </ul>
+                <p v-if="target.hidden_references_exist" class="font-medium text-amber-800 dark:text-amber-300">
+                  Other restricted Datasets reference this content
+                </p>
+                <p
+                  v-if="target.would_remove_last_resolvable_aruna_location"
+                  class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+                >
+                  This operation would remove this content's last resolvable Aruna location.
+                </p>
+                <p
+                  v-else-if="!target.location_impact_complete"
+                  class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+                >
+                  The last-resolvable-location impact is unknown for this content.
+                </p>
+              </div>
+              <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+                <dt>Queried scope</dt>
+                <dd class="text-right text-foreground">{{ displayBacklinkValue(backlinkPreflight.coverage.queried_scope) }}</dd>
+                <dt>Queried forms</dt>
+                <dd class="text-right text-foreground">{{ backlinkPreflight.coverage.queried_forms.map(displayBacklinkValue).join(', ') }}</dd>
+                <dt>Completeness</dt>
+                <dd class="text-right text-foreground">{{ backlinkPreflightPartial ? 'Partial' : 'Complete' }}</dd>
+                <dt>Nodes queried</dt>
+                <dd class="text-right font-mono text-foreground">{{ backlinkPreflight.nodes_queried }}</dd>
+                <dt>Nodes failed</dt>
+                <dd class="text-right font-mono text-foreground">{{ backlinkPreflight.nodes_failed }}</dd>
+              </dl>
+              <div class="space-y-1 text-muted-foreground">
+                <p class="font-medium text-foreground">Index freshness</p>
+                <ul v-if="backlinkPreflight.coverage.node_freshness.length" class="space-y-1 pl-4">
+                  <li v-for="freshness in backlinkPreflight.coverage.node_freshness" :key="freshness.node_id" class="list-disc break-all">
+                    {{ freshness.node_id }}: {{ displayBacklinkValue(freshness.index_state) }}<template v-if="freshness.oldest_status_updated_at_ms !== null">, oldest status {{ backlinkFreshness(freshness.oldest_status_updated_at_ms) }}</template><template v-else>, timestamp unavailable</template>
+                  </li>
+                </ul>
+                <p v-else>Unknown</p>
+              </div>
+              <div class="space-y-1 text-muted-foreground">
+                <p class="font-medium text-foreground">Coverage caveats</p>
+                <ul class="space-y-1 pl-4">
+                  <li v-for="excluded in backlinkPreflight.coverage.excluded_forms" :key="excluded.form" class="list-disc">
+                    <code>{{ excluded.form }}</code>: {{ excluded.reason }}
+                  </li>
+                </ul>
+              </div>
+            </template>
+            <p
+              v-if="!backlinkPreflight && !backlinkPreflightBusy && !backlinkPreflightError"
+              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+            >
+              Dataset-reference coverage and last-resolvable-location impact are unknown.
+            </p>
+          </section>
+
+          <section v-if="bulkDeleteOutcome" class="space-y-2 rounded-md border border-border px-3 py-2">
+            <h4 class="font-medium text-foreground">Deletion outcome</h4>
+            <p class="font-medium">
+              Committed: {{ bulkDeleteOutcome.committed.length }}. Failed: {{ bulkDeleteOutcome.failed.length }}. Unknown: {{ bulkDeleteOutcome.unknown.length }}.
+            </p>
+            <div v-if="bulkDeleteOutcome.committed.length" class="space-y-1">
+              <p class="font-medium text-emerald-700 dark:text-emerald-300">Committed keys</p>
+              <ul class="space-y-1 pl-4 font-mono text-[10px] text-muted-foreground">
+                <li v-for="key in bulkDeleteOutcome.committed" :key="key" class="list-disc break-all">{{ key }}</li>
+              </ul>
+              <p class="text-muted-foreground">Only these confirmed-successful keys were cleared from the selection.</p>
+            </div>
+            <div v-if="bulkDeleteOutcome.failed.length" class="space-y-1 text-destructive">
+              <p class="font-medium">Failed keys</p>
+              <ul class="space-y-1 pl-4">
+                <li v-for="failure in bulkDeleteOutcome.failed" :key="failure.key" class="list-disc break-all">
+                  <span class="font-mono text-[10px]">{{ failure.key }}</span>: {{ failure.message }}
+                </li>
+              </ul>
+              <p>Failed keys stay selected for review or retry.</p>
+            </div>
+            <div v-if="bulkDeleteOutcome.unknown.length" class="space-y-1 text-amber-800 dark:text-amber-300">
+              <p class="font-medium">Unknown keys</p>
+              <ul class="space-y-1 pl-4">
+                <li v-for="failure in bulkDeleteOutcome.unknown" :key="failure.key" class="list-disc break-all">
+                  <span class="font-mono text-[10px]">{{ failure.key }}</span>: {{ failure.message }}
+                </li>
+              </ul>
+              <p>The transport returned no definitive result. Unknown keys stay selected for review or retry.</p>
+            </div>
+          </section>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" :disabled="bulkDeleteBusy" @click="closeBulkDelete">
+            {{ bulkDeleteOutcome && bulkDeleteUnresolvedCount === 0 ? 'Close' : 'Cancel' }}
+          </Button>
+          <Button
+            v-if="!bulkDeleteOutcome || bulkDeleteUnresolvedCount > 0"
+            variant="destructive"
+            :disabled="bulkDeleteBusy || backlinkPreflightBusy || (bulkDeleteMode === 'all_versions_purge' && (bulkPurgePreflightBusy || !bulkPurgePreflightReady))"
+            @click="confirmBulkDelete"
+          >
+            {{ bulkDeleteBusy ? (bulkDeleteMode === 'all_versions_purge' ? 'Purging selected keys…' : 'Deleting selected keys…') : bulkDeleteActionLabel }}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
