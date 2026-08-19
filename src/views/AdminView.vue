@@ -6,7 +6,9 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import ComputeAdminPanel from '@/components/compute-admin/ComputeAdminPanel.vue'
 import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
+import ResidencyAdminPanel from '@/components/residency/ResidencyAdminPanel.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
@@ -36,15 +38,19 @@ const policiesEnabled = featureEnabled('policies')
 
 const route = useRoute()
 const router = useRouter()
-type AdminTab = 'realm' | 'placement' | 'policies'
+type AdminTab = 'realm' | 'compute' | 'placement' | 'residency' | 'policies'
 const tab = computed<AdminTab>(() => {
+  if (route.query.tab === 'compute') return 'compute'
   if (route.query.tab === 'placement' && placementAdminEnabled) return 'placement'
+  if (route.query.tab === 'residency' && placementAdminEnabled) return 'residency'
   if (route.query.tab === 'policies' && policiesEnabled) return 'policies'
   return 'realm'
 })
 const adminTabs = computed(() => [
   { id: 'realm' as const, label: 'Quota & usage' },
+  { id: 'compute' as const, label: 'Compute' },
   ...(placementAdminEnabled ? [{ id: 'placement' as const, label: 'Placement' }] : []),
+  ...(placementAdminEnabled ? [{ id: 'residency' as const, label: 'Residency' }] : []),
   ...(policiesEnabled ? [{ id: 'policies' as const, label: 'Policies' }] : []),
 ])
 function setTab(next: AdminTab) {
@@ -334,7 +340,7 @@ async function save() {
 
 <template>
   <div>
-    <PageHeader title="Realm administration" description="Realm-wide usage, quota policy and placement configuration.">
+    <PageHeader title="Realm administration" description="Realm-wide usage, quotas, compute, placement strategies and residency policies.">
       <template #actions>
         <Button variant="outline" @click="refresh"><RefreshCw class="h-4 w-4" /> Refresh</Button>
       </template>
@@ -355,7 +361,7 @@ async function save() {
         <ShieldCheck class="mx-auto h-8 w-8 text-muted-foreground/70" />
         <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Realm admin access required</h2>
         <p class="mt-1.5 text-sm text-muted-foreground">
-          {{ isAuthenticated ? 'Your account does not hold the realm admin role needed to view or edit the quota policy.' : 'Sign in with a realm admin account to view or edit the quota policy.' }}
+          {{ isAuthenticated ? 'Your account does not hold WRITE permission on the realm administration configuration.' : 'Sign in with an account that can administer the realm configuration.' }}
         </p>
       </section>
     </div>
@@ -382,7 +388,11 @@ async function save() {
         </div>
       </div>
 
-      <PlacementAdminPanel v-if="tab === 'placement'" />
+      <ComputeAdminPanel v-if="tab === 'compute'" />
+
+      <PlacementAdminPanel v-else-if="tab === 'placement'" />
+
+      <ResidencyAdminPanel v-else-if="tab === 'residency'" />
 
       <div v-else-if="tab === 'policies'" class="container space-y-8 py-8">
         <PoliciesSection scope="realm" :can-admin="isRealmAdmin" />

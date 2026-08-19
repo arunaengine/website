@@ -23,6 +23,7 @@ import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import SyncStatusPanel from '@/components/data/SyncStatusPanel.vue'
 import BucketRoutingDialog from '@/components/data/BucketRoutingDialog.vue'
+import BucketPolicyDialog from '@/components/residency/BucketPolicyDialog.vue'
 import ObjectLocationsDialog from '@/components/data/ObjectLocationsDialog.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
@@ -69,7 +70,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { authToken, currentUser, bootstrapped, credentials, getGroupUsage, listGroupConnectors, listSyncRelationships, nodeInfo, realmInfo } = useAruna()
+const { authToken, currentUser, bootstrapped, credentials, getGroupUsage, isManagementNode, isRealmAdmin, listGroupConnectors, listSyncRelationships, nodeInfo, realmInfo } = useAruna()
 const s3 = useS3()
 
 function routeString(value: unknown): string {
@@ -104,6 +105,7 @@ const remoteBlocked = computed(() => remoteEndpointMissing.value || remoteBrowse
 // Per-bucket storage rules; local buckets only, like the bucket delete
 // affordance, because the rules are read and written on the connected node.
 const routingDialogOpen = ref(false)
+const residencyDialogOpen = ref(false)
 
 // Per-version copy list; the connected node answers for its own objects only.
 const locationsKey = ref<string | null>(null)
@@ -324,6 +326,7 @@ const staging = useStaging()
 // Staging jobs side panel: config-gated (no job-listing endpoint on today's
 // backend). The dialog's connector tab covers registered connectors regardless.
 const stagingJobsEnabled = featureEnabled('stagingJobs')
+const residencyPoliciesEnabled = featureEnabled('placementAdmin')
 const stagingPanelOpen = ref(false)
 
 // ALL uploads (toolbar, drop zones and the Add data dialog) run through the
@@ -1217,6 +1220,15 @@ const isEmpty = computed(
                   <Route class="h-4 w-4" /> Routing
                 </Button>
                 <Button
+                  v-if="!remoteNodeId && residencyPoliciesEnabled && isRealmAdmin && isManagementNode"
+                  variant="outline"
+                  size="sm"
+                  title="Residency policies for this bucket"
+                  @click="residencyDialogOpen = true"
+                >
+                  <ShieldAlert class="h-4 w-4" /> Residency
+                </Button>
+                <Button
                   v-if="showSyncButton"
                   variant="outline"
                   size="sm"
@@ -1459,6 +1471,8 @@ const isEmpty = computed(
     <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />
 
     <BucketRoutingDialog v-model:open="routingDialogOpen" :bucket="bucket" :group-id="activeGroupId" />
+
+    <BucketPolicyDialog v-if="residencyPoliciesEnabled && isRealmAdmin && isManagementNode" v-model:open="residencyDialogOpen" :bucket="bucket" />
 
     <ObjectLocationsDialog
       :open="locationsKey !== null"
