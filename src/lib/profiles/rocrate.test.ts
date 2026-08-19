@@ -1,8 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { extractShapesTexts, missingShapesArtifacts, parseProfileCrate, resolveProfileArtifacts } from './rocrate'
+import {
+  extractShapesTexts,
+  missingShapesArtifacts,
+  parseProfileCrate,
+  parseProfileCrateForControls,
+  resolveProfileArtifacts,
+} from './rocrate'
 import { liftShapes } from '../shacl/lift'
+import { controlsFromRules } from './controls'
+import { isDatasetType } from './uri'
 
 function fixture(name: string): string {
   return readFileSync(fileURLToPath(new URL(`../shacl/__fixtures__/${name}`, import.meta.url)), 'utf8')
@@ -54,15 +62,26 @@ describe('an externally authored profile crate', () => {
     expect(missingShapesArtifacts(resolved)).toEqual([])
   })
 
-  it('yields rules for every referenced type', async () => {
+  it('gives imported and stored SHACL-only profiles identical controls and additional requirements', async () => {
     const { fetch } = server({ [`${new URL('constraints/chemical-substance.shacl.ttl', CRATE_URL)}`]: shapes() })
-    const parsed = parseProfileCrate(await resolveProfileArtifacts(crate(), fetch, CRATE_URL))
+    const resolved = await resolveProfileArtifacts(crate(), fetch, CRATE_URL)
+    const parsed = parseProfileCrate(resolved)
     expect(parsed.name).toContain('ChemicalSubstance')
     // The crate carries no Describo mode file, so its rules live in the shapes.
     expect(parsed.entityRules).toHaveLength(0)
-    const lifted = liftShapes(parsed.shapesText ?? '')
-    expect(lifted.entities).toHaveLength(9)
-    expect(lifted.fieldCount).toBe(28)
+    const imported = liftShapes(parsed.shapesText ?? '')
+    const stored = await parseProfileCrateForControls(resolved)
+    const importedDatasetRules = imported.entities.find((entity) => isDatasetType(entity.type))?.propertyRules ?? []
+
+    expect(imported.entities).toHaveLength(9)
+    expect(imported.fieldCount).toBe(28)
+    expect(stored.entityRules).toEqual(imported.entities)
+    expect(controlsFromRules(stored.datasetPropertyRules, stored.entityRules)).toEqual(
+      controlsFromRules(importedDatasetRules, imported.entities),
+    )
+    expect(stored.liftNotes).toEqual(imported.notes)
+    expect(stored.liftNotes.length).toBeGreaterThan(0)
+    expect(parsed.customShapesText).toBe(parsed.shapesText)
   })
 
   it('names the file it cannot reach', async () => {

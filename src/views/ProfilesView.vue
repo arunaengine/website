@@ -10,10 +10,11 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import NewProfileDialog from '@/components/metadata/NewProfileDialog.vue'
+import LiftNotesPanel from '@/components/metadata/profile-builder/LiftNotesPanel.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAruna } from '@/composables/useAruna'
+import { profileRulesLoadState, useAruna } from '@/composables/useAruna'
 import { ListChecks, Pencil, Plus, Star, Lock, Download, Trash2 } from '@lucide/vue'
 import {
   OBLIGATION_ACCENT,
@@ -31,7 +32,20 @@ import type { ProfilePropertyRule } from '@/lib/profiles/types'
 
 const route = useRoute()
 const router = useRouter()
-const { profiles, profileItems, currentUser, userInfo, updateUserProfile, saving, loadRoCrate, deleteMetadataDocument, fullCrates, refreshProfiles } = useAruna()
+const {
+  profiles,
+  profileItems,
+  currentUser,
+  userInfo,
+  updateUserProfile,
+  saving,
+  loadRoCrate,
+  loadProfileCrate,
+  profileCrateParses,
+  deleteMetadataDocument,
+  fullCrates,
+  refreshProfiles,
+} = useAruna()
 
 // Profiles can appear from other nodes or sessions; entering the tab
 // revalidates in the background while the current set stays rendered.
@@ -41,9 +55,26 @@ const showNewProfile = ref(false)
 const editingProfile = ref<MetadataProfile | null>(null)
 const showDelete = ref(false)
 const deleteError = ref<string | null>(null)
+const acceptedProfiles = ref<Record<string, MetadataProfile>>({})
 
-const selectedId = computed(() => (route.params.profileId as string) || profiles.value[0]?.id || '')
-const selected = computed(() => profiles.value.find((profile) => profile.id === selectedId.value))
+// Keep the dialog's accepted summary visible until the stored full crate is
+// readable. A stale profiles/ refresh may not contain the new document yet, and
+// a registry summary may omit the rule artifacts the dialog just submitted.
+const visibleProfiles = computed(() => {
+  const storedIds = new Set(profiles.value.map((profile) => profile.id))
+  const stored = profiles.value.map((profile) => {
+    const accepted = acceptedProfiles.value[profile.id]
+    if (!accepted) return profile
+    return accepted.documentId && profileCrateParses.value[accepted.documentId] ? profile : accepted
+  })
+  return [
+    ...stored,
+    ...Object.values(acceptedProfiles.value).filter((profile) => !storedIds.has(profile.id)),
+  ]
+})
+
+const selectedId = computed(() => (route.params.profileId as string) || visibleProfiles.value[0]?.id || '')
+const selected = computed(() => visibleProfiles.value.find((profile) => profile.id === selectedId.value))
 const preferredId = computed(() => currentUser.value?.preferredProfileId ?? '')
 
 function select(id: string) {
@@ -69,9 +100,12 @@ function openCreate() {
 
 async function confirmDelete() {
   if (!selected.value?.documentId) return
+  const profileId = selected.value.id
   deleteError.value = null
   try {
     await deleteMetadataDocument(selected.value.documentId)
+    const { [profileId]: _deleted, ...remaining } = acceptedProfiles.value
+    acceptedProfiles.value = remaining
     showDelete.value = false
     router.push({ name: 'profiles' })
   } catch (err) {
@@ -79,35 +113,77 @@ async function confirmDelete() {
   }
 }
 
+function handleCreated(profile: MetadataProfile) {
+  acceptedProfiles.value = { ...acceptedProfiles.value, [profile.id]: profile }
+  router.push({ name: 'profile-detail', params: { profileId: profile.id } })
+}
+
 async function setPreferred(id: string) {
   await updateUserProfile({ set_attributes: { 'ui.preferred_profile_path': `profiles/${id}` } })
 }
 
-// Profile list summaries can omit the structured rule entities. When the selected
-// profile lacks entity rules but has a backing document, fetch the full crate once
-// so the reactive `profiles` computed re-maps with the parsed rules. Guarded by a
-// per-document loading flag so we neither double-fetch nor spin forever on errors.
+// Profile list summaries can omit rule artifacts. Fetch the selected full crate
+// once so stored SHACL-only profiles can be lifted and unsupported constraints
+// can be presented. Failures stay explicit and Retry starts the same bounded
+// materialization load again.
 const loadingCrateIds = ref<Record<string, boolean>>({})
-async function ensureFullProfile(profile: MetadataProfile | undefined) {
+const loadedCrateIds = ref<Record<string, boolean>>({})
+const profileLoadErrors = ref<Record<string, string>>({})
+async function ensureFullProfile(profile: MetadataProfile | undefined, force = false) {
   if (!profile?.documentId) return
   const docId = profile.documentId
-  if (profile.entityRules.length || loadingCrateIds.value[docId]) return
+  if (loadingCrateIds.value[docId]) return
+  if (!force && (profileCrateParses.value[docId] || loadedCrateIds.value[docId])) return
   loadingCrateIds.value = { ...loadingCrateIds.value, [docId]: true }
+  const { [docId]: _cleared, ...otherErrors } = profileLoadErrors.value
+  profileLoadErrors.value = otherErrors
   try {
-    await loadRoCrate(docId)
-  } catch {
-    // Includes CrateNotReadyError (transient, just materializing). Stay quiet and
-    // keep showing the summary view; a later re-selection can retry.
+    await loadProfileCrate(docId, { force })
+    loadedCrateIds.value = { ...loadedCrateIds.value, [docId]: true }
+    if (acceptedProfiles.value[profile.id]?.documentId === docId) {
+      const { [profile.id]: _reconciled, ...remaining } = acceptedProfiles.value
+      acceptedProfiles.value = remaining
+    }
+  } catch (err) {
+    profileLoadErrors.value = {
+      ...profileLoadErrors.value,
+      [docId]: err instanceof Error ? err.message : String(err),
+    }
   } finally {
     loadingCrateIds.value = { ...loadingCrateIds.value, [docId]: false }
   }
 }
 watch(selected, (profile) => { void ensureFullProfile(profile) }, { immediate: true })
 
-const selectedLoadingFull = computed(() => {
+const selectedProfileParse = computed(() => {
   const docId = selected.value?.documentId
-  return Boolean(docId && loadingCrateIds.value[docId] && !selected.value?.entityRules.length)
+  return docId ? profileCrateParses.value[docId] : undefined
 })
+const selectedLoadError = computed(() => {
+  const docId = selected.value?.documentId
+  return docId ? profileLoadErrors.value[docId] : undefined
+})
+const selectedHasRules = computed(() => Boolean(
+  selected.value?.entityRules.length
+    || selected.value?.propertyRules.length
+    || selected.value?.schema
+    || selected.value?.shapesText
+    || selected.value?.customShapesText,
+))
+const selectedRuleState = computed(() => {
+  const profile = selected.value
+  const docId = profile?.documentId
+  return profileRulesLoadState({
+    loading: Boolean(docId && loadingCrateIds.value[docId]),
+    unavailable: Boolean(selectedLoadError.value),
+    complete: Boolean(profile && (!docId || selectedProfileParse.value || loadedCrateIds.value[docId])),
+    hasRules: selectedHasRules.value,
+  })
+})
+const selectedLoadingFull = computed(() => selectedRuleState.value === 'loading')
+// Copy out of the reactive parse: the computed's DeepReadonly wrapper cannot
+// feed LiftNotesPanel's mutable LiftNote[] prop.
+const additionalRequirements = computed(() => [...(selectedProfileParse.value?.liftNotes ?? [])])
 
 function propertyCount(profile: MetadataProfile): number {
   return profile.entityRules.length
@@ -197,7 +273,9 @@ function downloadModeFile(profile: MetadataProfile) {
 // present) as .ttl files, so the profile's constraints are usable in any SHACL
 // tool outside the portal.
 function downloadShapes(profile: MetadataProfile) {
-  const parts = [profile.shapesText, profile.customShapesText].filter((text): text is string => Boolean(text?.trim()))
+  const parts = [...new Set(
+    [profile.shapesText, profile.customShapesText].filter((text): text is string => Boolean(text?.trim())),
+  )]
   if (!parts.length) return
   const blob = new Blob([parts.join('\n\n')], { type: 'text/turtle' })
   const url = URL.createObjectURL(blob)
@@ -245,8 +323,8 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
 
     <div class="container grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
       <aside class="surface max-h-[80vh] overflow-y-auto scrollbar-thin">
-        <ul v-if="profiles.length" class="divide-y divide-border">
-          <li v-for="profile in profiles" :key="profile.id">
+        <ul v-if="visibleProfiles.length" class="divide-y divide-border">
+          <li v-for="profile in visibleProfiles" :key="profile.id">
             <button
               type="button"
               class="flex w-full items-start gap-3 border-l-2 px-4 py-3 text-left transition-colors hover:bg-muted/30"
@@ -366,15 +444,33 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
               </div>
             </div>
           </div>
+          <p class="mt-4 text-xs text-muted-foreground">
+            Properties omitted by this profile remain allowed unless an explicit closed or other restricting SHACL rule constrains them.
+          </p>
         </div>
 
         <div v-if="selectedLoadingFull" class="flex items-center gap-2 px-1 text-xs text-muted-foreground">
           <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" aria-hidden="true" />
-          Loading full profile…
+          Preparing profile rules…
         </div>
 
+        <div v-else-if="selectedRuleState === 'unavailable'" class="surface border-destructive/40 bg-destructive/5 px-5 py-4">
+          <p class="text-sm font-medium text-destructive">Profile rules are unavailable.</p>
+          <p class="mt-1 text-xs text-destructive/90">{{ selectedLoadError }}</p>
+          <p class="mt-1 text-xs text-muted-foreground">The crate may still be materializing. Retry runs the same bounded preparation check again.</p>
+          <Button variant="outline" size="sm" class="mt-3" @click="ensureFullProfile(selected, true)">Retry</Button>
+        </div>
+
+        <section v-if="selectedRuleState === 'ready' && additionalRequirements.length" class="surface space-y-2 p-5">
+          <div>
+            <h3 class="text-sm font-semibold text-foreground">Additional requirements</h3>
+            <p class="mt-0.5 text-xs text-muted-foreground">Read-only SHACL requirements retained for authoritative validation.</p>
+          </div>
+          <LiftNotesPanel :notes="additionalRequirements" attached />
+        </section>
+
         <!-- Grouped entity-rule sections: what entities this profile expects and how they must be described. -->
-        <template v-if="selected.entityRules.length">
+        <template v-if="selectedRuleState !== 'unavailable' && selected.entityRules.length">
           <div v-for="entry in entityRulesWithObligation" :key="entry.rule.id" class="surface overflow-hidden">
             <header class="border-b border-border px-5 py-4">
               <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-foreground">
@@ -436,9 +532,11 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
           </div>
         </template>
 
-        <!-- Profiles without a mode.json artifact surface with no machine-readable rules. -->
-        <div v-else class="surface px-5 py-10 text-center text-sm text-muted-foreground">
-          This profile has no machine-readable rules.
+        <div v-else-if="selectedRuleState === 'ready' && (selected.shapesText || selected.customShapesText)" class="surface px-5 py-10 text-center text-sm text-muted-foreground">
+          No editable controls could be generated. The retained SHACL requirements still apply during validation.
+        </div>
+        <div v-else-if="selectedRuleState === 'empty'" class="surface px-5 py-10 text-center text-sm text-muted-foreground">
+          No rules are defined for this profile.
         </div>
       </section>
 
@@ -466,7 +564,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
     <NewProfileDialog
       v-model:open="showNewProfile"
       :edit-profile="editingProfile"
-      @created="(profile) => router.push({ name: 'profile-detail', params: { profileId: profile.id } })"
+      @created="handleCreated"
       @updated="editingProfile = null"
     />
   </div>

@@ -4,6 +4,7 @@ import { entityRulesToMode, isModeFile, modeToEntityRules, type ModeFile } from 
 import { buildProfileContext } from './propertyCatalog'
 import { collectContextObjects, contextTermsOf } from './contextTerms'
 import { shapesFromEntityRules } from '../shacl/projection'
+import type { LiftNote } from '../shacl/lift'
 import { ARUNA_PROFILE_PREFIX, isDatasetType, isRecord, normalizeTypeUri, termNameFromUri } from './uri'
 import {
   DX_HAS_ARTIFACT,
@@ -63,6 +64,10 @@ export interface ProfileArtifactTexts {
   schema: string
   mode: string
   shapes: string
+}
+
+export interface ParsedProfileControls extends ParsedProfileCrate {
+  liftNotes: LiftNote[]
 }
 
 const PRESERVED_SHAPES_MARKER = '# ARUNA-PRESERVED-SHAPES '
@@ -223,10 +228,15 @@ export function parseProfileCrate(rocrate: unknown): ParsedProfileCrate {
   const datasetPropertyRules = entityRules.find((entity) => isDatasetType(entity.type))?.propertyRules ?? []
   const contextTerms = contextTermsFromCrate(rocrate, mode)
   const { shapesText, customShapesText } = extractShapesTexts(rocrate)
+  // A SHACL-only crate has no mode rules to regenerate its source constraints.
+  // Keep that source attached when the crate is imported and saved again, so
+  // constraints that cannot become controls remain available to validation.
+  const liftableShapesText = shapesText ?? (!entityRules.length ? customShapesText : undefined)
+  const retainedShapesText = customShapesText ?? (!entityRules.length ? liftableShapesText : undefined)
   const artifactUrl = publishedArtifactUrl(entries)
   return {
-    ...(shapesText ? { shapesText } : {}),
-    ...(customShapesText ? { customShapesText } : {}),
+    ...(liftableShapesText ? { shapesText: liftableShapesText } : {}),
+    ...(retainedShapesText ? { customShapesText: retainedShapesText } : {}),
     ...(artifactUrl ? { artifactUrl } : {}),
     name: textValue(root?.name) || (mode?.metadata?.name ? String(mode.metadata.name) : '') || schema?.title || '',
     description:
@@ -242,6 +252,31 @@ export function parseProfileCrate(rocrate: unknown): ParsedProfileCrate {
     ...(contextTerms ? { contextTerms } : {}),
     entityRules,
     datasetPropertyRules,
+  }
+}
+
+// Stored profiles use the same lazy SHACL lift as the import UI. Mode-derived
+// rules remain authoritative when present; otherwise every supported SHACL
+// constraint becomes a control, while lift notes describe the retained source
+// constraints that have no complete control representation.
+export async function parseProfileCrateForControls(rocrate: unknown): Promise<ParsedProfileControls> {
+  const parsed = parseProfileCrate(rocrate)
+  const shapeTexts = [...new Set([parsed.shapesText, parsed.customShapesText].filter(
+    (text): text is string => Boolean(text?.trim()),
+  ))]
+  if (!shapeTexts.length) return { ...parsed, liftNotes: [] }
+
+  const { liftShapes } = await import('../shacl/lift')
+  const lifted = liftShapes(parsed.shapesText ?? shapeTexts[0])
+  const liftNotes = shapeTexts.length === 1 ? lifted.notes : liftShapes(shapeTexts.join('\n\n')).notes
+  if (parsed.entityRules.length) return { ...parsed, liftNotes }
+
+  const entityRules = lifted.entities
+  return {
+    ...parsed,
+    entityRules,
+    datasetPropertyRules: entityRules.find((entity) => isDatasetType(entity.type))?.propertyRules ?? [],
+    liftNotes,
   }
 }
 

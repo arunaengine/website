@@ -71,7 +71,12 @@ import {
   type UnifiedSearchOptions,
   type UnifiedSearchResponse,
 } from '@/lib/api'
-import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
+import {
+  parseProfileCrate,
+  parseProfileCrateForControls,
+  resolveProfileArtifacts,
+  type ParsedProfileControls,
+} from '@/lib/profiles/rocrate'
 import { classifyRoCrateSpecIri } from '@/lib/rocrateVersions'
 import {
   PROCESS_RUN_CRATE_PROFILE,
@@ -114,6 +119,7 @@ const metadataItems = ref<MetadataDocumentListItem[]>([])
 const profileItems = ref<MetadataDocumentListItem[]>([])
 const credentials = ref<S3CredentialSummary[]>([])
 const fullCrates = ref<Record<string, unknown>>({})
+const profileCrateParses = ref<Record<string, ParsedProfileControls>>({})
 const cratePending = ref<Record<string, boolean>>({})
 // Invalidation fence for the crate cache: a load captures its document's
 // generation before the first request and commits only when it still matches,
@@ -122,7 +128,9 @@ const cratePending = ref<Record<string, boolean>>({})
 // shared request instead of stacking their own materialization polls.
 const crateGenerations = new Map<string, number>()
 const crateLoads = new Map<string, Promise<unknown>>()
+const profileCrateLoads = new Map<string, Promise<ParsedProfileControls>>()
 const recentlyCreatedMetadataIds = new Set<string>()
+const acceptedProfileItems = new Map<string, MetadataDocumentListItem>()
 const bootstrapped = ref(false)
 // Monotonic identity counter: bumped whenever the token or API base changes,
 // so in-flight work and module-singleton caches can tell sessions apart.
@@ -171,10 +179,13 @@ function clearIdentityState(clearPublic = false) {
   metadataItems.value = []
   profileItems.value = []
   fullCrates.value = {}
+  profileCrateParses.value = {}
   cratePending.value = {}
   crateGenerations.clear()
   crateLoads.clear()
+  profileCrateLoads.clear()
   recentlyCreatedMetadataIds.clear()
+  acceptedProfileItems.clear()
   authError.value = null
   if (clearPublic) {
     nodeInfo.value = null
@@ -292,6 +303,23 @@ async function loadProfiles(context = refreshContext()) {
     offset = last.offset + last.total_returned
   } while (last.total_returned > 0 && last.total_returned >= last.limit)
   if (context.epoch !== sessionEpoch.value || walk !== profileWalk) return
+  // A successful create is authoritative even while the eventually consistent
+  // profiles/ prefix walk is stale. Keep its accepted summary in the list until
+  // the server walk sees that document, so routing to its detail cannot land on
+  // an empty selection immediately after creation.
+  for (const [documentId, accepted] of acceptedProfileItems) {
+    const index = documents.findIndex((document) => document.document_id === documentId)
+    if (index < 0) {
+      documents.push(accepted)
+      continue
+    }
+    documents[index] = {
+      ...accepted,
+      ...documents[index],
+      rocrate_summary: documents[index].rocrate_summary ?? accepted.rocrate_summary,
+    }
+    acceptedProfileItems.delete(documentId)
+  }
   profileItems.value = documents
 }
 
@@ -343,6 +371,20 @@ export class CrateNotReadyError extends Error {
   }
 }
 
+export type ProfileRulesLoadState = 'loading' | 'ready' | 'empty' | 'unavailable'
+
+export function profileRulesLoadState(options: {
+  loading: boolean
+  unavailable: boolean
+  complete: boolean
+  hasRules: boolean
+}): ProfileRulesLoadState {
+  if (options.loading) return 'loading'
+  if (options.unavailable) return 'unavailable'
+  if (options.complete && !options.hasRules) return 'empty'
+  return 'ready'
+}
+
 function assertCurrentSession(epoch: number) {
   if (epoch !== sessionEpoch.value) throw new DOMException('The API session changed.', 'AbortError')
 }
@@ -381,6 +423,34 @@ async function loadRoCrate(documentId: string, options: { force?: boolean } = {}
     return await load
   } finally {
     if (crateLoads.get(documentId) === load) crateLoads.delete(documentId)
+  }
+}
+
+async function loadProfileCrate(
+  documentId: string,
+  options: { force?: boolean } = {},
+): Promise<ParsedProfileControls> {
+  if (!options.force) {
+    const cached = profileCrateParses.value[documentId]
+    if (cached) return cached
+    const inFlight = profileCrateLoads.get(documentId)
+    if (inFlight) return inFlight
+  }
+
+  const generation = crateGenerations.get(documentId) ?? 0
+  const load = (async () => {
+    const rocrate = await loadRoCrate(documentId, options)
+    const parsed = await parseProfileCrateForControls(rocrate)
+    if ((crateGenerations.get(documentId) ?? 0) === generation) {
+      profileCrateParses.value = { ...profileCrateParses.value, [documentId]: parsed }
+    }
+    return parsed
+  })()
+  profileCrateLoads.set(documentId, load)
+  try {
+    return await load
+  } finally {
+    if (profileCrateLoads.get(documentId) === load) profileCrateLoads.delete(documentId)
   }
 }
 
@@ -431,6 +501,13 @@ async function createMetadata(input: CreateMetadataRequest) {
       body: JSON.stringify(input),
     })
     recentlyCreatedMetadataIds.add(summary.document_id)
+    if (summary.document_path.startsWith('profiles/')) {
+      acceptedProfileItems.set(summary.document_id, summary)
+      profileItems.value = [
+        ...profileItems.value.filter((item) => item.document_id !== summary.document_id),
+        summary,
+      ]
+    }
     // The document is already created; a failing catalog refresh here (e.g. the
     // projection race) must not surface as a create failure.
     await loadMetadata().catch(() => undefined)
@@ -506,6 +583,8 @@ function invalidateCrate(documentId: string) {
   crateGenerations.set(documentId, (crateGenerations.get(documentId) ?? 0) + 1)
   const { [documentId]: _removed, ...rest } = fullCrates.value
   fullCrates.value = rest
+  const { [documentId]: _removedParse, ...remainingParses } = profileCrateParses.value
+  profileCrateParses.value = remainingParses
 }
 
 async function replaceMetadataRoCrate(
@@ -540,6 +619,7 @@ async function deleteMetadataDocument(documentId: string): Promise<void> {
     invalidateCrate(documentId)
     metadataItems.value = metadataItems.value.filter((item) => item.document_id !== documentId)
     profileItems.value = profileItems.value.filter((item) => item.document_id !== documentId)
+    acceptedProfileItems.delete(documentId)
     await loadMetadata().catch(() => undefined)
   } finally {
     saving.value = false
@@ -1612,7 +1692,7 @@ function mapProfile(item: MetadataDocumentListItem): MetadataProfile {
   const rocrate = fullCrates.value[item.document_id] ?? item.rocrate_summary
   let parsed: ReturnType<typeof parseProfileCrate>
   try {
-    parsed = parseProfileCrate(rocrate)
+    parsed = profileCrateParses.value[item.document_id] ?? parseProfileCrate(rocrate)
   } catch {
     // A malformed stored profile crate must never throw the whole `profiles`
     // computed; surface it with no machine-readable rules instead.
@@ -1798,6 +1878,7 @@ export function useAruna() {
     metadataItems,
     profileItems,
     fullCrates,
+    profileCrateParses: readonly(profileCrateParses),
     cratePending,
     refresh,
     loadInfo,
@@ -1805,6 +1886,7 @@ export function useAruna() {
     refreshProfiles,
     toMetadataDoc: mapMetadataDoc,
     loadRoCrate,
+    loadProfileCrate,
     createMetadata,
     getMetadataDocument,
     getMetadataItem,

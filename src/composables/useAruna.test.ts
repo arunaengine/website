@@ -5,6 +5,7 @@ import {
   DEFAULT_SPARQL_MODE,
   IncompleteSparqlResultError,
   isRecencyOrdered,
+  profileRulesLoadState,
   sparqlCoverageStatus,
   useAruna,
   walkRecentPages,
@@ -166,6 +167,77 @@ describe('the crate cache fence', () => {
     vi.mocked(apiRequest).mockResolvedValueOnce({ rocrate: { '@graph': [{ '@id': 'second' }] } })
     await loadRoCrate('doc-force', { force: true })
     expect(fullCrates.value['doc-force']).toEqual({ '@graph': [{ '@id': 'second' }] })
+  })
+})
+
+describe('stored profile rule load states', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.mocked(apiRequest).mockReset()
+  })
+
+  it('classifies a completed rule-free profile as empty', async () => {
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      rocrate: {
+        '@graph': [
+          { '@id': 'ro-crate-metadata.json', '@type': 'CreativeWork', about: { '@id': './' } },
+          { '@id': './', '@type': 'Dataset', name: 'Rule-free profile' },
+        ],
+      },
+    })
+    const parsed = await useAruna().loadProfileCrate('profile-no-rules')
+    const hasRules = Boolean(parsed.entityRules.length || parsed.schema || parsed.shapesText || parsed.customShapesText)
+
+    expect(profileRulesLoadState({ loading: false, unavailable: false, complete: true, hasRules })).toBe('empty')
+  })
+
+  it('keeps exhausted materialization retry unavailable instead of empty', async () => {
+    vi.useFakeTimers()
+    vi.mocked(apiRequest).mockRejectedValue(new ApiError(503, 'Preparing'))
+    const pending = useAruna().loadProfileCrate('profile-materializing')
+    const rejected = expect(pending).rejects.toBeInstanceOf(CrateNotReadyError)
+    await vi.runAllTimersAsync()
+
+    await rejected
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(8)
+    expect(profileRulesLoadState({ loading: false, unavailable: true, complete: false, hasRules: false })).toBe('unavailable')
+  })
+})
+
+describe('accepted profile reconciliation', () => {
+  afterEach(() => {
+    vi.mocked(apiRequest).mockReset()
+  })
+
+  it('retains the accepted summary when the immediate prefix list is stale', async () => {
+    const accepted: MetadataDocumentListItem = {
+      ...doc('profiles/new-profile', stamp(0)),
+      document_id: 'accepted-profile',
+      document_path: 'profiles/new-profile',
+      graph_iri: 'urn:profile:accepted',
+      rocrate_summary: {
+        '@graph': [
+          { '@id': 'ro-crate-metadata.json', '@type': 'CreativeWork', about: { '@id': './' } },
+          { '@id': './', '@type': ['Dataset', 'Profile'], name: 'New profile' },
+        ],
+      },
+    }
+    vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+      if (path === '/metadata' && options?.method === 'POST') return accepted
+      if (path === '/metadata') {
+        const query = options?.query as Record<string, number> | undefined
+        return page([], Number(query?.offset ?? 0), Number(query?.limit ?? 100))
+      }
+      throw new ApiError(404, 'Not found')
+    })
+    const { createMetadata, profileItems, profiles } = useAruna()
+
+    await createMetadata({ group_id: 'group', path: 'profiles/new-profile', rocrate: {} })
+
+    expect(profileItems.value).toContainEqual(accepted)
+    expect(profiles.value).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'new-profile', documentId: 'accepted-profile', name: 'New profile' }),
+    ]))
   })
 })
 
