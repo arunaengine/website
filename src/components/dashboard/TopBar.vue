@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
+import Badge from '@/components/ui/Badge.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -59,6 +60,11 @@ const {
   groups: quickGroups,
   users: quickUsers,
   pending: quickPending,
+  searched: quickSearched,
+  error: quickError,
+  nodesQueried: quickNodesQueried,
+  nodesFailed: quickNodesFailed,
+  truncated: quickTruncated,
 } = useUnifiedSearch(q, { limit: 5 })
 
 const items = computed<QuickItem[]>(() => [
@@ -89,6 +95,21 @@ const items = computed<QuickItem[]>(() => [
 // The previous matches stay listed while a new request runs, so they are dimmed
 // rather than read as the answer to what was just typed.
 const quickStale = computed(() => quickPending.value && items.value.length > 0)
+const quickCoverage = computed<'Complete' | 'Partial' | 'Unavailable' | null>(() => {
+  if (quickError.value) return 'Unavailable'
+  if (!quickSearched.value) return null
+  return quickNodesFailed.value > 0 || quickTruncated.value ? 'Partial' : 'Complete'
+})
+const quickCoverageDetail = computed(() => {
+  if (quickCoverage.value === 'Unavailable') return quickError.value ?? 'Search is unavailable.'
+  if (quickCoverage.value !== 'Partial') return 'Document coverage'
+  const details: string[] = []
+  if (quickNodesFailed.value > 0) {
+    details.push(`${Math.max(0, quickNodesQueried.value - quickNodesFailed.value)} of ${quickNodesQueried.value} nodes answered`)
+  }
+  if (quickTruncated.value) details.push('document results were truncated')
+  return details.join('; ')
+})
 
 const SECTION_META: Array<{ id: QuickSection; label: string }> = [
   { id: 'datasets', label: 'Datasets' },
@@ -187,6 +208,15 @@ function onSearchFocusOut(event: FocusEvent) {
           :aria-busy="quickPending"
           class="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-md border border-border bg-popover shadow-xl"
         >
+          <div v-if="quickCoverage" class="flex items-center gap-2 border-b border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground">
+            <Badge
+              :variant="quickCoverage === 'Complete' ? 'success' : quickCoverage === 'Partial' ? 'warn' : 'destructive'"
+              class="px-1.5 py-0 text-[9px] uppercase"
+            >
+              {{ quickCoverage }}
+            </Badge>
+            <span class="truncate" :title="quickCoverageDetail">{{ quickCoverageDetail }}</span>
+          </div>
           <div
             v-for="section in sections"
             :key="section.id"

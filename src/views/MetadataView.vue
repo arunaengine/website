@@ -138,9 +138,11 @@ const crateError = ref<string | null>(null)
 // Honest per-document resolution: the catalog list is not authoritative (it can
 // be stale after a create, and a missing id there is indistinguishable from a
 // private/deleted document), so we fall back to GET /metadata/{id}.
-const docState = ref<'loading' | 'found' | 'not-found' | 'forbidden' | 'error'>('loading')
+const docState = ref<'loading' | 'found' | 'preparing' | 'not-found' | 'forbidden' | 'error'>('loading')
 const docError = ref<string | null>(null)
 const fetchedSummary = ref<MetadataDocumentSummary | null>(null)
+const resolvingDoc = ref(false)
+const acceptedPreparing = ref(false)
 
 const detailId = computed(() => (route.params.id as string) || '')
 // Built from this document's own fetch (registry summary plus its crate), not
@@ -206,21 +208,34 @@ async function resolveDoc(id: string) {
   docError.value = null
   fetchedSummary.value = null
   docState.value = 'loading'
+  acceptedPreparing.value = false
   if (!id) return
+  resolvingDoc.value = true
   try {
-    const summary = await getMetadataDocument(id)
+    const summary = await getMetadataDocument(id, {
+      pollPreparing: true,
+      onPreparing: (recentlyCreated) => {
+        if (token === resolveToken) {
+          acceptedPreparing.value = recentlyCreated
+          docState.value = 'preparing'
+        }
+      },
+    })
     if (token !== resolveToken) return
     fetchedSummary.value = summary
     docState.value = 'found'
     await fetchCrate(id)
   } catch (err) {
     if (token !== resolveToken) return
-    if (err instanceof ApiError && (err.status === 404 || err.status === 400)) docState.value = 'not-found'
+    if (err instanceof CrateNotReadyError) docState.value = 'preparing'
+    else if (err instanceof ApiError && (err.status === 404 || err.status === 400)) docState.value = 'not-found'
     else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) docState.value = 'forbidden'
     else {
       docState.value = 'error'
       docError.value = err instanceof Error ? err.message : String(err)
     }
+  } finally {
+    if (token === resolveToken) resolvingDoc.value = false
   }
 }
 
@@ -769,6 +784,14 @@ watch(relatedDocs, (rows) => {
 
       <div v-else-if="docState === 'loading'" class="surface p-12 text-center text-sm text-muted-foreground">
         Loading metadata…
+      </div>
+
+      <div v-else-if="docState === 'preparing'" class="surface px-5 py-12 text-center">
+        <p class="text-sm font-medium text-foreground">{{ acceptedPreparing ? 'Accepted, preparing metadata' : 'Metadata is still being prepared' }}</p>
+        <p class="mx-auto mt-2 max-w-md break-all font-mono text-xs text-muted-foreground">{{ detailId }}</p>
+        <Button variant="outline" size="sm" class="mt-5" :disabled="resolvingDoc" @click="resolveDoc(detailId)">
+          {{ resolvingDoc ? 'Checking…' : 'Retry' }}
+        </Button>
       </div>
 
       <div v-else-if="docState === 'not-found'" class="surface px-5 py-12 text-center">

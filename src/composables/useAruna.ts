@@ -1,5 +1,5 @@
 import { computed, readonly, ref } from 'vue'
-import type { Group, MetadataDoc, MetadataProfile, Node, Realm, SparqlResult, User } from '@/data/types'
+import type { Group, MetadataDoc, MetadataProfile, Node, Realm, SparqlExecutionMode, SparqlResult, User } from '@/data/types'
 import {
   ApiError,
   apiRequest,
@@ -121,6 +121,7 @@ const cratePending = ref<Record<string, boolean>>({})
 // shared request instead of stacking their own materialization polls.
 const crateGenerations = new Map<string, number>()
 const crateLoads = new Map<string, Promise<unknown>>()
+const recentlyCreatedMetadataIds = new Set<string>()
 const bootstrapped = ref(false)
 // Monotonic identity counter: bumped whenever the token or API base changes,
 // so in-flight work and module-singleton caches can tell sessions apart.
@@ -172,6 +173,7 @@ function clearIdentityState(clearPublic = false) {
   cratePending.value = {}
   crateGenerations.clear()
   crateLoads.clear()
+  recentlyCreatedMetadataIds.clear()
   authError.value = null
   if (clearPublic) {
     nodeInfo.value = null
@@ -427,6 +429,7 @@ async function createMetadata(input: CreateMetadataRequest) {
       method: 'POST',
       body: JSON.stringify(input),
     })
+    recentlyCreatedMetadataIds.add(summary.document_id)
     // The document is already created; a failing catalog refresh here (e.g. the
     // projection race) must not surface as a create failure.
     await loadMetadata().catch(() => undefined)
@@ -436,15 +439,32 @@ async function createMetadata(input: CreateMetadataRequest) {
   }
 }
 
-async function getMetadataDocument(documentId: string): Promise<MetadataDocumentSummary> {
+async function getMetadataDocument(
+  documentId: string,
+  options: { pollPreparing?: boolean; onPreparing?: (recentlyCreated: boolean) => void } = {},
+): Promise<MetadataDocumentSummary> {
   const context = refreshContext()
-  const summary = await apiRequest<MetadataDocumentSummary>(
-    `/metadata/${encodeURIComponent(documentId)}`,
-    {},
-    context.client,
-  )
-  assertCurrentSession(context.epoch)
-  return summary
+  const recentlyCreated = recentlyCreatedMetadataIds.has(documentId)
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const summary = await apiRequest<MetadataDocumentSummary>(
+        `/metadata/${encodeURIComponent(documentId)}`,
+        {},
+        context.client,
+      )
+      assertCurrentSession(context.epoch)
+      recentlyCreatedMetadataIds.delete(documentId)
+      return summary
+    } catch (err) {
+      assertCurrentSession(context.epoch)
+      const status = err instanceof ApiError ? err.status : 0
+      const preparing = options.pollPreparing && (status === 503 || (recentlyCreated && status === 404))
+      if (!preparing) throw err
+      options.onPreparing?.(recentlyCreated)
+      if (attempt >= CRATE_POLL_DELAYS_MS.length) throw new CrateNotReadyError(documentId)
+      await new Promise((resolve) => setTimeout(resolve, CRATE_POLL_DELAYS_MS[attempt]))
+    }
+  }
 }
 
 // An accepted update re-materializes the graph asynchronously, and until it
@@ -1114,28 +1134,87 @@ async function listUsers(opts: { limit?: number; startAfter?: string } = {}): Pr
   })
 }
 
-async function runSparql(query: string, mode: 'local' | 'distributed'): Promise<SparqlResult> {
+export const DEFAULT_SPARQL_MODE: SparqlExecutionMode = 'distributed-strict'
+
+export class IncompleteSparqlResultError extends Error {
+  constructor(public result: SparqlResult) {
+    super('Strict distributed query did not return complete coverage.')
+    this.name = 'IncompleteSparqlResultError'
+  }
+}
+
+export function sparqlCoverageStatus(result: SparqlResult): 'Complete' | 'Partial' | 'Unavailable' {
+  if (result.complete) return 'Complete'
+  return result.nodesQueried > result.nodesFailed ? 'Partial' : 'Unavailable'
+}
+
+export function buildSparqlExportArtifact(
+  result: SparqlResult,
+  context: { query: string; scope: string; timestamp: string },
+) {
+  const rows = { columns: result.columns, rows: result.rows }
+  if (result.complete) return rows
+  return {
+    completeness_manifest: {
+      schema: 'aruna.sparql-completeness.v1',
+      query: context.query,
+      scope: context.scope,
+      mode: result.mode,
+      timestamp: context.timestamp,
+      result_count: result.totalRows,
+      truncation: null,
+      freshness: null,
+      complete: result.complete,
+      status: sparqlCoverageStatus(result).toLowerCase(),
+      failed_coverage: {
+        nodes_queried: result.nodesQueried,
+        nodes_failed: result.nodesFailed,
+        failed_partitions: result.failedPartitions,
+      },
+    },
+    results: rows,
+  }
+}
+
+async function runSparql(query: string, mode: SparqlExecutionMode): Promise<SparqlResult> {
   const started = performance.now()
   const result = await request<SparqlResponse>('/metadata/sparql/query', {
     method: 'POST',
-    body: JSON.stringify({ query, mode }),
+    body: JSON.stringify({
+      query,
+      mode: mode === 'local' ? 'local' : 'distributed',
+      allow_partial: mode !== 'distributed-strict',
+    }),
   })
+  const coverage = {
+    complete: result.complete,
+    nodesQueried: result.nodes_queried,
+    nodesFailed: result.nodes_failed,
+    failedPartitions: result.failed_partitions,
+    mode,
+  }
+  let mapped: SparqlResult
   if (result.kind === 'Boolean') {
-    return {
+    mapped = {
       columns: ['value'],
-      rows: [{ value: String(result.value) }],
+      rows: [{ value: result.complete ? String(result.value) : 'unknown' }],
       tookMs: Math.max(1, Math.round(performance.now() - started)),
       totalRows: 1,
+      ...coverage,
+    }
+  } else {
+    const rows = Array.isArray(result.value) ? result.value : []
+    const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))))
+    mapped = {
+      columns,
+      rows,
+      tookMs: Math.max(1, Math.round(performance.now() - started)),
+      totalRows: rows.length,
+      ...coverage,
     }
   }
-  const rows = Array.isArray(result.value) ? result.value : []
-  const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))))
-  return {
-    columns,
-    rows,
-    tookMs: Math.max(1, Math.round(performance.now() - started)),
-    totalRows: rows.length,
-  }
+  if (mode === 'distributed-strict' && !mapped.complete) throw new IncompleteSparqlResultError(mapped)
+  return mapped
 }
 
 async function searchMetadata(

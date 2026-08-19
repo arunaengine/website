@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { isRecencyOrdered, useAruna, walkRecentPages } from './useAruna'
-import { apiRequest } from '@/lib/api'
+import {
+  buildSparqlExportArtifact,
+  CrateNotReadyError,
+  DEFAULT_SPARQL_MODE,
+  IncompleteSparqlResultError,
+  isRecencyOrdered,
+  sparqlCoverageStatus,
+  useAruna,
+  walkRecentPages,
+} from './useAruna'
+import { ApiError, apiRequest } from '@/lib/api'
 import type { ListMetadataResponse, MetadataDocumentListItem } from '@/lib/api'
 
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -157,5 +166,200 @@ describe('the crate cache fence', () => {
     vi.mocked(apiRequest).mockResolvedValueOnce({ rocrate: { '@graph': [{ '@id': 'second' }] } })
     await loadRoCrate('doc-force', { force: true })
     expect(fullCrates.value['doc-force']).toEqual({ '@graph': [{ '@id': 'second' }] })
+  })
+})
+
+describe('initial metadata detail reads', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.mocked(apiRequest).mockReset()
+  })
+
+  function created(id: string): MetadataDocumentListItem {
+    return doc(id, stamp(0))
+  }
+
+  function mockCreateThenDetail(id: string, detail: Array<MetadataDocumentListItem | ApiError>) {
+    vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+      if (path === '/metadata' && options?.method === 'POST') return created(id)
+      if (path === `/metadata/${id}`) {
+        const response = detail.shift()
+        if (response instanceof ApiError) throw response
+        if (response) return response
+      }
+      throw new ApiError(400, 'Catalog refresh unavailable')
+    })
+  }
+
+  it('polls 503 responses after a successful create until the detail is ready', async () => {
+    vi.useFakeTimers()
+    const id = 'created-503'
+    mockCreateThenDetail(id, [
+      new ApiError(503, 'Preparing'),
+      new ApiError(503, 'Preparing'),
+      created(id),
+    ])
+    const { createMetadata, getMetadataDocument } = useAruna()
+    const onPreparing = vi.fn()
+
+    await createMetadata({ group_id: 'group', path: id, rocrate: {} })
+    const pending = getMetadataDocument(id, { pollPreparing: true, onPreparing })
+    await vi.runAllTimersAsync()
+
+    await expect(pending).resolves.toEqual(created(id))
+    expect(onPreparing).toHaveBeenNthCalledWith(1, true)
+    expect(onPreparing).toHaveBeenNthCalledWith(2, true)
+    expect(vi.mocked(apiRequest).mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
+  })
+
+  it('polls a transient 404 after a successful create', async () => {
+    vi.useFakeTimers()
+    const id = 'created-404'
+    mockCreateThenDetail(id, [new ApiError(404, 'Not found'), created(id)])
+    const { createMetadata, getMetadataDocument } = useAruna()
+    const onPreparing = vi.fn()
+
+    await createMetadata({ group_id: 'group', path: id, rocrate: {} })
+    const pending = getMetadataDocument(id, { pollPreparing: true, onPreparing })
+    await vi.runAllTimersAsync()
+
+    await expect(pending).resolves.toEqual(created(id))
+    expect(onPreparing).toHaveBeenCalledWith(true)
+  })
+
+  it('keeps a confirmed 404 immediate without create context', async () => {
+    vi.mocked(apiRequest).mockRejectedValue(new ApiError(404, 'Not found'))
+    const { getMetadataDocument } = useAruna()
+
+    await expect(getMetadataDocument('direct-404', { pollPreparing: true })).rejects.toMatchObject({ status: 404 })
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(1)
+  })
+
+  it('bounds a direct 503 and reports non-create preparing context', async () => {
+    vi.useFakeTimers()
+    vi.mocked(apiRequest).mockRejectedValue(new ApiError(503, 'Preparing'))
+    const { getMetadataDocument } = useAruna()
+    const onPreparing = vi.fn()
+
+    const pending = getMetadataDocument('direct-503', { pollPreparing: true, onPreparing })
+    const rejected = expect(pending).rejects.toBeInstanceOf(CrateNotReadyError)
+    await vi.runAllTimersAsync()
+
+    await rejected
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(8)
+    expect(onPreparing).toHaveBeenCalledWith(false)
+  })
+
+  it('keeps a 403 immediate', async () => {
+    vi.mocked(apiRequest).mockRejectedValue(new ApiError(403, 'Forbidden'))
+    const { getMetadataDocument } = useAruna()
+
+    await expect(getMetadataDocument('private', { pollPreparing: true })).rejects.toMatchObject({ status: 403 })
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('SPARQL completeness', () => {
+  afterEach(() => {
+    vi.mocked(apiRequest).mockReset()
+  })
+
+  it('retains every completeness field in the result adapter', async () => {
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      kind: 'Solutions',
+      value: [{ dataset: 'urn:dataset' }],
+      complete: false,
+      nodes_queried: 3,
+      nodes_failed: 1,
+      failed_partitions: ['node-b'],
+    })
+    const { runSparql } = useAruna()
+
+    const result = await runSparql('SELECT DISTINCT ?dataset WHERE { ?dataset a <urn:Dataset> }', 'distributed-best-effort')
+
+    expect(result).toMatchObject({
+      complete: false,
+      nodesQueried: 3,
+      nodesFailed: 1,
+      failedPartitions: ['node-b'],
+      mode: 'distributed-best-effort',
+      totalRows: 1,
+    })
+  })
+
+  it('renders an incomplete ASK answer as unknown', async () => {
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      kind: 'Boolean',
+      value: false,
+      complete: false,
+      nodes_queried: 3,
+      nodes_failed: 1,
+      failed_partitions: ['node-c'],
+    })
+    const { runSparql } = useAruna()
+
+    const result = await runSparql('ASK { ?s ?p ?o }', 'distributed-best-effort')
+
+    expect(result.rows).toEqual([{ value: 'unknown' }])
+    expect(result.complete).toBe(false)
+    expect(sparqlCoverageStatus(result)).toBe('Partial')
+  })
+
+  it('defaults to strict and never retries an incomplete strict response as best-effort', async () => {
+    expect(DEFAULT_SPARQL_MODE).toBe('distributed-strict')
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      kind: 'Solutions',
+      value: [],
+      complete: false,
+      nodes_queried: 2,
+      nodes_failed: 1,
+      failed_partitions: ['node-d'],
+    })
+    const { runSparql } = useAruna()
+
+    await expect(runSparql('SELECT DISTINCT ?s WHERE { ?s a <urn:Dataset> }', DEFAULT_SPARQL_MODE))
+      .rejects.toBeInstanceOf(IncompleteSparqlResultError)
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(1)
+    const request = vi.mocked(apiRequest).mock.calls[0]?.[1]
+    expect(JSON.parse(String(request?.body))).toMatchObject({
+      mode: 'distributed',
+      allow_partial: false,
+    })
+  })
+
+  it('wraps every partial export in its completeness manifest', () => {
+    const artifact = buildSparqlExportArtifact({
+      columns: ['dataset'],
+      rows: [{ dataset: 'urn:dataset' }],
+      tookMs: 12,
+      totalRows: 1,
+      complete: false,
+      nodesQueried: 3,
+      nodesFailed: 1,
+      failedPartitions: ['node-b'],
+      mode: 'distributed-best-effort',
+    }, {
+      query: 'SELECT DISTINCT ?dataset WHERE { ?dataset a <urn:Dataset> }',
+      scope: 'realm-1',
+      timestamp: '2026-08-19T09:00:00.000Z',
+    })
+
+    expect(artifact).toHaveProperty('completeness_manifest', expect.objectContaining({
+      query: 'SELECT DISTINCT ?dataset WHERE { ?dataset a <urn:Dataset> }',
+      scope: 'realm-1',
+      mode: 'distributed-best-effort',
+      timestamp: '2026-08-19T09:00:00.000Z',
+      result_count: 1,
+      truncation: null,
+      freshness: null,
+      complete: false,
+      failed_coverage: {
+        nodes_queried: 3,
+        nodes_failed: 1,
+        failed_partitions: ['node-b'],
+      },
+    }))
+    expect(artifact).toHaveProperty('results.rows', [{ dataset: 'urn:dataset' }])
+    expect(artifact).not.toHaveProperty('rows')
   })
 })

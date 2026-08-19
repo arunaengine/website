@@ -296,11 +296,18 @@ export interface ActivityEvent {
   message: string
 }
 
+export type SparqlExecutionMode = 'local' | 'distributed-best-effort' | 'distributed-strict'
+
 export interface SparqlResult {
   columns: string[]
   rows: Record<string, string>[]
   tookMs: number
   totalRows: number
+  complete: boolean
+  nodesQueried: number
+  nodesFailed: number
+  failedPartitions: string[]
+  mode: SparqlExecutionMode
 }
 
 export interface SavedQuery {

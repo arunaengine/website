@@ -14,7 +14,13 @@ import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
 import CatalogCard from '@/components/metadata/CatalogCard.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { useAruna } from '@/composables/useAruna'
+import {
+  buildSparqlExportArtifact,
+  DEFAULT_SPARQL_MODE,
+  IncompleteSparqlResultError,
+  sparqlCoverageStatus,
+  useAruna,
+} from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
 import { useCatalogBrowse, type CatalogPageParams } from '@/composables/useCatalogBrowse'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -23,8 +29,8 @@ import { useDebounceFn } from '@vueuse/core'
 import { formatNumber, shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { conformsToProcessRun } from '@/lib/profiles/builtinProfiles'
-import { Search, FileArchive, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound } from '@lucide/vue'
-import type { MetadataDoc, SparqlResult } from '@/data/types'
+import { Search, FileArchive, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound, Download } from '@lucide/vue'
+import type { MetadataDoc, SparqlExecutionMode, SparqlResult } from '@/data/types'
 import type { BucketSearchHit, ListMetadataResponse, MetadataDocumentListItem, UserSearchHit } from '@/lib/api'
 import type { RouteLocationRaw } from 'vue-router'
 
@@ -116,9 +122,13 @@ const showNewDataset = ref(false)
 const showCrateImport = ref(false)
 const { jobsEnabled } = useJobs()
 const sparql = ref(`SELECT DISTINCT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 25`)
-const sparqlDistributed = ref(true)
+const sparqlMode = ref<SparqlExecutionMode>(DEFAULT_SPARQL_MODE)
 const sparqlResult = ref<SparqlResult | null>(null)
+const sparqlResultQuery = ref('')
 const sparqlError = ref<string | null>(null)
+const sparqlFailure = ref(false)
+const sparqlFailureResult = ref<SparqlResult | null>(null)
+const sparqlFailureMode = ref<SparqlExecutionMode | null>(null)
 const running = ref(false)
 
 // One watcher builds the whole query from the refs. Spreading route.query in a
@@ -652,19 +662,50 @@ function clearFilters() {
   browsePage.value = 1
 }
 
+const sparqlModeLabels: Record<SparqlExecutionMode, string> = {
+  local: 'Local',
+  'distributed-best-effort': 'Distributed best-effort',
+  'distributed-strict': 'Distributed strict',
+}
+
+function downloadSparqlResult() {
+  const result = sparqlResult.value
+  if (!result) return
+  const artifact = buildSparqlExportArtifact(result, {
+    query: sparqlResultQuery.value,
+    scope: realm.value.id,
+    timestamp: new Date().toISOString(),
+  })
+  const url = URL.createObjectURL(new Blob([JSON.stringify(artifact, null, 2)], { type: 'application/json' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = result.complete ? 'sparql-results.json' : 'sparql-partial-results-with-manifest.json'
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 async function runQuery() {
   sparqlError.value = null
-  const selectClause = sparql.value.match(/(?:^|[>\r\n])\s*SELECT\b([\s\S]*?)(?:\bWHERE\b|\{)/i)?.[1]
-  if (sparqlDistributed.value && selectClause !== undefined && !/\bDISTINCT\b/i.test(selectClause)) {
+  sparqlFailure.value = false
+  sparqlFailureResult.value = null
+  sparqlFailureMode.value = null
+  const query = sparql.value
+  const mode = sparqlMode.value
+  const selectClause = query.match(/(?:^|[>\r\n])\s*SELECT\b([\s\S]*?)(?:\bWHERE\b|\{)/i)?.[1]
+  if (mode !== 'local' && selectClause !== undefined && !/\bDISTINCT\b/i.test(selectClause)) {
     sparqlError.value = 'Distributed SELECT queries must include DISTINCT in the SELECT clause.'
     sparqlResult.value = null
     return
   }
   running.value = true
   try {
-    sparqlResult.value = await runSparql(sparql.value, sparqlDistributed.value ? 'distributed' : 'local')
+    sparqlResult.value = await runSparql(query, mode)
+    sparqlResultQuery.value = query
   } catch (err) {
     sparqlError.value = err instanceof Error ? err.message : String(err)
+    sparqlFailure.value = true
+    sparqlFailureResult.value = err instanceof IncompleteSparqlResultError ? err.result : null
+    sparqlFailureMode.value = mode
     sparqlResult.value = null
   } finally {
     running.value = false
@@ -1076,24 +1117,58 @@ async function runQuery() {
               <Badge variant="secondary" class="text-[10px] uppercase">real API</Badge>
             </div>
             <div class="flex items-center gap-3">
-              <div class="flex items-center gap-2 text-[11px] text-muted-foreground">
-                <span>Local</span>
-                <Switch :checked="sparqlDistributed" aria-label="Use distributed SPARQL execution" @update:checked="sparqlDistributed = $event" />
-                <span>Distributed</span>
-              </div>
+              <select
+                v-model="sparqlMode"
+                aria-label="SPARQL execution mode"
+                class="h-8 rounded-md border border-input bg-background px-2 text-[11px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="local">Local</option>
+                <option value="distributed-best-effort">Distributed best-effort</option>
+                <option value="distributed-strict">Distributed strict</option>
+              </select>
               <Button size="sm" :disabled="running" @click="runQuery"><Play class="h-3.5 w-3.5" /> {{ running ? 'Running…' : 'Run query' }}</Button>
             </div>
           </div>
           <textarea v-model="sparql" rows="14" class="mt-3 w-full rounded-md border border-input bg-muted/20 p-3 font-mono text-[12px] leading-relaxed text-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-          <p class="mt-2 text-[11px] text-muted-foreground">Only SELECT and ASK queries are accepted. Distributed SELECT queries must include DISTINCT.</p>
-          <div v-if="sparqlError" class="mt-3 text-xs text-destructive">{{ sparqlError }}</div>
+          <p class="mt-2 text-[11px] text-muted-foreground">Only SELECT and ASK queries are accepted. Distributed queries accept only ASK or SELECT DISTINCT over a single pattern. Joins, aggregates, OFFSET, and other non-union-safe shapes are rejected.</p>
+          <div v-if="sparqlError && !sparqlFailure" class="mt-3 text-xs text-destructive">{{ sparqlError }}</div>
+        </section>
+
+        <section v-if="sparqlFailure" class="surface overflow-hidden">
+          <header class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-4 py-2.5 text-[11px] text-muted-foreground">
+            <Badge variant="destructive" class="text-[10px] uppercase">Unavailable</Badge>
+            <span v-if="sparqlFailureMode">Mode: {{ sparqlModeLabels[sparqlFailureMode] }}</span>
+            <Button variant="outline" size="sm" class="ml-auto" :disabled="running" @click="runQuery">Retry</Button>
+          </header>
+          <div class="space-y-1.5 px-4 py-3 text-xs text-muted-foreground">
+            <p>{{ sparqlError }}</p>
+            <p v-if="sparqlFailureResult?.nodesFailed">{{ sparqlFailureResult.nodesFailed }} of {{ sparqlFailureResult.nodesQueried }} node partitions failed.</p>
+            <p v-if="sparqlFailureResult?.failedPartitions.length" class="break-all">Failed partitions: {{ sparqlFailureResult.failedPartitions.join(', ') }}</p>
+          </div>
         </section>
 
         <section v-if="sparqlResult" class="surface overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2.5 text-[11px] text-muted-foreground">
+          <header class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-4 py-2.5 text-[11px] text-muted-foreground">
+            <Badge
+              :variant="sparqlCoverageStatus(sparqlResult) === 'Complete' ? 'success' : sparqlCoverageStatus(sparqlResult) === 'Partial' ? 'warn' : 'destructive'"
+              class="text-[10px] uppercase"
+            >
+              {{ sparqlCoverageStatus(sparqlResult) }}
+            </Badge>
             <span>{{ sparqlResult.totalRows }} rows · {{ sparqlResult.tookMs }} ms</span>
+            <span>Mode: {{ sparqlModeLabels[sparqlResult.mode] }}</span>
             <span class="font-mono">scope: {{ realm.shortName }}</span>
+            <div class="ml-auto flex items-center gap-2">
+              <Button v-if="!sparqlResult.complete" variant="outline" size="sm" :disabled="running" @click="runQuery">Retry</Button>
+              <Button variant="outline" size="sm" @click="downloadSparqlResult">
+                <Download class="h-3.5 w-3.5" /> {{ sparqlResult.complete ? 'Export JSON' : 'Export with manifest' }}
+              </Button>
+            </div>
           </header>
+          <div v-if="!sparqlResult.complete" class="space-y-1 border-b border-border bg-amber-500/10 px-4 py-2 text-[11px] text-amber-800 dark:text-amber-200">
+            <p>{{ sparqlResult.nodesFailed }} of {{ sparqlResult.nodesQueried }} node partitions failed.</p>
+            <p v-if="sparqlResult.failedPartitions.length" class="break-all">Failed partitions: {{ sparqlResult.failedPartitions.join(', ') }}</p>
+          </div>
           <div class="max-h-[480px] overflow-auto scrollbar-thin">
             <table class="w-full text-sm">
               <thead class="sticky top-0 bg-background text-[11px] uppercase tracking-wider text-muted-foreground">

@@ -597,6 +597,7 @@ export interface SearchDocumentsSection {
   next_cursor?: string | null
   nodes_queried: number
   nodes_failed: number
+  truncated: boolean
 }
 
 export interface SearchGroupHit {
@@ -637,6 +638,10 @@ export interface ResolveUserResult {
 export interface SparqlResponse {
   kind: 'Solutions' | 'Boolean'
   value: Array<Record<string, string>> | boolean
+  complete: boolean
+  nodes_queried: number
+  nodes_failed: number
+  failed_partitions: string[]
 }
 
 export interface S3CredentialSummary {

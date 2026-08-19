@@ -41,6 +41,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
   const userCursor = ref<string | null>(null)
   const nodesQueried = ref(0)
   const nodesFailed = ref(0)
+  const truncated = ref(false)
 
   const pending = ref(false)
   const loadingSection = ref<SearchSectionType | null>(null)
@@ -48,7 +49,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
   const searched = ref(false)
 
   const active = computed(() => query.value.trim().length >= UNIFIED_MIN_CHARS)
-  const partial = computed(() => nodesFailed.value > 0)
+  const partial = computed(() => nodesFailed.value > 0 || truncated.value)
   const empty = computed(() => !documents.value.length && !groups.value.length && !users.value.length)
 
   let timer: number | undefined
@@ -74,6 +75,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     userCursor.value = null
     nodesQueried.value = 0
     nodesFailed.value = 0
+    truncated.value = false
     error.value = null
     searched.value = false
     pending.value = false
@@ -86,6 +88,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
       documentCursor.value = response.documents.next_cursor ?? null
       nodesQueried.value = response.documents.nodes_queried
       nodesFailed.value = response.documents.nodes_failed
+      truncated.value = response.documents.truncated
     }
     if (response.groups) {
       groups.value = response.groups.hits
@@ -154,6 +157,9 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
       if (section === 'documents' && response.documents) {
         documents.value = [...documents.value, ...response.documents.hits]
         documentCursor.value = response.documents.next_cursor ?? null
+        nodesQueried.value = Math.max(nodesQueried.value, response.documents.nodes_queried)
+        nodesFailed.value = Math.max(nodesFailed.value, response.documents.nodes_failed)
+        if (response.documents.truncated) truncated.value = true
       } else if (section === 'groups' && response.groups) {
         groups.value = [...groups.value, ...response.groups.hits]
         groupCursor.value = response.groups.next_cursor ?? null
@@ -212,6 +218,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     userCursor,
     nodesQueried,
     nodesFailed,
+    truncated,
     pending,
     loadingSection,
     error,
