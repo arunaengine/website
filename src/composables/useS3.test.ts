@@ -336,3 +336,28 @@ describe('session restrictions', () => {
     expect(s3.canDeletePrefix('bucket-a', '', null)).toBe(false)
   })
 })
+
+describe('ordinary operation errors', () => {
+  it('presents a fenced purge as a retryable location message', () => {
+    expect(
+      sessionModule.s3ErrorMessage({
+        name: 'PurgeInProgress',
+        message: 'backend detail',
+        $metadata: { httpStatusCode: 503 },
+      }),
+    ).toBe('A purge is running for this location; retry when it completes.')
+    expect(
+      sessionModule.isS3PurgeInProgressError({
+        name: 'S3ServiceException',
+        Code: 'PurgeInProgress',
+        statusCode: 503,
+      }),
+    ).toBe(true)
+    expect(
+      sessionModule.isS3PurgeInProgressError({
+        name: 'PurgeInProgress',
+        $metadata: { httpStatusCode: 409 },
+      }),
+    ).toBe(false)
+  })
+})

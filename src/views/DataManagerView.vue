@@ -35,15 +35,31 @@ import { useStaging } from '@/composables/useStaging'
 import { useStagingReferences } from '@/composables/useStagingReferences'
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import { featureEnabled } from '@/lib/config'
-import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, isS3BucketNotEmptyError, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
+import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
+import {
+  createStoragePurgeOperation,
+  getStorageDeletionPreflight,
+  getStoragePurgeJob,
+  isStorageDeletionNotFound,
+  isTerminalStoragePurgeJob,
+  retainStoragePurgeProgress,
+  startStoragePurge,
+  storageDeletionErrorMessage,
+  type StorageDeletionPreflight,
+  type StorageDeletionScope,
+  type StoragePurgeJobStatus,
+  type StoragePurgeOperation,
+  type StoragePurgeProgress,
+  type StoragePurgeSubmission,
+} from '@/lib/storageDeletion'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
 import { parseArunaArn, prefixesOverlap, syncBucketKey } from '@/lib/sync'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeftRight,
@@ -433,25 +449,34 @@ const deleteTarget = ref<DeleteTarget | null>(null)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 
-// Bucket deletion is destructive and irreversible (it removes the container and
-// every object inside), so it gets its own type-to-confirm dialog rather than
-// the single-click object/folder delete above.
-interface BucketDeleteTarget {
+interface PermanentDeleteTarget {
+  type: StorageDeletionScope['kind']
   bucket: string
   nodeId: string | null
-  /** Object count under the bucket; null while the walk runs, -1 when unknown. */
-  count: number | null
-  /** Summed size of the counted objects; a lower bound when countTruncated. */
-  bytes: number
-  countTruncated: boolean
+  label: string
+  apiBase: string
+  operation: StoragePurgeOperation
 }
-const bucketDeleteTarget = ref<BucketDeleteTarget | null>(null)
-const bucketDeleteBusy = ref(false)
-const bucketDeleteError = ref<string | null>(null)
-const bucketDeleteConfirm = ref('')
-// The typed name must match exactly before the destructive action unlocks.
-const bucketDeleteConfirmed = computed(
-  () => bucketDeleteTarget.value !== null && bucketDeleteConfirm.value === bucketDeleteTarget.value.bucket,
+const permanentDeleteTarget = ref<PermanentDeleteTarget | null>(null)
+const permanentDeletePreflight = ref<StorageDeletionPreflight | null>(null)
+const permanentDeletePreflightBusy = ref(false)
+const permanentDeleteBusy = ref(false)
+const permanentDeleteAttempted = ref(false)
+const permanentDeleteError = ref<string | null>(null)
+const permanentDeleteSubmission = ref<StoragePurgeSubmission | null>(null)
+const permanentDeleteStatus = ref<StoragePurgeJobStatus | null>(null)
+const permanentDeleteProgress = ref<StoragePurgeProgress | null>(null)
+const permanentDeleteRemaining = ref<StorageDeletionPreflight | null>(null)
+const permanentDeleteRemainingBusy = ref(false)
+const permanentDeleteRemainingMissing = ref(false)
+const permanentDeleteRemainingError = ref<string | null>(null)
+const permanentDeleteConfirm = ref('')
+let permanentDeleteRequestId = 0
+
+const permanentDeleteConfirmed = computed(
+  () =>
+    permanentDeleteTarget.value?.type !== 'bucket' ||
+    permanentDeleteConfirm.value === permanentDeleteTarget.value.bucket,
 )
 
 const newFolderOpen = ref(false)
@@ -1028,72 +1053,260 @@ async function confirmDelete() {
   }
 }
 
-// Bucket delete only exposes local (connected-node) buckets: a remote node's S3
-// endpoint is often CORS-blocked from this origin, so a browser-side DeleteBucket
-// there would fail confusingly. openDeleteBucket also kicks off the object walk
-// that fills the dialog's "contains N objects, X" line.
-function openDeleteBucket(name: string, nodeId: string | null) {
-  if (!s3.canDeletePrefix(name, '', nodeId)) return
-  bucketDeleteError.value = null
-  bucketDeleteConfirm.value = ''
-  bucketDeleteTarget.value = { bucket: name, nodeId, count: null, bytes: 0, countTruncated: false }
-  void resolveBucketStats(name, nodeId)
+function permanentDeleteAllowed(target: PermanentDeleteTarget | null): boolean {
+  if (!target) return false
+  const scope = target.operation.scope
+  if (scope.kind === 'file') return s3.canWrite(scope.bucket, scope.key, target.nodeId)
+  if (scope.kind === 'prefix') return s3.canDeletePrefix(scope.bucket, scope.prefix, target.nodeId)
+  return s3.canDeletePrefix(scope.bucket, '', target.nodeId)
 }
 
-async function resolveBucketStats(name: string, nodeId: string | null) {
-  try {
-    const result = await s3.listObjectsRecursive(name, '', FOLDER_COUNT_LIMIT, nodeId)
-    const target = bucketDeleteTarget.value
-    if (target?.bucket !== name || target.nodeId !== nodeId) return
-    target.count = result.objects.length
-    target.bytes = result.objects.reduce((sum, object) => sum + (object.size ?? 0), 0)
-    target.countTruncated = result.truncated
-  } catch {
-    // The count stays unknown; deleting is still possible (empty via purge).
-    const target = bucketDeleteTarget.value
-    if (target?.bucket === name && target.nodeId === nodeId) target.count = -1
+function permanentDeleteApiBase(nodeId: string | null): string | null {
+  const context = s3.activeContext.value
+  return context && context.nodeId === s3.nodeIdFor(nodeId) ? context.session.apiBase : null
+}
+
+const permanentDeleteActionLabel = computed(() => {
+  if (permanentDeleteTarget.value?.type === 'file') return 'Permanently delete all versions'
+  if (permanentDeleteTarget.value?.type === 'prefix') {
+    return 'Permanently delete folder and all versions'
   }
+  return 'Delete bucket'
+})
+
+function storageInventoryRows(preflight: StorageDeletionPreflight) {
+  return [
+    { label: 'Current heads', value: preflight.counts.current_heads },
+    { label: 'Noncurrent versions', value: preflight.counts.noncurrent_versions },
+    { label: 'Delete markers', value: preflight.counts.delete_markers },
+    { label: 'Open multipart uploads', value: preflight.counts.open_multipart_uploads },
+  ]
 }
 
-async function confirmDeleteBucket() {
-  const target = bucketDeleteTarget.value
-  if (!target || !bucketDeleteConfirmed.value) return
-  if (!s3.canDeletePrefix(target.bucket, '', target.nodeId)) {
-    bucketDeleteError.value = 'This session no longer allows deleting this bucket.'
+function resetPermanentDeleteState() {
+  ++permanentDeleteRequestId
+  permanentDeleteTarget.value = null
+  permanentDeletePreflight.value = null
+  permanentDeletePreflightBusy.value = false
+  permanentDeleteBusy.value = false
+  permanentDeleteAttempted.value = false
+  permanentDeleteError.value = null
+  permanentDeleteSubmission.value = null
+  permanentDeleteStatus.value = null
+  permanentDeleteProgress.value = null
+  permanentDeleteRemaining.value = null
+  permanentDeleteRemainingBusy.value = false
+  permanentDeleteRemainingMissing.value = false
+  permanentDeleteRemainingError.value = null
+  permanentDeleteConfirm.value = ''
+}
+
+function closePermanentDelete() {
+  if (!permanentDeleteBusy.value) resetPermanentDeleteState()
+}
+
+function openPermanentDelete(
+  scope: StorageDeletionScope,
+  nodeId: string | null,
+  label: string,
+) {
+  const apiBase = permanentDeleteApiBase(nodeId)
+  if (!apiBase) {
+    listError.value = 'The node API endpoint for this storage location is unavailable.'
     return
   }
-  bucketDeleteBusy.value = true
-  bucketDeleteError.value = null
+  resetPermanentDeleteState()
+  const target: PermanentDeleteTarget = {
+    type: scope.kind,
+    bucket: scope.bucket,
+    nodeId,
+    label,
+    apiBase,
+    operation: createStoragePurgeOperation(scope),
+  }
+  permanentDeleteTarget.value = target
+  void loadPermanentDeletePreflight(target)
+}
+
+function openPermanentDeleteObject(object: ObjectEntry) {
+  if (!s3.canWrite(bucket.value, object.key, remoteNodeId.value)) return
+  openPermanentDelete(
+    { kind: 'file', bucket: bucket.value, key: object.key },
+    remoteNodeId.value,
+    object.key,
+  )
+}
+
+function openPermanentDeleteFolder(folder: FolderEntry) {
+  if (!s3.canDeletePrefix(bucket.value, folder.prefix, remoteNodeId.value)) return
+  openPermanentDelete(
+    { kind: 'prefix', bucket: bucket.value, prefix: folder.prefix },
+    remoteNodeId.value,
+    folder.prefix,
+  )
+}
+
+// Bucket deletion remains local-only in the existing affordance, but now the
+// connected node performs the complete all-version and multipart-aware purge.
+function openDeleteBucket(name: string, nodeId: string | null) {
+  if (!s3.canDeletePrefix(name, '', nodeId)) return
+  openPermanentDelete({ kind: 'bucket', bucket: name }, nodeId, name)
+}
+
+function permanentDeleteClient(target: PermanentDeleteTarget) {
+  return { baseUrl: target.apiBase, token: authToken.value || undefined }
+}
+
+async function loadPermanentDeletePreflight(target = permanentDeleteTarget.value) {
+  if (!target) return
+  const requestId = ++permanentDeleteRequestId
+  permanentDeletePreflightBusy.value = true
+  permanentDeletePreflight.value = null
+  permanentDeleteError.value = null
   try {
-    // S3 only removes an empty bucket. Skip the purge only when the walk proved
-    // it empty; otherwise batch-delete every object first (deletePrefix paginates
-    // and DeleteObjects in 1000-key batches, reused from the folder delete).
-    const knownEmpty = target.count === 0 && !target.countTruncated
-    if (!knownEmpty) {
-      const result = await s3.deletePrefix(target.bucket, '', target.nodeId)
-      if (result.errors.length) {
-        const first = result.errors[0]
-        bucketDeleteError.value = `${result.deleted} object${result.deleted === 1 ? '' : 's'} deleted, ${result.errors.length} could not be removed, so the bucket was kept. First failure: ${first.key}: ${first.message}`
-        return
-      }
+    const response = await getStorageDeletionPreflight(
+      target.operation.scope,
+      permanentDeleteClient(target),
+    )
+    if (
+      requestId !== permanentDeleteRequestId ||
+      permanentDeleteTarget.value?.operation.idempotencyKey !== target.operation.idempotencyKey
+    ) return
+    permanentDeletePreflight.value = response
+  } catch (error) {
+    if (requestId !== permanentDeleteRequestId) return
+    permanentDeleteError.value = storageDeletionErrorMessage(error)
+  } finally {
+    if (requestId === permanentDeleteRequestId) permanentDeletePreflightBusy.value = false
+  }
+}
+
+async function refreshPermanentDeleteRemaining(target: PermanentDeleteTarget) {
+  const requestId = permanentDeleteRequestId
+  permanentDeleteRemainingBusy.value = true
+  permanentDeleteRemaining.value = null
+  permanentDeleteRemainingMissing.value = false
+  permanentDeleteRemainingError.value = null
+  try {
+    const response = await getStorageDeletionPreflight(
+      target.operation.scope,
+      permanentDeleteClient(target),
+    )
+    if (
+      requestId !== permanentDeleteRequestId ||
+      permanentDeleteTarget.value?.operation.idempotencyKey !== target.operation.idempotencyKey
+    ) return
+    permanentDeleteRemaining.value = response
+  } catch (error) {
+    if (requestId !== permanentDeleteRequestId) return
+    if (isStorageDeletionNotFound(error)) {
+      permanentDeleteRemainingMissing.value = true
+    } else {
+      permanentDeleteRemainingError.value = storageDeletionErrorMessage(error)
     }
-    await s3.deleteBucket(target.bucket, target.nodeId)
+  } finally {
+    if (requestId === permanentDeleteRequestId) permanentDeleteRemainingBusy.value = false
+  }
+}
+
+async function refreshAfterPermanentDelete(
+  target: PermanentDeleteTarget,
+  status: StoragePurgeJobStatus,
+) {
+  await refreshPermanentDeleteRemaining(target)
+  if (permanentDeleteTarget.value?.operation.idempotencyKey !== target.operation.idempotencyKey) {
+    return
+  }
+
+  if (target.type === 'bucket' && status.state === 'succeeded') {
     shortcuts.remove(target.bucket, target.nodeId)
     const wasOpen = bucket.value === target.bucket && remoteNodeId.value === target.nodeId
-    bucketDeleteTarget.value = null
-    bucketDeleteConfirm.value = ''
-    // Leave the dead bucket's route before refreshing so the listing is clean.
     if (wasOpen) await router.push({ name: 'buckets' })
     await bucketList.refresh()
     void loadSyncOverview()
-  } catch (err) {
-    bucketDeleteError.value = isS3BucketNotEmptyError(err)
-      ? 'The bucket still holds data after the purge. This usually means object versioning is enabled, so older versions and delete markers remain that the browser cannot remove. Ask a node administrator to delete it.'
-      : s3ErrorMessage(err)
-  } finally {
-    bucketDeleteBusy.value = false
+    return
+  }
+
+  if (bucket.value === target.bucket && remoteNodeId.value === target.nodeId) {
+    await loadObjects()
+    const scope = target.operation.scope
+    if (
+      (scope.kind === 'file' && previewObject.value?.key === scope.key) ||
+      (scope.kind === 'prefix' && previewObject.value?.key.startsWith(scope.prefix))
+    ) {
+      previewOpen.value = false
+      previewObject.value = null
+    }
+  }
+  if (target.type === 'bucket') await bucketList.refresh()
+}
+
+async function pollPermanentDelete(
+  target: PermanentDeleteTarget,
+  jobId: string,
+  requestId: number,
+) {
+  for (;;) {
+    const status = await getStoragePurgeJob(jobId, permanentDeleteClient(target))
+    if (requestId !== permanentDeleteRequestId) return
+    if (status.kind !== 'storage_purge') {
+      throw new Error(`Job ${jobId} is not a storage purge.`)
+    }
+    permanentDeleteStatus.value = status
+    permanentDeleteProgress.value = retainStoragePurgeProgress(
+      permanentDeleteProgress.value,
+      status.progress,
+    )
+    if (isTerminalStoragePurgeJob(status.state)) {
+      if (status.state === 'failed') {
+        permanentDeleteError.value = status.error?.message ?? 'The purge job failed.'
+      } else if (status.state === 'cancelled') {
+        permanentDeleteError.value = 'The purge job was cancelled.'
+      }
+      await refreshAfterPermanentDelete(target, status)
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    if (requestId !== permanentDeleteRequestId) return
   }
 }
+
+async function confirmPermanentDelete() {
+  const target = permanentDeleteTarget.value
+  if (
+    !target ||
+    !permanentDeleteConfirmed.value ||
+    !permanentDeletePreflight.value?.permissions.purge
+  ) return
+  if (!permanentDeleteAllowed(target)) {
+    permanentDeleteError.value = 'This session no longer allows deleting the selected scope.'
+    return
+  }
+
+  const requestId = ++permanentDeleteRequestId
+  permanentDeleteBusy.value = true
+  permanentDeleteAttempted.value = true
+  permanentDeleteError.value = null
+  permanentDeleteStatus.value = null
+  try {
+    const submission = await startStoragePurge(
+      target.operation,
+      permanentDeleteClient(target),
+    )
+    if (requestId !== permanentDeleteRequestId) return
+    permanentDeleteSubmission.value = submission
+    await pollPermanentDelete(target, submission.job_id, requestId)
+  } catch (error) {
+    if (requestId !== permanentDeleteRequestId) return
+    permanentDeleteError.value = storageDeletionErrorMessage(error)
+  } finally {
+    if (requestId === permanentDeleteRequestId) permanentDeleteBusy.value = false
+  }
+}
+
+onUnmounted(() => {
+  ++permanentDeleteRequestId
+})
 
 const isEmpty = computed(
   () => !listLoading.value && !listError.value && !folders.value.length && !objects.value.length,
@@ -1514,6 +1727,15 @@ const isEmpty = computed(
                     <td class="px-4 py-2.5 text-muted-foreground">-</td>
                     <td class="px-4 py-2.5">
                       <div class="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          class="text-destructive hover:text-destructive"
+                          aria-label="Permanently delete folder and all versions"
+                          :disabled="!s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId)"
+                          :title="s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId) ? 'Permanently delete folder and all versions' : 'This session cannot delete this entire folder'"
+                          @click.stop="openPermanentDeleteFolder(folder)"
+                        ><History class="size-3.5" /></Button>
                         <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete folder" :disabled="!s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId)" :title="s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId) ? 'Delete folder' : 'This session cannot delete this entire folder'" @click.stop="openDeleteFolder(folder)"><Trash2 class="size-3.5" /></Button>
                       </div>
                     </td>
@@ -1555,6 +1777,15 @@ const isEmpty = computed(
                           title="Storage locations: where this file is stored"
                           @click.stop="locationsKey = object.key"
                         ><HardDrive class="size-3.5" /></Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          class="text-destructive hover:text-destructive"
+                          aria-label="Permanently delete all versions"
+                          :disabled="!s3.canWrite(bucket, object.key, remoteNodeId)"
+                          :title="s3.canWrite(bucket, object.key, remoteNodeId) ? 'Permanently delete all versions' : 'This session cannot delete this object'"
+                          @click.stop="openPermanentDeleteObject(object)"
+                        ><History class="size-3.5" /></Button>
                         <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" :disabled="!s3.canWrite(bucket, object.key, remoteNodeId)" :title="s3.canWrite(bucket, object.key, remoteNodeId) ? 'Delete object' : 'This session cannot delete this object'" @click.stop="openDeleteObject(object)"><Trash2 class="size-3.5" /></Button>
                       </div>
                     </td>
@@ -1673,7 +1904,7 @@ const isEmpty = computed(
           <DialogTitle>{{ deleteTarget?.type === 'folder' ? 'Delete folder' : 'Delete object' }}</DialogTitle>
           <DialogDescription v-if="deleteTarget?.type === 'folder'">
              Deletes the folder <span class="font-mono text-xs">{{ deleteTarget.folder.name }}/</span> from
-             <span class="font-mono text-xs">{{ deleteTarget.bucket }}</span>. ALL objects under it are permanently deleted.
+             <span class="font-mono text-xs">{{ deleteTarget.bucket }}</span>. Delete markers are written for current objects; earlier versions stay retrievable by version ID.
           </DialogDescription>
           <DialogDescription v-else>
              Deletes <span class="font-mono text-xs">{{ deleteTarget?.object.key }}</span> from
@@ -1703,52 +1934,166 @@ const isEmpty = computed(
       </DialogContent>
     </Dialog>
 
-    <Dialog
-      :open="bucketDeleteTarget !== null"
-      @update:open="(v: boolean) => { if (!v && !bucketDeleteBusy) { bucketDeleteTarget = null; bucketDeleteConfirm = '' } }"
-    >
-      <DialogContent class="max-w-md">
+    <Dialog :open="permanentDeleteTarget !== null" @update:open="(v: boolean) => { if (!v) closePermanentDelete() }">
+      <DialogContent class="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Delete bucket</DialogTitle>
-          <DialogDescription v-if="bucketDeleteTarget">
-            Permanently deletes the bucket <span class="font-mono text-xs">{{ bucketDeleteTarget.bucket }}</span> and everything stored in it. This cannot be undone.
+          <DialogTitle>{{ permanentDeleteActionLabel }}</DialogTitle>
+          <DialogDescription v-if="permanentDeleteTarget?.type === 'file'">
+            Permanently deletes every version and delete marker for
+            <span class="font-mono text-xs">{{ permanentDeleteTarget.label }}</span> from
+            <span class="font-mono text-xs">{{ permanentDeleteTarget.bucket }}</span>. This cannot be undone.
+          </DialogDescription>
+          <DialogDescription v-else-if="permanentDeleteTarget?.type === 'prefix'">
+            Permanently deletes the folder
+            <span class="font-mono text-xs">{{ permanentDeleteTarget.label }}</span> and every version and delete marker below it. This cannot be undone.
+          </DialogDescription>
+          <DialogDescription v-else-if="permanentDeleteTarget">
+            Permanently deletes the bucket
+            <span class="font-mono text-xs">{{ permanentDeleteTarget.bucket }}</span>, every version and delete marker, and every open multipart upload. This cannot be undone.
           </DialogDescription>
         </DialogHeader>
-        <div v-if="bucketDeleteTarget" class="space-y-3 text-xs">
-          <p v-if="bucketDeleteTarget.count === null" class="flex items-center gap-2 text-muted-foreground">
-            <Loader2 class="h-3 w-3 animate-spin" /> Checking bucket contents…
+
+        <div v-if="permanentDeleteTarget" class="space-y-3 text-xs">
+          <p v-if="permanentDeletePreflightBusy" class="flex items-center gap-2 text-muted-foreground">
+            <Loader2 class="h-3 w-3 animate-spin" /> Loading deletion preflight…
           </p>
-          <p v-else-if="bucketDeleteTarget.count === 0" class="text-muted-foreground">This bucket is empty.</p>
-          <div
-            v-else-if="bucketDeleteTarget.count > 0"
-            class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive"
+
+          <template v-else-if="permanentDeletePreflight">
+            <section class="space-y-2 rounded-md border border-border px-3 py-2">
+              <h4 class="font-medium text-foreground">Preflight inventory</h4>
+              <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+                <div v-for="row in storageInventoryRows(permanentDeletePreflight)" :key="row.label" class="contents">
+                  <dt>{{ row.label }}</dt>
+                  <dd class="text-right font-mono text-foreground">{{ row.value }}</dd>
+                </div>
+              </dl>
+              <p v-if="!permanentDeletePreflight.counts.complete" class="text-amber-800 dark:text-amber-300">
+                This inventory is truncated. Total items may be more than shown.
+              </p>
+              <p v-if="permanentDeletePreflight.truncation.versions_truncated" class="text-muted-foreground">
+                The version and delete-marker inventory has another page.
+              </p>
+              <p v-if="permanentDeletePreflight.truncation.multipart_uploads_truncated" class="text-muted-foreground">
+                The multipart-upload inventory has another page.
+              </p>
+              <p v-if="permanentDeletePreflight.counts.open_multipart_uploads > 0" class="text-muted-foreground">
+                Open multipart uploads in this scope will be aborted by the purge.
+              </p>
+            </section>
+
+            <section class="space-y-1 rounded-md border border-border px-3 py-2">
+              <h4 class="font-medium text-foreground">Permissions</h4>
+              <p>Read inventory: <span class="font-medium">{{ permanentDeletePreflight.permissions.read ? 'Allowed' : 'Not allowed' }}</span></p>
+              <p>Permanent purge: <span class="font-medium">{{ permanentDeletePreflight.permissions.purge ? 'Allowed' : 'Not allowed' }}</span></p>
+              <p v-if="!permanentDeletePreflight.permissions.purge" class="text-destructive">
+                You can inspect this scope but do not have permission to purge it.
+              </p>
+            </section>
+
+            <section
+              v-if="permanentDeleteTarget.type === 'bucket' && permanentDeletePreflight.sync_relationships_apply_to_bucket_delete"
+              class="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300"
+            >
+              <h4 class="font-medium">Sync-relationship removal</h4>
+              <template v-if="permanentDeletePreflight.sync_relationships.length">
+                <p>
+                  Deleting this bucket also removes {{ permanentDeletePreflight.sync_relationships.length }} sync relationship{{ permanentDeletePreflight.sync_relationships.length === 1 ? '' : 's' }} and repairs the remote mirrors. This confirmed side effect is not a blocker.
+                </p>
+                <ul class="space-y-1 pl-4">
+                  <li v-for="relationship in permanentDeletePreflight.sync_relationships" :key="relationship.relationship_id" class="list-disc break-all">
+                    {{ relationship.direction }}: {{ relationship.source }} to {{ relationship.target }}
+                  </li>
+                </ul>
+              </template>
+              <p v-else>No sync relationships will be removed.</p>
+            </section>
+
+            <div v-if="permanentDeleteTarget.type === 'bucket'" class="space-y-1">
+              <label class="block text-muted-foreground">
+                Type <span class="font-mono text-foreground">{{ permanentDeleteTarget.bucket }}</span> to confirm this permanent purge and the sync-relationship removal shown above.
+              </label>
+              <Input
+                v-model="permanentDeleteConfirm"
+                class="font-mono text-xs"
+                autocomplete="off"
+                placeholder="bucket name"
+                :disabled="permanentDeleteBusy"
+                @keyup.enter="confirmPermanentDelete"
+              />
+            </div>
+          </template>
+
+          <section
+            v-if="permanentDeleteSubmission || permanentDeleteProgress"
+            class="space-y-1 rounded-md border border-border px-3 py-2"
           >
-            Deletes {{ bucketDeleteTarget.count }}{{ bucketDeleteTarget.countTruncated ? '+' : '' }} object{{ bucketDeleteTarget.count === 1 && !bucketDeleteTarget.countTruncated ? '' : 's' }}<template v-if="bucketDeleteTarget.bytes > 0"> ({{ bucketDeleteTarget.countTruncated ? 'at least ' : '' }}{{ formatBytes(bucketDeleteTarget.bytes) }})</template>. All contents are removed before the bucket itself.
-          </div>
-          <p v-else class="text-muted-foreground">
-            The contents could not be listed. Any objects present are removed before the bucket is deleted.
-          </p>
-          <div class="space-y-1">
-            <label class="block text-muted-foreground">
-              Type <span class="font-mono text-foreground">{{ bucketDeleteTarget.bucket }}</span> to confirm.
-            </label>
-            <Input
-              v-model="bucketDeleteConfirm"
-              class="font-mono text-xs"
-              autocomplete="off"
-              placeholder="bucket name"
-              @keyup.enter="confirmDeleteBucket"
-            />
-          </div>
+            <h4 class="font-medium text-foreground">Purge job progress</h4>
+            <p v-if="permanentDeleteSubmission" class="break-all text-muted-foreground">
+              Job {{ permanentDeleteSubmission.job_id }}
+            </p>
+            <p v-if="permanentDeleteSubmission && !permanentDeleteSubmission.created" class="text-muted-foreground">
+              Reusing the existing purge job for this retry.
+            </p>
+            <p v-if="permanentDeleteStatus" class="capitalize">
+              State: {{ permanentDeleteStatus.state.replaceAll('_', ' ') }}
+            </p>
+            <p v-if="permanentDeleteProgress" class="font-medium">
+              Committed entries from completed batches:
+              {{ permanentDeleteProgress.current }}<template v-if="permanentDeleteProgress.total !== undefined"> of {{ permanentDeleteProgress.total }}</template>
+              {{ permanentDeleteProgress.unit }}
+            </p>
+            <template v-if="permanentDeleteStatus?.result">
+              <p>Completed batches: {{ permanentDeleteStatus.result.batches_completed }}</p>
+              <p>Versions and markers removed: {{ permanentDeleteStatus.result.versions_removed }}</p>
+              <p>Multipart uploads removed: {{ permanentDeleteStatus.result.multipart_uploads_removed }}</p>
+            </template>
+            <p
+              v-if="permanentDeleteStatus?.state === 'failed'"
+              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
+            >
+              The purge stopped after committing the progress shown above. Work committed by completed batches remains deleted.
+            </p>
+          </section>
+
+          <section
+            v-if="permanentDeleteRemainingBusy || permanentDeleteRemaining || permanentDeleteRemainingMissing || permanentDeleteRemainingError"
+            class="space-y-2 rounded-md border border-border px-3 py-2"
+          >
+            <h4 class="font-medium text-foreground">Remaining after refresh</h4>
+            <p v-if="permanentDeleteRemainingBusy" class="flex items-center gap-2 text-muted-foreground">
+              <Loader2 class="h-3 w-3 animate-spin" /> Refreshing the selected scope…
+            </p>
+            <dl v-else-if="permanentDeleteRemaining" class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+              <div v-for="row in storageInventoryRows(permanentDeleteRemaining)" :key="row.label" class="contents">
+                <dt>{{ row.label }}</dt>
+                <dd class="text-right font-mono text-foreground">{{ row.value }}</dd>
+              </div>
+            </dl>
+            <p v-if="permanentDeleteRemaining && !permanentDeleteRemaining.counts.complete" class="text-amber-800 dark:text-amber-300">
+              This remaining inventory is truncated. Total items may be more than shown.
+            </p>
+            <p v-if="permanentDeleteRemainingMissing" class="text-muted-foreground">The selected scope no longer exists.</p>
+            <p v-if="permanentDeleteRemainingError" class="text-destructive">{{ permanentDeleteRemainingError }}</p>
+          </section>
         </div>
-        <p v-if="bucketDeleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ bucketDeleteError }}</p>
+
+        <p v-if="permanentDeleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ permanentDeleteError }}</p>
         <DialogFooter>
-          <DialogClose as-child><Button variant="outline" :disabled="bucketDeleteBusy">Cancel</Button></DialogClose>
+          <Button variant="outline" :disabled="permanentDeleteBusy" @click="closePermanentDelete">
+            {{ permanentDeleteStatus?.state === 'succeeded' ? 'Close' : 'Cancel' }}
+          </Button>
           <Button
+            v-if="!permanentDeletePreflight && permanentDeleteError && !permanentDeletePreflightBusy"
+            variant="outline"
+            :disabled="permanentDeleteBusy"
+            @click="loadPermanentDeletePreflight()"
+          >Retry preflight</Button>
+          <Button
+            v-if="permanentDeletePreflight && permanentDeleteStatus?.state !== 'succeeded'"
             variant="destructive"
-            :disabled="!bucketDeleteConfirmed || bucketDeleteBusy || !s3.canDeletePrefix(bucketDeleteTarget?.bucket ?? '', '', bucketDeleteTarget?.nodeId ?? null)"
-            @click="confirmDeleteBucket"
-          >{{ bucketDeleteBusy ? 'Deleting…' : 'Delete bucket' }}</Button>
+            :disabled="!permanentDeleteConfirmed || permanentDeleteBusy || !permanentDeletePreflight.permissions.purge || !permanentDeleteAllowed(permanentDeleteTarget)"
+            @click="confirmPermanentDelete"
+          >{{ permanentDeleteBusy ? 'Purging…' : permanentDeleteAttempted ? 'Retry purge' : permanentDeleteActionLabel }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

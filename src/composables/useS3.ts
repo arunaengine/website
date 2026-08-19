@@ -8,7 +8,6 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   ListBucketsCommand,
-  ListObjectVersionsCommand,
   ListObjectsV2Command,
   PutBucketCorsCommand,
   PutObjectCommand,
@@ -879,10 +878,12 @@ export interface DeletePrefixResult {
   errors: { key: string; message: string }[]
 }
 
-// Deletes EVERYTHING under `prefix`, including the zero-byte "folder/" marker
-// objects that listObjectsRecursive deliberately skips, in DeleteObjects
-// batches of up to 1000 keys. Per-key failures are collected instead of
-// aborting the walk so one locked object does not strand the rest.
+// Applies version-less deletes to every current key under `prefix`, including
+// the zero-byte "folder/" marker that listObjectsRecursive deliberately skips,
+// in DeleteObjects batches of up to 1000 keys. In a versioned bucket this
+// creates delete markers and preserves historical versions. Per-key failures
+// are collected instead of aborting the walk so one locked object does not
+// strand the rest.
 async function deletePrefix(
   bucket: string,
   prefix: string,
@@ -910,10 +911,13 @@ async function deletePrefix(
     for (const failure of failed) {
       // The marker often does not exist as a real object; a failed delete for
       // that specific key must not fail the whole folder delete.
-      if (markerKey && failure.Key === markerKey) continue
+      if (markerKey && failure.Key === markerKey && failure.Code !== 'PurgeInProgress') continue
       errors.push({
         key: failure.Key ?? '(unknown key)',
-        message: failure.Message ?? failure.Code ?? 'delete failed',
+        message:
+          failure.Code === 'PurgeInProgress'
+            ? PURGE_IN_PROGRESS_MESSAGE
+            : failure.Message ?? failure.Code ?? 'delete failed',
       })
     }
   }
@@ -943,32 +947,6 @@ async function deletePrefix(
     token = page.NextContinuationToken
   }
 
-  // Verify the marker is really gone. A versioned store can keep the folder
-  // visible behind a delete marker; best-effort purge every version of the
-  // marker key. All of this is non-fatal: stores without versioning support
-  // reject the calls and the bulk delete above already did the real work.
-  if (markerKey) {
-    try {
-      const check = await s3.send(
-        new ListObjectsV2Command({ Bucket: bucket, Prefix: markerKey, MaxKeys: 1 }),
-      )
-      if ((check.KeyCount ?? check.Contents?.length ?? 0) > 0) {
-        const versions = await s3.send(
-          new ListObjectVersionsCommand({ Bucket: bucket, Prefix: markerKey, MaxKeys: 1000 }),
-        )
-        const stale = [...(versions.Versions ?? []), ...(versions.DeleteMarkers ?? [])]
-          .filter((entry) => entry.Key === markerKey && entry.VersionId)
-          .map((entry) => ({ Key: entry.Key as string, VersionId: entry.VersionId as string }))
-        if (stale.length) {
-          await s3.send(
-            new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: stale, Quiet: true } }),
-          )
-        }
-      }
-    } catch {
-      // Version purge unsupported or forbidden here; nothing more we can do.
-    }
-  }
   return { deleted, errors }
 }
 
@@ -1057,6 +1035,7 @@ async function fetchDrsText(id: string): Promise<string> {
 }
 
 export function s3ErrorMessage(err: unknown): string {
+  if (isS3PurgeInProgressError(err)) return PURGE_IN_PROGRESS_MESSAGE
   if (err && typeof err === 'object') {
     const error = err as { name?: string; message?: string }
     if (error.name && error.message) return `${error.name}: ${error.message}`
@@ -1065,10 +1044,29 @@ export function s3ErrorMessage(err: unknown): string {
   return String(err)
 }
 
+export const PURGE_IN_PROGRESS_MESSAGE =
+  'A purge is running for this location; retry when it completes.'
+
+export function isS3PurgeInProgressError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const error = err as {
+    name?: string
+    Code?: string
+    code?: string
+    status?: number
+    statusCode?: number
+    $metadata?: { httpStatusCode?: number }
+  }
+  const status = error.$metadata?.httpStatusCode ?? error.statusCode ?? error.status
+  const purgeCode = [error.name, error.Code, error.code].includes('PurgeInProgress')
+  return purgeCode && (status === undefined || status === 503)
+}
+
 // DeleteBucket refuses a non-empty bucket with the S3 code "BucketNotEmpty"
 // (HTTP 409). After a full object purge this only happens on a versioning-
-// enabled store, where noncurrent versions and delete markers survive the
-// version-less DeleteObjects batches, a case the browser cannot clear.
+// enabled store, where noncurrent versions and delete markers survive, or
+// while an open multipart upload remains. A browser-side current-key sweep
+// cannot prove either condition absent.
 export function isS3BucketNotEmptyError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false
   const error = err as { name?: string; Code?: string }
