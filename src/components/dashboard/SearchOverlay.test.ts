@@ -3,7 +3,7 @@ import { compile } from '@vue/compiler-dom'
 import { compileScript, parse } from '@vue/compiler-sfc'
 import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
-import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
+import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component, type Ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const ButtonStub = defineComponent({
@@ -14,6 +14,14 @@ const ButtonStub = defineComponent({
 })
 const BadgeStub = defineComponent((_, { attrs, slots }) => () => h('span', attrs, slots.default?.()))
 const SpinnerStub = defineComponent((_, { attrs }) => () => h('span', attrs, 'Searching…'))
+const SelectStub = defineComponent({
+  props: { modelValue: String, options: { type: Array, default: () => [] } },
+  setup(props, { attrs }) {
+    return () => h('select', attrs, (props.options as Array<{ value: string; label: string }>).map((option) =>
+      h('option', { value: option.value }, option.label),
+    ))
+  },
+})
 const IconStub = defineComponent(() => () => h('svg'))
 const icons = new Proxy({}, { get: () => IconStub })
 const moduleDefault = (component: Component) => ({ __esModule: true, default: component })
@@ -21,16 +29,24 @@ const moduleDefault = (component: Component) => ({ __esModule: true, default: co
 const narrow = ref(true)
 const mediaQuery = vi.fn(() => narrow)
 const routerPush = vi.fn()
+let configuredObjectMode: Ref<string> | undefined
 const search = {
   documents: ref<Array<Record<string, unknown>>>([]),
   groups: ref<Array<Record<string, unknown>>>([]),
   users: ref<Array<Record<string, unknown>>>([]),
+  objects: ref<Array<Record<string, unknown>>>([]),
+  objectCoverage: ref<Record<string, unknown> | null>(null),
+  objectError: ref<string | null>(null),
+  objectSearched: ref(false),
   pending: ref(false),
   searched: ref(false),
   error: ref<string | null>(null),
   nodesQueried: ref(0),
   nodesFailed: ref(0),
   truncated: ref(false),
+  objectCursor: ref<string | null>(null),
+  loadingSection: ref<string | null>(null),
+  loadMore: vi.fn(),
   retry: vi.fn(),
 }
 
@@ -68,9 +84,28 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Test realm' }) }) },
-  '@/composables/useUnifiedSearch': { useUnifiedSearch: () => search },
+  '@/composables/useRealmNodes': {
+    useRealmNodes: () => ({
+      displayName: (nodeId: string) => nodeId === 'node-b' ? 'Storage node B' : nodeId,
+      isLocalNode: (nodeId: string) => nodeId === 'node-a',
+    }),
+  },
+  '@/lib/utils': { truncateMiddle: (value: string) => value },
+  '@/composables/useUnifiedSearch': {
+    DEFAULT_OBJECT_SEARCH_MODE: 'distributed_best_effort',
+    OBJECT_SEARCH_MODE_LABELS: {
+      local: 'Local',
+      distributed_best_effort: 'Distributed best-effort',
+      distributed_strict: 'Distributed strict',
+    },
+    useUnifiedSearch: (_query: unknown, config: { objectMode?: Ref<string> }) => {
+      configuredObjectMode = config.objectMode
+      return search
+    },
+  },
 })
 const SearchOverlay = compiled.component
 const TOP_BAR_SEARCH_COLLAPSE_PX = compiled.exports.TOP_BAR_SEARCH_COLLAPSE_PX as number
@@ -225,6 +260,12 @@ async function click(node: HostNode) {
   await flush()
 }
 
+async function inputValue(node: HostNode, value: string) {
+  node.value = value
+  await callHandler(node.props.onInput, { target: node })
+  await flush()
+}
+
 async function keydown(node: HostNode, key: string, shiftKey = false) {
   let stopped = false
   const event = {
@@ -304,13 +345,21 @@ function resetSearch() {
   search.documents.value = []
   search.groups.value = []
   search.users.value = []
+  search.objects.value = []
+  search.objectCoverage.value = null
+  search.objectError.value = null
+  search.objectSearched.value = false
   search.pending.value = false
   search.searched.value = false
   search.error.value = null
   search.nodesQueried.value = 0
   search.nodesFailed.value = 0
   search.truncated.value = false
+  search.objectCursor.value = null
+  search.loadingSection.value = null
+  search.loadMore.mockReset()
   search.retry.mockReset()
+  configuredObjectMode = undefined
 }
 
 beforeEach(() => {
@@ -424,6 +473,62 @@ describe('narrow TopBar search panel', () => {
     expect(content(dialog)).toContain('Retry')
     await click(element(mounted.root, (node) => node.tag === 'button' && content(node).trim() === 'Retry'))
     expect(search.retry).toHaveBeenCalledOnce()
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('places partial object coverage before typed storage results', async () => {
+    search.objects.value = [{
+      kind: 'object',
+      mode: 'distributed_best_effort',
+      issuer_node_id: 'node-b',
+      group_id: 'group-a',
+      bucket: 'raw-data',
+      key: 'reads/sample.fastq',
+    }]
+    search.objectCoverage.value = {
+      scope: 'realm',
+      mode: 'distributed_best_effort',
+      index_freshness: { source: 'live_heads', as_of: '2026-08-19T09:00:00Z' },
+      nodes_queried: 3,
+      nodes_failed: 1,
+      failed_partitions: ['node-c'],
+      omitted_partitions: 0,
+      complete: false,
+      truncated: false,
+      partitions: [],
+    }
+    search.objectSearched.value = true
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
+
+    const text = content(element(mounted.root, (node) => node.props.role === 'dialog'))
+    expect(text.indexOf('Partial object inventory')).toBeGreaterThanOrEqual(0)
+    expect(text.indexOf('Partial object inventory')).toBeLessThan(text.indexOf('reads/sample.fastq'))
+    expect(text).toContain('Object · Distributed best-effort · Node: Storage node B · Group: group-a · Bucket: raw-data')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('presents a strict object failure without fallback results', async () => {
+    search.documents.value = [{
+      document_id: 'doc-1',
+      document_path: 'datasets/one',
+      title: 'One',
+    }]
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    if (!configuredObjectMode) throw new Error('Object mode was not configured')
+    configuredObjectMode.value = 'distributed_strict'
+    search.objectSearched.value = true
+    search.objectError.value = 'Strict coverage unavailable'
+    await flush()
+
+    const text = content(element(mounted.root, (node) => node.props.role === 'dialog'))
+    expect(text).toContain('Distributed strict unavailable')
+    expect(text).toContain('Strict mode did not fall back to best-effort')
+    expect(text).not.toContain('reads/sample.fastq')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

@@ -47,6 +47,7 @@ import CatalogCard from '@/components/metadata/CatalogCard.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
+  buildObjectSearchExportArtifact,
   buildSparqlExportArtifact,
   DEFAULT_SPARQL_MODE,
   IncompleteSparqlResultError,
@@ -55,15 +56,28 @@ import {
   useAruna,
 } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
+import {
+  DEFAULT_OBJECT_SEARCH_MODE,
+  OBJECT_SEARCH_MODE_LABELS,
+  useUnifiedSearch,
+} from '@/composables/useUnifiedSearch'
 import { useCatalogBrowse, type CatalogPageParams } from '@/composables/useCatalogBrowse'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useJobs } from '@/composables/useJobs'
 import { useDebounceFn } from '@vueuse/core'
-import { formatNumber, shortUserId, truncateMiddle } from '@/lib/utils'
+import { formatBytes, formatNumber, shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { Search, FileArchive, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound, Download, ListChecks } from '@lucide/vue'
 import type { MetadataDoc, SparqlExecutionMode, SparqlResult } from '@/data/types'
-import type { BucketSearchHit, ListMetadataResponse, MetadataDocumentListItem, UserSearchHit } from '@/lib/api'
+import {
+  ApiError,
+  type BucketSearchHit,
+  type ListMetadataResponse,
+  type MetadataDocumentListItem,
+  type ObjectSearchHit,
+  type ObjectSearchMode,
+  type UserSearchHit,
+} from '@/lib/api'
 import type { RouteLocationRaw } from 'vue-router'
 
 const route = useRoute()
@@ -109,6 +123,7 @@ function queryPage(value: unknown): number {
 }
 
 const q = ref(queryString(route.query.q))
+const documentScope = computed(() => queryString(route.query.document) || null)
 const profileFilter = ref<string | null>(queryFilter(route.query.profile))
 // Search push-down: the group filter maps to the server group_id and the profile
 // filter to conforms_to when it resolves to a local profile IRI. Browsing with a
@@ -152,6 +167,23 @@ const {
   goToPage: goToSearchPage,
   retry: retrySearch,
 } = useMetadataSearch(q, { groupId: groupFilter, conformsTo: conformsToIri }, { cached: true })
+const objectSearchMode = ref<ObjectSearchMode>(DEFAULT_OBJECT_SEARCH_MODE)
+const {
+  objects: objectResults,
+  objectCursor,
+  objectCoverage,
+  objectError,
+  objectSearched,
+  pending: objectsSearching,
+  loadingSection: objectLoadingSection,
+  loadMore: loadMoreUnifiedSection,
+  retry: retryObjectSearch,
+} = useUnifiedSearch(q, {
+  types: [],
+  limit: 25,
+  includeObjects: true,
+  objectMode: objectSearchMode,
+})
 const expertMode = ref(queryString(route.query.expert) === '1')
 const favBusy = ref<Set<string>>(new Set())
 const favError = ref<string | null>(null)
@@ -167,6 +199,16 @@ const sparqlFailure = ref(false)
 const sparqlFailureResult = ref<SparqlResult | null>(null)
 const sparqlFailureMode = ref<SparqlExecutionMode | null>(null)
 const running = ref(false)
+
+watch(documentScope, () => {
+  sparqlMode.value = DEFAULT_SPARQL_MODE
+  sparqlResult.value = null
+  sparqlResultQuery.value = ''
+  sparqlError.value = null
+  sparqlFailure.value = false
+  sparqlFailureResult.value = null
+  sparqlFailureMode.value = null
+})
 
 // One watcher builds the whole query from the refs. Spreading route.query in a
 // per-ref watcher re-applies a stale value when two refs change in the same tick
@@ -544,11 +586,12 @@ function showSearchPage(page: number) {
 // loaded group lists, like the top bar), people (server /users/search) and
 // buckets across the realm's nodes (the `buckets` section of the unified
 // GET /search).
-type SearchKind = 'all' | 'datasets' | 'buckets' | 'groups' | 'people'
+type SearchKind = 'all' | 'datasets' | 'objects' | 'buckets' | 'groups' | 'people'
 const kindFilter = ref<SearchKind>('all')
 const KIND_OPTIONS: Array<{ id: SearchKind; label: string }> = [
   { id: 'all', label: 'All' },
   { id: 'datasets', label: 'Datasets' },
+  { id: 'objects', label: 'Data objects' },
   { id: 'buckets', label: 'Buckets' },
   { id: 'groups', label: 'Groups' },
   { id: 'people', label: 'People' },
@@ -567,13 +610,58 @@ const searchBusy = computed(
   () =>
     searchActive.value &&
     !searchError.value &&
-    (searchPending.value || searchPaging.value || !searched.value),
+    (searchPending.value || searchPaging.value || !searched.value || (Boolean(textQuery.value) && objectsSearching.value)),
 )
 // Results from the previous request are still on screen while a new one runs.
 const searchStale = computed(() => searchBusy.value && visibleResults.value.length > 0)
 // A refresh failed over results it could not replace: they stay on screen and
 // the error rides beside them instead of taking the whole area.
 const keptResults = computed(() => Boolean(searchError.value) && searchResults.value.length > 0)
+
+const objectModeOptions = Object.entries(OBJECT_SEARCH_MODE_LABELS).map(([value, label]) => ({ value, label }))
+const objectInventoryPartial = computed(() => Boolean(
+  objectCoverage.value && (!objectCoverage.value.complete || objectCoverage.value.truncated),
+))
+const objectCoverageStatus = computed<'Complete' | 'Partial' | 'Unavailable' | null>(() => {
+  if (objectError.value) return 'Unavailable'
+  if (!objectCoverage.value) return null
+  return objectInventoryPartial.value ? 'Partial' : 'Complete'
+})
+
+function objectParentPrefix(key: string): string | undefined {
+  const separator = key.lastIndexOf('/')
+  return separator > 0 ? key.slice(0, separator) : undefined
+}
+
+function objectHitRoute(hit: ObjectSearchHit): RouteLocationRaw {
+  const parent = objectParentPrefix(hit.key)
+  return {
+    name: 'bucket',
+    params: { bucketId: hit.bucket },
+    query: {
+      group: hit.group_id,
+      ...(!isLocalNode(hit.issuer_node_id) ? { node: hit.issuer_node_id } : {}),
+      ...(parent ? { prefix: parent } : {}),
+    },
+  }
+}
+
+function downloadObjectResults() {
+  const coverage = objectCoverage.value
+  if (!coverage || !objectResults.value.length) return
+  const artifact = buildObjectSearchExportArtifact(
+    { hits: objectResults.value, coverage },
+    { query: textQuery.value, timestamp: new Date().toISOString() },
+  )
+  const url = URL.createObjectURL(new Blob([JSON.stringify(artifact, null, 2)], { type: 'application/json' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = objectInventoryPartial.value
+    ? 'object-search-partial-results-with-manifest.json'
+    : 'object-search-results.json'
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 const groupMatches = computed(() => {
   const term = q.value.trim().toLowerCase()
@@ -695,7 +783,7 @@ function downloadSparqlResult() {
   if (!result) return
   const artifact = buildSparqlExportArtifact(result, {
     query: sparqlResultQuery.value,
-    scope: realm.value.id,
+    scope: documentScope.value ?? realm.value.id,
     timestamp: new Date().toISOString(),
   })
   const url = URL.createObjectURL(new Blob([JSON.stringify(artifact, null, 2)], { type: 'application/json' }))
@@ -706,6 +794,16 @@ function downloadSparqlResult() {
   URL.revokeObjectURL(url)
 }
 
+function sparqlFailureMessage(error: unknown): string {
+  if (documentScope.value && error instanceof ApiError && error.status === 404) {
+    return 'This Dataset does not exist or is not readable by this session. The two cases are intentionally indistinguishable.'
+  }
+  if (documentScope.value && error instanceof ApiError && error.status === 503) {
+    return 'This Dataset graph is unavailable or still materializing. Retry when it is ready.'
+  }
+  return error instanceof Error ? error.message : String(error)
+}
+
 async function runQuery() {
   sparqlError.value = null
   sparqlFailure.value = false
@@ -714,17 +812,17 @@ async function runQuery() {
   const query = sparql.value
   const mode = sparqlMode.value
   const selectClause = query.match(/(?:^|[>\r\n])\s*SELECT\b([\s\S]*?)(?:\bWHERE\b|\{)/i)?.[1]
-  if (mode !== 'local' && selectClause !== undefined && !/\bDISTINCT\b/i.test(selectClause)) {
+  if (!documentScope.value && mode !== 'local' && selectClause !== undefined && !/\bDISTINCT\b/i.test(selectClause)) {
     sparqlError.value = 'Distributed SELECT queries must include DISTINCT in the SELECT clause.'
     sparqlResult.value = null
     return
   }
   running.value = true
   try {
-    sparqlResult.value = await runSparql(query, mode)
+    sparqlResult.value = await runSparql(query, mode, documentScope.value ?? undefined)
     sparqlResultQuery.value = query
   } catch (err) {
-    sparqlError.value = err instanceof Error ? err.message : String(err)
+    sparqlError.value = sparqlFailureMessage(err)
     sparqlFailure.value = true
     sparqlFailureResult.value = err instanceof IncompleteSparqlResultError ? err.result : null
     sparqlFailureMode.value = mode
@@ -823,6 +921,126 @@ async function runQuery() {
               {{ kind.label }}
             </button>
           </div>
+
+          <section v-if="showKind('objects') && textQuery" :aria-busy="objectsSearching || objectLoadingSection === 'objects'">
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+              <Boxes class="h-4 w-4 text-primary" />
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Data objects</h2>
+              <Spinner v-if="objectsSearching" show-label label="Searching…" />
+              <div class="ml-auto flex flex-wrap items-center gap-2">
+                <Select
+                  v-model="objectSearchMode"
+                  :options="objectModeOptions"
+                  aria-label="Object inventory search mode"
+                  class="h-8 w-auto text-[11px]"
+                />
+                <Button v-if="objectResults.length && objectCoverage" variant="outline" size="sm" @click="downloadObjectResults">
+                  <Download class="h-3.5 w-3.5" />
+                  {{ objectInventoryPartial ? 'Export with manifest' : 'Export JSON' }}
+                </Button>
+              </div>
+            </div>
+
+            <!-- Object inventory coverage is intentionally before every hit. -->
+            <div
+              v-if="objectCoverageStatus"
+              role="status"
+              class="mb-3 space-y-1.5 rounded-md border px-4 py-3 text-xs"
+              :class="objectCoverageStatus === 'Complete'
+                ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-800 dark:text-emerald-200'
+                : objectCoverageStatus === 'Partial'
+                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200'
+                  : 'border-destructive/30 bg-destructive/5 text-destructive'"
+            >
+              <div class="flex flex-wrap items-center gap-2">
+                <Badge
+                  :variant="objectCoverageStatus === 'Complete' ? 'success' : objectCoverageStatus === 'Partial' ? 'warn' : 'destructive'"
+                  class="text-[10px] uppercase"
+                >
+                  {{ objectCoverageStatus }}
+                </Badge>
+                <span>Mode: {{ OBJECT_SEARCH_MODE_LABELS[objectCoverage?.mode ?? objectSearchMode] }}</span>
+                <Button
+                  v-if="objectCoverageStatus !== 'Complete'"
+                  variant="outline"
+                  size="sm"
+                  class="ml-auto"
+                  :disabled="objectsSearching"
+                  @click="retryObjectSearch"
+                >
+                  Retry
+                </Button>
+              </div>
+              <template v-if="objectCoverage">
+                <p v-if="objectCoverageStatus === 'Partial'" class="font-medium">Partial object inventory. Coverage is incomplete, so missing objects cannot be treated as absent.</p>
+                <p>
+                  Scope: {{ objectCoverage.scope === 'realm' ? 'Realm' : 'This node' }}.
+                  Freshness source: {{ objectCoverage.index_freshness.source }}.
+                  As of: {{ objectCoverage.index_freshness.as_of }}.
+                </p>
+                <p v-if="objectCoverage.index_freshness.oldest_observed_at">Oldest observed partition: {{ objectCoverage.index_freshness.oldest_observed_at }}.</p>
+                <p>Nodes queried: {{ objectCoverage.nodes_queried }}. Nodes failed: {{ objectCoverage.nodes_failed }}.</p>
+                <p v-if="objectCoverage.truncated">This page is truncated. Load more before treating the result set as complete.</p>
+                <p v-if="objectCoverage.omitted_partitions">Omitted partitions: {{ objectCoverage.omitted_partitions }}.</p>
+                <p v-if="objectCoverage.failed_partitions.length" class="break-all">Failed partitions: {{ objectCoverage.failed_partitions.join(', ') }}</p>
+              </template>
+              <template v-else>
+                <p v-if="objectSearchMode === 'distributed_strict'">Distributed strict was unavailable. Strict mode did not fall back to best-effort.</p>
+                <p>{{ objectError }}</p>
+              </template>
+            </div>
+
+            <div v-if="objectResults.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <RouterLink
+                v-for="hit in objectResults"
+                :key="`${hit.issuer_node_id}:${hit.bucket}:${hit.key}`"
+                :to="objectHitRoute(hit)"
+                class="surface flex min-w-0 flex-col gap-3 p-4 transition-shadow hover:shadow-md"
+              >
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <Badge variant="secondary" class="text-[10px] uppercase">Object</Badge>
+                  <Badge variant="outline" class="text-[10px]">{{ OBJECT_SEARCH_MODE_LABELS[hit.mode] }}</Badge>
+                </div>
+                <p class="break-all font-mono text-xs font-medium text-foreground">{{ hit.key }}</p>
+                <dl class="grid gap-1 text-[11px] text-muted-foreground">
+                  <div class="flex gap-1"><dt class="font-medium text-foreground/80">Node:</dt><dd :title="hit.issuer_node_id">{{ nodeDisplayName(hit.issuer_node_id) }}</dd></div>
+                  <div class="flex gap-1"><dt class="font-medium text-foreground/80">Group:</dt><dd class="truncate" :title="hit.group_id">{{ truncateMiddle(hit.group_id) }}</dd></div>
+                  <div class="flex gap-1"><dt class="font-medium text-foreground/80">Bucket:</dt><dd class="font-mono">{{ hit.bucket }}</dd></div>
+                  <div v-if="hit.content_w3id" class="min-w-0">
+                    <dt class="font-medium text-foreground/80">Content identity:</dt>
+                    <dd class="break-all font-mono" :title="hit.content_w3id">{{ hit.content_w3id }}</dd>
+                  </div>
+                  <div v-if="hit.checksum" class="min-w-0">
+                    <dt class="font-medium text-foreground/80">Checksum:</dt>
+                    <dd class="break-all font-mono">{{ hit.checksum.algorithm }}:{{ hit.checksum.value }}</dd>
+                  </div>
+                </dl>
+                <div class="mt-auto flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                  <span v-if="hit.size !== null && hit.size !== undefined">{{ formatBytes(hit.size) }}</span>
+                  <span v-if="hit.updated_at">Updated {{ hit.updated_at }}</span>
+                  <span class="font-medium text-primary">Open in Data</span>
+                </div>
+              </RouterLink>
+            </div>
+
+            <div v-if="objectCursor" class="mt-3 flex justify-center">
+              <Button variant="outline" size="sm" :disabled="objectLoadingSection === 'objects'" @click="loadMoreUnifiedSection('objects')">
+                {{ objectLoadingSection === 'objects' ? 'Loading…' : 'Load more objects' }}
+              </Button>
+            </div>
+            <EmptyState
+              v-else-if="currentUser && objectSearched && !objectsSearching && !objectResults.length && !objectError"
+              title="No matching data objects"
+              :description="objectInventoryPartial
+                ? 'No permission-visible live object was returned. Coverage is incomplete.'
+                : 'No permission-visible live object matched this query.'"
+            />
+            <EmptyState
+              v-else-if="!currentUser"
+              title="Sign in to search data objects"
+              description="Realm object inventory search requires an authenticated session."
+            />
+          </section>
 
           <section v-if="showKind('groups') && groupMatches.length">
             <div class="mb-3 flex items-center gap-2">
@@ -1199,8 +1417,18 @@ async function runQuery() {
               <Button size="sm" :disabled="running" @click="runQuery"><Play class="h-3.5 w-3.5" /> {{ running ? 'Running…' : 'Run query' }}</Button>
             </div>
           </div>
+          <div v-if="documentScope" class="mt-3 rounded-md border border-primary/25 bg-primary/5 px-3 py-2.5 text-xs text-foreground/80">
+            <div class="flex flex-wrap items-center gap-2">
+              <Badge variant="accent" class="text-[10px] uppercase">Fixed Dataset scope</Badge>
+              <span class="break-all font-mono">{{ documentScope }}</span>
+            </div>
+            <p class="mt-2 leading-relaxed">
+              Distributed modes try readable replicas of this Dataset until one complete answer succeeds. Distributed best-effort permits local fallback only when holder discovery is unavailable. It never merges graphs from other Datasets. A 404 means the Dataset is either absent or unreadable. A 503 can mean the graph is still materializing, so retry instead of treating it as empty.
+            </p>
+          </div>
           <textarea v-model="sparql" rows="14" class="mt-3 w-full rounded-md border border-input bg-muted/20 p-3 font-mono text-[12px] leading-relaxed text-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-          <p class="mt-2 text-[11px] text-muted-foreground">Only SELECT and ASK queries are accepted. Distributed queries accept only ASK or SELECT DISTINCT over a single pattern. Joins, aggregates, OFFSET, and other non-union-safe shapes are rejected.</p>
+          <p v-if="documentScope" class="mt-2 text-[11px] text-muted-foreground">Only SELECT and ASK queries are accepted. The selected mode changes replica and fallback behavior, never the fixed Dataset scope.</p>
+          <p v-else class="mt-2 text-[11px] text-muted-foreground">Only SELECT and ASK queries are accepted. Distributed queries accept only ASK or SELECT DISTINCT over a single pattern. Joins, aggregates, OFFSET, and other non-union-safe shapes are rejected.</p>
           <div v-if="sparqlError && !sparqlFailure" class="mt-3 text-xs text-destructive">{{ sparqlError }}</div>
         </section>
 
@@ -1208,6 +1436,7 @@ async function runQuery() {
           <header class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-4 py-2.5 text-[11px] text-muted-foreground">
             <Badge variant="destructive" class="text-[10px] uppercase">Unavailable</Badge>
             <span v-if="sparqlFailureMode">Mode: {{ sparqlModeLabels[sparqlFailureMode] }}</span>
+            <span v-if="documentScope" class="font-mono">Fixed Dataset scope: {{ documentScope }}</span>
             <Button variant="outline" size="sm" class="ml-auto" :disabled="running" @click="runQuery">Retry</Button>
           </header>
           <div class="space-y-1.5 px-4 py-3 text-xs text-muted-foreground">
@@ -1227,7 +1456,7 @@ async function runQuery() {
             </Badge>
             <span>{{ sparqlResult.totalRows }} rows · {{ sparqlResult.tookMs }} ms</span>
             <span>Mode: {{ sparqlModeLabels[sparqlResult.mode] }}</span>
-            <span class="font-mono">scope: {{ realm.shortName }}</span>
+            <span class="font-mono">scope: {{ documentScope ? `Dataset ${documentScope}` : realm.shortName }}</span>
             <div class="ml-auto flex items-center gap-2">
               <Button v-if="!sparqlResult.complete" variant="outline" size="sm" :disabled="running" @click="runQuery">Retry</Button>
               <Button variant="outline" size="sm" @click="downloadSparqlResult">

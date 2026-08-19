@@ -639,6 +639,72 @@ export interface BucketSearchResponse {
   failed_nodes: string[]
 }
 
+// GET /search/objects — authenticated live-head inventory search. The backend
+// applies group READ and token path restrictions per hit and deliberately
+// exposes no total. Distributed strict fails instead of returning a partial
+// page; best-effort and local answers carry their exact coverage.
+export type ObjectSearchMode = 'local' | 'distributed_best_effort' | 'distributed_strict'
+export type ObjectSearchMatchMode = 'substring' | 'prefix'
+export type ObjectSearchScope = 'this_node' | 'realm'
+
+export interface ObjectSearchChecksum {
+  algorithm: string
+  value: string
+}
+
+export interface ObjectSearchHit {
+  kind: 'object'
+  mode: ObjectSearchMode
+  issuer_node_id: string
+  group_id: string
+  bucket: string
+  key: string
+  content_w3id?: string | null
+  checksum?: ObjectSearchChecksum | null
+  size?: number | null
+  updated_at?: string | null
+}
+
+export interface ObjectSearchIndexFreshness {
+  source: string
+  as_of: string
+  oldest_observed_at?: string | null
+}
+
+export interface ObjectSearchPartitionCoverage {
+  node_id: string
+  observed_at: string
+  truncated: boolean
+}
+
+export interface ObjectSearchCoverage {
+  scope: ObjectSearchScope
+  mode: ObjectSearchMode
+  index_freshness: ObjectSearchIndexFreshness
+  nodes_queried: number
+  nodes_failed: number
+  failed_partitions: string[]
+  omitted_partitions: number
+  complete: boolean
+  truncated: boolean
+  partitions: ObjectSearchPartitionCoverage[]
+}
+
+export interface ObjectSearchResponse {
+  hits: ObjectSearchHit[]
+  next_cursor?: string | null
+  coverage: ObjectSearchCoverage
+}
+
+export interface ObjectSearchOptions {
+  bucket?: string
+  match?: ObjectSearchMatchMode
+  mode?: ObjectSearchMode
+  limit?: number
+  cursor?: string
+  signal?: AbortSignal
+}
+
 // GET /search — unified realm search (aruna api/src/routes/search.rs). Returns
 // only the requested sections; `types` defaults to all four. `cursor` continues
 // exactly one section and is rejected with 400 when more than one type is asked

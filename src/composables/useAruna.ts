@@ -25,6 +25,8 @@ import {
   type MetadataRoCrateResponse,
   type MetadataSearchOptions,
   type MetadataSearchResponse,
+  type ObjectSearchOptions,
+  type ObjectSearchResponse,
   type ProfileValidationCapabilitiesResponse,
   type ProfileValidationStatusResponse,
   type ReplaceMetadataRoCrateRequest,
@@ -1489,32 +1491,69 @@ export function buildSparqlExportArtifact(
   context: { query: string; scope: string; timestamp: string },
 ) {
   const rows = { columns: result.columns, rows: result.rows }
-  if (result.complete) return rows
-  return {
-    completeness_manifest: {
-      schema: 'aruna.sparql-completeness.v1',
-      query: context.query,
-      scope: context.scope,
-      mode: result.mode,
-      timestamp: context.timestamp,
-      result_count: result.totalRows,
-      truncation: null,
-      freshness: null,
-      complete: result.complete,
-      status: sparqlCoverageStatus(result).toLowerCase(),
-      failed_coverage: {
-        nodes_queried: result.nodesQueried,
-        nodes_failed: result.nodesFailed,
-        failed_partitions: result.failedPartitions,
-      },
+  return buildCompletenessExportArtifact(rows, result.complete, {
+    schema: 'aruna.sparql-completeness.v1',
+    query: context.query,
+    scope: context.scope,
+    mode: result.mode,
+    timestamp: context.timestamp,
+    result_count: result.totalRows,
+    truncation: null,
+    freshness: null,
+    complete: result.complete,
+    status: sparqlCoverageStatus(result).toLowerCase(),
+    failed_coverage: {
+      nodes_queried: result.nodesQueried,
+      nodes_failed: result.nodesFailed,
+      failed_partitions: result.failedPartitions,
     },
-    results: rows,
-  }
+  })
 }
 
-async function runSparql(query: string, mode: SparqlExecutionMode): Promise<SparqlResult> {
+function buildCompletenessExportArtifact<T>(
+  results: T,
+  complete: boolean,
+  completenessManifest: Record<string, unknown>,
+) {
+  return complete ? results : { completeness_manifest: completenessManifest, results }
+}
+
+export function buildObjectSearchExportArtifact(
+  result: Pick<ObjectSearchResponse, 'hits' | 'coverage'>,
+  context: { query: string; timestamp: string },
+) {
+  const coverage = result.coverage
+  const complete = coverage.complete && !coverage.truncated
+  return buildCompletenessExportArtifact(result.hits, complete, {
+    schema: 'aruna.object-search-completeness.v1',
+    query: context.query,
+    scope: coverage.scope,
+    mode: coverage.mode,
+    timestamp: context.timestamp,
+    result_count: result.hits.length,
+    truncation: coverage.truncated,
+    freshness: coverage.index_freshness,
+    complete,
+    status: complete ? 'complete' : 'partial',
+    failed_coverage: {
+      nodes_queried: coverage.nodes_queried,
+      nodes_failed: coverage.nodes_failed,
+      failed_partitions: coverage.failed_partitions,
+      omitted_partitions: coverage.omitted_partitions,
+    },
+  })
+}
+
+async function runSparql(
+  query: string,
+  mode: SparqlExecutionMode,
+  documentId?: string,
+): Promise<SparqlResult> {
   const started = performance.now()
-  const result = await request<SparqlResponse>('/metadata/sparql/query', {
+  const path = documentId
+    ? `/metadata/${encodeURIComponent(documentId)}/sparql/query`
+    : '/metadata/sparql/query'
+  const result = await request<SparqlResponse>(path, {
     method: 'POST',
     body: JSON.stringify({
       query,
@@ -1587,6 +1626,23 @@ async function searchUnified(
       group_id: options.group_id,
       conforms_to: options.conforms_to,
       mode: options.mode,
+    },
+    signal: options.signal,
+  })
+}
+
+async function searchObjects(
+  query: string,
+  options: ObjectSearchOptions = {},
+): Promise<ObjectSearchResponse> {
+  return request<ObjectSearchResponse>('/search/objects', {
+    query: {
+      q: query,
+      bucket: options.bucket,
+      match: options.match,
+      mode: options.mode ?? 'distributed_best_effort',
+      limit: Math.min(Math.max(options.limit ?? 10, 1), 100),
+      cursor: options.cursor,
     },
     signal: options.signal,
   })
@@ -2207,6 +2263,7 @@ export function useAruna() {
     runSparql,
     searchMetadata,
     searchUnified,
+    searchObjects,
     searchBuckets,
     listSyncRelationships,
     getSyncRelationship,

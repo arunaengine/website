@@ -10,15 +10,23 @@ export const TOP_BAR_SEARCH_COLLAPSE_PX = 480
 <script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useRealm } from '@/composables/useRealm'
-import { useUnifiedSearch } from '@/composables/useUnifiedSearch'
-import { FileJson2, Search, UserRound, Users, X } from '@lucide/vue'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import {
+  DEFAULT_OBJECT_SEARCH_MODE,
+  OBJECT_SEARCH_MODE_LABELS,
+  useUnifiedSearch,
+} from '@/composables/useUnifiedSearch'
+import { truncateMiddle } from '@/lib/utils'
+import type { ObjectSearchMode } from '@/lib/api'
+import { File, FileJson2, Search, UserRound, Users, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-type QuickSection = 'datasets' | 'groups' | 'people'
+type QuickSection = 'datasets' | 'objects' | 'groups' | 'people'
 
 interface QuickItem {
   key: string
@@ -27,6 +35,7 @@ interface QuickItem {
   subtitle?: string
   routeName: string
   routeParams: Record<string, string>
+  routeQuery?: Record<string, string>
 }
 
 const PANEL_HISTORY_KEY = '__arunaGlobalSearchPanel'
@@ -43,7 +52,10 @@ const panelEl = ref<HTMLElement | null>(null)
 const wrapperEl = ref<HTMLElement | null>(null)
 const isNarrowSearch = useMediaQuery(`(max-width: ${TOP_BAR_SEARCH_COLLAPSE_PX - 0.02}px)`)
 const { realm } = useRealm()
+const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
 const router = useRouter()
+const quickObjectMode = ref<ObjectSearchMode>(DEFAULT_OBJECT_SEARCH_MODE)
+const objectModeOptions = Object.entries(OBJECT_SEARCH_MODE_LABELS).map(([value, label]) => ({ value, label }))
 
 // Quick search is server-backed only: the catalog is paged, so a client-side
 // filter over it would silently answer from the first pages.
@@ -51,6 +63,10 @@ const {
   documents: quickDocuments,
   groups: quickGroups,
   users: quickUsers,
+  objects: quickObjects,
+  objectCoverage: quickObjectCoverage,
+  objectError: quickObjectError,
+  objectSearched: quickObjectSearched,
   pending: quickPending,
   searched: quickSearched,
   error: quickError,
@@ -58,7 +74,12 @@ const {
   nodesFailed: quickNodesFailed,
   truncated: quickTruncated,
   retry: retrySearch,
-} = useUnifiedSearch(q, { limit: 5 })
+} = useUnifiedSearch(q, { limit: 5, includeObjects: true, objectMode: quickObjectMode })
+
+function objectParentPrefix(key: string): string | undefined {
+  const separator = key.lastIndexOf('/')
+  return separator > 0 ? key.slice(0, separator) : undefined
+}
 
 const items = computed<QuickItem[]>(() => [
   ...quickDocuments.value.map((hit): QuickItem => ({
@@ -68,6 +89,19 @@ const items = computed<QuickItem[]>(() => [
     subtitle: hit.snippet ?? undefined,
     routeName: 'metadata-detail',
     routeParams: { id: hit.document_id },
+  })),
+  ...quickObjects.value.map((hit): QuickItem => ({
+    key: `o:${hit.issuer_node_id}:${hit.bucket}:${hit.key}`,
+    section: 'objects',
+    title: hit.key,
+    subtitle: `Object · ${OBJECT_SEARCH_MODE_LABELS[hit.mode]} · Node: ${nodeDisplayName(hit.issuer_node_id)} · Group: ${truncateMiddle(hit.group_id)} · Bucket: ${hit.bucket}`,
+    routeName: 'bucket',
+    routeParams: { bucketId: hit.bucket },
+    routeQuery: {
+      group: hit.group_id,
+      ...(!isLocalNode(hit.issuer_node_id) ? { node: hit.issuer_node_id } : {}),
+      ...(objectParentPrefix(hit.key) ? { prefix: objectParentPrefix(hit.key) as string } : {}),
+    },
   })),
   ...quickGroups.value.map((group): QuickItem => ({
     key: `g:${group.group_id}`,
@@ -106,15 +140,45 @@ const quickCoverageDetail = computed(() => {
   return details.join('; ')
 })
 
+const quickObjectCoverageStatus = computed<'Complete' | 'Partial' | 'Unavailable' | null>(() => {
+  if (quickObjectError.value) return 'Unavailable'
+  if (!quickObjectSearched.value || !quickObjectCoverage.value) return null
+  return quickObjectCoverage.value.complete && !quickObjectCoverage.value.truncated ? 'Complete' : 'Partial'
+})
+const quickObjectCoverageDetail = computed(() => {
+  if (quickObjectError.value) {
+    const strict = quickObjectMode.value === 'distributed_strict'
+      ? ' Strict mode did not fall back to best-effort.'
+      : ''
+    return `${OBJECT_SEARCH_MODE_LABELS[quickObjectMode.value]} unavailable.${strict} ${quickObjectError.value}`.trim()
+  }
+  const coverage = quickObjectCoverage.value
+  if (!coverage) return ''
+  const parts = [
+    `${coverage.scope === 'realm' ? 'Realm' : 'This node'} scope`,
+    OBJECT_SEARCH_MODE_LABELS[coverage.mode],
+    `${coverage.index_freshness.source} as of ${coverage.index_freshness.as_of}`,
+    `nodes queried: ${coverage.nodes_queried}`,
+    `nodes failed: ${coverage.nodes_failed}`,
+  ]
+  if (coverage.truncated) parts.push('results truncated')
+  if (coverage.failed_partitions.length) parts.push(`failed partitions: ${coverage.failed_partitions.join(', ')}`)
+  return parts.join(' · ')
+})
+
 const SECTION_META: Array<{ id: QuickSection; label: string }> = [
   { id: 'datasets', label: 'Datasets' },
+  { id: 'objects', label: 'Data objects' },
   { id: 'groups', label: 'Groups' },
   { id: 'people', label: 'People' },
 ]
 const sections = computed(() =>
-  SECTION_META.map((meta) => ({ ...meta, items: items.value.filter((item) => item.section === meta.id) })).filter(
-    (section) => section.items.length,
-  ),
+  SECTION_META
+    .map((meta) => ({ ...meta, items: items.value.filter((item) => item.section === meta.id) }))
+    .filter((section) =>
+      section.items.length ||
+      (section.id === 'objects' && (quickObjectSearched.value || Boolean(quickObjectError.value))),
+    ),
 )
 const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
 
@@ -185,7 +249,11 @@ function navigateAfterPanel(callback: () => void) {
 function openItem(item: QuickItem) {
   showResults.value = false
   q.value = ''
-  navigateAfterPanel(() => void router.push({ name: item.routeName, params: item.routeParams }))
+  navigateAfterPanel(() => void router.push({
+    name: item.routeName,
+    params: item.routeParams,
+    query: item.routeQuery,
+  }))
 }
 
 function openSearchPage() {
@@ -353,6 +421,18 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
             ]"
           >
             <div
+              v-if="q.trim().length >= 2"
+              class="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-1.5"
+            >
+              <span class="text-[10px] font-medium text-muted-foreground">Object inventory mode</span>
+              <Select
+                v-model="quickObjectMode"
+                :options="objectModeOptions"
+                aria-label="Object inventory search mode"
+                class="h-7 w-auto text-[10px]"
+              />
+            </div>
+            <div
               v-if="quickCoverage"
               role="status"
               class="flex items-center gap-2 border-b border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground"
@@ -391,9 +471,36 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
                   class="flex items-center gap-1.5 border-b border-border/70 bg-muted/30 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
                 >
                   <FileJson2 v-if="section.id === 'datasets'" class="h-3 w-3" aria-hidden="true" />
+                  <File v-else-if="section.id === 'objects'" class="h-3 w-3" aria-hidden="true" />
                   <Users v-else-if="section.id === 'groups'" class="h-3 w-3" aria-hidden="true" />
                   <UserRound v-else class="h-3 w-3" aria-hidden="true" />
                   {{ section.label }}
+                </div>
+                <div
+                  v-if="section.id === 'objects' && quickObjectCoverageStatus"
+                  role="status"
+                  class="flex items-start gap-2 border-b border-border/70 bg-muted/20 px-3 py-2 text-[10px] text-muted-foreground"
+                >
+                  <Badge
+                    :variant="quickObjectCoverageStatus === 'Complete' ? 'success' : quickObjectCoverageStatus === 'Partial' ? 'warn' : 'destructive'"
+                    class="shrink-0 px-1.5 py-0 text-[9px] uppercase"
+                  >
+                    {{ quickObjectCoverageStatus }}
+                  </Badge>
+                  <span class="min-w-0 flex-1" :title="quickObjectCoverageDetail">
+                    {{ quickObjectCoverageStatus === 'Partial' ? 'Partial object inventory. ' : '' }}{{ quickObjectCoverageDetail }}
+                  </span>
+                  <Button
+                    v-if="quickObjectCoverageStatus !== 'Complete'"
+                    variant="ghost"
+                    size="sm"
+                    class="h-7 shrink-0 px-2 text-[10px]"
+                    :disabled="quickPending"
+                    @mousedown.prevent
+                    @click="retrySearch"
+                  >
+                    Retry
+                  </Button>
                 </div>
                 <button
                   v-for="item in section.items"
@@ -413,6 +520,14 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
                     <div v-if="item.subtitle" class="truncate text-xs text-muted-foreground">{{ item.subtitle }}</div>
                   </div>
                 </button>
+                <p
+                  v-if="section.id === 'objects' && quickObjectSearched && !section.items.length && !quickPending && !quickObjectError"
+                  class="border-b border-border/70 px-3 py-2.5 text-xs text-muted-foreground"
+                >
+                  {{ quickObjectCoverageStatus === 'Partial'
+                    ? 'No visible live object was returned. Coverage is incomplete.'
+                    : 'No visible live object matched this query.' }}
+                </p>
               </div>
             </div>
             <div v-if="quickPending && !items.length" class="px-3 py-2.5 text-xs text-muted-foreground">

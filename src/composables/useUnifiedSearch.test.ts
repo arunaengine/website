@@ -2,14 +2,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { useUnifiedSearch } from './useUnifiedSearch'
 
-const mocks = vi.hoisted(() => ({ searchUnified: vi.fn() }))
+const mocks = vi.hoisted(() => ({ searchUnified: vi.fn(), searchObjects: vi.fn() }))
 
 vi.mock('@/composables/useAruna', async () => {
   const { ref } = await import('vue')
   return {
     useAruna: () => ({
       searchUnified: mocks.searchUnified,
-      authToken: ref(''),
+      searchObjects: mocks.searchObjects,
+      authToken: ref('token'),
       apiBaseUrl: ref('/api/v1'),
     }),
   }
@@ -17,6 +18,7 @@ vi.mock('@/composables/useAruna', async () => {
 
 afterEach(() => {
   mocks.searchUnified.mockReset()
+  mocks.searchObjects.mockReset()
   vi.restoreAllMocks()
 })
 
@@ -46,5 +48,61 @@ describe('unified document coverage', () => {
 
     expect(search.truncated.value).toBe(true)
     expect(search.partial.value).toBe(true)
+  })
+
+  it('keeps typed partial object coverage with the returned live heads', async () => {
+    mocks.searchObjects.mockResolvedValueOnce({
+      hits: [{
+        kind: 'object',
+        mode: 'distributed_best_effort',
+        issuer_node_id: 'node-a',
+        group_id: 'group-a',
+        bucket: 'raw-data',
+        key: 'reads/sample.fastq',
+      }],
+      next_cursor: 'next',
+      coverage: {
+        scope: 'realm',
+        mode: 'distributed_best_effort',
+        index_freshness: { source: 'live_heads', as_of: '2026-08-19T09:00:00Z' },
+        nodes_queried: 3,
+        nodes_failed: 1,
+        failed_partitions: ['node-c'],
+        omitted_partitions: 0,
+        complete: false,
+        truncated: true,
+        partitions: [],
+      },
+    })
+
+    const search = useUnifiedSearch(ref('sample'), { types: [], includeObjects: true })
+    await vi.waitFor(() => expect(search.objectSearched.value).toBe(true))
+
+    expect(mocks.searchObjects).toHaveBeenCalledWith('sample', expect.objectContaining({
+      mode: 'distributed_best_effort',
+    }))
+    expect(search.objects.value[0]?.key).toBe('reads/sample.fastq')
+    expect(search.objectCoverage.value?.scope).toBe('realm')
+    expect(search.partial.value).toBe(true)
+  })
+
+  it('does not downgrade a failed strict object search', async () => {
+    mocks.searchObjects.mockRejectedValueOnce(new Error('Strict coverage unavailable'))
+    const mode = ref<'distributed_strict'>('distributed_strict')
+
+    const search = useUnifiedSearch(ref('sample'), {
+      types: [],
+      includeObjects: true,
+      objectMode: mode,
+    })
+    await vi.waitFor(() => expect(search.objectSearched.value).toBe(true))
+
+    expect(mocks.searchObjects).toHaveBeenCalledOnce()
+    expect(mocks.searchObjects).toHaveBeenCalledWith('sample', expect.objectContaining({
+      mode: 'distributed_strict',
+    }))
+    expect(search.objects.value).toEqual([])
+    expect(search.objectCoverage.value).toBeNull()
+    expect(search.objectError.value).toBe('Strict coverage unavailable')
   })
 })

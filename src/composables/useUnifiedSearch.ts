@@ -1,6 +1,5 @@
-// Debounced, server-backed unified search against GET /search: one call fans
-// out to the documents, groups and users sections; each section pages on its own
-// (backend accepts a cursor only for a single-type request).
+// Debounced, server-backed unified search against GET /search plus the typed
+// GET /search/objects inventory when requested. Each section pages on its own.
 //
 // Per-view FACTORY, not a module singleton: the debounce timer, in-flight
 // AbortControllers and section cursors are bound to the owning view. Must be
@@ -8,6 +7,9 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import {
   type MetadataSearchHit,
+  type ObjectSearchCoverage,
+  type ObjectSearchHit,
+  type ObjectSearchMode,
   type SearchGroupHit,
   type SearchSectionType,
   type SearchUserHit,
@@ -18,39 +20,61 @@ import { useAruna } from '@/composables/useAruna'
 export const UNIFIED_DEBOUNCE_MS = 250
 // Backend rejects a query shorter than two characters with 400.
 export const UNIFIED_MIN_CHARS = 2
+export const DEFAULT_OBJECT_SEARCH_MODE: ObjectSearchMode = 'distributed_best_effort'
+export const OBJECT_SEARCH_MODE_LABELS: Record<ObjectSearchMode, string> = {
+  local: 'Local',
+  distributed_best_effort: 'Distributed best-effort',
+  distributed_strict: 'Distributed strict',
+}
 
 const ALL_TYPES: SearchSectionType[] = ['documents', 'groups', 'users']
+export type UnifiedSearchSection = SearchSectionType | 'objects'
 
 export interface UnifiedSearchConfig {
   types?: SearchSectionType[]
   limit?: number
   groupId?: Ref<string | null>
   conformsTo?: Ref<string | null>
+  includeObjects?: boolean
+  objectMode?: Ref<ObjectSearchMode>
 }
 
 export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig = {}) {
-  const { searchUnified, authToken, apiBaseUrl } = useAruna()
-  const types = config.types?.length ? config.types : ALL_TYPES
+  const { searchUnified, searchObjects, authToken, apiBaseUrl } = useAruna()
+  const types = config.types ?? ALL_TYPES
   const limit = config.limit ?? 10
+  const includeObjects = config.includeObjects ?? false
+  const objectMode = config.objectMode ?? ref<ObjectSearchMode>(DEFAULT_OBJECT_SEARCH_MODE)
 
   const documents = ref<MetadataSearchHit[]>([])
   const groups = ref<SearchGroupHit[]>([])
   const users = ref<SearchUserHit[]>([])
+  const objects = ref<ObjectSearchHit[]>([])
   const documentCursor = ref<string | null>(null)
   const groupCursor = ref<string | null>(null)
   const userCursor = ref<string | null>(null)
+  const objectCursor = ref<string | null>(null)
+  const objectCoverage = ref<ObjectSearchCoverage | null>(null)
+  const objectError = ref<string | null>(null)
+  const objectSearched = ref(false)
   const nodesQueried = ref(0)
   const nodesFailed = ref(0)
   const truncated = ref(false)
 
   const pending = ref(false)
-  const loadingSection = ref<SearchSectionType | null>(null)
+  const loadingSection = ref<UnifiedSearchSection | null>(null)
   const error = ref<string | null>(null)
   const searched = ref(false)
 
   const active = computed(() => query.value.trim().length >= UNIFIED_MIN_CHARS)
-  const partial = computed(() => nodesFailed.value > 0 || truncated.value)
-  const empty = computed(() => !documents.value.length && !groups.value.length && !users.value.length)
+  const partial = computed(() =>
+    nodesFailed.value > 0 ||
+    truncated.value ||
+    Boolean(objectCoverage.value && (!objectCoverage.value.complete || objectCoverage.value.truncated)),
+  )
+  const empty = computed(() =>
+    !documents.value.length && !groups.value.length && !users.value.length && !objects.value.length,
+  )
 
   let timer: number | undefined
   let seq = 0
@@ -70,9 +94,14 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     documents.value = []
     groups.value = []
     users.value = []
+    objects.value = []
     documentCursor.value = null
     groupCursor.value = null
     userCursor.value = null
+    objectCursor.value = null
+    objectCoverage.value = null
+    objectError.value = null
+    objectSearched.value = false
     nodesQueried.value = 0
     nodesFailed.value = 0
     truncated.value = false
@@ -100,6 +129,20 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     }
   }
 
+  function applyObjects(response: { hits: ObjectSearchHit[]; next_cursor?: string | null; coverage: ObjectSearchCoverage }) {
+    objects.value = response.hits
+    objectCursor.value = response.next_cursor ?? null
+    objectCoverage.value = response.coverage
+  }
+
+  async function settled<T>(promise: Promise<T>): Promise<{ value: T | null; failure: unknown | null }> {
+    try {
+      return { value: await promise, failure: null }
+    } catch (failure) {
+      return { value: null, failure }
+    }
+  }
+
   async function runSearch(term: string) {
     const mySeq = ++seq
     sectionController?.abort()
@@ -110,15 +153,39 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     pending.value = true
     error.value = null
     try {
-      const response = await searchUnified(term, {
-        types,
-        limit,
-        ...filters(),
-        signal: controller.signal,
-      })
+      const searchObjectsNow = includeObjects && Boolean(authToken.value)
+      const [unifiedOutcome, objectOutcome] = await Promise.all([
+        types.length
+          ? settled(searchUnified(term, {
+              types,
+              limit,
+              ...filters(),
+              signal: controller.signal,
+            }))
+          : Promise.resolve({ value: null, failure: null }),
+        searchObjectsNow
+          ? settled(searchObjects(term, {
+              mode: objectMode.value,
+              limit,
+              signal: controller.signal,
+            }))
+          : Promise.resolve({ value: null, failure: null }),
+      ])
       if (mySeq !== seq) return // superseded
       reset()
-      apply(response)
+      if (unifiedOutcome.value) apply(unifiedOutcome.value)
+      else if (unifiedOutcome.failure) {
+        error.value = unifiedOutcome.failure instanceof Error
+          ? unifiedOutcome.failure.message
+          : String(unifiedOutcome.failure)
+      }
+      if (objectOutcome.value) applyObjects(objectOutcome.value)
+      else if (objectOutcome.failure) {
+        objectError.value = objectOutcome.failure instanceof Error
+          ? objectOutcome.failure.message
+          : String(objectOutcome.failure)
+      }
+      objectSearched.value = searchObjectsNow
       cursorQuery = term
       searched.value = true
     } catch (err) {
@@ -135,9 +202,9 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     return userCursor
   }
 
-  async function loadMore(section: SearchSectionType) {
+  async function loadMore(section: UnifiedSearchSection) {
     if (loadingSection.value || pending.value) return
-    const cursorRef = cursorFor(section)
+    const cursorRef = section === 'objects' ? objectCursor : cursorFor(section)
     const cursor = cursorRef.value
     const term = query.value.trim()
     if (!cursor || term !== cursorQuery) return
@@ -146,6 +213,20 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     sectionController = pageController
     loadingSection.value = section
     try {
+      if (section === 'objects') {
+        const response = await searchObjects(term, {
+          mode: objectMode.value,
+          limit,
+          cursor,
+          signal: pageController.signal,
+        })
+        if (mySeq !== seq || sectionController !== pageController) return
+        objects.value = [...objects.value, ...response.hits]
+        objectCursor.value = response.next_cursor ?? null
+        objectCoverage.value = response.coverage
+        objectError.value = null
+        return
+      }
       const response = await searchUnified(term, {
         types: [section],
         limit,
@@ -169,7 +250,9 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
       }
     } catch (err) {
       if (mySeq !== seq || sectionController !== pageController) return
-      error.value = err instanceof Error ? err.message : String(err)
+      const message = err instanceof Error ? err.message : String(err)
+      if (section === 'objects') objectError.value = message
+      else error.value = message
     } finally {
       if (sectionController === pageController) {
         sectionController = null
@@ -186,6 +269,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
   const deps: Array<Ref<unknown>> = [query, authToken, apiBaseUrl]
   if (config.groupId) deps.push(config.groupId)
   if (config.conformsTo) deps.push(config.conformsTo)
+  if (includeObjects) deps.push(objectMode)
   watch(deps, () => {
     window.clearTimeout(timer)
     ++seq
@@ -213,9 +297,15 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     documents,
     groups,
     users,
+    objects,
     documentCursor,
     groupCursor,
     userCursor,
+    objectCursor,
+    objectCoverage,
+    objectError,
+    objectSearched,
+    objectMode,
     nodesQueried,
     nodesFailed,
     truncated,

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  buildObjectSearchExportArtifact,
   buildSparqlExportArtifact,
   CrateNotReadyError,
   DEFAULT_SPARQL_MODE,
@@ -645,5 +646,73 @@ describe('SPARQL completeness', () => {
     }))
     expect(artifact).toHaveProperty('results.rows', [{ dataset: 'urn:dataset' }])
     expect(artifact).not.toHaveProperty('rows')
+  })
+
+  it('keeps a document-scoped query on the document endpoint with strict coverage', async () => {
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      kind: 'Solutions',
+      value: [],
+      complete: true,
+      nodes_queried: 1,
+      nodes_failed: 0,
+      failed_partitions: [],
+    })
+    const { runSparql } = useAruna()
+
+    await runSparql('SELECT ?s WHERE { ?s ?p ?o }', DEFAULT_SPARQL_MODE, 'doc/one')
+
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledOnce()
+    expect(vi.mocked(apiRequest).mock.calls[0]?.[0]).toBe('/metadata/doc%2Fone/sparql/query')
+    expect(JSON.parse(String(vi.mocked(apiRequest).mock.calls[0]?.[1]?.body))).toMatchObject({
+      mode: 'distributed',
+      allow_partial: false,
+    })
+  })
+
+  it('wraps a partial object inventory export with its manifest and freshness', () => {
+    const artifact = buildObjectSearchExportArtifact({
+      hits: [{
+        kind: 'object',
+        mode: 'distributed_best_effort',
+        issuer_node_id: 'node-a',
+        group_id: 'group-a',
+        bucket: 'raw-data',
+        key: 'reads/sample.fastq',
+      }],
+      coverage: {
+        scope: 'realm',
+        mode: 'distributed_best_effort',
+        index_freshness: { source: 'live_heads', as_of: '2026-08-19T09:00:00.000Z' },
+        nodes_queried: 3,
+        nodes_failed: 1,
+        failed_partitions: ['node-c'],
+        omitted_partitions: 0,
+        complete: false,
+        truncated: true,
+        partitions: [],
+      },
+    }, {
+      query: 'sample',
+      timestamp: '2026-08-19T09:01:00.000Z',
+    })
+
+    expect(artifact).toHaveProperty('completeness_manifest', expect.objectContaining({
+      schema: 'aruna.object-search-completeness.v1',
+      query: 'sample',
+      scope: 'realm',
+      mode: 'distributed_best_effort',
+      timestamp: '2026-08-19T09:01:00.000Z',
+      result_count: 1,
+      truncation: true,
+      freshness: { source: 'live_heads', as_of: '2026-08-19T09:00:00.000Z' },
+      complete: false,
+      failed_coverage: {
+        nodes_queried: 3,
+        nodes_failed: 1,
+        failed_partitions: ['node-c'],
+        omitted_partitions: 0,
+      },
+    }))
+    expect(artifact).toHaveProperty('results.0.key', 'reads/sample.fastq')
   })
 })
