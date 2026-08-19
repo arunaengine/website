@@ -202,7 +202,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
       <h2 class="font-display text-[15px] font-semibold text-foreground/85">Federation network</h2>
       <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
         <Badge variant="outline" class="tabular-nums">{{ nodes.length }} nodes</Badge>
-        <Badge variant="outline" class="tabular-nums">{{ connectedCount }} DHT presence confirmed</Badge>
+        <Badge variant="outline" class="tabular-nums">{{ connectedCount }} of {{ nodes.length }} present in DHT</Badge>
         <Badge variant="outline">replication {{ replicationLabel }}</Badge>
         <RouterLink to="/app/status" class="text-xs font-medium text-primary hover:underline">Node status</RouterLink>
       </div>

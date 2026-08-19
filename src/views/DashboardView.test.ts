@@ -136,7 +136,7 @@ describe('guest dashboard truth', () => {
     expect(text).toMatch(/4 Configured nodes/)
     expect(text).toContain('Gaia realm')
     expect(text).toContain('Shared science data')
-    expect(text).toContain('Log in')
+    expect(text).toContain('Sign in')
     expect(text).not.toContain('Loaded profiles')
     expect(text).not.toContain('Nodes online')
     expect(text).not.toContain('0 / 0')

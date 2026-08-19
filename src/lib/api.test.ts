@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiOrigin, apiRequest } from './api'
+import { computeAdminErrorMessage } from './computeAdmin'
+import { placementPoliciesErrorMessage } from './placementPolicies'
 
 const PAGE_ORIGIN = 'https://portal.test'
 
@@ -45,6 +47,23 @@ describe('apiRequest url building', () => {
     const urls = stubBrowser()
     await apiRequest('/info', {}, { baseUrl: '/api/v1' })
     expect(urls).toEqual([`${PAGE_ORIGIN}/api/v1/info`])
+  })
+
+  it('preserves structured quota errors for surface-specific messages', async () => {
+    stubBrowser()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      message: 'quota denied',
+      quota: { scope: 'group', dimension: 'cpu_cores', observed: 6, requested: 2, limit: 7 },
+    }), { status: 409, statusText: 'Conflict' })))
+
+    const error = await apiRequest('/compute', {}, { baseUrl: '/api/v1' }).catch((caught) => caught)
+
+    expect(computeAdminErrorMessage(error)).toBe(
+      'Compute quota denied for group CPU cores: observed 6, requested 2, limit 7.',
+    )
+    expect(placementPoliciesErrorMessage(error)).toBe(
+      'Quota denied for group CPU cores: observed 6, requested 2, limit 7.',
+    )
   })
 })
 

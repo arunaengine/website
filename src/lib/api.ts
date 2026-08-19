@@ -10,6 +10,8 @@ export class ApiError extends Error {
     message: string,
     /** Machine-readable backend code, e.g. `rate_limited`. */
     public code?: string,
+    /** Parsed structured backend error body. */
+    public details?: Record<string, unknown>,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -79,10 +81,13 @@ export async function apiRequest<T>(
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`
     let code: string | undefined
+    let details: Record<string, unknown> | undefined
     try {
-      const body = await response.json()
+      const body = await response.json() as Record<string, unknown>
+      details = body
       // `msg` is the GA4GH TES error shape (api/src/routes/tes.rs).
-      message = body.message || body.error || body.msg || message
+      const bodyMessage = body.message || body.error || body.msg
+      if (typeof bodyMessage === 'string') message = bodyMessage
       code = typeof body.code === 'string' ? body.code : undefined
     } catch {
       // Keep the HTTP status message if the body is not JSON.
@@ -93,7 +98,7 @@ export async function apiRequest<T>(
       message = rateLimitMessage(response)
       code = code ?? 'rate_limited'
     }
-    throw new ApiError(response.status, message, code)
+    throw new ApiError(response.status, message, code, details)
   }
 
   if (response.status === 204 || response.status === 205) return undefined as T

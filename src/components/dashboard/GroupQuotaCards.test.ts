@@ -232,7 +232,7 @@ describe('group purpose counts', () => {
       fileURLToPath(new URL('../groups/GroupDetail.vue', import.meta.url)),
       'utf8',
     )
-    const purposeBlock = source.match(/Lifecycle-live documents[\s\S]*?<\/dl>/)?.[0] ?? ''
+    const purposeBlock = source.match(/Live documents[\s\S]*?<\/dl>/)?.[0] ?? ''
 
     expect(source).toContain("usage.value?.dataset_count")
     expect(source).toContain("usage.value?.profile_count")

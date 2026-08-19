@@ -336,7 +336,7 @@ async function leave() {
       <div v-if="usage" class="border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <FileJson2 class="h-3.5 w-3.5 text-primary" />
-          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Lifecycle-live documents</span>
+          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Live documents</span>
         </div>
         <dl class="grid grid-cols-3 gap-3 px-5 py-3">
           <div v-for="count in purposeCounts" :key="count.label" class="rounded-md border border-border bg-background px-3 py-2">

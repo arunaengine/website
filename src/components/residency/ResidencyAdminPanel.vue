@@ -364,7 +364,7 @@ watch(
                       <tr v-for="violation in diagnostics.violations" :key="`${violation.bucket}:${violation.key}:${violation.version_id}`">
                         <td class="px-3 py-2"><div class="font-medium">{{ violation.bucket }}</div><div class="font-mono text-[11px] text-muted-foreground">{{ violation.key }}</div></td>
                         <td class="px-3 py-2 font-mono" :title="violation.version_id">{{ truncateMiddle(violation.version_id) }}</td>
-                        <td class="px-3 py-2"><Badge :variant="violation.state === 'quarantined' ? 'destructive' : 'warn'">{{ violation.state }}</Badge></td>
+                        <td class="px-3 py-2"><Badge :variant="violation.state === 'quarantined' ? 'destructive' : 'warn'">{{ violation.state.replaceAll('_', ' ') }}</Badge></td>
                         <td class="px-3 py-2"><div v-for="policy in violation.policies" :key="policyRefKey(policy)" class="font-mono text-[10px]" :title="`${policy.policy_id}:${policy.digest}`">{{ truncateMiddle(policy.policy_id) }} / {{ truncateMiddle(policy.digest, 8, 6) }}</div></td>
                         <td class="px-3 py-2 text-right"><Button variant="destructive" size="sm" :disabled="resolutionBusy" @click="confirmRelease(violation)">Release</Button></td>
                       </tr>

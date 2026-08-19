@@ -375,7 +375,7 @@ async function confirmDelete() {
 
         <JobFamilySection v-if="nativeFamily" :family="nativeFamily" />
         <p v-else-if="nativeDetailUnavailable" class="text-xs text-muted-foreground">
-          Distributed execution detail is not available for this session
+          Distributed execution detail could not be loaded.
         </p>
 
         <!-- Executors & logs -->

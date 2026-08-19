@@ -2,6 +2,7 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import SearchFilterBar, { type Facet, type FilterModel } from '@/components/search/SearchFilterBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -667,6 +668,7 @@ const sparqlModeLabels: Record<SparqlExecutionMode, string> = {
   'distributed-best-effort': 'Distributed best-effort',
   'distributed-strict': 'Distributed strict',
 }
+const sparqlModeOptions = Object.entries(sparqlModeLabels).map(([value, label]) => ({ value, label }))
 
 function downloadSparqlResult() {
   const result = sparqlResult.value
@@ -1117,15 +1119,12 @@ async function runQuery() {
               <Badge variant="secondary" class="text-[10px] uppercase">real API</Badge>
             </div>
             <div class="flex items-center gap-3">
-              <select
+              <Select
                 v-model="sparqlMode"
+                :options="sparqlModeOptions"
                 aria-label="SPARQL execution mode"
-                class="h-8 rounded-md border border-input bg-background px-2 text-[11px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="local">Local</option>
-                <option value="distributed-best-effort">Distributed best-effort</option>
-                <option value="distributed-strict">Distributed strict</option>
-              </select>
+                class="h-8 w-auto text-[11px]"
+              />
               <Button size="sm" :disabled="running" @click="runQuery"><Play class="h-3.5 w-3.5" /> {{ running ? 'Running…' : 'Run query' }}</Button>
             </div>
           </div>

@@ -95,7 +95,7 @@ const quickCoverage = computed<'Complete' | 'Partial' | 'Unavailable' | null>(()
 })
 const quickCoverageDetail = computed(() => {
   if (quickCoverage.value === 'Unavailable') return quickError.value ?? 'Search is unavailable.'
-  if (quickCoverage.value !== 'Partial') return 'Document coverage'
+  if (quickCoverage.value !== 'Partial') return 'All document nodes answered'
   const details: string[] = []
   if (quickNodesFailed.value > 0) {
     details.push(
@@ -279,6 +279,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
           ? 'fixed inset-0 z-50 bg-background/80 backdrop-blur-sm'
           : 'relative min-w-0 max-w-xl flex-1'
       "
+      @click.self="requestPanelClose()"
     >
       <div
         ref="panelEl"
@@ -312,6 +313,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
                 aria-controls="quick-search-results"
                 :aria-expanded="showResults"
                 :aria-busy="quickPending"
+                :aria-activedescendant="activeKey ? 'qs-' + activeKey : undefined"
                 class="h-9 w-full rounded-md border border-input bg-field pl-8 pr-8 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:pr-16"
                 :placeholder="`Search ${realm.shortName}, datasets, groups and people…`"
                 @focus="showResults = true"
@@ -343,9 +345,6 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
 
           <div
             v-if="showResults && (items.length || q)"
-            id="quick-search-results"
-            role="listbox"
-            :aria-busy="quickPending"
             :class="[
               'left-0 right-0 z-40 rounded-md border border-border bg-popover shadow-xl',
               isNarrowSearch
@@ -371,7 +370,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
                 v-if="quickCoverage !== 'Complete'"
                 variant="ghost"
                 size="sm"
-                class="h-6 shrink-0 px-2 text-[10px]"
+                class="h-8 shrink-0 px-2 text-[10px]"
                 :disabled="quickPending"
                 @mousedown.prevent
                 @click="retrySearch"
@@ -379,37 +378,42 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
                 Retry
               </Button>
             </div>
-            <div
-              v-for="section in sections"
-              :key="section.id"
-              class="transition-opacity"
-              :class="quickStale ? 'opacity-40' : ''"
-            >
+            <div id="quick-search-results" role="listbox" :aria-busy="quickPending">
               <div
-                class="flex items-center gap-1.5 border-b border-border/70 bg-muted/30 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                v-for="section in sections"
+                :key="section.id"
+                role="group"
+                :aria-label="section.label"
+                class="transition-opacity"
+                :class="quickStale ? 'opacity-40' : ''"
               >
-                <FileJson2 v-if="section.id === 'datasets'" class="h-3 w-3" aria-hidden="true" />
-                <Users v-else-if="section.id === 'groups'" class="h-3 w-3" aria-hidden="true" />
-                <UserRound v-else class="h-3 w-3" aria-hidden="true" />
-                {{ section.label }}
-              </div>
-              <button
-                v-for="item in section.items"
-                :key="item.key"
-                role="option"
-                :aria-selected="activeKey === item.key"
-                :class="[
-                  'flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted',
-                  activeKey === item.key ? 'bg-muted' : '',
-                ]"
-                @mousedown.prevent
-                @click="openItem(item)"
-              >
-                <div class="flex-1 overflow-hidden">
-                  <div class="truncate font-medium text-foreground">{{ item.title }}</div>
-                  <div v-if="item.subtitle" class="truncate text-xs text-muted-foreground">{{ item.subtitle }}</div>
+                <div
+                  class="flex items-center gap-1.5 border-b border-border/70 bg-muted/30 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                >
+                  <FileJson2 v-if="section.id === 'datasets'" class="h-3 w-3" aria-hidden="true" />
+                  <Users v-else-if="section.id === 'groups'" class="h-3 w-3" aria-hidden="true" />
+                  <UserRound v-else class="h-3 w-3" aria-hidden="true" />
+                  {{ section.label }}
                 </div>
-              </button>
+                <button
+                  v-for="item in section.items"
+                  :id="'qs-' + item.key"
+                  :key="item.key"
+                  role="option"
+                  :aria-selected="activeKey === item.key"
+                  :class="[
+                    'flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted',
+                    activeKey === item.key ? 'bg-muted' : '',
+                  ]"
+                  @mousedown.prevent
+                  @click="openItem(item)"
+                >
+                  <div class="flex-1 overflow-hidden">
+                    <div class="truncate font-medium text-foreground">{{ item.title }}</div>
+                    <div v-if="item.subtitle" class="truncate text-xs text-muted-foreground">{{ item.subtitle }}</div>
+                  </div>
+                </button>
+              </div>
             </div>
             <div v-if="quickPending && !items.length" class="px-3 py-2.5 text-xs text-muted-foreground">
               Searching…

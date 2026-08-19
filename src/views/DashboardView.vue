@@ -192,11 +192,11 @@ function startSignIn() {
             <h3 class="font-display text-base font-semibold text-aruna-navy">{{ realm.name }}</h3>
             <p v-if="realm.description && realm.description !== realm.name" class="mt-1 text-sm text-muted-foreground">{{ realm.description }}</p>
             <p v-else-if="!realm.description" class="mt-1 text-sm text-muted-foreground">This realm has no description yet.</p>
-            <p v-if="!publicOverview" class="mt-1 text-xs text-muted-foreground">Public counts are unavailable from this node. Log in for authenticated realm details.</p>
+            <p v-if="!publicOverview" class="mt-1 text-xs text-muted-foreground">Public counts are unavailable from this node. Sign in for authenticated realm details.</p>
             <div class="mt-2 break-all font-mono text-[11px] text-muted-foreground">{{ realm.id }}</div>
           </div>
           <Button :disabled="signingIn" @click="startSignIn">
-            <LogIn class="h-4 w-4" /> Log in
+            <LogIn class="h-4 w-4" /> Sign in
           </Button>
         </div>
 

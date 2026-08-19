@@ -166,7 +166,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Group statistics</h2>
         <Badge variant="outline" class="tabular-nums">{{ entries.length }}</Badge>
       </div>
-      <Button variant="ghost" size="icon-sm" aria-label="Refresh storage" @click="load">
+      <Button variant="ghost" size="icon-sm" aria-label="Refresh group statistics" @click="load">
         <RefreshCw class="h-3.5 w-3.5" />
       </Button>
     </header>
@@ -208,15 +208,15 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
         <template v-else>
           <dl class="mt-2 grid grid-cols-3 gap-2 border-t border-border/70 pt-2">
             <div>
-              <dt class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Datasets</dt>
+              <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Datasets</dt>
               <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">{{ purposeCountLabel(entry.datasetCount) }}</dd>
             </div>
             <div>
-              <dt class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Profiles</dt>
+              <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Profiles</dt>
               <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">{{ purposeCountLabel(entry.profileCount) }}</dd>
             </div>
             <div>
-              <dt class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Process runs</dt>
+              <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Process runs</dt>
               <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">{{ purposeCountLabel(entry.processRunCount) }}</dd>
             </div>
           </dl>

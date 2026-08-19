@@ -275,7 +275,7 @@ watch(
           </div>
           <div class="flex items-center gap-2">
             <Badge variant="outline" class="tabular-nums">
-              {{ connectedCount }} / {{ sortedNodes.length }} DHT presence confirmed
+              {{ connectedCount }} / {{ sortedNodes.length }} present in DHT
             </Badge>
             <Badge variant="outline" class="tabular-nums">
               replication {{ replicationLabel }}

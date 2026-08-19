@@ -64,6 +64,8 @@ const bulkOpen = ref(false)
 const bulkBusy = ref(false)
 const bulkProgress = ref<BulkRunProgress | null>(null)
 const bulkError = ref<string | null>(null)
+const staleBulkRun = Symbol('stale bulk run')
+let bulkRunGeneration = 0
 
 let loadSequence = 0
 async function load() {
@@ -156,25 +158,38 @@ async function saveDefaults() {
 
 async function startBulkRun() {
   if (bulkBusy.value) return
+  const bucket = props.bucket
+  const generation = ++bulkRunGeneration
+  const isCurrentRun = () => generation === bulkRunGeneration && props.open && props.bucket === bucket
   bulkBusy.value = true
   bulkError.value = null
   bulkProgress.value = null
   try {
-    bulkProgress.value = await runBulkToCompletion(
-      (request) => runBucketPlacement(props.bucket, request),
-      (progress) => { bulkProgress.value = { ...progress } },
+    const progress = await runBulkToCompletion(
+      (request) => {
+        if (!isCurrentRun()) throw staleBulkRun
+        return runBucketPlacement(bucket, request)
+      },
+      (progress) => {
+        if (isCurrentRun()) bulkProgress.value = { ...progress }
+      },
     )
+    if (!isCurrentRun()) return
+    bulkProgress.value = progress
     void loadCoverage()
   } catch (error) {
+    if (error === staleBulkRun || !isCurrentRun()) return
     bulkError.value = placementPoliciesErrorMessage(error, 'bulk')
   } finally {
-    bulkBusy.value = false
+    if (generation === bulkRunGeneration) bulkBusy.value = false
   }
 }
 
 watch(
   () => [props.open, props.bucket],
   () => {
+    bulkRunGeneration += 1
+    bulkBusy.value = false
     if (!props.open) return
     bulkOpen.value = false
     bulkProgress.value = null

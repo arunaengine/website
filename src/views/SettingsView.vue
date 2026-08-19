@@ -339,13 +339,13 @@ function toggleGroup(groupId: string) {
 
     <div class="container grid min-w-0 gap-6 py-8 lg:grid-cols-[260px_1fr]">
       <nav class="hidden flex-col gap-1 text-sm lg:flex">
-        <a href="#connection" class="rounded-md px-3 py-2 font-medium text-primary bg-primary/5">API connection</a>
-        <a href="#profile" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Profile</a>
-        <a href="#default-profile" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Default profile</a>
-        <a href="#groups" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Groups &amp; roles</a>
-        <a href="#credentials" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">S3 credentials</a>
-        <a href="#interop" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Interoperability</a>
-        <a href="#appearance" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Appearance</a>
+        <a
+          v-for="section in settingsSections"
+          :key="section.id"
+          :href="'#' + section.id"
+          class="rounded-md px-3 py-2"
+          :class="activeSettingsSection === section.id ? 'bg-primary/5 font-medium text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
+        >{{ section.label }}</a>
         <RouterLink v-if="watchesAvailable" :to="{ name: 'settings-watches' }" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Watched resources &rarr;</RouterLink>
       </nav>
 

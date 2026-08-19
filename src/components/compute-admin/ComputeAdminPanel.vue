@@ -351,12 +351,11 @@ watch(
                   <div>
                     <label class="text-xs font-medium text-foreground">Availability stale after (ms)</label>
                     <Input v-model="draft.availability_stale_after_ms" type="number" min="0" step="1" class="mt-1" />
-                    <p class="mt-1 text-[11px] text-muted-foreground"><code>availability_stale_after_ms</code></p>
                   </div>
                   <div>
                     <label class="text-xs font-medium text-foreground">Witness base delay (ms)</label>
                     <Input v-model="draft.witness_base_delay_ms" type="number" min="1" step="1" class="mt-1" />
-                    <p class="mt-1 text-[11px] text-muted-foreground"><code>witness_base_delay_ms</code> must be greater than zero.</p>
+                    <p class="mt-1 text-[11px] text-muted-foreground">Must be greater than zero.</p>
                   </div>
                 </div>
               </div>
@@ -425,7 +424,7 @@ watch(
               <div class="flex items-center gap-2">
                 <Activity class="h-4 w-4 text-primary" />
                 <h3 class="font-display text-sm font-semibold text-aruna-navy">Approximate replicated view</h3>
-                <Badge variant="warn">approximate</Badge>
+                <Badge v-if="snapshots?.approximate ?? true" variant="warn">approximate</Badge>
               </div>
               <Button variant="ghost" size="sm" :disabled="snapshotLoading" @click="loadSnapshots">
                 <RefreshCw class="h-3.5 w-3.5" :class="snapshotLoading ? 'animate-spin' : ''" /> Refresh

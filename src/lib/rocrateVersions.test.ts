@@ -18,6 +18,7 @@ describe('RO-Crate specification IRI classification', () => {
     'http://w3id.org/ro/crate/1.3',
     'https://w3id.org/ro/crate/1.3/context',
     'http://w3id.org/ro/crate/1.3/context',
+    'https://www.researchobject.org/ro-crate/1.3/context.jsonld',
   ])('classifies %s as known but unsupported', (iri) => {
     expect(RO_CRATE_SPEC_IRIS.has(iri)).toBe(true)
     expect(classifyRoCrateSpecIri(iri)).toEqual({ kind: 'known-unsupported', version: '1.3' })

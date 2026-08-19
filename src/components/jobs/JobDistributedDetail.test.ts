@@ -316,7 +316,7 @@ describe('distributed job detail components', () => {
 
     expect(mounted.errors).toEqual([])
     expect(getJob).toHaveBeenCalledWith('native-job-id')
-    expect(text).toContain('Distributed execution detail is not available for this session')
+    expect(text).toContain('Distributed execution detail could not be loaded.')
     expect(text).not.toContain('native family detail')
     expect(text).not.toContain('ERROR:')
     mounted.app.unmount()

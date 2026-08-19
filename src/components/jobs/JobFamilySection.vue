@@ -116,10 +116,10 @@ function sealedAt(ms: number): string {
         </dd>
       </dl>
     </div>
-    <p v-else class="text-xs text-muted-foreground">Planned on another node</p>
+    <p v-else class="text-xs text-muted-foreground">No local placement record for this family.</p>
 
     <div class="space-y-1.5">
-      <div class="flex flex-wrap gap-1.5" aria-label="Responder-local caveats">
+      <div class="flex flex-wrap gap-1.5" role="group" aria-label="Responder-local caveats">
         <Badge
           v-if="family.eventually_consistent"
           variant="outline"

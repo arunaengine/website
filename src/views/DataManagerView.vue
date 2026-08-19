@@ -64,6 +64,7 @@ import {
   RefreshCw,
   Route,
   ShieldAlert,
+  ShieldCheck,
   Trash2,
   Upload,
 } from '@lucide/vue'
@@ -1226,7 +1227,7 @@ const isEmpty = computed(
                   title="Residency policies for this bucket"
                   @click="residencyDialogOpen = true"
                 >
-                  <ShieldAlert class="h-4 w-4" /> Residency
+                  <ShieldCheck class="h-4 w-4" /> Residency
                 </Button>
                 <Button
                   v-if="showSyncButton"

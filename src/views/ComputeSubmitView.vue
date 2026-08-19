@@ -327,6 +327,7 @@ const canContinue = computed(() => {
       return groupId.value.length > 0
     case 1:
       return (
+        groupId.value.length > 0 &&
         executorsValid.value &&
         outputsValid.value &&
         workspaceValid.value &&
@@ -335,7 +336,7 @@ const canContinue = computed(() => {
         diskGbValid.value
       )
     default:
-      return true
+      return groupId.value.length > 0
   }
 })
 
@@ -625,18 +626,18 @@ async function submit() {
             <div class="grid gap-3 sm:grid-cols-3">
               <div>
                 <label class="text-xs font-medium text-foreground">CPU cores</label>
-                <Input v-model="cpuCores" type="number" min="1" :max="U32_MAX" step="1" class="mt-1" placeholder="1" />
-                <p v-if="!cpuCoresValid" class="mt-1 text-[11px] text-destructive">Enter a whole number from 1 to 4294967295.</p>
+                <Input v-model="cpuCores" type="number" min="1" :max="U32_MAX" step="1" class="mt-1" placeholder="1" title="Allowed range: 1 to 4294967295." />
+                <p v-if="!cpuCoresValid" class="mt-1 text-[11px] text-destructive">Enter a whole number of at least 1.</p>
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">RAM (GB)</label>
-                <Input v-model="ramGb" type="number" :min="MIN_RESOURCE_GB" :max="MAX_RESOURCE_GB" step="any" class="mt-1" placeholder="2" />
-                <p v-if="!ramGbValid" class="mt-1 text-[11px] text-destructive">Enter 0.000000001 to 9223372036.854774 GB.</p>
+                <Input v-model="ramGb" type="number" :min="MIN_RESOURCE_GB" :max="MAX_RESOURCE_GB" step="any" class="mt-1" placeholder="2" title="Allowed range: 0.000000001 to 9223372036.854774 GB." />
+                <p v-if="!ramGbValid" class="mt-1 text-[11px] text-destructive">Must be greater than zero.</p>
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">Disk (GB)</label>
-                <Input v-model="diskGb" type="number" :min="MIN_RESOURCE_GB" :max="MAX_RESOURCE_GB" step="any" class="mt-1" placeholder="10" />
-                <p v-if="!diskGbValid" class="mt-1 text-[11px] text-destructive">Enter 0.000000001 to 9223372036.854774 GB.</p>
+                <Input v-model="diskGb" type="number" :min="MIN_RESOURCE_GB" :max="MAX_RESOURCE_GB" step="any" class="mt-1" placeholder="10" title="Allowed range: 0.000000001 to 9223372036.854774 GB." />
+                <p v-if="!diskGbValid" class="mt-1 text-[11px] text-destructive">Must be greater than zero.</p>
               </div>
             </div>
             <label class="flex items-center gap-2 text-xs font-medium text-foreground">
@@ -703,7 +704,7 @@ async function submit() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || !executorsValid || !outputsValid || !workspaceValid || !cpuCoresValid || !ramGbValid || !diskGbValid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
+        <Button v-else size="sm" :disabled="busy || !groupId || !executorsValid || !outputsValid || !workspaceValid || !cpuCoresValid || !ramGbValid || !diskGbValid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
       </div>
     </div>
 

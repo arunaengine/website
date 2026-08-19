@@ -27,8 +27,13 @@ const ButtonStub = defineComponent({
 })
 const SelectStub = defineComponent({
   props: { modelValue: { type: String, default: '' } },
-  setup(props, { attrs }) {
-    return () => h('select', { ...attrs, value: props.modelValue })
+  emits: ['update:modelValue'],
+  setup(props, { attrs, emit }) {
+    return () => h('select', {
+      ...attrs,
+      value: props.modelValue,
+      onInput: (event: { target: { value: unknown } }) => emit('update:modelValue', String(event.target.value)),
+    })
   },
 })
 const SwitchStub = defineComponent((_, { attrs }) => () => h('input', { ...attrs, type: 'checkbox' }))
@@ -470,6 +475,17 @@ describe('numeric Input consumers', () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new?step=1')
     await fillValidWorkload(mounted.root)
 
+    expect(button(mounted.root, 'Continue').props.disabled).toBe(true)
+    await mounted.router!.push('/app/compute/new?step=2')
+    await flush()
+    expect(button(mounted.root, 'Submit task').props.disabled).toBe(true)
+
+    await mounted.router!.push('/app/compute/new')
+    await flush()
+    await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
+    await mounted.router!.push('/app/compute/new?step=1')
+    await flush()
+
     expect(button(mounted.root, 'Continue').props.disabled).toBe(false)
     await click(button(mounted.root, 'Continue'))
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -493,8 +509,8 @@ describe('numeric Input consumers', () => {
     await typeValue(input(mounted.root, 'placeholder', '10'), '9223372036.854776')
 
     expect(button(mounted.root, 'Continue').props.disabled).toBe(true)
-    expect(content(mounted.root)).toContain('Enter a whole number from 1 to 4294967295.')
-    expect(content(mounted.root)).toContain('Enter 0.000000001 to 9223372036.854774 GB.')
+    expect(content(mounted.root)).toContain('Enter a whole number of at least 1.')
+    expect(content(mounted.root)).toContain('Must be greater than zero.')
 
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()

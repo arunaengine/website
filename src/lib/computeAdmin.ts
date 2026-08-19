@@ -371,11 +371,30 @@ export function isComputeAdminUnsupported(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 404 || error.status === 405)
 }
 
+export function quotaDimensionLabel(dimension: string): string {
+  switch (dimension) {
+    case 'jobs': return 'jobs'
+    case 'cpu_cores': return 'CPU cores'
+    case 'ram_bytes': return 'RAM'
+    case 'disk_bytes': return 'disk'
+    case 'walltime_ms': return 'walltime'
+    case 'job_cpu_cores':
+    case 'max_job_cpu_cores': return 'per-job CPU cores'
+    case 'job_ram_bytes':
+    case 'max_job_ram_bytes': return 'per-job RAM'
+    case 'job_disk_bytes':
+    case 'max_job_disk_bytes': return 'per-job disk'
+    case 'job_walltime_ms':
+    case 'max_job_walltime_ms': return 'per-job walltime'
+    default: return dimension.replaceAll('_', ' ')
+  }
+}
+
 export function computeAdminErrorMessage(error: unknown): string {
-  const typed = error as ComputeAdminBackendError
+  const typed = (error instanceof ApiError ? error.details : error) as ComputeAdminBackendError | undefined
   if (typed?.quota) {
     const quota = typed.quota
-    return `Compute quota denied for ${quota.scope} ${quota.dimension}: observed ${quota.observed}, requested ${quota.requested}, limit ${quota.limit}.`
+    return `Compute quota denied for ${quota.scope} ${quotaDimensionLabel(quota.dimension)}: observed ${quota.observed}, requested ${quota.requested}, limit ${quota.limit}.`
   }
   if (error instanceof ApiError && error.status === 409) {
     return 'The compute configuration changed concurrently. Reload it before saving again.'

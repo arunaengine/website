@@ -12,7 +12,7 @@ defineProps<{ report: CoverageResponse }>()
 <template>
   <div class="space-y-4">
     <div class="flex flex-wrap items-center gap-2">
-      <Badge variant="outline">{{ report.scope }} scope</Badge>
+      <Badge variant="outline">{{ report.scope.replaceAll('_', ' ') }} scope</Badge>
       <Badge :variant="report.complete ? 'success' : 'warn'">
         {{ report.complete ? 'responder scan complete' : 'more responder rows' }}
       </Badge>
@@ -50,8 +50,8 @@ defineProps<{ report: CoverageResponse }>()
           <tr v-for="gap in report.gaps" :key="`${gap.key}:${gap.version_id}`">
             <td class="px-3 py-2 font-mono">{{ gap.key }}</td>
             <td class="px-3 py-2 font-mono" :title="gap.version_id">{{ truncateMiddle(gap.version_id) }}</td>
-            <td class="px-3 py-2"><Badge :variant="gap.attachment === 'missing' ? 'destructive' : 'warn'">{{ gap.attachment }}</Badge></td>
-            <td class="px-3 py-2">{{ gap.copy ?? 'not reported for historical scope' }}</td>
+            <td class="px-3 py-2"><Badge :variant="gap.attachment === 'missing' ? 'destructive' : 'warn'">{{ gap.attachment.replaceAll('_', ' ') }}</Badge></td>
+            <td class="px-3 py-2">{{ gap.copy?.replaceAll('_', ' ') ?? 'not reported for historical scope' }}</td>
           </tr>
         </tbody>
       </table>

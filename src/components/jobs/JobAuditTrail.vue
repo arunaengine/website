@@ -233,7 +233,7 @@ watch(
 
           <div v-if="nextCursor || moreError" class="flex flex-wrap items-center gap-3">
             <Button v-if="nextCursor" variant="outline" size="sm" :disabled="loadingMore" @click="load(false)">
-              {{ loadingMore ? 'Loading records...' : 'Load more records' }}
+              {{ loadingMore ? 'Loading records…' : 'Load more records' }}
             </Button>
             <p v-if="moreError" class="text-[11px] text-destructive">{{ moreError }}</p>
           </div>

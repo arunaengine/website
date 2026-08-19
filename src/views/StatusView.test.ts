@@ -12,6 +12,6 @@ describe('node outage presentation', () => {
     expect(predicate).not.toContain('node.configured')
     expect(predicate).not.toContain('connection_status')
     expect(source).toContain('The browser API probe failed')
-    expect(source).toContain('DHT presence confirmed')
+    expect(source).toContain('present in DHT')
   })
 })

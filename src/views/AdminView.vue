@@ -367,23 +367,25 @@ async function save() {
 
     <template v-else>
       <div v-if="adminTabs.length > 1" class="container pt-6">
-        <div class="flex items-center gap-1 border-b border-border" role="tablist" aria-label="Realm administration sections">
-          <button
-            v-for="entry in adminTabs"
-            :key="entry.id"
-            type="button"
-            role="tab"
-            :aria-selected="tab === entry.id"
-            :class="[
-              '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-              tab === entry.id
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            ]"
-            @click="setTab(entry.id)"
-          >
-            {{ entry.label }}
-          </button>
+        <div class="overflow-x-auto">
+          <div class="flex items-center gap-1 border-b border-border" role="tablist" aria-label="Realm administration sections">
+            <button
+              v-for="entry in adminTabs"
+              :key="entry.id"
+              type="button"
+              role="tab"
+              :aria-selected="tab === entry.id"
+              :class="[
+                '-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+                tab === entry.id
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              ]"
+              @click="setTab(entry.id)"
+            >
+              {{ entry.label }}
+            </button>
+          </div>
         </div>
       </div>
 

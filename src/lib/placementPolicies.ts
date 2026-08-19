@@ -1,4 +1,5 @@
 import { ApiError } from '@/lib/api'
+import { quotaDimensionLabel } from '@/lib/computeAdmin'
 
 export interface PolicyRefBody {
   policy_id: string
@@ -378,10 +379,10 @@ export function placementPoliciesErrorMessage(
   error: unknown,
   context: PlacementErrorContext = 'generic',
 ): string {
-  const typed = error as PlacementPoliciesBackendError
+  const typed = (error instanceof ApiError ? error.details : error) as PlacementPoliciesBackendError | undefined
   if (typed?.quota) {
     const quota = typed.quota
-    return `Compute quota denied for ${quota.scope} ${quota.dimension}: observed ${quota.observed}, requested ${quota.requested}, limit ${quota.limit}.`
+    return `Quota denied for ${quota.scope} ${quotaDimensionLabel(quota.dimension)}: observed ${quota.observed}, requested ${quota.requested}, limit ${quota.limit}.`
   }
   if (error instanceof ApiError && error.status === 409) {
     const message = error.message.toLowerCase()
