@@ -86,11 +86,11 @@ export function knownLocations(nodes: RealmNodeInfo[]): string[] {
 }
 
 // Assumed reserved matcher key for location pinning (aruna#269): affinity
-// matches label key/value pairs, and core's built-in matcher keys use the
-// 'aruna.io/' prefix (the core tests match 'aruna.io/kind'). Until the backend
-// fixes the vocabulary, location pins are emitted as
+// matches label key/value pairs, and the backend's reserved keys live under
+// the 'aruna-engine.org/' namespace (core reserves 'aruna-engine.org/kind').
+// Until the backend reserves this key, location pins are emitted as
 // { key: LOCATION_AFFINITY_KEY, value: <location>, effect: 'filter' }.
-export const LOCATION_AFFINITY_KEY = 'aruna.io/location'
+export const LOCATION_AFFINITY_KEY = 'aruna-engine.org/location'
 
 export function isLocationPin(rule: PlacementAffinityRule): boolean {
   return rule.key === LOCATION_AFFINITY_KEY && rule.effect.kind === 'filter'
