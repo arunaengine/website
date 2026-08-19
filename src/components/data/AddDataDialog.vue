@@ -440,7 +440,7 @@ watch(
     groupSel.value =
       props.groupId && groups.some((group) => group.id === props.groupId)
         ? props.groupId
-        : groups[0]?.id ?? ''
+        : ''
     void loadConnectors()
     // Fresh Other-buckets session per dialog visit.
     sourceBucket.value = ''

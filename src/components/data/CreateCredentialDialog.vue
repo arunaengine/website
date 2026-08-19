@@ -20,11 +20,10 @@ import type { CreateS3CredentialsResponse } from '@/lib/api'
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
-  (e: 'activated'): void
 }>()
 
-const { myGroups, saving, createS3Credentials } = useAruna()
-const { endpoint, setActiveKey } = useS3()
+const { myGroups, userInfo, saving, createS3Credentials } = useAruna()
+const { connectedEndpoint } = useS3()
 
 const EXPIRY_OPTIONS = [
   { value: '3600', label: '1 hour' },
@@ -60,8 +59,20 @@ function removeRestriction(index: number) {
   restrictions.value.splice(index, 1)
 }
 
+function hasWriteAccess(groupId: string): boolean {
+  const group = userInfo.value?.groups.find((entry) => entry.group_id === groupId)
+  return Boolean(
+    group?.roles.some((role) =>
+      Object.values(role.permissions).some((permission) => permission.toLowerCase() === 'write'),
+    ),
+  )
+}
+
 const groupOptions = computed(() =>
-  myGroups.value.map((group) => ({ value: group.id, label: group.name })),
+  myGroups.value.map((group) => ({
+    value: group.id,
+    label: hasWriteAccess(group.id) ? group.name : `${group.name} (no write access)`,
+  })),
 )
 
 const cliSnippet = computed(() => {
@@ -69,16 +80,19 @@ const cliSnippet = computed(() => {
   return [
     `export AWS_ACCESS_KEY_ID=${created.value.access_key_id}`,
     `export AWS_SECRET_ACCESS_KEY=${created.value.access_secret}`,
-    `aws s3 ls --endpoint-url ${endpoint.value ?? '<s3-endpoint>'}`,
-    `s5cmd --endpoint-url ${endpoint.value ?? '<s3-endpoint>'} ls`,
+    `aws s3 ls --endpoint-url ${connectedEndpoint.value ?? '<s3-endpoint>'}`,
+    `s5cmd --endpoint-url ${connectedEndpoint.value ?? '<s3-endpoint>'} ls`,
   ].join('\n')
 })
 
 watch(
   () => props.open,
   (open) => {
-    if (!open) return
-    groupId.value = myGroups.value[0]?.id ?? ''
+    if (!open) {
+      created.value = null
+      return
+    }
+    groupId.value = ''
     expiresIn.value = '2592000'
     submitError.value = null
     created.value = null
@@ -105,16 +119,6 @@ async function submit() {
     submitError.value = err instanceof Error ? err.message : String(err)
   }
 }
-
-function activate() {
-  if (!created.value) return
-  setActiveKey({
-    accessKeyId: created.value.access_key_id,
-    secretAccessKey: created.value.access_secret,
-  })
-  emit('activated')
-  emit('update:open', false)
-}
 </script>
 
 <template>
@@ -122,10 +126,10 @@ function activate() {
     <DialogContent class="max-w-lg">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
-          <KeyRound class="h-4 w-4 text-primary" /> Create S3 credentials
+          <KeyRound class="h-4 w-4 text-primary" /> Create CLI or service key
         </DialogTitle>
         <DialogDescription>
-          The key is scoped to one group and works with any S3 client against this node.
+          Create a long-lived, group-scoped key for an S3 client against this node. Portal browsing uses temporary sessions instead.
         </DialogDescription>
       </DialogHeader>
 
@@ -175,7 +179,7 @@ function activate() {
       <div v-else class="space-y-3">
         <div class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
           <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>The secret is shown once and cannot be retrieved later. Activating it below remembers it in this browser until you sign out or revoke it.</span>
+          <span>The secret is shown once and cannot be retrieved later. The portal never stores or uses this key.</span>
         </div>
         <div class="space-y-2 text-sm">
           <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
@@ -206,8 +210,7 @@ function activate() {
           <Button :disabled="saving || !groupId" @click="submit">{{ saving ? 'Creating…' : 'Create' }}</Button>
         </template>
         <template v-else>
-          <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
-          <Button @click="activate">Use in browser</Button>
+          <DialogClose as-child><Button>Close</Button></DialogClose>
         </template>
       </DialogFooter>
 

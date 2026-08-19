@@ -3,6 +3,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
+import Select from '@/components/ui/Select.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -15,7 +16,6 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import Popover from '@/components/ui/Popover.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
-import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
@@ -71,7 +71,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { authToken, currentUser, bootstrapped, credentials, getGroupUsage, isManagementNode, isRealmAdmin, listGroupConnectors, listSyncRelationships, nodeInfo, realmInfo } = useAruna()
+const { authToken, currentUser, bootstrapped, myGroups, getGroupUsage, isManagementNode, isRealmAdmin, listGroupConnectors, listSyncRelationships, nodeInfo, realmInfo } = useAruna()
 const s3 = useS3()
 
 function routeString(value: unknown): string {
@@ -85,8 +85,8 @@ const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
 
 // Federated bucket search + cross-node browsing. The optional ?node=<id> route
 // param selects the hosting node (default: the connected node) so deep links
-// into remote buckets stay stable. S3 credentials are realm-wide, so the same
-// stored key signs requests against the remote node's published S3 endpoint.
+// into remote buckets stay stable. Each node and group uses its own temporary
+// session, selected explicitly before any request is sent.
 const realmNodes = useRealmNodes()
 const shortcuts = useBucketShortcuts()
 
@@ -95,6 +95,70 @@ const remoteNodeId = computed(() => {
   if (!nodeId || realmNodes.isLocalNode(nodeId)) return null
   return nodeId
 })
+const selectedGroupId = ref(routeString(route.query.group) || s3.activeContext.value?.groupId || '')
+const selectedGroupLabel = ref('')
+const contextBusy = ref(false)
+const contextError = ref<string | null>(null)
+const requiredNodeId = computed(() => s3.nodeIdFor(remoteNodeId.value))
+const contextMismatch = computed(() => s3.contextMismatch(remoteNodeId.value))
+const contextReady = computed(() => {
+  const context = s3.activeContext.value
+  return Boolean(
+    context &&
+      s3.activeKey.value &&
+      currentUser.value &&
+      context.userId === currentUser.value.id &&
+      context.nodeId === requiredNodeId.value &&
+      context.groupId === selectedGroupId.value,
+  )
+})
+const contextFingerprint = computed(() => {
+  const context = contextReady.value ? s3.activeContext.value : null
+  return context ? `${context.nodeId}|${context.groupId}|${context.session.accessKeyId}` : ''
+})
+const sessionWarning = computed(() =>
+  contextReady.value ? s3.activeContext.value?.session.warning ?? null : null,
+)
+const groupOptions = computed(() => {
+  const options = myGroups.value.map((group) => ({ value: group.id, label: group.name }))
+  if (selectedGroupId.value && !options.some((option) => option.value === selectedGroupId.value)) {
+    options.push({
+      value: selectedGroupId.value,
+      label: selectedGroupLabel.value || selectedGroupId.value,
+    })
+  }
+  return options
+})
+const requiredNodeName = computed(() =>
+  requiredNodeId.value ? realmNodes.displayName(requiredNodeId.value) : 'the selected node',
+)
+const issuerNodeName = computed(() =>
+  contextMismatch.value ? realmNodes.displayName(contextMismatch.value.issuerNodeId) : '',
+)
+
+watch(selectedGroupId, () => {
+  contextError.value = null
+  uploadRestrictionError.value = null
+})
+
+async function openSelectedContext() {
+  if (!selectedGroupId.value || !requiredNodeId.value || contextBusy.value) return
+  contextBusy.value = true
+  contextError.value = null
+  try {
+    await s3.activateContext(remoteNodeId.value, selectedGroupId.value)
+    await router.replace({
+      query: {
+        ...route.query,
+        group: selectedGroupId.value,
+      },
+    })
+  } catch (err) {
+    contextError.value = s3ErrorMessage(err)
+  } finally {
+    contextBusy.value = false
+  }
+}
 // The endpoint actually serving the browsed bucket (local or remote).
 const effectiveEndpoint = computed(() => s3.endpointForNode(remoteNodeId.value))
 // Remote node without a published S3 endpoint: honest info panel, never a
@@ -312,15 +376,12 @@ const newBucketName = ref('')
 const creatingBucket = ref(false)
 const createBucketError = ref<string | null>(null)
 
-const credentialDialogOpen = ref(false)
-const manualKeyId = ref('')
-const manualSecret = ref('')
-
 const keyTail = computed(() => s3.activeKey.value?.accessKeyId.slice(-4) ?? '')
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragActive = ref(false)
 const stripDrag = ref(false)
+const uploadRestrictionError = ref<string | null>(null)
 
 const addDataOpen = ref(false)
 const staging = useStaging()
@@ -417,7 +478,11 @@ function clearObjectListing() {
 }
 
 async function loadObjects(more = false) {
-  if (!s3.hasActiveKey.value || !effectiveEndpoint.value || !bucket.value) return
+  if (!contextReady.value || !effectiveEndpoint.value || !bucket.value) return
+  if (!s3.canRead(bucket.value, s3Prefix.value, remoteNodeId.value)) {
+    listError.value = 'This session does not allow reading the selected bucket and prefix.'
+    return
+  }
   const requestId = ++listRequestId
   const targetBucket = bucket.value
   const targetPrefix = s3Prefix.value
@@ -467,13 +532,13 @@ function refreshAll() {
 // /info bootstrap), so loading must wait for both the key and the endpoint
 // and re-fire once the endpoint resolves.
 watch(
-  [() => s3.activeKey.value, () => s3.endpoint.value],
-  ([key, endpoint]) => {
+  [contextFingerprint, effectiveEndpoint],
+  ([context, endpoint]) => {
     clearObjectListing()
-    if (!key) return
+    if (!context) return
     if (!endpoint) return
-    // Cached buckets show at once; useBuckets drops them itself when this key
-    // or endpoint belongs to another identity.
+    // Cached buckets show at once; useBuckets scopes them by session and
+    // endpoint, so another node or group never inherits this list.
     void bucketList.ensure()
     reloadContext()
   },
@@ -484,8 +549,16 @@ watch(
 // realm document (with the remote node's published S3 URL) arrives.
 watch([bucket, prefix, remoteNodeId, effectiveEndpoint], () => {
   clearObjectListing()
-  if (bucket.value) void loadObjects()
+  if (bucket.value && contextReady.value) void loadObjects()
 })
+
+watch(
+  () => route.query.group,
+  (group) => {
+    const next = routeString(group)
+    if (next) selectedGroupId.value = next
+  },
+)
 
 watch(
   bucket,
@@ -505,17 +578,10 @@ watch(
   { immediate: true },
 )
 
-function activateManualKey() {
-  if (!manualKeyId.value.trim() || !manualSecret.value.trim()) return
-  s3.setActiveKey({ accessKeyId: manualKeyId.value.trim(), secretAccessKey: manualSecret.value.trim() })
-  manualKeyId.value = ''
-  manualSecret.value = ''
-}
-
 // Navigating to the current location must reload, not clear: a push to an
 // identical route never fires the [bucket, prefix] watch, so a pre-cleared
 // listing would stay empty (the "home shows an empty bucket" bug).
-function openBucketOn(name: string, nodeId: string | null) {
+function openBucketOn(name: string, nodeId: string | null, groupId = selectedGroupId.value) {
   if (name === bucket.value && !prefix.value && nodeId === remoteNodeId.value) {
     void loadObjects()
     return
@@ -523,7 +589,10 @@ function openBucketOn(name: string, nodeId: string | null) {
   void router.push({
     name: 'bucket',
     params: { bucketId: name },
-    query: nodeId ? { node: nodeId } : {},
+    query: {
+      ...(nodeId ? { node: nodeId } : {}),
+      ...(groupId ? { group: groupId } : {}),
+    },
   })
 }
 
@@ -532,7 +601,9 @@ function openBucket(name: string) {
 }
 
 function openSearchHit(hit: BucketSearchHit) {
-  openBucketOn(hit.bucket, realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
+  selectedGroupId.value = hit.group_id
+  selectedGroupLabel.value = hit.group_name ?? hit.group_id
+  openBucketOn(hit.bucket, realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id, hit.group_id)
 }
 
 function navigateTo(path: string) {
@@ -546,6 +617,7 @@ function navigateTo(path: string) {
     query: {
       ...(path ? { prefix: path } : {}),
       ...(remoteNodeId.value ? { node: remoteNodeId.value } : {}),
+      ...(selectedGroupId.value ? { group: selectedGroupId.value } : {}),
     },
   })
 }
@@ -556,7 +628,7 @@ function openFolder(folder: FolderEntry) {
 
 async function createBucket() {
   const name = newBucketName.value.trim()
-  if (!name) return
+  if (!name || !contextReady.value || !s3.canWrite(name, undefined, remoteNodeId.value)) return
   creatingBucket.value = true
   createBucketError.value = null
   try {
@@ -572,6 +644,7 @@ async function createBucket() {
 }
 
 function openNewFolder() {
+  if (!canWriteCurrentPrefix.value) return
   newFolderName.value = ''
   newFolderError.value = null
   newFolderOpen.value = true
@@ -583,6 +656,11 @@ async function createFolder() {
   newFolderError.value = null
   const targetBucket = bucket.value
   const targetPrefix = s3Prefix.value
+  const targetKey = `${targetPrefix}${newFolderName.value.trim()}/`
+  if (!s3.canWrite(targetBucket, targetKey, remoteNodeId.value)) {
+    newFolderError.value = 'This session does not allow creating that folder.'
+    return
+  }
   try {
     await s3.createFolder(targetBucket, targetPrefix, newFolderName.value.trim(), remoteNodeId.value)
     newFolderOpen.value = false
@@ -595,6 +673,7 @@ async function createFolder() {
 }
 
 function pickFiles() {
+  if (!canWriteCurrentPrefix.value) return
   fileInput.value?.click()
 }
 
@@ -606,27 +685,37 @@ function onFileInput(event: Event) {
 
 function onDrop(event: DragEvent) {
   dragActive.value = false
-  if (!bucket.value || !event.dataTransfer?.files.length) return
+  if (!canWriteCurrentPrefix.value || !bucket.value || !event.dataTransfer?.files.length) return
   void requestUpload(Array.from(event.dataTransfer.files))
 }
 
 function onStripDrop(event: DragEvent) {
   stripDrag.value = false
-  if (!bucket.value || !event.dataTransfer?.files.length) return
+  if (!canWriteCurrentPrefix.value || !bucket.value || !event.dataTransfer?.files.length) return
   void requestUpload(Array.from(event.dataTransfer.files))
 }
 
-// The bucket namespace is the credential's group, so quota state for uploads
-// comes from that group's usage endpoint. Manual keys not in the caller's
-// credential list resolve to null -> the precheck silently skips (advisory).
-const activeGroupId = computed(
-  () => credentials.value.find((c) => c.access_key_id === s3.activeKey.value?.accessKeyId)?.group_id ?? null,
+// The selected group is part of the active session context, never inferred
+// from a long-lived credential list.
+const activeGroupId = computed(() =>
+  contextReady.value ? s3.activeContext.value?.groupId ?? null : null,
+)
+const canWriteCurrentPrefix = computed(() =>
+  Boolean(
+    contextReady.value &&
+      bucket.value &&
+      s3.canWritePrefix(bucket.value, s3Prefix.value, remoteNodeId.value),
+  ),
+)
+const writeRestrictionMessage = computed(() =>
+  canWriteCurrentPrefix.value
+    ? null
+    : 'This session is read-only for the selected bucket or prefix. Upload, create, and delete actions are unavailable.',
 )
 
-// Canonical data watch prefix for the browsed bucket/prefix. Needs the
-// credential's group (manual keys outside the caller's credential list cannot
-// resolve one) and the id of the node SERVING the S3 endpoint — uploads emit
-// under that node, so watching the wrong node id would never fire.
+// Canonical data watch prefix for the browsed bucket/prefix. It uses the
+// active session's explicit group and the node serving the S3 endpoint, so an
+// upload watch is never attached to another context.
 const watchNodeId = computed(
   () =>
     // Browsing a remote node: uploads there emit under that node's id.
@@ -678,7 +767,15 @@ interface UploadContext {
 }
 
 function captureUploadContext(files: File[]): UploadContext | null {
-  if (!s3.activeKey.value || !effectiveEndpoint.value || !bucket.value) return null
+  if (!contextReady.value || !effectiveEndpoint.value || !bucket.value || !activeGroupId.value) return null
+  if (
+    files.some((file) =>
+      !s3.canWrite(bucket.value, `${s3Prefix.value}${file.name}`, remoteNodeId.value),
+    )
+  ) {
+    uploadRestrictionError.value = 'This session does not allow one or more selected upload paths.'
+    return null
+  }
   return {
     files,
     bucket: bucket.value,
@@ -690,6 +787,7 @@ function captureUploadContext(files: File[]): UploadContext | null {
 
 // Advisory only: this may warn but never blocks. Every path ends in an upload.
 async function requestUpload(files: File[]) {
+  uploadRestrictionError.value = null
   const context = captureUploadContext(files)
   if (!context) return
   const groupId = context.groupId
@@ -842,6 +940,7 @@ async function download(object: ObjectEntry) {
 }
 
 function openDeleteObject(object: ObjectEntry) {
+  if (!s3.canWrite(bucket.value, object.key, remoteNodeId.value)) return
   deleteError.value = null
   deleteTarget.value = { type: 'object', bucket: bucket.value, object, nodeId: remoteNodeId.value }
 }
@@ -850,6 +949,7 @@ function openDeleteObject(object: ObjectEntry) {
 // finds (capped; '+' marks a truncated count) before anything is removed.
 const FOLDER_COUNT_LIMIT = 2000
 function openDeleteFolder(folder: FolderEntry) {
+  if (!s3.canDeletePrefix(bucket.value, folder.prefix, remoteNodeId.value)) return
   deleteError.value = null
   deleteTarget.value = {
     type: 'folder',
@@ -887,6 +987,15 @@ async function resolveFolderCount(folder: FolderEntry) {
 async function confirmDelete() {
   if (!deleteTarget.value) return
   const target = deleteTarget.value
+  const targetKey = target.type === 'object' ? target.object.key : target.folder.prefix
+  const deletionAllowed =
+    target.type === 'object'
+      ? s3.canWrite(target.bucket, targetKey, target.nodeId)
+      : s3.canDeletePrefix(target.bucket, targetKey, target.nodeId)
+  if (!deletionAllowed) {
+    deleteError.value = 'This session no longer allows deleting the selected path.'
+    return
+  }
   deleteBusy.value = true
   deleteError.value = null
   try {
@@ -924,6 +1033,7 @@ async function confirmDelete() {
 // there would fail confusingly. openDeleteBucket also kicks off the object walk
 // that fills the dialog's "contains N objects, X" line.
 function openDeleteBucket(name: string, nodeId: string | null) {
+  if (!s3.canDeletePrefix(name, '', nodeId)) return
   bucketDeleteError.value = null
   bucketDeleteConfirm.value = ''
   bucketDeleteTarget.value = { bucket: name, nodeId, count: null, bytes: 0, countTruncated: false }
@@ -948,6 +1058,10 @@ async function resolveBucketStats(name: string, nodeId: string | null) {
 async function confirmDeleteBucket() {
   const target = bucketDeleteTarget.value
   if (!target || !bucketDeleteConfirmed.value) return
+  if (!s3.canDeletePrefix(target.bucket, '', target.nodeId)) {
+    bucketDeleteError.value = 'This session no longer allows deleting this bucket.'
+    return
+  }
   bucketDeleteBusy.value = true
   bucketDeleteError.value = null
   try {
@@ -993,10 +1107,32 @@ const isEmpty = computed(
       description="Browse buckets and objects through the node's S3 interface, signed in your browser."
     >
       <template #actions>
-        <template v-if="s3.hasActiveKey.value">
+        <template v-if="currentUser && s3.connectedEndpoint.value">
+          <span class="hidden text-xs text-muted-foreground xl:inline" :title="requiredNodeId ?? undefined">
+            Node: {{ requiredNodeName }}
+          </span>
+          <Select
+            v-model="selectedGroupId"
+            :options="groupOptions"
+            placeholder="Select a group"
+            aria-label="S3 session group"
+            class="w-52"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="!selectedGroupId || !requiredNodeId || contextBusy || contextReady"
+            @click="openSelectedContext"
+          >
+            <Loader2 v-if="contextBusy" class="h-4 w-4 animate-spin" />
+            <KeyRound v-else class="h-4 w-4" />
+            {{ contextReady ? 'Session active' : contextMismatch || remoteNodeId ? 'Open on this node' : 'Open group' }}
+          </Button>
+        </template>
+        <template v-if="contextReady">
           <span
             class="flex items-center gap-1 font-mono text-[11px] text-muted-foreground"
-            :title="`Signing with key ${s3.activeKey.value?.accessKeyId}, manage keys in Settings`"
+            :title="`Temporary session ${s3.activeKey.value?.accessKeyId} for group ${activeGroupId} on node ${requiredNodeId}`"
           >
             <KeyRound class="h-3 w-3" /> …{{ keyTail }}
           </span>
@@ -1011,48 +1147,46 @@ const isEmpty = computed(
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <section v-if="!s3.endpoint.value && !bootstrapped" class="surface flex items-center gap-2 p-5 text-sm text-muted-foreground">
+      <section v-if="!s3.connectedEndpoint.value && !bootstrapped" class="surface flex items-center gap-2 p-5 text-sm text-muted-foreground">
         <Loader2 class="h-4 w-4 animate-spin" /> Connecting to the node…
       </section>
 
-      <section v-else-if="!s3.endpoint.value" class="surface border-amber-500/30 bg-amber-500/5 p-5 text-sm text-amber-900 dark:text-amber-200">
+      <section v-else-if="!s3.connectedEndpoint.value" class="surface border-amber-500/30 bg-amber-500/5 p-5 text-sm text-amber-900 dark:text-amber-200">
         <div class="flex items-start gap-3">
           <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />
           <p>This node does not advertise an S3 endpoint, so the data manager cannot connect.</p>
         </div>
       </section>
 
-      <section v-else-if="!s3.hasActiveKey.value" class="grid gap-4 md:grid-cols-2">
-        <div class="surface p-6">
-          <div class="flex items-center gap-2">
-            <KeyRound class="h-4 w-4 text-primary" />
-            <h2 class="font-display text-base font-semibold text-aruna-navy">Create S3 credentials</h2>
-          </div>
-          <p class="mt-2 text-sm text-muted-foreground">
-            Mint a group-scoped key for this realm. The same key works in the browser and in any S3 client.
-          </p>
-          <div class="mt-4">
-            <Button v-if="currentUser" @click="credentialDialogOpen = true"><Plus class="h-4 w-4" /> Create credentials</Button>
-            <p v-else class="flex items-center gap-2 text-sm text-muted-foreground"><LogIn class="h-4 w-4" /> Sign in first to create credentials.</p>
-          </div>
-        </div>
-        <div class="surface p-6">
-          <div class="flex items-center gap-2">
-            <Boxes class="h-4 w-4 text-primary" />
-            <h2 class="font-display text-base font-semibold text-aruna-navy">Use an existing key</h2>
-          </div>
-          <p class="mt-2 text-sm text-muted-foreground">
-            The key is kept in this browser so the session survives reloads. Revoke keys under Settings.
-          </p>
-          <div class="mt-4 space-y-2">
-            <Input v-model="manualKeyId" placeholder="Access key ID" class="font-mono text-xs" />
-            <Input v-model="manualSecret" placeholder="Secret access key" type="password" class="font-mono text-xs" @keyup.enter="activateManualKey" />
-            <Button variant="outline" :disabled="!manualKeyId.trim() || !manualSecret.trim()" @click="activateManualKey">Use key</Button>
+      <section v-else-if="!contextReady" class="surface p-6">
+        <div class="flex items-start gap-3">
+          <KeyRound class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div>
+            <h2 class="font-display text-base font-semibold text-aruna-navy">Open a temporary S3 session</h2>
+            <p v-if="!currentUser" class="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <LogIn class="h-4 w-4" /> Sign in, then explicitly select a node and group.
+            </p>
+            <p v-else-if="contextMismatch" class="mt-2 text-sm text-muted-foreground">
+              The current session was issued by {{ issuerNodeName }} ({{ contextMismatch.issuerNodeId }}). This bucket requires {{ requiredNodeName }} ({{ contextMismatch.requiredNodeId }}). Select the group and choose Open on this node. The existing credential will not be sent to the required node.
+            </p>
+            <p v-else-if="!selectedGroupId" class="mt-2 text-sm text-muted-foreground">
+              Select a group above. The portal mints a node-local session only after that explicit selection and keeps it in memory only.
+            </p>
+            <p v-else class="mt-2 text-sm text-muted-foreground">
+              Open group {{ selectedGroupLabel || selectedGroupId }} on {{ requiredNodeName }}. Expired sessions block new operations and are replaced only after this explicit action.
+            </p>
+            <p v-if="contextError" class="mt-3 text-xs text-destructive">{{ contextError }}</p>
           </div>
         </div>
       </section>
 
       <section v-else class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div
+          v-if="sessionWarning"
+          class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-800 lg:col-span-2 dark:text-amber-300"
+        >
+          {{ sessionWarning }}
+        </div>
         <aside class="space-y-3">
           <div class="surface p-3">
             <BucketSearchBox :sync-by-bucket="syncByBucket" @open="openSearchHit" @sync="openSyncFromHit" />
@@ -1071,12 +1205,9 @@ const isEmpty = computed(
               <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading buckets…
             </div>
             <div v-else-if="bucketsError && bucketsAuthError" class="m-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-              <p>Your S3 credentials were rejected: the key may be invalid, expired, or revoked.</p>
+              <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
               <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ bucketsError }}</p>
-              <div class="mt-2 flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="h-3.5 w-3.5" /> Create new credentials</Button>
-                <Button variant="outline" size="sm" @click="s3.clearActiveKey()"><KeyRound class="h-3.5 w-3.5" /> Clear active key</Button>
-              </div>
+              <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
             </div>
             <p v-else-if="bucketsError && !bucketsLoaded" class="px-4 py-3 text-xs text-destructive">{{ bucketsError }}</p>
             <template v-else>
@@ -1102,8 +1233,10 @@ const isEmpty = computed(
                       <button
                         type="button"
                         class="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
+                        :class="!s3.canDeletePrefix(entry.bucket, '', entry.nodeId) && 'cursor-not-allowed opacity-40'"
                         :title="`Delete ${entry.bucket}`"
                         :aria-label="`Delete bucket ${entry.bucket}`"
+                        :disabled="!s3.canDeletePrefix(entry.bucket, '', entry.nodeId)"
                         @mousedown.prevent
                         @click="openDeleteBucket(entry.bucket, entry.nodeId)"
                       >
@@ -1161,11 +1294,12 @@ const isEmpty = computed(
             <footer class="space-y-2 border-t border-border p-3">
               <div class="flex gap-2">
                 <Input v-model="newBucketName" placeholder="new-bucket-name" class="h-8 font-mono text-xs" @keyup.enter="createBucket" />
-                <Button variant="outline" size="sm" :disabled="creatingBucket || !newBucketName.trim()" @click="createBucket">
+                <Button variant="outline" size="sm" :disabled="creatingBucket || !newBucketName.trim() || !s3.canWrite(newBucketName.trim(), undefined, remoteNodeId)" title="Create a bucket only when the session permits this path" @click="createBucket">
                   <FolderPlus class="h-4 w-4" />
                 </Button>
               </div>
               <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
+              <p v-else-if="newBucketName.trim() && !s3.canWrite(newBucketName.trim(), undefined, remoteNodeId)" class="text-xs text-muted-foreground">This session does not allow creating that bucket.</p>
             </footer>
           </div>
         </aside>
@@ -1200,6 +1334,7 @@ const isEmpty = computed(
                   class="h-8 w-8 text-destructive hover:text-destructive"
                   :title="`Delete ${bucket}`"
                   aria-label="Delete bucket"
+                  :disabled="!s3.canDeletePrefix(bucket, '', null)"
                   @click="openDeleteBucket(bucket, null)"
                 >
                   <Trash2 class="h-4 w-4" />
@@ -1296,10 +1431,13 @@ const isEmpty = computed(
                   </template>
                 </Popover>
                 <!-- The Add data pipeline always targets the connected node. -->
-                <Button v-if="!remoteBlocked" variant="outline" size="sm" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
-                <Button v-if="!remoteNodeId" size="sm" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
+                <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Create a folder'" @click="openNewFolder"><FolderPlus class="h-4 w-4" /> New folder</Button>
+                <Button v-if="!remoteNodeId" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Add data'" @click="addDataOpen = true"><Plus class="h-4 w-4" /> Add data</Button>
               </div>
             </div>
+            <p v-if="writeRestrictionMessage" class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              {{ writeRestrictionMessage }}
+            </p>
 
             <!-- Remote bucket whose endpoint the browser cannot use: an honest
                  info panel instead of a broken listing. -->
@@ -1329,17 +1467,14 @@ const isEmpty = computed(
             <div
               class="surface overflow-hidden"
               :class="dragActive ? 'ring-2 ring-primary ring-offset-2' : ''"
-              @dragover.prevent="dragActive = true"
+              @dragover.prevent="dragActive = canWriteCurrentPrefix"
               @dragleave="dragActive = false"
               @drop.prevent="onDrop"
             >
               <div v-if="listError && listAuthError" class="border-b border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
-                <p>Your S3 credentials were rejected, the key may be invalid, expired, or revoked.</p>
+                <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
                 <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ listError }}</p>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="h-3.5 w-3.5" /> Create new credentials</Button>
-                  <Button variant="outline" size="sm" @click="s3.clearActiveKey()"><KeyRound class="h-3.5 w-3.5" /> Clear active key</Button>
-                </div>
+                <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
               </div>
               <p v-else-if="listError" class="border-b border-border px-4 py-3 text-xs text-destructive">{{ listError }}</p>
               <table class="w-full text-sm">
@@ -1379,7 +1514,7 @@ const isEmpty = computed(
                     <td class="px-4 py-2.5 text-muted-foreground">-</td>
                     <td class="px-4 py-2.5">
                       <div class="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete folder" @click.stop="openDeleteFolder(folder)"><Trash2 class="size-3.5" /></Button>
+                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete folder" :disabled="!s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId)" :title="s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId) ? 'Delete folder' : 'This session cannot delete this entire folder'" @click.stop="openDeleteFolder(folder)"><Trash2 class="size-3.5" /></Button>
                       </div>
                     </td>
                   </tr>
@@ -1420,13 +1555,13 @@ const isEmpty = computed(
                           title="Storage locations: where this file is stored"
                           @click.stop="locationsKey = object.key"
                         ><HardDrive class="size-3.5" /></Button>
-                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" @click.stop="openDeleteObject(object)"><Trash2 class="size-3.5" /></Button>
+                        <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" :disabled="!s3.canWrite(bucket, object.key, remoteNodeId)" :title="s3.canWrite(bucket, object.key, remoteNodeId) ? 'Delete object' : 'This session cannot delete this object'" @click.stop="openDeleteObject(object)"><Trash2 class="size-3.5" /></Button>
                       </div>
                     </td>
                   </tr>
                   <tr v-if="isEmpty">
                     <td colspan="4" class="px-4 py-10 text-center text-xs text-muted-foreground">
-                      This prefix is empty. Drop files here or use Upload.
+                      {{ canWriteCurrentPrefix ? 'This prefix is empty. Drop files here or use Add data.' : 'This prefix is empty. This session is read-only here.' }}
                     </td>
                   </tr>
                 </tbody>
@@ -1441,22 +1576,23 @@ const isEmpty = computed(
             <button
               type="button"
               class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-5 text-xs transition-colors"
-              :class="stripDrag ? 'border-primary bg-primary/[0.06] text-foreground' : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'"
+              :class="canWriteCurrentPrefix ? (stripDrag ? 'border-primary bg-primary/[0.06] text-foreground' : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground') : 'cursor-not-allowed border-border text-muted-foreground opacity-60'"
+              :disabled="!canWriteCurrentPrefix"
+              :title="writeRestrictionMessage ?? 'Upload files'"
               @click="pickFiles"
               @dragover.prevent="stripDrag = true"
               @dragleave="stripDrag = false"
               @drop.prevent="onStripDrop"
             >
               <Upload class="h-4 w-4" />
-              <span>Drop files here to upload to <span class="font-mono">{{ bucket }}/{{ s3Prefix }}</span></span>
+              <span>{{ canWriteCurrentPrefix ? 'Drop files here to upload to' : 'Uploads are unavailable for' }} <span class="font-mono">{{ bucket }}/{{ s3Prefix }}</span></span>
             </button>
+            <p v-if="uploadRestrictionError" class="mt-2 text-xs text-destructive">{{ uploadRestrictionError }}</p>
             </template>
           </template>
         </div>
       </section>
     </div>
-
-    <CreateCredentialDialog v-model:open="credentialDialogOpen" />
 
     <AddDataDialog
       v-model:open="addDataOpen"
@@ -1526,7 +1662,7 @@ const isEmpty = computed(
         </div>
         <DialogFooter>
           <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
-          <Button :disabled="newFolderInvalid || newFolderBusy" @click="createFolder">{{ newFolderBusy ? 'Creating…' : 'Create' }}</Button>
+          <Button :disabled="newFolderInvalid || newFolderBusy || !s3.canWrite(bucket, `${s3Prefix}${newFolderName.trim()}/`, remoteNodeId)" @click="createFolder">{{ newFolderBusy ? 'Creating…' : 'Create' }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1562,7 +1698,7 @@ const isEmpty = computed(
         <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
         <DialogFooter>
           <DialogClose as-child><Button variant="outline" :disabled="deleteBusy">Cancel</Button></DialogClose>
-          <Button variant="destructive" :disabled="deleteBusy" @click="confirmDelete">{{ deleteBusy ? 'Deleting…' : 'Delete' }}</Button>
+          <Button variant="destructive" :disabled="deleteBusy || (deleteTarget?.type === 'object' ? !s3.canWrite(deleteTarget.bucket, deleteTarget.object.key, deleteTarget.nodeId) : deleteTarget?.type === 'folder' ? !s3.canDeletePrefix(deleteTarget.bucket, deleteTarget.folder.prefix, deleteTarget.nodeId) : true)" @click="confirmDelete">{{ deleteBusy ? 'Deleting…' : 'Delete' }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1610,7 +1746,7 @@ const isEmpty = computed(
           <DialogClose as-child><Button variant="outline" :disabled="bucketDeleteBusy">Cancel</Button></DialogClose>
           <Button
             variant="destructive"
-            :disabled="!bucketDeleteConfirmed || bucketDeleteBusy"
+            :disabled="!bucketDeleteConfirmed || bucketDeleteBusy || !s3.canDeletePrefix(bucketDeleteTarget?.bucket ?? '', '', bucketDeleteTarget?.nodeId ?? null)"
             @click="confirmDeleteBucket"
           >{{ bucketDeleteBusy ? 'Deleting…' : 'Delete bucket' }}</Button>
         </DialogFooter>

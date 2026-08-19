@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import {
   CreateBucketCommand,
   DeleteBucketCommand,
@@ -17,12 +17,48 @@ import {
 } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import {
+  apiRequest,
+  type CreateS3SessionRequest,
+  type S3SessionResponse,
+  type S3SessionRestriction,
+} from '@/lib/api'
 import { drsDownloadHref, isDrsReference, parseS3Url } from '@/lib/tes'
 import { useAruna } from './useAruna'
 
 export interface S3Key {
   accessKeyId: string
   secretAccessKey: string
+  sessionToken: string
+}
+
+export type S3SessionState = 'active' | 'refreshing' | 'warning' | 'expired'
+
+export interface PortalS3Session extends S3Key {
+  sessionId: string
+  userId: string
+  groupId: string
+  issuerNodeId: string
+  s3Endpoint: string
+  apiBase: string
+  expiresAt: number
+  restrictions: S3SessionRestriction[]
+  state: S3SessionState
+  warning: string | null
+  lastUsedAt: number | null
+}
+
+export interface S3ActiveContext {
+  nodeId: string
+  userId: string
+  groupId: string
+  session: PortalS3Session
+}
+
+export interface S3SessionReference {
+  nodeId: string
+  groupId: string
+  accessKeyId: string
 }
 
 export interface BucketEntry {
@@ -62,58 +98,348 @@ const { nodeInfo, realmInfo, authToken, apiBaseUrl, currentUser } = useAruna()
 
 const STORAGE_KEY = 'aruna.s3Key'
 
-// The persisted key is scoped to the connection and account it was activated
-// under so a stored secret is never reused against a different API or user.
-interface StoredS3Key extends S3Key {
-  userId?: string
-  apiBase?: string
-}
+export const S3_SESSION_REFRESH_WINDOW_MS = 5 * 60 * 1000
+const S3_SESSION_REFRESH_JITTER_MAX_MS = 5_000
 
-function loadStoredKey(): StoredS3Key | null {
-  try {
-    // Keys persist across restarts, same trust level as aruna.authToken.
-    // Fall back to sessionStorage once to migrate older portal versions.
-    const raw = localStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<StoredS3Key>
-    if (typeof parsed.accessKeyId !== 'string' || typeof parsed.secretAccessKey !== 'string') return null
-    if (typeof parsed.apiBase === 'string' && parsed.apiBase !== apiBaseUrl.value) return null
-    return {
-      accessKeyId: parsed.accessKeyId,
-      secretAccessKey: parsed.secretAccessKey,
-      userId: typeof parsed.userId === 'string' ? parsed.userId : undefined,
-      apiBase: typeof parsed.apiBase === 'string' ? parsed.apiBase : undefined,
+/** One-time migration only. Portal S3 sessions are never written to storage. */
+export function purgeLegacyS3KeyStorage(): void {
+  if (typeof window === 'undefined') return
+  for (const storage of [window.localStorage, window.sessionStorage]) {
+    try {
+      storage.removeItem(STORAGE_KEY)
+    } catch {
+      // Continue with the other storage and the in-memory session layer.
     }
-  } catch {
-    // fall through to no key
   }
-  return null
 }
 
-const activeKey = ref<StoredS3Key | null>(loadStoredKey())
+purgeLegacyS3KeyStorage()
 
-const endpoint = computed(
+const connectedEndpoint = computed(
   () =>
     nodeInfo.value?.services?.interfaces?.s3?.url ??
     realmInfo.value?.interfaces?.s3?.url ??
     null,
 )
 
+const sessions = shallowRef(new Map<string, PortalS3Session>())
+const sessionRevision = ref(0)
+const activeSessionKey = ref<string | null>(null)
+const pendingMints = new Map<string, Promise<PortalS3Session>>()
+const clientCache = new Map<
+  string,
+  { storeKey: string; accessKeyId: string; client: S3Client }
+>()
+let boundaryGeneration = 0
+let activationGeneration = 0
+let refreshTimer: ReturnType<typeof globalThis.setTimeout> | undefined
+let expiryTimer: ReturnType<typeof globalThis.setTimeout> | undefined
+
+function storeKey(nodeId: string, groupId: string): string {
+  return `${nodeId}\u0000${groupId}`
+}
+
+function localNodeId(): string | null {
+  return nodeInfo.value?.node.peer_id ?? null
+}
+
+function normalizeNodeId(nodeId?: string | null): string | null {
+  if (nodeId === undefined) {
+    return activeSession.value?.issuerNodeId ?? localNodeId()
+  }
+  if (!nodeId || nodeId === localNodeId()) return localNodeId()
+  return nodeId
+}
+
+function nodeApiBase(nodeId: string): string | null {
+  if (nodeId === localNodeId()) return apiBaseUrl.value
+  const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === nodeId)
+  const url = (node?.info?.urls?.api ?? node?.rest_url ?? '').replace(/\/+$/, '')
+  if (!url) return null
+  return url.endsWith('/api/v1') ? url : `${url}/api/v1`
+}
+
+function putSession(key: string, session: PortalS3Session): void {
+  const previous = sessions.value.get(key)
+  if (previous && previous.accessKeyId !== session.accessKeyId) {
+    for (const [cacheKey, cached] of clientCache) {
+      if (cached.storeKey !== key) continue
+      cached.client.destroy()
+      clientCache.delete(cacheKey)
+    }
+  }
+  const next = new Map(sessions.value)
+  next.set(key, session)
+  sessions.value = next
+  sessionRevision.value++
+}
+
+function sessionUsable(session: PortalS3Session | null | undefined, now = Date.now()): session is PortalS3Session {
+  return Boolean(session && session.state !== 'expired' && session.expiresAt > now)
+}
+
+const activeSession = computed(() =>
+  activeSessionKey.value ? (sessions.value.get(activeSessionKey.value) ?? null) : null,
+)
+
+const activeContext = computed<S3ActiveContext | null>(() => {
+  const session = activeSession.value
+  return session
+    ? {
+        nodeId: session.issuerNodeId,
+        userId: session.userId,
+        groupId: session.groupId,
+        session,
+      }
+    : null
+})
+
+const activeKey = computed<S3Key | null>(() => {
+  const session = activeSession.value
+  return sessionUsable(session)
+    ? {
+        accessKeyId: session.accessKeyId,
+        secretAccessKey: session.secretAccessKey,
+        sessionToken: session.sessionToken,
+      }
+    : null
+})
+
 const hasActiveKey = computed(() => activeKey.value !== null)
+const endpoint = computed(() => activeSession.value?.s3Endpoint ?? connectedEndpoint.value)
 
-// S3 credentials are realm-wide: a key issued on one node authenticates on
-// every node, so remote buckets are browsed with the same stored key against
-// the remote node's published S3 endpoint. One client per endpoint, all
-// invalidated together when the active key changes.
-const clientCache = new Map<string, { key: S3Key; client: S3Client }>()
-
-// Resolves the S3 endpoint serving `nodeId`; null/the local peer id map to
-// the connected node's endpoint. Returns null when the node publishes none.
+// Resolves the S3 endpoint serving `nodeId`; null/the local peer id map to the
+// connected node. Resolution never changes the active session.
 function endpointForNode(nodeId?: string | null): string | null {
-  if (!nodeId || nodeId === nodeInfo.value?.node.peer_id) return endpoint.value
+  if (!nodeId || nodeId === localNodeId()) return connectedEndpoint.value
   const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === nodeId)
   return node?.info?.urls?.s3 ?? null
 }
+
+export function s3SessionRefreshJitterMs(accessKeyId: string): number {
+  let hash = 0
+  for (const char of accessKeyId) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  return hash % (S3_SESSION_REFRESH_JITTER_MAX_MS + 1)
+}
+
+function clearTimers(): void {
+  if (refreshTimer !== undefined) globalThis.clearTimeout(refreshTimer)
+  if (expiryTimer !== undefined) globalThis.clearTimeout(expiryTimer)
+  refreshTimer = undefined
+  expiryTimer = undefined
+}
+
+function expireSession(key: string): void {
+  const session = sessions.value.get(key)
+  if (!session || session.state === 'expired') return
+  putSession(key, {
+    ...session,
+    state: 'expired',
+    warning: 'This S3 session has expired. Open the node and group again to continue.',
+  })
+  if (activeSessionKey.value === key) clearTimers()
+}
+
+function scheduleActiveSession(): void {
+  clearTimers()
+  const key = activeSessionKey.value
+  if (!key) return
+  const session = sessions.value.get(key)
+  if (!sessionUsable(session)) {
+    if (session) expireSession(key)
+    return
+  }
+  expiryTimer = globalThis.setTimeout(
+    () => expireSession(key),
+    Math.max(0, session.expiresAt - Date.now()),
+  )
+  // A failed refresh is not retried automatically. The still-valid session can
+  // finish known work, but no request with an unknown outcome is replayed.
+  if (session.lastUsedAt === null || session.state === 'warning') return
+  const refreshAt =
+    session.expiresAt - S3_SESSION_REFRESH_WINDOW_MS + s3SessionRefreshJitterMs(session.accessKeyId)
+  const delay = Math.max(0, refreshAt - Date.now())
+  refreshTimer = globalThis.setTimeout(() => void refreshSession(key), delay)
+}
+
+function responseSession(
+  response: S3SessionResponse,
+  expected: { nodeId: string; groupId: string; userId: string; apiBase: string; previous?: PortalS3Session },
+): PortalS3Session {
+  if (response.group.id !== expected.groupId) {
+    throw new Error(`The session response named group ${response.group.id}, expected ${expected.groupId}.`)
+  }
+  if (response.issuer_node.node_id !== expected.nodeId) {
+    throw new Error(`The session was issued by node ${response.issuer_node.node_id}, expected ${expected.nodeId}.`)
+  }
+  if (expected.previous && response.access_key_id !== expected.previous.accessKeyId) {
+    throw new Error('The refreshed session changed its access key ID.')
+  }
+  const expiresAt = Date.parse(response.expires_at)
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    throw new Error('The node returned an expired S3 session.')
+  }
+  const s3Endpoint = response.issuer_node.s3_endpoint ?? endpointForNode(expected.nodeId)
+  if (!s3Endpoint) throw new Error(`Node ${expected.nodeId} does not publish an S3 endpoint.`)
+  return {
+    sessionId: response.access_key_id,
+    accessKeyId: response.access_key_id,
+    secretAccessKey: response.secret_access_key,
+    sessionToken: response.session_token,
+    userId: expected.userId,
+    groupId: expected.groupId,
+    issuerNodeId: expected.nodeId,
+    s3Endpoint,
+    apiBase: expected.apiBase,
+    expiresAt,
+    restrictions: response.restrictions,
+    state: 'active',
+    warning: null,
+    // Refresh resets the backend activity marker. The next signed S3 request
+    // marks this cycle active and arms its next refresh.
+    lastUsedAt: null,
+  }
+}
+
+async function mintSession(nodeId: string, groupId: string, userId: string): Promise<PortalS3Session> {
+  const key = storeKey(nodeId, groupId)
+  const pending = pendingMints.get(key)
+  if (pending) return pending
+  const apiBase = nodeApiBase(nodeId)
+  if (!apiBase) throw new Error(`Node ${nodeId} does not publish an API endpoint.`)
+  const generation = boundaryGeneration
+  const request = (async () => {
+    const body: CreateS3SessionRequest = { group_id: groupId }
+    const response = await apiRequest<S3SessionResponse>(
+      '/users/s3-sessions',
+      { method: 'POST', body: JSON.stringify(body) },
+      { baseUrl: apiBase, token: authToken.value },
+    )
+    if (
+      generation !== boundaryGeneration ||
+      apiBaseUrl.value !== sessionsBoundaryApiBase ||
+      knownUserId !== userId
+    ) {
+      throw new DOMException('The authenticated API context changed.', 'AbortError')
+    }
+    const session = responseSession(response, { nodeId, groupId, userId, apiBase })
+    putSession(key, session)
+    return session
+  })()
+  pendingMints.set(key, request)
+  try {
+    return await request
+  } finally {
+    if (pendingMints.get(key) === request) pendingMints.delete(key)
+  }
+}
+
+async function refreshSession(key: string): Promise<void> {
+  const session = sessions.value.get(key)
+  if (!sessionUsable(session) || activeSessionKey.value !== key) return
+  putSession(key, { ...session, state: 'refreshing', warning: null })
+  try {
+    const response = await apiRequest<S3SessionResponse>(
+      `/users/s3-sessions/${encodeURIComponent(session.accessKeyId)}/refresh`,
+      { method: 'POST' },
+      { baseUrl: session.apiBase, token: authToken.value },
+    )
+    const current = sessions.value.get(key)
+    if (!current || current.accessKeyId !== session.accessKeyId) return
+    putSession(
+      key,
+      responseSession(response, {
+        nodeId: session.issuerNodeId,
+        groupId: session.groupId,
+        userId: session.userId,
+        apiBase: session.apiBase,
+        previous: session,
+      }),
+    )
+  } catch (error) {
+    const current = sessions.value.get(key)
+    if (!current || current.accessKeyId !== session.accessKeyId) return
+    if (current.expiresAt <= Date.now()) {
+      expireSession(key)
+      return
+    }
+    putSession(key, {
+      ...current,
+      state: 'warning',
+      warning: `Session refresh failed. The current session remains valid until ${new Date(current.expiresAt).toLocaleTimeString()}: ${s3ErrorMessage(error)}`,
+    })
+  } finally {
+    if (activeSessionKey.value === key) scheduleActiveSession()
+  }
+}
+
+function markSessionUsed(key: string): void {
+  const session = sessions.value.get(key)
+  if (!sessionUsable(session)) return
+  putSession(key, { ...session, lastUsedAt: Date.now() })
+  if (activeSessionKey.value === key) scheduleActiveSession()
+}
+
+async function activateContext(nodeId: string | null, groupId: string): Promise<PortalS3Session> {
+  const explicitGroupId = groupId.trim()
+  if (!explicitGroupId) throw new Error('Select a group before opening S3 storage.')
+  const user = currentUser.value
+  if (!user || !authToken.value) throw new Error('Sign in before opening S3 storage.')
+  const issuerNodeId = normalizeNodeId(nodeId)
+  if (!issuerNodeId) throw new Error('The selected node identity is not available yet.')
+  const activation = ++activationGeneration
+  const key = storeKey(issuerNodeId, explicitGroupId)
+  const existing = sessions.value.get(key)
+  const session = sessionUsable(existing)
+    ? existing
+    : await mintSession(issuerNodeId, explicitGroupId, user.id)
+  if (activation !== activationGeneration) return session
+  if (currentUser.value?.id !== session.userId || apiBaseUrl.value !== sessionsBoundaryApiBase) {
+    throw new DOMException('The authenticated API context changed.', 'AbortError')
+  }
+  activeSessionKey.value = key
+  scheduleActiveSession()
+  return session
+}
+
+function destroyClients(): void {
+  for (const cached of clientCache.values()) cached.client.destroy()
+  clientCache.clear()
+}
+
+function clearSessions(): void {
+  boundaryGeneration++
+  activationGeneration++
+  pendingMints.clear()
+  activeSessionKey.value = null
+  clearTimers()
+  destroyClients()
+  sessions.value = new Map()
+  sessionRevision.value++
+}
+
+let knownUserId = currentUser.value?.id ?? null
+let sessionsBoundaryApiBase = apiBaseUrl.value
+
+watch(apiBaseUrl, (base) => {
+  if (base === sessionsBoundaryApiBase) return
+  sessionsBoundaryApiBase = base
+  knownUserId = currentUser.value?.id ?? null
+  clearSessions()
+})
+
+watch([authToken, currentUser], ([token, user]) => {
+  if (!token) {
+    knownUserId = null
+    if (sessions.value.size) clearSessions()
+    return
+  }
+  // useAruna temporarily clears currentUser while a replacement token is
+  // validated. Keep sessions until the resolved identity proves it changed.
+  if (!user) return
+  if (knownUserId && knownUserId !== user.id) clearSessions()
+  knownUserId = user.id
+})
 
 // Maps a path-style object URL (as stored in profile-crate `contentUrl`s) back to
 // the bucket/key/node an authenticated GetObject needs. Tries the connected
@@ -122,7 +448,7 @@ function endpointForNode(nodeId?: string | null): string | null {
 // belong to no known node, the genuinely external URLs a browser must fetch
 // directly.
 function resolveObjectUrl(url: string): { bucket: string; key: string; nodeId: string | null } | null {
-  const local = parseS3Url(url, endpoint.value)
+  const local = parseS3Url(url, connectedEndpoint.value)
   if (local) return { ...local, nodeId: null }
   for (const node of realmInfo.value?.nodes ?? []) {
     const nodeEndpoint = node.info?.urls?.s3
@@ -133,74 +459,203 @@ function resolveObjectUrl(url: string): { bucket: string; key: string; nodeId: s
   return null
 }
 
-function client(nodeId?: string | null): S3Client {
-  const url = endpointForNode(nodeId)
-  const key = activeKey.value
-  if (!url) {
-    throw new Error(
-      nodeId && nodeId !== nodeInfo.value?.node.peer_id
-        ? 'This node does not publish an S3 endpoint'
-        : 'The node does not advertise an S3 endpoint',
-    )
+export class S3ContextMismatchError extends Error {
+  constructor(
+    public issuerNodeId: string,
+    public requiredNodeId: string,
+  ) {
+    super(`Session issuer ${issuerNodeId} cannot access node ${requiredNodeId}. Open the group on node ${requiredNodeId} first.`)
+    this.name = 'S3ContextMismatchError'
   }
-  if (!key) throw new Error('No active S3 credentials')
-  const cached = clientCache.get(url)
-  if (cached && cached.key === key) return cached.client
+}
+
+export class S3SessionUnavailableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'S3SessionUnavailableError'
+  }
+}
+
+function sessionForReference(reference: S3SessionReference): PortalS3Session | null {
+  const session = sessions.value.get(storeKey(reference.nodeId, reference.groupId)) ?? null
+  if (!session || session.accessKeyId !== reference.accessKeyId) return null
+  if (!sessionUsable(session)) {
+    expireSession(storeKey(reference.nodeId, reference.groupId))
+    return null
+  }
+  return session
+}
+
+function referenceForContext(nodeId: string | null, groupId: string): S3SessionReference | null {
+  const issuerNodeId = normalizeNodeId(nodeId)
+  if (!issuerNodeId) return null
+  const session = sessions.value.get(storeKey(issuerNodeId, groupId))
+  return sessionUsable(session)
+    ? { nodeId: issuerNodeId, groupId, accessKeyId: session.accessKeyId }
+    : null
+}
+
+function client(nodeId?: string | null, reference?: S3SessionReference): S3Client {
+  const session = reference ? sessionForReference(reference) : activeSession.value
+  if (!sessionUsable(session)) {
+    throw new S3SessionUnavailableError('No valid S3 session is available for this node and group.')
+  }
+  if (currentUser.value?.id !== session.userId) {
+    throw new S3SessionUnavailableError('The S3 session belongs to a different authenticated user.')
+  }
+  const requiredNodeId = nodeId === undefined ? session.issuerNodeId : normalizeNodeId(nodeId)
+  if (!requiredNodeId) throw new S3SessionUnavailableError('The required node identity is not available.')
+  if (requiredNodeId !== session.issuerNodeId) {
+    throw new S3ContextMismatchError(session.issuerNodeId, requiredNodeId)
+  }
+  const key = storeKey(session.issuerNodeId, session.groupId)
+  const cacheKey = `${session.s3Endpoint}\u0000${key}\u0000${session.accessKeyId}`
+  const cached = clientCache.get(cacheKey)
+  if (cached) return cached.client
   const created = new S3Client({
-    endpoint: url,
+    endpoint: session.s3Endpoint,
     region: 'us-east-1',
     forcePathStyle: true,
-    credentials: { accessKeyId: key.accessKeyId, secretAccessKey: key.secretAccessKey },
+    credentials: async () => {
+      const current = sessions.value.get(key)
+      if (!sessionUsable(current) || current.accessKeyId !== session.accessKeyId) {
+        throw new S3SessionUnavailableError('The S3 session expired before this request could start.')
+      }
+      markSessionUsed(key)
+      return {
+        accessKeyId: current.accessKeyId,
+        secretAccessKey: current.secretAccessKey,
+        sessionToken: current.sessionToken,
+      }
+    },
+    maxAttempts: 1,
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
   })
-  clientCache.set(url, { key, client: created })
+  clientCache.set(cacheKey, { storeKey: key, accessKeyId: session.accessKeyId, client: created })
   return created
 }
 
-function setActiveKey(key: S3Key) {
-  const stored: StoredS3Key = {
-    accessKeyId: key.accessKeyId,
-    secretAccessKey: key.secretAccessKey,
-    userId: currentUser.value?.id,
-    apiBase: apiBaseUrl.value,
-  }
-  activeKey.value = stored
-  clientCache.clear()
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
-    sessionStorage.removeItem(STORAGE_KEY)
-  } catch {
-    // Keep the key in memory when storage is unavailable.
-  }
+function permissionPatternMatches(pattern: string, path: string): boolean {
+  if (pattern === path) return true
+  if (!pattern.endsWith('/**')) return false
+  const root = pattern.slice(0, -3)
+  return path === root || path.startsWith(`${root}/`)
 }
 
-function clearActiveKey() {
-  activeKey.value = null
-  clientCache.clear()
-  try {
-    sessionStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem(STORAGE_KEY)
-  } catch {
-    // The in-memory key is already cleared.
+export function s3RestrictionsAllowPath(
+  restrictions: readonly S3SessionRestriction[],
+  path: string,
+  required: 'read' | 'write',
+): boolean {
+  if (!restrictions.length) return true
+  let allowed = false
+  for (const restriction of restrictions) {
+    if (!permissionPatternMatches(restriction.pattern, path)) continue
+    const permission = restriction.permission.toLowerCase()
+    if (permission === 'deny') return false
+    if (permission === 'write' || (permission === 'read' && required === 'read')) allowed = true
   }
+  return allowed
 }
 
-// The persisted secret survives re-logins on this device; only an explicit
-// sign-out (token cleared) or an API switch revokes browser-side access.
-watch([authToken, apiBaseUrl], ([token, base], [previousToken, previousBase]) => {
-  if (base !== previousBase) clearActiveKey()
-  else if (!token && previousToken) clearActiveKey()
-})
+function permissionPath(session: PortalS3Session, bucket: string, key?: string): string | null {
+  const realmId = realmInfo.value?.realm_id ?? nodeInfo.value?.node.realm_id
+  if (!realmId) return null
+  const bucketPath = `/${realmId}/g/${session.groupId}/data/${session.issuerNodeId}/${bucket}`
+  return key === undefined || key === '' ? bucketPath : `${bucketPath}/${key}`
+}
 
-// A key activated by one account must never survive into another account's
-// session; stamp legacy entries that predate the userId scope.
-watch(currentUser, (user) => {
-  const key = activeKey.value
-  if (!user || !key) return
-  if (key.userId && key.userId !== user.id) clearActiveKey()
-  else if (!key.userId) setActiveKey(key)
-})
+function sessionForNode(nodeId?: string | null): PortalS3Session | null {
+  const session = activeSession.value
+  if (!sessionUsable(session)) return null
+  const requiredNodeId = nodeId === undefined ? session.issuerNodeId : normalizeNodeId(nodeId)
+  return requiredNodeId === session.issuerNodeId ? session : null
+}
+
+function canAccess(
+  required: 'read' | 'write',
+  bucket: string,
+  key?: string,
+  nodeId?: string | null,
+): boolean {
+  const session = sessionForNode(nodeId)
+  if (!session) return false
+  const path = permissionPath(session, bucket, key)
+  return path ? s3RestrictionsAllowPath(session.restrictions, path, required) : false
+}
+
+function restrictionScope(pattern: string): { root: string; recursive: boolean } {
+  return pattern.endsWith('/**')
+    ? { root: pattern.slice(0, -3), recursive: true }
+    : { root: pattern, recursive: false }
+}
+
+function canWritePrefix(bucket: string, prefix: string, nodeId?: string | null): boolean {
+  const session = sessionForNode(nodeId)
+  if (!session) return false
+  if (!session.restrictions.length) return true
+  const path = permissionPath(session, bucket, prefix.replace(/\/$/, ''))
+  if (!path) return false
+  return session.restrictions.some((restriction) => {
+    if (restriction.permission.toLowerCase() !== 'write') return false
+    const scope = restrictionScope(restriction.pattern)
+    let candidate: string | null = null
+    if (!scope.recursive) {
+      if (scope.root === path || scope.root.startsWith(`${path}/`)) candidate = scope.root
+    } else if (path === scope.root || path.startsWith(`${scope.root}/`)) {
+      candidate = path
+    } else if (scope.root.startsWith(`${path}/`)) {
+      candidate = scope.root
+    }
+    return candidate ? s3RestrictionsAllowPath(session.restrictions, candidate, 'write') : false
+  })
+}
+
+function restrictionIntersectsTree(pattern: string, path: string): boolean {
+  const scope = restrictionScope(pattern)
+  if (!scope.recursive) return scope.root === path || scope.root.startsWith(`${path}/`)
+  return path === scope.root || path.startsWith(`${scope.root}/`) || scope.root.startsWith(`${path}/`)
+}
+
+function canDeletePrefix(bucket: string, prefix: string, nodeId?: string | null): boolean {
+  const session = sessionForNode(nodeId)
+  if (!session) return false
+  if (!session.restrictions.length) return true
+  const normalizedPrefix = prefix.replace(/\/$/, '')
+  const path = permissionPath(session, bucket, normalizedPrefix)
+  if (!path) return false
+  const coversTree = session.restrictions.some((restriction) => {
+    if (restriction.permission.toLowerCase() !== 'write' || !restriction.pattern.endsWith('/**')) {
+      return false
+    }
+    const root = restriction.pattern.slice(0, -3)
+    return path === root || path.startsWith(`${root}/`)
+  })
+  if (!coversTree) return false
+  return !session.restrictions.some(
+    (restriction) =>
+      restriction.permission.toLowerCase() === 'deny' &&
+      restrictionIntersectsTree(restriction.pattern, path),
+  )
+}
+
+function contextMismatch(nodeId: string | null): { issuerNodeId: string; requiredNodeId: string } | null {
+  const session = activeSession.value
+  const requiredNodeId = normalizeNodeId(nodeId)
+  if (!session || !requiredNodeId || session.issuerNodeId === requiredNodeId) return null
+  return { issuerNodeId: session.issuerNodeId, requiredNodeId }
+}
+
+function sessionState(reference: S3SessionReference): 'usable' | 'expired' | 'missing' {
+  const session = sessions.value.get(storeKey(reference.nodeId, reference.groupId))
+  if (!session || session.accessKeyId !== reference.accessKeyId) return 'missing'
+  if (!sessionUsable(session)) {
+    expireSession(storeKey(reference.nodeId, reference.groupId))
+    return 'expired'
+  }
+  return 'usable'
+}
 
 async function listBuckets(): Promise<BucketEntry[]> {
   const response = await client().send(new ListBucketsCommand({}))
@@ -378,9 +833,10 @@ function uploadObject(
   file: File,
   onProgress?: (loaded: number, total: number) => void,
   nodeId?: string | null,
+  sessionReference?: S3SessionReference,
 ): UploadHandle {
   const upload = new Upload({
-    client: client(nodeId),
+    client: client(nodeId, sessionReference),
     params: {
       Bucket: bucket,
       Key: key,
@@ -650,9 +1106,9 @@ export function isS3NetworkError(err: unknown): boolean {
   return /failed to fetch|networkerror|load failed|network request failed/i.test(message)
 }
 
-// A rejected, expired or revoked key surfaces as one of these SDK error names
-// or as a 401/403 from the node — distinct from a transient network or server
-// fault, so the UI can offer to mint a fresh key instead of just showing text.
+// A rejected or expired session surfaces as one of these SDK error names or as
+// a 401/403 from the node. Keep those distinct from transient network faults so
+// the UI can offer to open a fresh session.
 export function isS3AuthError(err: unknown): boolean {
   // A full group is a 403 too; never misreport it as "credentials rejected".
   if (isS3QuotaError(err)) return false
@@ -667,13 +1123,28 @@ export function isS3AuthError(err: unknown): boolean {
 
 export function useS3() {
   return {
+    sessions,
+    sessionRevision,
+    activeSession,
+    activeContext,
     activeKey,
     hasActiveKey,
     endpoint,
+    connectedEndpoint,
     endpointForNode,
+    nodeIdFor: normalizeNodeId,
     resolveObjectUrl,
-    setActiveKey,
-    clearActiveKey,
+    activateContext,
+    clearSessions,
+    referenceForContext,
+    sessionState,
+    contextMismatch,
+    canRead: (bucket: string, key?: string, nodeId?: string | null) =>
+      canAccess('read', bucket, key, nodeId),
+    canWrite: (bucket: string, key?: string, nodeId?: string | null) =>
+      canAccess('write', bucket, key, nodeId),
+    canWritePrefix,
+    canDeletePrefix,
     listBuckets,
     createBucket,
     allowPublicReadCors,

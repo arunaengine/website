@@ -683,6 +683,28 @@ export interface CreateS3CredentialsResponse {
   access_secret: string
 }
 
+export interface CreateS3SessionRequest {
+  group_id: string
+}
+
+export interface S3SessionRestriction {
+  pattern: string
+  permission: string
+}
+
+export interface S3SessionResponse {
+  access_key_id: string
+  secret_access_key: string
+  session_token: string
+  expires_at: string
+  group: { id: string }
+  restrictions: S3SessionRestriction[]
+  issuer_node: {
+    node_id: string
+    s3_endpoint?: string | null
+  }
+}
+
 // Source connectors (GET/POST /groups/{group_id}/connectors — verified against
 // aruna api/src/routes/connectors.rs). Real, served contract — no gating.
 export type SourceConnectorKind = 'http' | 's3' | 'webdav' | 'ftp' | 'aruna_native'

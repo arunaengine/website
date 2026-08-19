@@ -1,5 +1,11 @@
-import { computed, ref } from 'vue'
-import { useS3, s3ErrorMessage, isS3QuotaError, type UploadHandle } from './useS3'
+import { computed, ref, watch } from 'vue'
+import {
+  useS3,
+  s3ErrorMessage,
+  isS3QuotaError,
+  type S3SessionReference,
+  type UploadHandle,
+} from './useS3'
 
 export type UploadItemState = 'queued' | 'uploading' | 'done' | 'error' | 'canceled'
 
@@ -13,17 +19,19 @@ export interface UploadQueueItem {
   progress: number // 0-100
   error?: string
   quotaExceeded?: boolean
-  // Group backing the credential at enqueue time — keeps the "View group
-  // quota" link working after navigation. Null for manual keys.
+  // Group backing the temporary session at enqueue time. It remains fixed
+  // when the user opens another group or node.
   groupId: string | null
   // Node hosting the target bucket; null = the connected node.
   nodeId: string | null
   // The target key already existed in the caller's listing at enqueue time,
   // so completing this upload overwrites an existing object.
   overwrite: boolean
-  // Endpoint+key fingerprint at enqueue time; a queued item never uploads
-  // through a session it was not queued under.
-  session: string | null
+  // Exact node/group/session attribution at enqueue time. Refresh rotates the
+  // secret and token under the same access key, so new parts use the refreshed
+  // material while already signed requests finish with their original values.
+  session: S3SessionReference | null
+  pausedForSession?: boolean
 }
 
 export interface UploadTarget {
@@ -59,14 +67,14 @@ const MAX_CONCURRENT_FILES = 3
 
 const lastCompleted = ref<{ bucket: string; key: string; nodeId: string | null; at: number } | null>(null)
 
-function sessionOf(nodeId: string | null): string | null {
-  const key = s3.activeKey.value
-  const endpoint = s3.endpointForNode(nodeId)
-  return key && endpoint ? `${endpoint}|${key.accessKeyId}` : null
+function sessionOf(nodeId: string | null, groupId: string | null): S3SessionReference | null {
+  return groupId ? s3.referenceForContext(nodeId, groupId) : null
 }
 
 const hasActiveUploads = computed(() =>
-  items.value.some((item) => item.state === 'queued' || item.state === 'uploading'),
+  items.value.some(
+    (item) => item.state === 'queued' || item.state === 'uploading' || item.pausedForSession,
+  ),
 )
 
 // Item fields are mutated in place (progress, state); re-assign the array to
@@ -89,8 +97,9 @@ function enqueue(list: File[], target: UploadTarget): void {
       groupId: target.groupId,
       nodeId,
       overwrite: target.overwrite ?? false,
-      session: sessionOf(nodeId),
+      session: sessionOf(nodeId, target.groupId),
     }
+    if (!item.session) pauseForSession(item, 'No valid S3 session is available for this node and group.')
     files.set(item.id, file)
     items.value.push(item)
   }
@@ -114,13 +123,24 @@ async function run(item: UploadQueueItem): Promise<void> {
     touch()
     return
   }
-  if (item.session !== sessionOf(item.nodeId)) {
-    item.state = 'error'
-    item.error = 'The S3 key or endpoint changed after this file was queued. Retry to upload with the current session.'
+  if (!item.session) {
+    pauseForSession(item, 'No valid S3 session is available for the queued node and group.')
+    touch()
+    return
+  }
+  const sessionState = s3.sessionState(item.session)
+  if (sessionState !== 'usable') {
+    pauseForSession(
+      item,
+      sessionState === 'expired'
+        ? 'The S3 session expired before this upload started.'
+        : 'The original S3 session is no longer available.',
+    )
     touch()
     return
   }
   item.state = 'uploading'
+  item.pausedForSession = undefined
   item.progress = 0
   touch()
   try {
@@ -133,6 +153,7 @@ async function run(item: UploadQueueItem): Promise<void> {
         touch()
       },
       item.nodeId,
+      item.session,
     )
     handles.set(item.id, handle)
     await handle.promise
@@ -146,11 +167,16 @@ async function run(item: UploadQueueItem): Promise<void> {
     // cancel() may have flipped the state to 'canceled' during the await, which
     // TS's synchronous control-flow analysis cannot see — widen before compare.
     if ((item.state as UploadItemState) !== 'canceled') {
-      item.state = 'error'
-      if (isS3QuotaError(err)) {
+      if (item.session && s3.sessionState(item.session) !== 'usable') {
+        pauseForSession(item, 'The S3 session expired while this upload was running.')
+      } else if (isS3QuotaError(err)) {
+        item.state = 'error'
+        item.pausedForSession = undefined
         item.quotaExceeded = true
         item.error = 'The group’s storage quota is exhausted; the node rejected this upload (QuotaExceeded).'
       } else {
+        item.state = 'error'
+        item.pausedForSession = undefined
         item.error = s3ErrorMessage(err)
       }
     }
@@ -162,9 +188,10 @@ async function run(item: UploadQueueItem): Promise<void> {
 }
 
 async function cancel(item: UploadQueueItem): Promise<void> {
-  if (item.state === 'queued') {
+  if (item.state === 'queued' || item.pausedForSession) {
     // Never started: just mark canceled; the File is kept for retry.
     item.state = 'canceled'
+    item.pausedForSession = undefined
     touch()
     return
   }
@@ -182,8 +209,15 @@ function retry(item: UploadQueueItem): void {
   item.progress = 0
   item.error = undefined
   item.quotaExceeded = undefined
-  // A retry is an explicit user action under whatever session is now active.
-  item.session = sessionOf(item.nodeId)
+  // Retry can only rebind to the same queued node and group. It never follows
+  // the currently active context to a different target.
+  item.session = sessionOf(item.nodeId, item.groupId)
+  if (!item.session) {
+    pauseForSession(item, 'Open the queued node and group to resume this upload.')
+    touch()
+    return
+  }
+  item.pausedForSession = undefined
   item.state = 'queued'
   touch()
   pump()
@@ -200,10 +234,37 @@ function dismiss(id: number): void {
 
 function clearFinished(): void {
   for (const item of items.value) {
-    if (item.state !== 'queued' && item.state !== 'uploading') files.delete(item.id)
+    if (item.state !== 'queued' && item.state !== 'uploading' && !item.pausedForSession) files.delete(item.id)
   }
-  items.value = items.value.filter((item) => item.state === 'queued' || item.state === 'uploading')
+  items.value = items.value.filter(
+    (item) => item.state === 'queued' || item.state === 'uploading' || item.pausedForSession,
+  )
 }
+
+function pauseForSession(item: UploadQueueItem, reason: string): void {
+  item.state = 'error'
+  item.pausedForSession = true
+  item.error = `Upload paused: ${reason}`
+}
+
+// Opening or reminting the same node/group context resumes only files that
+// were paused for that exact context. Switching elsewhere never retargets them.
+watch(s3.sessionRevision, () => {
+  let resumed = false
+  for (const item of items.value) {
+    if (!item.pausedForSession || !item.groupId) continue
+    const session = sessionOf(item.nodeId, item.groupId)
+    if (!session) continue
+    item.session = session
+    item.pausedForSession = undefined
+    item.error = undefined
+    item.state = 'queued'
+    resumed = true
+  }
+  if (!resumed) return
+  touch()
+  pump()
+})
 
 // The beforeunload guard lives at module scope so it survives navigation while
 // a background upload is still running (the old view-local guard detached on

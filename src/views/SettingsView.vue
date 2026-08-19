@@ -15,7 +15,6 @@ import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useWatches } from '@/composables/useWatches'
-import { useS3 } from '@/composables/useS3'
 import { RouterLink, useRoute } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
@@ -41,7 +40,6 @@ const {
   revokeS3Credential,
 } = useAruna()
 const { signIn, signOut, isAuthenticated, authPending, stage, stageError } = useAuth()
-const { activeKey, clearActiveKey } = useS3()
 const route = useRoute()
 // Optimistic until a watch request answers 404/403 (mirrors the bell's probe).
 const { available: watchesAvailable } = useWatches()
@@ -165,7 +163,7 @@ const settingsSections = [
   { id: 'profile', label: 'Profile' },
   { id: 'default-profile', label: 'Default profile' },
   { id: 'groups', label: 'Groups & roles' },
-  { id: 'credentials', label: 'S3 credentials' },
+  { id: 'credentials', label: 'CLI and service access' },
   { id: 'interop', label: 'Interoperability' },
   { id: 'appearance', label: 'Appearance' },
 ] as const
@@ -317,7 +315,6 @@ async function revoke(accessKeyId: string) {
   revokeError.value = null
   try {
     await revokeS3Credential(accessKeyId)
-    if (activeKey.value?.accessKeyId === accessKeyId) clearActiveKey()
   } catch (err) {
     revokeError.value = err instanceof Error ? err.message : String(err)
   }
@@ -546,7 +543,7 @@ function toggleGroup(groupId: string) {
         <section id="credentials" class="surface scroll-mt-20 overflow-hidden lg:scroll-mt-[4.5rem]">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2">
-              <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 credentials</h3><Badge variant="outline">{{ visibleCredentials.length }}</Badge>
+              <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">CLI and service access</h3><Badge variant="secondary" class="text-[10px] uppercase">Advanced</Badge><Badge variant="outline">{{ visibleCredentials.length }}</Badge>
               <button
                 v-if="inactiveCredentials.length"
                 type="button"
@@ -556,20 +553,23 @@ function toggleGroup(groupId: string) {
                 {{ showInactiveCredentials ? 'Hide inactive' : `Show inactive (${inactiveCredentials.length})` }}
               </button>
             </div>
-            <Button size="sm" @click="createCredentialOpen = true"><Plus class="h-4 w-4" /> Create</Button>
+            <Button size="sm" :disabled="!currentUser" @click="createCredentialOpen = true"><Plus class="h-4 w-4" /> Create key</Button>
           </header>
+          <p class="border-b border-border px-5 py-3 text-xs leading-relaxed text-muted-foreground">
+            Long-lived keys are for command-line tools and services on this node. Their secret is shown once and is never stored or activated by the portal. Portal storage uses temporary in-memory sessions.
+          </p>
           <div class="min-w-0 overflow-x-auto">
             <table class="min-w-max w-full text-sm">
               <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th><th class="px-5 py-2"></th></tr></thead>
               <tbody>
-                <tr v-for="credential in visibleCredentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}<Badge v-if="credential.access_key_id === activeKey?.accessKeyId" variant="accent" class="ml-2 text-[9px] uppercase">this device</Badge></td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
+                <tr v-for="credential in visibleCredentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
                 <tr v-if="!visibleCredentials.length">
                   <td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">
                     <template v-if="inactiveCredentials.length">
-                      No active S3 credentials.
+                      No active CLI or service keys.
                       <button type="button" class="text-primary hover:underline" @click="showInactiveCredentials = true">Show inactive ({{ inactiveCredentials.length }})</button>
                     </template>
-                    <template v-else>No S3 credentials for the authenticated user.</template>
+                    <template v-else>No CLI or service keys for the authenticated user.</template>
                   </td>
                 </tr>
               </tbody>
