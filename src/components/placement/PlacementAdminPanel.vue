@@ -3,6 +3,7 @@ import { computed, ref, toRaw, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import StrategyEditor from '@/components/placement/StrategyEditor.vue'
+import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
@@ -10,13 +11,17 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
-import { isPlacementUnsupported, usePlacement } from '@/composables/usePlacement'
-import type {
-  RealmPlacementBinding,
-  RealmPlacementConfigResponse,
-  RealmPlacementStrategy,
-} from '@/lib/api'
-import { aggregateByLocation, knownLocations as computeKnownLocations } from '@/lib/placement'
+import {
+  isPlacementUnsupported,
+  placementMutationErrorMessage,
+  usePlacement,
+} from '@/composables/usePlacement'
+import type { RealmPlacementBinding, RealmPlacementStrategy } from '@/lib/api'
+import {
+  aggregateByLocation,
+  knownLocations as computeKnownLocations,
+  type RealmPlacementConfigResponse,
+} from '@/lib/placement'
 import { Link2, MapPinned, Plus, RefreshCw, SlidersHorizontal } from '@lucide/vue'
 
 // Realm-admin access is gated by the parent AdminView; this panel only guards
@@ -62,6 +67,14 @@ const strategyDirty = computed(() => {
 })
 const selectedIsDefault = computed(
   () => Boolean(strategyDraft.value && strategyDraft.value.strategy_id === config.value?.default_strategy_id),
+)
+const selectedIsJobFamily = computed(
+  () =>
+    Boolean(
+      !creatingStrategy.value &&
+        strategyDraft.value &&
+        strategyDraft.value.strategy_id === config.value?.job_family_strategy_id,
+    ),
 )
 
 function cloneStrategy(strategy: RealmPlacementStrategy): RealmPlacementStrategy {
@@ -148,7 +161,7 @@ async function saveStrategy() {
     applyConfig(next, strategy.strategy_id)
     saveMessage.value = 'Placement strategy saved.'
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err)
+    saveError.value = placementMutationErrorMessage(err)
   }
 }
 
@@ -164,7 +177,20 @@ async function setDefaultStrategy() {
     )
     saveMessage.value = 'Realm default strategy updated.'
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err)
+    saveError.value = placementMutationErrorMessage(err)
+  }
+}
+
+async function removeStrategy() {
+  const strategyId = strategyDraft.value?.strategy_id
+  if (!strategyId || creatingStrategy.value || selectedIsJobFamily.value || strategyDirty.value || busy.value) return
+  saveError.value = null
+  saveMessage.value = null
+  try {
+    applyConfig(await mutateRealmPlacement({ mutation: 'remove_strategy', strategy_id: strategyId }))
+    saveMessage.value = 'Placement strategy removed.'
+  } catch (err) {
+    saveError.value = placementMutationErrorMessage(err)
   }
 }
 
@@ -198,7 +224,7 @@ async function saveGroupBinding() {
     )
     bindingGroupId.value = ''
   } catch (err) {
-    bindingError.value = err instanceof Error ? err.message : String(err)
+    bindingError.value = placementMutationErrorMessage(err)
   }
 }
 
@@ -211,7 +237,7 @@ async function removeGroupBinding(binding: RealmPlacementBinding) {
       selectedStrategyId.value,
     )
   } catch (err) {
-    bindingError.value = err instanceof Error ? err.message : String(err)
+    bindingError.value = placementMutationErrorMessage(err)
   }
 }
 
@@ -300,18 +326,39 @@ watch(
                   <label class="text-xs font-medium text-foreground">Strategy ID</label>
                   <Input v-model="strategyDraft.strategy_id" class="mt-1 font-mono" placeholder="ULID" :disabled="busy" />
                 </div>
-                <div v-else class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  <span class="font-mono">{{ strategyDraft.strategy_id }}</span>
-                  <span v-if="selectedIsDefault" class="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">realm default</span>
+                <div v-else>
+                  <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <span class="font-mono">{{ strategyDraft.strategy_id }}</span>
+                    <span v-if="selectedIsDefault" class="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">realm default</span>
+                    <Badge v-if="selectedIsJobFamily" variant="accent">Job family</Badge>
+                  </div>
+                  <p v-if="selectedIsJobFamily" class="mt-1 text-[11px] text-muted-foreground">
+                    Routes job-family records. It cannot be removed, and its shard count is frozen.
+                  </p>
                 </div>
 
-                <StrategyEditor v-model="strategyDraft" :known-locations="knownLocations" :disabled="busy" />
+                <StrategyEditor
+                  v-model="strategyDraft"
+                  :known-locations="knownLocations"
+                  :disabled="busy"
+                  :shard-count-locked="selectedIsJobFamily"
+                />
                 <p v-if="saveError" class="text-xs text-destructive">{{ saveError }}</p>
                 <p v-else-if="saveMessage" class="text-xs text-emerald-700 dark:text-emerald-300">{{ saveMessage }}</p>
                 <div class="flex flex-wrap items-center gap-2">
                   <Button size="sm" :disabled="!strategyDirty || busy" @click="saveStrategy">Save strategy</Button>
                   <Button variant="ghost" size="sm" :disabled="!strategyDirty || busy" @click="resetStrategy">Reset</Button>
                   <Button variant="outline" size="sm" :disabled="selectedIsDefault || strategyDirty || busy" @click="setDefaultStrategy">Set realm default</Button>
+                  <Button
+                    v-if="!creatingStrategy"
+                    variant="destructive"
+                    size="sm"
+                    :disabled="selectedIsJobFamily || strategyDirty || busy"
+                    :title="selectedIsJobFamily ? 'The job-family strategy cannot be removed, and its shard count is frozen.' : undefined"
+                    @click="removeStrategy"
+                  >
+                    Remove strategy
+                  </Button>
                 </div>
               </template>
             </template>

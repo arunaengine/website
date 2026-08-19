@@ -3,10 +3,10 @@ import {
   ApiError,
   apiRequest,
   type ApiRequestOptions,
-  type RealmPlacementConfigResponse,
   type RealmPlacementMutationRequest,
 } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
+import type { RealmPlacementConfigResponse } from '@/lib/placement'
 import { useAruna } from '@/composables/useAruna'
 
 const placementAdminEnabled = computed(() => featureEnabled('placementAdmin'))
@@ -27,6 +27,18 @@ function request<T>(path: string, options: ApiRequestOptions = {}) {
 
 export function isPlacementUnsupported(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 404 || err.status === 405)
+}
+
+export function placementMutationErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && err.status === 409) {
+    if (/immutable job-family strategy/i.test(err.message)) {
+      return 'The job-family strategy cannot be removed, and its shard count is frozen.'
+    }
+    if (/currently referenced/i.test(err.message)) {
+      return 'This placement strategy is currently referenced and cannot be removed. Remove or update its references first.'
+    }
+  }
+  return err instanceof Error ? err.message : String(err)
 }
 
 async function getRealmPlacement(): Promise<RealmPlacementConfigResponse> {

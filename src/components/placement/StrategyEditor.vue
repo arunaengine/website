@@ -14,6 +14,7 @@ const props = defineProps<{
   // The realm's known locations (lib/placement.ts knownLocations) feeding the pin chips.
   knownLocations: string[]
   disabled?: boolean
+  shardCountLocked?: boolean
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: RealmPlacementStrategy): void }>()
 
@@ -98,8 +99,19 @@ function ruleLabel(rule: RealmPlacementStrategy['affinity'][number]): string {
       </div>
       <div>
         <label class="text-xs font-medium text-foreground">Shard count</label>
-        <Input v-model="shardCount" type="number" min="1" max="4096" step="1" class="mt-1" :disabled="disabled" />
-        <p class="mt-1 text-[11px] text-muted-foreground">Power of two, at most 4096.</p>
+        <Input
+          v-model="shardCount"
+          type="number"
+          min="1"
+          max="4096"
+          step="1"
+          class="mt-1"
+          :disabled="disabled || shardCountLocked"
+          :title="shardCountLocked ? 'The job-family strategy shard count is frozen.' : undefined"
+        />
+        <p class="mt-1 text-[11px] text-muted-foreground">
+          {{ shardCountLocked ? 'Frozen for the job-family strategy.' : 'Power of two, at most 4096.' }}
+        </p>
       </div>
     </div>
 
