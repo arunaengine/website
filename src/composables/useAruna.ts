@@ -72,6 +72,7 @@ import {
   type UnifiedSearchResponse,
 } from '@/lib/api'
 import { parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
+import { classifyRoCrateSpecIri } from '@/lib/rocrateVersions'
 import {
   PROCESS_RUN_CRATE_PROFILE,
   PROCESS_RUN_CRATE_PROFILE_ID,
@@ -1486,7 +1487,7 @@ const nodes = computed<Node[]>(() => {
     bucketCount: 0,
     metadataCount: metadataItems.value.length,
     peers: [],
-    replicaFactor: realmInfo.value?.metadata_replication.default_replication_factor ?? 1,
+    replicaFactor: realmInfo.value?.metadata_replication.default_replication_factor ?? null,
     established: '',
   }))
 })
@@ -1563,7 +1564,7 @@ function mapMetadataDoc(item: MetadataDocumentListItem): MetadataDoc {
   // Keep the raw conformance ids so the UI can show an external profile IRI even when it
   // resolves to no local profile. Drop the RO-Crate spec conformance URI, which is not a profile.
   const conformsToIds = idValues(entity?.conformsTo).filter(
-    (id) => id !== 'https://w3id.org/ro/crate/1.1' && id !== 'https://w3id.org/ro/crate/1.2',
+    (id) => classifyRoCrateSpecIri(id).kind === 'non-spec',
   )
   const profileIds = profileIdsFromConformsTo(entity?.conformsTo)
   let profileId = ''

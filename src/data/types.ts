@@ -35,7 +35,9 @@ export interface Node {
   bucketCount: number
   metadataCount: number
   peers: string[]
-  replicaFactor: number
+  // null mirrors the wire value: the default strategy replicates to all
+  // eligible nodes, so no numeric factor exists to display.
+  replicaFactor: number | null
   established: string
 }
 

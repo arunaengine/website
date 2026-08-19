@@ -6,6 +6,7 @@ import roCrateContext from './ro-crate-context-1.2.json'
 import { CRATE_BASE_IRI, SH } from './projection'
 import { isDatasetType } from '../profiles/uri'
 import type { ShaclFinding, ShaclSeverity } from './findings'
+import { classifyRoCrateSpecIri } from '../rocrateVersions'
 
 // Deep in-browser crate validation (plan section 8). This module carries the
 // whole RDF stack (jsonld + n3 + shacl-engine) and is therefore ONLY imported
@@ -52,10 +53,15 @@ export async function validateCrate(
     } as never)) as unknown as string
   } catch (err) {
     if (refusedContexts.length) {
+      const unsupportedSpecVersion = refusedContexts
+        .map(classifyRoCrateSpecIri)
+        .find((classification) => classification.kind === 'known-unsupported')?.version
       return [
         {
           focusId: rootId,
-          message: `Deep validation skipped: the crate uses a remote context that is not bundled (${refusedContexts.join(', ')}). Only the RO-Crate 1.2 context is available offline.`,
+          message: unsupportedSpecVersion
+            ? `Deep validation skipped: RO-Crate ${unsupportedSpecVersion} is not supported yet. Validation remains at RO-Crate 1.2, and full ${unsupportedSpecVersion} support will arrive with a later release.`
+            : `Deep validation skipped: the crate uses a remote context that is not bundled (${refusedContexts.join(', ')}). Only the RO-Crate 1.2 context is available offline.`,
           severity: 'info',
           sourceShape: '',
         },

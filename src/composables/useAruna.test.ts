@@ -169,6 +169,32 @@ describe('the crate cache fence', () => {
   })
 })
 
+describe('metadata conformance classification', () => {
+  it('excludes supported and known-unsupported RO-Crate versions from profile ids', () => {
+    const item = {
+      ...doc('data/future', stamp(0)),
+      rocrate_summary: {
+        '@graph': [
+          { '@id': 'ro-crate-metadata.json', '@type': 'CreativeWork', about: { '@id': './' } },
+          {
+            '@id': './',
+            '@type': 'Dataset',
+            conformsTo: [
+              { '@id': 'https://w3id.org/ro/crate/1.2' },
+              { '@id': 'http://w3id.org/ro/crate/1.3' },
+              { '@id': 'https://example.test/profiles/future' },
+            ],
+          },
+        ],
+      },
+    }
+
+    expect(useAruna().toMetadataDoc(item).conformsToIds).toEqual([
+      'https://example.test/profiles/future',
+    ])
+  })
+})
+
 describe('initial metadata detail reads', () => {
   afterEach(() => {
     vi.useRealTimers()

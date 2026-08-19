@@ -1,4 +1,5 @@
 import { crateGraph, crateRootId, dataEntitiesOf, isLeafFile, stringProp } from '@/lib/dataEntities'
+import { classifyRoCrateSpecIri, type UnsupportedRoCrateSpecVersion } from '@/lib/rocrateVersions'
 
 // Shared RO-Crate import helpers: structural validation + preview summary for
 // every surface that accepts an uploaded/pasted crate (the metadata detail
@@ -13,6 +14,7 @@ export interface CrateImportPreview {
   entityCount: number
   fileCount: number
   conformsToIds: string[]
+  unsupportedSpecVersion?: UnsupportedRoCrateSpecVersion
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -42,15 +44,23 @@ export function analyzeCrateJson(text: string, source: string): CrateImportPrevi
   const rootId = crateRootId(json)
   const root = rootId ? graph.find((entity) => entity['@id'] === rootId) : undefined
   if (!root) throw new Error('Not an RO-Crate: no root dataset entity was found in @graph.')
+  const conformsToIds = [...new Set(idValues(root.conformsTo))]
+  const descriptor = graph.find((entity) => entity['@id'] === 'ro-crate-metadata.json')
+  const unsupportedSpecVersion = [...new Set([
+    ...conformsToIds,
+    ...idValues(descriptor?.conformsTo),
+    ...idValues(json['@context']),
+  ])]
+    .map(classifyRoCrateSpecIri)
+    .find((classification) => classification.kind === 'known-unsupported')?.version
   return {
     crate: json,
     source,
     rootName: stringProp(root.name) || rootId || 'Untitled dataset',
     entityCount: graph.length,
     fileCount: dataEntitiesOf(json).filter((entity) => isLeafFile(entity.types)).length,
-    conformsToIds: [...new Set(idValues(root.conformsTo))].filter(
-      (id) => id !== 'https://w3id.org/ro/crate/1.1' && id !== 'https://w3id.org/ro/crate/1.2',
-    ),
+    conformsToIds: conformsToIds.filter((id) => classifyRoCrateSpecIri(id).kind === 'non-spec'),
+    ...(unsupportedSpecVersion ? { unsupportedSpecVersion } : {}),
   }
 }
 
