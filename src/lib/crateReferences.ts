@@ -6,10 +6,12 @@ export interface CrateObjectReference {
 }
 
 // Builds an index of "bucket/key" -> referencing documents from client-side
-// crate caches ONLY (never issues a request). Two verified URL forms point into
-// the node's buckets:
-//   s3://{bucket}/{key}              (SelectDataDialog data references)
-//   {s3endpoint}/{bucket}/{key}      (path-style https contentUrl, useProfilePublish)
+// crate caches ONLY (never issues a request). Backlink coverage has three
+// authored forms to account for: a canonical content W3ID @id with a path-style
+// contentUrl, a legacy s3://{bucket}/{key} @id, and a legacy path-style
+// {s3endpoint}/{bucket}/{key} @id. This location index sees the canonical form
+// through contentUrl and both legacy locations through @id; complete server-side
+// claims must query all three identities.
 // The lookup is honest-by-construction: it only knows about crates the portal
 // has already fetched this session, so the badge tooltip says exactly that.
 export function buildCrateReferenceIndex(

@@ -26,6 +26,7 @@ import { AlertTriangle, Layers, Pencil, Plus, X } from '@lucide/vue'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { profileRulesLoadState, useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentListItem, type MetadataDocumentSummary } from '@/lib/api'
+import { takeSelectedContentReference } from '@/lib/contentIdentity'
 import { applyDataEntities, dataEntityTreeOf, type DataEntity } from '@/lib/dataEntities'
 import { addSubcrateLink, removeSubcrateLink, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
 import { documentIdFromIri } from '@/lib/graphIri'
@@ -312,7 +313,24 @@ const relatedPick = ref('')
 
 // The dataset's data entities, seeded from the crate and written back through
 // buildFromFields so file edits ride the same parsed-crate path as the fields.
-const files = ref<DataEntity[]>([])
+const fileRows = ref<DataEntity[]>([])
+const locationIdentityIds = ref<Set<string>>(new Set())
+const files = computed<DataEntity[]>({
+  get: () => fileRows.value,
+  set: (next) => {
+    const previous = new Map(fileRows.value.map((file) => [file.id, file]))
+    const fallbackIds = new Set([...locationIdentityIds.value].filter((id) => next.some((file) => file.id === id)))
+    fileRows.value = next.map((file) => {
+      const existing = previous.get(file.id)
+      if (existing) return { ...file, contentUrl: file.contentUrl ?? existing.contentUrl }
+      const selected = takeSelectedContentReference(file.id)
+      if (selected?.identity === 'location') fallbackIds.add(file.id)
+      return { ...file, contentUrl: selected?.contentUrl }
+    })
+    locationIdentityIds.value = fallbackIds
+  },
+})
+const locationIdentityFiles = computed(() => fileRows.value.filter((file) => locationIdentityIds.value.has(file.id)))
 const crateOptions = computed(() => files.value.map((file) => ({ value: file.id, label: file.name || file.id })))
 
 watch(
@@ -627,7 +645,8 @@ function seedFields(crate: unknown) {
   // them here would hoist them into the root's hasPart on save.
   subcrates.value = subcrateLinksOf(crate)
   const subcrateIris = new Set(subcrates.value.map((link) => link.iri))
-  files.value = dataEntityTreeOf(crate).filter((row) => row.depth === 0 && !subcrateIris.has(row.id))
+  fileRows.value = dataEntityTreeOf(crate).filter((row) => row.depth === 0 && !subcrateIris.has(row.id))
+  locationIdentityIds.value = new Set()
 
   // A mention is one of our documents iff its @id is an Aruna graph IRI; that
   // is a pure decision on the IRI, not a catalog lookup.
@@ -656,6 +675,7 @@ function buildFromFields(): unknown {
   // File edits rebuild hasPart and File entities before mentions are rewritten, so
   // a removed file still counted as referenced by an existing mention is preserved.
   applyDataEntities(clone, files.value)
+  applyAuthoredContentUrls(clone)
   restoreSubcrates(clone)
   // Newly picked subcrates compose via the spec-conformant helper; kept links
   // were already restored verbatim above (addSubcrateLink is idempotent).
@@ -696,6 +716,17 @@ function buildFromFields(): unknown {
   else delete root.mentions
   for (const id of relatedIds.value) upsertRelatedEntity(clone, id)
   return clone
+}
+
+function applyAuthoredContentUrls(crate: unknown) {
+  if (!isRecord(crate)) return
+  const graph = Array.isArray(crate['@graph']) ? crate['@graph'] : []
+  for (const file of files.value) {
+    const contentUrl = file.contentUrl?.trim()
+    if (!contentUrl) continue
+    const entity = graph.find((value) => isRecord(value) && value['@id'] === file.id)
+    if (isRecord(entity)) entity.contentUrl = contentUrl
+  }
 }
 
 function applyProfileFields(crate: unknown, root: Record<string, unknown>) {
@@ -1455,6 +1486,14 @@ async function save() {
 
           <TabsContent value="files">
             <DatasetFilesEditor v-model="files" :crate="pristine" />
+            <div v-if="locationIdentityFiles.length" class="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+              <p class="font-medium">Location identity</p>
+              <ul class="mt-1 space-y-1">
+                <li v-for="file in locationIdentityFiles" :key="file.id">
+                  <code class="break-all font-mono">{{ file.id }}</code> keeps its storage location as the File identifier because the content digest was unavailable.
+                </li>
+              </ul>
+            </div>
             <p class="mt-2 text-[11px] text-muted-foreground">
               Reference identifiers are kept verbatim. Removing a file drops it from the crate unless another entity still references it.
             </p>

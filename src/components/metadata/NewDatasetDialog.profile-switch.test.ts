@@ -7,6 +7,7 @@ import { createRenderer, defineComponent, h, nextTick, ref, type App, type Compo
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { profileRulesLoadState } from '@/composables/useAruna'
 import type { MetadataProfile } from '@/data/types'
+import * as ContentIdentity from '@/lib/contentIdentity'
 import * as CrateImport from '@/lib/crateImport'
 import * as CustomFields from '@/lib/customFields'
 import * as Subcrates from '@/lib/subcrates'
@@ -95,6 +96,16 @@ const CustomFieldsStub = defineComponent({
     return () => h('custom-fields', { rows: props.rows })
   },
 })
+const FilesEditorStub = defineComponent({
+  props: { modelValue: { type: Array, default: () => [] } },
+  emits: ['update:modelValue'],
+  setup(props, { emit }) {
+    return () => h('files-editor', {
+      files: props.modelValue,
+      onSet: (files: unknown[]) => emit('update:modelValue', files),
+    })
+  },
+})
 const DiscardStub = defineComponent({
   props: { open: Boolean },
   setup: (props) => () => props.open ? h('discard-confirm') : null,
@@ -142,7 +153,7 @@ function compileDialog(): Component {
     '@/components/ui/TabsList.vue': moduleDefault(SlotStub),
     '@/components/ui/TabsTrigger.vue': moduleDefault(SlotStub),
     '@/components/groups/CreateGroupDialog.vue': moduleDefault(SlotStub),
-    '@/components/metadata/DatasetFilesEditor.vue': moduleDefault(SlotStub),
+    '@/components/metadata/DatasetFilesEditor.vue': moduleDefault(FilesEditorStub),
     '@/components/metadata/DatasetEntityInstances.vue': moduleDefault(EntityControlStub),
     '@/components/metadata/ProfileControlField.vue': moduleDefault(ProfileControlStub),
     '@/components/metadata/profile-builder/LiftNotesPanel.vue': moduleDefault(SlotStub),
@@ -163,6 +174,7 @@ function compileDialog(): Component {
       }),
     },
     '@/lib/crateImport': CrateImport,
+    '@/lib/contentIdentity': ContentIdentity,
     '@/lib/customFields': CustomFields,
     '@/lib/subcrates': Subcrates,
     '@/lib/profiles/controls': ProfileControls,
@@ -316,9 +328,9 @@ function profile(id: string, propertyRules: ProfilePropertyRule[]): MetadataProf
   }
 }
 
-async function mountDialog(): Promise<HostNode> {
+async function mountDialog(defaultProfileId = 'old'): Promise<HostNode> {
   const root = hostNode('root')
-  const app = renderer.createApp(NewDatasetDialog, { open: true, defaultProfileId: 'old' })
+  const app = renderer.createApp(NewDatasetDialog, { open: true, defaultProfileId })
   app.mount(root)
   mountedApps.push(app)
   await flush()
@@ -345,6 +357,18 @@ function entityControl(root: HostNode, property: string): HostNode {
   const control = nodes(root).find((node) => node.tag === 'entity-control' && node.props.property === property)
   if (!control) throw new Error(`Entity control ${property} not found`)
   return control
+}
+
+function filesEditor(root: HostNode): HostNode {
+  const editor = nodes(root).find((node) => node.tag === 'files-editor')
+  if (!editor) throw new Error('Files editor not found')
+  return editor
+}
+
+function setModel(root: HostNode, predicate: (node: HostNode) => boolean, value: string) {
+  const node = nodes(root).find(predicate)
+  if (!node) throw new Error('Model field not found')
+  ;(node.props['onUpdate:modelValue'] as (next: string) => void)(value)
 }
 
 function button(root: HostNode, label: string): HostNode {
@@ -382,6 +406,66 @@ afterEach(() => {
 })
 
 describe('New Dataset profile switching', () => {
+  it('authors a W3ID with contentUrl while preserving an external identity', async () => {
+    createMetadata.mockResolvedValue({
+      document_id: 'dataset-1',
+      group_id: 'group-1',
+      created_at: '2026-08-19T00:00:00Z',
+      updated_at: '2026-08-19T00:00:00Z',
+    })
+    const root = await mountDialog('')
+    setModel(root, (node) => node.props.placeholder === 'Dataset title', 'Identity fixture')
+    setModel(root, (node) => node.props.placeholder === 'datasets/my-dataset', 'datasets/identity-fixture')
+    setModel(root, (node) => String(node.props.rows) === '3', 'Fixture description')
+
+    const location = 's3://raw-data/resolved.fastq.gz'
+    const resolved = ContentIdentity.arunaContentReference(
+      location,
+      ContentIdentity.contentIdentityFromBlake3('ab'.repeat(32)),
+    )
+    const external = ContentIdentity.externalContentReference('https://example.org/external.fastq.gz')
+    const clearResolved = ContentIdentity.stageSelectedContentReference(resolved)
+    const clearExternal = ContentIdentity.stageSelectedContentReference(external)
+    ;(filesEditor(root).props.onSet as (files: unknown[]) => void)([
+      { id: resolved.id, name: 'Resolved reads', types: ['File'] },
+      { id: external.id, name: 'External reads', types: ['File'] },
+    ])
+    clearResolved()
+    clearExternal()
+    await flush()
+
+    click(button(root, 'Create metadata'))
+    await flush()
+
+    const payload = createMetadata.mock.calls[0][0] as { rocrate: { '@graph': Array<Record<string, unknown>> } }
+    const dataset = payload.rocrate['@graph'].find((entity) => entity['@id'] === './')
+    expect(dataset?.hasPart).toEqual([{ '@id': resolved.id }, { '@id': external.id }])
+    expect(payload.rocrate['@graph'].find((entity) => entity['@id'] === resolved.id)).toMatchObject({
+      '@id': resolved.id,
+      contentUrl: location,
+    })
+    expect(payload.rocrate['@graph'].find((entity) => entity['@id'] === external.id)).toMatchObject({
+      '@id': external.id,
+    })
+  })
+
+  it('shows the location-identity marker for an unresolved node pick', async () => {
+    const root = await mountDialog()
+    const location = 's3://raw-data/unresolved.fastq.gz'
+    const clear = ContentIdentity.stageSelectedContentReference({
+      id: location,
+      identity: 'location',
+    })
+    ;(filesEditor(root).props.onSet as (files: unknown[]) => void)([
+      { id: location, name: 'unresolved.fastq.gz', types: ['File'] },
+    ])
+    clear()
+    await flush()
+
+    expect(content(root)).toContain('Location identity')
+    expect(content(root)).toContain(location)
+  })
+
   it('migrates a populated matching field by property URI', async () => {
     const uri = 'https://example.test/terms/shared'
     profiles.value = [

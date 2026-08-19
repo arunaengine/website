@@ -1,12 +1,11 @@
 import { blake3, sha256 } from 'hash-wasm'
 import { useAruna } from './useAruna'
 import { isS3NetworkError, useS3 } from './useS3'
+import { arunaContentReference, resolveContentIdentity } from '@/lib/contentIdentity'
 import type { ExternalProfileArtifacts, ProfileArtifactTexts } from '@/lib/profiles/rocrate'
 
 // Where content-addressed data resolves: any aruna node's GA4GH DRS API accepts
 // these ids (`/ga4gh/drs/v1/objects/https://w3id.org/aruna/data/<blake3-hex>`).
-const W3ID_DATA_PREFIX = 'https://w3id.org/aruna/data/'
-
 const ARTIFACT_FILES = [
   { key: 'html', name: 'profile.html', contentType: 'text/html' },
   { key: 'schema', name: 'schema.json', contentType: 'application/schema+json' },
@@ -68,9 +67,14 @@ export function useProfilePublish() {
         throw corsAwareError(err, `Uploading ${artifact.name}`, bucket)
       }
       const bytes = new TextEncoder().encode(text)
+      const contentUrl = `${endpoint.replace(/\/$/, '')}/${bucket}/${key}`
+      const reference = arunaContentReference(
+        contentUrl,
+        await resolveContentIdentity(bucket, key, { blake3: await blake3(bytes) }),
+      )
       refs[artifact.key] = {
-        id: `${W3ID_DATA_PREFIX}${await blake3(bytes)}`,
-        contentUrl: `${endpoint.replace(/\/$/, '')}/${bucket}/${key}`,
+        id: reference.id,
+        contentUrl,
         contentSize: bytes.byteLength,
         sha256: await sha256(bytes),
       }

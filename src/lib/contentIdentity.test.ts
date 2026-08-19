@@ -1,0 +1,118 @@
+import { describe, expect, it, vi } from 'vitest'
+import { dataEntitiesOf } from './dataEntities'
+import {
+  arunaContentReference,
+  contentIdentityFromBlake3,
+  externalContentReference,
+  fileEntityForReference,
+  resolveContentIdentity,
+  stageSelectedContentReference,
+  takeSelectedContentReference,
+} from './contentIdentity'
+
+const BLAKE3 = 'ab'.repeat(32)
+
+function crateWith(reference: ReturnType<typeof arunaContentReference>, name = 'reads.fastq.gz') {
+  return {
+    '@context': 'https://w3id.org/ro/crate/1.2/context',
+    '@graph': [
+      {
+        '@id': 'ro-crate-metadata.json',
+        '@type': 'CreativeWork',
+        about: { '@id': './' },
+      },
+      {
+        '@id': './',
+        '@type': 'Dataset',
+        hasPart: [{ '@id': reference.id }],
+      },
+      fileEntityForReference(reference, name),
+    ],
+  }
+}
+
+describe('canonical content identity authoring', () => {
+  it('resolves a bucket and key through the current version DRS checksum', async () => {
+    const getVersionId = vi.fn().mockResolvedValue('01JABCDEF0123456789ABCDEFG')
+    const getDrsObject = vi.fn().mockResolvedValue({
+      checksums: [
+        { type: 'sha256', checksum: 'cd'.repeat(32) },
+        { type: 'blake3', checksum: BLAKE3.toUpperCase() },
+      ],
+    })
+
+    await expect(resolveContentIdentity('raw-data', 'runs/a @ %.fastq', {
+      realmId: 'realm-id',
+      nodeId: 'node-id',
+      getVersionId,
+      getDrsObject,
+    })).resolves.toEqual({
+      status: 'resolved',
+      id: `https://w3id.org/aruna/data/${BLAKE3}`,
+      blake3: BLAKE3,
+    })
+    expect(getVersionId).toHaveBeenCalledWith('raw-data', 'runs/a @ %.fastq')
+    expect(getDrsObject).toHaveBeenCalledWith(
+      'arn:aruna:realm-id:node-id:s3/raw-data/runs/a%20%40%20%25.fastq@01JABCDEF0123456789ABCDEFG',
+    )
+  })
+
+  it('round-trips Aruna-held content with a W3ID and separate location', () => {
+    const location = 's3://raw-data/runs/reads.fastq.gz'
+    const reference = arunaContentReference(location, contentIdentityFromBlake3(BLAKE3))
+    const crate = crateWith(reference)
+
+    expect(reference).toEqual({
+      id: `https://w3id.org/aruna/data/${BLAKE3}`,
+      contentUrl: location,
+      identity: 'content',
+    })
+    expect(crate['@graph'][1].hasPart).toEqual([{ '@id': reference.id }])
+    expect(dataEntitiesOf(crate)).toEqual([{
+      id: reference.id,
+      name: 'reads.fastq.gz',
+      types: ['File'],
+      encodingFormat: undefined,
+      contentSize: undefined,
+      contentUrl: location,
+      description: undefined,
+    }])
+  })
+
+  it('falls back without fabricating a digest and carries the location marker', async () => {
+    const location = 's3://raw-data/runs/unresolved.fastq.gz'
+    const resolution = await resolveContentIdentity('raw-data', 'runs/unresolved.fastq.gz', {
+      realmId: 'realm-id',
+      nodeId: 'node-id',
+      getVersionId: vi.fn().mockRejectedValue(new Error('unavailable')),
+    })
+    const reference = arunaContentReference(location, resolution)
+
+    expect(reference).toEqual({ id: location, identity: 'location' })
+    expect(fileEntityForReference(reference, 'unresolved.fastq.gz')).toEqual({
+      '@id': location,
+      '@type': 'File',
+      name: 'unresolved.fastq.gz',
+    })
+  })
+
+  it('preserves an external source identity untouched', () => {
+    const source = 'https://example.org/archive/data.tar.gz'
+    const reference = externalContentReference(source)
+
+    expect(reference).toEqual({ id: source, identity: 'external' })
+    expect(fileEntityForReference(reference, 'External archive')['@id']).toBe(source)
+  })
+
+  it('hands resolved picker details to the existing editor event synchronously', () => {
+    const reference = arunaContentReference(
+      's3://raw-data/reads.fastq.gz',
+      contentIdentityFromBlake3(BLAKE3),
+    )
+    const clear = stageSelectedContentReference(reference)
+
+    expect(takeSelectedContentReference(reference.id)).toEqual(reference)
+    clear()
+    expect(takeSelectedContentReference(reference.id)).toBeUndefined()
+  })
+})

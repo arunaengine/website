@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { profileRulesLoadState } from '@/composables/useAruna'
 import type { MetadataProfile } from '@/data/types'
 import * as Api from '@/lib/api'
+import * as ContentIdentity from '@/lib/contentIdentity'
 import * as DataEntities from '@/lib/dataEntities'
 import * as Subcrates from '@/lib/subcrates'
 import * as GraphIri from '@/lib/graphIri'
@@ -76,6 +77,16 @@ const CustomFieldsStub = defineComponent({
     return () => h('custom-fields', { rows: props.rows, preserved: props.preserved })
   },
 })
+const FilesEditorStub = defineComponent({
+  props: { modelValue: { type: Array, default: () => [] } },
+  emits: ['update:modelValue'],
+  setup(props, { emit }) {
+    return () => h('files-editor', {
+      files: props.modelValue,
+      onSet: (files: unknown[]) => emit('update:modelValue', files),
+    })
+  },
+})
 
 const moduleDefault = (component: Component) => ({ __esModule: true, default: component })
 const icons = new Proxy({}, { get: () => SlotStub })
@@ -114,7 +125,7 @@ function compileDialog(): Component {
     '@/components/ui/TabsTrigger.vue': moduleDefault(SlotStub),
     '@/components/ui/TabsContent.vue': moduleDefault(SlotStub),
     '@/components/ui/Select.vue': moduleDefault(SelectStub),
-    '@/components/metadata/DatasetFilesEditor.vue': moduleDefault(SlotStub),
+    '@/components/metadata/DatasetFilesEditor.vue': moduleDefault(FilesEditorStub),
     '@/components/metadata/DatasetEntityInstances.vue': moduleDefault(EntityControlStub),
     '@/components/metadata/ProfileControlField.vue': moduleDefault(ProfileControlStub),
     '@/components/metadata/profile-builder/LiftNotesPanel.vue': moduleDefault(SlotStub),
@@ -136,6 +147,7 @@ function compileDialog(): Component {
       }),
     },
     '@/lib/api': Api,
+    '@/lib/contentIdentity': ContentIdentity,
     '@/lib/dataEntities': DataEntities,
     '@/lib/subcrates': Subcrates,
     '@/lib/graphIri': GraphIri,
@@ -385,6 +397,12 @@ function customRows(root: HostNode): CustomFields.CustomFieldRow[] {
   return (nodes(root).find((node) => node.tag === 'custom-fields')?.props.rows ?? []) as CustomFields.CustomFieldRow[]
 }
 
+function filesEditor(root: HostNode): HostNode {
+  const editor = nodes(root).find((node) => node.tag === 'files-editor')
+  if (!editor) throw new Error('Files editor not found')
+  return editor
+}
+
 beforeEach(() => {
   saving.value = false
   dialogOpen.value = false
@@ -408,6 +426,60 @@ afterEach(() => {
 })
 
 describe('existing Dataset profile transition', () => {
+  it('keeps a legacy location unchanged and marks only a newly unresolved pick', async () => {
+    const legacy = 's3://raw-data/legacy.fastq.gz'
+    const value = crate('', { hasPart: [{ '@id': legacy }] })
+    ;(value['@graph'] as Array<Record<string, unknown>>).push({
+      '@id': legacy,
+      '@type': 'File',
+      name: 'Legacy reads',
+    })
+    const root = await mountDialog(value)
+
+    expect(filesEditor(root).props.files).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: legacy, name: 'Legacy reads' }),
+    ]))
+    expect(content(root)).not.toContain('Location identity')
+
+    const unresolved = 's3://raw-data/unresolved.fastq.gz'
+    const clear = ContentIdentity.stageSelectedContentReference({ id: unresolved, identity: 'location' })
+    ;(filesEditor(root).props.onSet as (files: unknown[]) => void)([
+      ...(filesEditor(root).props.files as unknown[]),
+      { id: unresolved, name: 'Unresolved reads', types: ['File'] },
+    ])
+    clear()
+    await flush()
+
+    expect(content(root)).toContain('Location identity')
+    expect(content(root)).toContain(unresolved)
+  })
+
+  it('writes a newly resolved file with its W3ID and contentUrl', async () => {
+    const root = await mountDialog(crate(''))
+    const digest = 'ab'.repeat(32)
+    const location = 's3://raw-data/resolved.fastq.gz'
+    const reference = ContentIdentity.arunaContentReference(
+      location,
+      ContentIdentity.contentIdentityFromBlake3(digest),
+    )
+    const clear = ContentIdentity.stageSelectedContentReference(reference)
+    ;(filesEditor(root).props.onSet as (files: unknown[]) => void)([
+      { id: reference.id, name: 'Resolved reads', types: ['File'] },
+    ])
+    clear()
+    await flush()
+
+    click(button(root, 'Save changes'))
+    await flush()
+
+    const payload = replaceMetadataRoCrate.mock.calls[0][1] as { rocrate: { '@graph': Array<Record<string, unknown>> } }
+    expect(rootOf(payload.rocrate).hasPart).toEqual([{ '@id': reference.id }])
+    expect(payload.rocrate['@graph'].find((entity) => entity['@id'] === reference.id)).toMatchObject({
+      '@id': reference.id,
+      contentUrl: location,
+    })
+  })
+
   it('migrates matching property URI values and preserves unmatched values for review', async () => {
     const shared = 'https://example.test/terms/shared'
     const oldEntity = 'https://example.test/terms/old-entity'

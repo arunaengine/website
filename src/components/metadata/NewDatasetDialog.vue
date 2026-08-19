@@ -27,6 +27,11 @@ import { computed, ref, watch } from 'vue'
 import { AlertTriangle, Check, FileJson, FileJson2, FileUp, Layers, Plus, Upload, X } from '@lucide/vue'
 import { profileRulesLoadState, useAruna } from '@/composables/useAruna'
 import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
+import {
+  fileEntityForReference,
+  takeSelectedContentReference,
+  type ContentReferenceIdentity,
+} from '@/lib/contentIdentity'
 import { groupCustomFieldRows, type CustomFieldRow } from '@/lib/customFields'
 import { addSubcrateLink, type SubcrateLink } from '@/lib/subcrates'
 import type { MetadataDocumentListItem } from '@/lib/api'
@@ -114,7 +119,13 @@ const isPublic = ref(false)
 const keywords = ref('')
 const identifier = ref('')
 const creators = ref<string[]>([])
-const dataRefs = ref<Array<{ label: string; url: string }>>([])
+interface DatasetDataReference {
+  label: string
+  url: string
+  contentUrl?: string
+  identity: ContentReferenceIdentity
+}
+const dataRefs = ref<DatasetDataReference[]>([])
 // Typed extra root properties (shared CustomFieldsEditor rows).
 const customFields = ref<CustomFieldRow[]>([])
 const customFieldValues = computed(() => groupCustomFieldRows(customFields.value))
@@ -202,18 +213,42 @@ const keywordList = computed(() => keywords.value.split(',').map((keyword) => ke
 const creatorList = computed(() => creators.value.map((name) => name.trim()).filter(Boolean))
 const dataRefList = computed(() =>
   dataRefs.value
-    .map((entry) => ({ label: entry.label.trim(), url: entry.url.trim() }))
+    .map((entry) => ({
+      label: entry.label.trim(),
+      url: entry.url.trim(),
+      contentUrl: entry.contentUrl?.trim() || undefined,
+      identity: entry.identity,
+    }))
     .filter((entry) => entry.url),
 )
 // Bridge the shared files editor onto the existing {label,url} model so buildRoCrate
 // keeps emitting hasPart File entities from `dataRefs`; per-file details are omitted
 // here (`detailed: false`) because the create emit shape carries only id + name.
 const filesModel = computed<DataEntity[]>({
-  get: () => dataRefs.value.map((entry) => ({ id: entry.url, name: entry.label, types: ['File'] })),
+  get: () => dataRefs.value.map((entry) => ({
+    id: entry.url,
+    name: entry.label,
+    types: ['File'],
+    contentUrl: entry.contentUrl,
+  })),
   set: (next) => {
-    dataRefs.value = next.map((file) => ({ label: file.name, url: file.id }))
+    const previous = new Map(dataRefs.value.map((entry) => [entry.url, entry]))
+    dataRefs.value = next.map((file) => {
+      const existing = previous.get(file.id)
+      if (existing) {
+        return { ...existing, label: file.name, contentUrl: file.contentUrl ?? existing.contentUrl }
+      }
+      const selected = takeSelectedContentReference(file.id)
+      return {
+        label: file.name,
+        url: file.id,
+        contentUrl: selected?.contentUrl,
+        identity: selected?.identity ?? 'external',
+      }
+    })
   },
 })
+const locationIdentityRefs = computed(() => dataRefList.value.filter((entry) => entry.identity === 'location'))
 // A labelled reference needs a URL, and every supplied URL must be an absolute
 // URI (http(s)://, s3://, …) so it emits as a valid `{"@id"}` reference.
 function dataRefUrlError(entry: { label: string; url: string }): boolean {
@@ -1200,7 +1235,11 @@ function buildRoCrate() {
   if (dataRefList.value.length) {
     dataset.hasPart = dataRefList.value.map((entry) => ({ '@id': entry.url }))
     for (const entry of dataRefList.value) {
-      addEntity({ '@id': entry.url, '@type': 'File', name: entry.label || entry.url })
+      addEntity(fileEntityForReference({
+        id: entry.url,
+        contentUrl: entry.contentUrl,
+        identity: entry.identity,
+      }, entry.label))
     }
   }
 
@@ -1590,6 +1629,14 @@ async function submit() {
         </div>
         <div>
           <DatasetFilesEditor v-model="filesModel" :detailed="false" />
+          <div v-if="locationIdentityRefs.length" class="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+            <p class="font-medium">Location identity</p>
+            <ul class="mt-1 space-y-1">
+              <li v-for="entry in locationIdentityRefs" :key="entry.url">
+                <code class="break-all font-mono">{{ entry.url }}</code> keeps its storage location as the File identifier because the content digest was unavailable.
+              </li>
+            </ul>
+          </div>
           <!-- WS5: the profile's required contents for hasPart. A reference is
                matched by its @id (url) or name (label), the same way the File
                entities are emitted, so this checklist agrees with validation. -->

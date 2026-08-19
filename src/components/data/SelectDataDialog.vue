@@ -16,9 +16,16 @@ import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import { useS3 } from '@/composables/useS3'
 import { useAruna } from '@/composables/useAruna'
+import {
+  arunaContentReference,
+  externalContentReference,
+  resolveContentIdentity,
+  stageSelectedContentReference,
+  type AuthoredContentReference,
+} from '@/lib/contentIdentity'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
 import { ref, watch } from 'vue'
-import { Database, KeyRound, LogIn, Plus, ShieldAlert } from '@lucide/vue'
+import { Database, KeyRound, Loader2, LogIn, Plus, ShieldAlert } from '@lucide/vue'
 
 // Picker for a dataset data reference: browse the node's own S3 data or paste
 // an external URL. Emits one `{ label, url }` entry per add — the same shape
@@ -30,10 +37,12 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { currentUser } = useAruna()
+const { currentUser, getBlobLocations, nodeInfo, apiBaseUrl, authToken } = useAruna()
 
 const tab = ref('node')
 const credentialDialogOpen = ref(false)
+const resolving = ref(false)
+let pickToken = 0
 
 const externalLabel = ref('')
 const externalUrl = ref('')
@@ -42,7 +51,11 @@ const externalUrlInvalid = ref(false)
 watch(
   () => props.open,
   (open) => {
-    if (!open) return
+    if (!open) {
+      ++pickToken
+      resolving.value = false
+      return
+    }
     tab.value = s3.endpoint.value ? 'node' : 'external'
     externalLabel.value = ''
     externalUrl.value = ''
@@ -51,19 +64,43 @@ watch(
   { immediate: true },
 )
 
-function pickObject(entry: { bucket: string; key: string; name: string }) {
-  // Stable, scheme-explicit reference; presigned URLs expire, so they are never
-  // used as crate ids.
-  emit('add', { label: entry.name, url: `s3://${entry.bucket}/${entry.key}` })
+function emitReference(label: string, reference: AuthoredContentReference) {
+  const clearStaged = stageSelectedContentReference(reference)
+  try {
+    emit('add', { label, url: reference.id })
+  } finally {
+    clearStaged()
+  }
   emit('update:open', false)
+}
+
+async function pickObject(entry: { bucket: string; key: string; name: string }) {
+  if (resolving.value) return
+  const token = ++pickToken
+  resolving.value = true
+  const location = `s3://${entry.bucket}/${entry.key}`
+  try {
+    const resolution = await resolveContentIdentity(entry.bucket, entry.key, {
+      realmId: nodeInfo.value?.node.realm_id,
+      nodeId: nodeInfo.value?.node.peer_id,
+      apiBaseUrl: apiBaseUrl.value,
+      authToken: authToken.value,
+      getVersionId: async (bucket, key) => (await getBlobLocations(bucket, key)).version_id,
+    })
+    if (token !== pickToken || !props.open) return
+    emitReference(entry.name, arunaContentReference(location, resolution))
+  } finally {
+    if (token === pickToken) resolving.value = false
+  }
 }
 
 function addExternal() {
   const url = externalUrl.value.trim()
   externalUrlInvalid.value = !isAbsoluteUri(url)
   if (externalUrlInvalid.value) return
-  emit('add', { label: externalLabel.value.trim(), url })
-  emit('update:open', false)
+  ++pickToken
+  resolving.value = false
+  emitReference(externalLabel.value.trim(), externalContentReference(url))
 }
 </script>
 
@@ -98,7 +135,8 @@ function addExternal() {
             <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
           </div>
           <template v-else>
-            <p class="pb-2 text-[11px] text-muted-foreground">Click an object to reference it as <code class="rounded bg-muted px-1">s3://bucket/key</code>.</p>
+            <p class="pb-2 text-[11px] text-muted-foreground">Click an object to use its content identity. Its <code class="rounded bg-muted px-1">s3://bucket/key</code> location is kept as <code class="rounded bg-muted px-1">contentUrl</code>.</p>
+            <p v-if="resolving" class="flex items-center gap-2 pb-2 text-[11px] text-muted-foreground"><Loader2 class="h-3.5 w-3.5 animate-spin" /> Resolving the content identity…</p>
             <ObjectBrowserPanel @select="pickObject" />
           </template>
         </TabsContent>
