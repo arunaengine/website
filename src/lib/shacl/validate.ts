@@ -2,11 +2,11 @@ import jsonld from 'jsonld'
 import { DataFactory, Parser, Store } from 'n3'
 import { Validator } from 'shacl-engine'
 import type { ShaclEngineResult } from 'shacl-engine'
-import roCrateContext from './ro-crate-context-1.2.json'
+import roCrateContext12 from './ro-crate-context-1.2.json'
+import roCrateContext13 from './ro-crate-context-1.3.json'
 import { CRATE_BASE_IRI, SH } from './projection'
 import { isDatasetType } from '../profiles/uri'
 import type { ShaclFinding, ShaclSeverity } from './findings'
-import { classifyRoCrateSpecIri } from '../rocrateVersions'
 
 // Deep in-browser crate validation (plan section 8). This module carries the
 // whole RDF stack (jsonld + n3 + shacl-engine) and is therefore ONLY imported
@@ -19,13 +19,16 @@ import { classifyRoCrateSpecIri } from '../rocrateVersions'
 
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
 
-// Context URLs answered from the bundled RO-Crate 1.2 context. Any other
+// Context URLs answered from the matching bundled RO-Crate context. Any other
 // remote context is refused offline and reported as a single info finding —
 // never fetched, never a hard failure.
-const BUNDLED_CONTEXT_URLS = new Set([
-  'https://w3id.org/ro/crate/1.2/context',
-  'http://w3id.org/ro/crate/1.2/context',
-  'https://www.researchobject.org/ro-crate/1.2/context.jsonld',
+const BUNDLED_CONTEXTS = new Map<string, unknown>([
+  ['https://w3id.org/ro/crate/1.2/context', roCrateContext12],
+  ['http://w3id.org/ro/crate/1.2/context', roCrateContext12],
+  ['https://www.researchobject.org/ro-crate/1.2/context.jsonld', roCrateContext12],
+  ['https://w3id.org/ro/crate/1.3/context', roCrateContext13],
+  ['http://w3id.org/ro/crate/1.3/context', roCrateContext13],
+  ['https://www.researchobject.org/ro-crate/1.3/context.jsonld', roCrateContext13],
 ])
 
 export async function validateCrate(
@@ -37,8 +40,9 @@ export async function validateCrate(
 
   const refusedContexts: string[] = []
   const documentLoader = async (url: string) => {
-    if (BUNDLED_CONTEXT_URLS.has(url)) {
-      return { contextUrl: undefined, document: roCrateContext, documentUrl: url }
+    const document = BUNDLED_CONTEXTS.get(url)
+    if (document) {
+      return { contextUrl: undefined, document, documentUrl: url }
     }
     refusedContexts.push(url)
     throw new Error(`Remote context not available offline: ${url}`)
@@ -53,15 +57,10 @@ export async function validateCrate(
     } as never)) as unknown as string
   } catch (err) {
     if (refusedContexts.length) {
-      const unsupportedSpecVersion = refusedContexts
-        .map(classifyRoCrateSpecIri)
-        .find((classification) => classification.kind === 'known-unsupported')?.version
       return [
         {
           focusId: rootId,
-          message: unsupportedSpecVersion
-            ? `Deep validation skipped: RO-Crate ${unsupportedSpecVersion} is not supported yet. Validation remains at RO-Crate 1.2, and full ${unsupportedSpecVersion} support will arrive with a later release.`
-            : `Deep validation skipped: the crate uses a remote context that is not bundled (${refusedContexts.join(', ')}). Only the RO-Crate 1.2 context is available offline.`,
+          message: `Deep validation skipped: the crate uses a remote context that is not bundled (${refusedContexts.join(', ')}). Only the RO-Crate 1.2 and 1.3 contexts are available offline.`,
           severity: 'info',
           sourceShape: '',
         },

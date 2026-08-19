@@ -1,5 +1,5 @@
 import { crateGraph, crateRootId, dataEntitiesOf, isLeafFile, stringProp } from '@/lib/dataEntities'
-import { classifyRoCrateSpecIri, type UnsupportedRoCrateSpecVersion } from '@/lib/rocrateVersions'
+import { classifyRoCrateSpecIri, type RoCrateSpecVersion } from '@/lib/rocrateVersions'
 
 // Shared RO-Crate import helpers: structural validation + preview summary for
 // every surface that accepts an uploaded/pasted crate (the metadata detail
@@ -14,7 +14,8 @@ export interface CrateImportPreview {
   entityCount: number
   fileCount: number
   conformsToIds: string[]
-  unsupportedSpecVersion?: UnsupportedRoCrateSpecVersion
+  specVersion?: RoCrateSpecVersion
+  unknownSpecVersion?: string
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,13 +47,18 @@ export function analyzeCrateJson(text: string, source: string): CrateImportPrevi
   if (!root) throw new Error('Not an RO-Crate: no root dataset entity was found in @graph.')
   const conformsToIds = [...new Set(idValues(root.conformsTo))]
   const descriptor = graph.find((entity) => entity['@id'] === 'ro-crate-metadata.json')
-  const unsupportedSpecVersion = [...new Set([
-    ...conformsToIds,
+  const specClassifications = [...new Set([
     ...idValues(descriptor?.conformsTo),
     ...idValues(json['@context']),
+    ...conformsToIds,
   ])]
     .map(classifyRoCrateSpecIri)
-    .find((classification) => classification.kind === 'known-unsupported')?.version
+  const specVersion = specClassifications.find(
+    (classification) => classification.kind === 'supported',
+  )?.version
+  const unknownSpecVersion = specClassifications.find(
+    (classification) => classification.kind === 'unknown-spec',
+  )?.version
   return {
     crate: json,
     source,
@@ -60,7 +66,8 @@ export function analyzeCrateJson(text: string, source: string): CrateImportPrevi
     entityCount: graph.length,
     fileCount: dataEntitiesOf(json).filter((entity) => isLeafFile(entity.types)).length,
     conformsToIds: conformsToIds.filter((id) => classifyRoCrateSpecIri(id).kind === 'non-spec'),
-    ...(unsupportedSpecVersion ? { unsupportedSpecVersion } : {}),
+    ...(specVersion ? { specVersion } : {}),
+    ...(unknownSpecVersion ? { unknownSpecVersion } : {}),
   }
 }
 

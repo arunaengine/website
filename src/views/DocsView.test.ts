@@ -72,6 +72,14 @@ describe('versioned in-portal Docs', () => {
     expect(JSON.stringify(docsTopics)).not.toMatch(/lorem ipsum/i)
   })
 
+  it('states the activated RO-Crate compatibility and 1.2 creation default', () => {
+    const datasets = docsTopics.find((topic) => topic.slug === 'datasets')
+    const copy = JSON.stringify(datasets)
+
+    expect(copy).toContain('RO-Crate 1.2 and 1.3 are supported for import, validation, and round-trip export.')
+    expect(copy).toContain('New portal-authored crates currently emit RO-Crate 1.2.')
+  })
+
   it('renders an honest unknown-topic state', async () => {
     const html = await renderTopic('not-a-topic')
     expect(html).toContain('Docs topic not found')

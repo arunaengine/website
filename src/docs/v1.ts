@@ -50,6 +50,14 @@ export const docsTopics: DocsTopic[] = [
           'These are separate intents. Import does not overwrite an existing Dataset unless an explicit replacement workflow says so.',
         ],
       },
+      {
+        title: 'RO-Crate version compatibility',
+        bullets: [
+          'RO-Crate 1.2 and 1.3 are supported for import, validation, and round-trip export.',
+          'New portal-authored crates currently emit RO-Crate 1.2. Importing and exporting an existing 1.3 crate preserves its declared version.',
+          'RO-Crate 1.1 remains supported for reading.',
+        ],
+      },
     ],
   },
   {

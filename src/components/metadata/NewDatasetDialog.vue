@@ -1469,15 +1469,18 @@ async function submit(unprofiled = false) {
             <div class="flex items-center gap-2 font-medium text-foreground">
               <FileJson class="h-3.5 w-3.5 shrink-0 text-primary" />
               {{ importPreview.source }}: {{ importPreview.rootName }}
+              <span v-if="importPreview.specVersion" class="ml-auto shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                RO-Crate {{ importPreview.specVersion }}
+              </span>
             </div>
             <p class="text-muted-foreground">
               {{ importPreview.entityCount }} {{ importPreview.entityCount === 1 ? 'entity' : 'entities' }} in the graph,
               {{ importPreview.fileCount }} referenced data {{ importPreview.fileCount === 1 ? 'file' : 'files' }}.
             </p>
           </div>
-          <div v-if="importPreview.unsupportedSpecVersion" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          <div v-if="importPreview.unknownSpecVersion" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>RO-Crate {{ importPreview.unsupportedSpecVersion }} is not supported yet. Crate creation remains at RO-Crate 1.2, and full {{ importPreview.unsupportedSpecVersion }} support will arrive with a later release.</span>
+            <span>RO-Crate {{ importPreview.unknownSpecVersion }} is not recognized by this portal. The backend may reject this import.</span>
           </div>
           <div v-if="unrecognizedImportProfiles.length" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />

@@ -390,7 +390,7 @@ describe('accepted profile reconciliation', () => {
 })
 
 describe('metadata conformance classification', () => {
-  it('excludes supported and known-unsupported RO-Crate versions from profile ids', () => {
+  it('excludes supported and unknown RO-Crate specification versions from profile ids', () => {
     const item = {
       ...doc('data/future', stamp(0)),
       rocrate_summary: {
@@ -402,6 +402,7 @@ describe('metadata conformance classification', () => {
             conformsTo: [
               { '@id': 'https://w3id.org/ro/crate/1.2' },
               { '@id': 'http://w3id.org/ro/crate/1.3' },
+              { '@id': 'https://w3id.org/ro/crate/1.4' },
               { '@id': 'https://example.test/profiles/future' },
             ],
           },

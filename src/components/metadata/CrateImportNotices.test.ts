@@ -54,7 +54,7 @@ const components = Object.fromEntries(
 )
 
 describe('RO-Crate 1.3 import notices', () => {
-  it('renders in the existing-document import preview without an unknown-profile warning', () => {
+  it('renders as supported in the existing-document import preview', () => {
     const html = renderSsr(CrateImportExport, { canImport: true }, {
       ...components,
       showCrate: false,
@@ -71,12 +71,13 @@ describe('RO-Crate 1.3 import notices', () => {
       importedSummary: null,
     })
 
-    expect(html).toContain('RO-Crate 1.3 is not supported yet.')
-    expect(html).toContain('Import support remains at RO-Crate 1.2')
+    expect(html).toContain('RO-Crate 1.3')
+    expect(html).not.toContain('not supported yet')
+    expect(html).not.toContain('Import support remains')
     expect(html).not.toContain('profile that is not yet recognized')
   })
 
-  it('renders in the new-document import preview without an unknown-profile warning', () => {
+  it('renders as supported in the new-document import preview', () => {
     const html = renderSsr(NewDatasetDialog, {}, {
       ...components,
       props: { open: true },
@@ -100,8 +101,9 @@ describe('RO-Crate 1.3 import notices', () => {
       confirmDiscardOpen: false,
     })
 
-    expect(html).toContain('RO-Crate 1.3 is not supported yet.')
-    expect(html).toContain('Crate creation remains at RO-Crate 1.2')
+    expect(html).toContain('RO-Crate 1.3')
+    expect(html).not.toContain('not supported yet')
+    expect(html).not.toContain('Crate creation remains')
     expect(html).not.toContain('profile that is not yet recognized')
   })
 })
