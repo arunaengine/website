@@ -153,19 +153,27 @@ const p2pPort = ref('3001')
 const s3Port = ref('1337')
 const dataDir = ref('./aruna-data')
 const location = ref('')
-const weight = ref('')
+// type="number" inputs emit numbers; normalize before any string handling.
+function text(value: string | number): string {
+  return String(value).trim()
+}
+
+const weight = ref<string | number>('')
 const labels = ref('')
 
-const configInput = computed<NodeConfigInput>(() => ({
-  secret: minted.value?.onboarding_secret ?? '',
-  httpPort: Number(httpPort.value) || 3000,
-  p2pPort: Number(p2pPort.value) || 3001,
-  s3Port: Number(s3Port.value) || 1337,
-  dataDir: dataDir.value,
-  location: location.value || undefined,
-  weight: weight.value.trim() === '' ? undefined : Number(weight.value),
-  labels: labels.value || undefined,
-}))
+const configInput = computed<NodeConfigInput>(() => {
+  const normalizedWeight = text(weight.value)
+  return {
+    secret: minted.value?.onboarding_secret ?? '',
+    httpPort: Number(httpPort.value) || 3000,
+    p2pPort: Number(p2pPort.value) || 3001,
+    s3Port: Number(s3Port.value) || 1337,
+    dataDir: dataDir.value,
+    location: location.value || undefined,
+    weight: normalizedWeight === '' ? undefined : Number(normalizedWeight),
+    labels: labels.value || undefined,
+  }
+})
 const envBlock = computed(() => buildEnvBlock(configInput.value))
 const composeSnippet = computed(() => buildComposeSnippet(configInput.value))
 

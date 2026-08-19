@@ -29,6 +29,8 @@ const consoleErrors = []
 page.on('console', (msg) => {
   if (msg.type() === 'error') consoleErrors.push(msg.text())
 })
+const pageErrors = []
+page.on('pageerror', (error) => pageErrors.push(String(error)))
 // Any request to the assumed TES surface is a flag-off regression.
 const tesRequests = []
 page.on('request', (req) => {
@@ -48,35 +50,35 @@ try {
   await page.waitForTimeout(2000)
   step('admin signed in', (await page.textContent('body')).includes('Aruna Admin'))
 
-  // ── Section 1: flag-off no-op (runnable today) ─────────────────────────────
-  const asideText = (await page.textContent('aside')) || ''
-  step('compute nav hidden while flag off', !asideText.includes('Compute'))
+  if (!RUN_FLAG_ON) {
+    // ── Section 1: flag-off no-op ────────────────────────────────────────────
+    const asideText = (await page.textContent('aside')) || ''
+    step('compute nav hidden while flag off', !asideText.includes('Compute'))
 
-  await page.goto(BASE + '/app/compute')
-  await page.waitForTimeout(1200)
-  step(
-    'compute view renders honest disabled panel',
-    (await page.textContent('body')).includes('Compute is not enabled'),
-  )
+    await page.goto(BASE + '/app/compute')
+    await page.waitForTimeout(1200)
+    step(
+      'compute view renders honest disabled panel',
+      (await page.textContent('body')).includes('Compute is not enabled'),
+    )
 
-  await page.goto(BASE + '/app/compute/new')
-  await page.waitForTimeout(1200)
-  step(
-    'compute submit view renders honest disabled panel',
-    (await page.textContent('body')).includes('Compute is not enabled'),
-  )
+    await page.goto(BASE + '/app/compute/new')
+    await page.waitForTimeout(1200)
+    step(
+      'compute submit view renders honest disabled panel',
+      (await page.textContent('body')).includes('Compute is not enabled'),
+    )
 
-  await page.goto(BASE + '/app/compute/some-task-id')
-  await page.waitForTimeout(1200)
-  step(
-    'compute task deep-link renders honest disabled panel',
-    (await page.textContent('body')).includes('Compute is not enabled'),
-  )
+    await page.goto(BASE + '/app/compute/some-task-id')
+    await page.waitForTimeout(1200)
+    step(
+      'compute task deep-link renders honest disabled panel',
+      (await page.textContent('body')).includes('Compute is not enabled'),
+    )
 
-  step('no /ga4gh/tes/ request fired while flag off', tesRequests.length === 0, tesRequests.slice(0, 3).join(' | '))
-
-  // ── Section 2: flag-on happy path (env-guarded, needs a TES backend) ───────
-  if (RUN_FLAG_ON) {
+    step('no /ga4gh/tes/ request fired while flag off', tesRequests.length === 0, tesRequests.slice(0, 3).join(' | '))
+  } else {
+    // ── Section 2: flag-on happy path (needs a TES backend) ──────────────────
     await page.goto(BASE + '/app/compute')
     await page.waitForTimeout(1500)
     const listBody = await page.textContent('body')
@@ -89,32 +91,50 @@ try {
     await page.waitForURL(/\/app\/compute\/new/)
     await page.waitForTimeout(800)
 
-    // Step 1 — Basics: pick a group, then Continue.
+    // Basics: name the task, describe it, and pick its owning group.
+    await page.getByPlaceholder('align-and-count').fill('TES resource e2e')
+    await page.locator('textarea').first().fill('Exercises the three-step task wizard.')
     await page.locator('[role="combobox"], button[aria-haspopup="listbox"]').first().click()
     await page.waitForTimeout(300)
     await page.getByRole('option').first().click()
     await page.getByRole('button', { name: /^Continue$/ }).click()
 
-    // Step 2 — Inputs: skip.
-    await page.getByRole('button', { name: /^Continue$/ }).click()
+    // Workload: one command line, one output capture, a workspace, and resources.
+    await page.getByRole('button', { name: 'Table', exact: true }).click()
+    await page.getByPlaceholder('ubuntu:22.04').fill('alpine:3.20')
+    const commandLine = page.getByRole('textbox', { name: 'Command line' })
+    await commandLine.fill('sh -c "echo hello > /outputs/result.txt"')
+    await page.getByRole('textbox', { name: 'Container path to capture' }).fill('/outputs/result.txt')
 
-    // Step 3 — the current facade accepts exactly one executor.
-    await page.getByPlaceholder('ubuntu:22.04').first().fill('alpine:3')
-    await page.getByPlaceholder('echo').first().fill('echo')
-    await page.getByRole('button', { name: /Add argument/ }).first().click()
-    await page.locator('input[placeholder="argument"]').last().fill('hello')
-    step('single executor editor shown', (await page.getByText('The current Aruna TES facade accepts exactly one executor per task.').count()) === 1)
-    await page.getByRole('button', { name: /^Continue$/ }).click()
+    const outputBucket = page.locator('[aria-label="Destination bucket"]').first()
+    if ((await outputBucket.evaluate((element) => element.tagName)) === 'INPUT') {
+      await outputBucket.fill('e2e-results')
+    } else {
+      await outputBucket.click()
+      await page.getByRole('option').first().click()
+    }
+    await page.getByRole('textbox', { name: 'Destination key' }).fill('tes-e2e/result.txt')
+    await page.getByRole('button', { name: /^Temporary workspace/ }).click()
 
-    // Step 4 — Outputs & resources: accept defaults.
-    await page.getByRole('button', { name: /^Continue$/ }).click()
+    await page.getByText('CPU cores', { exact: true }).locator('..').locator('input').fill('4')
+    await page.getByText('RAM (GB)', { exact: true }).locator('..').locator('input').fill('8.5')
+    await page.getByText('Disk (GB)', { exact: true }).locator('..').locator('input').fill('20.25')
 
-    // Step 5 — Review: the pruned JSON carries the group tag and executors.
-    await page.waitForTimeout(500)
-    const reviewBody = await page.textContent('body')
     step(
-      'review JSON carries the group tag and executors',
-      reviewBody.includes('aruna-engine.org/group') && reviewBody.includes('executors'),
+      'single executor command-line editor shown',
+      (await page.getByText('The current Aruna TES facade accepts exactly one executor per task.').count()) === 1,
+    )
+    await page.getByRole('button', { name: /^Continue$/ }).click()
+
+    // Review replaces the Workload DOM and shows the exact pruned request JSON.
+    await page.getByText('TES task request', { exact: true }).waitFor()
+    const reviewJson = (await page.locator('pre').filter({ hasText: '"resources"' }).textContent()) || ''
+    step('Workload form replaced by Review', (await commandLine.count()) === 0)
+    step(
+      'Review JSON carries CPU, RAM, and Disk values',
+      reviewJson.includes('"cpu_cores": 4') &&
+        reviewJson.includes('"ram_gb": 8.5') &&
+        reviewJson.includes('"disk_gb": 20.25'),
     )
 
     await page.getByRole('button', { name: /Submit task/ }).click()
@@ -143,6 +163,7 @@ try {
     (e) => !/Failed to load resource: the server responded with a status of 500/.test(e),
   )
   step('no unexpected console errors', unexpected.length === 0, unexpected.slice(0, 3).join(' | '))
+  step('no page errors', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '))
 } catch (err) {
   step('E2E run', false, String(err))
   await page.screenshot({ path: '/tmp/e2e-tes-failure.png', fullPage: true }).catch(() => {})

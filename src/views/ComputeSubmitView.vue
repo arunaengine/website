@@ -95,9 +95,14 @@ function outputDestination(row: { bucket: string; key: string }): string {
   return `s3://${row.bucket.trim() || '<bucket>'}/${normalizedOutputKey(row.key) || '<key>'}`
 }
 
-const cpuCores = ref('')
-const ramGb = ref('')
-const diskGb = ref('')
+// type="number" inputs emit numbers; normalize before any string handling.
+function text(value: string | number): string {
+  return String(value).trim()
+}
+
+const cpuCores = ref<string | number>('')
+const ramGb = ref<string | number>('')
+const diskGb = ref<string | number>('')
 const preemptible = ref(false)
 
 // Workspace handling for the run's scratch storage — an explicit, required
@@ -234,12 +239,15 @@ const outputs = computed<TesOutput[]>(() =>
 
 const resources = computed<TesResources>(() => {
   const r: TesResources = {}
-  const cpu = Number(cpuCores.value)
-  if (cpuCores.value.trim() && !Number.isNaN(cpu)) r.cpu_cores = cpu
-  const ram = Number(ramGb.value)
-  if (ramGb.value.trim() && !Number.isNaN(ram)) r.ram_gb = ram
-  const disk = Number(diskGb.value)
-  if (diskGb.value.trim() && !Number.isNaN(disk)) r.disk_gb = disk
+  const cpuRaw = text(cpuCores.value)
+  const cpu = Number(cpuRaw)
+  if (cpuRaw && !Number.isNaN(cpu)) r.cpu_cores = cpu
+  const ramRaw = text(ramGb.value)
+  const ram = Number(ramRaw)
+  if (ramRaw && !Number.isNaN(ram)) r.ram_gb = ram
+  const diskRaw = text(diskGb.value)
+  const disk = Number(diskRaw)
+  if (diskRaw && !Number.isNaN(disk)) r.disk_gb = disk
   if (preemptible.value) r.preemptible = true
   return r
 })
@@ -293,20 +301,39 @@ const outputsValid = computed(() => {
     new Set(destinations).size === destinations.length
   )
 })
-// The facade takes cpu_cores as a whole positive count; a fractional value is
-// rejected by the JSON extractor with a plain-text 422 the UI cannot explain.
+const U32_MAX = 4_294_967_295
+const MIN_RESOURCE_GB = 0.000000001
+// TES converts decimal GB to bytes and accepts 1..=i64::MAX; this is the
+// largest f64 GB value whose conversion does not round up past that limit.
+const MAX_RESOURCE_GB = 9_223_372_036.854_774
+
 const cpuCoresValid = computed(() => {
-  const raw = cpuCores.value.trim()
+  const raw = text(cpuCores.value)
   if (!raw) return true
   const cpu = Number(raw)
-  return Number.isInteger(cpu) && cpu > 0
+  return Number.isInteger(cpu) && cpu >= 1 && cpu <= U32_MAX
 })
+function decimalGbValid(value: string | number): boolean {
+  const raw = text(value)
+  if (!raw) return true
+  const gb = Number(raw)
+  return Number.isFinite(gb) && gb >= MIN_RESOURCE_GB && gb <= MAX_RESOURCE_GB
+}
+const ramGbValid = computed(() => decimalGbValid(ramGb.value))
+const diskGbValid = computed(() => decimalGbValid(diskGb.value))
 const canContinue = computed(() => {
   switch (step.value) {
     case 0:
       return groupId.value.length > 0
     case 1:
-      return executorsValid.value && outputsValid.value && workspaceValid.value && cpuCoresValid.value
+      return (
+        executorsValid.value &&
+        outputsValid.value &&
+        workspaceValid.value &&
+        cpuCoresValid.value &&
+        ramGbValid.value &&
+        diskGbValid.value
+      )
     default:
       return true
   }
@@ -598,16 +625,18 @@ async function submit() {
             <div class="grid gap-3 sm:grid-cols-3">
               <div>
                 <label class="text-xs font-medium text-foreground">CPU cores</label>
-                <Input v-model="cpuCores" type="number" min="1" step="1" class="mt-1" placeholder="1" />
-                <p v-if="!cpuCoresValid" class="mt-1 text-[11px] text-destructive">Whole cores only, at least 1.</p>
+                <Input v-model="cpuCores" type="number" min="1" :max="U32_MAX" step="1" class="mt-1" placeholder="1" />
+                <p v-if="!cpuCoresValid" class="mt-1 text-[11px] text-destructive">Enter a whole number from 1 to 4294967295.</p>
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">RAM (GB)</label>
-                <Input v-model="ramGb" type="number" min="0.5" step="0.5" class="mt-1" placeholder="2" />
+                <Input v-model="ramGb" type="number" :min="MIN_RESOURCE_GB" :max="MAX_RESOURCE_GB" step="any" class="mt-1" placeholder="2" />
+                <p v-if="!ramGbValid" class="mt-1 text-[11px] text-destructive">Enter 0.000000001 to 9223372036.854774 GB.</p>
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">Disk (GB)</label>
-                <Input v-model="diskGb" type="number" min="1" step="1" class="mt-1" placeholder="10" />
+                <Input v-model="diskGb" type="number" :min="MIN_RESOURCE_GB" :max="MAX_RESOURCE_GB" step="any" class="mt-1" placeholder="10" />
+                <p v-if="!diskGbValid" class="mt-1 text-[11px] text-destructive">Enter 0.000000001 to 9223372036.854774 GB.</p>
               </div>
             </div>
             <label class="flex items-center gap-2 text-xs font-medium text-foreground">
@@ -646,7 +675,11 @@ async function submit() {
 
         <!-- Step 3: Review -->
         <div v-else class="space-y-3">
-          <TaskJsonPreview title="TES task (POST /ga4gh/tes/v1/tasks)" :task="task" />
+          <TaskJsonPreview title="TES task request" :task="task" />
+          <details class="text-[11px] text-muted-foreground">
+            <summary class="cursor-pointer">Technical details</summary>
+            <code class="mt-1 block rounded bg-muted px-2 py-1">POST /ga4gh/tes/v1/tasks</code>
+          </details>
           <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ submitError }}</p>
           <div
             v-if="submittedWithoutWorkspace"
@@ -670,7 +703,7 @@ async function submit() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || !workspaceValid || !cpuCoresValid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
+        <Button v-else size="sm" :disabled="busy || !executorsValid || !outputsValid || !workspaceValid || !cpuCoresValid || !ramGbValid || !diskGbValid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
       </div>
     </div>
 
