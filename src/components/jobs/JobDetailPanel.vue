@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -8,11 +8,13 @@ import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
+import JobAuditTrail from '@/components/jobs/JobAuditTrail.vue'
+import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import { useJobDetail } from '@/composables/useJobs'
 import { formatJobProgress, isTerminalJobState, jobProgressPercent } from '@/lib/jobs'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
-import { Ban } from '@lucide/vue'
+import { Ban, History } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 
 const props = defineProps<{ jobId: string; open: boolean }>()
@@ -32,6 +34,14 @@ const prettyResult = computed(() =>
 )
 const prettyRunCrate = computed(() =>
   job.value?.run_crate !== undefined ? JSON.stringify(job.value.run_crate, null, 2) : null,
+)
+const auditOpen = ref(false)
+
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) auditOpen.value = false
+  },
 )
 
 // Two-step inline confirm (TaskDetailPanel pattern).
@@ -121,6 +131,13 @@ async function confirmCancel() {
           </template>
         </dl>
 
+        <template v-if="job.family">
+          <JobFamilySection :family="job.family" />
+          <Button variant="outline" size="sm" @click="auditOpen = true">
+            <History class="h-3.5 w-3.5" /> View audit trail
+          </Button>
+        </template>
+
         <section v-if="job.error" class="space-y-2">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Last error</h3>
           <div class="space-y-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
@@ -173,4 +190,10 @@ async function confirmCancel() {
       </div>
     </div>
   </DetailDialog>
+  <JobAuditTrail
+    v-if="job"
+    :job-id="job.job_id"
+    :open="auditOpen"
+    @update:open="(value: boolean) => (auditOpen = value)"
+  />
 </template>

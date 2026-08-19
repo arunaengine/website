@@ -32,6 +32,50 @@ export interface JobErrorResponse {
   kind: string
 }
 
+export type LogicalJobState = 'queued' | 'running' | 'indeterminate' | 'succeeded' | 'failed' | 'cancelled'
+
+export interface JobOutputResponse {
+  bucket: string
+  key: string
+  version_id: string
+  execution_id: string
+  container_path: string
+  size: number
+  digest?: string
+}
+
+export interface JobPlacementResponse {
+  executor_kind?: string
+  estimated_transfer_bytes: number
+  estimated_transfer_ms: number
+  alternatives: number
+  rejected: number
+  omitted: number
+  sealed_at_ms: number
+}
+
+export interface JobFamilyResponse {
+  submission_id: string
+  request_digest: string
+  canonical_job_id: string
+  aliases: string[]
+  alias_count: number
+  conflict_count: number
+  logical_state: LogicalJobState
+  canonical_execution_id?: string
+  executions: number
+  duplicate_successes: number
+  outputs: JobOutputResponse[]
+  revision: number
+  projection_digest: string
+  eventually_consistent: boolean
+  responder_node_id?: string
+  partial: boolean
+  locally_exhausted: boolean
+  cancel_requested: boolean
+  placement?: JobPlacementResponse
+}
+
 export interface JobStatusResponse {
   job_id: string // ULID
   // JobPayload::kind(): probe | execution | staging | import_rocrate |
@@ -52,6 +96,7 @@ export interface JobStatusResponse {
   // ("temporary" | "kept" | "existing"); kept open for older/newer backends.
   workspace_mode?: string
   run_crate?: unknown
+  family?: JobFamilyResponse
 }
 
 export interface JobListResponse {
@@ -67,6 +112,99 @@ export interface ListJobsParams {
   state?: JobState
 }
 
+export type JobAuditScope = 'family' | 'submission'
+export type JobAuditRecordKind = 'spec' | 'claim' | 'budget' | 'launch' | 'receipt' | 'update' | 'output' | 'cancel'
+
+interface JobAuditRecordBase<K extends JobAuditRecordKind> {
+  kind: K
+  digest: string
+  request_digest: string
+  conflicting_family: boolean
+  at_ms: number
+}
+
+export interface JobAuditSpecRecord extends JobAuditRecordBase<'spec'> {
+  job_id: string
+  spec_digest: string
+}
+
+export interface JobAuditClaimRecord extends JobAuditRecordBase<'claim'> {
+  job_id: string
+  canonical_alias: boolean
+  spec_digest: string
+}
+
+export interface JobAuditBudgetRecord extends JobAuditRecordBase<'budget'> {
+  sequence: number
+  spec_digest: string
+}
+
+export interface JobAuditLaunchRecord extends JobAuditRecordBase<'launch'> {
+  job_id: string
+  sequence: number
+  spec_digest: string
+  plan_digest: string
+}
+
+export interface JobAuditReceiptRecord extends JobAuditRecordBase<'receipt'> {
+  job_id: string
+  execution_id: string
+  spec_digest: string
+}
+
+export interface JobAuditUpdateRecord extends JobAuditRecordBase<'update'> {
+  execution_id: string
+  sequence: number
+  state: string
+}
+
+export interface JobAuditOutputRecord extends JobAuditRecordBase<'output'> {
+  job_id: string
+  execution_id: string
+  outputs?: JobOutputResponse[]
+}
+
+export interface JobAuditCancelRecord extends JobAuditRecordBase<'cancel'> {
+  job_id: string
+  spec_digest: string
+}
+
+export type JobAuditRecord =
+  | JobAuditSpecRecord
+  | JobAuditClaimRecord
+  | JobAuditBudgetRecord
+  | JobAuditLaunchRecord
+  | JobAuditReceiptRecord
+  | JobAuditUpdateRecord
+  | JobAuditOutputRecord
+  | JobAuditCancelRecord
+
+export interface JobAuditConflict {
+  kind: JobAuditRecordKind
+  digest: string
+  retained: string
+  observed_at_ms: number
+}
+
+export interface JobAuditResponse {
+  submission_id: string
+  request_digest: string
+  scope: JobAuditScope
+  records: JobAuditRecord[]
+  conflicts: JobAuditConflict[]
+  next_cursor?: string
+  projection_digest: string
+  responder_node_id?: string
+  partial: boolean
+}
+
+export interface GetJobAuditParams {
+  scope: JobAuditScope
+  cursor?: string
+  // Server default/max is 64.
+  limit?: number
+}
+
 // GET /jobs/ — the caller's jobs, newest first. There is NO kind filter.
 export function listJobs(params: ListJobsParams, client: ApiClientOptions): Promise<JobListResponse> {
   return apiRequest<JobListResponse>(
@@ -80,6 +218,20 @@ export function listJobs(params: ListJobsParams, client: ApiClientOptions): Prom
 // not necessarily an absent endpoint.
 export function getJob(jobId: string, client: ApiClientOptions): Promise<JobStatusResponse> {
   return apiRequest<JobStatusResponse>(`/jobs/${encodeURIComponent(jobId)}`, {}, client)
+}
+
+// GET /jobs/{job_id}/audit: stable-key pagination. Consumers must sort by
+// `at_ms` when presenting the records as a timeline.
+export function getJobAudit(
+  jobId: string,
+  params: GetJobAuditParams,
+  client: ApiClientOptions,
+): Promise<JobAuditResponse> {
+  return apiRequest<JobAuditResponse>(
+    `/jobs/${encodeURIComponent(jobId)}/audit`,
+    { query: { scope: params.scope, cursor: params.cursor, limit: params.limit } },
+    client,
+  )
 }
 
 // POST /jobs/{job_id}/cancel — idempotent; 202 while live, 200 once terminal.

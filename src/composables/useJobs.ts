@@ -5,9 +5,12 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import {
   cancelJob as requestCancelJob,
-  getJob,
+  getJob as requestGetJob,
+  getJobAudit as requestGetJobAudit,
   isTerminalJobState,
   listJobs,
+  type GetJobAuditParams,
+  type JobAuditResponse,
   type JobState,
   type JobStatusResponse,
 } from '@/lib/jobs'
@@ -241,7 +244,7 @@ export function useJobDetail(jobId: () => string | null) {
     const id = jobId()
     if (!id) return
     try {
-      job.value = await getJob(id, client())
+      job.value = await requestGetJob(id, client())
       lastPollError.value = null
       if (isTerminalJobState(job.value.state)) stopPolling()
     } catch (err) {
@@ -258,7 +261,7 @@ export function useJobDetail(jobId: () => string | null) {
     lastPollError.value = null
     cancelError.value = null
     try {
-      job.value = await getJob(id, client())
+      job.value = await requestGetJob(id, client())
       loadState.value = 'ready'
       if (!isTerminalJobState(job.value.state)) startPolling()
     } catch (err) {
@@ -314,5 +317,15 @@ export function useJobDetail(jobId: () => string | null) {
 }
 
 export function useJobs() {
-  return { jobsEnabled }
+  function getJob(jobId: string): Promise<JobStatusResponse> {
+    assertEnabled()
+    return requestGetJob(jobId, client())
+  }
+
+  function getJobAudit(jobId: string, params: GetJobAuditParams): Promise<JobAuditResponse> {
+    assertEnabled()
+    return requestGetJobAudit(jobId, params, client())
+  }
+
+  return { jobsEnabled, getJob, getJobAudit }
 }

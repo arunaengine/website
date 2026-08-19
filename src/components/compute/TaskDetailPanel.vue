@@ -8,13 +8,16 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
+import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
+import { useJobs } from '@/composables/useJobs'
 import { useAruna } from '@/composables/useAruna'
 import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { useS3 } from '@/composables/useS3'
 import type { MetadataDocumentListItem } from '@/lib/api'
+import type { JobFamilyResponse } from '@/lib/jobs'
 import { detectQuickRun } from '@/lib/quickRuntimes'
 import {
   TES_GROUP_TAG,
@@ -34,6 +37,7 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled')
 
 const router = useRouter()
 const { getTask, cancelTask, busy } = useTes()
+const { getJob: getNativeJob } = useJobs()
 const { myGroups, apiBaseUrl, metadataAtPath } = useAruna()
 const { hide } = useHiddenTasks()
 const s3 = useS3()
@@ -43,11 +47,25 @@ function errorMessage(err: unknown): string {
 }
 
 const task = ref<TesTask | null>(null)
+const nativeFamily = ref<JobFamilyResponse | null>(null)
+const nativeDetailUnavailable = ref(false)
 const runCrate = ref<MetadataDocumentListItem | null>(null)
 const runCrateLoading = ref(false)
 const loadState = ref<'idle' | 'loading' | 'ready' | 'error' | 'unsupported'>('idle')
 const loadError = ref<string | null>(null)
 const lastPollError = ref<string | null>(null)
+let nativeRequestId = 0
+
+async function loadNativeJob(jobId: string, requestId: number) {
+  try {
+    const nativeJob = await getNativeJob(jobId)
+    if (requestId !== nativeRequestId) return
+    nativeFamily.value = nativeJob.family ?? null
+  } catch {
+    if (requestId !== nativeRequestId) return
+    nativeDetailUnavailable.value = true
+  }
+}
 
 // ── Load + poll (view-owned) ─────────────────────────────────────────────────
 let pollTimer: number | undefined
@@ -99,11 +117,15 @@ async function initialLoad() {
 watch(
   () => [props.open, props.taskId] as const,
   ([open, id]) => {
+    const requestId = ++nativeRequestId
     stopPolling()
     task.value = null
+    nativeFamily.value = null
+    nativeDetailUnavailable.value = false
     runCrate.value = null
     if (!open || !id) return
     void initialLoad()
+    void loadNativeJob(id, requestId)
     void findRunCrate()
   },
   { immediate: true },
@@ -350,6 +372,11 @@ async function confirmDelete() {
         <div v-if="otherTags.length" class="flex flex-wrap items-center gap-1.5">
           <Badge v-for="[k, v] in otherTags" :key="k" variant="outline" class="font-mono">{{ k }}={{ v }}</Badge>
         </div>
+
+        <JobFamilySection v-if="nativeFamily" :family="nativeFamily" />
+        <p v-else-if="nativeDetailUnavailable" class="text-xs text-muted-foreground">
+          Distributed execution detail is not available for this session
+        </p>
 
         <!-- Executors & logs -->
         <section class="space-y-2">
