@@ -6,11 +6,15 @@ import { useAruna } from './useAruna'
 import { aggregateReferences } from '@/lib/references'
 import type { StagingReferenceEntry } from '@/lib/api'
 
+export type StagingReferencesStatus = 'unknown' | 'loading' | 'loaded' | 'error'
+
 export function useStagingReferences(bucket: Ref<string>, active?: Ref<boolean>) {
   const { authToken, listStagingReferences } = useAruna()
 
   const entries = ref<StagingReferenceEntry[]>([])
   const loading = ref(false)
+  const status = ref<StagingReferencesStatus>('unknown')
+  const error = ref<string | null>(null)
   let requestId = 0
   let controller: AbortController | undefined
 
@@ -19,18 +23,24 @@ export function useStagingReferences(bucket: Ref<string>, active?: Ref<boolean>)
     controller?.abort()
     controller = undefined
     entries.value = []
+    loading.value = false
+    status.value = 'unknown'
+    error.value = null
     if (!bucket.value || !authToken.value) return
     if (active && !active.value) return
     controller = new AbortController()
     const signal = controller.signal
     loading.value = true
+    status.value = 'loading'
     try {
       const result = await listStagingReferences(bucket.value, undefined, signal)
       if (id !== requestId) return
       entries.value = result
-    } catch {
-      // Indicators are a progressive enhancement: a transient failure just
-      // leaves the bucket bare instead of blocking the listing.
+      status.value = 'loaded'
+    } catch (caught) {
+      if (id !== requestId || signal.aborted) return
+      error.value = caught instanceof Error ? caught.message : String(caught)
+      status.value = 'error'
     } finally {
       if (id === requestId) loading.value = false
     }
@@ -63,6 +73,8 @@ export function useStagingReferences(bucket: Ref<string>, active?: Ref<boolean>)
 
   return {
     loading,
+    status,
+    error,
     entries,
     referencedByKey,
     keyIsReferenced,

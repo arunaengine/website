@@ -34,6 +34,12 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStaging } from '@/composables/useStaging'
 import { useStagingReferences } from '@/composables/useStagingReferences'
 import { useUploadQueue } from '@/composables/useUploadQueue'
+import {
+  preflightBacklinks,
+  type BacklinkPreflightResponse,
+  type BacklinkPreflightStorageOperation,
+  type BacklinkPreflightTarget,
+} from '@/lib/backlinks'
 import { featureEnabled } from '@/lib/config'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
@@ -448,6 +454,11 @@ type DeleteTarget =
 const deleteTarget = ref<DeleteTarget | null>(null)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
+const backlinkPreflight = ref<BacklinkPreflightResponse | null>(null)
+const backlinkPreflightBusy = ref(false)
+const backlinkPreflightError = ref<string | null>(null)
+let backlinkPreflightRequestId = 0
+let backlinkPreflightController: AbortController | undefined
 
 interface PermanentDeleteTarget {
   type: StorageDeletionScope['kind']
@@ -470,13 +481,58 @@ const permanentDeleteRemaining = ref<StorageDeletionPreflight | null>(null)
 const permanentDeleteRemainingBusy = ref(false)
 const permanentDeleteRemainingMissing = ref(false)
 const permanentDeleteRemainingError = ref<string | null>(null)
-const permanentDeleteConfirm = ref('')
 let permanentDeleteRequestId = 0
 
-const permanentDeleteConfirmed = computed(
-  () =>
-    permanentDeleteTarget.value?.type !== 'bucket' ||
-    permanentDeleteConfirm.value === permanentDeleteTarget.value.bucket,
+const destructiveScope = computed<StorageDeletionScope | null>(() => {
+  const ordinary = deleteTarget.value
+  if (ordinary?.type === 'object') {
+    return { kind: 'file', bucket: ordinary.bucket, key: ordinary.object.key }
+  }
+  if (ordinary?.type === 'folder') {
+    return { kind: 'prefix', bucket: ordinary.bucket, prefix: ordinary.folder.prefix }
+  }
+  return permanentDeleteTarget.value?.operation.scope ?? null
+})
+const destructiveNodeId = computed(() =>
+  deleteTarget.value?.nodeId ?? permanentDeleteTarget.value?.nodeId ?? null,
+)
+const destructiveSourceBucket = computed(() => destructiveScope.value?.bucket ?? '')
+const destructiveSourceReferences = useStagingReferences(
+  destructiveSourceBucket,
+  computed(() => Boolean(destructiveScope.value) && destructiveNodeId.value === null),
+)
+const destructiveSourceBindings = computed(() => {
+  const scope = destructiveScope.value
+  if (!scope) return []
+  return destructiveSourceReferences.entries.value.filter((entry) => {
+    if (!entry.referenced) return false
+    if (scope.kind === 'file') return entry.key === scope.key
+    if (scope.kind === 'prefix') return entry.key.startsWith(scope.prefix)
+    return true
+  })
+})
+const destructiveSyncApplies = computed(() => {
+  const scope = destructiveScope.value
+  if (!scope || scope.kind === 'bucket' || scope.bucket !== bucket.value) return false
+  return keyIsSynced(scope.kind === 'file' ? scope.key : scope.prefix)
+})
+const backlinkPreflightPartial = computed(() => {
+  const response = backlinkPreflight.value
+  if (!response) return false
+  return Boolean(
+    !response.complete ||
+      response.truncated ||
+      response.nodes_failed ||
+      !response.coverage.target_resolution_complete ||
+      !response.coverage.path_style_endpoint_coverage_complete ||
+      !response.coverage.realm_coverage_complete ||
+      response.coverage.node_freshness.some((entry) => entry.index_state !== 'current')
+  )
+})
+const backlinkReferencesReported = computed(() =>
+  backlinkPreflight.value?.targets.some(
+    (target) => target.visible_references.length > 0 || target.hidden_references_exist,
+  ) ?? false,
 )
 
 const newFolderOpen = ref(false)
@@ -966,8 +1022,19 @@ async function download(object: ObjectEntry) {
 
 function openDeleteObject(object: ObjectEntry) {
   if (!s3.canWrite(bucket.value, object.key, remoteNodeId.value)) return
+  const target: DeleteTarget = {
+    type: 'object',
+    bucket: bucket.value,
+    object,
+    nodeId: remoteNodeId.value,
+  }
   deleteError.value = null
-  deleteTarget.value = { type: 'object', bucket: bucket.value, object, nodeId: remoteNodeId.value }
+  void loadBacklinkPreflight(
+    { kind: 'file', bucket: target.bucket, key: target.object.key },
+    'latest_version_tombstone',
+    target.nodeId,
+  )
+  deleteTarget.value = target
 }
 
 // Folder delete: the confirm dialog shows how many objects the recursive walk
@@ -975,8 +1042,7 @@ function openDeleteObject(object: ObjectEntry) {
 const FOLDER_COUNT_LIMIT = 2000
 function openDeleteFolder(folder: FolderEntry) {
   if (!s3.canDeletePrefix(bucket.value, folder.prefix, remoteNodeId.value)) return
-  deleteError.value = null
-  deleteTarget.value = {
+  const target: DeleteTarget = {
     type: 'folder',
     bucket: bucket.value,
     folder,
@@ -984,7 +1050,20 @@ function openDeleteFolder(folder: FolderEntry) {
     count: null,
     countTruncated: false,
   }
+  deleteError.value = null
+  void loadBacklinkPreflight(
+    { kind: 'prefix', bucket: target.bucket, prefix: target.folder.prefix },
+    'latest_version_tombstone',
+    target.nodeId,
+  )
+  deleteTarget.value = target
   void resolveFolderCount(folder)
+}
+
+function closeDeleteDialog() {
+  if (deleteBusy.value) return
+  deleteTarget.value = null
+  resetBacklinkPreflightState()
 }
 
 async function resolveFolderCount(folder: FolderEntry) {
@@ -1044,6 +1123,7 @@ async function confirmDelete() {
       }
     }
     deleteTarget.value = null
+    resetBacklinkPreflightState()
     if (target.bucket === bucket.value) await loadObjects()
     if (target.type === 'folder') void references.reload()
   } catch (err) {
@@ -1066,6 +1146,73 @@ function permanentDeleteApiBase(nodeId: string | null): string | null {
   return context && context.nodeId === s3.nodeIdFor(nodeId) ? context.session.apiBase : null
 }
 
+function backlinkTargetForScope(
+  scope: StorageDeletionScope,
+  operation: BacklinkPreflightStorageOperation,
+): BacklinkPreflightTarget {
+  return {
+    kind: 'bucket_prefix',
+    bucket: scope.bucket,
+    ...(scope.kind === 'file'
+      ? { prefix: scope.key }
+      : scope.kind === 'prefix'
+        ? { prefix: scope.prefix }
+        : {}),
+    operation,
+  }
+}
+
+function resetBacklinkPreflightState() {
+  ++backlinkPreflightRequestId
+  backlinkPreflightController?.abort()
+  backlinkPreflightController = undefined
+  backlinkPreflight.value = null
+  backlinkPreflightBusy.value = false
+  backlinkPreflightError.value = null
+}
+
+async function loadBacklinkPreflight(
+  scope: StorageDeletionScope,
+  operation: BacklinkPreflightStorageOperation,
+  nodeId: string | null,
+) {
+  resetBacklinkPreflightState()
+  const requestId = backlinkPreflightRequestId
+  const apiBase = permanentDeleteApiBase(nodeId)
+  if (!apiBase) {
+    backlinkPreflightError.value = 'The node API endpoint for the Dataset-reference lookup is unavailable.'
+    return
+  }
+  const controller = new AbortController()
+  backlinkPreflightController = controller
+  backlinkPreflightBusy.value = true
+  try {
+    const response = await preflightBacklinks(
+      { target: backlinkTargetForScope(scope, operation) },
+      { baseUrl: apiBase, token: authToken.value || undefined },
+      controller.signal,
+    )
+    if (requestId !== backlinkPreflightRequestId) return
+    backlinkPreflight.value = response
+  } catch (error) {
+    if (requestId !== backlinkPreflightRequestId || controller.signal.aborted) return
+    backlinkPreflightError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    if (requestId === backlinkPreflightRequestId) {
+      backlinkPreflightBusy.value = false
+      backlinkPreflightController = undefined
+    }
+  }
+}
+
+function displayBacklinkValue(value: string): string {
+  return value.replaceAll('_', ' ')
+}
+
+function backlinkFreshness(updatedAtMs: number): string {
+  return relativeTime(new Date(updatedAtMs).toISOString())
+}
+
 const permanentDeleteActionLabel = computed(() => {
   if (permanentDeleteTarget.value?.type === 'file') return 'Permanently delete all versions'
   if (permanentDeleteTarget.value?.type === 'prefix') {
@@ -1085,6 +1232,7 @@ function storageInventoryRows(preflight: StorageDeletionPreflight) {
 
 function resetPermanentDeleteState() {
   ++permanentDeleteRequestId
+  resetBacklinkPreflightState()
   permanentDeleteTarget.value = null
   permanentDeletePreflight.value = null
   permanentDeletePreflightBusy.value = false
@@ -1098,7 +1246,6 @@ function resetPermanentDeleteState() {
   permanentDeleteRemainingBusy.value = false
   permanentDeleteRemainingMissing.value = false
   permanentDeleteRemainingError.value = null
-  permanentDeleteConfirm.value = ''
 }
 
 function closePermanentDelete() {
@@ -1124,6 +1271,7 @@ function openPermanentDelete(
     apiBase,
     operation: createStoragePurgeOperation(scope),
   }
+  void loadBacklinkPreflight(scope, 'all_versions_purge', nodeId)
   permanentDeleteTarget.value = target
   void loadPermanentDeletePreflight(target)
 }
@@ -1275,7 +1423,6 @@ async function confirmPermanentDelete() {
   const target = permanentDeleteTarget.value
   if (
     !target ||
-    !permanentDeleteConfirmed.value ||
     !permanentDeletePreflight.value?.permissions.purge
   ) return
   if (!permanentDeleteAllowed(target)) {
@@ -1306,6 +1453,7 @@ async function confirmPermanentDelete() {
 
 onUnmounted(() => {
   ++permanentDeleteRequestId
+  resetBacklinkPreflightState()
 })
 
 const isEmpty = computed(
@@ -1898,8 +2046,8 @@ const isEmpty = computed(
       </DialogContent>
     </Dialog>
 
-    <Dialog :open="deleteTarget !== null" @update:open="(v: boolean) => { if (!v && !deleteBusy) deleteTarget = null }">
-      <DialogContent class="max-w-md">
+    <Dialog :open="deleteTarget !== null" @update:open="(v: boolean) => { if (!v) closeDeleteDialog() }">
+      <DialogContent class="max-h-[90vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ deleteTarget?.type === 'folder' ? 'Delete folder' : 'Delete object' }}</DialogTitle>
           <DialogDescription v-if="deleteTarget?.type === 'folder'">
@@ -1919,23 +2067,142 @@ const isEmpty = computed(
             Contains {{ deleteTarget.count }}{{ deleteTarget.countTruncated ? '+' : '' }} object{{ deleteTarget.count === 1 && !deleteTarget.countTruncated ? '' : 's' }}.
           </p>
           <p v-else class="text-muted-foreground">The object count could not be resolved.</p>
-          <p
-            v-if="references.prefixHasReferences(deleteTarget.folder.prefix) || keyIsSynced(deleteTarget.folder.prefix)"
-            class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300"
-          >
-            This folder includes referenced or synced content.
-          </p>
         </div>
+
+        <section aria-label="RDF Dataset references" class="space-y-2 rounded-md border border-border px-3 py-2 text-xs">
+          <h4 class="font-medium text-foreground">RDF Dataset references</h4>
+          <p v-if="backlinkPreflightBusy" class="flex items-center gap-2 text-muted-foreground">
+            <Loader2 class="h-3 w-3 animate-spin" /> Checking Dataset references…
+          </p>
+          <div
+            v-else-if="backlinkPreflightError"
+            class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
+          >
+            <p class="font-medium">Dataset-reference lookup failed.</p>
+            <p>Reference and last-resolvable-location impact are unknown.</p>
+            <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ backlinkPreflightError }}</p>
+          </div>
+          <template v-else-if="backlinkPreflight">
+            <p
+              v-if="backlinkPreflightPartial"
+              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+            >
+              Dataset-reference coverage is partial. References or remaining locations may be missing.
+            </p>
+            <p v-if="!backlinkReferencesReported" class="text-muted-foreground">
+              No visible or restricted Dataset references were reported for the covered forms.
+            </p>
+            <div
+              v-for="target in backlinkPreflight.targets"
+              :key="target.content_w3id"
+              class="space-y-1 rounded-md bg-muted/40 px-2 py-1.5"
+            >
+              <p class="break-all font-mono text-[10px] text-muted-foreground">{{ target.content_w3id }}</p>
+              <ul v-if="target.visible_references.length" class="space-y-1 pl-4">
+                <li v-for="reference in target.visible_references" :key="reference.document_id" class="list-disc">
+                  <RouterLink
+                    :to="{ name: 'metadata-detail', params: { id: reference.document_id } }"
+                    class="font-medium text-primary hover:underline"
+                  >{{ reference.title }}</RouterLink>
+                </li>
+              </ul>
+              <p v-if="target.hidden_references_exist" class="font-medium text-amber-800 dark:text-amber-300">
+                Other restricted Datasets reference this content
+              </p>
+              <p
+                v-if="target.would_remove_last_resolvable_aruna_location"
+                class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+              >
+                This operation would remove this content's last resolvable Aruna location.
+              </p>
+              <p
+                v-else-if="!target.location_impact_complete"
+                class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+              >
+                The last-resolvable-location impact is unknown for this content.
+              </p>
+            </div>
+            <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+              <dt>Queried scope</dt>
+              <dd class="text-right text-foreground">{{ displayBacklinkValue(backlinkPreflight.coverage.queried_scope) }}</dd>
+              <dt>Queried forms</dt>
+              <dd class="text-right text-foreground">{{ backlinkPreflight.coverage.queried_forms.map(displayBacklinkValue).join(', ') }}</dd>
+              <dt>Completeness</dt>
+              <dd class="text-right text-foreground">{{ backlinkPreflightPartial ? 'Partial' : 'Complete' }}</dd>
+              <dt>Nodes queried</dt>
+              <dd class="text-right font-mono text-foreground">{{ backlinkPreflight.nodes_queried }}</dd>
+              <dt>Nodes failed</dt>
+              <dd class="text-right font-mono text-foreground">{{ backlinkPreflight.nodes_failed }}</dd>
+            </dl>
+            <div class="space-y-1 text-muted-foreground">
+              <p class="font-medium text-foreground">Index freshness</p>
+              <ul v-if="backlinkPreflight.coverage.node_freshness.length" class="space-y-1 pl-4">
+                <li v-for="freshness in backlinkPreflight.coverage.node_freshness" :key="freshness.node_id" class="list-disc break-all">
+                  {{ freshness.node_id }}: {{ displayBacklinkValue(freshness.index_state) }}<template v-if="freshness.oldest_status_updated_at_ms !== null">, oldest status {{ backlinkFreshness(freshness.oldest_status_updated_at_ms) }}</template><template v-else>, timestamp unavailable</template>
+                </li>
+              </ul>
+              <p v-else>Unknown</p>
+            </div>
+            <div class="space-y-1 text-muted-foreground">
+              <p class="font-medium text-foreground">Coverage caveats</p>
+              <ul class="space-y-1 pl-4">
+                <li v-for="excluded in backlinkPreflight.coverage.excluded_forms" :key="excluded.form" class="list-disc">
+                  <code>{{ excluded.form }}</code>: {{ excluded.reason }}
+                </li>
+              </ul>
+            </div>
+          </template>
+          <p
+            v-else
+            class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+          >
+            Dataset-reference coverage and last-resolvable-location impact are unknown.
+          </p>
+        </section>
+
+        <section aria-label="Source bindings" class="space-y-1 rounded-md border border-border px-3 py-2 text-xs">
+          <h4 class="font-medium text-foreground">Source bindings</h4>
+          <p v-if="destructiveSourceReferences.status.value === 'loading'" class="flex items-center gap-2 text-muted-foreground">
+            <Loader2 class="h-3 w-3 animate-spin" /> Checking source bindings…
+          </p>
+          <div
+            v-else-if="destructiveSourceReferences.status.value === 'error'"
+            class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
+          >
+            <p class="font-medium">Source-binding lookup failed.</p>
+            <p>Existing source bindings are unknown.</p>
+            <p v-if="destructiveSourceReferences.error.value" class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ destructiveSourceReferences.error.value }}</p>
+          </div>
+          <p
+            v-else-if="destructiveSourceReferences.status.value === 'unknown'"
+            class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
+          >
+            Source-binding coverage is unknown for this scope.
+          </p>
+          <p v-else-if="destructiveSourceBindings.length" class="text-amber-800 dark:text-amber-300">
+            {{ destructiveSourceBindings.length }} source binding{{ destructiveSourceBindings.length === 1 ? '' : 's' }} apply to this scope. Deletion does not detach source bindings.
+          </p>
+          <p v-else class="text-muted-foreground">No source bindings were found for this scope.</p>
+        </section>
+
+        <section
+          v-if="destructiveSyncApplies"
+          aria-label="Sync relationships"
+          class="space-y-1 rounded-md border border-border px-3 py-2 text-xs"
+        >
+          <h4 class="font-medium text-foreground">Sync relationships</h4>
+          <p class="text-muted-foreground">This scope overlaps a sync relationship. Sync state is separate from Dataset references and source bindings.</p>
+        </section>
         <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
         <DialogFooter>
           <DialogClose as-child><Button variant="outline" :disabled="deleteBusy">Cancel</Button></DialogClose>
-          <Button variant="destructive" :disabled="deleteBusy || (deleteTarget?.type === 'object' ? !s3.canWrite(deleteTarget.bucket, deleteTarget.object.key, deleteTarget.nodeId) : deleteTarget?.type === 'folder' ? !s3.canDeletePrefix(deleteTarget.bucket, deleteTarget.folder.prefix, deleteTarget.nodeId) : true)" @click="confirmDelete">{{ deleteBusy ? 'Deleting…' : 'Delete' }}</Button>
+          <Button variant="destructive" :disabled="deleteBusy || backlinkPreflightBusy || (deleteTarget?.type === 'object' ? !s3.canWrite(deleteTarget.bucket, deleteTarget.object.key, deleteTarget.nodeId) : deleteTarget?.type === 'folder' ? !s3.canDeletePrefix(deleteTarget.bucket, deleteTarget.folder.prefix, deleteTarget.nodeId) : true)" @click="confirmDelete">{{ deleteBusy ? 'Deleting…' : 'Delete' }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
 
     <Dialog :open="permanentDeleteTarget !== null" @update:open="(v: boolean) => { if (!v) closePermanentDelete() }">
-      <DialogContent class="max-w-lg">
+      <DialogContent class="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ permanentDeleteActionLabel }}</DialogTitle>
           <DialogDescription v-if="permanentDeleteTarget?.type === 'file'">
@@ -2008,20 +2275,132 @@ const isEmpty = computed(
               <p v-else>No sync relationships will be removed.</p>
             </section>
 
-            <div v-if="permanentDeleteTarget.type === 'bucket'" class="space-y-1">
-              <label class="block text-muted-foreground">
-                Type <span class="font-mono text-foreground">{{ permanentDeleteTarget.bucket }}</span> to confirm this permanent purge and the sync-relationship removal shown above.
-              </label>
-              <Input
-                v-model="permanentDeleteConfirm"
-                class="font-mono text-xs"
-                autocomplete="off"
-                placeholder="bucket name"
-                :disabled="permanentDeleteBusy"
-                @keyup.enter="confirmPermanentDelete"
-              />
-            </div>
           </template>
+
+          <section aria-label="RDF Dataset references" class="space-y-2 rounded-md border border-border px-3 py-2">
+            <h4 class="font-medium text-foreground">RDF Dataset references</h4>
+            <p v-if="backlinkPreflightBusy" class="flex items-center gap-2 text-muted-foreground">
+              <Loader2 class="h-3 w-3 animate-spin" /> Checking Dataset references…
+            </p>
+            <div
+              v-else-if="backlinkPreflightError"
+              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
+            >
+              <p class="font-medium">Dataset-reference lookup failed.</p>
+              <p>Reference and last-resolvable-location impact are unknown.</p>
+              <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ backlinkPreflightError }}</p>
+            </div>
+            <template v-else-if="backlinkPreflight">
+              <p
+                v-if="backlinkPreflightPartial"
+                class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+              >
+                Dataset-reference coverage is partial. References or remaining locations may be missing.
+              </p>
+              <p v-if="!backlinkReferencesReported" class="text-muted-foreground">
+                No visible or restricted Dataset references were reported for the covered forms.
+              </p>
+              <div
+                v-for="target in backlinkPreflight.targets"
+                :key="target.content_w3id"
+                class="space-y-1 rounded-md bg-muted/40 px-2 py-1.5"
+              >
+                <p class="break-all font-mono text-[10px] text-muted-foreground">{{ target.content_w3id }}</p>
+                <ul v-if="target.visible_references.length" class="space-y-1 pl-4">
+                  <li v-for="reference in target.visible_references" :key="reference.document_id" class="list-disc">
+                    <RouterLink
+                      :to="{ name: 'metadata-detail', params: { id: reference.document_id } }"
+                      class="font-medium text-primary hover:underline"
+                    >{{ reference.title }}</RouterLink>
+                  </li>
+                </ul>
+                <p v-if="target.hidden_references_exist" class="font-medium text-amber-800 dark:text-amber-300">
+                  Other restricted Datasets reference this content
+                </p>
+                <p
+                  v-if="target.would_remove_last_resolvable_aruna_location"
+                  class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+                >
+                  This operation would remove this content's last resolvable Aruna location.
+                </p>
+                <p
+                  v-else-if="!target.location_impact_complete"
+                  class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+                >
+                  The last-resolvable-location impact is unknown for this content.
+                </p>
+              </div>
+              <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+                <dt>Queried scope</dt>
+                <dd class="text-right text-foreground">{{ displayBacklinkValue(backlinkPreflight.coverage.queried_scope) }}</dd>
+                <dt>Queried forms</dt>
+                <dd class="text-right text-foreground">{{ backlinkPreflight.coverage.queried_forms.map(displayBacklinkValue).join(', ') }}</dd>
+                <dt>Completeness</dt>
+                <dd class="text-right text-foreground">{{ backlinkPreflightPartial ? 'Partial' : 'Complete' }}</dd>
+                <dt>Nodes queried</dt>
+                <dd class="text-right font-mono text-foreground">{{ backlinkPreflight.nodes_queried }}</dd>
+                <dt>Nodes failed</dt>
+                <dd class="text-right font-mono text-foreground">{{ backlinkPreflight.nodes_failed }}</dd>
+              </dl>
+              <div class="space-y-1 text-muted-foreground">
+                <p class="font-medium text-foreground">Index freshness</p>
+                <ul v-if="backlinkPreflight.coverage.node_freshness.length" class="space-y-1 pl-4">
+                  <li v-for="freshness in backlinkPreflight.coverage.node_freshness" :key="freshness.node_id" class="list-disc break-all">
+                    {{ freshness.node_id }}: {{ displayBacklinkValue(freshness.index_state) }}<template v-if="freshness.oldest_status_updated_at_ms !== null">, oldest status {{ backlinkFreshness(freshness.oldest_status_updated_at_ms) }}</template><template v-else>, timestamp unavailable</template>
+                  </li>
+                </ul>
+                <p v-else>Unknown</p>
+              </div>
+              <div class="space-y-1 text-muted-foreground">
+                <p class="font-medium text-foreground">Coverage caveats</p>
+                <ul class="space-y-1 pl-4">
+                  <li v-for="excluded in backlinkPreflight.coverage.excluded_forms" :key="excluded.form" class="list-disc">
+                    <code>{{ excluded.form }}</code>: {{ excluded.reason }}
+                  </li>
+                </ul>
+              </div>
+            </template>
+            <p
+              v-else
+              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
+            >
+              Dataset-reference coverage and last-resolvable-location impact are unknown.
+            </p>
+          </section>
+
+          <section aria-label="Source bindings" class="space-y-1 rounded-md border border-border px-3 py-2">
+            <h4 class="font-medium text-foreground">Source bindings</h4>
+            <p v-if="destructiveSourceReferences.status.value === 'loading'" class="flex items-center gap-2 text-muted-foreground">
+              <Loader2 class="h-3 w-3 animate-spin" /> Checking source bindings…
+            </p>
+            <div
+              v-else-if="destructiveSourceReferences.status.value === 'error'"
+              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
+            >
+              <p class="font-medium">Source-binding lookup failed.</p>
+              <p>Existing source bindings are unknown.</p>
+              <p v-if="destructiveSourceReferences.error.value" class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ destructiveSourceReferences.error.value }}</p>
+            </div>
+            <p
+              v-else-if="destructiveSourceReferences.status.value === 'unknown'"
+              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
+            >
+              Source-binding coverage is unknown for this scope.
+            </p>
+            <p v-else-if="destructiveSourceBindings.length" class="text-amber-800 dark:text-amber-300">
+              {{ destructiveSourceBindings.length }} source binding{{ destructiveSourceBindings.length === 1 ? '' : 's' }} apply to this scope. Deletion does not detach source bindings.
+            </p>
+            <p v-else class="text-muted-foreground">No source bindings were found for this scope.</p>
+          </section>
+
+          <section
+            v-if="destructiveSyncApplies"
+            aria-label="Sync relationships"
+            class="space-y-1 rounded-md border border-border px-3 py-2"
+          >
+            <h4 class="font-medium text-foreground">Sync relationships</h4>
+            <p class="text-muted-foreground">This scope overlaps a sync relationship. Sync state is separate from Dataset references and source bindings.</p>
+          </section>
 
           <section
             v-if="permanentDeleteSubmission || permanentDeleteProgress"
@@ -2091,7 +2470,7 @@ const isEmpty = computed(
           <Button
             v-if="permanentDeletePreflight && permanentDeleteStatus?.state !== 'succeeded'"
             variant="destructive"
-            :disabled="!permanentDeleteConfirmed || permanentDeleteBusy || !permanentDeletePreflight.permissions.purge || !permanentDeleteAllowed(permanentDeleteTarget)"
+            :disabled="permanentDeleteBusy || backlinkPreflightBusy || !permanentDeletePreflight.permissions.purge || !permanentDeleteAllowed(permanentDeleteTarget)"
             @click="confirmPermanentDelete"
           >{{ permanentDeleteBusy ? 'Purging…' : permanentDeleteAttempted ? 'Retry purge' : permanentDeleteActionLabel }}</Button>
         </DialogFooter>

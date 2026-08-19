@@ -3,6 +3,8 @@ import { useAruna } from './useAruna'
 import { useS3 } from './useS3'
 import { buildCrateReferenceIndex, toBucketKey, type CrateObjectReference } from '@/lib/crateReferences'
 
+export const LOADED_METADATA_REFERENCE_LABEL = 'Referenced by loaded metadata'
+
 // Reactive reverse index of "bucket/key" -> referencing documents, fed only from
 // crates already in the client caches (never issues a request). Exposed so any
 // view (data manager, metadata detail) can show what references an object.
@@ -19,5 +21,5 @@ export function useCrateReferences() {
     if (!key) return []
     return index.value.get(key) ?? []
   }
-  return { index, referencesFor }
+  return { index, referencesFor, label: LOADED_METADATA_REFERENCE_LABEL }
 }
