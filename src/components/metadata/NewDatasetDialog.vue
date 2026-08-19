@@ -53,7 +53,7 @@ import { licenseEntity } from '@/lib/profiles/rocrate'
 import { mapShaclFindings } from '@/lib/shacl/mapFindings'
 import { useShaclValidation } from '@/lib/shacl/useShaclValidation'
 import type { ShaclFinding } from '@/lib/shacl/findings'
-import type { LiftNote } from '@/lib/shacl/lift'
+import { cloneLiftNotes, type LiftNote } from '@/lib/shacl/lift'
 import { buildProfileContext } from '@/lib/profiles/propertyCatalog'
 import { isAbsoluteUri, termNameFromUri } from '@/lib/profiles/uri'
 import { validateProfileData, validateRequiredInstances } from '@/lib/profiles/validate'
@@ -1003,7 +1003,7 @@ async function loadSelectedProfileSchema(force = false, migration?: ProfileDraft
     profile.schema,
     profile.contextTerms,
     shapesList(profile.shapesText, profile.customShapesText),
-    cached?.liftNotes ?? [],
+    cloneLiftNotes(cached?.liftNotes ?? []),
     Boolean(migration),
   )
   profileLoadComplete.value = Boolean(!profile.documentId || cached)

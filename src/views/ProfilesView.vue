@@ -27,6 +27,7 @@ import { deriveEntityObligation, entityRulesToMode } from '@/lib/profiles/mode'
 import { buildProfileCrate } from '@/lib/profiles/rocrate'
 import { isRecord } from '@/lib/profiles/uri'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
+import { cloneLiftNotes } from '@/lib/shacl/lift'
 import type { MetadataProfile } from '@/data/types'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 
@@ -181,9 +182,7 @@ const selectedRuleState = computed(() => {
   })
 })
 const selectedLoadingFull = computed(() => selectedRuleState.value === 'loading')
-// Copy out of the reactive parse: the computed's DeepReadonly wrapper cannot
-// feed LiftNotesPanel's mutable LiftNote[] prop.
-const additionalRequirements = computed(() => [...(selectedProfileParse.value?.liftNotes ?? [])])
+const additionalRequirements = computed(() => cloneLiftNotes(selectedProfileParse.value?.liftNotes ?? []))
 
 function propertyCount(profile: MetadataProfile): number {
   return profile.entityRules.length

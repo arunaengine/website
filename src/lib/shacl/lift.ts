@@ -88,6 +88,14 @@ export interface LiftResult {
   fieldCount: number
 }
 
+// Reactive caches hand out DeepReadonly notes; copy them back into the
+// mutable LiftNote shape the presentation components declare.
+export function cloneLiftNotes(
+  notes: readonly { readonly kind: LiftNote['kind']; readonly message: string; readonly scopes: readonly string[] }[],
+): LiftNote[] {
+  return notes.map((note) => ({ kind: note.kind, message: note.message, scopes: [...note.scopes] }))
+}
+
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
 const RDF_FIRST = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#first'
 const RDF_REST = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#rest'

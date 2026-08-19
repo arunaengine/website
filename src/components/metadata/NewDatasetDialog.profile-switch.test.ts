@@ -119,6 +119,10 @@ function compileDialog(): Component {
   const modules: Record<string, unknown> = {
     vue: VueRuntime,
     '@lucide/vue': icons,
+    '@/lib/shacl/lift': {
+      cloneLiftNotes: (notes: Array<{ kind: string; message: string; scopes: string[] }>) =>
+        notes.map((note) => ({ ...note, scopes: [...note.scopes] })),
+    },
     '@/components/ui/Dialog.vue': moduleDefault(SlotStub),
     '@/components/ui/DialogContent.vue': moduleDefault(SlotStub),
     '@/components/ui/DialogHeader.vue': moduleDefault(SlotStub),
