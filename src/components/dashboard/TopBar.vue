@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
-import Badge from '@/components/ui/Badge.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import Spinner from '@/components/ui/Spinner.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
@@ -13,23 +11,22 @@ import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import RealmSwitcher from '@/components/layout/RealmSwitcher.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
-import { ChevronDown, Plus, Search, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw, FileJson2, Users, UserRound } from '@lucide/vue'
-import { ref, computed, watch } from 'vue'
+import SearchOverlay from '@/components/dashboard/SearchOverlay.vue'
+import { ChevronDown, Plus, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRealm } from '@/composables/useRealm'
 import { useTheme } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
-import { useUnifiedSearch } from '@/composables/useUnifiedSearch'
 
-const q = ref('')
-const showResults = ref(false)
 const showNewDataset = ref(false)
 const { realm, role } = useRealm()
 const { currentUser, authError, loading } = useAruna()
 const { hasSession, signIn, signOut, stage, authPending } = useAuth()
 const { isDark, toggleTheme } = useTheme()
 const route = useRoute()
+const router = useRouter()
 
 // A token is stored but the API rejected it (expired/revoked session).
 const sessionBroken = computed(() => hasSession.value && !currentUser.value && Boolean(authError.value))
@@ -43,220 +40,14 @@ async function handleSignOut() {
   await signOut()
   router.push({ name: 'landing' })
 }
-type QuickSection = 'datasets' | 'groups' | 'people'
-interface QuickItem {
-  key: string
-  section: QuickSection
-  title: string
-  subtitle?: string
-  routeName: string
-  routeParams: Record<string, string>
-}
-
-// Quick search is server-backed only: the catalog is paged, so a client-side
-// filter over it would silently answer from the first pages.
-const {
-  documents: quickDocuments,
-  groups: quickGroups,
-  users: quickUsers,
-  pending: quickPending,
-  searched: quickSearched,
-  error: quickError,
-  nodesQueried: quickNodesQueried,
-  nodesFailed: quickNodesFailed,
-  truncated: quickTruncated,
-} = useUnifiedSearch(q, { limit: 5 })
-
-const items = computed<QuickItem[]>(() => [
-  ...quickDocuments.value.map((hit): QuickItem => ({
-    key: `d:${hit.document_id}`,
-    section: 'datasets',
-    title: hit.title || hit.document_path,
-    subtitle: hit.snippet ?? undefined,
-    routeName: 'metadata-detail',
-    routeParams: { id: hit.document_id },
-  })),
-  ...quickGroups.value.map((group): QuickItem => ({
-    key: `g:${group.group_id}`,
-    section: 'groups',
-    title: group.display_name,
-    routeName: 'groups',
-    routeParams: { id: group.group_id },
-  })),
-  ...quickUsers.value.map((user): QuickItem => ({
-    key: `u:${user.user_id}`,
-    section: 'people',
-    title: user.name,
-    routeName: 'user-profile',
-    routeParams: { id: user.user_id },
-  })),
-])
-
-// The previous matches stay listed while a new request runs, so they are dimmed
-// rather than read as the answer to what was just typed.
-const quickStale = computed(() => quickPending.value && items.value.length > 0)
-const quickCoverage = computed<'Complete' | 'Partial' | 'Unavailable' | null>(() => {
-  if (quickError.value) return 'Unavailable'
-  if (!quickSearched.value) return null
-  return quickNodesFailed.value > 0 || quickTruncated.value ? 'Partial' : 'Complete'
-})
-const quickCoverageDetail = computed(() => {
-  if (quickCoverage.value === 'Unavailable') return quickError.value ?? 'Search is unavailable.'
-  if (quickCoverage.value !== 'Partial') return 'Document coverage'
-  const details: string[] = []
-  if (quickNodesFailed.value > 0) {
-    details.push(`${Math.max(0, quickNodesQueried.value - quickNodesFailed.value)} of ${quickNodesQueried.value} nodes answered`)
-  }
-  if (quickTruncated.value) details.push('document results were truncated')
-  return details.join('; ')
-})
-
-const SECTION_META: Array<{ id: QuickSection; label: string }> = [
-  { id: 'datasets', label: 'Datasets' },
-  { id: 'groups', label: 'Groups' },
-  { id: 'people', label: 'People' },
-]
-const sections = computed(() =>
-  SECTION_META.map((meta) => ({ ...meta, items: items.value.filter((item) => item.section === meta.id) })).filter(
-    (section) => section.items.length,
-  ),
-)
-
-const activeIndex = ref(-1)
-const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
-watch(items, () => (activeIndex.value = -1))
-watch(q, () => (activeIndex.value = -1))
-
-const router = useRouter()
-
-function openItem(item: QuickItem) {
-  showResults.value = false
-  q.value = ''
-  router.push({ name: item.routeName, params: item.routeParams })
-}
-
-function openSearchPage() {
-  const term = q.value
-  showResults.value = false
-  q.value = ''
-  router.push({ name: 'search', query: { q: term } })
-}
-
-function onKeydown(event: KeyboardEvent) {
-  const list = items.value
-  if (event.key === 'ArrowDown') {
-    event.preventDefault()
-    showResults.value = true
-    activeIndex.value = list.length ? (activeIndex.value + 1) % list.length : -1
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    activeIndex.value = list.length ? (activeIndex.value - 1 + list.length) % list.length : -1
-  } else if (event.key === 'Enter') {
-    const item = list[activeIndex.value]
-    if (item) openItem(item)
-    else if (q.value.trim()) openSearchPage()
-  } else if (event.key === 'Escape') {
-    showResults.value = false
-  }
-}
-
-const wrapperEl = ref<HTMLElement | null>(null)
-
-// Hide results only when focus leaves the whole search wrapper (input plus the
-// result buttons), so keyboard users can Tab into a result. A blur-timeout
-// would pull the list away mid-Tab. Mouse clicks use @mousedown.prevent on the
-// buttons, so focus never leaves the input for them.
-function onSearchFocusOut(event: FocusEvent) {
-  const next = event.relatedTarget as Node | null
-  if (!next || !wrapperEl.value?.contains(next)) showResults.value = false
-}
 </script>
 
 <template>
   <div class="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur-xl">
-    <div class="container flex h-14 items-center gap-3">
-      <RealmSwitcher />
+    <div class="container flex h-14 items-center gap-1 min-[480px]:gap-3">
+      <RealmSwitcher class="max-w-36 min-[480px]:max-w-none" />
 
-      <div ref="wrapperEl" class="relative min-w-0 max-w-xl flex-1" @focusout="onSearchFocusOut">
-        <Search
-          class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-        />
-        <input
-          v-model="q"
-          aria-label="Search this realm — metadata and groups"
-          @focus="showResults = true"
-          @keydown="onKeydown"
-          role="combobox"
-          aria-controls="quick-search-results"
-          :aria-expanded="showResults"
-          :aria-busy="quickPending"
-          class="h-9 w-full rounded-md border border-input bg-field pl-8 pr-16 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :placeholder="`Search ${realm.shortName}, datasets, groups and people…`"
-        />
-        <Spinner v-if="quickPending" label="Searching…" class="absolute right-11 top-1/2 -translate-y-1/2 text-primary" />
-        <kbd
-          aria-hidden="true"
-          class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-flex"
-        >
-          ⌘K
-        </kbd>
-
-        <div
-          v-if="showResults && (items.length || q)"
-          id="quick-search-results"
-          role="listbox"
-          :aria-busy="quickPending"
-          class="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-md border border-border bg-popover shadow-xl"
-        >
-          <div v-if="quickCoverage" class="flex items-center gap-2 border-b border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground">
-            <Badge
-              :variant="quickCoverage === 'Complete' ? 'success' : quickCoverage === 'Partial' ? 'warn' : 'destructive'"
-              class="px-1.5 py-0 text-[9px] uppercase"
-            >
-              {{ quickCoverage }}
-            </Badge>
-            <span class="truncate" :title="quickCoverageDetail">{{ quickCoverageDetail }}</span>
-          </div>
-          <div
-            v-for="section in sections"
-            :key="section.id"
-            class="transition-opacity"
-            :class="quickStale ? 'opacity-40' : ''"
-          >
-            <div class="flex items-center gap-1.5 border-b border-border/70 bg-muted/30 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <FileJson2 v-if="section.id === 'datasets'" class="h-3 w-3" />
-              <Users v-else-if="section.id === 'groups'" class="h-3 w-3" />
-              <UserRound v-else class="h-3 w-3" />
-              {{ section.label }}
-            </div>
-            <button
-              v-for="item in section.items"
-              :key="item.key"
-              role="option"
-              :aria-selected="activeKey === item.key"
-              @mousedown.prevent="openItem(item)"
-              :class="[
-                'flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted',
-                activeKey === item.key ? 'bg-muted' : '',
-              ]"
-            >
-              <div class="flex-1 overflow-hidden">
-                <div class="truncate font-medium text-foreground">{{ item.title }}</div>
-                <div v-if="item.subtitle" class="truncate text-xs text-muted-foreground">{{ item.subtitle }}</div>
-              </div>
-            </button>
-          </div>
-          <div v-if="quickPending && !items.length" class="px-3 py-2.5 text-xs text-muted-foreground">Searching…</div>
-          <button
-            v-if="q"
-            @mousedown.prevent
-            @click="openSearchPage"
-            class="flex w-full items-center gap-2 border-t border-border bg-muted/30 px-3 py-2.5 text-left text-xs font-medium text-primary hover:bg-muted"
-          >
-            See all results for "{{ q }}" in Search →
-          </button>
-        </div>
-      </div>
+      <SearchOverlay />
 
       <Button
         v-if="currentUser"
@@ -323,14 +114,23 @@ function onSearchFocusOut(event: FocusEvent) {
           variant="outline"
           size="sm"
           class="h-9 border-amber-500/50 text-amber-700 dark:text-amber-300"
+          aria-label="Session expired, sign in again"
           :title="authError ?? undefined"
           :disabled="signingIn"
           @click="onSignIn"
         >
-          <RefreshCw class="h-3.5 w-3.5" /> Session expired - sign in again
+          <RefreshCw class="h-3.5 w-3.5" />
+          <span class="hidden min-[480px]:inline">Session expired - sign in again</span>
         </Button>
-        <Button v-else size="sm" class="h-9" :disabled="loading || signingIn" @click="onSignIn">
-          <LogIn class="h-4 w-4" /> Sign in
+        <Button
+          v-else
+          size="sm"
+          class="h-9"
+          aria-label="Sign in"
+          :disabled="loading || signingIn"
+          @click="onSignIn"
+        >
+          <LogIn class="h-4 w-4" /> <span class="hidden min-[480px]:inline">Sign in</span>
         </Button>
       </template>
     </div>

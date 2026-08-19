@@ -1,0 +1,430 @@
+<script lang="ts">
+/**
+ * Browser measurements found the inline input overlapping adjacent controls at
+ * 414 px, while it and its wrapper both fit at 480 px. Widths below this value
+ * therefore use the compact trigger and top search panel.
+ */
+export const TOP_BAR_SEARCH_COLLAPSE_PX = 480
+</script>
+
+<script setup lang="ts">
+import Badge from '@/components/ui/Badge.vue'
+import Button from '@/components/ui/Button.vue'
+import Spinner from '@/components/ui/Spinner.vue'
+import { useRealm } from '@/composables/useRealm'
+import { useUnifiedSearch } from '@/composables/useUnifiedSearch'
+import { FileJson2, Search, UserRound, Users, X } from '@lucide/vue'
+import { useMediaQuery } from '@vueuse/core'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+
+type QuickSection = 'datasets' | 'groups' | 'people'
+
+interface QuickItem {
+  key: string
+  section: QuickSection
+  title: string
+  subtitle?: string
+  routeName: string
+  routeParams: Record<string, string>
+}
+
+const PANEL_HISTORY_KEY = '__arunaGlobalSearchPanel'
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+const q = ref('')
+const showResults = ref(false)
+const panelOpen = ref(false)
+const activeIndex = ref(-1)
+const triggerEl = ref<HTMLElement | null>(null)
+const inputEl = ref<HTMLInputElement | null>(null)
+const panelEl = ref<HTMLElement | null>(null)
+const wrapperEl = ref<HTMLElement | null>(null)
+const isNarrowSearch = useMediaQuery(`(max-width: ${TOP_BAR_SEARCH_COLLAPSE_PX - 0.02}px)`)
+const { realm } = useRealm()
+const router = useRouter()
+
+// Quick search is server-backed only: the catalog is paged, so a client-side
+// filter over it would silently answer from the first pages.
+const {
+  documents: quickDocuments,
+  groups: quickGroups,
+  users: quickUsers,
+  pending: quickPending,
+  searched: quickSearched,
+  error: quickError,
+  nodesQueried: quickNodesQueried,
+  nodesFailed: quickNodesFailed,
+  truncated: quickTruncated,
+  retry: retrySearch,
+} = useUnifiedSearch(q, { limit: 5 })
+
+const items = computed<QuickItem[]>(() => [
+  ...quickDocuments.value.map((hit): QuickItem => ({
+    key: `d:${hit.document_id}`,
+    section: 'datasets',
+    title: hit.title || hit.document_path,
+    subtitle: hit.snippet ?? undefined,
+    routeName: 'metadata-detail',
+    routeParams: { id: hit.document_id },
+  })),
+  ...quickGroups.value.map((group): QuickItem => ({
+    key: `g:${group.group_id}`,
+    section: 'groups',
+    title: group.display_name,
+    routeName: 'groups',
+    routeParams: { id: group.group_id },
+  })),
+  ...quickUsers.value.map((user): QuickItem => ({
+    key: `u:${user.user_id}`,
+    section: 'people',
+    title: user.name,
+    routeName: 'user-profile',
+    routeParams: { id: user.user_id },
+  })),
+])
+
+// The previous matches stay listed while a new request runs, so they are dimmed
+// rather than read as the answer to what was just typed.
+const quickStale = computed(() => quickPending.value && items.value.length > 0)
+const quickCoverage = computed<'Complete' | 'Partial' | 'Unavailable' | null>(() => {
+  if (quickError.value) return 'Unavailable'
+  if (!quickSearched.value) return null
+  return quickNodesFailed.value > 0 || quickTruncated.value ? 'Partial' : 'Complete'
+})
+const quickCoverageDetail = computed(() => {
+  if (quickCoverage.value === 'Unavailable') return quickError.value ?? 'Search is unavailable.'
+  if (quickCoverage.value !== 'Partial') return 'Document coverage'
+  const details: string[] = []
+  if (quickNodesFailed.value > 0) {
+    details.push(
+      `${Math.max(0, quickNodesQueried.value - quickNodesFailed.value)} of ${quickNodesQueried.value} nodes answered`,
+    )
+  }
+  if (quickTruncated.value) details.push('document results were truncated')
+  return details.join('; ')
+})
+
+const SECTION_META: Array<{ id: QuickSection; label: string }> = [
+  { id: 'datasets', label: 'Datasets' },
+  { id: 'groups', label: 'Groups' },
+  { id: 'people', label: 'People' },
+]
+const sections = computed(() =>
+  SECTION_META.map((meta) => ({ ...meta, items: items.value.filter((item) => item.section === meta.id) })).filter(
+    (section) => section.items.length,
+  ),
+)
+const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
+
+watch(items, () => (activeIndex.value = -1))
+watch(q, () => (activeIndex.value = -1))
+watch(isNarrowSearch, (narrow) => {
+  if (!narrow && panelOpen.value) requestPanelClose(false)
+})
+
+let ownsHistoryEntry = false
+let restoreTriggerAfterClose = true
+let afterClose: (() => void) | null = null
+
+function finishPanelClose() {
+  panelOpen.value = false
+  showResults.value = false
+  const shouldRestoreTrigger = restoreTriggerAfterClose
+  const callback = afterClose
+  restoreTriggerAfterClose = true
+  afterClose = null
+  void nextTick(() => {
+    if (shouldRestoreTrigger) triggerEl.value?.focus()
+    callback?.()
+  })
+}
+
+function onPopState() {
+  if (!panelOpen.value) return
+  ownsHistoryEntry = false
+  finishPanelClose()
+}
+
+async function openPanel(event: MouseEvent) {
+  triggerEl.value = event.currentTarget as HTMLElement
+  if (panelOpen.value) return
+  const state = window.history.state
+  window.history.pushState(
+    { ...(state && typeof state === 'object' ? state : {}), [PANEL_HISTORY_KEY]: true },
+    '',
+  )
+  ownsHistoryEntry = true
+  panelOpen.value = true
+  showResults.value = true
+  await nextTick()
+  inputEl.value?.focus()
+}
+
+function requestPanelClose(restoreTrigger = true, callback: (() => void) | null = null) {
+  if (!panelOpen.value) {
+    callback?.()
+    return
+  }
+  restoreTriggerAfterClose = restoreTrigger
+  afterClose = callback
+  if (ownsHistoryEntry) {
+    ownsHistoryEntry = false
+    window.history.back()
+  } else {
+    finishPanelClose()
+  }
+}
+
+function navigateAfterPanel(callback: () => void) {
+  if (panelOpen.value) requestPanelClose(false, callback)
+  else callback()
+}
+
+function openItem(item: QuickItem) {
+  showResults.value = false
+  q.value = ''
+  navigateAfterPanel(() => void router.push({ name: item.routeName, params: item.routeParams }))
+}
+
+function openSearchPage() {
+  const term = q.value
+  showResults.value = false
+  q.value = ''
+  navigateAfterPanel(() => void router.push({ name: 'search', query: { q: term } }))
+}
+
+function onInputKeydown(event: KeyboardEvent) {
+  const list = items.value
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    showResults.value = true
+    activeIndex.value = list.length ? (activeIndex.value + 1) % list.length : -1
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    activeIndex.value = list.length ? (activeIndex.value - 1 + list.length) % list.length : -1
+  } else if (event.key === 'Enter') {
+    const item = list[activeIndex.value]
+    if (item) openItem(item)
+    else if (q.value.trim()) openSearchPage()
+  } else if (event.key === 'Escape') {
+    showResults.value = false
+  }
+}
+
+function onPanelKeydown(event: KeyboardEvent) {
+  if (!isNarrowSearch.value || !panelOpen.value) return
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    requestPanelClose()
+    return
+  }
+  if (event.key !== 'Tab') return
+
+  const focusable = Array.from(panelEl.value?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [])
+  if (!focusable.length) {
+    event.preventDefault()
+    return
+  }
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement
+  if (!panelEl.value?.contains(active)) {
+    event.preventDefault()
+    const fallback = event.shiftKey ? last : first
+    fallback.focus()
+  } else if (event.shiftKey && active === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+// Hide results only when focus leaves the whole search wrapper (input plus the
+// result buttons), so keyboard users can Tab into a result.
+function onSearchFocusOut(event: FocusEvent) {
+  const next = event.relatedTarget as Node | null
+  if (!next || !wrapperEl.value?.contains(next)) showResults.value = false
+}
+
+onMounted(() => window.addEventListener('popstate', onPopState))
+onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
+</script>
+
+<template>
+  <Button
+    v-if="isNarrowSearch"
+    v-show="!panelOpen"
+    variant="outline"
+    size="icon"
+    class="mr-auto h-9 w-9 shrink-0"
+    aria-label="Open global search"
+    aria-haspopup="dialog"
+    :aria-expanded="panelOpen"
+    title="Search"
+    @click="openPanel"
+  >
+    <Search class="h-4 w-4" aria-hidden="true" />
+  </Button>
+
+  <Teleport to="body" :disabled="!isNarrowSearch">
+    <div
+      v-if="!isNarrowSearch || panelOpen"
+      :class="
+        isNarrowSearch
+          ? 'fixed inset-0 z-50 bg-background/80 backdrop-blur-sm'
+          : 'relative min-w-0 max-w-xl flex-1'
+      "
+    >
+      <div
+        ref="panelEl"
+        :role="isNarrowSearch ? 'dialog' : undefined"
+        :aria-modal="isNarrowSearch ? 'true' : undefined"
+        :aria-label="isNarrowSearch ? 'Global search' : undefined"
+        :class="
+          isNarrowSearch
+            ? 'w-full border-b border-border/80 bg-background/95 shadow-xl backdrop-blur-xl'
+            : 'contents'
+        "
+        @keydown="onPanelKeydown"
+      >
+        <div
+          ref="wrapperEl"
+          class="relative"
+          :class="isNarrowSearch ? 'mx-auto w-full max-w-[1400px] p-3' : ''"
+          @focusout="onSearchFocusOut"
+        >
+          <div class="flex items-center gap-2">
+            <div class="relative min-w-0 flex-1">
+              <Search
+                class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <input
+                ref="inputEl"
+                v-model="q"
+                aria-label="Search this realm, metadata and groups"
+                role="combobox"
+                aria-controls="quick-search-results"
+                :aria-expanded="showResults"
+                :aria-busy="quickPending"
+                class="h-9 w-full rounded-md border border-input bg-field pl-8 pr-8 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:pr-16"
+                :placeholder="`Search ${realm.shortName}, datasets, groups and people…`"
+                @focus="showResults = true"
+                @keydown="onInputKeydown"
+              />
+              <Spinner
+                v-if="quickPending"
+                label="Searching…"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-primary sm:right-11"
+              />
+              <kbd
+                aria-hidden="true"
+                class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-flex"
+              >
+                ⌘K
+              </kbd>
+            </div>
+            <Button
+              v-if="isNarrowSearch"
+              variant="ghost"
+              size="icon"
+              class="h-9 w-9 shrink-0"
+              aria-label="Close global search"
+              @click="requestPanelClose()"
+            >
+              <X class="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+
+          <div
+            v-if="showResults && (items.length || q)"
+            id="quick-search-results"
+            role="listbox"
+            :aria-busy="quickPending"
+            :class="[
+              'left-0 right-0 z-40 rounded-md border border-border bg-popover shadow-xl',
+              isNarrowSearch
+                ? 'mt-3 max-h-[calc(100dvh-4.75rem)] overflow-y-auto'
+                : 'absolute top-11 overflow-hidden',
+            ]"
+          >
+            <div
+              v-if="quickCoverage"
+              role="status"
+              class="flex items-center gap-2 border-b border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground"
+            >
+              <Badge
+                :variant="
+                  quickCoverage === 'Complete' ? 'success' : quickCoverage === 'Partial' ? 'warn' : 'destructive'
+                "
+                class="px-1.5 py-0 text-[9px] uppercase"
+              >
+                {{ quickCoverage }}
+              </Badge>
+              <span class="min-w-0 flex-1 truncate" :title="quickCoverageDetail">{{ quickCoverageDetail }}</span>
+              <Button
+                v-if="quickCoverage !== 'Complete'"
+                variant="ghost"
+                size="sm"
+                class="h-6 shrink-0 px-2 text-[10px]"
+                :disabled="quickPending"
+                @mousedown.prevent
+                @click="retrySearch"
+              >
+                Retry
+              </Button>
+            </div>
+            <div
+              v-for="section in sections"
+              :key="section.id"
+              class="transition-opacity"
+              :class="quickStale ? 'opacity-40' : ''"
+            >
+              <div
+                class="flex items-center gap-1.5 border-b border-border/70 bg-muted/30 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                <FileJson2 v-if="section.id === 'datasets'" class="h-3 w-3" aria-hidden="true" />
+                <Users v-else-if="section.id === 'groups'" class="h-3 w-3" aria-hidden="true" />
+                <UserRound v-else class="h-3 w-3" aria-hidden="true" />
+                {{ section.label }}
+              </div>
+              <button
+                v-for="item in section.items"
+                :key="item.key"
+                role="option"
+                :aria-selected="activeKey === item.key"
+                :class="[
+                  'flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted',
+                  activeKey === item.key ? 'bg-muted' : '',
+                ]"
+                @mousedown.prevent
+                @click="openItem(item)"
+              >
+                <div class="flex-1 overflow-hidden">
+                  <div class="truncate font-medium text-foreground">{{ item.title }}</div>
+                  <div v-if="item.subtitle" class="truncate text-xs text-muted-foreground">{{ item.subtitle }}</div>
+                </div>
+              </button>
+            </div>
+            <div v-if="quickPending && !items.length" class="px-3 py-2.5 text-xs text-muted-foreground">
+              Searching…
+            </div>
+            <button
+              v-if="q"
+              class="flex w-full items-center gap-2 border-t border-border bg-muted/30 px-3 py-2.5 text-left text-xs font-medium text-primary hover:bg-muted"
+              @mousedown.prevent
+              @click="openSearchPage"
+            >
+              See all results for "{{ q }}" in Search →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+</template>
