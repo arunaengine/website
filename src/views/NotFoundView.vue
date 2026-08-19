@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { Compass, LayoutDashboard } from '@lucide/vue'
+import { FileJson2, LayoutDashboard } from '@lucide/vue'
 
 const route = useRoute()
 </script>
@@ -21,7 +21,7 @@ const route = useRoute()
           <Button variant="outline"><LayoutDashboard class="h-4 w-4" /> Dashboard</Button>
         </RouterLink>
         <RouterLink :to="{ name: 'search' }">
-          <Button><Compass class="h-4 w-4" /> Discover</Button>
+          <Button><FileJson2 class="h-4 w-4" /> Datasets</Button>
         </RouterLink>
       </div>
     </div>

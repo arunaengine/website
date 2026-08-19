@@ -167,11 +167,11 @@ function startSignIn() {
       <template #actions>
         <Button variant="outline" :disabled="refreshing" @click="refreshDashboard">Refresh</Button>
         <Button v-if="currentUser" variant="outline" @click="showNewDataset = true">
-          <Plus class="h-4 w-4" /> New dataset
+          <Plus class="h-4 w-4" /> Create dataset
         </Button>
         <RouterLink to="/app/metadata">
           <Button :variant="currentUser ? 'default' : 'outline'">
-            Open catalog <ArrowRight class="h-4 w-4" />
+            Open Datasets <ArrowRight class="h-4 w-4" />
           </Button>
         </RouterLink>
       </template>
@@ -275,9 +275,9 @@ function startSignIn() {
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2">
               <FileJson2 class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Recent metadata</h2>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Recent Datasets</h2>
             </div>
-            <RouterLink to="/app/metadata" class="text-xs font-medium text-primary hover:underline">Catalog</RouterLink>
+            <RouterLink to="/app/metadata" class="text-xs font-medium text-primary hover:underline">Datasets</RouterLink>
           </header>
           <ul v-if="!bootstrapped" class="divide-y divide-border">
             <li v-for="n in 4" :key="n" class="px-5 py-3.5">
@@ -299,7 +299,7 @@ function startSignIn() {
               </RouterLink>
             </li>
             <li v-if="!recentMetadata.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
-              No visible metadata documents yet.
+              No visible Datasets yet.
             </li>
           </ul>
         </div>

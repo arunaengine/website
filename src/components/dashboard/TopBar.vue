@@ -56,7 +56,7 @@ async function handleSignOut() {
         class="hidden h-9 md:inline-flex"
         @click="showNewDataset = true"
       >
-        <Plus class="h-4 w-4" /> New dataset
+        <Plus class="h-4 w-4" /> Create dataset
       </Button>
 
       <NotificationBell />

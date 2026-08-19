@@ -29,14 +29,17 @@ const routes: RouteRecordRaw[] = [
           query: { ...(typeof to.query.prefix === 'string' && to.query.prefix ? { prefix: to.query.prefix } : {}), addData: '1' },
         }),
       },
-      // Discover — the metadata catalog plus search, SPARQL in expert mode
+      // Datasets catalog plus search, with SPARQL in expert mode. The existing
+      // path and route name stay stable for saved links.
       { path: 'search', name: 'search', component: () => import('@/views/SearchView.vue') },
-      // The old catalog listing merged into Discover; detail pages stay here
+      // The old catalog listing merged into Datasets; detail pages stay here.
       { path: 'metadata', name: 'metadata', redirect: { name: 'search' } },
       { path: 'metadata/:id', name: 'metadata-detail', component: () => import('@/views/MetadataView.vue') },
       // Profiles for RO-Crate metadata schemas
       { path: 'profiles', name: 'profiles', component: () => import('@/views/ProfilesView.vue') },
       { path: 'profiles/:profileId', name: 'profile-detail', component: () => import('@/views/ProfilesView.vue') },
+      // Versioned, repository-owned portal guidance.
+      { path: 'docs/v1/:topic?', name: 'docs', component: () => import('@/views/DocsView.vue') },
       // Groups — dedicated management page
       { path: 'groups/:id?', name: 'groups', component: () => import('@/views/GroupsView.vue') },
       // Public user profile resolved from the realm's user directory

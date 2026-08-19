@@ -1,3 +1,34 @@
+<script lang="ts">
+import type { MetadataDoc as PurposeMetadataDoc } from '@/data/types'
+import { conformsToProcessRun } from '@/lib/profiles/builtinProfiles'
+import { DX_PROFILE } from '@/lib/profiles/types'
+
+export type DatasetPurpose = 'dataset' | 'profile' | 'process-run'
+
+const PROFILE_ROOT_TYPES = new Set([
+  'Profile',
+  'prof:Profile',
+  DX_PROFILE,
+])
+
+// P0-5 precedence: semantic Profile root type, exact Process Run conformance,
+// then the default Dataset purpose. Storage paths never decide the purpose.
+export function datasetPurposeOf(
+  doc?: Pick<PurposeMetadataDoc, 'type' | 'conformsToIds'> | null,
+): DatasetPurpose {
+  const rootTypes = (doc?.type ?? '').split(',').map((entry) => entry.trim()).filter(Boolean)
+  if (rootTypes.some((type) => PROFILE_ROOT_TYPES.has(type))) return 'profile'
+  if (conformsToProcessRun(doc?.conformsToIds)) return 'process-run'
+  return 'dataset'
+}
+
+export function datasetPurposeLabel(purpose: DatasetPurpose): string {
+  if (purpose === 'profile') return 'Profile'
+  if (purpose === 'process-run') return 'Process Run'
+  return 'Dataset'
+}
+</script>
+
 <script setup lang="ts">
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
@@ -29,8 +60,7 @@ import { useJobs } from '@/composables/useJobs'
 import { useDebounceFn } from '@vueuse/core'
 import { formatNumber, shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
-import { conformsToProcessRun } from '@/lib/profiles/builtinProfiles'
-import { Search, FileArchive, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound, Download } from '@lucide/vue'
+import { Search, FileArchive, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound, Download, ListChecks } from '@lucide/vue'
 import type { MetadataDoc, SparqlExecutionMode, SparqlResult } from '@/data/types'
 import type { BucketSearchHit, ListMetadataResponse, MetadataDocumentListItem, UserSearchHit } from '@/lib/api'
 import type { RouteLocationRaw } from 'vue-router'
@@ -51,7 +81,6 @@ const {
   discoverableGroups,
   searchUsers,
   searchUnified,
-  profileItems,
   getMetadataItem,
   toMetadataDoc,
 } = useAruna()
@@ -66,6 +95,13 @@ function queryFilter(value: unknown): string | null {
   return queryString(value) || null
 }
 
+function queryPurposeFilter(value: unknown): DatasetPurpose | null {
+  const purpose = queryString(value)
+  return purpose === 'dataset' || purpose === 'profile' || purpose === 'process-run'
+    ? purpose
+    : null
+}
+
 function queryPage(value: unknown): number {
   const parsed = Number.parseInt(queryString(value), 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
@@ -77,9 +113,8 @@ const profileFilter = ref<string | null>(queryFilter(route.query.profile))
 // filter to conforms_to when it resolves to a local profile IRI. Browsing with a
 // group filter pages a group-scoped listing instead of the shared catalog.
 const groupFilter = ref<string | null>(queryFilter(route.query.group))
-// Entity/resource type facet, derived from the RO-Crate @type of the documents
-// on screen. Applied client-side in both the browse and the search branches.
-const typeFilter = ref<string | null>(queryFilter(route.query.type))
+// Dataset purpose is classified client-side from the semantic P0-5 fields.
+const typeFilter = ref<DatasetPurpose | null>(queryPurposeFilter(route.query.type))
 const favouritesOnly = ref(false)
 // 1-based browse page, kept in the URL so a page can be shared and the browser
 // back button steps through it.
@@ -142,7 +177,7 @@ watch([q, profileFilter, groupFilter, typeFilter, expertMode, browsePage], ([nq,
     queryString(route.query.q) === nq &&
     queryFilter(route.query.profile) === np &&
     queryFilter(route.query.group) === ng &&
-    queryFilter(route.query.type) === nt &&
+    queryPurposeFilter(route.query.type) === nt &&
     (queryString(route.query.expert) === '1') === ne &&
     queryPage(route.query.page) === npage
   ) {
@@ -168,7 +203,7 @@ watch(
     q.value = queryString(query.q)
     profileFilter.value = queryFilter(query.profile)
     groupFilter.value = queryFilter(query.group)
-    typeFilter.value = queryFilter(query.type)
+    typeFilter.value = queryPurposeFilter(query.type)
     expertMode.value = queryString(query.expert) === '1'
     browsePage.value = queryPage(query.page)
   },
@@ -209,9 +244,7 @@ function browseParams(): CatalogPageParams {
 
 /** Paints a cached window exactly as a fresh response would. */
 function paintWindow(response: ListMetadataResponse) {
-  browseDocs.value = response.documents
-    .filter((item) => !item.document_path.startsWith('profiles/'))
-    .map(toMetadataDoc)
+  browseDocs.value = response.documents.map(toMetadataDoc)
   browseReturned.value = response.total_returned
   browseLimit.value = response.limit
   browseEstimateRaw.value = response.total_estimate ?? null
@@ -335,15 +368,11 @@ const hasNextPage = computed(() => {
 })
 
 // APPROXIMATE match count from the server (estimated per group, so it can over-
-// or under-count) and absent on small limits or older nodes. profiles/ documents
-// never browse here and are held separately, so the unfiltered count drops them.
+// or under-count) and absent on small limits or older nodes.
 const browseEstimate = computed<number | null>(() => {
   if (favouritesOnly.value) return favouriteDocs.value.length
   if (browseEstimateRaw.value === null) return null
-  const raw = groupFilter.value
-    ? browseEstimateRaw.value
-    : browseEstimateRaw.value - profileItems.value.length
-  return Math.max(0, raw)
+  return Math.max(0, browseEstimateRaw.value)
 })
 
 // Approximate page count; null without an estimate, which degrades the pager to
@@ -360,10 +389,10 @@ const pageCount = computed<number | null>(() => {
 const browseSummary = computed(() => {
   const shown = formatNumber(hits.value.length)
   const page = formatNumber(browsePage.value)
-  if (pageCount.value === null) return `Page ${page} · ${shown} documents on this page.`
+  if (pageCount.value === null) return `Page ${page} · ${shown} Datasets on this page.`
   // Favourites are fetched by id, so only the server estimate reads "about".
   const about = favouritesOnly.value ? '' : 'about '
-  return `Page ${page} of ${about}${formatNumber(pageCount.value)} · ${shown} documents on this page.`
+  return `Page ${page} of ${about}${formatNumber(pageCount.value)} · ${shown} Datasets on this page.`
 })
 
 function goToPage(page: number) {
@@ -378,33 +407,28 @@ function retryBrowse() {
   else void loadBrowsePage(true)
 }
 
-// The RO-Crate @type is stored comma-joined (e.g. "Dataset, SoftwareSourceCode");
-// split it so a doc matches a facet when any of its types equals the selection.
-function docTypes(doc?: MetadataDoc | null): string[] {
-  if (!doc?.type) return []
-  return doc.type.split(',').map((entry) => entry.trim()).filter(Boolean)
-}
-
-// The group filter is served by the source itself; profile, type and favourites
+// The group filter is served by the source itself; profile, purpose and favourites
 // still narrow what the source returned.
 const hits = computed(() =>
   browseSource.value.filter((doc) => {
     if (profileFilter.value && !(doc.profileIds ?? []).includes(profileFilter.value)) return false
     if (groupFilter.value && doc.realmId !== groupFilter.value) return false
-    if (typeFilter.value && !docTypes(doc).includes(typeFilter.value)) return false
+    if (typeFilter.value && datasetPurposeOf(doc) !== typeFilter.value) return false
     if (favouritesOnly.value && !favouriteIds.value.includes(doc.ulid)) return false
     return true
   }),
 )
-// Process runs are their own Discover section and match the complete profile IRI.
-function isRunCrateDoc(doc: MetadataDoc): boolean {
-  return conformsToProcessRun(doc.conformsToIds)
-}
 const catalogSplit = computed(() => {
   const runs: MetadataDoc[] = []
+  const profileDocs: MetadataDoc[] = []
   const datasets: MetadataDoc[] = []
-  for (const doc of hits.value) (isRunCrateDoc(doc) ? runs : datasets).push(doc)
-  return { runs, datasets }
+  for (const doc of hits.value) {
+    const purpose = datasetPurposeOf(doc)
+    if (purpose === 'profile') profileDocs.push(doc)
+    else if (purpose === 'process-run') runs.push(doc)
+    else datasets.push(doc)
+  }
+  return { runs, profiles: profileDocs, datasets }
 })
 
 // Group labels: names for groups the caller can see, honest truncated id otherwise.
@@ -427,17 +451,6 @@ const groupOptions = computed(() => {
     .sort((a, b) => a.label.localeCompare(b.label))
 })
 
-// Distinct entity/resource types present in the documents loaded so far, plus
-// the active filter so a value carried in from the URL is never dropped. The
-// facet only appears when the data offers a real choice (more than one type).
-const typeOptions = computed(() => {
-  const types = new Set<string>()
-  for (const doc of browseSource.value) for (const type of docTypes(doc)) types.add(type)
-  if (typeFilter.value) types.add(typeFilter.value)
-  return [...types].sort((a, b) => a.localeCompare(b))
-})
-const showTypeFilter = computed(() => typeOptions.value.length > 1)
-
 // Per-facet option lists (no "All" entry: SearchFilterBar prepends it). Each keeps
 // the active value present so a filter carried in from the URL is never dropped.
 const profileFacetOptions = computed(() => {
@@ -452,15 +465,21 @@ const profileFacetOptions = computed(() => {
   }
   return options
 })
-const typeFacetOptions = computed(() => typeOptions.value.map((type) => ({ value: type, label: type })))
+const typeFacetOptions = [
+  { value: 'dataset', label: 'Dataset' },
+  { value: 'profile', label: 'Profile' },
+  { value: 'process-run', label: 'Process Run' },
+]
 const groupFacetOptions = computed(() => groupOptions.value.map((option) => ({ value: option.id, label: option.label })))
 
 // Extensible filter config: one entry per facet. Adding a facet means pushing
 // one more entry here (single select, `multi: true`, or `toggle: true`) with no
 // template changes. The favourites toggle only appears for a signed-in user.
 const filterFacets = computed<Facet[]>(() => {
-  const facets: Facet[] = [{ key: 'profile', label: 'Profile', options: profileFacetOptions.value }]
-  if (showTypeFilter.value || typeFilter.value) facets.push({ key: 'type', label: 'Type', options: typeFacetOptions.value })
+  const facets: Facet[] = [
+    { key: 'type', label: 'Purpose', options: typeFacetOptions },
+    { key: 'profile', label: 'Profile', options: profileFacetOptions.value },
+  ]
   facets.push({ key: 'group', label: 'Group', options: groupFacetOptions.value })
   if (currentUser.value) facets.push({ key: 'favourites', label: 'Favourites', toggle: true, icon: Star })
   return facets
@@ -477,7 +496,9 @@ const filterModel = computed<FilterModel>({
   }),
   set: (next) => {
     profileFilter.value = typeof next.profile === 'string' ? next.profile : null
-    typeFilter.value = typeof next.type === 'string' ? next.type : null
+    typeFilter.value = next.type === 'dataset' || next.type === 'profile' || next.type === 'process-run'
+      ? next.type
+      : null
     groupFilter.value = typeof next.group === 'string' ? next.group : null
     favouritesOnly.value = next.favourites === true
     // A different filter means a different listing; page numbers do not carry.
@@ -491,9 +512,7 @@ const visibleResults = computed(() =>
   searchResults.value.filter((line) => {
     if (favouritesOnly.value && !favouriteIds.value.includes(line.hit.document_id)) return false
     if (profileFilter.value && !profilePushedDown.value && !(line.doc?.profileIds ?? []).includes(profileFilter.value)) return false
-    // Type is a client-side facet: id-only hits carry no catalog doc and so drop
-    // out while a type filter is active, mirroring the client-side profile filter.
-    if (typeFilter.value && !docTypes(line.doc).includes(typeFilter.value)) return false
+    if (typeFilter.value && datasetPurposeOf(line.doc) !== typeFilter.value) return false
     return true
   }),
 )
@@ -718,20 +737,34 @@ async function runQuery() {
 <template>
   <div>
     <PageHeader
-      title="Discover"
-      description="Browse the live RO-Crate metadata catalog, filter and search it, or run SPARQL against the Aruna metadata index."
+      title="Datasets"
+      description="Browse every visible RO-Crate by Dataset purpose, search across supported resource kinds, or use the SPARQL workbench."
     >
+      <template #breadcrumbs>
+        <template v-if="groupFilter">
+          <span>·</span>
+          <Badge variant="outline" :title="groupFilter">
+            Group: {{ groupNames.get(groupFilter) ?? truncateMiddle(groupFilter) }}
+          </Badge>
+        </template>
+        <span>·</span>
+        <span>What is this?</span>
+        <RouterLink
+          :to="{ name: 'docs', params: { topic: 'datasets' } }"
+          class="font-medium text-primary hover:underline"
+        >Learn more</RouterLink>
+      </template>
       <template #actions>
-        <Button :disabled="!currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
+        <Button :disabled="!currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> Create dataset</Button>
         <!-- Importing an archive registers a NEW document, so it lives here next
-             to "New metadata" rather than on a single crate's page. -->
+             to Create dataset rather than on a single Dataset's page. -->
         <Button
           v-if="currentUser && jobsEnabled"
           variant="outline"
-          title="Upload an RO-Crate zip or eln archive and register it as a new metadata document"
+          title="Upload an RO-Crate zip or eln archive and register it as a new Dataset"
           @click="showCrateImport = true"
         >
-          <FileArchive class="h-4 w-4" /> Import archive
+          <FileArchive class="h-4 w-4" /> Import RO-Crate dataset
         </Button>
         <div class="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
           <Code2 class="h-3.5 w-3.5 text-muted-foreground" />
@@ -746,12 +779,12 @@ async function runQuery() {
         <div class="surface p-4">
           <div class="relative">
             <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input v-model="q" :aria-busy="searchBusy" placeholder="Search datasets, groups and people…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring" />
+            <input v-model="q" :aria-busy="searchBusy" placeholder="Search Datasets, data, groups, and people…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring" />
             <Spinner v-if="searchBusy" label="Searching…" class="absolute right-3 top-1/2 -translate-y-1/2 text-primary" />
           </div>
-          <SearchFilterBar v-model="filterModel" :facets="filterFacets" aria-label="Discover filters" class="mt-3" />
-          <p v-if="showTypeFilter || typeFilter" class="mt-2 text-[11px] text-muted-foreground">
-            Profile and group filters are applied by the server; Type covers the documents on this page.
+          <SearchFilterBar v-model="filterModel" :facets="filterFacets" aria-label="Dataset filters" class="mt-3" />
+          <p class="mt-2 text-[11px] text-muted-foreground">
+            Purpose classifies each RO-Crate as Dataset, Profile, or Process Run. Profile and group filters are applied by the server.
           </p>
         </div>
 
@@ -894,21 +927,25 @@ async function runQuery() {
           <section v-else-if="visibleResults.length" :aria-busy="searchBusy">
             <div class="mb-3 flex items-center gap-2">
               <FileJson2 class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ textQuery ? 'Search results' : 'Documents with this profile' }}</h2>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ textQuery ? 'Dataset results' : 'Datasets with this profile' }}</h2>
               <span class="text-xs text-muted-foreground">{{ visibleResults.length }}</span>
               <span v-if="searchStale" class="text-xs text-muted-foreground">· previous results</span>
             </div>
             <div class="grid gap-4 transition-opacity sm:grid-cols-2 lg:grid-cols-3" :class="searchStale ? 'opacity-40' : ''">
               <template v-for="line in visibleResults" :key="line.hit.document_id">
-                <CatalogCard
-                  v-if="line.doc"
-                  :doc="line.doc"
-                  :score="textQuery ? line.hit.score : undefined"
-                  :favourite="isFavourite(line.doc.ulid)"
-                  :can-favourite="Boolean(currentUser)"
-                  :favourite-busy="favBusy.has(line.doc.ulid)"
-                  @toggle-favourite="toggleFav"
-                />
+                <div v-if="line.doc" class="flex min-w-0 flex-col gap-1.5">
+                  <Badge variant="secondary" class="w-fit text-[10px] uppercase">
+                    {{ datasetPurposeLabel(datasetPurposeOf(line.doc)) }}
+                  </Badge>
+                  <CatalogCard
+                    :doc="line.doc"
+                    :score="textQuery ? line.hit.score : undefined"
+                    :favourite="isFavourite(line.doc.ulid)"
+                    :can-favourite="Boolean(currentUser)"
+                    :favourite-busy="favBusy.has(line.doc.ulid)"
+                    @toggle-favourite="toggleFav"
+                  />
+                </div>
                 <!-- Server-side hit outside the loaded pages: title and snippet
                      come from the answering node, the rest opens on the detail
                      page (which handles unknown or private ids honestly). -->
@@ -917,6 +954,7 @@ async function runQuery() {
                   :to="{ name: 'metadata-detail', params: { id: line.hit.document_id } }"
                   class="surface group flex h-full flex-col gap-3 p-4 transition-shadow hover:shadow-md"
                 >
+                  <Badge variant="secondary" class="w-fit text-[10px] uppercase">Dataset</Badge>
                   <div>
                     <h3 v-if="line.title" class="font-display text-sm font-semibold text-aruna-navy">{{ line.title }}</h3>
                     <h3 v-else class="break-all font-mono text-xs font-semibold text-aruna-navy">{{ line.hit.document_path }}</h3>
@@ -941,10 +979,10 @@ async function runQuery() {
             v-else-if="!cursorEnabled || (searched && !searchPending && !searchPaging)"
             :title="searchResults.length ? 'No matches after filters' : 'No matches'"
             :description="searchResults.length
-              ? 'Results were hidden by the active group, profile or favourites filters.'
+              ? 'Results were hidden by the active purpose, group, profile, or favourites filters.'
               : textQuery
-                ? `No metadata in ${realm.shortName} matched “${textQuery}”.`
-                : `No document in ${realm.shortName} conforms to this profile.`"
+                ? `No Dataset in ${realm.shortName} matched “${textQuery}”.`
+                : `No Dataset in ${realm.shortName} conforms to this profile.`"
           >
             <Button v-if="searchResults.length" variant="outline" @click="clearFilters">Clear filters</Button>
           </EmptyState>
@@ -1020,40 +1058,72 @@ async function runQuery() {
               <section v-if="catalogSplit.datasets.length">
                 <div class="mb-3 flex items-center gap-2">
                   <FileJson2 class="h-4 w-4 text-primary" />
-                  <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ filtering ? 'Matching metadata' : 'Catalog' }}</h2>
+                  <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ filtering ? 'Matching Datasets' : 'Datasets' }}</h2>
                   <span class="text-xs text-muted-foreground">{{ catalogSplit.datasets.length }}</span>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <CatalogCard
+                  <div
                     v-for="doc in catalogSplit.datasets"
                     :key="doc.ulid"
-                    :doc="doc"
-                    :favourite="isFavourite(doc.ulid)"
-                    :can-favourite="Boolean(currentUser)"
-                    :favourite-busy="favBusy.has(doc.ulid)"
-                    @toggle-favourite="toggleFav"
-                  />
+                    class="flex min-w-0 flex-col gap-1.5"
+                  >
+                    <Badge variant="secondary" class="w-fit text-[10px] uppercase">Dataset</Badge>
+                    <CatalogCard
+                      :doc="doc"
+                      :favourite="isFavourite(doc.ulid)"
+                      :can-favourite="Boolean(currentUser)"
+                      :favourite-busy="favBusy.has(doc.ulid)"
+                      @toggle-favourite="toggleFav"
+                    />
+                  </div>
                 </div>
               </section>
 
-              <!-- Process Run crates get their own
-                   section so compute runs never mix with ordinary datasets. -->
+              <section v-if="catalogSplit.profiles.length">
+                <div class="mb-3 flex items-center gap-2">
+                  <ListChecks class="h-4 w-4 text-primary" />
+                  <h2 class="font-display text-sm font-semibold text-aruna-navy">Profiles</h2>
+                  <span class="text-xs text-muted-foreground">{{ catalogSplit.profiles.length }}</span>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div
+                    v-for="doc in catalogSplit.profiles"
+                    :key="doc.ulid"
+                    class="flex min-w-0 flex-col gap-1.5"
+                  >
+                    <Badge variant="secondary" class="w-fit text-[10px] uppercase">Profile</Badge>
+                    <CatalogCard
+                      :doc="doc"
+                      :favourite="isFavourite(doc.ulid)"
+                      :can-favourite="Boolean(currentUser)"
+                      :favourite-busy="favBusy.has(doc.ulid)"
+                      @toggle-favourite="toggleFav"
+                    />
+                  </div>
+                </div>
+              </section>
+
               <section v-if="catalogSplit.runs.length">
                 <div class="mb-3 flex items-center gap-2">
                   <Play class="h-4 w-4 text-primary" />
-                  <h2 class="font-display text-sm font-semibold text-aruna-navy">Compute runs</h2>
+                  <h2 class="font-display text-sm font-semibold text-aruna-navy">Process Runs</h2>
                   <span class="text-xs text-muted-foreground">{{ catalogSplit.runs.length }}</span>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <CatalogCard
+                  <div
                     v-for="doc in catalogSplit.runs"
                     :key="doc.ulid"
-                    :doc="doc"
-                    :favourite="isFavourite(doc.ulid)"
-                    :can-favourite="Boolean(currentUser)"
-                    :favourite-busy="favBusy.has(doc.ulid)"
-                    @toggle-favourite="toggleFav"
-                  />
+                    class="flex min-w-0 flex-col gap-1.5"
+                  >
+                    <Badge variant="secondary" class="w-fit text-[10px] uppercase">Process Run</Badge>
+                    <CatalogCard
+                      :doc="doc"
+                      :favourite="isFavourite(doc.ulid)"
+                      :can-favourite="Boolean(currentUser)"
+                      :favourite-busy="favBusy.has(doc.ulid)"
+                      @toggle-favourite="toggleFav"
+                    />
+                  </div>
                 </div>
               </section>
             </div>
@@ -1075,7 +1145,7 @@ async function runQuery() {
               v-else-if="filtering"
               title="No matches on this page"
               :description="hasNextPage
-                ? 'No document on this page matches the active filters. Try the next page, or search by name.'
+                ? 'No Dataset on this page matches the active filters. Try the next page, or search by name.'
                 : `Nothing in ${realm.shortName} matches the active filters.`"
             >
               <Button variant="outline" @click="clearFilters">Clear filters</Button>
@@ -1083,10 +1153,10 @@ async function runQuery() {
 
             <EmptyState
               v-else
-              :title="`No visible metadata in ${realm.shortName}`"
-              description="No RO-Crate metadata documents are visible here yet."
+              :title="`No visible Datasets in ${realm.shortName}`"
+              description="No RO-Crate Datasets are visible here yet."
             >
-              <Button v-if="currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> New metadata</Button>
+              <Button v-if="currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> Create dataset</Button>
             </EmptyState>
 
             <!-- The page count is derived from an approximate estimate, so it is

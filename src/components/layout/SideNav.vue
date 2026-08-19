@@ -7,10 +7,11 @@ import { featureEnabled } from '@/lib/config'
 import {
   Activity,
   ArrowLeft,
+  BookOpen,
   Boxes,
   ChevronsLeft,
   ChevronsRight,
-  Compass,
+  FileJson2,
   LayoutDashboard,
   ListChecks,
   Settings,
@@ -32,7 +33,13 @@ interface NavSection {
   items: NavItem[]
 }
 
-const { isRealmAdmin } = useAruna()
+const {
+  isRealmAdmin,
+  canInspectUsers,
+  canManageOnboarding,
+  canManageQuarantine,
+  isManagementNode,
+} = useAruna()
 
 // Config resolves before the app mounts, so a plain read is safe here. The
 // unified Compute entry appears when either compute plane (TES tasks or
@@ -40,34 +47,61 @@ const { isRealmAdmin } = useAruna()
 const tesEnabled = featureEnabled('tes')
 const jobsEnabled = featureEnabled('jobs')
 
-// Placement admin moved into the Admin view as a tab, so the admin section
-// holds a single entry regardless of the placementAdmin flag.
+const adminItems = computed<NavItem[]>(() => [
+  ...(isRealmAdmin.value
+    ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true }]
+    : []),
+  ...(canInspectUsers.value
+    ? [{ to: '/app/admin/users', icon: Users, label: 'Users' }]
+    : []),
+  ...(canManageOnboarding.value && isManagementNode.value
+    ? [{ to: '/app/admin/onboarding', icon: Workflow, label: 'Node onboarding' }]
+    : []),
+  ...(canManageQuarantine.value
+    ? [{ to: '/app/admin/quarantine', icon: Activity, label: 'Quarantine' }]
+    : []),
+])
+
 const sections = computed<NavSection[]>(() => [
   {
     label: 'Workspace',
     items: [
       { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-      { to: '/app/search', icon: Compass, label: 'Discover', match: ['/app/search', '/app/metadata'] },
       { to: '/app/buckets', icon: Boxes, label: 'Data' },
       ...(tesEnabled || jobsEnabled
         ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }]
         : []),
+    ],
+  },
+  {
+    label: 'Metadata',
+    items: [
+      { to: '/app/search', icon: FileJson2, label: 'Datasets', match: ['/app/search', '/app/metadata'] },
       { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
-      { to: '/app/groups', icon: Users, label: 'Groups' },
     ],
   },
   {
     label: 'Realm',
     items: [
+      { to: '/app/groups', icon: Users, label: 'Groups' },
       { to: '/app/status', icon: Activity, label: 'Status' },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
       { to: '/app/settings', icon: Settings, label: 'Settings' },
     ],
   },
-  ...(isRealmAdmin.value
+  {
+    label: 'Help',
+    items: [{ to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] }],
+  },
+  ...(adminItems.value.length
     ? [
         {
           label: 'Admin',
-          items: [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin' }],
+          items: adminItems.value,
         },
       ]
     : []),

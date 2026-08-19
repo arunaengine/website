@@ -36,9 +36,10 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { CrateNotReadyError, readableIri, useAruna } from '@/composables/useAruna'
 import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
 import { useS3 } from '@/composables/useS3'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
-import { isHttpUrl, relativeTime } from '@/lib/utils'
+import { isHttpUrl, relativeTime, truncateMiddle } from '@/lib/utils'
 import { metaWatchPathPrefix } from '@/lib/watches'
 import { parseRunCrate, runClaimedIds } from '@/lib/runCrate'
 import { presentCrate } from '@/lib/cratePresenter'
@@ -56,6 +57,8 @@ import DataEntityDialog from '@/components/metadata/DataEntityDialog.vue'
 const route = useRoute()
 const router = useRouter()
 const s3 = useS3()
+const { hasActiveKey: hasS3Access, endpoint: s3Endpoint } = s3
+const { localNodeId, displayName: nodeDisplayName } = useRealmNodes()
 const {
   metadata,
   profiles,
@@ -481,9 +484,24 @@ watch(relatedDocs, (rows) => {
 <template>
   <div>
     <PageHeader
-      :title="current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Metadata'"
-      :description="current ? (runProvenance ? profileName : `${profileName} · ${current.ulid}`) : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate metadata document.'"
+      :title="current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Dataset'"
+      :description="current ? (runProvenance ? profileName : `${profileName} · ${current.ulid}`) : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate Dataset.'"
     >
+      <template #breadcrumbs>
+        <template v-if="current?.realmId || fetchedSummary?.group_id">
+          <span>·</span>
+          <Badge
+            variant="outline"
+            :title="current?.realmId || fetchedSummary?.group_id"
+          >Group: {{ truncateMiddle(current?.realmId || fetchedSummary?.group_id || '') }}</Badge>
+        </template>
+        <span>·</span>
+        <span>What is this?</span>
+        <RouterLink
+          :to="{ name: 'docs', params: { topic: 'datasets' } }"
+          class="font-medium text-primary hover:underline"
+        >Learn more</RouterLink>
+      </template>
       <template #actions>
         <Button
           v-if="current && currentUser"
@@ -543,8 +561,8 @@ watch(relatedDocs, (rows) => {
               >
                 <Upload class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <span class="min-w-0">
-                  <span class="block text-sm font-medium text-foreground">Replace this metadata from a file</span>
-                  <span class="block text-xs leading-relaxed text-muted-foreground">Overwrites this document's crate with an uploaded ro-crate-metadata.json, previewed first.</span>
+                  <span class="block text-sm font-medium text-foreground">Replace this Dataset from a file</span>
+                  <span class="block text-xs leading-relaxed text-muted-foreground">Overwrites this Dataset's crate with an uploaded ro-crate-metadata.json, previewed first.</span>
                 </span>
               </DropdownMenuItem>
             </template>
@@ -564,7 +582,7 @@ watch(relatedDocs, (rows) => {
         <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
         <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
         <RouterLink :to="{ name: 'search' }">
-          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Discover</Button>
+          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Datasets</Button>
         </RouterLink>
       </template>
     </PageHeader>
@@ -604,11 +622,19 @@ watch(relatedDocs, (rows) => {
 
           <dl class="mt-6 grid gap-3 sm:grid-cols-4">
             <div class="surface-muted p-3">
-              <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Document ID</dt>
+              <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Dataset ID</dt>
               <dd class="mt-1 break-all font-mono text-[11px] text-foreground">{{ current.ulid }}</dd>
             </div>
             <div class="surface-muted p-3">
-              <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Profile</dt>
+              <dt class="flex flex-wrap items-center gap-x-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+                <span>Profile</span>
+                <span class="normal-case tracking-normal">What is this?
+                  <RouterLink
+                    :to="{ name: 'docs', params: { topic: 'profiles-conformance' } }"
+                    class="font-medium text-primary hover:underline"
+                  >Learn more</RouterLink>
+                </span>
+              </dt>
               <dd class="mt-1 break-all text-sm font-medium text-foreground" :title="conformsTitle || undefined">{{ profileShortName }}</dd>
             </div>
             <div class="surface-muted p-3">
@@ -674,6 +700,10 @@ watch(relatedDocs, (rows) => {
           <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
             <FileJson2 class="h-4 w-4 text-primary" /> Referenced data
             <span v-if="dataEntities.length" class="text-xs font-normal text-muted-foreground">{{ dataEntities.length }}</span>
+            <div class="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+              <Badge variant="outline" class="text-[10px]">Node: {{ nodeDisplayName(localNodeId) }}</Badge>
+              <Badge v-if="hasS3Access" variant="accent" class="text-[10px]" :title="s3Endpoint ?? undefined">S3 access active</Badge>
+            </div>
           </div>
 
           <table v-if="loadingCrate || dataEntities.length" class="w-full text-sm">
@@ -741,7 +771,7 @@ watch(relatedDocs, (rows) => {
             <Button variant="outline" size="sm" @click="fetchCrate(detailId)">Retry</Button>
           </div>
           <p v-else-if="!loadingCrate && !dataEntities.length" class="px-5 py-6 text-xs text-muted-foreground">
-            This document does not reference any data files. Files can be attached by editing the crate.
+            This Dataset does not reference any data files. Files can be attached by editing the crate.
           </p>
         </section>
 
@@ -783,11 +813,11 @@ watch(relatedDocs, (rows) => {
       </template>
 
       <div v-else-if="docState === 'loading'" class="surface p-12 text-center text-sm text-muted-foreground">
-        Loading metadata…
+        Loading Dataset…
       </div>
 
       <div v-else-if="docState === 'preparing'" class="surface px-5 py-12 text-center">
-        <p class="text-sm font-medium text-foreground">{{ acceptedPreparing ? 'Accepted, preparing metadata' : 'Metadata is still being prepared' }}</p>
+        <p class="text-sm font-medium text-foreground">{{ acceptedPreparing ? 'Accepted, preparing Dataset' : 'Dataset is still being prepared' }}</p>
         <p class="mx-auto mt-2 max-w-md break-all font-mono text-xs text-muted-foreground">{{ detailId }}</p>
         <Button variant="outline" size="sm" class="mt-5" :disabled="resolvingDoc" @click="resolveDoc(detailId)">
           {{ resolvingDoc ? 'Checking…' : 'Retry' }}
@@ -795,26 +825,26 @@ watch(relatedDocs, (rows) => {
       </div>
 
       <div v-else-if="docState === 'not-found'" class="surface px-5 py-12 text-center">
-        <p class="text-sm font-medium text-foreground">This metadata document does not exist (or has been deleted).</p>
+        <p class="text-sm font-medium text-foreground">This Dataset does not exist or has been deleted.</p>
         <p class="mx-auto mt-2 max-w-md break-all font-mono text-xs text-muted-foreground">{{ detailId }}</p>
         <RouterLink :to="{ name: 'search' }" class="mt-5 inline-flex">
-          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Discover</Button>
+          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Datasets</Button>
         </RouterLink>
       </div>
 
       <div v-else-if="docState === 'forbidden'" class="surface px-5 py-12 text-center">
-        <p class="text-sm font-medium text-foreground">This document is not public.</p>
+        <p class="text-sm font-medium text-foreground">This Dataset is not public.</p>
         <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
           {{ currentUser ? 'Sign in with an account that can see it.' : 'Sign in with an account that can see it, using the button in the top bar.' }}
         </p>
         <RouterLink :to="{ name: 'search' }" class="mt-5 inline-flex">
-          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Discover</Button>
+          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Datasets</Button>
         </RouterLink>
       </div>
 
       <ErrorPanel
         v-else-if="docState === 'error'"
-        :message="docError ?? 'Failed to load this document.'"
+        :message="docError ?? 'Failed to load this Dataset.'"
         @retry="resolveDoc(detailId)"
       />
     </div>
@@ -844,10 +874,15 @@ watch(relatedDocs, (rows) => {
     <Dialog :open="showDelete" @update:open="(v: boolean) => (showDelete = v)">
       <DialogContent class="max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete metadata document</DialogTitle>
+          <DialogTitle>Delete Dataset</DialogTitle>
           <DialogDescription>
+            <span class="font-medium text-foreground">What is this?</span>
             Deletes <span class="font-medium text-foreground">{{ current?.title }}</span>
-            (<span class="font-mono text-xs">{{ currentPath }}</span>) and its graph from the catalog. This removes only the RO-Crate metadata; any S3 objects it references are not touched.
+            (<span class="font-mono text-xs">{{ currentPath }}</span>) and its RO-Crate graph from Datasets. Referenced S3 objects are not touched.
+            <RouterLink
+              :to="{ name: 'docs', params: { topic: 'data-and-deletion' } }"
+              class="font-medium text-primary hover:underline"
+            >Learn more</RouterLink>
           </DialogDescription>
         </DialogHeader>
         <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
