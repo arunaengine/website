@@ -20,11 +20,12 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import DatasetFilesEditor from '@/components/metadata/DatasetFilesEditor.vue'
 import DatasetEntityInstances from '@/components/metadata/DatasetEntityInstances.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
+import LiftNotesPanel from '@/components/metadata/profile-builder/LiftNotesPanel.vue'
 import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { AlertTriangle, Check, FileJson, FileJson2, FileUp, Layers, Plus, Upload, X } from '@lucide/vue'
-import { useAruna } from '@/composables/useAruna'
+import { profileRulesLoadState, useAruna } from '@/composables/useAruna'
 import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
 import { groupCustomFieldRows, type CustomFieldRow } from '@/lib/customFields'
 import { addSubcrateLink, type SubcrateLink } from '@/lib/subcrates'
@@ -48,10 +49,11 @@ import {
   validateEntries,
   type EntryViolationNode,
 } from '@/lib/profiles/entityTree'
-import { licenseEntity, parseProfileCrate } from '@/lib/profiles/rocrate'
+import { licenseEntity } from '@/lib/profiles/rocrate'
 import { mapShaclFindings } from '@/lib/shacl/mapFindings'
 import { useShaclValidation } from '@/lib/shacl/useShaclValidation'
 import type { ShaclFinding } from '@/lib/shacl/findings'
+import type { LiftNote } from '@/lib/shacl/lift'
 import { buildProfileContext } from '@/lib/profiles/propertyCatalog'
 import { isAbsoluteUri, termNameFromUri } from '@/lib/profiles/uri'
 import { validateProfileData, validateRequiredInstances } from '@/lib/profiles/validate'
@@ -69,6 +71,21 @@ import {
 // "no profile" choice travels as this sentinel and maps back to '' on write.
 const NO_PROFILE_VALUE = '__no_profile__'
 
+interface ProfileDraftItem {
+  property: string
+  propertyUri: string
+  label: string
+  kind: 'generated' | 'entity'
+  value: unknown
+  multiple: boolean
+  valueKind: ProfileControl['kind']
+}
+
+interface ProfileDraftMigration {
+  items: ProfileDraftItem[]
+  targetRules: ProfilePropertyRule[]
+}
+
 const props = defineProps<{
   open: boolean
   defaultProfileId?: string
@@ -79,7 +96,17 @@ const emit = defineEmits<{
   (e: 'created', doc: MetadataDoc): void
 }>()
 
-const { groups, profiles, metadata, createMetadata, loadRoCrate, saving, currentUser, apiBaseUrl } = useAruna()
+const {
+  groups,
+  profiles,
+  metadata,
+  createMetadata,
+  loadProfileCrate,
+  profileCrateParses,
+  saving,
+  currentUser,
+  apiBaseUrl,
+} = useAruna()
 
 const groupId = ref('')
 const profileId = ref('')
@@ -120,6 +147,7 @@ const entityEntries = ref<Record<string, EntityEntry[]>>({})
 // shapes.custom.ttl), driving the deep-validation worker. Empty when the
 // profile carries none (e.g. a legacy v2 crate): deep validation then stays off.
 const profileShapes = ref<string[]>([])
+const profileAdditionalRequirements = ref<LiftNote[]>([])
 const profileLoading = ref(false)
 const profileLoadError = ref<string | null>(null)
 // True when the full-crate load (or its S3 artifact resolution) FAILED — as
@@ -129,7 +157,18 @@ const profileLoadError = ref<string | null>(null)
 // is silently missing fields; that state blocks the generated section AND
 // submission until a retry succeeds or the profile is deselected.
 const profileLoadFailed = ref(false)
+const profileLoadComplete = ref(false)
+const profileSwitchOpen = ref(false)
+const profileSwitchLoading = ref(false)
+const profileSwitchError = ref<string | null>(null)
+const pendingProfileId = ref<string | null>(null)
+const pendingProfileDraft = ref<ProfileDraftItem[]>([])
+const pendingProfileTargetRules = ref<ProfilePropertyRule[]>([])
+const pendingProfileTargetEntityRules = ref<ProfileEntityRule[]>([])
+const profileMigrationSummary = ref<{ migrated: number; preserved: number } | null>(null)
 let profileLoadToken = 0
+let profileSwitchToken = 0
+let queuedProfileMigration: ProfileDraftMigration | undefined
 
 const builtInDatasetKeys = new Set(['name', 'description', 'datePublished', 'license'])
 // `hasPart` is NOT reserved: a profile hasPart rule binds to the always-present
@@ -151,10 +190,18 @@ const profileOptions = computed(() => [
 const profileSelection = computed({
   get: () => profileId.value || NO_PROFILE_VALUE,
   set: (next: string) => {
-    profileId.value = next === NO_PROFILE_VALUE ? '' : next
+    void requestProfileSwitch(next === NO_PROFILE_VALUE ? '' : next)
   },
 })
 const selectedProfile = computed(() => profiles.value.find((profile) => profile.id === profileId.value))
+const pendingProfile = computed(() => profiles.value.find((profile) => profile.id === pendingProfileId.value))
+const pendingProfileTargetControls = computed(() =>
+  controlsFromRules(pendingProfileTargetRules.value, pendingProfileTargetEntityRules.value),
+)
+const profileSwitchPreview = computed(() => pendingProfileDraft.value.map((item) => ({
+  item,
+  target: migrationTarget(item, pendingProfileTargetRules.value, pendingProfileTargetControls.value),
+})))
 
 const keywordList = computed(() => keywords.value.split(',').map((keyword) => keyword.trim()).filter(Boolean))
 const creatorList = computed(() => creators.value.map((name) => name.trim()).filter(Boolean))
@@ -320,6 +367,18 @@ const hasPartSchemaViolations = computed(() => [
 ])
 
 const profileInputCount = computed(() => generatedScalarControls.value.length + entityControls.value.length)
+const profileHasRules = computed(() => Boolean(
+  profileEntityRules.value.length
+    || profileDatasetRules.value.length
+    || profileSchema.value
+    || profileShapes.value.length,
+))
+const profileRuleState = computed(() => profileRulesLoadState({
+  loading: profileLoading.value,
+  unavailable: profileLoadFailed.value,
+  complete: profileLoadComplete.value,
+  hasRules: profileHasRules.value,
+}))
 
 // Value names the profile itself defines; when it covers author/keywords/
 // identifier the matching built-in scaffold input is hidden (the profile control
@@ -401,11 +460,10 @@ const needsRoCrate = computed(() =>
   ),
 )
 
-// A profile schema that fails to load (legacy/external profile, or a transient
-// CrateNotReadyError) is non-blocking: we cannot generate/validate inputs, but
-// the dataset can still be created and will reference the profile via
-// conformsTo when a URI is available. So profileLoadError is NOT in canSubmit —
-// only the in-flight load, hard error-severity violations, and collisions gate.
+// A selected profile whose rules are unavailable cannot safely generate or
+// validate its inputs, so loading and failed states gate submission until Retry
+// succeeds or the profile reference is removed. A completed profile with no
+// rules is distinct and remains non-blocking.
 // An RO-Crate root MUST carry description, datePublished and license, so an empty
 // `license: {"@id": ""}` can never be emitted. Only enforced when a full crate is
 // actually built (needsRoCrate); the scaffold path uses the API fields directly.
@@ -678,11 +736,217 @@ function discardDraft() {
   emit('update:open', false)
 }
 
+function cloneDraftValue<T>(value: T): T {
+  if (value === undefined) return value
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+function isDraftRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+function entityDraftPopulated(entry: EntityEntry): boolean {
+  if (entry.source === 'existing') return Boolean(entry.ref?.trim())
+  return Boolean(entry.customId?.trim()) || draftValuePopulated(entry.instance ?? {})
+}
+
+function draftValuePopulated(value: unknown): boolean {
+  if (typeof value === 'string') return Boolean(value.trim())
+  if (typeof value === 'number' || typeof value === 'boolean') return true
+  if (Array.isArray(value)) {
+    return value.some((entry) =>
+      isDraftRecord(entry) && typeof entry.__uid === 'number'
+        ? entityDraftPopulated(entry as unknown as EntityEntry)
+        : draftValuePopulated(entry),
+    )
+  }
+  if (!isDraftRecord(value)) return false
+  return Object.values(value).some(draftValuePopulated)
+}
+
+function snapshotProfileDraft(): ProfileDraftItem[] {
+  const controls = new Map(profileControls.value.map((control) => [control.property, control]))
+  const items: ProfileDraftItem[] = []
+  for (const rule of profileDatasetRules.value) {
+    if (builtInDatasetKeys.has(rule.valueName) || isHasPartUri(rule.propertyUri)) continue
+    const control = controls.get(rule.valueName)
+    if (!control) continue
+    if (control.control === 'entity') {
+      const entries = (entityEntries.value[control.property] ?? []).filter(entityDraftPopulated)
+      if (!entries.length) continue
+      items.push({
+        property: control.property,
+        propertyUri: rule.propertyUri,
+        label: control.label,
+        kind: 'entity',
+        value: cloneDraftValue(entries),
+        multiple: control.multiple,
+        valueKind: control.kind,
+      })
+      continue
+    }
+    const raw = generatedValues.value[control.property]
+    const value = control.control === 'select-object'
+      ? cloneDraftValue(raw)
+      : normalizeProfileValues({ [control.property]: raw }, [control], { omitEmpty: true })[control.property]
+    if (!draftValuePopulated(value)) continue
+    items.push({
+      property: control.property,
+      propertyUri: rule.propertyUri,
+      label: control.label,
+      kind: 'generated',
+      value: cloneDraftValue(value),
+      multiple: control.multiple,
+      valueKind: control.kind,
+    })
+  }
+  return items
+}
+
+function migrationValueCount(item: ProfileDraftItem): number {
+  if (item.kind === 'entity') return (item.value as EntityEntry[]).length
+  return Array.isArray(item.value) ? item.value.length : 1
+}
+
+function migrationTarget(
+  item: ProfileDraftItem,
+  rules: ProfilePropertyRule[],
+  controls: ProfileControl[],
+): ProfileControl | undefined {
+  const rule = rules.find((candidate) => candidate.propertyUri === item.propertyUri)
+  if (!rule || builtInDatasetKeys.has(rule.valueName) || isHasPartUri(rule.propertyUri)) return undefined
+  const control = controls.find((candidate) => candidate.property === rule.valueName)
+  if (!control || (item.kind === 'entity') !== (control.control === 'entity')) return undefined
+  if (!control.multiple && migrationValueCount(item) > 1) return undefined
+  return control
+}
+
+function draftItemPreview(item: ProfileDraftItem): string {
+  if (item.kind === 'entity') {
+    const count = (item.value as EntityEntry[]).length
+    const rendered = JSON.stringify(stripDraftInternals(item.value))
+    const preview = `${count} ${count === 1 ? 'entity draft' : 'entity drafts'}: ${rendered}`
+    return preview.length > 120 ? `${preview.slice(0, 117)}...` : preview
+  }
+  const rendered = Array.isArray(item.value) ? item.value.join(', ') : String(item.value)
+  return rendered.length > 120 ? `${rendered.slice(0, 117)}...` : rendered
+}
+
+function stripDraftInternals(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripDraftInternals)
+  if (!isDraftRecord(value)) return value
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== '__uid')
+      .map(([key, entry]) => [key, stripDraftInternals(entry)]),
+  )
+}
+
+function customRow(key: string, value: unknown, iri = false): CustomFieldRow {
+  if (iri && typeof value === 'string') return { key, type: 'iri', value }
+  if (typeof value === 'number') return { key, type: 'number', value: String(value) }
+  if (typeof value === 'string') {
+    return { key, type: /^\d{4}-\d{2}-\d{2}$/.test(value) ? 'date' : 'text', value }
+  }
+  if (isDraftRecord(value) && typeof value['@id'] === 'string' && Object.keys(value).length === 1) {
+    return { key, type: 'iri', value: value['@id'] }
+  }
+  return { key, type: 'text', value: typeof value === 'boolean' ? String(value) : JSON.stringify(stripDraftInternals(value)) }
+}
+
+function customRowsForDraft(item: ProfileDraftItem): CustomFieldRow[] {
+  const key = item.propertyUri || item.property
+  if (item.kind === 'generated') {
+    const values = Array.isArray(item.value) ? item.value : [item.value]
+    return values.map((value) => customRow(key, value, item.valueKind === 'select-object'))
+  }
+  return (item.value as EntityEntry[]).map((entry) => {
+    if (entry.source === 'existing') return customRow(key, entry.ref?.trim() ?? '', true)
+    return customRow(key, {
+      source: 'new',
+      ...(entry.customId?.trim() ? { customId: entry.customId.trim() } : {}),
+      values: entry.instance ?? {},
+    })
+  })
+}
+
+async function requestProfileSwitch(nextId: string) {
+  if (nextId === profileId.value || profileSwitchOpen.value) return
+  const items = snapshotProfileDraft()
+  if (!items.length) {
+    commitProfileSwitch(nextId, { items, targetRules: [] })
+    return
+  }
+
+  const token = ++profileSwitchToken
+  pendingProfileId.value = nextId
+  pendingProfileDraft.value = items
+  pendingProfileTargetRules.value = []
+  pendingProfileTargetEntityRules.value = []
+  profileSwitchError.value = null
+  profileSwitchLoading.value = true
+  profileSwitchOpen.value = true
+
+  const target = profiles.value.find((profile) => profile.id === nextId)
+  try {
+    if (!target) return
+    if (target.documentId) {
+      const parsed = await loadProfileCrate(target.documentId)
+      if (token !== profileSwitchToken) return
+      pendingProfileTargetRules.value = parsed.datasetPropertyRules
+      pendingProfileTargetEntityRules.value = parsed.entityRules
+    } else {
+      pendingProfileTargetRules.value = target.propertyRules
+      pendingProfileTargetEntityRules.value = target.entityRules
+    }
+  } catch (err) {
+    if (token !== profileSwitchToken) return
+    profileSwitchError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    if (token === profileSwitchToken) profileSwitchLoading.value = false
+  }
+}
+
+function cancelProfileSwitch() {
+  ++profileSwitchToken
+  profileSwitchOpen.value = false
+  profileSwitchLoading.value = false
+  pendingProfileId.value = null
+  pendingProfileDraft.value = []
+}
+
+function confirmProfileSwitch() {
+  if (profileSwitchLoading.value || pendingProfileId.value === null) return
+  const nextId = pendingProfileId.value
+  const migration: ProfileDraftMigration = {
+    items: cloneDraftValue(pendingProfileDraft.value),
+    targetRules: cloneDraftValue(pendingProfileTargetRules.value),
+  }
+  cancelProfileSwitch()
+  commitProfileSwitch(nextId, migration)
+}
+
+function commitProfileSwitch(nextId: string, migration: ProfileDraftMigration) {
+  ++profileLoadToken
+  resetGeneratedProfileFields()
+  queuedProfileMigration = migration
+  profileMigrationSummary.value = null
+  profileId.value = nextId
+}
+
 watch(
   () => props.open,
   (open) => {
     if (!open) return
     confirmDiscardOpen.value = false
+    ++profileSwitchToken
+    profileSwitchOpen.value = false
+    profileSwitchLoading.value = false
+    profileSwitchError.value = null
+    pendingProfileId.value = null
+    pendingProfileDraft.value = []
+    profileMigrationSummary.value = null
+    queuedProfileMigration = undefined
     startTab.value = 'create'
     importPaste.value = ''
     importError.value = ''
@@ -712,7 +976,9 @@ watch(
 )
 
 watch(profileId, () => {
-  if (props.open) void loadSelectedProfileSchema()
+  const migration = queuedProfileMigration
+  queuedProfileMigration = undefined
+  if (props.open) void loadSelectedProfileSchema(false, migration)
 })
 
 function fillPath() {
@@ -720,29 +986,55 @@ function fillPath() {
   path.value = `datasets/${slugify(title.value)}`
 }
 
-async function loadSelectedProfileSchema() {
+async function loadSelectedProfileSchema(force = false, migration?: ProfileDraftMigration) {
   const token = ++profileLoadToken
   resetGeneratedProfileFields()
   const profile = selectedProfile.value
-  if (!profile) return
+  if (!profile) {
+    if (migration) applyProfileDraftMigration(migration, true)
+    return
+  }
 
   // Apply the summary-parsed rules immediately, then refine from the full crate.
-  applyParsedProfile(profile.entityRules, profile.propertyRules, profile.schema, profile.contextTerms, shapesList(profile.shapesText, profile.customShapesText))
-  if (!profile.documentId) return
+  const cached = profile.documentId ? profileCrateParses.value[profile.documentId] : undefined
+  applyParsedProfile(
+    profile.entityRules,
+    profile.propertyRules,
+    profile.schema,
+    profile.contextTerms,
+    shapesList(profile.shapesText, profile.customShapesText),
+    cached?.liftNotes ?? [],
+    Boolean(migration),
+  )
+  profileLoadComplete.value = Boolean(!profile.documentId || cached)
+  if (!profile.documentId) {
+    if (migration) applyProfileDraftMigration(migration)
+    return
+  }
 
   profileLoading.value = true
   profileLoadError.value = null
   profileLoadFailed.value = false
   try {
-    const rocrate = await loadRoCrate(profile.documentId)
+    const parsed = await loadProfileCrate(profile.documentId, { force })
     if (token !== profileLoadToken) return
-    const parsed = parseProfileCrate(rocrate)
-    applyParsedProfile(parsed.entityRules, parsed.datasetPropertyRules, parsed.schema, parsed.contextTerms, shapesList(parsed.shapesText, parsed.customShapesText))
-    if (!parsed.schema && !parsed.entityRules.length) profileLoadError.value = 'Selected profile has no machine-readable rules.'
+    applyParsedProfile(
+      parsed.entityRules,
+      parsed.datasetPropertyRules,
+      parsed.schema,
+      parsed.contextTerms,
+      shapesList(parsed.shapesText, parsed.customShapesText),
+      parsed.liftNotes,
+      Boolean(migration),
+    )
+    profileLoadComplete.value = true
+    if (migration) applyProfileDraftMigration(migration)
   } catch (err) {
     if (token !== profileLoadToken) return
     profileLoadError.value = err instanceof Error ? err.message : String(err)
     profileLoadFailed.value = true
+    profileLoadComplete.value = false
+    if (migration) applyProfileDraftMigration(migration, true)
   } finally {
     if (token === profileLoadToken) profileLoading.value = false
   }
@@ -757,16 +1049,51 @@ function resetGeneratedProfileFields() {
   generatedValues.value = {}
   entityEntries.value = {}
   profileShapes.value = []
+  profileAdditionalRequirements.value = []
   shaclReset()
   profileLoadError.value = null
   profileLoadFailed.value = false
+  profileLoadComplete.value = false
   // Clear the in-flight flag too, so switching to "No profile reference" mid-load
   // never leaves the Create button stuck behind a phantom loading state.
   profileLoading.value = false
 }
 
+function applyProfileDraftMigration(migration: ProfileDraftMigration, forceCustom = false) {
+  const nextGenerated = { ...generatedValues.value }
+  const nextEntities = { ...entityEntries.value }
+  const preservedRows: CustomFieldRow[] = []
+  let migrated = 0
+  let preserved = 0
+
+  for (const item of migration.items) {
+    const target = forceCustom
+      ? undefined
+      : migrationTarget(item, migration.targetRules, profileControls.value)
+    if (!target) {
+      preservedRows.push(...customRowsForDraft(item))
+      preserved += 1
+      continue
+    }
+    if (item.kind === 'entity') {
+      nextEntities[target.property] = cloneDraftValue(item.value as EntityEntry[])
+    } else {
+      const value = cloneDraftValue(item.value)
+      nextGenerated[target.property] = target.multiple
+        ? Array.isArray(value) ? value : [value]
+        : Array.isArray(value) ? value[0] : value
+    }
+    migrated += 1
+  }
+
+  generatedValues.value = nextGenerated
+  entityEntries.value = nextEntities
+  if (preservedRows.length) customFields.value = [...customFields.value, ...preservedRows]
+  if (migration.items.length) profileMigrationSummary.value = { migrated, preserved }
+}
+
 function shapesList(...texts: Array<string | undefined>): string[] {
-  return texts.filter((text): text is string => Boolean(text?.trim()))
+  return [...new Set(texts.filter((text): text is string => Boolean(text?.trim())))]
 }
 
 function applyParsedProfile(
@@ -775,8 +1102,11 @@ function applyParsedProfile(
   schema: JsonSchema | undefined,
   contextTerms: Record<string, string> | undefined,
   shapes: string[],
+  additionalRequirements: LiftNote[] = [],
+  preserveDatasetFields = false,
 ) {
   profileShapes.value = shapes
+  profileAdditionalRequirements.value = additionalRequirements
   profileSchema.value = schema
   profileDatasetRules.value = datasetPropertyRules
   profileEntityRules.value = entityRules
@@ -790,7 +1120,7 @@ function applyParsedProfile(
   // option so the Select doesn't open in an enum-error state.
   const licenseCtrl = controls.find((control) => control.property === 'license' && (control.kind === 'enum' || control.kind === 'select-url'))
   const allowedLicenses = licenseCtrl?.enumOptions ?? []
-  if (allowedLicenses.length && !allowedLicenses.includes(license.value.trim())) {
+  if (!preserveDatasetFields && allowedLicenses.length && !allowedLicenses.includes(license.value.trim())) {
     license.value = allowedLicenses[0]
   }
   // Only ENTITY-kind hasPart rules bind to the Data references section (a non-entity
@@ -1167,15 +1497,20 @@ async function submit() {
             <label class="text-xs font-medium text-foreground">Profile reference</label>
             <Select v-model="profileSelection" :options="profileOptions" placeholder="Optional profile" class="mt-1" />
             <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
-              <template v-if="profileLoading">Loading profile rules…</template>
+              <template v-if="profileRuleState === 'loading'">Loading profile rules…</template>
+              <template v-else-if="profileRuleState === 'unavailable'">Profile rules are unavailable. Retry below or choose "No profile reference".</template>
               <template v-else-if="profileInputCount">Adds {{ profileInputCount }} {{ profileInputCount === 1 ? 'field' : 'fields' }} below, <span class="text-destructive">*</span> marks required. The RO-Crate references {{ selectedProfile.name }} by its saved graph IRI.</template>
-              <template v-else>No additional fields, the RO-Crate references {{ selectedProfile.name }} by its saved graph IRI (conformance only).</template>
+              <template v-else-if="profileRuleState === 'empty'">No rules are defined for this profile. The RO-Crate still references {{ selectedProfile.name }} by its saved graph IRI.</template>
+              <template v-else>No controls could be generated, but the retained SHACL requirements still apply. The RO-Crate references {{ selectedProfile.name }} by its saved graph IRI.</template>
+            </p>
+            <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
+              Properties omitted by this profile remain allowed unless an explicit closed or other restricting SHACL rule constrains them.
             </p>
           </div>
         </div>
 
-        <div v-if="profileId && profileLoadError && !profileLoadFailed" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          {{ profileLoadError }} You can still create the dataset, it will reference this profile via <code>conformsTo</code> when a profile URI is available.
+        <div v-if="profileId && profileRuleState === 'empty'" class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          No rules are defined for this profile, so it adds no controls or validation requirements.
         </div>
         <div v-if="profileCollisionKeys.length" class="text-xs text-destructive">
           Profile field target collides with built-in dataset fields: {{ profileCollisionKeys.join(', ') }}.
@@ -1260,20 +1595,28 @@ async function submit() {
              silently missing fields: show a skeleton while loading and a BLOCKING
              error panel (with Retry) when the full-crate load failed — never a
              silently-degraded form. -->
-        <div v-if="profileId && profileLoading" class="rounded-md border border-border p-3">
+        <section v-if="profileAdditionalRequirements.length" class="space-y-2 rounded-md border border-border p-3">
+          <div>
+            <h3 class="text-xs font-semibold text-foreground">Additional requirements</h3>
+            <p class="mt-0.5 text-[11px] text-muted-foreground">Read-only SHACL requirements retained for authoritative validation.</p>
+          </div>
+          <LiftNotesPanel :notes="profileAdditionalRequirements" attached />
+        </section>
+
+        <div v-if="profileId && profileRuleState === 'loading'" class="rounded-md border border-border p-3">
           <p class="text-[11px] text-muted-foreground">Loading the profile's fields…</p>
           <div class="mt-2 grid gap-3 sm:grid-cols-2">
             <Skeleton v-for="n in 4" :key="n" class="h-14" />
           </div>
         </div>
-        <div v-else-if="profileLoadFailed" class="rounded-md border border-destructive/40 bg-destructive/5 p-3">
-          <p class="text-xs font-medium text-destructive">The profile's fields could not be loaded.</p>
+        <div v-else-if="profileRuleState === 'unavailable'" class="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+          <p class="text-xs font-medium text-destructive">The profile's rules are unavailable.</p>
           <p class="mt-1 text-[11px] text-destructive/90">{{ profileLoadError }}</p>
           <p class="mt-1 text-[11px] text-muted-foreground">
             Without these rules the form would be missing the profile's required fields, so creation is blocked.
             Retry, or switch to "No profile reference" to continue without them.
           </p>
-          <Button variant="outline" size="sm" class="mt-2" @click="loadSelectedProfileSchema">Retry</Button>
+          <Button variant="outline" size="sm" class="mt-2" @click="loadSelectedProfileSchema(true)">Retry</Button>
         </div>
         <template v-else>
           <div v-if="generatedScalarControls.length" class="grid gap-4 sm:grid-cols-2">
@@ -1373,6 +1716,16 @@ async function submit() {
             :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
           >
             {{ violation.message }}
+          </p>
+        </div>
+
+        <div v-if="profileMigrationSummary" class="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground">
+          <p class="font-medium">Profile draft migrated.</p>
+          <p class="mt-1 text-muted-foreground">
+            {{ profileMigrationSummary.migrated }} {{ profileMigrationSummary.migrated === 1 ? 'field now uses' : 'fields now use' }} the new profile controls.
+            <template v-if="profileMigrationSummary.preserved">
+              {{ profileMigrationSummary.preserved }} unmatched {{ profileMigrationSummary.preserved === 1 ? 'field is' : 'fields are' }} preserved in Additional fields below for review.
+            </template>
           </p>
         </div>
 
@@ -1477,6 +1830,51 @@ async function submit() {
       />
 
       <DiscardDraftConfirm :open="confirmDiscardOpen" @keep="confirmDiscardOpen = false" @discard="discardDraft" />
+
+      <Transition
+        enter-active-class="transition-opacity duration-150"
+        enter-from-class="opacity-0"
+        leave-active-class="transition-opacity duration-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="profileSwitchOpen"
+          class="absolute inset-0 z-40 flex items-center justify-center rounded-xl bg-background/70 p-4 backdrop-blur-sm"
+          @click.self="cancelProfileSwitch"
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="profile-switch-title"
+            class="w-full max-w-lg rounded-lg border border-border bg-popover p-4 shadow-xl"
+          >
+            <h2 id="profile-switch-title" class="text-sm font-semibold text-foreground">Switch profile and migrate this draft?</h2>
+            <p class="mt-1 text-xs text-muted-foreground">
+              Review how profile-owned values will move from {{ selectedProfile?.name ?? 'No profile reference' }} to {{ pendingProfile?.name ?? 'No profile reference' }}.
+              Dataset title, description, date, license, files, custom fields, and other profile-independent fields stay unchanged.
+            </p>
+            <p v-if="profileSwitchLoading" class="mt-3 text-xs text-muted-foreground">Preparing the migration preview...</p>
+            <template v-else>
+              <div v-if="profileSwitchError" class="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                The new profile's rules could not be loaded for this preview. Every populated profile field will be preserved in Additional fields for review. {{ profileSwitchError }}
+              </div>
+              <ul class="mt-3 max-h-64 space-y-2 overflow-y-auto">
+                <li v-for="({ item, target }, index) in profileSwitchPreview" :key="`${item.propertyUri}:${index}`" class="rounded-md border border-border bg-card px-3 py-2 text-xs">
+                  <p class="font-medium text-foreground">{{ item.label }}</p>
+                  <p class="mt-0.5 break-all font-mono text-[10px] text-muted-foreground">{{ item.propertyUri }}</p>
+                  <p class="mt-1 text-muted-foreground">Draft value: {{ draftItemPreview(item) }}</p>
+                  <p v-if="target" class="mt-1 text-foreground">Moves into the new {{ target.label }} control because the property URI matches.</p>
+                  <p v-else class="mt-1 text-foreground">Preserved in Additional fields for review. Nothing is cleared.</p>
+                </li>
+              </ul>
+            </template>
+            <div class="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" @click="cancelProfileSwitch">Keep current profile</Button>
+              <Button size="sm" :disabled="profileSwitchLoading" @click="confirmProfileSwitch">Switch and migrate</Button>
+            </div>
+          </div>
+        </div>
+      </Transition>
     </DialogContent>
   </Dialog>
 </template>
