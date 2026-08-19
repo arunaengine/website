@@ -6,7 +6,6 @@ import Input from '@/components/ui/Input.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import Switch from '@/components/ui/Switch.vue'
 import Separator from '@/components/ui/Separator.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
@@ -17,11 +16,11 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useWatches } from '@/composables/useWatches'
 import { useS3 } from '@/composables/useS3'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
-import { computed, ref, watch } from 'vue'
-import { ChevronRight, ExternalLink, KeyRound, Palette, Rss, ShieldCheck, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from '@lucide/vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { ChevronRight, ExternalLink, KeyRound, Palette, Rss, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from '@lucide/vue'
 
 const {
   apiBaseUrl,
@@ -43,6 +42,7 @@ const {
 } = useAruna()
 const { signIn, signOut, isAuthenticated, authPending, stage, stageError } = useAuth()
 const { activeKey, clearActiveKey } = useS3()
+const route = useRoute()
 // Optimistic until a watch request answers 404/403 (mirrors the bell's probe).
 const { available: watchesAvailable } = useWatches()
 
@@ -160,6 +160,132 @@ const themeOptions: Array<{ id: ThemeMode; title: string; icon: unknown; preview
 ]
 const { mode: appearance, setTheme } = useTheme()
 
+const settingsSections = [
+  { id: 'connection', label: 'API connection' },
+  { id: 'profile', label: 'Profile' },
+  { id: 'default-profile', label: 'Default profile' },
+  { id: 'groups', label: 'Groups & roles' },
+  { id: 'credentials', label: 'S3 credentials' },
+  { id: 'interop', label: 'Interoperability' },
+  { id: 'appearance', label: 'Appearance' },
+] as const
+type SettingsSectionId = (typeof settingsSections)[number]['id']
+
+const activeSettingsSection = ref<SettingsSectionId>('connection')
+const mobileSettingsTabs = ref<HTMLElement | null>(null)
+const showMobileTabsStartFade = ref(false)
+const showMobileTabsEndFade = ref(false)
+let settingsScrollFrame: number | null = null
+
+function settingsSectionFromHash(hash: string): SettingsSectionId | null {
+  const id = hash.replace(/^#/, '')
+  return settingsSections.some((section) => section.id === id) ? (id as SettingsSectionId) : null
+}
+
+function updateMobileTabFades() {
+  const tabs = mobileSettingsTabs.value
+  if (!tabs) return
+  showMobileTabsStartFade.value = tabs.scrollLeft > 2
+  showMobileTabsEndFade.value = tabs.scrollLeft + tabs.clientWidth < tabs.scrollWidth - 2
+}
+
+function revealMobileTab(tab: HTMLElement) {
+  const tabs = mobileSettingsTabs.value
+  if (!tabs) return
+
+  const visibleLeft = tabs.scrollLeft + 4
+  const visibleRight = tabs.scrollLeft + tabs.clientWidth - 40
+  const tabLeft = tab.offsetLeft
+  const tabRight = tabLeft + tab.offsetWidth
+  if (tabLeft >= visibleLeft && tabRight <= visibleRight) return
+
+  const left = tabLeft < visibleLeft ? tabLeft - 4 : tabRight - tabs.clientWidth + 40
+  tabs.scrollTo({ left: Math.max(0, left), behavior: 'smooth' })
+}
+
+function setActiveSettingsSection(sectionId: SettingsSectionId) {
+  if (activeSettingsSection.value === sectionId) return
+  activeSettingsSection.value = sectionId
+  void nextTick(() => {
+    const tab = mobileSettingsTabs.value?.querySelector<HTMLElement>(`a[href="#${sectionId}"]`)
+    if (tab) revealMobileTab(tab)
+  })
+}
+
+function revealFocusedMobileTab(event: FocusEvent) {
+  if (event.currentTarget instanceof HTMLElement) revealMobileTab(event.currentTarget)
+}
+
+function onMobileTabsKeydown(event: KeyboardEvent) {
+  if (!(event.currentTarget instanceof HTMLElement) || !(event.target instanceof HTMLAnchorElement)) return
+  const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLAnchorElement>('a'))
+  const currentIndex = tabs.indexOf(event.target)
+  if (currentIndex < 0) return
+
+  let nextIndex: number | null = null
+  if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length
+  if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
+  if (event.key === 'Home') nextIndex = 0
+  if (event.key === 'End') nextIndex = tabs.length - 1
+  if (nextIndex === null) return
+
+  event.preventDefault()
+  tabs[nextIndex]?.focus()
+  if (tabs[nextIndex]) revealMobileTab(tabs[nextIndex])
+}
+
+function updateActiveSettingsSection() {
+  const lastSection = settingsSections[settingsSections.length - 1]
+  if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) {
+    setActiveSettingsSection(lastSection.id)
+    return
+  }
+
+  let current: SettingsSectionId = settingsSections[0].id
+  for (const section of settingsSections) {
+    const target = document.getElementById(section.id)
+    if (!target || target.getBoundingClientRect().top > 80) break
+    current = section.id
+  }
+  setActiveSettingsSection(current)
+}
+
+function scheduleActiveSettingsSectionUpdate() {
+  if (settingsScrollFrame !== null) return
+  settingsScrollFrame = window.requestAnimationFrame(() => {
+    settingsScrollFrame = null
+    updateActiveSettingsSection()
+  })
+}
+
+function onSettingsViewportResize() {
+  updateMobileTabFades()
+  scheduleActiveSettingsSectionUpdate()
+}
+
+watch(
+  () => route.hash,
+  (hash) => {
+    const section = settingsSectionFromHash(hash)
+    if (section) setActiveSettingsSection(section)
+  },
+  { immediate: true },
+)
+watch(watchesAvailable, () => void nextTick(updateMobileTabFades))
+
+onMounted(() => {
+  window.addEventListener('scroll', scheduleActiveSettingsSectionUpdate, { passive: true })
+  window.addEventListener('resize', onSettingsViewportResize)
+  void nextTick(updateMobileTabFades)
+  scheduleActiveSettingsSectionUpdate()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', scheduleActiveSettingsSectionUpdate)
+  window.removeEventListener('resize', onSettingsViewportResize)
+  if (settingsScrollFrame !== null) window.cancelAnimationFrame(settingsScrollFrame)
+})
+
 const createGroupOpen = ref(false)
 const createCredentialOpen = ref(false)
 const revokeError = ref<string | null>(null)
@@ -211,8 +337,8 @@ function toggleGroup(groupId: string) {
       </template>
     </PageHeader>
 
-    <div class="container grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
-      <nav class="flex flex-col gap-1 text-sm">
+    <div class="container grid min-w-0 gap-6 py-8 lg:grid-cols-[260px_1fr]">
+      <nav class="hidden flex-col gap-1 text-sm lg:flex">
         <a href="#connection" class="rounded-md px-3 py-2 font-medium text-primary bg-primary/5">API connection</a>
         <a href="#profile" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Profile</a>
         <a href="#default-profile" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Default profile</a>
@@ -223,8 +349,41 @@ function toggleGroup(groupId: string) {
         <RouterLink v-if="watchesAvailable" :to="{ name: 'settings-watches' }" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Watched resources &rarr;</RouterLink>
       </nav>
 
-      <div class="space-y-6">
-        <section id="connection" class="surface">
+      <div class="relative min-w-0 lg:hidden">
+        <nav
+          ref="mobileSettingsTabs"
+          aria-label="Settings sections"
+          class="scrollbar-thin flex min-w-0 gap-1 overflow-x-auto border-y border-border/70 py-2 pr-10 text-sm"
+          @keydown="onMobileTabsKeydown"
+          @scroll="updateMobileTabFades"
+        >
+          <a
+            v-for="section in settingsSections"
+            :key="section.id"
+            :href="'#' + section.id"
+            :aria-current="activeSettingsSection === section.id ? 'location' : undefined"
+            class="shrink-0 rounded-md px-3 py-1.5 transition-colors hover:bg-muted hover:text-foreground"
+            :class="activeSettingsSection === section.id ? 'bg-primary/10 font-medium text-primary' : 'text-muted-foreground'"
+            @click="setActiveSettingsSection(section.id)"
+            @focus="revealFocusedMobileTab"
+          >
+            {{ section.label }}
+          </a>
+          <RouterLink
+            v-if="watchesAvailable"
+            :to="{ name: 'settings-watches' }"
+            class="shrink-0 rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            @focus="revealFocusedMobileTab"
+          >
+            Watched resources &rarr;
+          </RouterLink>
+        </nav>
+        <div v-if="showMobileTabsStartFade" aria-hidden="true" class="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent" />
+        <div v-if="showMobileTabsEndFade" aria-hidden="true" class="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent" />
+      </div>
+
+      <div class="min-w-0 space-y-6">
+        <section id="connection" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
           <header class="border-b border-border px-5 py-4">
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Session &amp; API connection</h3>
             <p class="text-xs text-muted-foreground">Sign-in is handled by the realm's identity provider; the issued Aruna token authenticates this browser.</p>
@@ -298,7 +457,7 @@ function toggleGroup(groupId: string) {
           </div>
         </section>
 
-        <section id="profile" class="surface">
+        <section id="profile" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
           <header class="border-b border-border px-5 py-4">
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Profile</h3>
             <p class="text-xs text-muted-foreground">Loaded from /users/info and saved with PATCH /users/info.</p>
@@ -327,7 +486,7 @@ function toggleGroup(groupId: string) {
           </div>
         </section>
 
-        <section id="default-profile" class="surface">
+        <section id="default-profile" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2"><ListChecks class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Default metadata profile</h3></div>
             <RouterLink :to="{ name: 'profiles' }"><Button variant="outline" size="sm">Browse profiles <ArrowRight class="h-3.5 w-3.5" /></Button></RouterLink>
@@ -342,7 +501,7 @@ function toggleGroup(groupId: string) {
           <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span><span v-if="profileDirty">, apply with "Save profile" above.</span></div>
         </section>
 
-        <section id="groups" class="surface overflow-hidden">
+        <section id="groups" class="surface scroll-mt-20 overflow-hidden lg:scroll-mt-[4.5rem]">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2"><h3 class="font-display text-sm font-semibold text-aruna-navy">Groups &amp; roles</h3><Badge variant="outline" class="tabular-nums">{{ myGroups.length }} groups</Badge></div>
             <Button size="sm" :disabled="!currentUser" @click="createGroupOpen = true"><Plus class="h-3.5 w-3.5" /> Create group</Button>
@@ -384,7 +543,7 @@ function toggleGroup(groupId: string) {
           <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (selectedGroupId = group.group_id)" />
         </section>
 
-        <section id="credentials" class="surface overflow-hidden">
+        <section id="credentials" class="surface scroll-mt-20 overflow-hidden lg:scroll-mt-[4.5rem]">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2">
               <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 credentials</h3><Badge variant="outline">{{ visibleCredentials.length }}</Badge>
@@ -399,26 +558,28 @@ function toggleGroup(groupId: string) {
             </div>
             <Button size="sm" @click="createCredentialOpen = true"><Plus class="h-4 w-4" /> Create</Button>
           </header>
-          <table class="w-full text-sm">
-            <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th><th class="px-5 py-2"></th></tr></thead>
-            <tbody>
-              <tr v-for="credential in visibleCredentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}<Badge v-if="credential.access_key_id === activeKey?.accessKeyId" variant="accent" class="ml-2 text-[9px] uppercase">this device</Badge></td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
-              <tr v-if="!visibleCredentials.length">
-                <td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">
-                  <template v-if="inactiveCredentials.length">
-                    No active S3 credentials.
-                    <button type="button" class="text-primary hover:underline" @click="showInactiveCredentials = true">Show inactive ({{ inactiveCredentials.length }})</button>
-                  </template>
-                  <template v-else>No S3 credentials for the authenticated user.</template>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="min-w-0 overflow-x-auto">
+            <table class="min-w-max w-full text-sm">
+              <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th><th class="px-5 py-2"></th></tr></thead>
+              <tbody>
+                <tr v-for="credential in visibleCredentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}<Badge v-if="credential.access_key_id === activeKey?.accessKeyId" variant="accent" class="ml-2 text-[9px] uppercase">this device</Badge></td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
+                <tr v-if="!visibleCredentials.length">
+                  <td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">
+                    <template v-if="inactiveCredentials.length">
+                      No active S3 credentials.
+                      <button type="button" class="text-primary hover:underline" @click="showInactiveCredentials = true">Show inactive ({{ inactiveCredentials.length }})</button>
+                    </template>
+                    <template v-else>No S3 credentials for the authenticated user.</template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <p v-if="revokeError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ revokeError }}</p>
           <CreateCredentialDialog v-model:open="createCredentialOpen" />
         </section>
 
-        <section id="interop" class="surface">
+        <section id="interop" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
           <header class="border-b border-border px-5 py-4">
             <div class="flex items-center gap-2"><Rss class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Interoperability</h3></div>
             <p class="text-xs text-muted-foreground">Open protocols external services can consume from this node.</p>
@@ -448,13 +609,11 @@ function toggleGroup(groupId: string) {
           </div>
         </section>
 
-        <section id="appearance" class="surface">
+        <section id="appearance" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
           <header class="flex items-center justify-between border-b border-border px-5 py-4"><div class="flex items-center gap-2"><Palette class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Appearance</h3></div></header>
           <div class="grid gap-3 p-5 md:grid-cols-3">
             <button v-for="option in themeOptions" :key="option.id" class="flex items-center gap-3 rounded-lg border border-border bg-background/70 p-3 text-left transition-colors hover:border-primary/40" :class="appearance === option.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="setTheme(option.id)"><span class="grid h-12 w-16 shrink-0 place-items-center rounded-md border border-border shadow-inner" :style="{ background: option.preview }"><component :is="option.icon" class="h-4 w-4 text-primary" /></span><div><div class="text-sm font-medium text-foreground">{{ option.title }}</div></div></button>
           </div>
-          <Separator />
-          <div class="flex items-center justify-between gap-3 p-5"><div class="flex items-center gap-2"><ShieldCheck class="h-4 w-4 text-primary" /><div><div class="text-sm font-medium text-foreground">Hide sensitive hashes by default</div><div class="text-xs text-muted-foreground">Hash display controls are local UI-only preferences.</div></div></div><Switch aria-label="Hide sensitive hashes by default" :checked="true" /></div>
         </section>
       </div>
     </div>
