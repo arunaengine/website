@@ -182,6 +182,10 @@ export interface UsageResponse {
   realm?: UsageTotals
   // Realm-wide total of live metadata documents; only on GET /info/usage.
   metadata_documents?: number
+  // Exact lifecycle-live purpose counts; only on GET /groups/{id}/usage.
+  dataset_count?: number | null
+  profile_count?: number | null
+  process_run_count?: number | null
   // Present on GET /groups/{id}/usage from quota-aware backends.
   quota?: GroupQuotaStatus
 }
@@ -232,7 +236,12 @@ export interface UsageHistoryResponse {
 export interface RealmInfoResponse {
   realm_id: string
   description?: string | null
-  metadata_replication: { default_replication_factor: number }
+  metadata_replication: { default_replication_factor: number | null }
+  public_overview?: {
+    live_datasets: number | null
+    groups: number | null
+    nodes_configured: number | null
+  }
   oidc_providers: Array<{
     id: string
     issuer: string
@@ -1176,6 +1185,8 @@ export type RealmPlacementDocumentClass =
   | 'user'
   | 'metadata'
   | 'metadata_registry'
+  | 'job_control'
+  | 'placement_policy'
 
 export type RealmPlacementBindingScope =
   | { kind: 'realm' }

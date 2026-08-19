@@ -8,20 +8,19 @@ import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import type { MetadataDoc } from '@/data/types'
-import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, Plus, Activity, Users } from '@lucide/vue'
+import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, LogIn, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useNotifications } from '@/composables/useNotifications'
-import { storedReferencedHint } from '@/lib/quota'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
 const { currentUser, metadata, profiles, nodes, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh, loadInfo, listRecentMetadata } = useAruna()
-const { authPending } = useAuth()
+const { authPending, signIn, stage } = useAuth()
 const { dashboardRevision } = useNotifications()
 const showNewDataset = ref(false)
 const refreshing = ref(false)
@@ -71,39 +70,67 @@ const docsHeld = computed(() => {
   )
   if (!reporting.length) return null
   const total = reporting.reduce((sum, node) => sum + (node.info?.utilization.documents_held ?? 0), 0)
-  return { total, nodes: reporting.length }
+  return { total, nodes: reporting.length, totalNodes: realmInfo.value?.nodes.length ?? reporting.length }
 })
 
 // Realm-wide total of live documents, not a per-caller figure. The loaded
 // catalog is a paged subset, so it must never stand in as the realm total.
 const realmDocuments = computed(() => usageInfo.value?.metadata_documents ?? null)
+const publicOverview = computed(() => realmInfo.value?.public_overview)
 
-const stats = computed(() => [
-  {
-    label: 'Realm documents',
-    value: realmDocuments.value === null ? '—' : formatCount(realmDocuments.value),
-    icon: FileJson2,
-    tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
-  },
-  {
-    label: 'Profiles',
-    value: profiles.value.length,
-    icon: ListChecks,
-    tone: 'bg-aruna-sky/15 text-aruna-sky',
-  },
-  {
-    label: 'Realm groups',
-    value: myGroups.value.length + discoverableGroups.value.length,
-    icon: Users,
-    tone: 'bg-aruna-aqua/15 text-aruna-aqua',
-  },
-  {
-    label: 'Nodes online',
-    value: `${onlineNodes.value} / ${nodes.value.length}`,
-    icon: Activity,
-    tone: 'bg-aruna-tagline/15 text-aruna-tagline',
-  },
-])
+function publicCount(value: number | null | undefined): string {
+  return value == null ? 'Unknown' : formatCount(value)
+}
+
+const stats = computed(() =>
+  currentUser.value
+    ? [
+        {
+          label: 'Realm documents',
+          value: realmDocuments.value === null ? 'Unknown' : formatCount(realmDocuments.value),
+          icon: FileJson2,
+          tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
+        },
+        {
+          label: 'Loaded profiles',
+          value: formatCount(profiles.value.length),
+          icon: ListChecks,
+          tone: 'bg-aruna-sky/15 text-aruna-sky',
+        },
+        {
+          label: 'Realm groups',
+          value: formatCount(myGroups.value.length + discoverableGroups.value.length),
+          icon: Users,
+          tone: 'bg-aruna-aqua/15 text-aruna-aqua',
+        },
+        {
+          label: 'Nodes online',
+          value: `${onlineNodes.value} / ${nodes.value.length}`,
+          icon: Activity,
+          tone: 'bg-aruna-tagline/15 text-aruna-tagline',
+        },
+      ]
+    : [
+        {
+          label: 'Live datasets',
+          value: publicCount(publicOverview.value?.live_datasets),
+          icon: FileJson2,
+          tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
+        },
+        {
+          label: 'Realm groups',
+          value: publicCount(publicOverview.value?.groups),
+          icon: Users,
+          tone: 'bg-aruna-aqua/15 text-aruna-aqua',
+        },
+        {
+          label: 'Configured nodes',
+          value: publicCount(publicOverview.value?.nodes_configured),
+          icon: Activity,
+          tone: 'bg-aruna-tagline/15 text-aruna-tagline',
+        },
+      ],
+)
 
 const recentMetadata = computed(
   () =>
@@ -125,6 +152,10 @@ const pageDescription = computed(() =>
     ? 'Live data from the local Aruna API.'
     : 'You are browsing public data as a guest. Sign in to create datasets and manage your groups.',
 )
+const signingIn = computed(() => stage.value === 'redirecting')
+function startSignIn() {
+  void signIn({ redirectTo: '/app' })
+}
 </script>
 
 <template>
@@ -147,51 +178,96 @@ const pageDescription = computed(() =>
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <section class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-        <template v-if="!bootstrapped">
-          <Skeleton v-for="n in 4" :key="n" class="h-16" />
-        </template>
-        <template v-else>
-          <div v-for="stat in stats" :key="stat.label" class="surface flex items-center gap-3.5 px-4 py-4">
-            <div :class="['grid h-9 w-9 shrink-0 place-items-center rounded-lg', stat.tone]">
-              <component :is="stat.icon" class="h-[17px] w-[17px]" />
-            </div>
-            <div class="min-w-0">
-              <div class="truncate font-display text-xl font-bold leading-tight text-foreground">{{ stat.value }}</div>
-              <div class="mt-0.5 truncate text-[11px] text-muted-foreground">{{ stat.label }}</div>
-            </div>
+      <section aria-labelledby="realm-statistics-heading" class="space-y-3.5">
+        <header>
+          <h2 id="realm-statistics-heading" class="font-display text-[15px] font-semibold text-foreground/85">Realm statistics</h2>
+          <p class="mt-0.5 text-xs text-muted-foreground">{{ realm.name }}</p>
+        </header>
+
+        <div
+          v-if="bootstrapped && !currentUser && !authPending"
+          class="surface flex flex-wrap items-center justify-between gap-4 p-5"
+        >
+          <div class="min-w-0">
+            <h3 class="font-display text-base font-semibold text-aruna-navy">{{ realm.name }}</h3>
+            <p v-if="realm.description && realm.description !== realm.name" class="mt-1 text-sm text-muted-foreground">{{ realm.description }}</p>
+            <p v-else-if="!realm.description" class="mt-1 text-sm text-muted-foreground">This realm has no description yet.</p>
+            <p v-if="!publicOverview" class="mt-1 text-xs text-muted-foreground">Public counts are unavailable from this node. Log in for authenticated realm details.</p>
+            <div class="mt-2 break-all font-mono text-[11px] text-muted-foreground">{{ realm.id }}</div>
           </div>
-        </template>
+          <Button :disabled="signingIn" @click="startSignIn">
+            <LogIn class="h-4 w-4" /> Log in
+          </Button>
+        </div>
+
+        <div :class="['grid gap-3.5 sm:grid-cols-2', currentUser ? 'lg:grid-cols-4' : 'lg:grid-cols-3']">
+          <template v-if="!bootstrapped">
+            <Skeleton v-for="n in currentUser ? 4 : 3" :key="n" class="h-16" />
+          </template>
+          <template v-else>
+            <div v-for="stat in stats" :key="stat.label" class="surface flex items-center gap-3.5 px-4 py-4">
+              <div :class="['grid h-9 w-9 shrink-0 place-items-center rounded-lg', stat.tone]">
+                <component :is="stat.icon" class="h-[17px] w-[17px]" />
+              </div>
+              <div class="min-w-0">
+                <div class="truncate font-display text-xl font-bold leading-tight text-foreground">{{ stat.value }}</div>
+                <div class="mt-0.5 truncate text-[11px] text-muted-foreground">{{ stat.label }}</div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div v-if="currentUser && (!bootstrapped || usageInfo)" class="grid gap-3.5 sm:grid-cols-3">
+          <template v-if="usageInfo">
+            <StatCard
+              label="Objects"
+              :value="formatNumber(usageInfo.objects)"
+              :icon="Files"
+              :hint="`${formatNumber(usageInfo.stored_blobs)} physical blob locations`"
+            />
+            <StatCard
+              label="Stored data"
+              :value="formatBytes(usageInfo.stored_bytes)"
+              :icon="Database"
+              hint="Aggregate blob storage on this node"
+            />
+            <StatCard
+              label="Buckets"
+              :value="formatNumber(usageInfo.buckets)"
+              :icon="FolderOpen"
+              hint="Node-reported total; may include per-run system workspaces (ws-…)"
+            />
+          </template>
+          <template v-else>
+            <Skeleton v-for="n in 3" :key="n" class="h-[108px]" />
+          </template>
+        </div>
+
+        <div v-if="currentUser && docsHeld" class="surface flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <h3 class="font-display text-sm font-semibold text-aruna-navy">Replica-inclusive placement records held</h3>
+            <p class="mt-1 text-xs text-muted-foreground">Metadata placement records held by reporting nodes. Replicas are included.</p>
+          </div>
+          <div class="text-right">
+            <div class="font-display text-xl font-bold text-foreground">{{ formatNumber(docsHeld.total) }}</div>
+            <div class="mt-0.5 text-[11px] text-muted-foreground">{{ docsHeld.nodes }} of {{ docsHeld.totalNodes }} nodes reporting</div>
+          </div>
+        </div>
       </section>
 
-      <section v-if="!bootstrapped || usageInfo" class="grid gap-3.5 sm:grid-cols-3">
-        <template v-if="usageInfo">
-          <StatCard
-            label="Objects"
-            :value="formatNumber(usageInfo.objects)"
-            :icon="Files"
-            :hint="storedReferencedHint(usageInfo)"
-          />
-          <StatCard
-            label="Stored data"
-            :value="formatBytes(usageInfo.stored_bytes)"
-            :icon="Database"
-            hint="Aggregate blob storage on this node"
-          />
-          <StatCard
-            label="Buckets"
-            :value="formatNumber(usageInfo.buckets)"
-            :icon="FolderOpen"
-            hint="Node-reported total; may include per-run system workspaces (ws-…)"
-          />
-        </template>
-        <template v-else>
-          <Skeleton v-for="n in 3" :key="n" class="h-[108px]" />
-        </template>
+      <section v-if="currentUser" aria-labelledby="my-groups-heading" class="space-y-3.5">
+        <h2 id="my-groups-heading" class="font-display text-[15px] font-semibold text-foreground/85">My groups</h2>
+        <GroupQuotaCards v-if="myGroups.length" :refresh-revision="quotaRevision" />
+        <p v-else class="surface px-5 py-4 text-sm text-muted-foreground">You do not belong to any groups yet.</p>
       </section>
 
-      <section v-if="currentUser && myGroups.length">
-        <GroupQuotaCards :refresh-revision="quotaRevision" />
+      <section v-if="currentUser" aria-labelledby="node-health-heading" class="space-y-3.5">
+        <h2 id="node-health-heading" class="font-display text-[15px] font-semibold text-foreground/85">Node health</h2>
+        <FederationPanel
+          :nodes="realmInfo?.nodes ?? []"
+          :replication-factor="realmInfo?.metadata_replication.default_replication_factor"
+          :local-peer-id="nodeInfo?.node.peer_id"
+        />
       </section>
 
       <section class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
@@ -231,22 +307,6 @@ const pageDescription = computed(() =>
         <div class="space-y-5">
           <section class="surface p-5">
             <div class="flex items-center gap-2">
-              <Activity class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Realm</h2>
-            </div>
-            <div class="mt-3 text-sm font-medium text-foreground">{{ realm.name }}</div>
-            <div class="mt-1 break-all font-mono text-[11px] text-muted-foreground">{{ realm.id }}</div>
-            <div
-              v-if="docsHeld"
-              class="mt-3 border-t border-border pt-3 text-xs text-muted-foreground"
-              :title="`Summed across ${docsHeld.nodes} reporting node${docsHeld.nodes === 1 ? '' : 's'}; replicas included`"
-            >
-              <span class="font-semibold text-foreground">{{ formatNumber(docsHeld.total) }}</span> documents held
-            </div>
-          </section>
-
-          <section class="surface p-5">
-            <div class="flex items-center gap-2">
               <Boxes class="h-4 w-4 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">Buckets</h2>
             </div>
@@ -257,12 +317,6 @@ const pageDescription = computed(() =>
           </section>
         </div>
       </section>
-
-      <FederationPanel
-        :nodes="realmInfo?.nodes ?? []"
-        :replication-factor="realmInfo?.metadata_replication.default_replication_factor ?? 1"
-        :local-peer-id="nodeInfo?.node.peer_id"
-      />
     </div>
 
     <NewDatasetDialog

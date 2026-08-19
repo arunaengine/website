@@ -10,7 +10,7 @@ import { relativeTime, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{
   nodes: RealmNodeInfo[]
-  replicationFactor: number
+  replicationFactor?: number | null
   /** peer id of the node this portal is connected to */
   localPeerId?: string
 }>()
@@ -22,6 +22,10 @@ function openNode(id: string) {
 }
 
 const connectedCount = computed(() => props.nodes.filter((node) => node.connection_status === 'connected').length)
+const replicationLabel = computed(() => {
+  if (props.replicationFactor === null) return 'all eligible nodes'
+  return props.replicationFactor === undefined ? 'unknown' : `×${props.replicationFactor}`
+})
 
 const kindCounts = computed<Array<[RealmNodeInfo['kind'], number]>>(() => {
   const counts = new Map<RealmNodeInfo['kind'], number>()
@@ -198,8 +202,8 @@ function loadArc(cx: number, cy: number, permille: number): string {
       <h2 class="font-display text-[15px] font-semibold text-foreground/85">Federation network</h2>
       <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
         <Badge variant="outline" class="tabular-nums">{{ nodes.length }} nodes</Badge>
-        <Badge variant="outline" class="tabular-nums">{{ connectedCount }} connected</Badge>
-        <Badge variant="outline">replication ×{{ replicationFactor }}</Badge>
+        <Badge variant="outline" class="tabular-nums">{{ connectedCount }} DHT presence confirmed</Badge>
+        <Badge variant="outline">replication {{ replicationLabel }}</Badge>
         <RouterLink to="/app/status" class="text-xs font-medium text-primary hover:underline">Node status</RouterLink>
       </div>
     </div>

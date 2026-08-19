@@ -23,11 +23,11 @@ interface CardEntry {
   quota?: GroupQuotaStatus | null
   usedBytes?: number
   referencedBytes?: number
+  datasetCount?: number | null
+  profileCount?: number | null
+  processRunCount?: number | null
 }
 
-// Cap the fetched cards so a user in dozens of groups does not fan out dozens
-// of usage requests on the dashboard.
-const CARD_LIMIT = 12
 const entries = ref<CardEntry[]>([])
 
 // Guard stale loads (same pattern as AdminView's userSearchSeq).
@@ -77,6 +77,10 @@ function quotaDetail(entry: CardEntry): string {
   return parts.join(' · ')
 }
 
+function purposeCountLabel(value: number | null | undefined): string {
+  return value == null ? 'Unknown' : String(value.toLocaleString())
+}
+
 async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   const queue = [...items]
   const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
@@ -91,6 +95,9 @@ async function fetchEntry(entry: CardEntry, seq: number) {
     if (seq !== loadSeq) return
     entry.usedBytes = quotaCountedBytes(usage)
     entry.referencedBytes = referencedBytes(usage)
+    entry.datasetCount = usage.dataset_count ?? null
+    entry.profileCount = usage.profile_count ?? null
+    entry.processRunCount = usage.process_run_count ?? null
     entry.quota = usage.quota ?? null
     entry.status = 'ready'
   } catch (err) {
@@ -105,7 +112,6 @@ async function load() {
   const seq = ++loadSeq
   const groups = [...myGroups.value]
     .sort((a, b) => a.name.localeCompare(b.name))
-    .slice(0, CARD_LIMIT)
   // Preserve already-loaded cards across a reload so a dashboard refresh
   // updates their quota bars in place instead of flashing every card back to a
   // skeleton (the revision-driven reloads fire on mount, on interval and on
@@ -116,6 +122,8 @@ async function load() {
     if (prior && prior.status === 'ready') return { ...prior, name: group.name }
     return { groupId: group.id, name: group.name, status: 'loading' }
   })
+  // Every membership is represented immediately; usage loads incrementally
+  // with only three requests in flight at once.
   await mapLimit(entries.value, 3, (entry) => fetchEntry(entry, seq))
 }
 
@@ -155,7 +163,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
     <header class="flex items-center justify-between border-b border-border px-5 py-4">
       <div class="flex items-center gap-2">
         <HardDrive class="h-4 w-4 text-primary" />
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Your groups' storage</h2>
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Group statistics</h2>
         <Badge variant="outline" class="tabular-nums">{{ entries.length }}</Badge>
       </div>
       <Button variant="ghost" size="icon-sm" aria-label="Refresh storage" @click="load">
@@ -198,6 +206,20 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
           <Button variant="ghost" size="sm" class="mt-1 h-6 px-2 text-xs" @click="retry(entry)">Retry</Button>
         </div>
         <template v-else>
+          <dl class="mt-2 grid grid-cols-3 gap-2 border-t border-border/70 pt-2">
+            <div>
+              <dt class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Datasets</dt>
+              <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">{{ purposeCountLabel(entry.datasetCount) }}</dd>
+            </div>
+            <div>
+              <dt class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Profiles</dt>
+              <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">{{ purposeCountLabel(entry.profileCount) }}</dd>
+            </div>
+            <div>
+              <dt class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Process runs</dt>
+              <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">{{ purposeCountLabel(entry.processRunCount) }}</dd>
+            </div>
+          </dl>
           <div v-if="entry.quota" class="mt-2">
             <div class="flex items-baseline justify-between gap-2 text-[11px]">
               <span class="min-w-0 truncate tabular-nums"><span class="font-medium text-foreground">{{ formatBytes(entry.usedBytes ?? 0) }}</span><span class="text-muted-foreground">{{ quotaRemainder(entry) }}</span></span>
@@ -228,10 +250,5 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
       </div>
     </div>
 
-    <footer v-if="myGroups.length > CARD_LIMIT" class="border-t border-border px-5 py-2.5">
-      <RouterLink :to="{ name: 'groups' }" class="text-xs font-medium text-primary hover:underline">
-        +{{ myGroups.length - CARD_LIMIT }} more groups →
-      </RouterLink>
-    </footer>
   </div>
 </template>

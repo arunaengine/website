@@ -155,6 +155,11 @@ const sortedNodes = computed(() =>
 const connectedCount = computed(
   () => sortedNodes.value.filter((node) => node.connection_status === 'connected').length,
 )
+const replicationLabel = computed(() => {
+  const factor = realmInfo.value?.metadata_replication.default_replication_factor
+  if (factor === null) return 'all eligible nodes'
+  return factor === undefined ? 'unknown' : `×${factor}`
+})
 
 // Placement location aggregates over the live /info/realm data (aruna#269). Pure
 // derivation of the already-served placement map — no gate, no assumed endpoint.
@@ -162,11 +167,7 @@ const locationAggregates = computed(() => aggregateByLocation(realmInfo.value?.n
 const mappedLocationCount = computed(() => locationAggregates.value.filter((a) => a.mapped).length)
 
 const unreachableNodes = computed(() =>
-  sortedNodes.value.filter(
-    (node) =>
-      probeFor(node)?.state === 'unreachable' ||
-      (node.configured && node.connection_status !== 'connected'),
-  ),
+  sortedNodes.value.filter((node) => probeFor(node)?.state === 'unreachable'),
 )
 
 const degradedNodes = computed(() =>
@@ -235,8 +236,8 @@ watch(
         v-if="unreachableNodes.length"
         class="surface border-red-500/30 bg-red-500/5 p-4 text-sm text-red-800 dark:text-red-300"
       >
-        {{ unreachableNodes.length === 1 ? '1 configured node is' : `${unreachableNodes.length} configured nodes are` }}
-        unreachable: <span class="font-mono text-xs">{{ nodeIdList(unreachableNodes) }}</span>
+        {{ unreachableNodes.length === 1 ? 'The browser API probe failed for 1 node' : `The browser API probe failed for ${unreachableNodes.length} nodes` }}:
+        <span class="font-mono text-xs">{{ nodeIdList(unreachableNodes) }}</span>
       </div>
 
       <div
@@ -274,10 +275,10 @@ watch(
           </div>
           <div class="flex items-center gap-2">
             <Badge variant="outline" class="tabular-nums">
-              {{ connectedCount }} / {{ sortedNodes.length }} nodes connected
+              {{ connectedCount }} / {{ sortedNodes.length }} DHT presence confirmed
             </Badge>
             <Badge variant="outline" class="tabular-nums">
-              replication ×{{ realmInfo?.metadata_replication.default_replication_factor ?? 1 }}
+              replication {{ replicationLabel }}
             </Badge>
           </div>
         </div>

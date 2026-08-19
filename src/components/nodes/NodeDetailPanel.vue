@@ -5,7 +5,6 @@ import LocalNodeDetails from './LocalNodeDetails.vue'
 import { connectionLabel, connectionVariant, kindVariant, statusVariant } from './node-display'
 import type { NodeProbe } from './node-probe'
 import type { RealmNodeInfo } from '@/lib/api'
-import { storedReferencedHint } from '@/lib/quota'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { TriangleAlert } from '@lucide/vue'
 
@@ -82,8 +81,7 @@ defineProps<{
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Objects</dt>
           <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatNumber(probe.usage.objects) }}</dd>
-          <!-- The stored/referenced split folds the former Blobs row in. -->
-          <dd class="mt-0.5 text-[11px] text-muted-foreground">{{ storedReferencedHint(probe.usage) }}</dd>
+          <dd class="mt-0.5 text-[11px] text-muted-foreground">{{ formatNumber(probe.usage.stored_blobs) }} physical blob locations</dd>
         </div>
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stored</dt>

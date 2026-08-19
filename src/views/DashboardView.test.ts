@@ -1,0 +1,185 @@
+import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
+import { renderToString } from '@vue/server-renderer'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const currentUser = ref<Record<string, unknown> | null>(null)
+const metadata = ref<unknown[]>([])
+const profiles = ref<unknown[]>([])
+const nodes = ref<Array<{ status: string }>>([])
+const myGroups = ref<Array<{ id: string; name: string }>>([])
+const discoverableGroups = ref<Array<{ id: string; name: string }>>([])
+const realm = ref({ id: 'realm-id', name: 'Test realm', description: 'Public research data' })
+const nodeInfo = ref<Record<string, unknown> | null>(null)
+const realmInfo = ref<Record<string, any> | null>(null)
+const usageInfo = ref<Record<string, any> | null>(null)
+const bootstrapped = ref(true)
+const authPending = ref(false)
+const authStage = ref('idle')
+const dashboardRevision = ref(0)
+const refresh = vi.fn(async () => undefined)
+const loadInfo = vi.fn(async () => undefined)
+const listRecentMetadata = vi.fn(async () => [])
+const signIn = vi.fn(async () => undefined)
+
+const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
+const PageHeaderStub = defineComponent({
+  props: { title: String, description: String },
+  setup(props, { slots }) {
+    return () => h('header', [h('h1', props.title), h('p', props.description), slots.actions?.()])
+  },
+})
+const RouterLinkStub = defineComponent((_, { attrs, slots }) => () => h('a', attrs, slots.default?.()))
+const StatCardStub = defineComponent({
+  props: { label: String, value: [String, Number], hint: String },
+  setup(props) {
+    return () => h('div', [h('strong', String(props.value)), h('span', props.label), props.hint ? h('small', props.hint) : null])
+  },
+})
+const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
+const GroupQuotaCardsStub = defineComponent(() => () => h('div', 'group quota cards'))
+const FederationPanelStub = defineComponent(() => () => h('div', 'federation panel'))
+const EmptyStub = defineComponent(() => () => null)
+
+let DashboardView: Component
+
+beforeAll(async () => {
+  vi.doMock('vue-router', () => ({
+    RouterLink: RouterLinkStub,
+    useRouter: () => ({ push: vi.fn() }),
+  }))
+  vi.doMock('@/composables/useAruna', () => ({
+    useAruna: () => ({
+      currentUser,
+      metadata,
+      profiles,
+      nodes,
+      myGroups,
+      discoverableGroups,
+      realm,
+      nodeInfo,
+      realmInfo,
+      usageInfo,
+      bootstrapped,
+      refresh,
+      loadInfo,
+      listRecentMetadata,
+    }),
+  }))
+  vi.doMock('@/composables/useAuth', () => ({
+    useAuth: () => ({ authPending, signIn, stage: authStage }),
+  }))
+  vi.doMock('@/composables/useNotifications', () => ({
+    useNotifications: () => ({ dashboardRevision }),
+  }))
+  vi.doMock('@vueuse/core', () => ({
+    useDocumentVisibility: () => ref('hidden'),
+    useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }),
+  }))
+  vi.doMock('@/components/ui/Button.vue', () => ({ default: ButtonStub }))
+  vi.doMock('@/components/dashboard/PageHeader.vue', () => ({ default: PageHeaderStub }))
+  vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: FederationPanelStub }))
+  vi.doMock('@/components/dashboard/GroupQuotaCards.vue', () => ({ default: GroupQuotaCardsStub }))
+  vi.doMock('@/components/metadata/NewDatasetDialog.vue', () => ({ default: EmptyStub }))
+  vi.doMock('@/components/metadata/ProfileChip.vue', () => ({ default: EmptyStub }))
+  vi.doMock('@/components/ui/StatCard.vue', () => ({ default: StatCardStub }))
+  vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
+  DashboardView = (await import('./DashboardView.vue')).default
+})
+
+beforeEach(() => {
+  currentUser.value = null
+  metadata.value = []
+  profiles.value = []
+  nodes.value = []
+  myGroups.value = []
+  discoverableGroups.value = []
+  realm.value = { id: 'realm-id', name: 'Test realm', description: 'Public research data' }
+  nodeInfo.value = null
+  realmInfo.value = {
+    metadata_replication: { default_replication_factor: 3 },
+    nodes: [],
+  }
+  usageInfo.value = null
+  bootstrapped.value = true
+  authPending.value = false
+  authStage.value = 'idle'
+  refresh.mockClear()
+  loadInfo.mockClear()
+  listRecentMetadata.mockClear()
+  signIn.mockClear()
+})
+
+async function renderedText(): Promise<string> {
+  const html = await renderToString(createSSRApp(DashboardView))
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+describe('guest dashboard truth', () => {
+  it('renders the three public_overview counts instead of guest-filtered zeros', async () => {
+    realm.value = { id: 'realm-public', name: 'Gaia realm', description: 'Shared science data' }
+    realmInfo.value = {
+      metadata_replication: { default_replication_factor: null },
+      nodes: [],
+      public_overview: { live_datasets: 23, groups: 8, nodes_configured: 4 },
+    }
+    profiles.value = Array.from({ length: 12 })
+
+    const text = await renderedText()
+
+    expect(text).toMatch(/23 Live datasets/)
+    expect(text).toMatch(/8 Realm groups/)
+    expect(text).toMatch(/4 Configured nodes/)
+    expect(text).toContain('Gaia realm')
+    expect(text).toContain('Shared science data')
+    expect(text).toContain('Log in')
+    expect(text).not.toContain('Loaded profiles')
+    expect(text).not.toContain('Nodes online')
+    expect(text).not.toContain('0 / 0')
+    expect(text).not.toContain('My groups')
+    expect(text).not.toContain('federation panel')
+  })
+
+  it('renders absent public counts as unknown rather than zero', async () => {
+    const text = await renderedText()
+
+    expect(text).toMatch(/Unknown Live datasets/)
+    expect(text).toMatch(/Unknown Realm groups/)
+    expect(text).toMatch(/Unknown Configured nodes/)
+    expect(text).toContain('Public counts are unavailable from this node')
+    expect(text).not.toContain('0 / 0')
+  })
+})
+
+describe('authenticated dashboard ordering', () => {
+  it('orders Realm statistics, My groups, and Node health and reports placement coverage', async () => {
+    currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
+    profiles.value = [{}, {}]
+    nodes.value = [{ status: 'healthy' }, { status: 'offline' }]
+    myGroups.value = [{ id: 'group-id', name: 'Research group' }]
+    usageInfo.value = { buckets: 2, objects: 5, stored_blobs: 7, stored_bytes: 1024, metadata_documents: 9 }
+    realmInfo.value = {
+      metadata_replication: { default_replication_factor: null },
+      nodes: [
+        { node_id: 'node-a', info: { utilization: { documents_held: 6 } } },
+        { node_id: 'node-b', info: { utilization: {} } },
+      ],
+    }
+
+    const text = await renderedText()
+    const realmIndex = text.indexOf('Realm statistics')
+    const groupsIndex = text.indexOf('My groups')
+    const healthIndex = text.indexOf('Node health')
+
+    expect(realmIndex).toBeGreaterThanOrEqual(0)
+    expect(groupsIndex).toBeGreaterThan(realmIndex)
+    expect(healthIndex).toBeGreaterThan(groupsIndex)
+    expect(text).toContain('Loaded profiles')
+    expect(text).toContain('Replica-inclusive placement records held')
+    expect(text).toContain('1 of 2 nodes reporting')
+  })
+})

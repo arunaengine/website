@@ -24,7 +24,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Route, ShieldAlert, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
-import { assessQuota, quotaCountedBytes, referencedBytes, storedReferencedHint, QUOTA_STATE_BADGES } from '@/lib/quota'
+import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
 import { featureEnabled } from '@/lib/config'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 import {
@@ -85,8 +85,16 @@ const quotaBadge = computed(() => QUOTA_STATE_BADGES[quotaAssessment.value.state
 const objectCounts = computed(() => {
   const value = usage.value
   if (!value || typeof value.objects !== 'number' || typeof value.stored_blobs !== 'number') return null
-  return { total: value.objects, split: storedReferencedHint(value) }
+  return { total: value.objects, physicalBlobs: value.stored_blobs }
 })
+const purposeCounts = computed(() => [
+  { label: 'Datasets', value: usage.value?.dataset_count },
+  { label: 'Profiles', value: usage.value?.profile_count },
+  { label: 'Process runs', value: usage.value?.process_run_count },
+])
+function purposeCountLabel(value: number | null | undefined): string {
+  return value == null ? 'Unknown' : formatNumber(value)
+}
 
 // Usage history is gated off by default: the backend endpoint does not exist
 // yet (aruna#250). With the flag off, loadHistory() short-circuits before any
@@ -325,6 +333,18 @@ async function leave() {
         </div>
 
         <TabsContent value="stats" class="mt-0">
+      <div v-if="usage" class="border-b border-border">
+        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
+          <FileJson2 class="h-3.5 w-3.5 text-primary" />
+          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Lifecycle-live documents</span>
+        </div>
+        <dl class="grid grid-cols-3 gap-3 px-5 py-3">
+          <div v-for="count in purposeCounts" :key="count.label" class="rounded-md border border-border bg-background px-3 py-2">
+            <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{{ count.label }}</dt>
+            <dd class="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{{ purposeCountLabel(count.value) }}</dd>
+          </div>
+        </dl>
+      </div>
       <div v-if="usage" id="storage" class="scroll-mt-24 border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <HardDrive class="h-3.5 w-3.5 text-primary" />
@@ -356,7 +376,7 @@ async function leave() {
             label="Group storage"
           />
           <p v-if="objectCounts" class="mt-1 text-[11px] tabular-nums text-muted-foreground">
-            Objects: {{ formatNumber(objectCounts.total) }} total · {{ objectCounts.split }}
+            Objects: {{ formatNumber(objectCounts.total) }} total · {{ formatNumber(objectCounts.physicalBlobs) }} physical blob locations
           </p>
           <p v-if="quotaStatus && quotaStatus.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
             Hard cap {{ formatBytes(quotaStatus.ceiling_bytes) }}.
