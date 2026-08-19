@@ -17,6 +17,10 @@ describe('Dataset file discovery presentation', () => {
     expect(source).toContain('backlinkResult.coverage.target_resolution_complete')
     expect(source).toContain('backlinkTarget.visible_references')
     expect(source).toContain('Other restricted Datasets reference this content')
+    expect(source).toContain("backlinkResult.coverage.queried_scope.replaceAll('_', ' ')")
+    expect(source).toContain("freshness.index_state.replaceAll('_', ' ')")
+    expect(source).toContain('relativeTime(new Date(value).toISOString())')
+    expect(source).toContain('new Date(freshness.oldest_status_updated_at_ms).toISOString()')
   })
 
   it('keeps the loaded-crate cache separate and presents identity apart from location', () => {

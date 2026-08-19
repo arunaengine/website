@@ -167,7 +167,21 @@ export function serverValidationRequiredConstraints(
 ): string[] {
   if (!capabilities || !shapes.length) return []
   const source = shapes.join('\n')
-  const used = new Set([...source.matchAll(/\bsh:([A-Za-z][\w-]*)/g)].map((match) => `sh:${match[1]}`))
+  const shaclPrefixes = new Set(['sh'])
+  for (const match of source.matchAll(
+    /(?:@prefix|prefix)\s+([A-Za-z][\w-]*):\s*<http:\/\/www\.w3\.org\/ns\/shacl#>/gi,
+  )) {
+    shaclPrefixes.add(match[1])
+  }
+  const used = new Set(
+    [...source.matchAll(/http:\/\/www\.w3\.org\/ns\/shacl#([A-Za-z][\w-]*)/g)]
+      .map((match) => `sh:${match[1]}`),
+  )
+  for (const prefix of shaclPrefixes) {
+    for (const match of source.matchAll(new RegExp(`\\b${prefix}:([A-Za-z][\\w-]*)`, 'g'))) {
+      used.add(`sh:${match[1]}`)
+    }
+  }
   const required: string[] = []
   for (const supported of capabilities.supported_constraints) {
     const term = profileConstraintTerm(supported)

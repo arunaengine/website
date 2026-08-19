@@ -59,7 +59,7 @@ import {
   type ProfileDraftItem,
 } from '@/lib/profiles/migration'
 import { licenseEntity } from '@/lib/profiles/rocrate'
-import { sameSchemaOrgType } from '@/lib/profiles/uri'
+import { isAbsoluteUri, sameSchemaOrgType } from '@/lib/profiles/uri'
 import { cloneLiftNotes, type LiftNote } from '@/lib/shacl/lift'
 import { validateProfileData } from '@/lib/profiles/validate'
 import { classifyRoCrateSpecIri } from '@/lib/rocrateVersions'
@@ -619,8 +619,17 @@ function applyProfileDefinition(definition: LoadedProfileDefinition, crate: unkn
     }
     const hasValue = Object.prototype.hasOwnProperty.call(root, control.property)
     if (control.control === 'entity') {
-      const ids = hasValue ? referenceIdsOf(root[control.property]) : []
-      if (hasValue && ((!ids.length && draftValuePopulated(root[control.property])) || (!control.multiple && ids.length > 1))) continue
+      const value = root[control.property]
+      const values: unknown[] = hasValue
+        ? (Array.isArray(value) ? value : [value])
+        : []
+      const seededIds = values.map((value) => {
+        if (typeof value === 'string' && isAbsoluteUri(value)) return value
+        if (isRecord(value) && typeof value['@id'] === 'string' && Object.keys(value).length === 1) return value['@id']
+        return undefined
+      })
+      if (hasValue && (seededIds.some((id) => id === undefined) || (!control.multiple && seededIds.length > 1))) continue
+      const ids = seededIds.filter((id): id is string => id !== undefined)
       const entries = ids.map((id) => ({ ...newRefEntry(), ref: id }))
       nextEntities[control.property] = entries.length
         ? entries
@@ -1329,10 +1338,18 @@ async function save(unprofiled = false) {
     showProfileWriteFailure(err, profiled)
   }
 }
+
+function requestClose(next: boolean) {
+  if (!next && profileSwitchOpen.value) {
+    cancelProfileSwitch()
+    return
+  }
+  emit('update:open', next)
+}
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
+  <Dialog :open="props.open" @update:open="requestClose">
     <DialogContent class="relative max-w-2xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2"><Pencil class="h-4 w-4 text-primary" /> Edit metadata</DialogTitle>
@@ -1377,7 +1394,7 @@ async function save(unprofiled = false) {
               </div>
 
               <div v-if="selectedProfile && profileRuleState === 'loading'" class="space-y-2">
-                <p class="text-[11px] text-muted-foreground">Loading the selected profile rules...</p>
+                <p class="text-[11px] text-muted-foreground">Loading the selected profile rules…</p>
                 <Skeleton class="h-12" />
               </div>
               <div v-else-if="selectedProfile && profileRuleState === 'unavailable'" class="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2">
@@ -1618,7 +1635,7 @@ async function save(unprofiled = false) {
             </p>
             <p class="mt-1 text-xs text-muted-foreground">All non-profile metadata stays in the crate. Matching property URI values move to the new controls, and unmatched values remain as custom metadata for review.</p>
 
-            <p v-if="profileSwitchLoading" class="mt-3 text-xs text-muted-foreground">Loading the stored profile and preparing the exact replacement preview...</p>
+            <p v-if="profileSwitchLoading" class="mt-3 text-xs text-muted-foreground">Loading the stored profile and preparing the exact replacement preview…</p>
             <div v-else-if="profileSwitchError" class="mt-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               <p>The registered profile could not be loaded, so this transition cannot be confirmed yet. {{ profileSwitchError }}</p>
               <Button variant="outline" size="sm" class="mt-2" @click="retryPendingProfile">Retry</Button>

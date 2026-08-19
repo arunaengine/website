@@ -71,10 +71,10 @@ export function draftItemPreview(item: ProfileDraftItem): string {
     const count = (item.value as EntityEntry[]).length
     const rendered = JSON.stringify(stripDraftInternals(item.value))
     const preview = `${count} ${count === 1 ? 'entity draft' : 'entity drafts'}: ${rendered}`
-    return preview.length > 120 ? `${preview.slice(0, 117)}...` : preview
+    return preview.length > 120 ? `${preview.slice(0, 117)}…` : preview
   }
   const rendered = Array.isArray(item.value) ? item.value.join(', ') : String(item.value)
-  return rendered.length > 120 ? `${rendered.slice(0, 117)}...` : rendered
+  return rendered.length > 120 ? `${rendered.slice(0, 117)}…` : rendered
 }
 
 function stripDraftInternals(value: unknown): unknown {

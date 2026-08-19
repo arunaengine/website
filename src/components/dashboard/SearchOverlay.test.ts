@@ -27,6 +27,7 @@ const icons = new Proxy({}, { get: () => IconStub })
 const moduleDefault = (component: Component) => ({ __esModule: true, default: component })
 
 const narrow = ref(true)
+const authToken = ref<string | null>('token-a')
 const mediaQuery = vi.fn(() => narrow)
 const routerPush = vi.fn()
 let configuredObjectMode: Ref<string> | undefined
@@ -86,6 +87,7 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
+  '@/composables/useAruna': { useAruna: () => ({ authToken }) },
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Test realm' }) }) },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
@@ -93,7 +95,10 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
       isLocalNode: (nodeId: string) => nodeId === 'node-a',
     }),
   },
-  '@/lib/utils': { truncateMiddle: (value: string) => value },
+  '@/lib/utils': {
+    relativeTime: (value: string) => `relative ${value}`,
+    truncateMiddle: (value: string) => value,
+  },
   '@/composables/useUnifiedSearch': {
     DEFAULT_OBJECT_SEARCH_MODE: 'distributed_best_effort',
     OBJECT_SEARCH_MODE_LABELS: {
@@ -263,6 +268,7 @@ async function click(node: HostNode) {
 async function inputValue(node: HostNode, value: string) {
   node.value = value
   await callHandler(node.props.onInput, { target: node })
+  await callHandler(node.props['onUpdate:modelValue'], value)
   await flush()
 }
 
@@ -283,6 +289,15 @@ async function keydown(node: HostNode, key: string, shiftKey = false) {
   }
   await flush()
   return event
+}
+
+async function focusout(node: HostNode, relatedTarget: unknown) {
+  let current: HostNode | null = node
+  while (current) {
+    await callHandler(current.props.onFocusout, { relatedTarget })
+    current = current.parent
+  }
+  await flush()
 }
 
 interface Mounted {
@@ -366,6 +381,7 @@ beforeEach(() => {
   teleportBody.children = []
   activeElement = null
   narrow.value = true
+  authToken.value = 'token-a'
   mediaQuery.mockClear()
   routerPush.mockReset()
   resetSearch()
@@ -451,6 +467,35 @@ describe('narrow TopBar search panel', () => {
     await keydown(close, 'Tab')
     expect(activeElement).toBe(input)
     expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('keeps results open while focus moves into a portaled Select listbox', async () => {
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    const input = element(mounted.root, (node) => node.tag === 'input')
+    await inputValue(input, 'sample')
+
+    await focusout(input, {
+      closest: (selector: string) => selector.includes('[role="listbox"]') ? {} : null,
+    })
+    expect(findElement(mounted.root, (node) => node.props.id === 'quick-search-results')).toBeDefined()
+
+    await focusout(input, { closest: () => null })
+    expect(findElement(mounted.root, (node) => node.props.id === 'quick-search-results')).toBeUndefined()
+    mounted.app.unmount()
+  })
+
+  it('shows object inventory mode only for authenticated search', async () => {
+    authToken.value = null
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
+    expect(findElement(mounted.root, (node) => node.props['aria-label'] === 'Object inventory search mode')).toBeUndefined()
+
+    authToken.value = 'token-a'
+    await flush()
+    expect(findElement(mounted.root, (node) => node.props['aria-label'] === 'Object inventory search mode')).toBeDefined()
     mounted.app.unmount()
   })
 

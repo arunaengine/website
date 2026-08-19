@@ -2,6 +2,10 @@
 export function profileChipValidationLabel(validation?: { status: string }): string {
   return validation?.status ?? 'not checked'
 }
+
+export function profileChipHasReference(doc: { profileId?: string; conformsToIds?: string[] }): boolean {
+  return Boolean(doc.profileId || doc.conformsToIds?.length)
+}
 </script>
 
 <script setup lang="ts">
@@ -34,6 +38,7 @@ const chip = computed(() => {
 const title = computed(() =>
   chip.value.profileId ? `Profile reference: ${chip.value.label}` : chip.value.title || undefined,
 )
+const hasProfileReference = computed(() => profileChipHasReference(props.doc))
 
 const validation = computed<DeepReadonly<ProfileValidationPresentation>>(() => profileValidationStatuses.value[props.doc.ulid] ?? {
   status: 'not checked' as const,
@@ -53,9 +58,9 @@ const validationClass = computed(() => {
 })
 
 watch(
-  () => props.doc.ulid,
-  (documentId) => {
-    if (documentId) void loadProfileValidationStatus(documentId).catch(() => undefined)
+  () => [props.doc.ulid, hasProfileReference.value] as const,
+  ([documentId, profiled]) => {
+    if (documentId && profiled) void loadProfileValidationStatus(documentId).catch(() => undefined)
   },
   { immediate: true },
 )
@@ -83,6 +88,7 @@ function retry(event: Event) {
       <ListChecks class="h-3 w-3" /> Reference: {{ chip.label }}
     </span>
     <span
+      v-if="hasProfileReference"
       class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]"
       :class="validationClass"
       :title="validationTitle"
@@ -91,13 +97,13 @@ function retry(event: Event) {
       <button
         v-if="validation.stale"
         type="button"
-        class="font-medium underline underline-offset-2"
+        class="-m-1 p-1 font-medium underline underline-offset-2"
         @click="revalidate"
       >Revalidate</button>
       <button
         v-else-if="validation.status === 'unavailable'"
         type="button"
-        class="font-medium underline underline-offset-2"
+        class="-m-1 p-1 font-medium underline underline-offset-2"
         @click="retry"
       >Retry</button>
     </span>

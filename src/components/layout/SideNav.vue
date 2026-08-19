@@ -74,7 +74,7 @@ const sections = computed<NavSection[]>(() => [
     ],
   },
   {
-    label: 'Metadata',
+    label: 'Catalog',
     items: [
       { to: '/app/search', icon: FileJson2, label: 'Datasets', match: ['/app/search', '/app/metadata'] },
       { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },

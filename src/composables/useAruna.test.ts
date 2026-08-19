@@ -289,6 +289,9 @@ describe('revision-bound Profile validation presentation', () => {
     expect(serverValidationRequiredConstraints([
       '@prefix sh: <http://www.w3.org/ns/shacl#> . [] sh:minCount 1 ; sh:closed true .',
     ], capabilities)).toEqual(['sh:closed'])
+    expect(serverValidationRequiredConstraints([
+      '@prefix shape: <http://www.w3.org/ns/shacl#> . [] <http://www.w3.org/ns/shacl#closed> true ; shape:ignoredProperties () .',
+    ], capabilities)).toEqual(['sh:closed', 'sh:ignoredProperties'])
   })
 
   it('invalidates and reloads status after an accepted crate PUT', async () => {

@@ -848,6 +848,10 @@ function requestClose(next: boolean) {
     emit('update:open', true)
     return
   }
+  if (profileSwitchOpen.value) {
+    cancelProfileSwitch()
+    return
+  }
   if (hasDraftProgress.value) {
     confirmDiscardOpen.value = true
     return
@@ -1428,17 +1432,17 @@ async function submit(unprofiled = false) {
     <DialogContent class="max-w-3xl" @interact-outside="(event: Event) => event.preventDefault()">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
-          <FileJson2 class="h-4 w-4 text-primary" /> New metadata document
+          <FileJson2 class="h-4 w-4 text-primary" /> Create Dataset
         </DialogTitle>
         <DialogDescription>
-          Author a new RO-Crate metadata document, or import an existing crate as a new document.
+          Author a new RO-Crate Dataset, or import an existing crate as a new Dataset.
         </DialogDescription>
       </DialogHeader>
 
       <Tabs v-model="startTab">
         <TabsList>
           <TabsTrigger value="create"><Plus class="mr-1 size-3.5" /> Create new</TabsTrigger>
-          <TabsTrigger value="import"><FileUp class="mr-1 size-3.5" /> Import crate</TabsTrigger>
+          <TabsTrigger value="import"><FileUp class="mr-1 size-3.5" /> Import RO-Crate</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -1502,7 +1506,7 @@ async function submit(unprofiled = false) {
                 placeholder="datasets/my-dataset"
                 @update:model-value="(value: string | number) => { importPath = String(value); importPathTouched = true }"
               />
-              <p class="mt-1 text-[11px] text-muted-foreground">Stored as the metadata document path in Aruna.</p>
+              <p class="mt-1 text-[11px] text-muted-foreground">Stored as the Dataset path in Aruna.</p>
             </div>
           </div>
           <label class="flex items-center justify-between rounded-md border border-border p-3 text-sm">
@@ -1575,7 +1579,7 @@ async function submit(unprofiled = false) {
           <label class="text-xs font-medium text-foreground">Document path</label>
           <Input v-model="path" class="mt-1" placeholder="datasets/my-dataset" :invalid="scaffoldFieldErrors.path ? 'error' : undefined" />
           <p v-if="scaffoldFieldErrors.path" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.path }}</p>
-          <p v-else class="mt-1 text-[11px] text-muted-foreground">Stored as the metadata document path in Aruna.</p>
+          <p v-else class="mt-1 text-[11px] text-muted-foreground">Stored as the Dataset path in Aruna.</p>
         </div>
         <div>
           <label class="text-xs font-medium text-foreground">Description</label>
@@ -1887,7 +1891,7 @@ async function submit(unprofiled = false) {
           {{ saving ? 'Importing…' : 'Import crate' }}
         </Button>
         <Button v-else :disabled="!canSubmit || saving" @click="submit()">
-          {{ saving ? 'Creating…' : 'Create metadata' }}
+          {{ saving ? 'Creating…' : 'Create dataset' }}
         </Button>
       </DialogFooter>
 
@@ -1923,7 +1927,7 @@ async function submit(unprofiled = false) {
               Review how profile-owned values will move from {{ selectedProfile?.name ?? 'No profile reference' }} to {{ pendingProfile?.name ?? 'No profile reference' }}.
               Dataset title, description, date, license, files, custom fields, and other profile-independent fields stay unchanged.
             </p>
-            <p v-if="profileSwitchLoading" class="mt-3 text-xs text-muted-foreground">Preparing the migration preview...</p>
+            <p v-if="profileSwitchLoading" class="mt-3 text-xs text-muted-foreground">Preparing the migration preview…</p>
             <template v-else>
               <div v-if="profileSwitchError" class="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
                 The new profile's rules could not be loaded for this preview. Every populated profile field will be preserved in Additional fields for review. {{ profileSwitchError }}

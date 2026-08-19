@@ -151,7 +151,7 @@ describe('portal S3 session signing and refresh', () => {
     expect(signed.searchParams.get('X-Amz-Security-Token')).toBe('token-a')
   })
 
-  it('refreshes an actively used session at the jittered T-5 minute boundary', async () => {
+  it('signs with rotated credentials and re-arms refresh after provider use', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-19T10:00:00.000Z'))
     const minted = sessionResponse()
@@ -160,7 +160,15 @@ describe('portal S3 session signing and refresh', () => {
       session_token: 'token-b',
       expires_at: new Date(Date.now() + 115 * 60 * 1000).toISOString(),
     })
-    apiRequest.mockResolvedValueOnce(minted).mockResolvedValueOnce(refreshed)
+    const refreshedAgain = sessionResponse({
+      secret_access_key: 'secret-c',
+      session_token: 'token-c',
+      expires_at: new Date(Date.now() + 170 * 60 * 1000).toISOString(),
+    })
+    apiRequest
+      .mockResolvedValueOnce(minted)
+      .mockResolvedValueOnce(refreshed)
+      .mockResolvedValueOnce(refreshedAgain)
     await s3.activateContext(null, 'group-a')
     await s3.downloadUrl('bucket-a', 'object.txt', null)
     const boundary =
@@ -177,7 +185,22 @@ describe('portal S3 session signing and refresh', () => {
       '/users/s3-sessions/session-key-a/refresh',
     )
     expect(apiRequest.mock.calls[1]?.[1]).toEqual({ method: 'POST' })
-    expect(s3.activeSession.value?.sessionToken).toBe('token-b')
+
+    const signed = new URL(await s3.downloadUrl('bucket-a', 'object.txt', null))
+    expect(signed.searchParams.get('X-Amz-Security-Token')).toBe('token-b')
+
+    const nextBoundary =
+      115 * 60 * 1000 -
+      sessionModule.S3_SESSION_REFRESH_WINDOW_MS +
+      sessionModule.s3SessionRefreshJitterMs(minted.access_key_id)
+    await vi.advanceTimersByTimeAsync(nextBoundary - boundary - 1)
+    expect(apiRequest).toHaveBeenCalledTimes(2)
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(apiRequest).toHaveBeenCalledTimes(3)
+    expect(apiRequest.mock.calls[2]?.[0]).toBe(
+      '/users/s3-sessions/session-key-a/refresh',
+    )
   })
 
   it('surfaces a failed refresh, keeps the valid session, and blocks it at expiry', async () => {

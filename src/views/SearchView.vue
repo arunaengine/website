@@ -3,7 +3,7 @@ import type { MetadataDoc as PurposeMetadataDoc } from '@/data/types'
 import { conformsToProcessRun } from '@/lib/profiles/builtinProfiles'
 import { DX_PROFILE } from '@/lib/profiles/types'
 
-export type DatasetPurpose = 'dataset' | 'profile' | 'process-run'
+export type DatasetPurpose = 'dataset' | 'profile' | 'process-run' | 'unknown'
 
 const PROFILE_ROOT_TYPES = new Set([
   'Profile',
@@ -16,6 +16,7 @@ const PROFILE_ROOT_TYPES = new Set([
 export function datasetPurposeOf(
   doc?: Pick<PurposeMetadataDoc, 'type' | 'conformsToIds'> | null,
 ): DatasetPurpose {
+  if (!doc) return 'unknown'
   const rootTypes = (doc?.type ?? '').split(',').map((entry) => entry.trim()).filter(Boolean)
   if (rootTypes.some((type) => PROFILE_ROOT_TYPES.has(type))) return 'profile'
   if (conformsToProcessRun(doc?.conformsToIds)) return 'process-run'
@@ -25,7 +26,16 @@ export function datasetPurposeOf(
 export function datasetPurposeLabel(purpose: DatasetPurpose): string {
   if (purpose === 'profile') return 'Profile'
   if (purpose === 'process-run') return 'Process Run'
+  if (purpose === 'unknown') return 'Purpose unknown'
   return 'Dataset'
+}
+
+export function datasetPurposeMatches(
+  doc: Pick<PurposeMetadataDoc, 'type' | 'conformsToIds'> | null | undefined,
+  selected: DatasetPurpose | null,
+): boolean {
+  const purpose = datasetPurposeOf(doc)
+  return !selected || purpose === 'unknown' || purpose === selected
 }
 </script>
 
@@ -65,7 +75,7 @@ import { useCatalogBrowse, type CatalogPageParams } from '@/composables/useCatal
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useJobs } from '@/composables/useJobs'
 import { useDebounceFn } from '@vueuse/core'
-import { formatBytes, formatNumber, shortUserId, truncateMiddle } from '@/lib/utils'
+import { formatBytes, formatNumber, relativeTime, shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { Search, FileArchive, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound, Download, ListChecks } from '@lucide/vue'
 import type { MetadataDoc, SparqlExecutionMode, SparqlResult } from '@/data/types'
@@ -456,7 +466,7 @@ const hits = computed(() =>
   browseSource.value.filter((doc) => {
     if (profileFilter.value && !(doc.profileIds ?? []).includes(profileFilter.value)) return false
     if (groupFilter.value && doc.realmId !== groupFilter.value) return false
-    if (typeFilter.value && datasetPurposeOf(doc) !== typeFilter.value) return false
+    if (!datasetPurposeMatches(doc, typeFilter.value)) return false
     if (favouritesOnly.value && !favouriteIds.value.includes(doc.ulid)) return false
     return true
   }),
@@ -555,7 +565,7 @@ const visibleResults = computed(() =>
   searchResults.value.filter((line) => {
     if (favouritesOnly.value && !favouriteIds.value.includes(line.hit.document_id)) return false
     if (profileFilter.value && !profilePushedDown.value && !(line.doc?.profileIds ?? []).includes(profileFilter.value)) return false
-    if (typeFilter.value && datasetPurposeOf(line.doc) !== typeFilter.value) return false
+    if (!datasetPurposeMatches(line.doc, typeFilter.value)) return false
     return true
   }),
 )
@@ -975,10 +985,10 @@ async function runQuery() {
                 <p v-if="objectCoverageStatus === 'Partial'" class="font-medium">Partial object inventory. Coverage is incomplete, so missing objects cannot be treated as absent.</p>
                 <p>
                   Scope: {{ objectCoverage.scope === 'realm' ? 'Realm' : 'This node' }}.
-                  Freshness source: {{ objectCoverage.index_freshness.source }}.
-                  As of: {{ objectCoverage.index_freshness.as_of }}.
+                  Freshness source: {{ objectCoverage.index_freshness.source.replaceAll('_', ' ') }}.
+                  As of: <span :title="objectCoverage.index_freshness.as_of">{{ relativeTime(objectCoverage.index_freshness.as_of) }}</span>.
                 </p>
-                <p v-if="objectCoverage.index_freshness.oldest_observed_at">Oldest observed partition: {{ objectCoverage.index_freshness.oldest_observed_at }}.</p>
+                <p v-if="objectCoverage.index_freshness.oldest_observed_at">Oldest observed partition: <span :title="objectCoverage.index_freshness.oldest_observed_at">{{ relativeTime(objectCoverage.index_freshness.oldest_observed_at) }}</span>.</p>
                 <p>Nodes queried: {{ objectCoverage.nodes_queried }}. Nodes failed: {{ objectCoverage.nodes_failed }}.</p>
                 <p v-if="objectCoverage.truncated">This page is truncated. Load more before treating the result set as complete.</p>
                 <p v-if="objectCoverage.omitted_partitions">Omitted partitions: {{ objectCoverage.omitted_partitions }}.</p>
@@ -1017,7 +1027,7 @@ async function runQuery() {
                 </dl>
                 <div class="mt-auto flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
                   <span v-if="hit.size !== null && hit.size !== undefined">{{ formatBytes(hit.size) }}</span>
-                  <span v-if="hit.updated_at">Updated {{ hit.updated_at }}</span>
+                  <span v-if="hit.updated_at" :title="hit.updated_at">Updated {{ relativeTime(hit.updated_at) }}</span>
                   <span class="font-medium text-primary">Open in Data</span>
                 </div>
               </RouterLink>
@@ -1173,7 +1183,7 @@ async function runQuery() {
                   :to="{ name: 'metadata-detail', params: { id: line.hit.document_id } }"
                   class="surface group flex h-full flex-col gap-3 p-4 transition-shadow hover:shadow-md"
                 >
-                  <Badge variant="secondary" class="w-fit text-[10px] uppercase">Dataset</Badge>
+                  <span class="w-fit text-[10px] uppercase text-muted-foreground">Purpose unknown</span>
                   <div>
                     <h3 v-if="line.title" class="font-display text-sm font-semibold text-aruna-navy">{{ line.title }}</h3>
                     <h3 v-else class="break-all font-mono text-xs font-semibold text-aruna-navy">{{ line.hit.document_path }}</h3>
@@ -1286,7 +1296,6 @@ async function runQuery() {
                     :key="doc.ulid"
                     class="flex min-w-0 flex-col gap-1.5"
                   >
-                    <Badge variant="secondary" class="w-fit text-[10px] uppercase">Dataset</Badge>
                     <CatalogCard
                       :doc="doc"
                       :favourite="isFavourite(doc.ulid)"
@@ -1310,7 +1319,6 @@ async function runQuery() {
                     :key="doc.ulid"
                     class="flex min-w-0 flex-col gap-1.5"
                   >
-                    <Badge variant="secondary" class="w-fit text-[10px] uppercase">Profile</Badge>
                     <CatalogCard
                       :doc="doc"
                       :favourite="isFavourite(doc.ulid)"
@@ -1334,7 +1342,6 @@ async function runQuery() {
                     :key="doc.ulid"
                     class="flex min-w-0 flex-col gap-1.5"
                   >
-                    <Badge variant="secondary" class="w-fit text-[10px] uppercase">Process Run</Badge>
                     <CatalogCard
                       :doc="doc"
                       :favourite="isFavourite(doc.ulid)"

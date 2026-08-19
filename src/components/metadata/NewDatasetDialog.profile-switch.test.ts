@@ -401,6 +401,14 @@ function click(node: HostNode) {
   ;(node.props.onClick as () => void)()
 }
 
+function requestDialogClose(root: HostNode) {
+  const dialog = nodes(root).find((node) =>
+    node.props.open === true && typeof node.props['onUpdate:open'] === 'function',
+  )
+  if (!dialog) throw new Error('Open dialog not found')
+  ;(dialog.props['onUpdate:open'] as (open: boolean) => void)(false)
+}
+
 function fillRequiredCreateFields(root: HostNode) {
   setModel(root, (node) => node.props.placeholder === 'Dataset title', 'Profiled fixture')
   setModel(root, (node) => node.props.placeholder === 'datasets/my-dataset', 'datasets/profiled-fixture')
@@ -485,7 +493,7 @@ describe('New Dataset profile switching', () => {
     clearExternal()
     await flush()
 
-    click(button(root, 'Create metadata'))
+    click(button(root, 'Create dataset'))
     await flush()
 
     const payload = createMetadata.mock.calls[0][0] as { rocrate: { '@graph': Array<Record<string, unknown>> } }
@@ -537,6 +545,24 @@ describe('New Dataset profile switching', () => {
     expect(profileControl(root, 'newName').props.modelValue).toBe('kept value')
     const rows = nodes(root).find((node) => node.tag === 'custom-fields')?.props.rows as CustomFields.CustomFieldRow[]
     expect(rows).toEqual([])
+  })
+
+  it('uses Escape close to dismiss the profile-switch preview before discard', async () => {
+    profiles.value = [
+      profile('old', [profileRule('oldName', 'https://example.test/terms/name')]),
+      profile('new', [profileRule('newName', 'https://example.test/terms/name')]),
+    ]
+    const root = await mountDialog()
+    ;(profileControl(root, 'oldName').props.onSet as (value: unknown) => void)('Draft value')
+    selectProfile(root, 'new')
+    await flush()
+
+    expect(content(root)).toContain('Switch profile and migrate this draft?')
+    requestDialogClose(root)
+    await flush()
+
+    expect(content(root)).not.toContain('Switch profile and migrate this draft?')
+    expect(nodes(root).some((node) => node.tag === 'discard-confirm')).toBe(false)
   })
 
   it('preserves unmatched generated and entity values as custom metadata', async () => {
@@ -620,7 +646,7 @@ describe('New Dataset profile switching', () => {
     const root = await mountDialog('registered')
     fillRequiredCreateFields(root)
 
-    click(button(root, 'Create metadata'))
+    click(button(root, 'Create dataset'))
     await flush()
 
     const payload = createMetadata.mock.calls[0][0] as { rocrate: { '@graph': Array<Record<string, unknown>> } }
@@ -646,7 +672,7 @@ describe('New Dataset profile switching', () => {
     const root = await mountDialog('registered')
     fillRequiredCreateFields(root)
 
-    click(button(root, 'Create metadata'))
+    click(button(root, 'Create dataset'))
     await flush()
 
     expect(content(root)).toContain('Profiled write rejected')
@@ -687,7 +713,7 @@ describe('New Dataset profile switching', () => {
     const root = await mountDialog('registered')
     fillRequiredCreateFields(root)
 
-    click(button(root, 'Create metadata'))
+    click(button(root, 'Create dataset'))
     await flush()
 
     expect(content(root)).toContain('Validation fails closed, so nothing was saved.')

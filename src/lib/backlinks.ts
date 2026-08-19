@@ -79,6 +79,36 @@ export interface BacklinkPreflightResponse {
   coverage: BacklinkPreflightCoverage
 }
 
+export function exactFileBacklinkPreflight(
+  response: BacklinkPreflightResponse,
+  bucket: string,
+  key: string,
+): BacklinkPreflightResponse {
+  const exact = response.targets.every((target) =>
+    target.targeted_versions.every(
+      (location) => location.bucket !== bucket || location.key === key,
+    ),
+  )
+  return {
+    ...response,
+    targets: response.targets.flatMap((target) => {
+      const targetedVersions = target.targeted_versions.filter(
+        (location) => location.bucket === bucket && location.key === key,
+      )
+      return targetedVersions.length ? [{ ...target, targeted_versions: targetedVersions }] : []
+    }),
+    complete: exact && response.complete,
+    coverage: {
+      ...response.coverage,
+      queried_scope: 'selected_bucket_keys',
+      target_resolution_complete: exact && response.coverage.target_resolution_complete,
+      path_style_endpoint_coverage_complete:
+        exact && response.coverage.path_style_endpoint_coverage_complete,
+      realm_coverage_complete: exact && response.coverage.realm_coverage_complete,
+    },
+  }
+}
+
 export function preflightBacklinks(
   request: BacklinkPreflightRequest,
   client: ApiClientOptions,

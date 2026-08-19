@@ -12,6 +12,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import {
@@ -19,7 +20,7 @@ import {
   OBJECT_SEARCH_MODE_LABELS,
   useUnifiedSearch,
 } from '@/composables/useUnifiedSearch'
-import { truncateMiddle } from '@/lib/utils'
+import { relativeTime, truncateMiddle } from '@/lib/utils'
 import type { ObjectSearchMode } from '@/lib/api'
 import { File, FileJson2, Search, UserRound, Users, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
@@ -52,6 +53,7 @@ const panelEl = ref<HTMLElement | null>(null)
 const wrapperEl = ref<HTMLElement | null>(null)
 const isNarrowSearch = useMediaQuery(`(max-width: ${TOP_BAR_SEARCH_COLLAPSE_PX - 0.02}px)`)
 const { realm } = useRealm()
+const { authToken } = useAruna()
 const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
 const router = useRouter()
 const quickObjectMode = ref<ObjectSearchMode>(DEFAULT_OBJECT_SEARCH_MODE)
@@ -157,7 +159,7 @@ const quickObjectCoverageDetail = computed(() => {
   const parts = [
     `${coverage.scope === 'realm' ? 'Realm' : 'This node'} scope`,
     OBJECT_SEARCH_MODE_LABELS[coverage.mode],
-    `${coverage.index_freshness.source} as of ${coverage.index_freshness.as_of}`,
+    `${coverage.index_freshness.source.replaceAll('_', ' ')} as of ${relativeTime(coverage.index_freshness.as_of)}`,
     `nodes queried: ${coverage.nodes_queried}`,
     `nodes failed: ${coverage.nodes_failed}`,
   ]
@@ -316,7 +318,10 @@ function onPanelKeydown(event: KeyboardEvent) {
 // result buttons), so keyboard users can Tab into a result.
 function onSearchFocusOut(event: FocusEvent) {
   const next = event.relatedTarget as Node | null
-  if (!next || !wrapperEl.value?.contains(next)) showResults.value = false
+  const portaledSelect = (next as Element | null)?.closest?.(
+    '[data-radix-popper-content-wrapper], [role="listbox"]',
+  )
+  if (!next || (!wrapperEl.value?.contains(next) && !portaledSelect)) showResults.value = false
 }
 
 onMounted(() => window.addEventListener('popstate', onPopState))
@@ -421,7 +426,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
             ]"
           >
             <div
-              v-if="q.trim().length >= 2"
+              v-if="authToken && q.trim().length >= 2"
               class="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-1.5"
             >
               <span class="text-[10px] font-medium text-muted-foreground">Object inventory mode</span>
@@ -487,7 +492,7 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
                   >
                     {{ quickObjectCoverageStatus }}
                   </Badge>
-                  <span class="min-w-0 flex-1" :title="quickObjectCoverageDetail">
+                  <span class="min-w-0 flex-1" :title="quickObjectCoverage?.index_freshness.as_of ?? quickObjectCoverageDetail">
                     {{ quickObjectCoverageStatus === 'Partial' ? 'Partial object inventory. ' : '' }}{{ quickObjectCoverageDetail }}
                   </span>
                   <Button

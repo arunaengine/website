@@ -81,7 +81,8 @@ describe('an externally authored profile crate', () => {
     )
     expect(stored.liftNotes).toEqual(imported.notes)
     expect(stored.liftNotes.length).toBeGreaterThan(0)
-    expect(parsed.customShapesText).toBe(parsed.shapesText)
+    expect(parsed.shapesText).toBe(shapes())
+    expect(parsed.customShapesText).toBeUndefined()
   })
 
   it('names the file it cannot reach', async () => {

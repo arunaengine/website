@@ -397,6 +397,14 @@ function click(node: HostNode) {
   ;(node.props.onClick as () => void)()
 }
 
+function requestDialogClose(root: HostNode) {
+  const dialog = nodes(root).find((node) =>
+    node.props.open === true && typeof node.props['onUpdate:open'] === 'function',
+  )
+  if (!dialog) throw new Error('Open dialog not found')
+  ;(dialog.props['onUpdate:open'] as (open: boolean) => void)(false)
+}
+
 function profileControl(root: HostNode, property: string): HostNode {
   const control = nodes(root).find((node) => node.tag === 'profile-control' && node.props.property === property)
   if (!control) throw new Error(`Profile control ${property} not found`)
@@ -499,6 +507,31 @@ describe('existing Dataset profile transition', () => {
     })
   })
 
+  it.each([
+    ['an inline entity', { '@id': 'https://orcid.org/0000-0001', name: 'Jane' }],
+    ['a bare literal', 'Jane'],
+  ])('preserves %s instead of seeding a lossy entity control', async (_label, author) => {
+    const selected = profile('authors', [
+      profileRule('author', 'http://schema.org/author', {
+        kind: 'entity',
+        entityTypes: ['http://schema.org/Person'],
+        entitySources: ['existing-external'],
+      }),
+    ])
+    profiles.value = [selected]
+    const root = await mountDialog(crate(selected.profileUri!, { author }))
+
+    expect(nodes(root).some((node) =>
+      node.tag === 'entity-control' && node.props.property === 'author',
+    )).toBe(false)
+
+    click(button(root, 'Save changes'))
+    await flush()
+
+    const payload = replaceMetadataRoCrate.mock.calls[0][1] as { rocrate: unknown }
+    expect(rootOf(payload.rocrate).author).toEqual(author)
+  })
+
   it('migrates matching property URI values and preserves unmatched values for review', async () => {
     const shared = 'https://example.test/terms/shared'
     const oldEntity = 'https://example.test/terms/old-entity'
@@ -553,6 +586,22 @@ describe('existing Dataset profile transition', () => {
     expect(savedRoot).not.toHaveProperty('oldName')
     expect(savedRoot).not.toHaveProperty('oldOnly')
     expect(savedRoot).not.toHaveProperty('oldEntity')
+  })
+
+  it('uses Escape close to dismiss the profile-transition preview first', async () => {
+    profiles.value = [
+      profile('old', [profileRule('oldName', 'https://example.test/terms/name')]),
+      profile('new', [profileRule('newName', 'https://example.test/terms/name')]),
+    ]
+    const root = await mountDialog(crate(profiles.value[0].profileUri!, { oldName: 'Draft value' }))
+
+    selectProfile(root, 'new')
+    await flush()
+    expect(content(root)).toContain('Confirm Dataset profile transition')
+
+    requestDialogClose(root)
+    await flush()
+    expect(content(root)).not.toContain('Confirm Dataset profile transition')
   })
 
   it('keeps profile-owned data as custom metadata when moving to no profile', async () => {

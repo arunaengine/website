@@ -421,7 +421,7 @@ function retryBacklinks() {
 }
 
 function backlinkFreshnessTime(value: number | null): string {
-  return value === null ? 'observation time unavailable' : new Date(value).toISOString()
+  return value === null ? 'observation time unavailable' : relativeTime(new Date(value).toISOString())
 }
 
 watch(detailId, () => {
@@ -881,7 +881,7 @@ watch(relatedDocs, (rows) => {
                           <dl class="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
                             <div class="surface-muted rounded-md px-3 py-2">
                               <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Scope</dt>
-                              <dd class="mt-1 font-medium">{{ backlinkResult.coverage.queried_scope }}</dd>
+                              <dd class="mt-1 font-medium">{{ backlinkResult.coverage.queried_scope.replaceAll('_', ' ') }}</dd>
                             </div>
                             <div class="surface-muted rounded-md px-3 py-2">
                               <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Overall coverage</dt>
@@ -909,8 +909,8 @@ watch(relatedDocs, (rows) => {
                             <ul v-if="backlinkResult.coverage.node_freshness.length" class="mt-1 divide-y divide-border/60 rounded-md border border-border/60 text-[11px] text-muted-foreground">
                               <li v-for="freshness in backlinkResult.coverage.node_freshness" :key="freshness.node_id" class="flex flex-wrap gap-x-2 px-3 py-1.5">
                                 <span class="font-mono" :title="freshness.node_id">{{ nodeDisplayName(freshness.node_id) }}</span>
-                                <span>State: {{ freshness.index_state }}</span>
-                                <span>Oldest status: {{ backlinkFreshnessTime(freshness.oldest_status_updated_at_ms) }}</span>
+                                <span>State: {{ freshness.index_state.replaceAll('_', ' ') }}</span>
+                                <span :title="freshness.oldest_status_updated_at_ms !== null ? new Date(freshness.oldest_status_updated_at_ms).toISOString() : undefined">Oldest status: {{ backlinkFreshnessTime(freshness.oldest_status_updated_at_ms) }}</span>
                               </li>
                             </ul>
                             <p v-else class="mt-1 text-[11px] text-muted-foreground">No per-node freshness detail was returned.</p>

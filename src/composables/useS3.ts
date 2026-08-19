@@ -160,7 +160,12 @@ function nodeApiBase(nodeId: string): string | null {
 
 function putSession(key: string, session: PortalS3Session): void {
   const previous = sessions.value.get(key)
-  if (previous && previous.accessKeyId !== session.accessKeyId) {
+  if (
+    previous &&
+    (previous.accessKeyId !== session.accessKeyId ||
+      previous.secretAccessKey !== session.secretAccessKey ||
+      previous.sessionToken !== session.sessionToken)
+  ) {
     for (const [cacheKey, cached] of clientCache) {
       if (cached.storeKey !== key) continue
       cached.client.destroy()
@@ -525,6 +530,7 @@ function client(nodeId?: string | null, reference?: S3SessionReference): S3Clien
         accessKeyId: current.accessKeyId,
         secretAccessKey: current.secretAccessKey,
         sessionToken: current.sessionToken,
+        expiration: new Date(current.expiresAt),
       }
     },
     maxAttempts: 1,

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { parse } from '@vue/compiler-sfc'
 import { describe, expect, it } from 'vitest'
+import { exactFileBacklinkPreflight, type BacklinkPreflightResponse } from '@/lib/backlinks'
 
 const dataManagerSource = readFileSync(
   fileURLToPath(new URL('./DataManagerView.vue', import.meta.url)),
@@ -23,9 +24,17 @@ const crateReferencesSource = readFileSync(
   fileURLToPath(new URL('../composables/useCrateReferences.ts', import.meta.url)),
   'utf8',
 )
+const datasetReferencesSource = readFileSync(
+  fileURLToPath(new URL('../components/data/DatasetReferencesPreflightPanel.vue', import.meta.url)),
+  'utf8',
+)
 const { descriptor } = parse(dataManagerSource, { filename: 'DataManagerView.vue' })
 const template = descriptor.template?.content ?? ''
 const script = descriptor.scriptSetup?.content ?? ''
+const { descriptor: datasetReferencesDescriptor } = parse(datasetReferencesSource, {
+  filename: 'DatasetReferencesPreflightPanel.vue',
+})
+const datasetReferencesTemplate = datasetReferencesDescriptor.template?.content ?? ''
 
 function functionSource(name: string): string {
   const start = script.indexOf(`function ${name}(`)
@@ -117,18 +126,61 @@ describe('Data Manager version-aware deletion', () => {
     expect(functionSource('openDeleteBucket')).toContain('openPermanentDelete(')
   })
 
+  it('drops a sibling-key result before a single-file preflight can render it', () => {
+    const response = {
+      targets: [{
+        content_w3id: 'https://w3id.org/aruna/data/sibling',
+        targeted_versions: [{ node_id: 'node-a', bucket: 'data', key: 'foo.bar', version_id: 'v1' }],
+        visible_references: [{ document_id: 'sibling-doc', title: 'Sibling Dataset' }],
+        hidden_references_exist: false,
+        would_remove_last_resolvable_aruna_location: true,
+        location_impact_complete: true,
+      }],
+      next_cursor: null,
+      truncated: false,
+      nodes_queried: 1,
+      nodes_failed: 0,
+      complete: true,
+      failed_partitions: [],
+      coverage: {
+        queried_scope: 'bucket_prefix',
+        queried_forms: ['contentUrl'],
+        excluded_forms: [],
+        node_freshness: [{ node_id: 'node-a', index_state: 'current', oldest_status_updated_at_ms: null }],
+        target_resolution_complete: true,
+        path_style_endpoint_coverage_complete: true,
+        realm_coverage_complete: true,
+      },
+    } satisfies BacklinkPreflightResponse
+
+    const filtered = exactFileBacklinkPreflight(response, 'data', 'foo')
+
+    expect(filtered.targets).toEqual([])
+    expect(filtered.complete).toBe(false)
+    expect(filtered.coverage).toMatchObject({
+      target_resolution_complete: false,
+      path_style_endpoint_coverage_complete: false,
+      realm_coverage_complete: false,
+    })
+    expect(functionSource('loadBacklinkPreflight')).toContain(
+      'exactFileBacklinkPreflight(response, scope.bucket, scope.key)',
+    )
+  })
+
   it('renders visible, restricted, last-location, and partial coverage warnings in all dialogs', () => {
-    expect(template.match(/aria-label="RDF Dataset references"/g)).toHaveLength(3)
-    expect(template).toContain("params: { id: reference.document_id }")
-    expect(template).toContain('{{ reference.title }}')
-    expect(template).toContain('Other restricted Datasets reference this content')
-    expect(template).toContain('target.would_remove_last_resolvable_aruna_location')
-    expect(template).toContain("This operation would remove this content's last resolvable Aruna location.")
-    expect(template).toContain('Dataset-reference coverage is partial.')
-    expect(template).toContain('backlinkPreflight.coverage.queried_scope')
-    expect(template).toContain('backlinkPreflight.coverage.queried_forms')
-    expect(template).toContain('backlinkPreflight.coverage.node_freshness')
-    expect(template).toContain('backlinkPreflight.coverage.excluded_forms')
+    expect(template.match(/<DatasetReferencesPreflightPanel/g)).toHaveLength(3)
+    expect(datasetReferencesTemplate).toContain('aria-label="Dataset references"')
+    expect(datasetReferencesTemplate).not.toContain('RDF Dataset references')
+    expect(datasetReferencesTemplate).toContain("params: { id: reference.document_id }")
+    expect(datasetReferencesTemplate).toContain('{{ reference.title }}')
+    expect(datasetReferencesTemplate).toContain('Other restricted Datasets reference this content')
+    expect(datasetReferencesTemplate).toContain('target.would_remove_last_resolvable_aruna_location')
+    expect(datasetReferencesTemplate).toContain("This operation would remove this content's last resolvable Aruna location.")
+    expect(datasetReferencesTemplate).toContain('Dataset-reference coverage is partial.')
+    expect(datasetReferencesTemplate).toContain('preflight.coverage.queried_scope')
+    expect(datasetReferencesTemplate).toContain('preflight.coverage.queried_forms')
+    expect(datasetReferencesTemplate).toContain('preflight.coverage.node_freshness')
+    expect(datasetReferencesTemplate).toContain('preflight.coverage.excluded_forms')
   })
 
   it('renders failed staging lookup as failed instead of a successful empty result', () => {
@@ -156,6 +208,7 @@ describe('Data Manager version-aware deletion', () => {
       expect(button).not.toContain('backlinkPreflightError')
       expect(button).not.toContain('hidden_references_exist')
       expect(button).not.toContain('would_remove_last_resolvable_aruna_location')
+      expect(button).not.toContain('backlinkPreflightBusy')
     }
     expect(dataManagerSource).not.toContain('permanentDeleteConfirm')
     expect(template).not.toContain('placeholder="bucket name"')
@@ -176,6 +229,14 @@ describe('Data Manager explicit multi-file deletion', () => {
 
     expect(functionSource('clearObjectListing')).toContain('selectedObjectKeys.value = new Set()')
     expect(functionSource('loadObjects')).not.toContain('selectedObjectKeys.value = new Set()')
+
+    const prune = functionSource('pruneSelectedObjectKeys')
+    expect(prune).toContain("scope.kind === 'bucket'")
+    expect(prune).toContain('key.startsWith(scope.prefix)')
+    expect(functionSource('confirmDelete')).toContain("{ kind: 'prefix', bucket: target.bucket, prefix: target.folder.prefix }")
+    expect(functionSource('refreshAfterPermanentDelete')).toContain(
+      'pruneSelectedObjectKeys(scope, target.nodeId)',
+    )
   })
 
   it('runs one bounded selection preflight phase and renders every D5 warning class', () => {
@@ -188,12 +249,12 @@ describe('Data Manager explicit multi-file deletion', () => {
     expect(preflight).toContain('limit: BULK_BACKLINK_LIMIT')
     expect(merge).toContain('location.bucket === target.bucket && location.key === key')
     expect(merge).toContain('location.bucket !== target.bucket || location.key === key')
-    expect(template).toContain('Dataset-reference lookup failed for part or all of the selection.')
-    expect(template).toContain('Other restricted Datasets reference this content')
-    expect(template).toContain("This operation would remove this content's last resolvable Aruna location.")
-    expect(template).toContain('Dataset-reference coverage is partial.')
-    expect(template).toContain('backlinkPreflight.coverage.node_freshness')
-    expect(template).toContain('backlinkPreflight.coverage.excluded_forms')
+    expect(datasetReferencesTemplate).toContain('Dataset-reference lookup failed for part or all of the selection.')
+    expect(datasetReferencesTemplate).toContain('Other restricted Datasets reference this content')
+    expect(datasetReferencesTemplate).toContain("This operation would remove this content's last resolvable Aruna location.")
+    expect(datasetReferencesTemplate).toContain('Dataset-reference coverage is partial.')
+    expect(datasetReferencesTemplate).toContain('preflight.coverage.node_freshness')
+    expect(datasetReferencesTemplate).toContain('preflight.coverage.excluded_forms')
   })
 
   it('caps ordinary batches and retains exact mixed-success and transport outcomes', () => {
@@ -222,10 +283,11 @@ describe('Data Manager explicit multi-file deletion', () => {
     expect(functionSource('runBulkPurgeScope')).toContain('startStoragePurge(')
     expect(functionSource('openDeleteFolder')).not.toContain('selectedObjectKeys')
     expect(functionSource('openPermanentDeleteFolder')).not.toContain('selectedObjectKeys')
+    expect(template.match(/<Bomb class="size-3\.5"/g)).toHaveLength(2)
   })
 
   it('keeps new UI copy free of em dashes and the retired label namespace', () => {
-    const renderedTemplate = template.replace(/<!--[\s\S]*?-->/g, '')
+    const renderedTemplate = `${template}\n${datasetReferencesTemplate}`.replace(/<!--[\s\S]*?-->/g, '')
     expect(renderedTemplate).not.toContain('—')
     expect(dataManagerSource).not.toMatch(/aruna[.]io/)
   })

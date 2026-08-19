@@ -232,7 +232,7 @@ export function parseProfileCrate(rocrate: unknown): ParsedProfileCrate {
   // Keep that source attached when the crate is imported and saved again, so
   // constraints that cannot become controls remain available to validation.
   const liftableShapesText = shapesText ?? (!entityRules.length ? customShapesText : undefined)
-  const retainedShapesText = customShapesText ?? (!entityRules.length ? liftableShapesText : undefined)
+  const retainedShapesText = customShapesText !== liftableShapesText ? customShapesText : undefined
   const artifactUrl = publishedArtifactUrl(entries)
   return {
     ...(liftableShapesText ? { shapesText: liftableShapesText } : {}),

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { nextTick, ref } from 'vue'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { S3SessionReference, UploadHandle } from './useS3'
@@ -113,5 +115,16 @@ describe('upload queue session attribution', () => {
 
     for (const entry of handles.slice(1)) entry.resolve()
     await nextTick()
+  })
+
+  it('presents a session pause separately from a destructive upload error', () => {
+    const panel = readFileSync(
+      fileURLToPath(new URL('../components/data/TransfersPanel.vue', import.meta.url)),
+      'utf8',
+    )
+    expect(panel).toContain("if (item.pausedForSession) return 'warn'")
+    expect(panel).toContain("item.pausedForSession ? 'PAUSED' : item.state")
+    expect(panel).toContain("item.pausedForSession ? 'text-amber-700 dark:text-amber-400' : 'text-destructive'")
+    expect(panel).toContain("item.state === 'error' || item.state === 'canceled'")
   })
 })

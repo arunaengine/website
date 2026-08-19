@@ -52,8 +52,9 @@ onBeforeUnmount(() => {
   timers.clear()
 })
 
-function stateVariant(item: UploadQueueItem): 'accent' | 'secondary' | 'destructive' {
+function stateVariant(item: UploadQueueItem): 'accent' | 'secondary' | 'warn' | 'destructive' {
   if (item.state === 'done') return 'accent'
+  if (item.pausedForSession) return 'warn'
   if (item.state === 'error') return 'destructive'
   return 'secondary'
 }
@@ -96,7 +97,7 @@ function stateVariant(item: UploadQueueItem): 'accent' | 'secondary' | 'destruct
             :variant="stateVariant(item)"
             class="shrink-0 text-[10px] uppercase"
           >
-            {{ item.state }}
+            {{ item.pausedForSession ? 'PAUSED' : item.state }}
           </Badge>
           <span v-else class="shrink-0 font-mono text-[11px] text-muted-foreground">{{ item.progress }}%</span>
           <Button
@@ -133,7 +134,11 @@ function stateVariant(item: UploadQueueItem): 'accent' | 'secondary' | 'destruct
         >
           <AlertTriangle class="h-3 w-3 shrink-0" /> Overwrites existing object
         </p>
-        <p v-if="item.error" class="break-words text-[10px] text-destructive">{{ item.error }}</p>
+        <p
+          v-if="item.error"
+          class="break-words text-[10px]"
+          :class="item.pausedForSession ? 'text-amber-700 dark:text-amber-400' : 'text-destructive'"
+        >{{ item.error }}</p>
         <div v-if="item.state === 'error' || item.state === 'canceled'" class="flex items-center gap-2">
           <button class="text-[10px] font-medium text-primary hover:underline" @click="queue.retry(item)">Retry</button>
           <RouterLink
