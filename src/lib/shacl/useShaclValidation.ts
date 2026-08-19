@@ -1,6 +1,8 @@
 import { onScopeDispose, ref, shallowRef } from 'vue'
 import type { ShaclFinding } from './findings'
 
+const SHACL_VALIDATION_TIMEOUT_MS = 20_000
+
 // Composable front for the lazy SHACL worker. The worker (and with it jsonld,
 // n3 and the engine) is only instantiated on the first validate call; when
 // worker creation or the worker module itself fails, `unavailable` flips to
@@ -24,53 +26,96 @@ export function useShaclValidation(options: UseShaclValidationOptions = {}) {
   const findings = shallowRef<ShaclFinding[]>([])
   const running = ref(false)
   const unavailable = ref(false)
-  // Message of the last failed run (bad shapes, malformed crate). A run error
-  // does not mark the worker unavailable — the next edit may validate fine.
+  // Message of the last failed run or request. A request error does not mark
+  // the worker unavailable; the next edit may validate fine.
   const error = ref<string | null>(null)
 
   let worker: Worker | null = null
   let requestId = 0
   let timer: ReturnType<typeof setTimeout> | undefined
+  let watchdog: ReturnType<typeof setTimeout> | undefined
   let disposed = false
+
+  function clearWatchdog() {
+    if (watchdog === undefined) return
+    clearTimeout(watchdog)
+    watchdog = undefined
+  }
+
+  function failRequest(id: number, message: string, target: Worker, restartWorker = false) {
+    if (id !== requestId || worker !== target) return
+    clearWatchdog()
+    requestId += 1
+    running.value = false
+    error.value = message
+    if (restartWorker) {
+      target.terminate()
+      worker = null
+      ensureWorker()
+    }
+  }
 
   function ensureWorker(): Worker | null {
     if (worker || unavailable.value || disposed) return worker
+    let target: Worker
     try {
-      worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+      target = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
     } catch {
       unavailable.value = true
       worker = null
       return null
     }
-    worker.addEventListener('message', (event: MessageEvent) => {
+    worker = target
+    target.addEventListener('message', (event: MessageEvent) => {
       const data = event.data as { id: number; ok: boolean; findings?: ShaclFinding[]; error?: string }
-      if (!data || data.id !== requestId) return
+      if (!data || data.id !== requestId || worker !== target) return
+      clearWatchdog()
       running.value = false
       if (data.ok) {
         findings.value = data.findings ?? []
         error.value = null
       } else {
-        findings.value = []
-        error.value = data.error ?? 'Validation failed.'
+        failRequest(data.id, data.error ?? 'Validation failed.', target)
       }
+    })
+    target.addEventListener('messageerror', () => {
+      if (!running.value) return
+      failRequest(requestId, 'The validation worker response could not be read. Retry validation.', target, true)
     })
     // A load/runtime error at the worker level (e.g. the module chunk failed)
     // disables deep validation for this session; the form works as today.
-    worker.addEventListener('error', () => {
+    target.addEventListener('error', () => {
+      if (worker !== target) return
+      clearWatchdog()
+      requestId += 1
       unavailable.value = true
       running.value = false
-      worker?.terminate()
+      error.value = 'The validation worker failed.'
+      target.terminate()
       worker = null
     })
-    return worker
+    return target
   }
 
   function post(input: ShaclValidationInput) {
     const target = ensureWorker()
     if (!target) return
     requestId += 1
+    const id = requestId
+    clearWatchdog()
+    running.value = false
+    try {
+      target.postMessage({ id, crate: input.crate, shapes: input.shapes, rootId: input.rootId })
+    } catch (cause) {
+      const detail = cause instanceof Error && cause.message ? ` ${cause.message}` : ''
+      failRequest(id, `The validation request could not be sent.${detail}`, target)
+      return
+    }
     running.value = true
-    target.postMessage({ id: requestId, crate: input.crate, shapes: input.shapes, rootId: input.rootId })
+    error.value = null
+    watchdog = setTimeout(() => {
+      failRequest(id, 'Validation timed out. Retry validation.', target, true)
+    }, SHACL_VALIDATION_TIMEOUT_MS)
   }
 
   // Debounced validation for form-change triggers.
@@ -99,6 +144,7 @@ export function useShaclValidation(options: UseShaclValidationOptions = {}) {
       clearTimeout(timer)
       timer = undefined
     }
+    clearWatchdog()
     requestId += 1
     findings.value = []
     running.value = false
@@ -108,6 +154,7 @@ export function useShaclValidation(options: UseShaclValidationOptions = {}) {
   onScopeDispose(() => {
     disposed = true
     if (timer !== undefined) clearTimeout(timer)
+    clearWatchdog()
     worker?.terminate()
     worker = null
   })
