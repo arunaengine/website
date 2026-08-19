@@ -22,6 +22,7 @@ describe('Datasets purpose filters', () => {
     expect(source).toContain("{ value: 'profile', label: 'Profile' }")
     expect(source).toContain("{ value: 'process-run', label: 'Process Run' }")
     expect(source).toContain('datasetPurposeLabel(datasetPurposeOf(line.doc))')
+    expect(source).toContain('profileReferenceIri(profile)')
     expect(source).not.toContain("document_path.startsWith('profiles/')")
   })
 })

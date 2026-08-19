@@ -5,13 +5,21 @@ import {
   DEFAULT_SPARQL_MODE,
   IncompleteSparqlResultError,
   isRecencyOrdered,
+  profileReferenceIri,
   profileRulesLoadState,
+  profileValidationPresentation,
+  publicProfileIri,
+  serverValidationRequiredConstraints,
   sparqlCoverageStatus,
   useAruna,
   walkRecentPages,
 } from './useAruna'
 import { ApiError, apiRequest } from '@/lib/api'
-import type { ListMetadataResponse, MetadataDocumentListItem } from '@/lib/api'
+import type {
+  ListMetadataResponse,
+  MetadataDocumentListItem,
+  ProfileValidationStatusResponse,
+} from '@/lib/api'
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -49,6 +57,24 @@ function dataDocs(count: number, from = 0): MetadataDocumentListItem[] {
 
 function profileDocs(count: number, from = 0): MetadataDocumentListItem[] {
   return Array.from({ length: count }, (_, index) => doc(`profiles/${from + index}`, stamp(from + index)))
+}
+
+function validationStatus(
+  overrides: Partial<ProfileValidationStatusResponse> = {},
+): ProfileValidationStatusResponse {
+  return {
+    document_id: 'validation-doc',
+    dataset_revision: 'dataset-revision',
+    state: 'valid',
+    profile_id: 'profile-doc',
+    profile_iri: publicProfileIri('profile-doc'),
+    profile_revision: 'profile-revision',
+    evaluator: 'test-evaluator',
+    validated_at_ms: 1,
+    findings: [],
+    completeness: 'complete',
+    ...overrides,
+  }
 }
 
 describe('recency capability detection', () => {
@@ -204,6 +230,127 @@ describe('stored profile rule load states', () => {
   })
 })
 
+describe('revision-bound Profile validation presentation', () => {
+  afterEach(() => {
+    vi.mocked(apiRequest).mockReset()
+  })
+
+  it('maps backend states into the canonical UI vocabulary', () => {
+    expect(profileValidationPresentation(validationStatus()).status).toBe('verified')
+    expect(profileValidationPresentation(validationStatus({ state: 'invalid' })).status).toBe('invalid')
+    expect(profileValidationPresentation(validationStatus({ completeness: 'incomplete' })).status).toBe('partial')
+    expect(profileValidationPresentation(validationStatus({ state: 'not_profiled' })).status).toBe('not checked')
+
+    const stale = profileValidationPresentation(validationStatus({ state: 'stale', completeness: 'incomplete' }))
+    expect(stale).toMatchObject({ status: 'not checked', stale: true, canRevalidate: true })
+  })
+
+  it('loads stale honestly and uses the revalidation route for a fresh result', async () => {
+    vi.mocked(apiRequest)
+      .mockResolvedValueOnce(validationStatus({ document_id: 'stale-doc', state: 'stale', completeness: 'incomplete' }))
+      .mockResolvedValueOnce(validationStatus({ document_id: 'stale-doc' }))
+    const {
+      loadProfileValidationStatus,
+      revalidateProfileValidationStatus,
+      profileValidationStatuses,
+    } = useAruna()
+
+    await loadProfileValidationStatus('stale-doc')
+    expect(profileValidationStatuses.value['stale-doc']).toMatchObject({ status: 'not checked', stale: true })
+
+    await revalidateProfileValidationStatus('stale-doc')
+    expect(profileValidationStatuses.value['stale-doc']).toMatchObject({ status: 'verified', stale: false })
+    expect(vi.mocked(apiRequest)).toHaveBeenNthCalledWith(
+      2,
+      '/metadata/stale-doc/profile-validation/revalidate',
+      { method: 'POST' },
+      expect.any(Object),
+    )
+  })
+
+  it('fetches capabilities and identifies server-only constraints in the active shapes', async () => {
+    const capabilities = {
+      evaluator: 'test-evaluator',
+      supported_constraints: ['sh:minCount', 'sh:closed', 'sh:ignoredProperties'],
+      unsupported_constraint_policy: 'fail_closed' as const,
+      public_profile_iri_template: 'https://w3id.org/aruna/profile/{id}',
+      legacy_profile_iri_template: 'https://w3id.org/aruna/{id}',
+    }
+    vi.mocked(apiRequest).mockResolvedValueOnce(capabilities)
+    const { loadProfileValidationCapabilities } = useAruna()
+
+    await expect(loadProfileValidationCapabilities(true)).resolves.toEqual(capabilities)
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(
+      '/metadata/profile-validation/capabilities',
+      {},
+      expect.any(Object),
+    )
+    expect(serverValidationRequiredConstraints([
+      '@prefix sh: <http://www.w3.org/ns/shacl#> . [] sh:minCount 1 ; sh:closed true .',
+    ], capabilities)).toEqual(['sh:closed'])
+  })
+
+  it('invalidates and reloads status after an accepted crate PUT', async () => {
+    const summary = doc('write-status-doc', stamp(0))
+    vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+      if (path === '/metadata/write-status-doc/rocrate' && options?.method === 'PUT') return summary
+      if (path === '/metadata/write-status-doc') return summary
+      if (path === '/metadata/write-status-doc/profile-validation') {
+        return validationStatus({ document_id: 'write-status-doc' })
+      }
+      if (path === '/metadata') {
+        const query = options?.query as Record<string, number> | undefined
+        return page([], Number(query?.offset ?? 0), Number(query?.limit ?? 100))
+      }
+      throw new ApiError(404, `Unexpected request ${path}`)
+    })
+    const { replaceMetadataRoCrate, profileValidationStatuses } = useAruna()
+
+    await replaceMetadataRoCrate('write-status-doc', { rocrate: { '@graph': [] } })
+
+    expect(profileValidationStatuses.value['write-status-doc']?.status).toBe('verified')
+    expect(vi.mocked(apiRequest).mock.calls.some(([path]) =>
+      path === '/metadata/write-status-doc/profile-validation',
+    )).toBe(true)
+  })
+
+  it('reloads cached dependent Dataset status after an accepted Profile PUT', async () => {
+    const profileSummary = {
+      ...doc('profile-write-doc', stamp(0)),
+      document_path: 'profiles/registered',
+    }
+    let datasetStatusReads = 0
+    vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+      if (path === '/metadata/dependent-dataset/profile-validation') {
+        datasetStatusReads += 1
+        return validationStatus({ document_id: 'dependent-dataset', profile_id: 'profile-write-doc' })
+      }
+      if (path === '/metadata/profile-write-doc/rocrate' && options?.method === 'PUT') return profileSummary
+      if (path === '/metadata/profile-write-doc') return profileSummary
+      if (path === '/metadata/profile-write-doc/profile-validation') {
+        return validationStatus({
+          document_id: 'profile-write-doc',
+          state: 'not_profiled',
+          profile_id: null,
+          profile_iri: null,
+          profile_revision: null,
+        })
+      }
+      if (path === '/metadata') {
+        const query = options?.query as Record<string, number> | undefined
+        return page([], Number(query?.offset ?? 0), Number(query?.limit ?? 100))
+      }
+      throw new ApiError(404, `Unexpected request ${path}`)
+    })
+    const { loadProfileValidationStatus, replaceMetadataRoCrate } = useAruna()
+
+    await loadProfileValidationStatus('dependent-dataset')
+    await replaceMetadataRoCrate('profile-write-doc', { rocrate: { '@graph': [] } })
+
+    expect(datasetStatusReads).toBe(2)
+  })
+})
+
 describe('accepted profile reconciliation', () => {
   afterEach(() => {
     vi.mocked(apiRequest).mockReset()
@@ -264,6 +411,45 @@ describe('metadata conformance classification', () => {
     expect(useAruna().toMetadataDoc(item).conformsToIds).toEqual([
       'https://example.test/profiles/future',
     ])
+  })
+
+  it('emits the public Profile w3id and resolves both public and legacy references', () => {
+    const documentId = '01PROFILEDOCUMENT000000000000'
+    const legacyIri = `https://w3id.org/aruna/${documentId}`
+    const storedProfile = {
+      ...doc('profiles/research', stamp(0)),
+      document_id: documentId,
+      document_path: 'profiles/research',
+      graph_iri: legacyIri,
+      rocrate_summary: {
+        '@graph': [
+          { '@id': 'ro-crate-metadata.json', about: { '@id': './' } },
+          { '@id': './', '@type': ['Dataset', 'http://www.w3.org/ns/dx/prof/Profile'], name: 'Research profile' },
+        ],
+      },
+    }
+    const { profileItems, profiles, toMetadataDoc } = useAruna()
+    const previous = [...profileItems.value]
+    profileItems.value = [storedProfile]
+    try {
+      const profile = profiles.value.find((item) => item.id === 'research')
+      expect(profileReferenceIri(profile)).toBe(publicProfileIri(documentId))
+      expect(profile?.graphIri).toBe(legacyIri)
+
+      const datasetWith = (iri: string) => toMetadataDoc({
+        ...doc(`dataset-${iri === legacyIri ? 'legacy' : 'public'}`, stamp(0)),
+        rocrate_summary: {
+          '@graph': [
+            { '@id': 'ro-crate-metadata.json', about: { '@id': './' } },
+            { '@id': './', '@type': 'Dataset', conformsTo: { '@id': iri } },
+          ],
+        },
+      })
+      expect(datasetWith(publicProfileIri(documentId)).profileIds).toEqual(['research'])
+      expect(datasetWith(legacyIri).profileIds).toEqual(['research'])
+    } finally {
+      profileItems.value = previous
+    }
   })
 })
 

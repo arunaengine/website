@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
+import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import DetailsSection from '@/components/metadata/DetailsSection.vue'
 import PeopleSection from '@/components/metadata/PeopleSection.vue'
 import ContextSection from '@/components/metadata/ContextSection.vue'
@@ -592,21 +593,24 @@ watch(relatedDocs, (rows) => {
         <article class="surface p-6">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
-              <RouterLink v-if="currentProfile" :to="{ name: 'profile-detail', params: { profileId: currentProfile.id } }" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:opacity-80">
-                <ListChecks class="h-3 w-3" /> {{ currentProfile.name }}
-              </RouterLink>
-              <ExternalLink
-                v-else-if="conformsIris.length === 1 && isHttpUrl(conformsIris[0])"
-                :href="conformsIris[0]"
-                :show-icon="false"
-                class="rounded-full bg-primary/10 px-2 py-0.5 text-[11px]"
-                :title="conformsTitle"
-              >
-                <ListChecks class="h-3 w-3" /> {{ profileName }}
-              </ExternalLink>
-              <span v-else-if="conformsIris.length" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary" :title="conformsTitle">
-                <ListChecks class="h-3 w-3" /> {{ profileName }}
-              </span>
+              <div class="flex flex-wrap items-center gap-1">
+                <RouterLink v-if="currentProfile" :to="{ name: 'profile-detail', params: { profileId: currentProfile.id } }" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:opacity-80">
+                  <ListChecks class="h-3 w-3" /> Reference: {{ currentProfile.name }}
+                </RouterLink>
+                <ExternalLink
+                  v-else-if="conformsIris.length === 1 && isHttpUrl(conformsIris[0])"
+                  :href="conformsIris[0]"
+                  :show-icon="false"
+                  class="rounded-full bg-primary/10 px-2 py-0.5 text-[11px]"
+                  :title="conformsTitle"
+                >
+                  <ListChecks class="h-3 w-3" /> Reference: {{ profileName }}
+                </ExternalLink>
+                <span v-else class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary" :title="conformsTitle || undefined">
+                  <ListChecks class="h-3 w-3" /> Reference: {{ profileName }}
+                </span>
+                <ProfileChip :doc="current" status-only />
+              </div>
               <h1 class="mt-3 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ current.title }}</h1>
               <p class="mt-3 max-w-3xl text-sm leading-relaxed text-foreground/85">{{ current.description || 'No description in RO-Crate summary.' }}</p>
               <div class="mt-4 flex flex-wrap gap-1.5">
@@ -627,7 +631,7 @@ watch(relatedDocs, (rows) => {
             </div>
             <div class="surface-muted p-3">
               <dt class="flex flex-wrap items-center gap-x-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                <span>Profile</span>
+                <span>Profile reference</span>
                 <span class="normal-case tracking-normal">What is this?
                   <RouterLink
                     :to="{ name: 'docs', params: { topic: 'profiles-conformance' } }"
@@ -636,6 +640,7 @@ watch(relatedDocs, (rows) => {
                 </span>
               </dt>
               <dd class="mt-1 break-all text-sm font-medium text-foreground" :title="conformsTitle || undefined">{{ profileShortName }}</dd>
+              <dd class="mt-2"><ProfileChip :doc="current" status-only /></dd>
             </div>
             <div class="surface-muted p-3">
               <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">License</dt>

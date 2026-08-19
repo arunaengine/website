@@ -25,6 +25,8 @@ import {
   type MetadataRoCrateResponse,
   type MetadataSearchOptions,
   type MetadataSearchResponse,
+  type ProfileValidationCapabilitiesResponse,
+  type ProfileValidationStatusResponse,
   type ReplaceMetadataRoCrateRequest,
   type RealmInfoResponse,
   type RealmQuotaConfig,
@@ -86,6 +88,93 @@ import {
 
 const TOKEN_KEY = 'aruna.authToken'
 const API_BASE_KEY = 'aruna.apiBaseUrl'
+const PROFILE_PUBLIC_IRI_PREFIX = 'https://w3id.org/aruna/profile/'
+
+export function publicProfileIri(documentId: string): string {
+  return `${PROFILE_PUBLIC_IRI_PREFIX}${documentId}`
+}
+
+export function profileReferenceIri(
+  profile?: Pick<MetadataProfile, 'builtIn' | 'documentId' | 'profileUri' | 'graphIri'> | null,
+): string | undefined {
+  if (!profile) return undefined
+  if (!profile.builtIn && profile.documentId) return publicProfileIri(profile.documentId)
+  return profile.profileUri || profile.graphIri
+}
+
+export type ProfileValidationPresentationStatus =
+  | 'not checked'
+  | 'checking'
+  | 'verified'
+  | 'invalid'
+  | 'partial'
+  | 'unavailable'
+
+export interface ProfileValidationPresentation {
+  status: ProfileValidationPresentationStatus
+  stale: boolean
+  canRevalidate: boolean
+  response?: ProfileValidationStatusResponse
+  message?: string
+}
+
+export function profileValidationPresentation(
+  response: ProfileValidationStatusResponse,
+): ProfileValidationPresentation {
+  if (response.state === 'stale') {
+    return { status: 'not checked', stale: true, canRevalidate: true, response }
+  }
+  if (response.state === 'not_profiled') {
+    return { status: 'not checked', stale: false, canRevalidate: false, response }
+  }
+  if (response.state === 'invalid') {
+    return { status: 'invalid', stale: false, canRevalidate: true, response }
+  }
+  if (response.completeness === 'incomplete') {
+    return { status: 'partial', stale: false, canRevalidate: true, response }
+  }
+  return { status: 'verified', stale: false, canRevalidate: true, response }
+}
+
+const BROWSER_LIFTED_PROFILE_CONSTRAINTS = new Set([
+  'sh:targetClass',
+  'sh:property',
+  'sh:path',
+  'sh:minCount',
+  'sh:maxCount',
+  'sh:datatype',
+  'sh:class',
+  'sh:nodeKind',
+  'sh:pattern',
+  'sh:in',
+  'sh:severity',
+  'sh:message',
+  'sh:name',
+  'sh:description',
+  'sh:order',
+  'sh:group',
+])
+
+function profileConstraintTerm(value: string): string | undefined {
+  return value.match(/^sh:[A-Za-z][\w-]*/)?.[0]
+}
+
+export function serverValidationRequiredConstraints(
+  shapes: readonly string[],
+  capabilities?: { readonly supported_constraints: readonly string[] } | null,
+): string[] {
+  if (!capabilities || !shapes.length) return []
+  const source = shapes.join('\n')
+  const used = new Set([...source.matchAll(/\bsh:([A-Za-z][\w-]*)/g)].map((match) => `sh:${match[1]}`))
+  const required: string[] = []
+  for (const supported of capabilities.supported_constraints) {
+    const term = profileConstraintTerm(supported)
+    if (term && used.has(term) && !BROWSER_LIFTED_PROFILE_CONSTRAINTS.has(term) && !required.includes(term)) {
+      required.push(term)
+    }
+  }
+  return required
+}
 
 // The catalog is paged, never walked: a realm can hold hundreds of thousands of
 // documents, and page sizes stay at or below 100, the server-side cap.
@@ -121,6 +210,8 @@ const credentials = ref<S3CredentialSummary[]>([])
 const fullCrates = ref<Record<string, unknown>>({})
 const profileCrateParses = ref<Record<string, ParsedProfileControls>>({})
 const cratePending = ref<Record<string, boolean>>({})
+const profileValidationStatuses = ref<Record<string, ProfileValidationPresentation>>({})
+const profileValidationCapabilities = ref<ProfileValidationCapabilitiesResponse | null>(null)
 // Invalidation fence for the crate cache: a load captures its document's
 // generation before the first request and commits only when it still matches,
 // so a fetch already in flight when a write invalidated the document cannot
@@ -129,6 +220,12 @@ const cratePending = ref<Record<string, boolean>>({})
 const crateGenerations = new Map<string, number>()
 const crateLoads = new Map<string, Promise<unknown>>()
 const profileCrateLoads = new Map<string, Promise<ParsedProfileControls>>()
+const profileValidationStatusGenerations = new Map<string, number>()
+const profileValidationStatusLoads = new Map<
+  string,
+  { generation: number; promise: Promise<ProfileValidationPresentation> }
+>()
+let profileValidationCapabilitiesLoad: Promise<ProfileValidationCapabilitiesResponse> | null = null
 const recentlyCreatedMetadataIds = new Set<string>()
 const acceptedProfileItems = new Map<string, MetadataDocumentListItem>()
 const bootstrapped = ref(false)
@@ -181,9 +278,14 @@ function clearIdentityState(clearPublic = false) {
   fullCrates.value = {}
   profileCrateParses.value = {}
   cratePending.value = {}
+  profileValidationStatuses.value = {}
+  profileValidationCapabilities.value = null
   crateGenerations.clear()
   crateLoads.clear()
   profileCrateLoads.clear()
+  profileValidationStatusGenerations.clear()
+  profileValidationStatusLoads.clear()
+  profileValidationCapabilitiesLoad = null
   recentlyCreatedMetadataIds.clear()
   acceptedProfileItems.clear()
   authError.value = null
@@ -383,6 +485,157 @@ export function profileRulesLoadState(options: {
   if (options.unavailable) return 'unavailable'
   if (options.complete && !options.hasRules) return 'empty'
   return 'ready'
+}
+
+function setProfileValidationPresentation(documentId: string, value: ProfileValidationPresentation) {
+  profileValidationStatuses.value = { ...profileValidationStatuses.value, [documentId]: value }
+}
+
+async function loadProfileValidationCapabilities(
+  force = false,
+): Promise<ProfileValidationCapabilitiesResponse> {
+  if (!force && profileValidationCapabilities.value) return profileValidationCapabilities.value
+  if (!force && profileValidationCapabilitiesLoad) return profileValidationCapabilitiesLoad
+  const context = refreshContext()
+  const load = apiRequest<ProfileValidationCapabilitiesResponse>(
+    '/metadata/profile-validation/capabilities',
+    {},
+    context.client,
+  ).then((capabilities) => {
+    assertCurrentSession(context.epoch)
+    profileValidationCapabilities.value = capabilities
+    return capabilities
+  }).finally(() => {
+    if (profileValidationCapabilitiesLoad === load) profileValidationCapabilitiesLoad = null
+  })
+  profileValidationCapabilitiesLoad = load
+  return load
+}
+
+async function loadProfileValidationStatus(
+  documentId: string,
+  force = false,
+): Promise<ProfileValidationPresentation> {
+  const previous = profileValidationStatuses.value[documentId]
+  if (!force && previous && previous.status !== 'checking') return previous
+  const generation = profileValidationStatusGenerations.get(documentId) ?? 0
+  const existing = profileValidationStatusLoads.get(documentId)
+  if (existing?.generation === generation) return existing.promise
+  if (!previous?.stale) {
+    setProfileValidationPresentation(documentId, {
+      status: 'checking',
+      stale: false,
+      canRevalidate: false,
+      response: previous?.response,
+    })
+  }
+  const context = refreshContext()
+  const load = apiRequest<ProfileValidationStatusResponse>(
+    `/metadata/${encodeURIComponent(documentId)}/profile-validation`,
+    {},
+    context.client,
+  ).then((response) => {
+    assertCurrentSession(context.epoch)
+    if ((profileValidationStatusGenerations.get(documentId) ?? 0) !== generation) {
+      return profileValidationStatuses.value[documentId]
+        ?? { status: 'not checked', stale: true, canRevalidate: true }
+    }
+    const presentation = profileValidationPresentation(response)
+    setProfileValidationPresentation(documentId, presentation)
+    return presentation
+  }).catch((error) => {
+    if (
+      context.epoch === sessionEpoch.value
+      && (profileValidationStatusGenerations.get(documentId) ?? 0) === generation
+    ) {
+      setProfileValidationPresentation(documentId, {
+        status: 'unavailable',
+        stale: false,
+        canRevalidate: false,
+        response: previous?.response,
+        message: errorMessage(error),
+      })
+    }
+    throw error
+  }).finally(() => {
+    if (profileValidationStatusLoads.get(documentId)?.promise === load) {
+      profileValidationStatusLoads.delete(documentId)
+    }
+  })
+  profileValidationStatusLoads.set(documentId, { generation, promise: load })
+  return load
+}
+
+async function revalidateProfileValidationStatus(
+  documentId: string,
+): Promise<ProfileValidationPresentation> {
+  const generation = (profileValidationStatusGenerations.get(documentId) ?? 0) + 1
+  profileValidationStatusGenerations.set(documentId, generation)
+  setProfileValidationPresentation(documentId, {
+    status: 'checking',
+    stale: false,
+    canRevalidate: false,
+    response: profileValidationStatuses.value[documentId]?.response,
+  })
+  try {
+    const response = await request<ProfileValidationStatusResponse>(
+      `/metadata/${encodeURIComponent(documentId)}/profile-validation/revalidate`,
+      { method: 'POST' },
+    )
+    if ((profileValidationStatusGenerations.get(documentId) ?? 0) !== generation) {
+      return profileValidationStatuses.value[documentId]
+        ?? { status: 'not checked', stale: true, canRevalidate: true }
+    }
+    const presentation = profileValidationPresentation(response)
+    setProfileValidationPresentation(documentId, presentation)
+    return presentation
+  } catch (error) {
+    if ((profileValidationStatusGenerations.get(documentId) ?? 0) === generation) {
+      setProfileValidationPresentation(documentId, {
+        status: 'unavailable',
+        stale: false,
+        canRevalidate: false,
+        message: errorMessage(error),
+      })
+    }
+    throw error
+  }
+}
+
+function invalidateProfileValidationStatus(documentId: string, reason: string) {
+  profileValidationStatusGenerations.set(
+    documentId,
+    (profileValidationStatusGenerations.get(documentId) ?? 0) + 1,
+  )
+  const previous = profileValidationStatuses.value[documentId]
+  setProfileValidationPresentation(documentId, {
+    status: 'not checked',
+    stale: true,
+    canRevalidate: true,
+    response: previous?.response
+      ? { ...previous.response, state: 'stale', completeness: 'incomplete', stale_reason: reason }
+      : undefined,
+  })
+}
+
+function invalidateProfileValidationAfterWrite(documentId: string): string[] {
+  const affected = new Set([documentId])
+  for (const [datasetId, presentation] of Object.entries(profileValidationStatuses.value)) {
+    if (presentation.response?.profile_id === documentId) affected.add(datasetId)
+  }
+  for (const id of affected) {
+    invalidateProfileValidationStatus(
+      id,
+      id === documentId ? 'dataset_revision_changed' : 'profile_revision_changed',
+    )
+  }
+  return [...affected]
+}
+
+async function refreshProfileValidationAfterWrite(documentIds: string[]) {
+  await Promise.all(documentIds.map((documentId) =>
+    loadProfileValidationStatus(documentId, true).catch(() => undefined),
+  ))
 }
 
 function assertCurrentSession(epoch: number) {
@@ -597,6 +850,7 @@ async function replaceMetadataRoCrate(
       method: 'PUT',
       body: JSON.stringify(input),
     })
+    const validationDocumentIds = invalidateProfileValidationAfterWrite(documentId)
     const wasCached = documentId in fullCrates.value
     invalidateCrate(documentId)
     await awaitCrateMaterialized(documentId)
@@ -606,6 +860,7 @@ async function replaceMetadataRoCrate(
     // failing re-prime nor a failing refresh may surface as a save failure.
     if (wasCached) await loadRoCrate(documentId, { force: true }).catch(() => undefined)
     await loadMetadata().catch(() => undefined)
+    await refreshProfileValidationAfterWrite(validationDocumentIds)
     return summary
   } finally {
     saving.value = false
@@ -1706,7 +1961,7 @@ function mapProfile(item: MetadataDocumentListItem): MetadataProfile {
     documentId: item.document_id,
     documentPath: item.document_path,
     graphIri: item.graph_iri,
-    profileUri: item.graph_iri,
+    profileUri: publicProfileIri(item.document_id),
     name,
     shortName: name.split(/\s+/)[0] || pathId,
     description: parsed.description || textValue(entity?.description) || '',
@@ -1785,7 +2040,9 @@ function profileIdsFromConformsTo(value: unknown): string[] {
 
 function profileIdFromConformanceId(id: string): string | undefined {
   if (id === PROCESS_RUN_PROFILE_URI) return PROCESS_RUN_CRATE_PROFILE_ID
-  const byGraph = profileItems.value.find((profile) => profile.graph_iri === id)
+  const byGraph = profileItems.value.find(
+    (profile) => profile.graph_iri === id || publicProfileIri(profile.document_id) === id,
+  )
   if (byGraph) return profileIdFromPath(byGraph.document_path) || byGraph.document_id
   return undefined
 }
@@ -1880,6 +2137,8 @@ export function useAruna() {
     fullCrates,
     profileCrateParses: readonly(profileCrateParses),
     cratePending,
+    profileValidationStatuses: readonly(profileValidationStatuses),
+    profileValidationCapabilities: readonly(profileValidationCapabilities),
     refresh,
     loadInfo,
     loadMetadata,
@@ -1887,6 +2146,9 @@ export function useAruna() {
     toMetadataDoc: mapMetadataDoc,
     loadRoCrate,
     loadProfileCrate,
+    loadProfileValidationCapabilities,
+    loadProfileValidationStatus,
+    revalidateProfileValidationStatus,
     createMetadata,
     getMetadataDocument,
     getMetadataItem,

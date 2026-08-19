@@ -5,7 +5,11 @@ import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { profileRulesLoadState } from '@/composables/useAruna'
+import {
+  profileReferenceIri,
+  profileRulesLoadState,
+  serverValidationRequiredConstraints,
+} from '@/composables/useAruna'
 import type { MetadataProfile } from '@/data/types'
 import * as Api from '@/lib/api'
 import * as ContentIdentity from '@/lib/contentIdentity'
@@ -30,12 +34,14 @@ const saving = ref(false)
 const profiles = ref<MetadataProfile[]>([])
 const metadataItems = ref([])
 const apiBaseUrl = ref('https://api.example.test')
+const profileValidationCapabilities = ref<Api.ProfileValidationCapabilitiesResponse | null>(null)
 const dialogOpen = ref(false)
 const fetchRoCrateRaw = vi.fn()
 const getMetadataDocument = vi.fn()
 const getMetadataItem = vi.fn()
 const replaceMetadataRoCrate = vi.fn()
 const loadProfileCrate = vi.fn()
+const loadProfileValidationCapabilities = vi.fn()
 
 const SlotStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -132,7 +138,9 @@ function compileDialog(): Component {
     '@/components/metadata/CustomFieldsEditor.vue': moduleDefault(CustomFieldsStub),
     '@/components/metadata/SubcratePickerDialog.vue': moduleDefault(SlotStub),
     '@/composables/useAruna': {
+      profileReferenceIri,
       profileRulesLoadState,
+      serverValidationRequiredConstraints,
       useAruna: () => ({
         saving,
         fetchRoCrateRaw,
@@ -144,6 +152,8 @@ function compileDialog(): Component {
         apiBaseUrl,
         profiles,
         loadProfileCrate,
+        profileValidationCapabilities,
+        loadProfileValidationCapabilities,
       }),
     },
     '@/lib/api': Api,
@@ -306,8 +316,8 @@ function parsedProfile(profileValue: MetadataProfile) {
     datasetPropertyRules: profileValue.propertyRules,
     schema: undefined,
     contextTerms: profileValue.contextTerms ?? {},
-    shapesText: undefined,
-    customShapesText: undefined,
+    shapesText: profileValue.shapesText,
+    customShapesText: profileValue.customShapesText,
     liftNotes: [],
   }
 }
@@ -408,6 +418,7 @@ beforeEach(() => {
   dialogOpen.value = false
   profiles.value = []
   metadataItems.value = []
+  profileValidationCapabilities.value = null
   fetchRoCrateRaw.mockReset()
   getMetadataDocument.mockReset()
   getMetadataItem.mockReset()
@@ -418,6 +429,14 @@ beforeEach(() => {
     const selected = profiles.value.find((entry) => entry.documentId === documentId)
     if (!selected) throw new Error('Profile not found')
     return parsedProfile(selected)
+  })
+  loadProfileValidationCapabilities.mockReset()
+  loadProfileValidationCapabilities.mockResolvedValue({
+    evaluator: 'test',
+    supported_constraints: [],
+    unsupported_constraint_policy: 'fail_closed',
+    public_profile_iri_template: 'https://w3id.org/aruna/profile/{id}',
+    legacy_profile_iri_template: 'https://w3id.org/aruna/{id}',
   })
 })
 
@@ -527,7 +546,7 @@ describe('existing Dataset profile transition', () => {
     const savedRoot = rootOf(payload.rocrate)
     expect(savedRoot).toMatchObject({
       newName: 'matching value',
-      conformsTo: [{ '@id': profiles.value[1].profileUri }],
+      conformsTo: [{ '@id': profileReferenceIri(profiles.value[1]) }],
     })
     expect(savedRoot['https://example.test/terms/old-only']).toBe('unmatched value')
     expect(savedRoot[oldEntity]).toEqual({ '@id': 'https://orcid.org/0000-0001' })
@@ -573,7 +592,7 @@ describe('existing Dataset profile transition', () => {
     const payload = replaceMetadataRoCrate.mock.calls[0][1] as { rocrate: unknown; public: boolean }
     expect(payload.public).toBe(true)
     expect(rootOf(payload.rocrate).identifier).toBe(identifier)
-    expect(rootOf(payload.rocrate).conformsTo).toEqual([{ '@id': profiles.value[1].profileUri }])
+    expect(rootOf(payload.rocrate).conformsTo).toEqual([{ '@id': profileReferenceIri(profiles.value[1]) }])
   })
 
   it('requires an external conformsTo reference to be removed before save', async () => {
@@ -600,5 +619,80 @@ describe('existing Dataset profile transition', () => {
     const payload = replaceMetadataRoCrate.mock.calls[0][1] as { rocrate: unknown }
     expect(rootOf(payload.rocrate).customValue).toBe('preserved')
     expect(rootOf(payload.rocrate)).not.toHaveProperty('conformsTo')
+  })
+
+  it('renders structured 400 findings and saves the same metadata without the Profile tag', async () => {
+    profiles.value = [profile('registered', [])]
+    replaceMetadataRoCrate.mockRejectedValueOnce(new Api.ApiError(400, 'Profile validation failed', 'constraint_violation', {
+      findings: [{
+        code: 'constraint_violation',
+        severity: 'violation',
+        focus_node: './',
+        path: 'http://schema.org/name',
+        rule: 'sh:minCount',
+        message: 'A name is required by this Profile.',
+        profile_revision: 'revision-1',
+        completeness: 'complete',
+      }],
+    }))
+    const root = await mountDialog(crate(profiles.value[0].profileUri!))
+
+    click(button(root, 'Save changes'))
+    await flush()
+
+    expect(content(root)).toContain('Profiled write rejected')
+    expect(content(root)).toContain('violation')
+    expect(content(root)).toContain('A name is required by this Profile.')
+    expect(content(root)).toContain('Focus node: ./')
+    expect(content(root)).toContain('Path: http://schema.org/name')
+
+    replaceMetadataRoCrate.mockResolvedValueOnce({ document_id: 'dataset-1' })
+    click(button(root, 'Remove Profile tag and save unprofiled'))
+    await flush()
+
+    const retry = replaceMetadataRoCrate.mock.calls[1][1] as { rocrate: unknown }
+    expect(rootOf(retry.rocrate)).not.toHaveProperty('conformsTo')
+  })
+
+  it('presents a 503 as fail-closed with Retry', async () => {
+    profiles.value = [profile('registered', [])]
+    replaceMetadataRoCrate.mockRejectedValueOnce(new Api.ApiError(503, 'Service unavailable', 'validator_unavailable', {
+      findings: [{
+        code: 'validator_unavailable',
+        severity: 'violation',
+        focus_node: null,
+        path: 'http://purl.org/dc/terms/conformsTo',
+        rule: 'validator_unavailable',
+        message: 'The Profile evaluator is unavailable.',
+        profile_revision: 'revision-1',
+        completeness: 'incomplete',
+      }],
+    }))
+    const root = await mountDialog(crate(profiles.value[0].profileUri!))
+
+    click(button(root, 'Save changes'))
+    await flush()
+
+    expect(content(root)).toContain('Validation fails closed, so nothing was saved.')
+    expect(content(root)).toContain('Retry when it is available')
+    expect(button(root, 'Retry')).toBeTruthy()
+    expect(button(root, 'Remove Profile tag and save unprofiled')).toBeTruthy()
+  })
+
+  it('labels backend-supported constraints outside the browser lift as server validation required', async () => {
+    const selected = profile('registered', [])
+    selected.shapesText = '@prefix sh: <http://www.w3.org/ns/shacl#> . [] sh:closed true .'
+    profiles.value = [selected]
+    profileValidationCapabilities.value = {
+      evaluator: 'test',
+      supported_constraints: ['sh:closed'],
+      unsupported_constraint_policy: 'fail_closed',
+      public_profile_iri_template: 'https://w3id.org/aruna/profile/{id}',
+      legacy_profile_iri_template: 'https://w3id.org/aruna/{id}',
+    }
+    const root = await mountDialog(crate(selected.profileUri!))
+
+    expect(content(root)).toContain('Server validation required')
+    expect(content(root)).toContain('sh:closed')
   })
 })

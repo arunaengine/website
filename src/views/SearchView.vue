@@ -50,6 +50,7 @@ import {
   buildSparqlExportArtifact,
   DEFAULT_SPARQL_MODE,
   IncompleteSparqlResultError,
+  profileReferenceIri,
   sparqlCoverageStatus,
   useAruna,
 } from '@/composables/useAruna'
@@ -125,7 +126,7 @@ const browsePage = ref(queryPage(route.query.page))
 const conformsToIri = computed<string | null>(() => {
   if (!profileFilter.value) return null
   const profile = profiles.value.find((item) => item.id === profileFilter.value)
-  return profile?.profileUri ?? profile?.graphIri ?? null
+  return profileReferenceIri(profile) ?? null
 })
 const profilePushedDown = computed(() => conformsToIri.value !== null)
 

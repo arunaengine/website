@@ -521,6 +521,57 @@ export interface ReplaceMetadataRoCrateRequest {
   public?: boolean
 }
 
+export type ProfileValidationSeverity = 'violation' | 'warning' | 'info'
+export type ProfileValidationCompleteness = 'complete' | 'incomplete'
+export type ProfileValidationBackendState = 'not_profiled' | 'valid' | 'invalid' | 'stale'
+
+export interface ProfileValidationFinding {
+  code: string
+  severity: ProfileValidationSeverity
+  focus_node?: string | null
+  path?: string | null
+  rule: string
+  message: string
+  profile_revision?: string | null
+  completeness: ProfileValidationCompleteness
+}
+
+export interface ProfileValidationCapabilitiesResponse {
+  evaluator: string
+  supported_constraints: string[]
+  unsupported_constraint_policy: 'fail_closed'
+  public_profile_iri_template: string
+  legacy_profile_iri_template: string
+}
+
+export interface ProfileValidationStatusResponse {
+  document_id: string
+  dataset_revision: string
+  state: ProfileValidationBackendState
+  profile_id?: string | null
+  profile_iri?: string | null
+  profile_revision?: string | null
+  evaluator: string
+  validated_at_ms?: number | null
+  findings: ProfileValidationFinding[]
+  completeness: ProfileValidationCompleteness
+  stale_reason?: string | null
+}
+
+export function profileValidationFindings(error: unknown): ProfileValidationFinding[] {
+  const findings = error instanceof ApiError ? error.details?.findings : undefined
+  if (!Array.isArray(findings)) return []
+  return findings.filter((finding): finding is ProfileValidationFinding => {
+    if (!finding || typeof finding !== 'object' || Array.isArray(finding)) return false
+    const value = finding as Record<string, unknown>
+    return typeof value.code === 'string'
+      && (value.severity === 'violation' || value.severity === 'warning' || value.severity === 'info')
+      && typeof value.rule === 'string'
+      && typeof value.message === 'string'
+      && (value.completeness === 'complete' || value.completeness === 'incomplete')
+  })
+}
+
 // GET /metadata/search — verified against aruna api/src/routes/metadata.rs and
 // operations/src/metadata/{api.rs,search_cursor.rs} (aruna feat/portal-backend).
 // Contract: `q` is required and trimmed to >= 2 chars (shorter ⇒ 400); `limit`

@@ -24,8 +24,19 @@ import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
 import { AlertTriangle, Layers, Pencil, Plus, X } from '@lucide/vue'
 import { computed, ref, shallowRef, watch } from 'vue'
-import { profileRulesLoadState, useAruna } from '@/composables/useAruna'
-import { ApiError, type MetadataDocumentListItem, type MetadataDocumentSummary } from '@/lib/api'
+import {
+  profileReferenceIri,
+  profileRulesLoadState,
+  serverValidationRequiredConstraints,
+  useAruna,
+} from '@/composables/useAruna'
+import {
+  ApiError,
+  profileValidationFindings,
+  type MetadataDocumentListItem,
+  type MetadataDocumentSummary,
+  type ProfileValidationFinding,
+} from '@/lib/api'
 import { takeSelectedContentReference } from '@/lib/contentIdentity'
 import { applyDataEntities, dataEntityTreeOf, type DataEntity } from '@/lib/dataEntities'
 import { addSubcrateLink, removeSubcrateLink, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
@@ -71,6 +82,7 @@ interface LoadedProfileDefinition {
   schema?: JsonSchema
   contextTerms: Record<string, string>
   additionalRequirements: LiftNote[]
+  shapes: string[]
   complete: boolean
 }
 
@@ -108,11 +120,16 @@ const {
   apiBaseUrl,
   profiles,
   loadProfileCrate,
+  profileValidationCapabilities,
+  loadProfileValidationCapabilities,
 } = useAruna()
 
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const saveError = ref<string | null>(null)
+const serverFindings = ref<ProfileValidationFinding[]>([])
+const profiledWriteUnavailable = ref(false)
+const profiledWriteRejected = ref(false)
 const rawError = ref<string | null>(null)
 const activeTab = ref<'fields' | 'files' | 'raw'>('fields')
 
@@ -139,6 +156,10 @@ const profileControls = ref<ProfileControl[]>([])
 const profileEntityRules = ref<ProfileEntityRule[]>([])
 const profileContextTerms = ref<Record<string, string>>({})
 const profileAdditionalRequirements = ref<LiftNote[]>([])
+const profileShapes = ref<string[]>([])
+const serverRequiredConstraints = computed(() =>
+  serverValidationRequiredConstraints(profileShapes.value, profileValidationCapabilities.value),
+)
 const profileContextConflicts = ref<string[]>([])
 const generatedValues = ref<Record<string, unknown>>({})
 const entityEntries = ref<Record<string, EntityEntry[]>>({})
@@ -355,8 +376,9 @@ watch(
       return
     }
     activeTab.value = 'fields'
-    saveError.value = null
+    clearProfileWriteFailure()
     rawError.value = null
+    void loadProfileValidationCapabilities().catch(() => undefined)
     void load(props.documentId, loadToken)
   },
 )
@@ -458,7 +480,9 @@ function profileReferencesOf(crate: unknown): string[] {
 }
 
 function profileForReference(iri: string): MetadataProfile | undefined {
-  return availableProfiles.value.find((profile) => profile.profileUri === iri || profile.graphIri === iri)
+  return availableProfiles.value.find(
+    (profile) => profileReferenceIri(profile) === iri || profile.profileUri === iri || profile.graphIri === iri,
+  )
 }
 
 function summaryProfileDefinition(profile: MetadataProfile): LoadedProfileDefinition {
@@ -469,6 +493,7 @@ function summaryProfileDefinition(profile: MetadataProfile): LoadedProfileDefini
     schema: profile.schema ? cloneDraftValue(profile.schema) : undefined,
     contextTerms: { ...(profile.contextTerms ?? {}) },
     additionalRequirements: [],
+    shapes: [profile.shapesText, profile.customShapesText].filter((value): value is string => Boolean(value?.trim())),
     complete: !profile.documentId,
   }
 }
@@ -484,6 +509,7 @@ async function fullProfileDefinition(profile: MetadataProfile, force = false): P
     schema: parsed.schema ? cloneDraftValue(parsed.schema) : undefined,
     contextTerms: { ...(parsed.contextTerms ?? {}) },
     additionalRequirements: cloneLiftNotes(parsed.liftNotes),
+    shapes: [parsed.shapesText, parsed.customShapesText].filter((value): value is string => Boolean(value?.trim())),
     complete: true,
   }
 }
@@ -530,6 +556,7 @@ function clearProfileDefinition(crate: unknown) {
   profileEntityRules.value = []
   profileContextTerms.value = {}
   profileAdditionalRequirements.value = []
+  profileShapes.value = []
   profileContextConflicts.value = []
   generatedValues.value = {}
   entityEntries.value = {}
@@ -571,6 +598,7 @@ function applyProfileDefinition(definition: LoadedProfileDefinition, crate: unkn
   profileEntityRules.value = definition.entityRules
   profileContextTerms.value = definition.contextTerms
   profileAdditionalRequirements.value = cloneLiftNotes(definition.additionalRequirements)
+  profileShapes.value = [...definition.shapes]
 
   const root = findRoot(crate) ?? {}
   const controls = controlsFromRules(definition.propertyRules, definition.entityRules)
@@ -840,7 +868,7 @@ function rewriteProfileReference(crate: unknown, profileValue: string, definitio
     return
   }
   const profile = definition?.profile
-  const iri = profile?.profileUri || profile?.graphIri
+  const iri = profileReferenceIri(profile)
   if (!profile || !iri) return
   root.conformsTo = [...specificationReferences, { '@id': iri }]
   graphEntitySink(crate)({
@@ -1034,7 +1062,7 @@ async function requestProfileSwitch(nextValue: string) {
     profileSwitchLoading.value = false
     return
   }
-  if (!target.profileUri && !target.graphIri) {
+  if (!profileReferenceIri(target)) {
     profileSwitchError.value = 'That registered profile has no saved reference IRI.'
     profileSwitchLoading.value = false
     return
@@ -1241,8 +1269,32 @@ function upsertLicenseEntity(crate: unknown, licenseValue: string) {
   crate['@graph'] = g
 }
 
-async function save() {
+function clearProfileWriteFailure() {
   saveError.value = null
+  serverFindings.value = []
+  profiledWriteUnavailable.value = false
+  profiledWriteRejected.value = false
+}
+
+function showProfileWriteFailure(error: unknown, profiled: boolean) {
+  const findings = profileValidationFindings(error)
+  const unavailable = profiled && error instanceof ApiError && error.status === 503
+  serverFindings.value = findings
+  profiledWriteUnavailable.value = unavailable
+  profiledWriteRejected.value = profiled && (findings.length > 0 || unavailable)
+  saveError.value = profiledWriteRejected.value
+    ? unavailable
+      ? 'The server did not save this profiled write because Profile validation is unavailable.'
+      : 'The server rejected this profiled write.'
+    : error instanceof ApiError && error.status === 403
+      ? 'You need write permission in the owning group.'
+      : error instanceof Error
+        ? error.message
+        : String(error)
+}
+
+async function save(unprofiled = false) {
+  clearProfileWriteFailure()
   rawError.value = null
   const documentId = loadedDocumentId.value
   if (!documentId || documentId !== props.documentId) {
@@ -1252,12 +1304,14 @@ async function save() {
   let rocrate: unknown
   try {
     rocrate = activeTab.value === 'raw' ? JSON.parse(rawText.value) : buildFromFields()
+    if (unprofiled) rewriteProfileReference(rocrate, NO_PROFILE_VALUE, null)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (activeTab.value === 'raw') rawError.value = message
     else saveError.value = message
     return
   }
+  const profiled = profileReferencesOf(rocrate).length > 0
   const externalReferences = unknownProfileReferences(rocrate)
   if (externalReferences.length) {
     const message = `Remove the external conformsTo ${externalReferences.length === 1 ? 'reference' : 'references'} before saving, or choose a registered profile. Only registered profile references can be written.`
@@ -1272,8 +1326,7 @@ async function save() {
     emit('saved', summary)
     emit('update:open', false)
   } catch (err) {
-    if (err instanceof ApiError && err.status === 403) saveError.value = 'You need write permission in the owning group.'
-    else saveError.value = err instanceof Error ? err.message : String(err)
+    showProfileWriteFailure(err, profiled)
   }
 }
 </script>
@@ -1343,8 +1396,12 @@ async function save() {
                 These profile field names already map to different property URIs in this crate and are not reinterpreted: {{ profileContextConflicts.join(', ') }}. Their saved values remain custom metadata. Resolve the context conflict in Raw JSON or remove the profile reference before saving if authoritative validation rejects the crate.
               </p>
 
-              <div v-if="profileAdditionalRequirements.length" class="rounded-md border border-border bg-muted/20 p-2">
+              <div v-if="profileAdditionalRequirements.length || serverRequiredConstraints.length" class="space-y-2 rounded-md border border-border bg-muted/20 p-2">
                 <p class="mb-1 text-[11px] font-medium text-foreground">Additional requirements</p>
+                <div v-if="serverRequiredConstraints.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                  <p class="font-medium">Server validation required</p>
+                  <p class="mt-1">The browser cannot lift {{ serverRequiredConstraints.join(', ') }} into complete controls. The server checks these constraints when you save.</p>
+                </div>
                 <LiftNotesPanel :notes="profileAdditionalRequirements" attached />
               </div>
 
@@ -1424,7 +1481,7 @@ async function save() {
               </ul>
               <details v-if="replacementPreviewText" class="mt-2 rounded border border-border bg-background/70 p-2">
                 <summary class="cursor-pointer font-medium text-foreground">Preview exact replacement crate</summary>
-                <p class="mt-1 text-[11px] text-muted-foreground">This is a local preview of the exact Fields-tab replacement. It does not report verified conformance. The server remains authoritative for PUT validation when that support lands.</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">This is a local preview of the exact Fields-tab replacement. It does not report verified conformance. The server validates the submitted replacement authoritatively.</p>
                 <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[10px] text-foreground">{{ replacementPreviewText }}</pre>
               </details>
             </div>
@@ -1474,7 +1531,7 @@ async function save() {
             </div>
 
             <div v-if="violations.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
-              <div class="font-medium text-amber-800 dark:text-amber-300">Local profile preview: {{ selectedProfile?.name }}</div>
+              <div class="font-medium text-amber-800 dark:text-amber-300">Browser SHACL preview: {{ selectedProfile?.name }}</div>
               <ul class="mt-1 list-disc space-y-0.5 pl-4">
                 <li v-for="violation in violations" :key="violation.pointer + violation.message" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
                   <span class="font-mono">{{ violation.fieldId ?? violation.pointer }}</span>: {{ violation.message }}
@@ -1514,12 +1571,31 @@ async function save() {
           <Switch aria-label="Public" :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
         </div>
 
-        <p v-if="saveError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ saveError }}</p>
+        <section v-if="profiledWriteRejected" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs">
+          <p class="font-medium text-destructive">Profiled write rejected</p>
+          <p v-if="profiledWriteUnavailable" class="mt-1 text-foreground">
+            The Profile or server validator is unavailable. Validation fails closed, so nothing was saved. Retry when it is available, or remove the Profile tag and save unprofiled.
+          </p>
+          <ul v-if="serverFindings.length" class="mt-2 space-y-2">
+            <li v-for="(finding, index) in serverFindings" :key="`${finding.code}:${index}`" class="rounded border border-border bg-background/70 px-2 py-1.5">
+              <p class="font-medium uppercase text-destructive">{{ finding.severity }}</p>
+              <p class="mt-0.5 text-foreground">{{ finding.message }}</p>
+              <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">Focus node: {{ finding.focus_node || 'Not provided' }}</p>
+              <p class="break-all font-mono text-[10px] text-muted-foreground">Path: {{ finding.path || 'Not provided' }}</p>
+            </li>
+          </ul>
+          <p v-if="!profiledWriteUnavailable" class="mt-2 text-foreground">Fix the metadata and retry, or remove the Profile tag and save unprofiled.</p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" :disabled="saving" @click="save()">Retry</Button>
+            <Button type="button" variant="outline" size="sm" :disabled="saving" @click="save(true)">Remove Profile tag and save unprofiled</Button>
+          </div>
+        </section>
+        <p v-else-if="saveError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ saveError }}</p>
       </template>
 
       <DialogFooter>
         <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
-        <Button :disabled="loading || Boolean(loadError) || saving" @click="save">{{ saving ? 'Saving…' : 'Save changes' }}</Button>
+        <Button :disabled="loading || Boolean(loadError) || saving" @click="save()">{{ saving ? 'Saving…' : 'Save changes' }}</Button>
       </DialogFooter>
 
       <Transition
@@ -1564,7 +1640,7 @@ async function save() {
                 <summary class="cursor-pointer text-xs font-medium text-foreground">Preview exact replacement crate</summary>
                 <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all text-[10px] text-foreground">{{ pendingReplacementText }}</pre>
               </details>
-              <p class="mt-2 text-[11px] text-muted-foreground">This local preview does not verify conformance. The existing PUT behavior is unchanged until server validation is available.</p>
+              <p class="mt-2 text-[11px] text-muted-foreground">This local preview does not verify conformance. The server performs authoritative validation when the Profile tag is retained.</p>
             </template>
 
             <div class="mt-4 flex justify-end gap-2">

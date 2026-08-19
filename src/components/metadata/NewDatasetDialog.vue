@@ -25,7 +25,12 @@ import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { AlertTriangle, Check, FileJson, FileJson2, FileUp, Layers, Plus, Upload, X } from '@lucide/vue'
-import { profileRulesLoadState, useAruna } from '@/composables/useAruna'
+import {
+  profileReferenceIri,
+  profileRulesLoadState,
+  serverValidationRequiredConstraints,
+  useAruna,
+} from '@/composables/useAruna'
 import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
 import {
   fileEntityForReference,
@@ -34,8 +39,13 @@ import {
 } from '@/lib/contentIdentity'
 import { groupCustomFieldRows, type CustomFieldRow } from '@/lib/customFields'
 import { addSubcrateLink, type SubcrateLink } from '@/lib/subcrates'
-import type { MetadataDocumentListItem } from '@/lib/api'
-import type { DataEntity } from '@/lib/dataEntities'
+import {
+  ApiError,
+  profileValidationFindings,
+  type MetadataDocumentListItem,
+  type ProfileValidationFinding,
+} from '@/lib/api'
+import { crateGraph, crateRootId, type DataEntity } from '@/lib/dataEntities'
 import type { MetadataDoc } from '@/data/types'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
 import { emitEntityEntries, emitSelectObject, isHasPartUri, slugify, uniqueId } from '@/lib/profiles/emit'
@@ -72,6 +82,7 @@ import { cloneLiftNotes, type LiftNote } from '@/lib/shacl/lift'
 import { buildProfileContext } from '@/lib/profiles/propertyCatalog'
 import { isAbsoluteUri, termNameFromUri } from '@/lib/profiles/uri'
 import { validateProfileData, validateRequiredInstances } from '@/lib/profiles/validate'
+import { classifyRoCrateSpecIri } from '@/lib/rocrateVersions'
 import {
   DX_PROFILE,
   RO_CRATE_PROFILE,
@@ -106,6 +117,8 @@ const {
   saving,
   currentUser,
   apiBaseUrl,
+  profileValidationCapabilities,
+  loadProfileValidationCapabilities,
 } = useAruna()
 
 const groupId = ref('')
@@ -134,6 +147,9 @@ const customFieldValues = computed(() => groupCustomFieldRows(customFields.value
 const subcrates = ref<SubcrateLink[]>([])
 const subcratePickerOpen = ref(false)
 const submitError = ref<string | null>(null)
+const serverFindings = ref<ProfileValidationFinding[]>([])
+const profiledWriteUnavailable = ref(false)
+const profiledWriteRejected = ref(false)
 const createGroupOpen = ref(false)
 const profileSchema = ref<JsonSchema | undefined>()
 const profileControls = ref<ProfileControl[]>([])
@@ -200,6 +216,9 @@ const profileSelection = computed({
   },
 })
 const selectedProfile = computed(() => profiles.value.find((profile) => profile.id === profileId.value))
+const serverRequiredConstraints = computed(() =>
+  serverValidationRequiredConstraints(profileShapes.value, profileValidationCapabilities.value),
+)
 const pendingProfile = computed(() => profiles.value.find((profile) => profile.id === pendingProfileId.value))
 const pendingProfileTargetControls = computed(() =>
   controlsFromRules(pendingProfileTargetRules.value, pendingProfileTargetEntityRules.value),
@@ -652,7 +671,9 @@ const importError = ref('')
 const importPreview = ref<CrateImportPreview | null>(null)
 const unrecognizedImportProfiles = computed(() =>
   (importPreview.value?.conformsToIds ?? []).filter(
-    (iri) => !profiles.value.some((profile) => profile.profileUri === iri || profile.graphIri === iri),
+    (iri) => !profiles.value.some(
+      (profile) => profileReferenceIri(profile) === iri || profile.profileUri === iri || profile.graphIri === iri,
+    ),
   ),
 )
 const importPath = ref('')
@@ -691,16 +712,78 @@ const canSubmitImport = computed(() =>
   Boolean(currentUser.value && groupId.value && importPath.value.trim() && importPreview.value),
 )
 
-async function submitImport() {
+function profileReferenceId(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const id = (value as Record<string, unknown>)['@id']
+    return typeof id === 'string' ? id : ''
+  }
+  return ''
+}
+
+function withoutProfileTag(crate: unknown): unknown {
+  const clone = structuredClone(crate)
+  const rootId = crateRootId(clone)
+  const root = rootId ? crateGraph(clone).find((entity) => entity['@id'] === rootId) : undefined
+  if (!root?.conformsTo) return clone
+  const references = Array.isArray(root.conformsTo) ? root.conformsTo : [root.conformsTo]
+  const retained = references.filter((reference) => {
+    const iri = profileReferenceId(reference)
+    return !iri || classifyRoCrateSpecIri(iri).kind !== 'non-spec'
+  })
+  if (retained.length) root.conformsTo = retained
+  else delete root.conformsTo
+  return clone
+}
+
+function hasProfileTag(crate: unknown): boolean {
+  const rootId = crateRootId(crate)
+  const root = rootId ? crateGraph(crate).find((entity) => entity['@id'] === rootId) : undefined
+  const references = Array.isArray(root?.conformsTo)
+    ? root.conformsTo
+    : root?.conformsTo
+      ? [root.conformsTo]
+      : []
+  return references.some((reference) => {
+    const iri = profileReferenceId(reference)
+    return Boolean(iri && classifyRoCrateSpecIri(iri).kind === 'non-spec')
+  })
+}
+
+function clearProfileWriteFailure() {
+  submitError.value = null
+  serverFindings.value = []
+  profiledWriteUnavailable.value = false
+  profiledWriteRejected.value = false
+}
+
+function showProfileWriteFailure(error: unknown, profiled: boolean) {
+  const findings = profileValidationFindings(error)
+  const unavailable = profiled && error instanceof ApiError && error.status === 503
+  serverFindings.value = findings
+  profiledWriteUnavailable.value = unavailable
+  profiledWriteRejected.value = profiled && (findings.length > 0 || unavailable)
+  submitError.value = profiledWriteRejected.value
+    ? unavailable
+      ? 'The server did not save this profiled write because Profile validation is unavailable.'
+      : 'The server rejected this profiled write.'
+    : error instanceof Error
+      ? error.message
+      : String(error)
+}
+
+async function submitImport(unprofiled = false) {
   const pending = importPreview.value
   if (!pending || !canSubmitImport.value) return
-  submitError.value = null
+  clearProfileWriteFailure()
+  const rocrate = unprofiled ? withoutProfileTag(pending.crate) : pending.crate
+  const profiled = hasProfileTag(rocrate)
   try {
     const created = await createMetadata({
       group_id: groupId.value,
       path: importPath.value.trim(),
       public: isPublic.value,
-      rocrate: pending.crate,
+      rocrate,
     })
     const doc = metadata.value.find((item) => item.ulid === created.document_id) ?? {
       ulid: created.document_id,
@@ -722,13 +805,23 @@ async function submitImport() {
       profileId: '',
       profileIds: [],
       contributors: [],
-      roCrate: pending.crate,
+      roCrate: rocrate,
     }
     emit('created', doc)
     emit('update:open', false)
   } catch (err) {
-    submitError.value = err instanceof Error ? err.message : String(err)
+    showProfileWriteFailure(err, profiled)
   }
+}
+
+function retryProfiledWrite() {
+  if (startTab.value === 'import') void submitImport()
+  else void submit()
+}
+
+function saveUnprofiled() {
+  if (startTab.value === 'import') void submitImport(true)
+  else void submit(true)
 }
 
 // Dialog discard guard: outside clicks never close the dialog; an explicit close
@@ -903,8 +996,9 @@ watch(
     customFields.value = []
     subcrates.value = []
     subcratePickerOpen.value = false
-    submitError.value = null
+    clearProfileWriteFailure()
     resetGeneratedProfileFields()
+    void loadProfileValidationCapabilities().catch(() => undefined)
     void loadSelectedProfileSchema()
   },
   { immediate: true },
@@ -1166,8 +1260,8 @@ function buildRoCrate() {
   }
 
   const profile = selectedProfile.value
-  const profileUri = profile?.profileUri || profile?.graphIri
-  if (profileUri) {
+  const profileUri = profileReferenceIri(profile)
+  if (profileUri && profile) {
     dataset.conformsTo = [{ '@id': profileUri }]
     addEntity({
       '@id': profileUri,
@@ -1272,11 +1366,14 @@ function buildRoCrate() {
   return crate
 }
 
-async function submit() {
+async function submit(unprofiled = false) {
   if (!canSubmit.value) return
-  submitError.value = null
+  clearProfileWriteFailure()
+  let profiled = false
   try {
-    const roCrate = needsRoCrate.value ? buildRoCrate() : undefined
+    const builtCrate = needsRoCrate.value ? buildRoCrate() : undefined
+    const roCrate = builtCrate && unprofiled ? withoutProfileTag(builtCrate) : builtCrate
+    profiled = Boolean(roCrate && hasProfileTag(roCrate))
     const created = await createMetadata(
       roCrate
         ? {
@@ -1312,8 +1409,8 @@ async function submit() {
       author: creatorList.value[0] ?? currentUser.value?.name ?? '',
       organization: currentUser.value?.affiliation ?? '',
       nodeId: '',
-      profileId: profileId.value,
-      profileIds: profileId.value ? [profileId.value] : [],
+      profileId: unprofiled ? '' : profileId.value,
+      profileIds: unprofiled || !profileId.value ? [] : [profileId.value],
       contributors: creatorList.value.map((name) => ({ name, role: 'Contributor', affiliation: undefined })),
       doi: identifier.value.trim() || undefined,
       roCrate: roCrate ?? {},
@@ -1321,7 +1418,7 @@ async function submit() {
     emit('created', doc)
     emit('update:open', false)
   } catch (err) {
-    submitError.value = err instanceof Error ? err.message : String(err)
+    showProfileWriteFailure(err, profiled)
   }
 }
 </script>
@@ -1386,7 +1483,7 @@ async function submit() {
             <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
               This crate declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
-              <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. You can still import it.
+              <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. Only registered Profile references can be saved. Remove the Profile tag and save unprofiled if the server rejects it.
             </span>
           </div>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -1413,7 +1510,6 @@ async function submit() {
             <Switch :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
           </label>
         </template>
-        <div v-if="submitError" class="text-xs text-destructive">{{ submitError }}</div>
       </div>
 
       <div v-else class="max-h-[70vh] space-y-4 overflow-y-auto px-1 scrollbar-thin">
@@ -1438,9 +1534,9 @@ async function submit() {
             <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
               <template v-if="profileRuleState === 'loading'">Loading profile rules…</template>
               <template v-else-if="profileRuleState === 'unavailable'">Profile rules are unavailable. Retry below or choose "No profile reference".</template>
-              <template v-else-if="profileInputCount">Adds {{ profileInputCount }} {{ profileInputCount === 1 ? 'field' : 'fields' }} below, <span class="text-destructive">*</span> marks required. The RO-Crate references {{ selectedProfile.name }} by its saved graph IRI.</template>
-              <template v-else-if="profileRuleState === 'empty'">No rules are defined for this profile. The RO-Crate still references {{ selectedProfile.name }} by its saved graph IRI.</template>
-              <template v-else>No controls could be generated, but the retained SHACL requirements still apply. The RO-Crate references {{ selectedProfile.name }} by its saved graph IRI.</template>
+              <template v-else-if="profileInputCount">Adds {{ profileInputCount }} {{ profileInputCount === 1 ? 'field' : 'fields' }} below, <span class="text-destructive">*</span> marks required. The RO-Crate references {{ selectedProfile.name }} by its public Profile w3id.</template>
+              <template v-else-if="profileRuleState === 'empty'">No rules are defined for this profile. The RO-Crate still references {{ selectedProfile.name }} by its public Profile w3id.</template>
+              <template v-else>No controls could be generated, but the retained SHACL requirements still apply. The RO-Crate references {{ selectedProfile.name }} by its public Profile w3id.</template>
             </p>
             <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
               Properties omitted by this profile remain allowed unless an explicit closed or other restricting SHACL rule constrains them.
@@ -1534,10 +1630,14 @@ async function submit() {
              silently missing fields: show a skeleton while loading and a BLOCKING
              error panel (with Retry) when the full-crate load failed — never a
              silently-degraded form. -->
-        <section v-if="profileAdditionalRequirements.length" class="space-y-2 rounded-md border border-border p-3">
+        <section v-if="profileAdditionalRequirements.length || serverRequiredConstraints.length" class="space-y-2 rounded-md border border-border p-3">
           <div>
             <h3 class="text-xs font-semibold text-foreground">Additional requirements</h3>
             <p class="mt-0.5 text-[11px] text-muted-foreground">Read-only SHACL requirements retained for authoritative validation.</p>
+          </div>
+          <div v-if="serverRequiredConstraints.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            <p class="font-medium">Server validation required</p>
+            <p class="mt-1">The browser cannot lift {{ serverRequiredConstraints.join(', ') }} into complete controls. The server checks these constraints when you save.</p>
           </div>
           <LiftNotesPanel :notes="profileAdditionalRequirements" attached />
         </section>
@@ -1704,21 +1804,21 @@ async function submit() {
              saved. Advisory only — findings never gate submission. -->
         <div v-if="profileId && profileShapes.length" class="rounded-md border border-border p-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-xs font-medium text-foreground">Profile conformance</p>
+            <p class="text-xs font-medium text-foreground">Browser SHACL preview</p>
             <div class="flex items-center gap-2">
               <span v-if="shaclRunning" class="text-[11px] text-muted-foreground">Checking…</span>
               <Button type="button" variant="outline" size="sm" :disabled="shaclUnavailable || shaclRunning" @click="validateAgainstProfile">
-                Validate against profile
+                Run browser preview
               </Button>
             </div>
           </div>
           <p v-if="shaclUnavailable" class="mt-2 text-[11px] text-muted-foreground">
-            Deep validation is unavailable in this browser session; the form checks above still apply unchanged.
+            Browser SHACL preview is unavailable in this session; the form checks above still apply unchanged.
           </p>
-          <p v-else-if="shaclError" class="mt-2 text-[11px] text-destructive">Deep validation failed: {{ shaclError }}</p>
+          <p v-else-if="shaclError" class="mt-2 text-[11px] text-destructive">Browser SHACL preview failed: {{ shaclError }}</p>
           <template v-else>
             <p v-if="!shaclFindings.length" class="mt-2 text-[11px] text-muted-foreground">
-              No conformance findings against the profile's shapes.
+              No browser preview findings against the profile's shapes.
             </p>
             <p v-else-if="shaclInlineCount && !shaclPanelGroups.length" class="mt-2 text-[11px] text-muted-foreground">
               All findings are shown inline at their fields above.
@@ -1751,8 +1851,28 @@ async function submit() {
           </span>
           <Switch :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
         </label>
-        <div v-if="submitError" class="text-xs text-destructive">{{ submitError }}</div>
       </div>
+
+      <section v-if="profiledWriteRejected" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs">
+        <p class="font-medium text-destructive">Profiled write rejected</p>
+        <p v-if="profiledWriteUnavailable" class="mt-1 text-foreground">
+          The Profile or server validator is unavailable. Validation fails closed, so nothing was saved. Retry when it is available, or remove the Profile tag and save unprofiled.
+        </p>
+        <ul v-if="serverFindings.length" class="mt-2 space-y-2">
+          <li v-for="(finding, index) in serverFindings" :key="`${finding.code}:${index}`" class="rounded border border-border bg-background/70 px-2 py-1.5">
+            <p class="font-medium uppercase text-destructive">{{ finding.severity }}</p>
+            <p class="mt-0.5 text-foreground">{{ finding.message }}</p>
+            <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">Focus node: {{ finding.focus_node || 'Not provided' }}</p>
+            <p class="break-all font-mono text-[10px] text-muted-foreground">Path: {{ finding.path || 'Not provided' }}</p>
+          </li>
+        </ul>
+        <p v-if="!profiledWriteUnavailable" class="mt-2 text-foreground">Fix the metadata and retry, or remove the Profile tag and save unprofiled.</p>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" :disabled="saving" @click="retryProfiledWrite">Retry</Button>
+          <Button type="button" variant="outline" size="sm" :disabled="saving" @click="saveUnprofiled">Remove Profile tag and save unprofiled</Button>
+        </div>
+      </section>
+      <p v-else-if="submitError" class="text-xs text-destructive">{{ submitError }}</p>
 
       <div v-if="startTab === 'create' && !canSubmit && !saving && currentUser && submitBlockerSummary.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
         {{ submitBlockerSummary.join(' ') }}
@@ -1760,10 +1880,10 @@ async function submit() {
 
       <DialogFooter>
         <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
-        <Button v-if="startTab === 'import'" :disabled="!canSubmitImport || saving" @click="submitImport">
+        <Button v-if="startTab === 'import'" :disabled="!canSubmitImport || saving" @click="submitImport()">
           {{ saving ? 'Importing…' : 'Import crate' }}
         </Button>
-        <Button v-else :disabled="!canSubmit || saving" @click="submit">
+        <Button v-else :disabled="!canSubmit || saving" @click="submit()">
           {{ saving ? 'Creating…' : 'Create metadata' }}
         </Button>
       </DialogFooter>
