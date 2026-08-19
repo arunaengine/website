@@ -15,6 +15,16 @@ export interface DataEntity {
   description?: string
 }
 
+export type EntityKind =
+  | 'people'
+  | 'organizations'
+  | 'publications'
+  | 'software'
+  | 'places'
+  | 'terms'
+  | 'comments'
+  | 'other'
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
@@ -43,8 +53,8 @@ export function stringProp(value: unknown): string | undefined {
   return undefined
 }
 
-function typesOf(entity: Record<string, unknown>): string[] {
-  const t = entity['@type']
+export function typesOf(entity: Record<string, unknown> | undefined): string[] {
+  const t = entity?.['@type']
   if (typeof t === 'string') return [t]
   if (Array.isArray(t)) return t.filter((x): x is string => typeof x === 'string')
   return []
@@ -82,7 +92,7 @@ export function dataEntitiesOf(crate: unknown): DataEntity[] {
   }
   for (const entity of g) {
     const types = typesOf(entity)
-    if (types.includes('File') || types.includes('Dataset')) {
+    if (isDataEntity(types)) {
       push(typeof entity['@id'] === 'string' ? (entity['@id'] as string) : '', entity)
     }
   }
@@ -93,17 +103,77 @@ export function dataEntitiesOf(crate: unknown): DataEntity[] {
 // and its media subtypes count as files; Dataset marks a sub-directory whose
 // own hasPart may nest further data entities.
 export const DATA_ENTITY_TYPES = new Set(['File', 'MediaObject', 'Dataset', 'ImageObject', 'AudioObject', 'VideoObject'])
+const LEAF_FILE_TYPES = new Set(['File', 'MediaObject', 'ImageObject', 'AudioObject', 'VideoObject'])
+export const ORG_TYPES = new Set([
+  'Organization',
+  'EducationalOrganization',
+  'CollegeOrUniversity',
+  'GovernmentOrganization',
+  'ResearchOrganization',
+  'Corporation',
+  'Consortium',
+  'FundingAgency',
+  'NGO',
+  'Project',
+  'ResearchProject',
+])
+const PUBLICATION_TYPES = new Set([
+  'ScholarlyArticle',
+  'Article',
+  'Book',
+  'Chapter',
+  'Thesis',
+  'Report',
+  'Periodical',
+  'PublicationIssue',
+  'PublicationVolume',
+])
+const SOFTWARE_TYPES = new Set([
+  'SoftwareApplication',
+  'SoftwareSourceCode',
+  'ComputationalWorkflow',
+  'WebApplication',
+])
+const PLACE_TYPES = new Set([
+  'Place',
+  'City',
+  'Country',
+  'State',
+  'AdministrativeArea',
+  'PostalAddress',
+  'GeoCoordinates',
+  'GeoShape',
+])
+const TERM_TYPES = new Set(['DefinedTerm', 'DefinedTermSet', 'CategoryCode', 'CategoryCodeSet'])
 
-function typeShortName(type: string): string {
+export function typeShortName(type: string): string {
   return type.split(/[#/]/).filter(Boolean).pop() ?? type
 }
 
-function isDataType(types: string[]): boolean {
+export function isDataEntity(types: string[]): boolean {
   return types.some((type) => DATA_ENTITY_TYPES.has(typeShortName(type)))
 }
 
+export function isLeafFile(types: string[]): boolean {
+  const normalized = types.map(typeShortName)
+  return !normalized.includes('Dataset') && normalized.some((type) => LEAF_FILE_TYPES.has(type))
+}
+
 function isDirectoryType(types: string[]): boolean {
-  return types.some((type) => typeShortName(type) === 'Dataset')
+  return isDataEntity(types) && !isLeafFile(types)
+}
+
+/** Display kind an entity's normalized explicit types decide (untyped entities: 'other'). */
+export function entityKind(types: string[]): EntityKind {
+  const normalized = types.map(typeShortName)
+  if (normalized.includes('Person')) return 'people'
+  if (normalized.some((type) => ORG_TYPES.has(type))) return 'organizations'
+  if (normalized.some((type) => PUBLICATION_TYPES.has(type))) return 'publications'
+  if (normalized.some((type) => SOFTWARE_TYPES.has(type))) return 'software'
+  if (normalized.some((type) => PLACE_TYPES.has(type))) return 'places'
+  if (normalized.some((type) => TERM_TYPES.has(type))) return 'terms'
+  if (normalized.includes('Comment')) return 'comments'
+  return 'other'
 }
 
 export interface DataEntityNode extends DataEntity {
@@ -162,7 +232,7 @@ export function dataEntityTreeOf(crate: unknown, maxDepth = 8): DataEntityNode[]
   for (const entity of g) {
     const id = typeof entity['@id'] === 'string' ? (entity['@id'] as string) : ''
     if (!id || id === 'ro-crate-metadata.json' || id === rootId || seen.has(id)) continue
-    if (isDataType(typesOf(entity))) walk(id, 0, rootId ?? '')
+    if (isDataEntity(typesOf(entity))) walk(id, 0, rootId ?? '')
   }
   return rows
 }

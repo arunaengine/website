@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Popover from '@/components/ui/Popover.vue'
+import { crateGraph, crateRootId, entityKind, typesOf } from '@/lib/dataEntities'
+import { refId, toArray } from '@/lib/contextualEntities'
 import { isArunaUserId, orcidOf } from '@/lib/identifiers'
 import { Building2, ExternalLink, User as UserIcon } from '@lucide/vue'
 
@@ -22,52 +24,26 @@ interface AuthorEntry {
   userId?: string
 }
 
-type Entity = Record<string, unknown>
-
-function graphOf(crate: unknown): Entity[] {
-  if (!crate || typeof crate !== 'object') return []
-  const graph = (crate as Entity)['@graph']
-  return Array.isArray(graph) ? graph.filter((e): e is Entity => Boolean(e) && typeof e === 'object') : []
-}
-
-function rootOf(graph: Entity[]): Entity | undefined {
-  const descriptor = graph.find((e) => e['@id'] === 'ro-crate-metadata.json')
-  const aboutId = refId(descriptor?.about) ?? './'
-  return graph.find((e) => e['@id'] === aboutId)
-}
-
-function refId(value: unknown): string | undefined {
-  if (typeof value === 'string') return value
-  if (value && typeof value === 'object') {
-    const id = (value as Entity)['@id']
-    return typeof id === 'string' ? id : undefined
-  }
-  return undefined
-}
-
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : value == null ? [] : [value]
-}
-
 function strings(value: unknown): string[] {
-  return asArray(value).filter((v): v is string => typeof v === 'string')
+  return toArray(value).filter((v): v is string => typeof v === 'string')
 }
 
 const authors = computed<AuthorEntry[]>(() => {
-  const graph = graphOf(props.crate)
+  const graph = crateGraph(props.crate)
   if (!graph.length) return []
-  const root = rootOf(graph)
+  const rootId = crateRootId(props.crate)
+  const root = rootId ? graph.find((entity) => entity['@id'] === rootId) : undefined
   if (!root) return []
   const entries: AuthorEntry[] = []
   const seen = new Set<string>()
   const collect = (property: string, role: AuthorEntry['role']) => {
-    for (const ref of asArray(root[property])) {
+    for (const ref of toArray(root[property])) {
       const id = refId(ref)
       if (!id || seen.has(id)) continue
       seen.add(id)
       const entity = graph.find((e) => e['@id'] === id)
       const name = typeof entity?.name === 'string' && entity.name ? entity.name : id
-      const types = strings(entity?.['@type'] ?? (typeof entity?.['@type'] === 'string' ? entity['@type'] : []))
+      const types = typesOf(entity)
       const identifiers = [id, ...strings(entity?.identifier)]
       const orcid = identifiers.map((v) => orcidOf(v)).find(Boolean)
       const userId = identifiers.find((v) => isArunaUserId(v))
@@ -81,7 +57,7 @@ const authors = computed<AuthorEntry[]>(() => {
         id,
         name,
         role,
-        kind: types.includes('Organization') ? 'organization' : 'person',
+        kind: entityKind(types) === 'organizations' ? 'organization' : 'person',
         orcid,
         userId,
         affiliation: typeof affiliation === 'string' ? affiliation : undefined,

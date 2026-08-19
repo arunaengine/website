@@ -152,6 +152,17 @@ describe('presentCrate', () => {
     expect(result.organizations.map((row) => row.name)).toEqual(['A lab'])
   })
 
+  it('classifies compact and full-IRI research organizations as organization cards', () => {
+    const result = presentCrate(
+      crate({}, [
+        { '@id': '#compact-lab', '@type': 'ResearchOrganization', name: 'Compact Lab' },
+        { '@id': '#iri-lab', '@type': 'https://schema.org/ResearchOrganization', name: 'IRI Lab' },
+      ]),
+    )
+    expect(result.organizations.map((row) => row.name)).toEqual(['Compact Lab', 'IRI Lab'])
+    expect(result.entities).toEqual([])
+  })
+
   it('detects identifiers', () => {
     const result = presentCrate(
       crate({}, [
@@ -256,6 +267,8 @@ describe('presentCrate', () => {
       crate({}, [
         { '@id': 'data.csv', '@type': 'File', name: 'data.csv' },
         { '@id': 'img.png', '@type': ['File', 'MediaObject'], name: 'img.png' },
+        { '@id': 'photo.png', '@type': 'ImageObject', name: 'photo.png' },
+        { '@id': 'audio.ogg', '@type': 'https://schema.org/AudioObject', name: 'audio.ogg' },
         { '@id': 'sub/', '@type': 'Dataset', name: 'a dataset' },
         { '@id': '#term', '@type': 'DefinedTerm', name: 'a term' },
       ]),

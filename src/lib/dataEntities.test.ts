@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { applyDataEntities, dataEntitiesOf, dataEntityTreeOf, formatContentSize } from './dataEntities'
+import {
+  applyDataEntities,
+  dataEntitiesOf,
+  dataEntityTreeOf,
+  formatContentSize,
+  isDataEntity,
+  isLeafFile,
+} from './dataEntities'
 
 // Shaped like the ENA metagenome crate: a root with a MediaObject file and a
 // sub-Dataset directory that lists its own parts. `./meta.json` is referenced
@@ -47,6 +54,36 @@ function crateOf(...entities: Array<Record<string, unknown>>) {
 function ids(crate: unknown): string[] {
   return dataEntityTreeOf(crate).map((node) => node.id)
 }
+
+describe('shared data entity classification', () => {
+  it.each([
+    ['File', 'https://schema.org/File'],
+    ['MediaObject', 'https://schema.org/MediaObject'],
+    ['ImageObject', 'https://schema.org/ImageObject'],
+    ['AudioObject', 'https://schema.org/AudioObject'],
+    ['VideoObject', 'https://schema.org/VideoObject'],
+  ])('classifies compact and full-IRI %s types as leaf files', (compact, fullIri) => {
+    expect(isDataEntity([compact])).toBe(true)
+    expect(isLeafFile([compact])).toBe(true)
+    expect(isDataEntity([fullIri])).toBe(true)
+    expect(isLeafFile([fullIri])).toBe(true)
+  })
+
+  it('classifies Dataset as data but never as a leaf file', () => {
+    expect(isDataEntity(['Dataset'])).toBe(true)
+    expect(isDataEntity(['https://schema.org/Dataset'])).toBe(true)
+    expect(isLeafFile(['Dataset'])).toBe(false)
+    expect(isLeafFile(['File', 'https://schema.org/Dataset'])).toBe(false)
+  })
+
+  it('uses the shared predicate when collecting unreferenced data entities', () => {
+    const crate = crateOf(
+      { '@id': 'root', '@type': 'Dataset' },
+      { '@id': './image.png', '@type': 'https://schema.org/ImageObject' },
+    )
+    expect(dataEntitiesOf(crate).map((entity) => entity.id)).toEqual(['./image.png'])
+  })
+})
 
 describe('the data entity tree', () => {
   it('walks hasPart depth first, in list order', () => {

@@ -1,4 +1,4 @@
-import { crateGraph, crateRootId, dataEntitiesOf, stringProp } from '@/lib/dataEntities'
+import { crateGraph, crateRootId, dataEntitiesOf, isLeafFile, stringProp } from '@/lib/dataEntities'
 
 // Shared RO-Crate import helpers: structural validation + preview summary for
 // every surface that accepts an uploaded/pasted crate (the metadata detail
@@ -47,7 +47,7 @@ export function analyzeCrateJson(text: string, source: string): CrateImportPrevi
     source,
     rootName: stringProp(root.name) || rootId || 'Untitled dataset',
     entityCount: graph.length,
-    fileCount: dataEntitiesOf(json).length,
+    fileCount: dataEntitiesOf(json).filter((entity) => isLeafFile(entity.types)).length,
     conformsToIds: [...new Set(idValues(root.conformsTo))].filter(
       (id) => id !== 'https://w3id.org/ro/crate/1.1' && id !== 'https://w3id.org/ro/crate/1.2',
     ),

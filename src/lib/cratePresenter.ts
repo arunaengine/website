@@ -3,7 +3,7 @@
 // person/organization card, or context block — and turns the root's and every
 // context entity's remaining properties into labeled, profile-ordered fields.
 
-import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
+import { crateGraph, crateRootId, entityKind, isDataEntity, stringProp } from '@/lib/dataEntities'
 import { readableIri } from '@/lib/identifiers'
 import { isHttpUrl } from '@/lib/utils'
 import { contextTermsOf } from '@/lib/profiles/contextTerms'
@@ -11,7 +11,6 @@ import { isDatasetType, termNameFromUri } from '@/lib/profiles/uri'
 import type { ProfileEntityRule } from '@/lib/profiles/types'
 import {
   cardEntity,
-  entityKind,
   isRecord,
   isStub,
   personName,
@@ -105,7 +104,6 @@ const ROLE_KINDS: Record<string, 'people' | 'organizations'> = {
   'Copyright holder': 'organizations',
   Maintainer: 'people',
 }
-const DATA_TYPES = new Set(['File', 'Dataset', 'MediaObject'])
 const ROOT_SKIP = new Set([...HERO_PROPS, ...RELATED_PROPS, ...DATA_PROPS, ...CARD_ROLES.map(([p]) => p)])
 const CONTEXT_SKIP = new Set(['name'])
 const LONG_TEXT = 280
@@ -440,7 +438,7 @@ export function presentCrate(crate: unknown, options: PresentOptions = {}): Crat
     const id = entity['@id']
     if (typeof id !== 'string' || homes.has(id) || claimed.has(id) || byId.get(id) !== entity) continue
     const types = effectiveTypes(typesOf(entity), rules)
-    if (types.includes('PropertyValue') || types.some((t) => DATA_TYPES.has(t))) {
+    if (types.includes('PropertyValue') || isDataEntity(types)) {
       homes.set(id, 'claimed')
       continue
     }

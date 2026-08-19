@@ -3,18 +3,11 @@
 // full crate (GET /metadata/{id}/rocrate?view=full, cached in fullCrates), so
 // resolving anything shown here never needs a follow-up request.
 
-import { stringProp } from '@/lib/dataEntities'
+import { entityKind, stringProp, typesOf } from '@/lib/dataEntities'
 import { isArunaUserId, orcidOf, readableIri, rorOf } from '@/lib/identifiers'
 
-export type EntityKind =
-  | 'people'
-  | 'organizations'
-  | 'publications'
-  | 'software'
-  | 'places'
-  | 'terms'
-  | 'comments'
-  | 'other'
+export { entityKind, ORG_TYPES, typesOf } from '@/lib/dataEntities'
+export type { EntityKind } from '@/lib/dataEntities'
 
 export interface EntityAffiliation {
   /** Set when the crate carries a displayed entity to jump to. */
@@ -44,60 +37,6 @@ export interface ContextualEntity {
   unresolved: boolean
 }
 
-const ORG_TYPES = new Set([
-  'Organization',
-  'EducationalOrganization',
-  'CollegeOrUniversity',
-  'GovernmentOrganization',
-  'ResearchOrganization',
-  'Corporation',
-  'Consortium',
-  'FundingAgency',
-  'NGO',
-  'Project',
-  'ResearchProject',
-])
-const PUBLICATION_TYPES = new Set([
-  'ScholarlyArticle',
-  'Article',
-  'Book',
-  'Chapter',
-  'Thesis',
-  'Report',
-  'Periodical',
-  'PublicationIssue',
-  'PublicationVolume',
-])
-const SOFTWARE_TYPES = new Set([
-  'SoftwareApplication',
-  'SoftwareSourceCode',
-  'ComputationalWorkflow',
-  'WebApplication',
-])
-const PLACE_TYPES = new Set([
-  'Place',
-  'City',
-  'Country',
-  'State',
-  'AdministrativeArea',
-  'PostalAddress',
-  'GeoCoordinates',
-  'GeoShape',
-])
-const TERM_TYPES = new Set(['DefinedTerm', 'DefinedTermSet', 'CategoryCode', 'CategoryCodeSet'])
-
-/** Display kind an entity's explicit types decide (untyped entities: 'other'). */
-export function entityKind(types: string[]): EntityKind {
-  if (types.includes('Person')) return 'people'
-  if (types.some((t) => ORG_TYPES.has(t))) return 'organizations'
-  if (types.some((t) => PUBLICATION_TYPES.has(t))) return 'publications'
-  if (types.some((t) => SOFTWARE_TYPES.has(t))) return 'software'
-  if (types.some((t) => PLACE_TYPES.has(t))) return 'places'
-  if (types.some((t) => TERM_TYPES.has(t))) return 'terms'
-  if (types.includes('Comment')) return 'comments'
-  return 'other'
-}
-
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
@@ -110,13 +49,6 @@ export function refId(value: unknown): string {
   if (typeof value === 'string') return value
   if (isRecord(value) && typeof value['@id'] === 'string') return value['@id']
   return ''
-}
-
-export function typesOf(entity: Record<string, unknown> | undefined): string[] {
-  const t = entity?.['@type']
-  if (typeof t === 'string') return [t]
-  if (Array.isArray(t)) return t.filter((x): x is string => typeof x === 'string')
-  return []
 }
 
 export function isStub(entity?: Record<string, unknown>): boolean {
@@ -194,7 +126,7 @@ export function cardEntity(
 ): ContextualEntity {
   const types = typesOf(entity)
   const identifiers = [id, ...identifierValues(entity, byId)]
-  const isComment = types.includes('Comment')
+  const isComment = entityKind(types) === 'comments'
   return {
     id,
     name: stringProp(entity?.name) || personName(entity) || readableIri(id),
