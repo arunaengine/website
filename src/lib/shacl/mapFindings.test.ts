@@ -11,7 +11,7 @@ const NAME_RULE: ProfilePropertyRule = {
   kind: 'text',
   propertyUri: 'https://schema.org/name',
   valueName: 'name',
-  obligation: 'required',
+  obligation: 'MUST',
 }
 
 function finding(overrides: Partial<ProfileValidationFinding> = {}): ProfileValidationFinding {
