@@ -19,8 +19,10 @@ import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useComputeDataView } from '@/composables/useComputeDataView'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import {
+  TES_EXECUTOR_TAG,
   TES_GROUP_TAG,
   expandDataRefEntry,
   parseS3Url,
@@ -100,6 +102,15 @@ function text(value: string | number): string {
   return String(value).trim()
 }
 
+// Executor kind pin, carried as the aruna-engine.org/executor tag; it becomes
+// the request's executor_constraint. Options come from what the realm's nodes
+// advertise, with free text on a realm that has advertised nothing yet.
+const executorConstraint = ref('')
+const { executorKinds } = useRealmNodes()
+const executorKindOptions = computed(() =>
+  executorKinds.value.map((kind) => ({ value: kind, label: kind })),
+)
+
 const cpuCores = ref<string | number>('')
 const ramGb = ref<string | number>('')
 const diskGb = ref<string | number>('')
@@ -157,6 +168,7 @@ async function applyRerun(id: string) {
     description.value = source.description ?? ''
     const group = source.tags?.[TES_GROUP_TAG]
     if (group) groupId.value = group
+    executorConstraint.value = source.tags?.[TES_EXECUTOR_TAG] ?? ''
 
     inputs.value = (source.inputs ?? []).map((input) => ({
       kind: 'file',
@@ -260,7 +272,10 @@ const task = computed<TesTask>(() =>
     outputs: outputs.value,
     resources: resources.value,
     executors: executors.value,
-    tags: { [TES_GROUP_TAG]: groupId.value },
+    tags: {
+      [TES_GROUP_TAG]: groupId.value,
+      ...(executorConstraint.value.trim() ? { [TES_EXECUTOR_TAG]: executorConstraint.value.trim() } : {}),
+    },
     workspace: workspaceMode.value
       ? { mode: workspaceMode.value, bucket: workspaceMode.value === 'existing' ? workspaceBucket.value.trim() : undefined }
       : undefined,
@@ -644,6 +659,25 @@ async function submit() {
               <Switch v-model:checked="preemptible" /> Preemptible
             </label>
             <p class="text-[11px] text-muted-foreground">Allows the backend to run this on capacity that may be reclaimed (state <code class="rounded bg-muted px-1">PREEMPTED</code>).</p>
+
+            <div class="max-w-xs">
+              <label class="text-xs font-medium text-foreground">Executor kind</label>
+              <Select
+                v-if="executorKindOptions.length"
+                v-model="executorConstraint"
+                :options="executorKindOptions"
+                placeholder="Any kind the realm offers"
+                class="mt-1"
+              />
+              <Input v-else v-model="executorConstraint" class="mt-1 font-mono" placeholder="docker" />
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                {{
+                  executorKindOptions.length
+                    ? 'Restricts placement to one backend kind. Leave unset to let the planner choose.'
+                    : 'No node has advertised an executor here yet, so this is free text. Leave it empty to let the planner choose.'
+                }}
+              </p>
+            </div>
           </div>
 
           <div class="space-y-3">
@@ -669,6 +703,11 @@ async function submit() {
             </div>
             <p v-if="!workspaceValid" class="text-[11px] text-destructive">
               {{ workspaceMode === 'existing' ? 'Pick the bucket the run should work in.' : 'A workspace choice is required before submitting.' }}
+            </p>
+            <p class="text-[11px] text-muted-foreground">
+              The GA4GH task interface carries no workspace field of its own, so a node may derive
+              the workspace from its own deployment instead. The run detail reports the mode that
+              was actually used.
             </p>
           </div>
           </div>

@@ -18,6 +18,8 @@ export interface RealmNodeDisplay {
   /** connection_status === 'connected' && present. */
   reachable: boolean
   isLocal: boolean
+  /** Executor kinds this node advertises; empty without a compute backend. */
+  executorKinds: string[]
 }
 
 function nodeLabel(node: RealmNodeInfo): string {
@@ -46,11 +48,23 @@ export function useRealmNodes() {
         apiBase: nodeApiBase(node),
         reachable: node.present && node.connection_status === 'connected',
         isLocal,
+        executorKinds: (node.info?.executors ?? []).map((executor) => executor.kind),
       }
     }),
   )
 
   const byId = computed(() => new Map(nodes.value.map((node) => [node.nodeId, node])))
+
+  // Node id → advertised executor kinds, for the data-locality hints.
+  const executorsByNode = computed(
+    () => new Map(nodes.value.map((node) => [node.nodeId, node.executorKinds])),
+  )
+
+  // Every executor kind the realm advertises, sorted. Empty when no node has
+  // published an info document yet, which is not the same as "no compute".
+  const executorKinds = computed(() =>
+    [...new Set(nodes.value.flatMap((node) => node.executorKinds))].sort((a, b) => a.localeCompare(b)),
+  )
 
   function nodeById(nodeId: string | null | undefined): RealmNodeDisplay | null {
     if (!nodeId) return null
@@ -69,5 +83,13 @@ export function useRealmNodes() {
     return nodeById(nodeId)?.isLocal ?? nodeId === localNodeId.value
   }
 
-  return { nodes, localNodeId, nodeById, displayName, isLocalNode }
+  return {
+    nodes,
+    localNodeId,
+    nodeById,
+    displayName,
+    isLocalNode,
+    executorsByNode,
+    executorKinds,
+  }
 }

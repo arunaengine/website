@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
+import InputLocalityHint from '@/components/compute/InputLocalityHint.vue'
 import type { TesDataRefEntry } from '@/lib/tes'
 import { truncateMiddle } from '@/lib/utils'
 import { Folder, ListPlus, X } from '@lucide/vue'
@@ -85,8 +86,15 @@ function remove(i: number) {
           </template>
         </div>
         <Button variant="ghost" size="icon-sm" class="self-center" :disabled="disabled" aria-label="Remove input" @click="remove(i)"><X class="h-4 w-4" /></Button>
+        <div v-if="entry.kind === 'file' && entry.url" class="col-span-2 pt-1.5">
+          <InputLocalityHint :url="entry.url" />
+        </div>
       </div>
     </div>
+    <p v-if="modelValue.some((entry) => entry.kind === 'file')" class="text-[11px] text-muted-foreground">
+      Locality is a hint about where these files already are. The node plans the run itself and can
+      still place it elsewhere.
+    </p>
 
     <Button variant="outline" size="sm" :disabled="disabled" @click="dialogOpen = true"><ListPlus class="size-3.5" /> Add input</Button>
 

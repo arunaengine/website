@@ -26,6 +26,7 @@ import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import QuickRunResult from '@/components/compute/QuickRunResult.vue'
+import InputLocalityHint from '@/components/compute/InputLocalityHint.vue'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
@@ -1293,6 +1294,7 @@ function dismissRerun() {
                         :invalid="!validContainerPath(input.path.trim()) ? 'error' : undefined"
                       />
                       <div class="truncate font-mono text-[10px] text-muted-foreground" :title="input.url">{{ input.url }}</div>
+                      <InputLocalityHint :url="input.url" />
                     </div>
                     <Button variant="ghost" size="icon-sm" class="mt-1 h-5 w-5 self-start" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
                   </div>
