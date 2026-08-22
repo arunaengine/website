@@ -23,6 +23,7 @@ import type {
   CopyViolationBody,
   DiagnosticsResponse,
   PolicyRefBody,
+  PolicyResponse,
   QuarantineResolveResponse,
   SelectorBody,
 } from '@/lib/placementPolicies'
@@ -43,6 +44,13 @@ const { bootstrapped, currentUser, isManagementNode, isRealmAdmin } = useAruna()
 const {
   getPlacementDiagnostics,
   getPlacementPolicy,
+  listCursor,
+  listComplete,
+  listError,
+  listLoadingMore,
+  listState,
+  listedPolicies,
+  loadPolicyPage,
   residencyAdminEnabled,
   resolvePlacementQuarantine,
   sessionPolicies,
@@ -58,12 +66,22 @@ const ready = computed(
     && isManagementNode.value,
 )
 
-const libraryEntries = computed(() =>
-  sessionPolicyRefs.value.map((policy) => ({
+// The realm listing when the node serves one, and the session-only refs when
+// it does not; the two are never mixed, so the panel never implies the
+// session library is the realm's complete set.
+const listed = computed(() => listState.value === 'ready')
+const libraryEntries = computed(() => {
+  if (listed.value) {
+    return listedPolicies.value.map((policy) => ({
+      ref: { policy_id: policy.policy_id, digest: policy.digest },
+      document: policy as PolicyResponse | undefined,
+    }))
+  }
+  return sessionPolicyRefs.value.map((policy) => ({
     ref: policy,
     document: sessionPolicies.value.find((candidate) => policyRefKey(candidate) === policyRefKey(policy)),
-  })),
-)
+  }))
+})
 const lookup = ref<PolicyRefBody>({ policy_id: '', digest: '' })
 const lookupBusy = ref(false)
 const lookupError = ref<string | null>(null)
@@ -185,6 +203,7 @@ watch(
     if (isReady && !loaded) {
       loaded = true
       void loadDiagnostics()
+      void loadPolicyPage()
     }
   },
   { immediate: true },
@@ -233,13 +252,31 @@ watch(
           <section id="residency-library" class="surface scroll-mt-24">
             <header class="flex items-center gap-2 border-b border-border px-5 py-4">
               <ShieldCheck class="h-4 w-4 text-primary" />
-              <h3 class="font-display text-sm font-semibold text-aruna-navy">Session residency policy library</h3>
+              <h3 class="font-display text-sm font-semibold text-aruna-navy">
+                {{ listed ? 'Realm residency policy library' : 'Session residency policy library' }}
+              </h3>
               <Badge variant="outline">{{ libraryEntries.length }}</Badge>
             </header>
             <div class="space-y-4 p-5">
-              <div class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-                The backend has no residency policy list endpoint. This library contains only policies created this session, exact id and digest lookups, and refs found while inspecting buckets.
+              <div
+                v-if="!listed"
+                class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+              >
+                {{
+                  listState === 'loading'
+                    ? 'Reading the realm policy list…'
+                    : 'This node serves no residency policy list. The library below contains only policies created this session, exact id and digest lookups, and refs found while inspecting buckets.'
+                }}
               </div>
+              <p v-else class="text-xs text-muted-foreground">
+                Published policies as this node holds them, ordered by id. It is a replicated local
+                view, so a very recent publication elsewhere may not be here yet.
+              </p>
+              <ErrorPanel
+                v-if="listState === 'error'"
+                :message="listError || 'The residency policy list could not be read.'"
+                @retry="loadPolicyPage()"
+              />
               <div class="grid gap-2 md:grid-cols-[minmax(12rem,0.8fr)_minmax(20rem,1.4fr)_auto]">
                 <Input v-model="lookup.policy_id" class="font-mono text-xs" placeholder="Residency policy ULID" aria-label="Residency policy id lookup" />
                 <Input v-model="lookup.digest" class="font-mono text-xs" placeholder="64-character lowercase digest" aria-label="Residency policy digest lookup" />
@@ -255,8 +292,14 @@ watch(
                   <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="min-w-0">
                       <h4 class="text-sm font-semibold text-foreground">{{ entry.document?.name ?? 'Referenced residency policy' }}</h4>
-                      <div class="mt-1 font-mono text-[11px] text-muted-foreground">{{ entry.ref.policy_id }}</div>
-                      <div class="mt-0.5 break-all font-mono text-[10px] text-muted-foreground">{{ entry.ref.digest }}</div>
+                      <!-- A reference is the pair: an id alone could be answered
+                           with other bytes, so both halves are always shown. -->
+                      <dl class="mt-1 grid grid-cols-[4rem_minmax(0,1fr)] gap-x-2 text-[11px]">
+                        <dt class="text-muted-foreground">policy_id</dt>
+                        <dd class="font-mono text-muted-foreground">{{ entry.ref.policy_id }}</dd>
+                        <dt class="text-muted-foreground">digest</dt>
+                        <dd class="break-all font-mono text-[10px] text-muted-foreground">{{ entry.ref.digest }}</dd>
+                      </dl>
                     </div>
                     <Button v-if="!entry.document" variant="outline" size="sm" :disabled="lookupBusy" @click="lookupPolicy(entry.ref)">Load definition</Button>
                     <Badge v-else variant="success">authenticated definition</Badge>
@@ -273,7 +316,23 @@ watch(
                     </p>
                   </template>
                 </article>
+                <div v-if="listed && listCursor" class="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" :disabled="listLoadingMore" @click="loadPolicyPage(true)">
+                    {{ listLoadingMore ? 'Loading…' : 'Load more' }}
+                  </Button>
+                  <span class="text-[11px] text-muted-foreground">{{ libraryEntries.length }} loaded</span>
+                </div>
+                <p v-else-if="listed && !listComplete" class="text-[11px] text-muted-foreground">
+                  This page is bounded, so a policy may exist that it did not list.
+                </p>
               </div>
+              <EmptyState
+                v-else-if="listed"
+                title="No residency policies published"
+                description="This node holds no published residency policy for the realm yet."
+              >
+                <Button @click="focusBucketInspector">Inspect a bucket</Button>
+              </EmptyState>
               <EmptyState v-else title="No session residency policies" description="Publish a policy, look up an exact ref, or inspect a bucket to populate this session-only library.">
                 <Button @click="focusBucketInspector">Inspect a bucket</Button>
               </EmptyState>

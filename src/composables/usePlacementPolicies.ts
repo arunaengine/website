@@ -2,7 +2,11 @@ import { computed, ref, watch } from 'vue'
 import { apiRequest, type ApiRequestOptions } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
 import { featureEnabled } from '@/lib/config'
-import { policyRefKey } from '@/lib/placementPolicies'
+import {
+  isPolicyListUnsupported,
+  listPlacementPolicies,
+  policyRefKey,
+} from '@/lib/placementPolicies'
 import type {
   BucketPlacementRequest,
   BucketPlacementResponse,
@@ -59,6 +63,58 @@ async function createPlacementPolicy(body: CreatePolicyRequest): Promise<PolicyR
   })
   rememberPolicy(policy)
   return policy
+}
+
+// ── Realm policy listing ─────────────────────────────────────────────────────
+// The read view of the realm's published residency policies. A node that does
+// not serve it answers 404/405, and the panel keeps its session library rather
+// than claiming the realm has none.
+
+export type PolicyListState = 'idle' | 'loading' | 'ready' | 'unsupported' | 'error'
+
+const listedPolicies = ref<PolicyResponse[]>([])
+const listCursor = ref<string | null>(null)
+const listComplete = ref(true)
+const listState = ref<PolicyListState>('idle')
+const listError = ref<string | null>(null)
+const listLoadingMore = ref(false)
+
+const POLICY_PAGE_SIZE = 50
+
+async function loadPolicyPage(more = false): Promise<void> {
+  if (more && (!listCursor.value || listLoadingMore.value)) return
+  const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
+  const epoch = sessionEpoch.value
+  if (more) listLoadingMore.value = true
+  else {
+    listState.value = 'loading'
+    listError.value = null
+  }
+  try {
+    const page = await listPlacementPolicies(
+      { limit: POLICY_PAGE_SIZE, cursor: more ? (listCursor.value ?? undefined) : undefined },
+      { baseUrl: apiBaseUrl.value, token: authToken.value },
+    )
+    if (epoch !== sessionEpoch.value) return
+    listedPolicies.value = more ? [...listedPolicies.value, ...page.policies] : page.policies
+    listCursor.value = page.next_cursor
+    listComplete.value = page.complete
+    listState.value = 'ready'
+    for (const policy of page.policies) rememberPolicy(policy)
+  } catch (error) {
+    if (epoch !== sessionEpoch.value) return
+    if (isPolicyListUnsupported(error)) {
+      listState.value = 'unsupported'
+      return
+    }
+    if (more) listError.value = error instanceof Error ? error.message : String(error)
+    else {
+      listState.value = 'error'
+      listError.value = error instanceof Error ? error.message : String(error)
+    }
+  } finally {
+    listLoadingMore.value = false
+  }
 }
 
 async function getPlacementPolicy(policy: PolicyRefBody): Promise<PolicyResponse> {
@@ -145,12 +201,23 @@ export function usePlacementPolicies() {
     watch(sessionEpoch, () => {
       sessionPolicies.value = []
       sessionPolicyRefs.value = []
+      listedPolicies.value = []
+      listCursor.value = null
+      listState.value = 'idle'
+      listError.value = null
     })
   }
   return {
     residencyAdminEnabled,
     sessionPolicies,
     sessionPolicyRefs,
+    listedPolicies,
+    listCursor,
+    listComplete,
+    listState,
+    listError,
+    listLoadingMore,
+    loadPolicyPage,
     createPlacementPolicy,
     getPlacementPolicy,
     getBucketPlacement,
