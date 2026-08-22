@@ -23,6 +23,7 @@ import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
 import LiftNotesPanel from '@/components/metadata/profile-builder/LiftNotesPanel.vue'
 import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
+import ProfileValidationPreview from '@/components/metadata/ProfileValidationPreview.vue'
 import { computed, ref, watch } from 'vue'
 import { AlertTriangle, Check, FileJson, FileJson2, FileUp, Layers, Plus, Upload, X } from '@lucide/vue'
 import {
@@ -31,6 +32,7 @@ import {
   serverValidationRequiredConstraints,
   useAruna,
 } from '@/composables/useAruna'
+import { useProfilePreview } from '@/composables/useProfilePreview'
 import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
 import {
   fileEntityForReference,
@@ -75,12 +77,10 @@ import {
   type EntryViolationNode,
 } from '@/lib/profiles/entityTree'
 import { licenseEntity } from '@/lib/profiles/rocrate'
-import { mapShaclFindings } from '@/lib/shacl/mapFindings'
-import { useShaclValidation } from '@/lib/shacl/useShaclValidation'
-import type { ShaclFinding } from '@/lib/shacl/findings'
+import { mapPreviewFindings } from '@/lib/shacl/mapFindings'
 import { cloneLiftNotes, type LiftNote } from '@/lib/shacl/lift'
 import { buildProfileContext } from '@/lib/profiles/propertyCatalog'
-import { isAbsoluteUri, termNameFromUri } from '@/lib/profiles/uri'
+import { isAbsoluteUri } from '@/lib/profiles/uri'
 import { validateProfileData, validateRequiredInstances } from '@/lib/profiles/validate'
 import { classifyRoCrateSpecIri } from '@/lib/rocrateVersions'
 import {
@@ -117,6 +117,7 @@ const {
   saving,
   currentUser,
   apiBaseUrl,
+  authToken,
   profileValidationCapabilities,
   loadProfileValidationCapabilities,
 } = useAruna()
@@ -412,7 +413,7 @@ const entityEntryErrorCount = computed(() => {
 // Mapped deep-validation findings for hasPart append here too (display-only).
 const hasPartSchemaViolations = computed(() => [
   ...profileViolations.value.filter((violation) => hasPartProperties.value.has(violation.fieldId ?? '')),
-  ...[...hasPartProperties.value].flatMap((property) => shaclViolationsFor(property)),
+  ...[...hasPartProperties.value].flatMap((property) => previewViolationsFor(property)),
 ])
 
 const profileInputCount = computed(() => generatedScalarControls.value.length + entityControls.value.length)
@@ -561,7 +562,7 @@ const builtInViolations = computed<Record<string, ProfileViolation[]>>(() => {
     if (!builtInDatasetKeys.has(fieldId)) continue
     ;(map[fieldId] ??= []).push(violation)
   }
-  for (const [fieldId, violations] of Object.entries(shaclMapped.value.inline)) {
+  for (const [fieldId, violations] of Object.entries(previewMapped.value.inline)) {
     if (builtInDatasetKeys.has(fieldId)) (map[fieldId] ??= []).push(...violations)
   }
   return map
@@ -605,59 +606,44 @@ const scaffoldClaimedKeys = computed(() =>
     .filter((property) => !(property === 'license' && licenseControl.value)),
 )
 
-// --- Deep validation (plan section 8): the exact crate JSON buildRoCrate
-// would save, validated against the profile's SHACL shapes in a lazy worker.
-// Debounced on every form change while a profile with shapes is active, plus
-// the explicit "Validate against profile" action. Findings NEVER gate
-// submission — the bespoke validator above stays the synchronous first line.
+// --- Server validation preview: the exact crate buildRoCrate would save, sent
+// to the node's advisory preview endpoint. Debounced on every form change while
+// a profile is active, plus the explicit "Run preview" action. Findings NEVER
+// gate submission — the bespoke validator above stays the synchronous first
+// line, and the write path validates authoritatively.
 const {
-  findings: shaclFindings,
-  running: shaclRunning,
-  unavailable: shaclUnavailable,
-  error: shaclError,
-  validate: shaclValidate,
-  validateNow: shaclValidateNow,
-  reset: shaclReset,
-} = useShaclValidation()
+  result: previewResult,
+  running: previewRunning,
+  unavailable: previewUnavailable,
+  error: previewError,
+  preview: previewDraft,
+  previewNow: previewDraftNow,
+  reset: previewReset,
+} = useProfilePreview({ client: () => ({ baseUrl: apiBaseUrl.value, token: authToken.value }) })
 
-// Reactive snapshot of the crate to validate; JSON-cloned before posting so no
-// reactive proxy ever crosses the worker boundary.
-const crateForValidation = computed(() => (profileShapes.value.length && !profileLoading.value ? buildRoCrate() : null))
+const crateForValidation = computed(() => (profileId.value && !profileLoading.value ? buildRoCrate() : null))
 watch(crateForValidation, (crate) => {
   if (!props.open || !crate) return
-  shaclValidate({ crate: JSON.parse(JSON.stringify(crate)), shapes: profileShapes.value, rootId: './' })
+  previewDraft(crate)
 })
 
 function validateAgainstProfile() {
-  if (!profileShapes.value.length) return
-  shaclValidateNow({ crate: JSON.parse(JSON.stringify(buildRoCrate())), shapes: profileShapes.value, rootId: './' })
+  if (!profileId.value) return
+  previewDraftNow(buildRoCrate())
 }
 
 // Findings resolvable to a rendered Dataset control render inline next to it,
 // deduplicated against the bespoke messages by field + severity; the rest
-// lands in the conformance panel below, grouped by severity.
-const shaclMapped = computed(() => mapShaclFindings(shaclFindings.value, profileDatasetRules.value, profileViolations.value))
-function shaclViolationsFor(property: string): ProfileViolation[] {
-  return shaclMapped.value.inline[property] ?? []
+// lands in the preview panel below.
+const previewMapped = computed(() =>
+  mapPreviewFindings(previewResult.value?.findings ?? [], profileDatasetRules.value, profileViolations.value),
+)
+function previewViolationsFor(property: string): ProfileViolation[] {
+  return previewMapped.value.inline[property] ?? []
 }
-const shaclPanelGroups = computed(() => {
-  const groups: Array<{ severity: ShaclFinding['severity']; label: string; findings: ShaclFinding[] }> = [
-    { severity: 'error', label: 'Errors', findings: [] },
-    { severity: 'warning', label: 'Warnings', findings: [] },
-    { severity: 'info', label: 'Notes', findings: [] },
-  ]
-  for (const finding of shaclMapped.value.panel) {
-    groups.find((group) => group.severity === finding.severity)?.findings.push(finding)
-  }
-  return groups.filter((group) => group.findings.length)
-})
-const shaclInlineCount = computed(() => Object.values(shaclMapped.value.inline).reduce((total, list) => total + list.length, 0))
-
-// Where a panel finding sits: crate-local focus id plus the property short name.
-function findingLocation(finding: ShaclFinding): string {
-  const focus = finding.focusId === './' ? 'Dataset' : finding.focusId
-  return finding.path ? `${focus} · ${termNameFromUri(finding.path)}` : focus
-}
+const previewInlineCount = computed(() =>
+  Object.values(previewMapped.value.inline).reduce((total, list) => total + list.length, 0),
+)
 
 // ── Import-crate mode ────────────────────────────────────────────────────────
 // Very prominent alternative to authoring from scratch: an uploaded or pasted
@@ -1083,7 +1069,7 @@ function resetGeneratedProfileFields() {
   entityEntries.value = {}
   profileShapes.value = []
   profileAdditionalRequirements.value = []
-  shaclReset()
+  previewReset()
   profileLoadError.value = null
   profileLoadFailed.value = false
   profileLoadComplete.value = false
@@ -1671,7 +1657,7 @@ async function submit(unprofiled = false) {
               :key="control.property"
               :control="control"
               :model-value="generatedValues[control.property]"
-              :violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...shaclViolationsFor(control.property)]"
+              :violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...previewViolationsFor(control.property)]"
               :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
               @update:model-value="(value: unknown) => setGeneratedValue(control.property, value)"
             />
@@ -1682,7 +1668,7 @@ async function submit(unprofiled = false) {
               :sub-controls="entitySubControls[control.property] ?? []"
               :entries="entityEntries[control.property] ?? []"
               :entry-violations="entityEntryViolations[control.property] ?? []"
-              :presence-violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...shaclViolationsFor(control.property)]"
+              :presence-violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...previewViolationsFor(control.property)]"
               :type-label="entityTypeLabelFor(control)"
               :crate-options="crateOptions"
               :entity-rules="profileEntityRules"
@@ -1807,49 +1793,17 @@ async function submit(unprofiled = false) {
             References to other crates (RO-Crate 1.2), written as <code class="font-mono">hasPart</code> Dataset entities. Linked crates stay independent documents.
           </p>
         </div>
-        <!-- Profile conformance: deep SHACL validation of the crate about to be
-             saved. Advisory only — findings never gate submission. -->
-        <div v-if="profileId && profileShapes.length" class="rounded-md border border-border p-3">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-xs font-medium text-foreground">Browser SHACL preview</p>
-            <div class="flex items-center gap-2">
-              <span v-if="shaclRunning" class="text-[11px] text-muted-foreground">Checking…</span>
-              <Button type="button" variant="outline" size="sm" :disabled="shaclUnavailable || shaclRunning" @click="validateAgainstProfile">
-                Run browser preview
-              </Button>
-            </div>
-          </div>
-          <p v-if="shaclUnavailable" class="mt-2 text-[11px] text-muted-foreground">
-            Browser SHACL preview is unavailable in this session; the form checks above still apply unchanged.
-          </p>
-          <p v-else-if="shaclError" class="mt-2 text-[11px] text-destructive">Browser SHACL preview failed: {{ shaclError }}</p>
-          <template v-else>
-            <p v-if="!shaclFindings.length" class="mt-2 text-[11px] text-muted-foreground">
-              No browser preview findings against the profile's shapes.
-            </p>
-            <p v-else-if="shaclInlineCount && !shaclPanelGroups.length" class="mt-2 text-[11px] text-muted-foreground">
-              All findings are shown inline at their fields above.
-            </p>
-            <div v-for="group in shaclPanelGroups" :key="group.severity" class="mt-2">
-              <p
-                class="text-[11px] font-medium"
-                :class="group.severity === 'error' ? 'text-destructive' : group.severity === 'warning' ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'"
-              >
-                {{ group.label }}
-              </p>
-              <ul class="mt-1 space-y-1">
-                <li
-                  v-for="(finding, index) in group.findings"
-                  :key="`${finding.sourceShape}${finding.focusId}${index}`"
-                  class="text-[11px]"
-                  :class="group.severity === 'error' ? 'text-destructive' : group.severity === 'warning' ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'"
-                >
-                  <span class="font-medium">{{ findingLocation(finding) }}:</span> {{ finding.message }}
-                </li>
-              </ul>
-            </div>
-          </template>
-        </div>
+        <!-- Advisory server validation of the crate about to be saved;
+             hidden when the node does not serve the preview endpoint. -->
+        <ProfileValidationPreview
+          v-if="profileId && !previewUnavailable"
+          :result="previewResult"
+          :running="previewRunning"
+          :error="previewError"
+          :findings="previewMapped.panel"
+          :inline-count="previewInlineCount"
+          @run="validateAgainstProfile"
+        />
 
         <label class="flex items-center justify-between rounded-md border border-border p-3 text-sm">
           <span>

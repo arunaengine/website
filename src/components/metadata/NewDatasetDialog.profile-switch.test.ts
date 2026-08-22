@@ -30,7 +30,6 @@ import * as ProfileTypes from '@/lib/profiles/types'
 import * as RoCrateVersions from '@/lib/rocrateVersions'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import * as MapFindings from '@/lib/shacl/mapFindings'
-import type { ShaclFinding } from '@/lib/shacl/findings'
 
 const groups = ref([{ id: 'group-1', name: 'Research group' }])
 const profiles = ref<MetadataProfile[]>([])
@@ -44,22 +43,23 @@ const currentUser = ref({
   preferredProfileId: '',
 })
 const apiBaseUrl = ref('https://api.example.test')
+const authToken = ref('test-token')
 const profileCrateParses = ref({})
 const profileValidationCapabilities = ref<Api.ProfileValidationCapabilitiesResponse | null>(null)
 const createMetadata = vi.fn()
 const loadProfileCrate = vi.fn()
 const loadProfileValidationCapabilities = vi.fn()
 
-const shaclFindings = ref<ShaclFinding[]>([])
-const shaclRunning = ref(false)
-const shaclUnavailable = ref(false)
-const shaclError = ref<string | null>(null)
-const shaclValidate = vi.fn()
-const shaclValidateNow = vi.fn()
-const shaclReset = vi.fn(() => {
-  shaclFindings.value = []
-  shaclRunning.value = false
-  shaclError.value = null
+const previewResult = ref<Api.ProfileValidationPreviewResponse | null>(null)
+const previewRunning = ref(false)
+const previewUnavailable = ref(false)
+const previewError = ref<string | null>(null)
+const previewDraft = vi.fn()
+const previewDraftNow = vi.fn()
+const previewReset = vi.fn(() => {
+  previewResult.value = null
+  previewRunning.value = false
+  previewError.value = null
 })
 
 const SlotStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -168,6 +168,7 @@ function compileDialog(): Component {
     '@/components/metadata/profile-builder/LiftNotesPanel.vue': moduleDefault(SlotStub),
     '@/components/metadata/CustomFieldsEditor.vue': moduleDefault(CustomFieldsStub),
     '@/components/metadata/SubcratePickerDialog.vue': moduleDefault(SlotStub),
+    '@/components/metadata/ProfileValidationPreview.vue': moduleDefault(SlotStub),
     '@/composables/useAruna': {
       profileReferenceIri,
       profileRulesLoadState,
@@ -182,6 +183,7 @@ function compileDialog(): Component {
         saving,
         currentUser,
         apiBaseUrl,
+        authToken,
         profileValidationCapabilities,
         loadProfileValidationCapabilities,
       }),
@@ -199,15 +201,15 @@ function compileDialog(): Component {
     '@/lib/profiles/migration': ProfileMigration,
     '@/lib/profiles/rocrate': ProfileRoCrate,
     '@/lib/shacl/mapFindings': MapFindings,
-    '@/lib/shacl/useShaclValidation': {
-      useShaclValidation: () => ({
-        findings: shaclFindings,
-        running: shaclRunning,
-        unavailable: shaclUnavailable,
-        error: shaclError,
-        validate: shaclValidate,
-        validateNow: shaclValidateNow,
-        reset: shaclReset,
+    '@/composables/useProfilePreview': {
+      useProfilePreview: () => ({
+        result: previewResult,
+        running: previewRunning,
+        unavailable: previewUnavailable,
+        error: previewError,
+        preview: previewDraft,
+        previewNow: previewDraftNow,
+        reset: previewReset,
       }),
     },
     '@/lib/profiles/propertyCatalog': ProfileCatalog,
@@ -441,10 +443,10 @@ beforeEach(() => {
   saving.value = false
   profileCrateParses.value = {}
   profileValidationCapabilities.value = null
-  shaclFindings.value = []
-  shaclRunning.value = false
-  shaclUnavailable.value = false
-  shaclError.value = null
+  previewResult.value = null
+  previewRunning.value = false
+  previewUnavailable.value = false
+  previewError.value = null
   createMetadata.mockReset()
   loadProfileCrate.mockReset()
   loadProfileValidationCapabilities.mockReset()
@@ -455,9 +457,9 @@ beforeEach(() => {
     public_profile_iri_template: 'https://w3id.org/aruna/profile/{id}',
     legacy_profile_iri_template: 'https://w3id.org/aruna/{id}',
   })
-  shaclValidate.mockReset()
-  shaclValidateNow.mockReset()
-  shaclReset.mockClear()
+  previewDraft.mockReset()
+  previewDraftNow.mockReset()
+  previewReset.mockClear()
 })
 
 afterEach(() => {
@@ -613,24 +615,32 @@ describe('New Dataset profile switching', () => {
     expect(profileControl(root, 'newName')).toBeTruthy()
   })
 
-  it('invalidates pending SHACL validation and findings on switch', async () => {
+  it('invalidates a pending preview and its findings on switch', async () => {
     profiles.value = [profile('old', []), profile('new', [])]
     const root = await mountDialog()
-    shaclRunning.value = true
-    shaclFindings.value = [{
-      focusId: './',
-      message: 'Old profile finding',
-      severity: 'warning',
-      sourceShape: 'https://example.test/old-shape',
-    }]
-    shaclReset.mockClear()
+    previewRunning.value = true
+    previewResult.value = {
+      accepted: false,
+      state: 'invalid',
+      evaluator: 'craqle',
+      findings: [{
+        code: 'constraint_violation',
+        severity: 'warning',
+        rule: 'http://www.w3.org/ns/shacl#minCount',
+        message: 'Old profile finding',
+        completeness: 'complete',
+      }],
+      completeness: 'complete',
+      structural_violations: [],
+    }
+    previewReset.mockClear()
 
     selectProfile(root, 'new')
     await flush()
 
-    expect(shaclReset).toHaveBeenCalled()
-    expect(shaclRunning.value).toBe(false)
-    expect(shaclFindings.value).toEqual([])
+    expect(previewReset).toHaveBeenCalled()
+    expect(previewRunning.value).toBe(false)
+    expect(previewResult.value).toBeNull()
     expect(content(root)).not.toContain('Switch profile and migrate this draft?')
   })
 
