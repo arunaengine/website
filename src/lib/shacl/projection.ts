@@ -1,3 +1,4 @@
+import { CRATE_BASE_IRI } from './crateIri'
 import { effectiveEntitySources } from '../profiles/sources'
 import { stringOptions } from '../profiles/schema'
 import { ARUNA_PROFILE_PREFIX, isDatasetType, normalizeTypeUri, sameSchemaOrgType, termNameFromUri } from '../profiles/uri'
@@ -15,12 +16,7 @@ export const SH = 'http://www.w3.org/ns/shacl#'
 export const XSD = 'http://www.w3.org/2001/XMLSchema#'
 const SCHEMA = 'http://schema.org/'
 
-// The base IRI every crate is anchored under at validation time. Crate-local
-// ids ("./", "index.html") are relative IRIs; jsonld.toRDF drops them without a
-// base, so validate.ts resolves the data graph AND parses shapes Turtle against
-// this same base. Shapes referencing crate-local ids (requiredInstances by @id)
-// emit an explicit `@base` header so the file stays self-contained.
-export const CRATE_BASE_IRI = 'arcp://name,aruna-portal/crate/'
+export { CRATE_BASE_IRI }
 
 // Kind-derived value patterns, matched to the bespoke validator (validate.ts in
 // lib/profiles) so both lines of validation agree. Exported for lift.ts, which
