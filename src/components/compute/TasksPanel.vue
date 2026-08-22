@@ -7,6 +7,7 @@ import FilterChips from '@/components/ui/FilterChips.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
+import TesPlacementTags from '@/components/compute/TesPlacementTags.vue'
 import TaskDetailPanel from '@/components/compute/TaskDetailPanel.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
@@ -428,7 +429,10 @@ onUnmounted(() => {
               <div class="font-medium text-foreground">{{ task.name || 'Untitled task' }}</div>
               <div v-if="task.id" class="font-mono text-[11px] text-muted-foreground" :title="task.id">{{ truncateMiddle(task.id) }}</div>
             </td>
-            <td class="px-5 py-2.5"><TaskStateBadge :state="task.state" /></td>
+            <td class="px-5 py-2.5">
+              <TaskStateBadge :state="task.state" />
+              <TesPlacementTags :tags="task.tags" compact class="mt-1" />
+            </td>
             <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground md:table-cell">
               <span v-if="taskGroup(task)" :class="taskGroup(task)!.mono ? 'font-mono' : ''">{{ taskGroup(task)!.text }}</span>
               <span v-else>-</span>

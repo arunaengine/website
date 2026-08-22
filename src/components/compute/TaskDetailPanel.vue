@@ -10,6 +10,7 @@ import CopyButton from '@/components/nodes/CopyButton.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
+import TesPlacementTags from '@/components/compute/TesPlacementTags.vue'
 import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useJobs } from '@/composables/useJobs'
@@ -21,6 +22,7 @@ import type { JobFamilyResponse } from '@/lib/jobs'
 import { detectQuickRun } from '@/lib/quickRuntimes'
 import {
   TES_GROUP_TAG,
+  TES_READONLY_TAGS,
   drsDownloadHref,
   drsObjectHref,
   isDrsReference,
@@ -142,7 +144,13 @@ const groupTagLabel = computed(() => {
   if (!id) return null
   return myGroups.value.find((g) => g.id === id)?.name ?? truncateMiddle(id)
 })
-const otherTags = computed(() => Object.entries(task.value?.tags ?? {}).filter(([k]) => k !== TES_GROUP_TAG))
+// The group tag has its own row and the read-only placement tags their own
+// block, so this only lists what the caller set itself.
+const otherTags = computed(() =>
+  Object.entries(task.value?.tags ?? {}).filter(
+    ([key]) => key !== TES_GROUP_TAG && !TES_READONLY_TAGS.includes(key),
+  ),
+)
 
 const resourceSummary = computed(() => {
   const r = task.value?.resources
@@ -369,6 +377,8 @@ async function confirmDelete() {
             </dd>
           </template>
         </dl>
+        <TesPlacementTags :tags="task.tags" />
+
         <div v-if="otherTags.length" class="flex flex-wrap items-center gap-1.5">
           <Badge v-for="[k, v] in otherTags" :key="k" variant="outline" class="font-mono">{{ k }}={{ v }}</Badge>
         </div>
