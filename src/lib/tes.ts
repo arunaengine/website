@@ -29,6 +29,9 @@ export interface TesInput {
   // Required by the backend; must be an s3://bucket/key URL. Inline `content`
   // is rejected (400), so scripts are uploaded to S3 and referenced here.
   url?: string
+  // Inline literal the spec allows instead of a url. Both the facade and the
+  // native surface reject it; typed so a re-run prefill can detect one.
+  content?: string
   // Absolute path inside the container the input is materialized at.
   path: string
   type?: TesFileType // default FILE; only FILE is accepted

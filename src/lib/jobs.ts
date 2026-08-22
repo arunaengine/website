@@ -251,6 +251,127 @@ export function cancelJob(jobId: string, client: ApiClientOptions): Promise<JobS
   return apiRequest<JobStatusResponse>(`/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' }, client)
 }
 
+// ── Native submission ────────────────────────────────────────────────────────
+// POST /jobs/ — the surface the GA4GH facade maps onto. It expresses what TES
+// cannot: per-input composition modes, an exact version pin, the collision
+// policy, workspace prefixes to inventory, and the workspace mode.
+
+// `exact_reference` requires version_id; `floating_reference` rejects it.
+export type InputModeRequest = 'snapshot' | 'floating_reference' | 'exact_reference'
+
+export type CollisionPolicyRequest = 'reject' | 'replace' | 'keep_existing'
+
+export type WorkspaceModeRequest = 'temporary' | 'kept' | 'existing'
+
+export interface ExecutionInputRequest {
+  bucket: string
+  key: string
+  version_id?: string
+  dest_key: string
+  /** Absolute container path; the backend defaults it to /inputs/<dest_key>. */
+  container_path?: string
+  mode?: InputModeRequest
+}
+
+export interface ExecutionOutputRequest {
+  container_path: string
+  /** Destination key inside the workspace bucket. */
+  dest_key: string
+}
+
+// `bucket` belongs to `existing` alone: sending one with temporary or kept is
+// a 400, and omitting the whole block defaults to `kept`.
+export interface WorkspaceRequest {
+  mode: WorkspaceModeRequest
+  bucket?: string
+}
+
+export interface SubmitExecutionRequest {
+  group_id: string
+  image: string
+  entrypoint?: string[]
+  command: string[]
+  env: Record<string, string>
+  cpu_cores?: number
+  ram_bytes?: number
+  max_walltime_ms?: number
+  executor_constraint?: string
+  inputs: ExecutionInputRequest[]
+  outputs: ExecutionOutputRequest[]
+  /** Workspace prefixes inventoried at completion; at most 32. */
+  output_prefixes: string[]
+  collision_policy: CollisionPolicyRequest
+  /** Scoped to the caller; the same key with a different plan is a 409. */
+  idempotency_key?: string
+  workspace?: WorkspaceRequest
+}
+
+export interface SubmitJobResponse {
+  /** The caller's stable handle, even when a merge moves the canonical alias. */
+  job_id: string
+  /** False on an idempotent replay: nothing new was admitted. */
+  created: boolean
+  submission_id: string
+  canonical_job_id: string
+  /** Point-in-time; a replay of a running request reports that instead. */
+  state: string
+  /** A preferred route, not an owner. */
+  origin_node_url: string
+  status_url: string
+}
+
+// POST /jobs/ — 201 when admitted, 200 when the idempotency key already names
+// this exact plan. `created` tells them apart, so the status is not needed.
+export function submitJob(
+  request: SubmitExecutionRequest,
+  client: ApiClientOptions,
+): Promise<SubmitJobResponse> {
+  return apiRequest<SubmitJobResponse>(
+    '/jobs/',
+    { method: 'POST', body: JSON.stringify(request) },
+    client,
+  )
+}
+
+// A 503 is always retryable here, and retrying with the SAME idempotency key
+// is what keeps a submission that may already have committed from duplicating.
+export function isSubmitRetryable(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 503
+}
+
+export function isNativeSubmitUnsupported(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 404 || error.status === 405)
+}
+
+// A plain-language reason for the refusals this surface actually produces.
+// The 503 reason rides in the message, because `code` is the generic status.
+export function submitErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) return error instanceof Error ? error.message : String(error)
+  if (error.status === 503) {
+    if (error.message === 'job_placement_unavailable') {
+      return 'No node could admit this job right now. Retrying keeps the same idempotency key, so a submission that already committed is not duplicated.'
+    }
+    if (error.message === 'structured_id_clock_unhealthy') {
+      return 'The node could not mint a job id right now. Retry in a moment.'
+    }
+    return `The node could not admit this job right now (${error.message}). Retry in a moment.`
+  }
+  if (error.status === 409) {
+    if (error.code === 'JobPlanConflict') {
+      return 'This idempotency key is already bound to a different plan. Change the run, or start a new submission.'
+    }
+    if (error.code === 'compute_quota_denied') {
+      return `The group's standing compute quota refused this job. ${error.message}`
+    }
+    return error.message
+  }
+  if (error.status === 403) {
+    return 'This token may not submit for that group, or may not write the workspace bucket it names.'
+  }
+  if (error.status === 401) return 'Sign in again before submitting.'
+  return error.message
+}
+
 // ── Frozen per-entry report ──────────────────────────────────────────────────
 // Only import_rocrate and export_rocrate jobs keep one; every other kind is a
 // plain 404. Rows are untyped on the wire (serde_json::Value), so the shared

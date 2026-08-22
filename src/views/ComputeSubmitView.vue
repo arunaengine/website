@@ -36,13 +36,30 @@ import {
   type TesTask,
 } from '@/lib/tes'
 import { isWorkspaceBucket, type WorkspaceMode } from '@/lib/workspaces'
+import {
+  droppedNativeFields,
+  isNativeBlocked,
+  nativeSubmitRequired,
+  tesFormToExecutionRequest,
+  type InputPlacement,
+  type NativePlacementOptions,
+} from '@/lib/nativeSubmit'
+import {
+  isNativeSubmitUnsupported,
+  isSubmitRetryable,
+  submitErrorMessage,
+  submitJob,
+  type CollisionPolicyRequest,
+  type InputModeRequest,
+} from '@/lib/jobs'
+import { createOperationId } from '@/lib/placementPolicies'
 import Badge from '@/components/ui/Badge.vue'
 import { ArrowLeft, ArrowRight, Cpu, FileText, Folder, ListPlus, LogIn, Plus, X } from '@lucide/vue'
 
 const router = useRouter()
 const route = useRoute()
 const { tesEnabled, busy, createTask, getTask } = useTes()
-const { currentUser, myGroups } = useAruna()
+const { apiBaseUrl, authToken, currentUser, myGroups } = useAruna()
 const { signIn, stage, authPending } = useAuth()
 
 const signingIn = computed(() => stage.value === 'redirecting')
@@ -406,14 +423,125 @@ function openInputDialog() {
   inputDialogOpen.value = true
 }
 
+// ── Advanced placement ───────────────────────────────────────────────────────
+// Options the GA4GH task interface cannot carry. Setting any of them switches
+// the submission to the native jobs API rather than silently dropping them.
+const INPUT_MODE_OPTIONS = [
+  { value: 'snapshot', label: 'Snapshot (default)' },
+  { value: 'floating_reference', label: 'Follow current version' },
+  { value: 'exact_reference', label: 'Pin an exact version' },
+]
+const COLLISION_OPTIONS = [
+  { value: 'reject', label: 'Reject (default)' },
+  { value: 'replace', label: 'Replace' },
+  { value: 'keep_existing', label: 'Keep existing' },
+]
+
+const inputPlacements = ref<Record<string, InputPlacement>>({})
+const collisionPolicy = ref<CollisionPolicyRequest>('reject')
+const outputPrefixes = ref<string[]>([])
+
+function placementFor(containerPath: string): InputPlacement {
+  return inputPlacements.value[containerPath] ?? { mode: 'snapshot' }
+}
+function setInputMode(containerPath: string, mode: InputModeRequest) {
+  const current = placementFor(containerPath)
+  const next = { ...current, mode }
+  // A version id only belongs to an exact pin; clearing it here keeps the
+  // form from carrying a value the backend would refuse.
+  if (mode !== 'exact_reference') delete next.versionId
+  inputPlacements.value = { ...inputPlacements.value, [containerPath]: next }
+}
+function setInputVersion(containerPath: string, versionId: string) {
+  inputPlacements.value = {
+    ...inputPlacements.value,
+    [containerPath]: { ...placementFor(containerPath), versionId },
+  }
+}
+function addOutputPrefix() {
+  outputPrefixes.value = [...outputPrefixes.value, '']
+}
+function removeOutputPrefix(index: number) {
+  outputPrefixes.value = outputPrefixes.value.filter((_, position) => position !== index)
+}
+
+// The expanded TES inputs, which is what the native request is built from: a
+// folder pick contributes one row per file, so each gets its own mode.
+const advancedInputs = computed(() => task.value.inputs ?? [])
+
+const placement = computed<NativePlacementOptions>(() => ({
+  inputs: inputPlacements.value,
+  collisionPolicy: collisionPolicy.value,
+  outputPrefixes: outputPrefixes.value,
+  workspace: workspaceMode.value
+    ? {
+        mode: workspaceMode.value,
+        bucket: workspaceMode.value === 'existing' ? workspaceBucket.value.trim() : undefined,
+      }
+    : null,
+}))
+
+const nativeMapping = computed(() =>
+  tesFormToExecutionRequest({
+    groupId: groupId.value,
+    task: task.value,
+    executorConstraint: executorConstraint.value,
+    placement: placement.value,
+  }),
+)
+// Only a draft that cannot be expressed natively switches the section off; a
+// half-filled native field is a fixable error, not a capability limit.
+const nativeUnsupported = computed(() =>
+  isNativeBlocked(nativeMapping.value) && nativeMapping.value.kind === 'unsupported'
+    ? nativeMapping.value.blocked
+    : null,
+)
+const nativeInvalid = computed(() =>
+  isNativeBlocked(nativeMapping.value) && nativeMapping.value.kind === 'invalid'
+    ? nativeMapping.value.blocked
+    : null,
+)
+const useNative = computed(() => !nativeUnsupported.value && nativeSubmitRequired(placement.value))
+const nativeDropped = computed(() => (useNative.value ? droppedNativeFields(task.value) : []))
+
 // ── Submit ───────────────────────────────────────────────────────────────────
 const submitError = ref<string | null>(null)
 // Set instead of navigating away when the node dropped the workspace choice,
 // so the hint is actually seen; the task itself was submitted fine.
 const submittedWithoutWorkspace = ref<string | null>(null)
+// Held across retries: a 503 may already have committed the submission, so the
+// same key is what makes the retry a replay instead of a duplicate.
+const idempotencyKey = ref('')
+const submitRetryable = ref(false)
+
+async function submitNative() {
+  const mapping = tesFormToExecutionRequest({
+    groupId: groupId.value,
+    task: task.value,
+    executorConstraint: executorConstraint.value,
+    placement: placement.value,
+    idempotencyKey: idempotencyKey.value,
+  })
+  if (isNativeBlocked(mapping)) {
+    submitError.value = mapping.blocked
+    return
+  }
+  const created = await submitJob(mapping.request, {
+    baseUrl: apiBaseUrl.value,
+    token: authToken.value,
+  })
+  void router.push({ name: 'job-detail', params: { jobId: created.job_id } })
+}
+
 async function submit() {
   submitError.value = null
+  submitRetryable.value = false
+  if (!idempotencyKey.value) idempotencyKey.value = createOperationId()
   try {
+    if (useNative.value) {
+      await submitNative()
+      return
+    }
     const created = await createTask(task.value)
     if (created.workspaceIgnored) {
       submittedWithoutWorkspace.value = created.id
@@ -421,6 +549,13 @@ async function submit() {
     }
     void router.push({ name: 'compute-task', params: { taskId: created.id } })
   } catch (err) {
+    if (useNative.value) {
+      submitRetryable.value = isSubmitRetryable(err)
+      submitError.value = isNativeSubmitUnsupported(err)
+        ? 'This node does not serve the native jobs API, so these advanced options cannot be submitted here.'
+        : submitErrorMessage(err)
+      return
+    }
     submitError.value = isTesUnsupported(err)
       ? `This node does not expose the TES endpoint. ${errorMessage(err)}`
       : errorMessage(err)
@@ -711,16 +846,126 @@ async function submit() {
             </p>
           </div>
           </div>
+
+          <div class="space-y-3 border-t border-border pt-6">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Advanced placement</div>
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                The GA4GH task interface cannot carry these. Setting any of them submits the run
+                through Aruna's own jobs API instead, which is what makes them take effect.
+              </p>
+            </div>
+
+            <p
+              v-if="nativeUnsupported"
+              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300"
+            >
+              These options are unavailable for this draft: {{ nativeUnsupported }}
+            </p>
+
+            <fieldset v-else class="space-y-4" :disabled="!!nativeUnsupported">
+              <div v-if="advancedInputs.length" class="space-y-2">
+                <div class="text-xs font-medium text-foreground">Input versions</div>
+                <div
+                  v-for="input in advancedInputs"
+                  :key="input.path"
+                  class="surface-inline grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)]"
+                >
+                  <div class="min-w-0 truncate font-mono text-[11px] text-foreground" :title="input.path">
+                    {{ input.path }}
+                  </div>
+                  <Select
+                    :model-value="placementFor(input.path).mode"
+                    :options="INPUT_MODE_OPTIONS"
+                    aria-label="Input composition mode"
+                    @update:model-value="setInputMode(input.path, String($event) as InputModeRequest)"
+                  />
+                  <Input
+                    v-if="placementFor(input.path).mode === 'exact_reference'"
+                    :model-value="placementFor(input.path).versionId ?? ''"
+                    class="font-mono"
+                    placeholder="Version id"
+                    aria-label="Input version id"
+                    @update:model-value="setInputVersion(input.path, String($event))"
+                  />
+                  <p v-else class="self-center text-[11px] text-muted-foreground">
+                    {{
+                      placementFor(input.path).mode === 'floating_reference'
+                        ? 'Resolved when the run starts.'
+                        : 'Copied as it is at submission.'
+                    }}
+                  </p>
+                </div>
+              </div>
+              <p v-else class="text-[11px] text-muted-foreground">Add an input to choose how it is composed.</p>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label class="text-xs font-medium text-foreground">Collision policy</label>
+                  <Select v-model="collisionPolicy" :options="COLLISION_OPTIONS" class="mt-1" />
+                  <p class="mt-1 text-[11px] text-muted-foreground">
+                    What happens when two inputs stage onto the same key. Only Reject refuses them.
+                  </p>
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-xs font-medium text-foreground">Output prefixes</label>
+                  <p class="text-[11px] text-muted-foreground">
+                    Workspace prefixes inventoried when the run finishes. Only objects this run
+                    wrote are attributed to it.
+                  </p>
+                  <div
+                    v-for="(prefix, index) in outputPrefixes"
+                    :key="index"
+                    class="grid grid-cols-[minmax(0,1fr)_1.75rem] gap-x-2"
+                  >
+                    <Input
+                      :model-value="prefix"
+                      class="font-mono"
+                      placeholder="reports/"
+                      aria-label="Output prefix"
+                      @update:model-value="outputPrefixes[index] = String($event)"
+                    />
+                    <Button variant="ghost" size="icon-sm" class="self-center" aria-label="Remove output prefix" @click="removeOutputPrefix(index)">
+                      <X class="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Button variant="outline" size="sm" @click="addOutputPrefix">
+                    <Plus class="h-3.5 w-3.5" /> Add prefix
+                  </Button>
+                </div>
+              </div>
+
+              <p v-if="nativeInvalid" class="text-[11px] text-destructive">{{ nativeInvalid }}</p>
+            </fieldset>
+          </div>
         </div>
 
         <!-- Step 3: Review -->
         <div v-else class="space-y-3">
+          <div
+            v-if="useNative"
+            class="space-y-1 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground"
+          >
+            <p>
+              This run is submitted through Aruna's native jobs API, because the GA4GH task
+              interface cannot express the advanced placement options you set.
+            </p>
+            <p v-if="nativeDropped.length" class="text-[11px] text-muted-foreground">
+              The native surface carries no {{ nativeDropped.join(', no ') }}, so that is not sent.
+            </p>
+          </div>
           <TaskJsonPreview title="TES task request" :task="task" />
           <details class="text-[11px] text-muted-foreground">
             <summary class="cursor-pointer">Technical details</summary>
-            <code class="mt-1 block rounded bg-muted px-2 py-1">POST /ga4gh/tes/v1/tasks</code>
+            <code class="mt-1 block rounded bg-muted px-2 py-1">{{ useNative ? 'POST /jobs/' : 'POST /ga4gh/tes/v1/tasks' }}</code>
           </details>
-          <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ submitError }}</p>
+          <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {{ submitError }}
+            <span v-if="submitRetryable" class="mt-1 block text-[11px]">
+              Submitting again reuses the same idempotency key, so a request that already committed
+              is replayed rather than duplicated.
+            </span>
+          </p>
           <div
             v-if="submittedWithoutWorkspace"
             class="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
@@ -743,7 +988,7 @@ async function submit() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || !groupId || !executorsValid || !outputsValid || !workspaceValid || !cpuCoresValid || !ramGbValid || !diskGbValid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> Submit task</Button>
+        <Button v-else size="sm" :disabled="busy || !groupId || !executorsValid || !outputsValid || !workspaceValid || !cpuCoresValid || !ramGbValid || !diskGbValid || !!nativeInvalid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> {{ useNative ? 'Submit job' : 'Submit task' }}</Button>
       </div>
     </div>
 
