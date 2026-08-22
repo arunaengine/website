@@ -228,6 +228,67 @@ export const docsTopics: DocsTopic[] = [
     ],
   },
   {
+    slug: 'data-to-compute',
+    kind: 'Concept',
+    title: 'Data-to-compute and compute-to-data',
+    summary: 'How a run is placed, what the placement verdict means, and how inputs and outputs are named.',
+    sections: [
+      {
+        title: 'How placement is decided',
+        paragraphs: [
+          'Every node that holds a request family plans it independently. One planning round screens every executor advertisement the realm publishes, walking members in node order and their backends by executor kind. Selection is sealed only after the last page, so a lower-ranked target seen early is never launched while a better one waits in a later page.',
+          'The plan carries a transfer estimate: the bytes the planner expected to move to the chosen executor. It is a plan-time estimate computed from configured link bandwidths, not a measurement of what was actually transferred.',
+        ],
+        bullets: [
+          'Ranked alternatives are the other acceptable targets, capped at 8 per round.',
+          'Rejected candidates are targets the round refused, with a reason recorded, capped at 32 explanations.',
+          'Omitted counts the rejections that cap dropped. A non-zero value means the recorded rejections are incomplete, not that the remaining targets agreed.',
+          'A plan is kept by the node that made it. A job answered by another node can report no placement at all, which is not the same as an unplanned run.',
+        ],
+      },
+      {
+        title: 'What the verdict means',
+        bullets: [
+          'Compute-to-data means the estimate was zero: every input already had a usable copy on the node chosen to run the work, so the plan expected to move no bytes.',
+          'Data-to-compute means at least one input had no usable copy there, so the plan expected to move those bytes to the chosen node before the run.',
+          'Not placed means the responding node sealed no plan of its own. It is an absence of local evidence, not a statement that no plan exists.',
+          'The verdict describes the plan, not the outcome. It does not prove how many bytes actually moved.',
+        ],
+      },
+      {
+        title: 'Input modes',
+        bullets: [
+          'A snapshot input is copied as it was at submission. The run is unaffected by later writes to that key.',
+          'A floating reference resolves the key at run time, so the run sees whatever is current then. It cannot name a version.',
+          'An exact reference pins one specific version and requires that version id.',
+          'The GA4GH task interface carries no mode of its own. A task submitted through it takes the mode the serving node derives from its own deployment, and never pins a version.',
+        ],
+      },
+      {
+        title: 'Outputs are exact versions',
+        paragraphs: [
+          'Each output names the exact version that one execution wrote, the execution that wrote it, and the node-local S3 endpoint that owns that version. Reading the same key without the version id answers whatever is current instead, which a duplicate execution, a later upload, or a copy from another node can all change.',
+          'The owner endpoint can be unknown while the version and the owning execution stay exact. The portal says so rather than dropping the output; retry, or ask a node that holds that advertisement.',
+        ],
+      },
+      {
+        title: 'Replicating data ahead of compute',
+        paragraphs: [
+          'The storage locations view of a file reports which nodes hold a copy, which have one on the way, and which could not answer. Asking another node for a copy needs WRITE on the file and is accepted as a queued request, not as a stored copy.',
+          'Placing a copy on a node that advertises a compute backend is what makes a compute-to-data plan possible. It does not force one: the planner still screens every advertisement and seals its own decision.',
+        ],
+      },
+      {
+        title: 'Placement policies and the job-family strategy',
+        bullets: [
+          'A residency policy is an immutable published definition. A reference to one is the pair of its id and the digest of that definition, because an id alone could be answered with other bytes.',
+          'Publishing a changed definition requires a new policy id. Policies restrict which nodes a copy may live on, and the planner only routes inputs from copies that comply.',
+          'The job-family strategy places the replicated job records themselves. It cannot be removed and its shard count is frozen, so it is shown read-only.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'first-dataset',
     kind: 'Guide',
     title: 'Create your first Dataset',
