@@ -5,11 +5,16 @@ import {
   getJobAudit,
   getJobReport,
   headJobArtifact,
+  isNativeSubmitUnsupported,
   isReportAbsent,
   isReportCursorConflict,
+  isSubmitRetryable,
   placementVerdict,
   reportPendingState,
+  submitErrorMessage,
+  submitJob,
   type JobStatusResponse,
+  type SubmitExecutionRequest,
 } from './jobs'
 import { ApiError } from './api'
 
@@ -259,5 +264,94 @@ describe('run crate artifact', () => {
 
     expect(result.state).toBe('expired')
     expect(result.blob).toBeUndefined()
+  })
+})
+
+const submission: SubmitExecutionRequest = {
+  group_id: '01GROUP',
+  image: 'tools:1',
+  command: ['run'],
+  env: {},
+  inputs: [],
+  outputs: [],
+  output_prefixes: [],
+  collision_policy: 'reject',
+  idempotency_key: 'key-1',
+}
+
+function submitBody(created: boolean, state: string) {
+  return {
+    job_id: '01JOB',
+    created,
+    submission_id: 'submission',
+    canonical_job_id: '01JOB',
+    state,
+    origin_node_url: 'https://node.test/api/v1',
+    status_url: 'https://node.test/api/v1/jobs/01JOB',
+  }
+}
+
+describe('native job submission', () => {
+  it('posts the request body verbatim and reports a fresh admission', async () => {
+    const calls = stubFetch(() => jsonResponse(201, submitBody(true, 'queued')))
+
+    const created = await submitJob(submission, client)
+
+    expect(calls[0].url).toBe('https://node.test/api/v1/jobs/')
+    expect(calls[0].method).toBe('POST')
+    expect(calls[0].auth).toBe('Bearer token')
+    expect(created.created).toBe(true)
+    expect(created.job_id).toBe('01JOB')
+  })
+
+  it('reads an idempotent replay from created rather than the status', async () => {
+    // A 200 replay reports the family's current state, not "queued".
+    stubFetch(() => jsonResponse(200, submitBody(false, 'running')))
+
+    const replayed = await submitJob(submission, client)
+
+    expect(replayed.created).toBe(false)
+    expect(replayed.state).toBe('running')
+  })
+
+  it('marks a 503 retryable and explains that the key is reused', async () => {
+    stubFetch(() =>
+      jsonResponse(503, { error: 'job_placement_unavailable', code: 'Service unavailable' }),
+    )
+
+    const error = await submitJob(submission, client).catch((err: unknown) => err)
+
+    expect(isSubmitRetryable(error)).toBe(true)
+    expect(isNativeSubmitUnsupported(error)).toBe(false)
+    expect(submitErrorMessage(error)).toContain('same idempotency key')
+  })
+
+  it('separates an idempotency conflict from a quota refusal', async () => {
+    stubFetch(() =>
+      jsonResponse(409, { error: 'idempotency key already bound to job 01OTHER', code: 'JobPlanConflict' }),
+    )
+    const conflict = await submitJob(submission, client).catch((err: unknown) => err)
+    expect(isSubmitRetryable(conflict)).toBe(false)
+    expect(submitErrorMessage(conflict)).toContain('already bound to a different plan')
+    vi.unstubAllGlobals()
+
+    stubFetch(() =>
+      jsonResponse(409, {
+        error: 'max_jobs exceeded',
+        code: 'compute_quota_denied',
+        quota: { scope: 'group', dimension: 'max_jobs', observed: 4, requested: 1, limit: 4 },
+      }),
+    )
+    const quota = await submitJob(submission, client).catch((err: unknown) => err)
+    expect(submitErrorMessage(quota)).toContain('standing compute quota')
+  })
+
+  it('treats an absent route as an unsupported surface', async () => {
+    stubFetch(() => jsonResponse(405, { error: 'Method not allowed', code: 'Not implemented' }))
+
+    const error = await submitJob(submission, client).catch((err: unknown) => err)
+
+    expect(isNativeSubmitUnsupported(error)).toBe(true)
+    expect(isSubmitRetryable(error)).toBe(false)
   })
 })
