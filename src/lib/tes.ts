@@ -363,6 +363,50 @@ export function expandDataRefEntry(entry: TesDataRefEntry): TesInput[] {
   }))
 }
 
+// ── Output captures ──────────────────────────────────────────────────────────
+// The facade rejects `type: DIRECTORY`, so a folder capture is expressed as a
+// wildcard output instead. The glob is built with a literal separator, so `*`
+// never crosses '/': only the folder's own files are captured, and nested
+// subfolders are not. `path_prefix` is the literal ancestor stripped from each
+// match before the remainder is appended to the destination key.
+
+export function isFolderCapture(containerPath: string): boolean {
+  return containerPath.trim().endsWith('/')
+}
+
+/** Destination key without its trailing separator; the backend appends one. */
+function capturePrefixKey(key: string): string {
+  return key.trim().replace(/^\/+/, '').replace(/\/+$/, '')
+}
+
+// One capture row (container path plus S3 destination) as a TES output.
+export function captureOutput(containerPath: string, bucket: string, key: string): TesOutput {
+  const path = containerPath.trim()
+  const target = bucket.trim()
+  if (!isFolderCapture(path)) {
+    return { url: `s3://${target}/${key.trim().replace(/^\/+/, '')}`, path, type: 'FILE' }
+  }
+  const directory = path.replace(/\/+$/, '')
+  return {
+    url: `s3://${target}/${capturePrefixKey(key)}`,
+    path: `${directory}/*`,
+    path_prefix: directory,
+    type: 'FILE',
+  }
+}
+
+// Inverse of captureOutput for a re-run prefill: a wildcard capture becomes the
+// folder row it came from, so the editor shows a folder rather than a pattern.
+export function captureContainerPath(output: TesOutput): string {
+  const path = output.path.trim()
+  if (output.path_prefix && path === `${output.path_prefix.replace(/\/+$/, '')}/*`) {
+    return `${output.path_prefix.replace(/\/+$/, '')}/`
+  }
+  // A legacy DIRECTORY output still restores as the folder it named.
+  if (output.type === 'DIRECTORY' && !path.endsWith('/')) return `${path}/`
+  return path
+}
+
 // ── Task pruning ─────────────────────────────────────────────────────────────
 
 function trimmed(value: string | undefined): string | undefined {

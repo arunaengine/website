@@ -24,6 +24,8 @@ import { useS3 } from '@/composables/useS3'
 import {
   TES_EXECUTOR_TAG,
   TES_GROUP_TAG,
+  captureContainerPath,
+  captureOutput,
   expandDataRefEntry,
   parseS3Url,
   pruneTesTask,
@@ -96,8 +98,8 @@ const outputRows = ref<{ path: string; bucket: string; key: string }[]>([
   { path: '/outputs/result.txt', bucket: '', key: '' },
 ])
 
-// A container path ending in '/' is a DIRECTORY output: everything the task
-// wrote below it is uploaded under the destination key prefix after the run.
+// A container path ending in '/' is a folder capture, mapped to a wildcard
+// output: only the files written directly in that folder are uploaded.
 function isDirCapture(path: string): boolean {
   return path.trim().endsWith('/')
 }
@@ -218,8 +220,9 @@ async function applyRerun(id: string) {
         notes.push(`The output destination ${output.url} is not an s3:// URL and was not restored.`)
         return []
       }
-      const dir = output.type === 'DIRECTORY' || output.path.endsWith('/')
-      return [{ path: dir && !output.path.endsWith('/') ? `${output.path}/` : output.path, bucket: parsed.bucket, key: parsed.key }]
+      const path = captureContainerPath(output)
+      const key = isDirCapture(path) && !parsed.key.endsWith('/') ? `${parsed.key}/` : parsed.key
+      return [{ path, bucket: parsed.bucket, key }]
     })
 
     const r = source.resources
@@ -259,11 +262,7 @@ onMounted(() => {
 })
 
 const outputs = computed<TesOutput[]>(() =>
-  outputRows.value.map((row) => ({
-    url: `s3://${row.bucket.trim()}/${normalizedOutputKey(row.key)}`,
-    path: row.path.trim(),
-    type: isDirCapture(row.path) ? ('DIRECTORY' as const) : ('FILE' as const),
-  })),
+  outputRows.value.map((row) => captureOutput(row.path, row.bucket, normalizedOutputKey(row.key))),
 )
 
 const resources = computed<TesResources>(() => {
@@ -468,6 +467,7 @@ function removeOutputPrefix(index: number) {
 // The expanded TES inputs, which is what the native request is built from: a
 // folder pick contributes one row per file, so each gets its own mode.
 const advancedInputs = computed(() => task.value.inputs ?? [])
+const hasFolderCapture = computed(() => outputRows.value.some((row) => isDirCapture(row.path)))
 
 const placement = computed<NativePlacementOptions>(() => ({
   inputs: inputPlacements.value,
@@ -718,7 +718,7 @@ async function submit() {
                   <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
                   <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
                 </div>
-                <p class="text-[11px] text-muted-foreground">A folder capture (path ending in /) uploads everything the task wrote under it after the run.</p>
+                <p class="text-[11px] text-muted-foreground">A folder capture (path ending in /) uploads the files the task wrote directly in that folder. Nested subfolders are not captured.</p>
               </section>
 
               <template v-else>
@@ -757,7 +757,7 @@ async function submit() {
                     <Button variant="ghost" size="icon-sm" class="self-center text-destructive hover:text-destructive" aria-label="Remove output" @click="removeOutputRow(i)"><X class="h-4 w-4" /></Button>
                   </div>
                   <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
-                  <p class="text-[11px] text-muted-foreground">A folder capture (container path ending in /) uploads everything the task wrote under that path after the run.</p>
+                  <p class="text-[11px] text-muted-foreground">A folder capture (container path ending in /) uploads the files the task wrote directly in that folder. Nested subfolders are not captured.</p>
                   <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
                     Every capture needs an absolute container path, one bucket and a canonical key; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
                   </p>
@@ -954,6 +954,13 @@ async function submit() {
               The native surface carries no {{ nativeDropped.join(', no ') }}, so that is not sent.
             </p>
           </div>
+          <p
+            v-if="hasFolderCapture"
+            class="rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
+          >
+            Folder captures are submitted as a wildcard pattern. Only the files written directly in
+            the captured folder are uploaded; nested subfolders are not.
+          </p>
           <TaskJsonPreview title="TES task request" :task="task" />
           <details class="text-[11px] text-muted-foreground">
             <summary class="cursor-pointer">Technical details</summary>

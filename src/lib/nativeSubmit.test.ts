@@ -8,7 +8,7 @@ import {
   type NativePlacementOptions,
   type NativeSubmitForm,
 } from './nativeSubmit'
-import type { TesTask } from './tes'
+import { captureOutput, type TesTask } from './tes'
 
 function task(overrides: Partial<TesTask> = {}): TesTask {
   return {
@@ -164,8 +164,8 @@ describe('task to execution request', () => {
         'folder capture',
       ],
       [
-        form({ task: task({ outputs: [{ url: 's3://r/o', path: '/out/*.txt', path_prefix: '/out' }] }) }),
-        'wildcard capture',
+        form({ task: task({ outputs: [captureOutput('/out/reports/', 'r', 'reports/')] }) }),
+        'folder capture /out/reports/',
       ],
       [
         form({ task: task({ outputs: [{ url: 'file:///tmp/out', path: '/outputs/out' }] }) }),

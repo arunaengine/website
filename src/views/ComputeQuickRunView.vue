@@ -36,6 +36,8 @@ import { useS3 } from '@/composables/useS3'
 import {
   TES_GROUP_TAG,
   TES_IDEMPOTENCY_TAG,
+  captureContainerPath,
+  captureOutput,
   expandDataRefEntry,
   parseS3Url,
   pruneTesTask,
@@ -325,19 +327,15 @@ function normalizedOutputKey(path: string): string {
 function outputBasename(path: string): string {
   return normalizedOutputKey(path).split('/').filter(Boolean).pop() ?? ''
 }
-// A captured container path ending in '/' means a DIRECTORY output: the run
-// uploads everything the script wrote below it, to a destination key prefix.
+// A captured container path ending in '/' is a folder capture, mapped to a
+// wildcard output: only files written directly in that folder are uploaded.
 function isDirCapture(path: string): boolean {
   return path.trim().endsWith('/')
 }
 const declaredOutputs = computed<TesOutput[]>(() =>
   outputRows.value
     .filter((row) => row.bucket.trim() && outputBasename(row.path) && row.containerPath.trim())
-    .map((row) => ({
-      url: `s3://${row.bucket.trim()}/${normalizedOutputKey(row.path)}`,
-      path: row.containerPath.trim(),
-      type: isDirCapture(row.containerPath) ? ('DIRECTORY' as const) : ('FILE' as const),
-    })),
+    .map((row) => captureOutput(row.containerPath, row.bucket, normalizedOutputKey(row.path))),
 )
 
 const task = computed<TesTask>(() =>
@@ -903,11 +901,10 @@ async function applyRerun(id: string) {
         notes.push(`The output destination ${output.url} is not an s3:// URL and was not restored.`)
         continue
       }
-      const dir = output.type === 'DIRECTORY' || output.path.endsWith('/')
       outputRows.value.push({
         bucket: parsed.bucket,
         path: parsed.key,
-        containerPath: dir && !output.path.endsWith('/') ? `${output.path}/` : output.path,
+        containerPath: captureContainerPath(output),
         keyTouched: true,
       })
     }
@@ -1312,7 +1309,7 @@ function dismissRerun() {
                     <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Output data
                   </div>
                   <p class="mt-1 text-[11px] text-muted-foreground">
-                    Captures files or folders the script writes, by default under <code class="rounded bg-muted px-1 font-mono">{{ activeWorkdir }}/out/</code>, into a bucket after the run. A container path ending in / captures everything below it. stdout and stderr are always captured.
+                    Captures files or folders the script writes, by default under <code class="rounded bg-muted px-1 font-mono">{{ activeWorkdir }}/out/</code>, into a bucket after the run. A container path ending in / captures the files written directly in that folder; nested subfolders are not. stdout and stderr are always captured.
                   </p>
                 </div>
                 <div v-if="outputRows.length" class="space-y-1.5">

@@ -141,8 +141,13 @@ function mapOutput(output: {
       kind: 'unsupported',
     }
   }
+  // Folder captures reach here as `<folder>/*` plus the prefix to strip, which
+  // the native request body has no field for.
   if (output.path_prefix) {
-    return { blocked: `The wildcard capture ${containerPath} has no native equivalent.`, kind: 'unsupported' }
+    return {
+      blocked: `The folder capture ${output.path_prefix}/ has no native equivalent; capture its files instead.`,
+      kind: 'unsupported',
+    }
   }
   const parsed = parseS3Url(output.url)
   if (!parsed) {
