@@ -325,7 +325,15 @@ function onSearchFocusOut(event: FocusEvent) {
 }
 
 onMounted(() => window.addEventListener('popstate', onPopState))
-onBeforeUnmount(() => window.removeEventListener('popstate', onPopState))
+onBeforeUnmount(() => {
+  window.removeEventListener('popstate', onPopState)
+  // Unmounting while open (a route change closes the layout) would otherwise
+  // strand the pushed entry and make the next Back a no-op.
+  if (ownsHistoryEntry) {
+    ownsHistoryEntry = false
+    window.history.back()
+  }
+})
 </script>
 
 <template>

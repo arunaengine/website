@@ -56,6 +56,22 @@ function setTab(next: AdminTab) {
   void router.replace({ query: { ...route.query, tab: next === 'realm' ? undefined : next } })
 }
 
+// Roving tabindex: the tablist is one tab stop and arrows move between tabs.
+function onTabKeydown(event: KeyboardEvent, index: number) {
+  const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+  let target = step ? index + step : -1
+  if (event.key === 'Home') target = 0
+  if (event.key === 'End') target = adminTabs.value.length - 1
+  if (target < 0) return
+  event.preventDefault()
+  const count = adminTabs.value.length
+  const next = adminTabs.value[(target + count) % count]
+  setTab(next.id)
+  const list = (event.currentTarget as HTMLElement).parentElement
+  const buttons = list?.querySelectorAll<HTMLElement>('[role="tab"]')
+  buttons?.[(target + count) % count]?.focus()
+}
+
 // Mirrors aruna's `impl Default for QuotaConfig` — the effective policy when a
 // backend serves no quota block. null = unlimited.
 const DEFAULT_QUOTA: RealmQuotaConfig = {
@@ -370,11 +386,13 @@ async function save() {
         <div class="overflow-x-auto">
           <div class="flex items-center gap-1 border-b border-border" role="tablist" aria-label="Realm administration sections">
             <button
-              v-for="entry in adminTabs"
+              v-for="(entry, index) in adminTabs"
               :key="entry.id"
               type="button"
               role="tab"
               :aria-selected="tab === entry.id"
+              :tabindex="tab === entry.id ? 0 : -1"
+              @keydown="onTabKeydown($event, index)"
               :class="[
                 '-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors',
                 tab === entry.id
