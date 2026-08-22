@@ -1,5 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getJob, getJobAudit, type JobStatusResponse } from './jobs'
+import {
+  downloadJobArtifact,
+  getJob,
+  getJobAudit,
+  getJobReport,
+  headJobArtifact,
+  isReportAbsent,
+  isReportCursorConflict,
+  placementVerdict,
+  reportPendingState,
+  type JobStatusResponse,
+} from './jobs'
+import { ApiError } from './api'
 
 const familyFixture: JobStatusResponse = {
   job_id: '01JJRSTVWXYZ0123456789ABCD',
@@ -105,5 +117,147 @@ describe('distributed job API', () => {
     expect(urls).toEqual([
       'https://node.test/api/v1/jobs/job%2Fid/audit?scope=submission&cursor=opaque-cursor&limit=12',
     ])
+  })
+})
+
+const client = { baseUrl: 'https://node.test/api/v1', token: 'token' }
+
+function stubFetch(handler: (url: string, init: RequestInit) => Response) {
+  vi.stubGlobal('window', { location: { origin: 'https://portal.test' } })
+  const calls: Array<{ url: string; method: string; auth: string | null }> = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: URL, init: RequestInit = {}) => {
+      calls.push({
+        url: String(input),
+        method: (init.method ?? 'GET').toUpperCase(),
+        auth: new Headers(init.headers).get('Authorization'),
+      })
+      return handler(String(input), init)
+    }),
+  )
+  return calls
+}
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+describe('placement verdict', () => {
+  it('reads a zero estimate as compute-to-data', () => {
+    const verdict = placementVerdict({ executor_kind: 'docker', estimated_transfer_bytes: 0 })
+
+    expect(verdict.verdict).toBe('compute-to-data')
+    expect(verdict.explanation).toContain('move no bytes')
+  })
+
+  it('reads any moved byte as data-to-compute', () => {
+    expect(placementVerdict({ executor_kind: 'docker', estimated_transfer_bytes: 1 }).verdict).toBe(
+      'data-to-compute',
+    )
+  })
+
+  it('stays unplaced without an executor kind', () => {
+    // A zero estimate with no chosen executor is an absent plan, not locality.
+    expect(placementVerdict({ estimated_transfer_bytes: 0 }).verdict).toBe('unplaced')
+    expect(placementVerdict(null).verdict).toBe('unplaced')
+    expect(placementVerdict(undefined).verdict).toBe('unplaced')
+  })
+})
+
+describe('job report', () => {
+  it('passes limit and cursor verbatim', async () => {
+    const calls = stubFetch(() => jsonResponse(200, { rows: [], report_digest: 'digest' }))
+
+    await getJobReport('job/id', { limit: 25, cursor: 'opaque' }, client)
+
+    expect(calls[0].url).toBe('https://node.test/api/v1/jobs/job%2Fid/report?limit=25&cursor=opaque')
+  })
+
+  it('separates a pending report from an absent one', () => {
+    const pending = new ApiError(404, 'not ready', 'report_pending', {
+      code: 'report_pending',
+      state: 'running',
+    })
+    const absent = new ApiError(404, 'Not found', 'Not found', {})
+
+    expect(reportPendingState(pending)).toBe('running')
+    expect(isReportAbsent(pending)).toBe(false)
+    expect(reportPendingState(absent)).toBeNull()
+    expect(isReportAbsent(absent)).toBe(true)
+    expect(isReportCursorConflict(new ApiError(409, 'stale cursor'))).toBe(true)
+  })
+})
+
+describe('run crate artifact', () => {
+  it('reports an available archive with its unquoted etag', async () => {
+    const calls = stubFetch(
+      () =>
+        new Response(null, {
+          status: 200,
+          headers: {
+            ETag: '"abc123"',
+            'Content-Length': '4096',
+            'Content-Disposition': "attachment; filename=\"run.zip\"; filename*=UTF-8''run%20crate.zip",
+          },
+        }),
+    )
+
+    const status = await headJobArtifact('01JOB', client)
+
+    expect(calls[0].method).toBe('HEAD')
+    expect(calls[0].auth).toBe('Bearer token')
+    expect(status).toEqual({
+      state: 'available',
+      etag: 'abc123',
+      size: 4096,
+      filename: 'run crate.zip',
+    })
+  })
+
+  it('maps every unavailable answer to its own state', async () => {
+    const bodies: Array<[number, unknown, string]> = [
+      [404, { error: 'not ready', code: 'artifact_pending', details: 'running' }, 'pending'],
+      [404, { error: 'Not found', code: 'Not found' }, 'absent'],
+      [410, { error: 'expired', code: 'artifact_expired' }, 'expired'],
+      [403, { error: 'forbidden' }, 'unauthorized'],
+      [416, { error: 'bad range', code: 'invalid_range' }, 'error'],
+    ]
+    for (const [status, body, expected] of bodies) {
+      stubFetch(() => jsonResponse(status, body))
+      const result = await headJobArtifact('01JOB', client)
+      expect(result.state).toBe(expected)
+      if (expected === 'pending') expect(result.jobState).toBe('running')
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('hands back the archive bytes on a full download', async () => {
+    const calls = stubFetch(
+      () =>
+        new Response('zip-bytes', {
+          status: 200,
+          headers: { ETag: '"deadbeef"', 'Content-Length': '9' },
+        }),
+    )
+
+    const result = await downloadJobArtifact('01JOB', client)
+
+    expect(calls[0].method).toBe('GET')
+    expect(result.state).toBe('available')
+    expect(result.etag).toBe('deadbeef')
+    expect(await result.blob?.text()).toBe('zip-bytes')
+  })
+
+  it('returns no blob when the archive is not there', async () => {
+    stubFetch(() => jsonResponse(410, { error: 'expired', code: 'artifact_expired' }))
+
+    const result = await downloadJobArtifact('01JOB', client)
+
+    expect(result.state).toBe('expired')
+    expect(result.blob).toBeUndefined()
   })
 })

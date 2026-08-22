@@ -268,6 +268,113 @@ describe('distributed job detail components', () => {
     mounted.app.unmount()
   })
 
+  it('offers a download only once the archive is there', async () => {
+    const headJobArtifact = vi.fn(async () => ({
+      state: 'available' as const,
+      etag: 'abc123',
+      size: 2048,
+      filename: 'run.zip',
+    }))
+    const JobArtifactButton = compileClientComponent(
+      new URL('./JobArtifactButton.vue', import.meta.url),
+      {
+        vue: VueRuntime,
+        '@lucide/vue': icons,
+        '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+        '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+        '@/composables/useJobs': {
+          useJobs: () => ({ headJobArtifact, downloadJobArtifact: vi.fn() }),
+        },
+        '@/lib/utils': Utils,
+      },
+    )
+
+    const mounted = await mount(JobArtifactButton, { jobId: '01JOB' })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(headJobArtifact).toHaveBeenCalledWith('01JOB')
+    expect(text).toContain('Download run crate')
+    expect(text).toContain('2 KB')
+    expect(text).toContain('abc123')
+    mounted.app.unmount()
+  })
+
+  it('names each unavailable archive state instead of failing', async () => {
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ state: 'pending', jobState: 'running' }, 'the job\n      is running'],
+      [{ state: 'expired' }, 'retention window has passed'],
+      [{ state: 'unauthorized' }, 'may not read the run crate'],
+      [{ state: 'absent' }, 'No run crate archive is kept'],
+    ]
+    for (const [status, expected] of cases) {
+      const JobArtifactButton = compileClientComponent(
+        new URL('./JobArtifactButton.vue', import.meta.url),
+        {
+          vue: VueRuntime,
+          '@lucide/vue': icons,
+          '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+          '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+          '@/composables/useJobs': {
+            useJobs: () => ({
+              headJobArtifact: vi.fn(async () => status),
+              downloadJobArtifact: vi.fn(),
+            }),
+          },
+          '@/lib/utils': Utils,
+        },
+      )
+
+      const mounted = await mount(JobArtifactButton, { jobId: '01JOB' })
+      const text = content(mounted.root).replace(/\s+/g, ' ')
+
+      expect(mounted.errors).toEqual([])
+      expect(text).toContain(expected.replace(/\s+/g, ' '))
+      expect(text).not.toContain('Download run crate')
+      mounted.app.unmount()
+    }
+  })
+
+  it('renders the placement tags and hides the block without them', async () => {
+    const modules = {
+      vue: VueRuntime,
+      'vue-router': { RouterLink: RouterLinkStub },
+      '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+      '@/lib/jobs': Jobs,
+      '@/lib/tes': Tes,
+      '@/lib/utils': Utils,
+    }
+    const TesPlacementTags = compileClientComponent(
+      new URL('../compute/TesPlacementTags.vue', import.meta.url),
+      modules,
+    )
+
+    const tagged = await mount(TesPlacementTags, {
+      tags: {
+        'aruna-engine.org/job-id': '01JOBIDENTIFIER',
+        'aruna-engine.org/logical-state': 'succeeded',
+        'aruna-engine.org/executor-kind': 'docker',
+        'aruna-engine.org/estimated-transfer-bytes': '0',
+      },
+    })
+    const taggedText = content(tagged.root)
+
+    expect(tagged.errors).toEqual([])
+    expect(taggedText).toContain('Compute-to-data')
+    expect(taggedText).toContain('succeeded')
+    expect(taggedText).toContain('docker')
+    tagged.app.unmount()
+
+    const untagged = await mount(TesPlacementTags, {
+      tags: { 'aruna-engine.org/group': 'group' },
+    })
+
+    expect(untagged.errors).toEqual([])
+    // Only the v-if placeholder comment remains, no badges and no job link.
+    expect(untagged.root.children.every((node) => node.kind === 'comment')).toBe(true)
+    untagged.app.unmount()
+  })
+
   it('renders audit records by at_ms instead of API page order', async () => {
     const page: JobAuditResponse = {
       submission_id: 'submission',
