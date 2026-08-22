@@ -1456,7 +1456,7 @@ function requestClose(next: boolean) {
                 <p class="mb-1 text-[11px] font-medium text-foreground">Additional requirements</p>
                 <div v-if="serverRequiredConstraints.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
                   <p class="font-medium">Server validation required</p>
-                  <p class="mt-1">The browser cannot lift {{ serverRequiredConstraints.join(', ') }} into complete controls. The server checks these constraints when you save.</p>
+                  <p class="mt-1">{{ serverRequiredConstraints.join(', ') }} {{ serverRequiredConstraints.length === 1 ? 'is' : 'are' }} not represented as form controls. The server enforces these constraints when you save.</p>
                 </div>
                 <LiftNotesPanel :notes="profileAdditionalRequirements" attached />
               </div>

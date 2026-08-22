@@ -206,7 +206,7 @@ export interface MetadataProfile {
   mode?: ModeFile
   // Non-schema.org term → URI mappings recovered from the profile crate context.
   contextTerms?: Record<string, string>
-  // Generated SHACL shapes (shapes.ttl) Turtle text, for deep validation.
+  // Generated SHACL shapes (shapes.ttl) Turtle text, validated by the server.
   shapesText?: string
   // Attached expert SHACL shapes (shapes.custom.ttl), preserved verbatim.
   customShapesText?: string

@@ -138,7 +138,9 @@ export function profileValidationPresentation(
   return { status: 'verified', stale: false, canRevalidate: true, response }
 }
 
-const BROWSER_LIFTED_PROFILE_CONSTRAINTS = new Set([
+// SHACL terms the profile builder turns into form controls. Anything else a
+// profile uses is enforced by the server alone, so it must be disclosed.
+const FORM_CONTROL_CONSTRAINTS = new Set([
   'sh:targetClass',
   'sh:property',
   'sh:path',
@@ -185,7 +187,7 @@ export function serverValidationRequiredConstraints(
   const required: string[] = []
   for (const supported of capabilities.supported_constraints) {
     const term = profileConstraintTerm(supported)
-    if (term && used.has(term) && !BROWSER_LIFTED_PROFILE_CONSTRAINTS.has(term) && !required.includes(term)) {
+    if (term && used.has(term) && !FORM_CONTROL_CONSTRAINTS.has(term) && !required.includes(term)) {
       required.push(term)
     }
   }

@@ -167,8 +167,8 @@ const generatedValues = ref<Record<string, unknown>>({})
 // rule's entitySources policy (plan Phase 4).
 const entityEntries = ref<Record<string, EntityEntry[]>>({})
 // SHACL shapes texts of the active profile (generated shapes.ttl + attached
-// shapes.custom.ttl), driving the deep-validation worker. Empty when the
-// profile carries none (e.g. a legacy v2 crate): deep validation then stays off.
+// shapes.custom.ttl). Empty when the profile carries none (e.g. a legacy v2
+// crate); only the disclosure of server-only constraints reads them.
 const profileShapes = ref<string[]>([])
 const profileAdditionalRequirements = ref<LiftNote[]>([])
 const profileLoading = ref(false)
@@ -1630,7 +1630,7 @@ async function submit(unprofiled = false) {
           </div>
           <div v-if="serverRequiredConstraints.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             <p class="font-medium">Server validation required</p>
-            <p class="mt-1">The browser cannot lift {{ serverRequiredConstraints.join(', ') }} into complete controls. The server checks these constraints when you save.</p>
+            <p class="mt-1">{{ serverRequiredConstraints.join(', ') }} {{ serverRequiredConstraints.length === 1 ? 'is' : 'are' }} not represented as form controls. The server enforces these constraints when you save.</p>
           </div>
           <LiftNotesPanel :notes="profileAdditionalRequirements" attached />
         </section>

@@ -288,7 +288,7 @@ function violationsFor(property: string) {
           <b class="text-foreground">profile.html</b> is the human-readable specification,
           <b class="text-foreground">mode.json</b> the editor form structure (Describo/Crate-O-compatible),
           <b class="text-foreground">schema.json</b> the validation rules, and
-          <b class="text-foreground">shapes.ttl</b> the unified generated and imported SHACL shapes for deep validation.
+          <b class="text-foreground">shapes.ttl</b> the unified generated and imported SHACL shapes the server validates against.
           Editors read the mode file; validation reads the validation rules, mode files have no vocabulary for constraints or recommended levels.
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-1.5">
@@ -329,7 +329,7 @@ function violationsFor(property: string) {
 
           <TabsContent value="shapes">
             <p class="mb-2 text-[11px] text-muted-foreground">
-              Unified generated and imported SHACL shapes (<code>shapes.ttl</code>), used for deep in-browser validation of dataset crates.
+              Unified generated and imported SHACL shapes (<code>shapes.ttl</code>), used by the server to validate dataset crates.
             </p>
             <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.shapes }}</pre>
           </TabsContent>

@@ -76,7 +76,7 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Validation authority',
         bullets: [
-          'Browser validation is an early preview that helps correct a draft.',
+          'The server validation preview in the dataset dialogs checks a draft against the registered Profile before it is saved. It is advisory and never blocks the form.',
           'The backend validates the exact submitted crate against the exact registered Profile revision before accepting a tagged write.',
           'A registered Profile that is unavailable or still preparing fails closed for that tagged write. Retry the check or remove the Profile tag and save an unprofiled Dataset.',
           'External and unregistered Profile references remain readable, but they cannot currently be used as enforceable write tags.',
@@ -246,7 +246,7 @@ export const docsTopics: DocsTopic[] = [
         steps: [
           'Open Datasets and choose Create dataset.',
           'Select the owning group, then add a title, description, and other useful metadata.',
-          'Optionally choose a registered Profile. Treat browser findings as a preview and resolve violations before submission.',
+          'Optionally choose a registered Profile. Treat the server validation preview findings as advisory and resolve violations before submission.',
           'Submit the Dataset. Accepted confirms the durable write. If the detail view says Preparing, wait or use Retry instead of creating a duplicate.',
           'Review the Dataset purpose badge, group scope, conformance status, and automatic w3id status on the detail page.',
         ],

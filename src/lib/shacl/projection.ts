@@ -7,10 +7,9 @@ import type { ProfileBasics, ProfileEntityRule, ProfilePropertyRule } from '../p
 // SHACL projection of the profile rule model (plan section 7): emits shapes.ttl
 // as deterministic Turtle via plain string emission — deliberately NOT the N3
 // writer, so this module can be imported by the synchronous profile-crate
-// emitter (rocrate.ts, main bundle) while the whole RDF parser/engine stack
-// (n3, jsonld, the SHACL engine) stays in lazy chunks only (plan section 13).
-// The Turtle syntax is exercised against a real parser by the lift round-trip
-// and the browser validation runtime, so drift cannot go unnoticed.
+// emitter (rocrate.ts, main bundle) while the n3 parser stays in the lazy lift
+// chunk. The Turtle syntax is exercised against a real parser by the lift
+// round-trip, so drift cannot go unnoticed.
 
 export const SH = 'http://www.w3.org/ns/shacl#'
 export const XSD = 'http://www.w3.org/2001/XMLSchema#'
