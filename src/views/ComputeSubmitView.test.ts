@@ -11,6 +11,9 @@ import * as VueUse from '@vueuse/core'
 import * as Api from '@/lib/api'
 import * as NodeDisplay from '@/components/nodes/node-display'
 import * as OnboardingConfig from '@/lib/onboarding-config'
+import * as Jobs from '@/lib/jobs'
+import * as NativeSubmit from '@/lib/nativeSubmit'
+import * as PlacementPolicies from '@/lib/placementPolicies'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 import * as Workspaces from '@/lib/workspaces'
@@ -233,8 +236,15 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/composables/useS3': {
     useS3: () => ({ hasActiveKey: ref(false), endpoint: ref(null), listBuckets: vi.fn(async () => []) }),
   },
+  '@/composables/useRealmNodes': {
+    useRealmNodes: () => ({ executorKinds: ref(['docker']) }),
+  },
   '@/lib/tes': Tes,
   '@/lib/workspaces': Workspaces,
+  // Real modules: the TES-versus-native switch is the behaviour under test.
+  '@/lib/nativeSubmit': NativeSubmit,
+  '@/lib/jobs': Jobs,
+  '@/lib/placementPolicies': PlacementPolicies,
 })
 const AdminOnboardingView = compileClientComponent(new URL('./AdminOnboardingView.vue', import.meta.url), {
   vue: VueRuntime,
@@ -380,6 +390,15 @@ function button(root: HostNode, label: string): HostNode {
   })
 }
 
+// The submit button's label follows the submission surface it will use; these
+// tests are about validity gating, not about which surface was picked.
+function submitButton(root: HostNode): HostNode {
+  return element(root, (node) => {
+    const text = content(node).trim()
+    return node.tag === 'button' && (text.startsWith('Submit task') || text.startsWith('Submit job'))
+  })
+}
+
 async function flush() {
   await Promise.resolve()
   await nextTick()
@@ -478,7 +497,7 @@ describe('numeric Input consumers', () => {
     expect(button(mounted.root, 'Continue').props.disabled).toBe(true)
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
-    expect(button(mounted.root, 'Submit task').props.disabled).toBe(true)
+    expect(submitButton(mounted.root).props.disabled).toBe(true)
 
     await mounted.router!.push('/app/compute/new')
     await flush()
@@ -496,7 +515,7 @@ describe('numeric Input consumers', () => {
     expect(content(mounted.root)).toContain('"ram_gb": 8.5')
     expect(content(mounted.root)).toContain('"disk_gb": 20.25')
     expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Command line')).toBe(false)
-    expect(button(mounted.root, 'Submit task').props.disabled).toBe(false)
+    expect(submitButton(mounted.root).props.disabled).toBe(false)
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -515,7 +534,7 @@ describe('numeric Input consumers', () => {
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
 
-    expect(button(mounted.root, 'Submit task').props.disabled).toBe(true)
+    expect(submitButton(mounted.root).props.disabled).toBe(true)
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -532,7 +551,7 @@ describe('numeric Input consumers', () => {
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
 
-    expect(button(mounted.root, 'Submit task').props.disabled).toBe(true)
+    expect(submitButton(mounted.root).props.disabled).toBe(true)
 
     await mounted.router!.push('/app/compute/new?step=1')
     await flush()
@@ -542,7 +561,28 @@ describe('numeric Input consumers', () => {
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
 
-    expect(button(mounted.root, 'Submit task').props.disabled).toBe(true)
+    expect(submitButton(mounted.root).props.disabled).toBe(true)
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('picks the native jobs API only for options TES cannot carry', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?step=1')
+    await click(button(mounted.root, 'Keep workspace'))
+    await mounted.router!.push('/app/compute/new?step=2')
+    await flush()
+
+    expect(content(mounted.root)).toContain('POST /ga4gh/tes/v1/tasks')
+    expect(content(mounted.root)).not.toContain("Aruna's native jobs API")
+
+    await mounted.router!.push('/app/compute/new?step=1')
+    await flush()
+    await click(button(mounted.root, 'Temporary workspace'))
+    await mounted.router!.push('/app/compute/new?step=2')
+    await flush()
+
+    expect(content(mounted.root)).toContain('POST /jobs/')
+    expect(content(mounted.root)).toContain("Aruna's native jobs API")
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

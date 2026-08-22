@@ -49,6 +49,7 @@ describe('versioned in-portal Docs', () => {
       'storage-access',
       'states-and-retry',
       'identifiers',
+      'data-to-compute',
       'first-dataset',
       'storage-backend',
       'cli-access-key',
