@@ -6,6 +6,7 @@ import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
+import * as Jobs from '@/lib/jobs'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 import type { JobAuditResponse, JobFamilyResponse } from '@/lib/jobs'
@@ -148,7 +149,26 @@ const family: JobFamilyResponse = {
   canonical_execution_id: 'canonical-execution',
   executions: 1,
   duplicate_successes: 0,
-  outputs: [],
+  outputs: [
+    {
+      bucket: 'ws-bucket',
+      key: 'reports/known.html',
+      version_id: 'version-known',
+      execution_id: 'canonical-execution',
+      container_path: '/outputs/known.html',
+      size: 2048,
+      digest: 'digest-known',
+      endpoint_url: 'https://owner.node.test',
+    },
+    {
+      bucket: 'ws-bucket',
+      key: 'reports/orphan.html',
+      version_id: 'version-orphan',
+      execution_id: 'canonical-execution',
+      size: 1024,
+      endpoint_url: null,
+    },
+  ],
   revision: 3,
   projection_digest: 'projection-digest',
   eventually_consistent: true,
@@ -167,23 +187,84 @@ const family: JobFamilyResponse = {
 }
 
 describe('distributed job detail components', () => {
+  const familyModules = {
+    vue: VueRuntime,
+    'vue-router': { RouterLink: RouterLinkStub },
+    '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+    '@/components/nodes/CopyButton.vue': moduleDefault(PassThroughStub),
+    '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
+    '@/lib/jobs': Jobs,
+    '@/lib/utils': Utils,
+  }
+
   it('labels planner transfer values as plan-time estimates', async () => {
-    const JobFamilySection = compileClientComponent(new URL('./JobFamilySection.vue', import.meta.url), {
-      vue: VueRuntime,
-      '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
-      '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
-      '@/lib/utils': Utils,
-    })
+    const JobFamilySection = compileClientComponent(
+      new URL('./JobFamilySection.vue', import.meta.url),
+      familyModules,
+    )
 
     const mounted = await mount(JobFamilySection, { family })
     const text = content(mounted.root)
 
     expect(mounted.errors).toEqual([])
-    expect(text).toContain('Planner estimate')
+    expect(text).toContain('Placement')
     expect(text).toContain('Estimated at planning time')
     expect(text).toContain('Data-to-compute')
+    expect(text).toContain('At least one input had no usable copy on the chosen node')
     expect(text).toContain('4 MB')
     expect(text).toContain('340 ms')
+    mounted.app.unmount()
+  })
+
+  it('names an unknown output endpoint instead of hiding the output', async () => {
+    const JobFamilySection = compileClientComponent(
+      new URL('./JobFamilySection.vue', import.meta.url),
+      familyModules,
+    )
+
+    const mounted = await mount(JobFamilySection, { family })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('https://owner.node.test')
+    expect(text).toContain('reports/orphan.html')
+    expect(text).toContain('Owner endpoint unknown')
+    expect(text).toContain('version-orphan')
+    mounted.app.unmount()
+  })
+
+  it('reports compute-to-data when the plan moved no bytes', async () => {
+    const JobFamilySection = compileClientComponent(
+      new URL('./JobFamilySection.vue', import.meta.url),
+      familyModules,
+    )
+    const local: JobFamilyResponse = {
+      ...family,
+      placement: { ...family.placement!, estimated_transfer_bytes: 0, estimated_transfer_ms: 0 },
+    }
+
+    const mounted = await mount(JobFamilySection, { family: local })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('Compute-to-data')
+    expect(text).toContain('the plan expected to move no bytes')
+    mounted.app.unmount()
+  })
+
+  it('says no local plan exists rather than claiming none was made', async () => {
+    const JobFamilySection = compileClientComponent(
+      new URL('./JobFamilySection.vue', import.meta.url),
+      familyModules,
+    )
+    const { placement: _placement, ...unplanned } = family
+
+    const mounted = await mount(JobFamilySection, { family: unplanned })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('Not placed')
+    expect(text).toContain('No local placement record for this family')
     mounted.app.unmount()
   })
 

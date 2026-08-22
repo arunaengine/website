@@ -8,8 +8,10 @@ import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
+import JobArtifactButton from '@/components/jobs/JobArtifactButton.vue'
 import JobAuditTrail from '@/components/jobs/JobAuditTrail.vue'
 import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
+import JobReportPanel from '@/components/jobs/JobReportPanel.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import { useJobDetail } from '@/composables/useJobs'
 import { formatJobProgress, isTerminalJobState, jobProgressPercent } from '@/lib/jobs'
@@ -34,6 +36,10 @@ const prettyResult = computed(() =>
 )
 const prettyRunCrate = computed(() =>
   job.value?.run_crate !== undefined ? JSON.stringify(job.value.run_crate, null, 2) : null,
+)
+// Only these two kinds keep a per-entry report; asking for any other is a 404.
+const reportKind = computed(
+  () => job.value?.kind === 'import_rocrate' || job.value?.kind === 'export_rocrate',
 )
 const auditOpen = ref(false)
 
@@ -159,6 +165,10 @@ async function confirmCancel() {
             class="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]"
           >{{ prettyRunCrate }}</pre>
         </section>
+
+        <JobArtifactButton :job-id="job.job_id" />
+
+        <JobReportPanel v-if="reportKind" :job-id="job.job_id" />
 
         <section v-if="!terminal" class="border-t border-border pt-4">
           <div class="flex items-center gap-2">

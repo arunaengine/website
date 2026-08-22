@@ -304,6 +304,12 @@ export function reportPendingState(error: unknown): string | null {
   return typeof state === 'string' ? state : 'unknown'
 }
 
+// No readable report at all: unknown job, a job of a kind that keeps none, or
+// one whose retention window passed. Distinct from the pending 404.
+export function isReportAbsent(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404 && error.code !== 'report_pending'
+}
+
 export function isReportCursorConflict(error: unknown): boolean {
   return error instanceof ApiError && error.status === 409
 }

@@ -1,16 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
+import CopyButton from '@/components/nodes/CopyButton.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
-import type { JobFamilyResponse } from '@/lib/jobs'
+import { placementVerdict, type JobFamilyResponse, type JobOutputResponse } from '@/lib/jobs'
 import { formatBytes, formatDuration, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{ family: JobFamilyResponse }>()
 
-const plannerOutcome = computed(() => {
-  if (!props.family.placement?.executor_kind) return 'No executor selected'
-  return props.family.placement.estimated_transfer_bytes === 0 ? 'Compute-to-data' : 'Data-to-compute'
-})
+const verdict = computed(() => placementVerdict(props.family.placement))
+const verdictVariant = computed(() =>
+  verdict.value.verdict === 'compute-to-data'
+    ? 'success'
+    : verdict.value.verdict === 'data-to-compute'
+      ? 'sky'
+      : 'outline',
+)
 
 function formatEstimatedTime(ms: number): string {
   return ms < 1000 ? `${ms} ms` : formatDuration(ms)
@@ -18,6 +24,15 @@ function formatEstimatedTime(ms: number): string {
 
 function sealedAt(ms: number): string {
   return new Date(ms).toLocaleString()
+}
+
+// The exact version on its owning endpoint when that endpoint is known, and
+// the bucket-relative URI otherwise. Never a version-less URL: that would
+// address whatever is current instead of what this job wrote.
+function outputUrl(output: JobOutputResponse): string {
+  const versioned = `${output.bucket}/${encodeURIComponent(output.key)}?versionId=${encodeURIComponent(output.version_id)}`
+  if (!output.endpoint_url) return `s3://${output.bucket}/${output.key}?versionId=${output.version_id}`
+  return `${output.endpoint_url.replace(/\/+$/, '')}/${versioned}`
 }
 </script>
 
@@ -57,11 +72,12 @@ function sealedAt(ms: number): string {
       <div>
         <h4 class="text-xs font-medium text-foreground">Canonical outputs</h4>
         <p class="text-[11px] text-muted-foreground">
-          These are the canonical execution's outputs. They can differ from the object's current S3 head.
+          These are the canonical execution's outputs, named by their exact version. Reading the same
+          key without that version answers whatever is current instead.
         </p>
       </div>
       <div v-if="family.outputs.length" class="overflow-x-auto rounded-md border border-border">
-        <table class="w-full min-w-[44rem] text-left text-[11px]">
+        <table class="w-full min-w-[52rem] text-left text-[11px]">
           <thead class="bg-muted/50 text-muted-foreground">
             <tr>
               <th scope="col" class="px-3 py-2 font-medium">Bucket</th>
@@ -69,12 +85,19 @@ function sealedAt(ms: number): string {
               <th scope="col" class="px-3 py-2 font-medium">Version ID</th>
               <th scope="col" class="px-3 py-2 font-medium">Execution ID</th>
               <th scope="col" class="px-3 py-2 text-right font-medium">Size</th>
+              <th scope="col" class="px-3 py-2 font-medium">Digest</th>
+              <th scope="col" class="px-3 py-2 font-medium">Owner endpoint</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-border">
             <tr v-for="output in family.outputs" :key="`${output.execution_id}:${output.version_id}`">
               <td class="px-3 py-2 font-mono text-foreground">{{ output.bucket }}</td>
-              <td class="max-w-64 break-all px-3 py-2 font-mono text-foreground">{{ output.key }}</td>
+              <td class="max-w-64 break-all px-3 py-2 font-mono text-foreground">
+                {{ output.key }}
+                <span v-if="output.container_path" class="block text-muted-foreground">
+                  from {{ output.container_path }}
+                </span>
+              </td>
               <td class="px-3 py-2 font-mono text-muted-foreground" :title="output.version_id">
                 {{ truncateMiddle(output.version_id) }}
               </td>
@@ -82,6 +105,26 @@ function sealedAt(ms: number): string {
                 {{ truncateMiddle(output.execution_id) }}
               </td>
               <td class="whitespace-nowrap px-3 py-2 text-right text-foreground">{{ formatBytes(output.size) }}</td>
+              <td class="px-3 py-2 font-mono text-muted-foreground">
+                <span v-if="output.digest" :title="output.digest">{{ truncateMiddle(output.digest) }}</span>
+                <span v-else>not recorded</span>
+              </td>
+              <td class="px-3 py-2">
+                <div class="flex items-center gap-1">
+                  <span v-if="output.endpoint_url" class="break-all font-mono text-muted-foreground">
+                    {{ output.endpoint_url }}
+                  </span>
+                  <span
+                    v-else
+                    class="text-muted-foreground"
+                    title="This responder does not know the owning node's endpoint. The version and the owning execution are still exact; retry, or ask a node that holds that advertisement."
+                  >Owner endpoint unknown</span>
+                  <CopyButton
+                    :value="outputUrl(output)"
+                    :label="output.endpoint_url ? 'Copy the versioned URL on the owning endpoint' : 'Copy the versioned s3:// URI'"
+                  />
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -89,37 +132,66 @@ function sealedAt(ms: number): string {
       <p v-else class="text-xs text-muted-foreground">No canonical outputs have been recorded.</p>
     </div>
 
-    <div v-if="family.placement" class="surface space-y-3 p-3">
+    <div class="surface space-y-3 p-3">
       <div class="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h4 class="text-xs font-medium text-foreground">Planner estimate</h4>
-          <p class="text-[11px] text-muted-foreground">Estimated at planning time. These are not measured transfer values.</p>
+          <h4 class="text-xs font-medium text-foreground">Placement</h4>
+          <p class="text-[11px] text-muted-foreground">
+            Where this run was scheduled, and what the planner expected it to cost.
+          </p>
         </div>
-        <Badge variant="secondary">{{ plannerOutcome }}</Badge>
+        <Badge :variant="verdictVariant">{{ verdict.label }}</Badge>
       </div>
-      <dl class="grid grid-cols-[10rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
-        <dt class="text-muted-foreground">Executor kind</dt>
-        <dd class="text-foreground">{{ family.placement.executor_kind || 'No executor selected' }}</dd>
-        <dt class="text-muted-foreground">Estimated transfer bytes</dt>
-        <dd class="text-foreground">{{ formatBytes(family.placement.estimated_transfer_bytes) }}</dd>
-        <dt class="text-muted-foreground">Estimated transfer time</dt>
-        <dd class="text-foreground">{{ formatEstimatedTime(family.placement.estimated_transfer_ms) }}</dd>
-        <dt class="text-muted-foreground">Alternative candidates</dt>
-        <dd class="text-foreground">{{ family.placement.alternatives }}</dd>
-        <dt class="text-muted-foreground">Rejected candidates</dt>
-        <dd class="text-foreground">{{ family.placement.rejected }}</dd>
-        <dt class="text-muted-foreground">Omitted candidates</dt>
-        <dd class="text-foreground">{{ family.placement.omitted }}</dd>
-        <dt class="text-muted-foreground">Plan sealed</dt>
-        <dd class="text-foreground" :title="new Date(family.placement.sealed_at_ms).toISOString()">
-          {{ sealedAt(family.placement.sealed_at_ms) }}
-        </dd>
-      </dl>
+      <p class="text-[11px] text-muted-foreground">
+        {{ verdict.explanation }}
+        <RouterLink
+          :to="{ name: 'docs', params: { topic: 'data-to-compute' } }"
+          class="font-medium text-primary hover:underline"
+        >Learn more</RouterLink>
+      </p>
+
+      <template v-if="family.placement">
+        <dl class="grid grid-cols-[10rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
+          <dt class="text-muted-foreground">Executor kind</dt>
+          <dd class="text-foreground">{{ family.placement.executor_kind || 'No executor selected' }}</dd>
+          <dt class="text-muted-foreground">Estimated transfer</dt>
+          <dd class="text-foreground">
+            {{ formatBytes(family.placement.estimated_transfer_bytes) }} ·
+            {{ formatEstimatedTime(family.placement.estimated_transfer_ms) }}
+          </dd>
+          <dt class="text-muted-foreground">Ranked alternatives</dt>
+          <dd
+            class="text-foreground"
+            title="Other targets the round would have accepted. One round keeps at most 8 ranked alternatives."
+          >{{ family.placement.alternatives }}</dd>
+          <dt class="text-muted-foreground">Rejected candidates</dt>
+          <dd
+            class="text-foreground"
+            title="Targets the round refused, with the reason recorded. One round keeps at most 32 rejection explanations."
+          >{{ family.placement.rejected }}</dd>
+          <dt class="text-muted-foreground">Omitted rejections</dt>
+          <dd
+            class="text-foreground"
+            title="Rejections dropped by that audit bound. A non-zero count means the recorded rejections are incomplete, not that the remaining targets agreed."
+          >{{ family.placement.omitted }}</dd>
+          <dt class="text-muted-foreground">Plan sealed</dt>
+          <dd class="text-foreground" :title="new Date(family.placement.sealed_at_ms).toISOString()">
+            {{ sealedAt(family.placement.sealed_at_ms) }}
+          </dd>
+        </dl>
+        <p class="text-[11px] text-muted-foreground">
+          Estimated at planning time, after the last page of executor advertisements was screened.
+          These are not measured transfer values.
+        </p>
+      </template>
+      <p v-else class="text-xs text-muted-foreground">
+        No local placement record for this family. The plan is kept by the node that made it, so
+        another node may hold one.
+      </p>
     </div>
-    <p v-else class="text-xs text-muted-foreground">No local placement record for this family.</p>
 
     <div class="space-y-1.5">
-      <div class="flex flex-wrap gap-1.5" role="group" aria-label="Responder-local caveats">
+      <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Responder-local caveats">
         <Badge
           v-if="family.eventually_consistent"
           variant="outline"
@@ -131,9 +203,16 @@ function sealedAt(ms: number): string {
         <Badge v-if="family.locally_exhausted" variant="outline" class="text-[10px] text-muted-foreground">
           Locally exhausted
         </Badge>
+        <span v-if="family.responder_node_id" class="text-[11px] text-muted-foreground">
+          answered by node
+          <span class="font-mono" :title="family.responder_node_id">
+            {{ truncateMiddle(family.responder_node_id) }}
+          </span>
+        </span>
       </div>
       <p v-if="family.eventually_consistent" class="text-[11px] text-muted-foreground">
-        This responder's view can change as replicated records converge.
+        This responder's view can change as replicated records converge. It is one node's reading,
+        not the realm's settled truth.
       </p>
       <p v-if="family.partial" class="text-[11px] text-muted-foreground">
         This responder could not reduce every family record.

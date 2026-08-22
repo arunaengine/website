@@ -5,12 +5,19 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import {
   cancelJob as requestCancelJob,
+  downloadJobArtifact as requestDownloadArtifact,
   getJob as requestGetJob,
   getJobAudit as requestGetJobAudit,
+  getJobReport as requestGetJobReport,
+  headJobArtifact as requestHeadArtifact,
   isTerminalJobState,
   listJobs,
   type GetJobAuditParams,
+  type GetJobReportParams,
+  type JobArtifactDownload,
+  type JobArtifactStatus,
   type JobAuditResponse,
+  type JobReportResponse,
   type JobState,
   type JobStatusResponse,
 } from '@/lib/jobs'
@@ -327,5 +334,20 @@ export function useJobs() {
     return requestGetJobAudit(jobId, params, client())
   }
 
-  return { jobsEnabled, getJob, getJobAudit }
+  function getJobReport(jobId: string, params: GetJobReportParams): Promise<JobReportResponse> {
+    assertEnabled()
+    return requestGetJobReport(jobId, params, client())
+  }
+
+  function headJobArtifact(jobId: string): Promise<JobArtifactStatus> {
+    assertEnabled()
+    return requestHeadArtifact(jobId, client())
+  }
+
+  function downloadJobArtifact(jobId: string): Promise<JobArtifactDownload> {
+    assertEnabled()
+    return requestDownloadArtifact(jobId, client())
+  }
+
+  return { jobsEnabled, getJob, getJobAudit, getJobReport, headJobArtifact, downloadJobArtifact }
 }
