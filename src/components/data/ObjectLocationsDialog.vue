@@ -6,11 +6,12 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { HardDrive, Server, ShieldAlert, TriangleAlert } from '@lucide/vue'
+import { Copy, HardDrive, Server, ShieldAlert, TriangleAlert } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { copyState, scanLimitText } from '@/lib/storage'
@@ -19,7 +20,7 @@ import { ApiError, type BlobCopyResponse, type BlobLocationsResponse } from '@/l
 const props = defineProps<{ open: boolean; bucket: string; objectKey: string; groupId: string | null }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
-const { getBlobLocations } = useAruna()
+const { getBlobLocations, replicateBlob } = useAruna()
 const realmNodes = useRealmNodes()
 
 const summary = ref<BlobLocationsResponse | null>(null)
@@ -93,6 +94,54 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
   if (state === 'pending' || state === 'unreachable') return 'warn'
   if (state === 'not-stored') return 'secondary'
   return 'outline'
+}
+
+// ── Replication ──────────────────────────────────────────────────────────────
+// Asks one node to fetch a copy. The node answers as soon as the request is
+// recorded, so a success here means queued, never stored.
+const replicaTarget = ref('')
+const replicating = ref(false)
+const replicateError = ref<string | null>(null)
+const replicateNote = ref<string | null>(null)
+const replicateUnsupported = ref(false)
+
+const covered = computed(
+  () => new Set((summary.value?.copies ?? [])
+    .filter((copy) => copy.state === 'present' || copy.state === 'pending')
+    .map((copy) => copy.node_id)),
+)
+const replicaTargets = computed(() =>
+  realmNodes.nodes.value
+    .filter((node) => !covered.value.has(node.nodeId))
+    .map((node) => ({ value: node.nodeId, label: node.reachable ? node.label : `${node.label} (unreachable)` })),
+)
+
+async function replicate() {
+  if (!replicaTarget.value || replicating.value) return
+  replicating.value = true
+  replicateError.value = null
+  replicateNote.value = null
+  try {
+    await replicateBlob({
+      bucket: props.bucket,
+      path: props.objectKey,
+      version_id: summary.value?.version_id,
+      node_id: replicaTarget.value,
+    })
+    replicateNote.value = `A copy was queued for ${realmNodes.displayName(replicaTarget.value)}. It is stored once that node reports it below.`
+    replicaTarget.value = ''
+    await load()
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
+      replicateUnsupported.value = true
+    } else if (err instanceof ApiError && err.status === 403) {
+      replicateError.value = 'Adding a copy needs WRITE permission on this file.'
+    } else {
+      replicateError.value = err instanceof Error ? err.message : String(err)
+    }
+  } finally {
+    replicating.value = false
+  }
 }
 </script>
 
@@ -191,6 +240,43 @@ function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outlin
           </p>
           <p v-for="limit in summary.limits" :key="limit" class="pl-6">{{ scanLimitText(limit) }}</p>
         </div>
+
+        <div v-if="!replicateUnsupported" class="space-y-2 rounded-md border border-border px-3 py-2">
+          <div>
+            <h3 class="text-xs font-medium text-foreground">Add a copy</h3>
+            <p class="text-[11px] text-muted-foreground">
+              Ask another node to fetch this exact version. Needs WRITE on the file, and the copy is
+              queued rather than stored right away.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <Select
+              v-if="replicaTargets.length"
+              v-model="replicaTarget"
+              :options="replicaTargets"
+              placeholder="Select a node"
+              class="min-w-56"
+              aria-label="Node to replicate to"
+            />
+            <span v-else class="text-[11px] text-muted-foreground">
+              Every realm node this portal knows already holds or is fetching a copy.
+            </span>
+            <Button
+              v-if="replicaTargets.length"
+              variant="outline"
+              size="sm"
+              :disabled="!replicaTarget || replicating"
+              @click="replicate"
+            >
+              <Copy class="h-3.5 w-3.5" /> {{ replicating ? 'Queueing…' : 'Replicate' }}
+            </Button>
+          </div>
+          <p v-if="replicateNote" class="text-[11px] text-emerald-700 dark:text-emerald-300">{{ replicateNote }}</p>
+          <p v-if="replicateError" class="text-[11px] text-destructive">{{ replicateError }}</p>
+        </div>
+        <p v-else class="text-[11px] text-muted-foreground">
+          This node does not offer replication requests.
+        </p>
 
         <div class="flex justify-end">
           <Button variant="outline" size="sm" :disabled="loading" @click="load">Refresh</Button>

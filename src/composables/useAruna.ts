@@ -34,6 +34,8 @@ import {
   type RealmQuotaConfig,
   type S3CredentialSummary,
   type BlobLocationsResponse,
+  type ReplicateBlobRequest,
+  type ReplicateBlobResponse,
   type BucketRoutingResponse,
   type GroupBackendRequest,
   type GroupBackendResponse,
@@ -1361,6 +1363,15 @@ async function getBlobLocations(
   })
 }
 
+// Asks one node to fetch a copy. Answered 202: the copy is queued, not stored
+// yet. Needs WRITE on the object, or on the bucket when `path` is omitted.
+async function replicateBlob(input: ReplicateBlobRequest): Promise<ReplicateBlobResponse> {
+  return request<ReplicateBlobResponse>('/blobs/replicate', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
 // Synchronous one-shot staging: the node pulls source_path from the connector
 // and materializes it as bucket/key (201 on success). Slow for big blobs —
 // callers must show a running state. The axum route is literally "/staging/".
@@ -2259,6 +2270,7 @@ export function useAruna() {
     getBucketRouting,
     putBucketRouting,
     getBlobLocations,
+    replicateBlob,
     stageBlob,
     stageBatch,
     listStagingJobs,
