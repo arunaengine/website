@@ -22,6 +22,7 @@ import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
 import LiftNotesPanel from '@/components/metadata/profile-builder/LiftNotesPanel.vue'
 import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
+import ProfileValidationPreview from '@/components/metadata/ProfileValidationPreview.vue'
 import { AlertTriangle, Layers, Pencil, Plus, X } from '@lucide/vue'
 import { computed, ref, shallowRef, watch } from 'vue'
 import {
@@ -30,6 +31,7 @@ import {
   serverValidationRequiredConstraints,
   useAruna,
 } from '@/composables/useAruna'
+import { useProfilePreview } from '@/composables/useProfilePreview'
 import {
   ApiError,
   profileValidationFindings,
@@ -118,6 +120,7 @@ const {
   toMetadataDoc,
   metadataItems,
   apiBaseUrl,
+  authToken,
   profiles,
   loadProfileCrate,
   profileValidationCapabilities,
@@ -160,6 +163,20 @@ const profileShapes = ref<string[]>([])
 const serverRequiredConstraints = computed(() =>
   serverValidationRequiredConstraints(profileShapes.value, profileValidationCapabilities.value),
 )
+
+// --- Server validation preview: the crate save() would send, checked against
+// the registered profile before saving. Advisory only; the write path validates
+// authoritatively and a node without the endpoint hides the panel.
+const {
+  result: previewResult,
+  running: previewRunning,
+  unavailable: previewUnavailable,
+  error: previewError,
+  preview: previewDraft,
+  previewNow: previewDraftNow,
+  reset: previewReset,
+} = useProfilePreview({ client: () => ({ baseUrl: apiBaseUrl.value, token: authToken.value }) })
+
 const profileContextConflicts = ref<string[]>([])
 const generatedValues = ref<Record<string, unknown>>({})
 const entityEntries = ref<Record<string, EntityEntry[]>>({})
@@ -558,6 +575,7 @@ function clearProfileDefinition(crate: unknown) {
   profileAdditionalRequirements.value = []
   profileShapes.value = []
   profileContextConflicts.value = []
+  previewReset()
   generatedValues.value = {}
   entityEntries.value = {}
   editableProfileKeys.value = new Set()
@@ -1253,6 +1271,27 @@ const violations = computed(() => {
   }
 })
 
+// The active tab decides what save() would send; an unparseable draft has
+// nothing to preview.
+function crateToPreview(): unknown {
+  if (!props.open || loading.value || !pristine.value) return null
+  try {
+    return activeTab.value === 'raw' ? JSON.parse(rawText.value) : buildFromFields()
+  } catch {
+    return null
+  }
+}
+
+watch(crateToPreview, (crate) => {
+  if (!crate || !selectedProfile.value) return
+  previewDraft(crate)
+})
+
+function runProfilePreview() {
+  const crate = crateToPreview()
+  if (crate) previewDraftNow(crate)
+}
+
 function violationsFor(property: string) {
   return violations.value.filter((violation) => violation.fieldId === property)
 }
@@ -1498,7 +1537,7 @@ function requestClose(next: boolean) {
               </ul>
               <details v-if="replacementPreviewText" class="mt-2 rounded border border-border bg-background/70 p-2">
                 <summary class="cursor-pointer font-medium text-foreground">Preview exact replacement crate</summary>
-                <p class="mt-1 text-[11px] text-muted-foreground">This is a local preview of the exact Fields-tab replacement. It does not report verified conformance. The server validates the submitted replacement authoritatively.</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">This is a local preview of the exact Fields-tab replacement. Run the server validation preview below to check conformance; the server validates the submitted replacement authoritatively.</p>
                 <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[10px] text-foreground">{{ replacementPreviewText }}</pre>
               </details>
             </div>
@@ -1548,13 +1587,13 @@ function requestClose(next: boolean) {
             </div>
 
             <div v-if="violations.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
-              <div class="font-medium text-amber-800 dark:text-amber-300">Browser SHACL preview: {{ selectedProfile?.name }}</div>
+              <div class="font-medium text-amber-800 dark:text-amber-300">Profile field checks: {{ selectedProfile?.name }}</div>
               <ul class="mt-1 list-disc space-y-0.5 pl-4">
                 <li v-for="violation in violations" :key="violation.pointer + violation.message" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
                   <span class="font-mono">{{ violation.fieldId ?? violation.pointer }}</span>: {{ violation.message }}
                 </li>
               </ul>
-              <p class="mt-1 text-muted-foreground">These browser findings are a preview and do not report verified conformance.</p>
+              <p class="mt-1 text-muted-foreground">These are the form's own field checks. Conformance is reported by the server validation preview below.</p>
             </div>
           </TabsContent>
 
@@ -1579,6 +1618,17 @@ function requestClose(next: boolean) {
             <p v-else class="text-[11px] text-muted-foreground">The active tab wins on save; raw JSON must be a valid RO-Crate object.</p>
           </TabsContent>
         </Tabs>
+
+        <!-- Advisory server validation of the crate this dialog would save;
+             hidden when the node does not serve the preview endpoint. -->
+        <ProfileValidationPreview
+          v-if="selectedProfile && !previewUnavailable"
+          :result="previewResult"
+          :running="previewRunning"
+          :error="previewError"
+          :findings="previewResult?.findings ?? []"
+          @run="runProfilePreview"
+        />
 
         <div class="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-3 py-2">
           <div>
@@ -1657,7 +1707,7 @@ function requestClose(next: boolean) {
                 <summary class="cursor-pointer text-xs font-medium text-foreground">Preview exact replacement crate</summary>
                 <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all text-[10px] text-foreground">{{ pendingReplacementText }}</pre>
               </details>
-              <p class="mt-2 text-[11px] text-muted-foreground">This local preview does not verify conformance. The server performs authoritative validation when the Profile tag is retained.</p>
+              <p class="mt-2 text-[11px] text-muted-foreground">This local preview shows the replacement crate itself. Conformance is checked by the server validation preview, and the server validates authoritatively when the Profile tag is retained.</p>
             </template>
 
             <div class="mt-4 flex justify-end gap-2">

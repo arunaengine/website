@@ -34,6 +34,7 @@ const saving = ref(false)
 const profiles = ref<MetadataProfile[]>([])
 const metadataItems = ref([])
 const apiBaseUrl = ref('https://api.example.test')
+const authToken = ref('test-token')
 const profileValidationCapabilities = ref<Api.ProfileValidationCapabilitiesResponse | null>(null)
 const dialogOpen = ref(false)
 const fetchRoCrateRaw = vi.fn()
@@ -137,6 +138,7 @@ function compileDialog(): Component {
     '@/components/metadata/profile-builder/LiftNotesPanel.vue': moduleDefault(SlotStub),
     '@/components/metadata/CustomFieldsEditor.vue': moduleDefault(CustomFieldsStub),
     '@/components/metadata/SubcratePickerDialog.vue': moduleDefault(SlotStub),
+    '@/components/metadata/ProfileValidationPreview.vue': moduleDefault(SlotStub),
     '@/composables/useAruna': {
       profileReferenceIri,
       profileRulesLoadState,
@@ -150,6 +152,7 @@ function compileDialog(): Component {
         toMetadataDoc: (item: { document_path?: string }) => ({ title: item.document_path ?? '' }),
         metadataItems,
         apiBaseUrl,
+        authToken,
         profiles,
         loadProfileCrate,
         profileValidationCapabilities,
@@ -170,6 +173,17 @@ function compileDialog(): Component {
     '@/lib/profiles/rocrate': ProfileRoCrate,
     '@/lib/profiles/uri': ProfileUri,
     '@/lib/shacl/lift': ShaclLift,
+    '@/composables/useProfilePreview': {
+      useProfilePreview: () => ({
+        result: ref(null),
+        running: ref(false),
+        unavailable: ref(false),
+        error: ref<string | null>(null),
+        preview: vi.fn(),
+        previewNow: vi.fn(),
+        reset: vi.fn(),
+      }),
+    },
     '@/lib/profiles/validate': ProfileValidate,
     '@/lib/rocrateVersions': RoCrateVersions,
     '@/lib/profiles/types': ProfileTypes,
