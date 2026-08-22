@@ -3,15 +3,11 @@
 // "default", see api/src/routes/info.rs), so placement.location is never
 // empty on the wire. Nodes without a placement entry are NOT in the realm's
 // placement map and are aggregated into a separate honest bucket.
-import type {
-  PlacementAffinityRule,
-  RealmNodeInfo,
-  RealmPlacementConfigResponse as ApiRealmPlacementConfigResponse,
-} from './api'
+import type { PlacementAffinityRule, RealmNodeInfo } from './api'
 
-export type RealmPlacementConfigResponse = ApiRealmPlacementConfigResponse & {
-  job_family_strategy_id: string
-}
+// The response type now lives in api.ts with the rest of the wire contracts;
+// re-exported so existing placement imports keep working.
+export type { RealmPlacementConfigResponse } from './api'
 
 export const UNMAPPED = '(not in placement map)'
 

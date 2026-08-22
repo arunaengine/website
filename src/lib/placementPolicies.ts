@@ -1,4 +1,4 @@
-import { ApiError } from '@/lib/api'
+import { ApiError, apiRequest, type ApiClientOptions } from '@/lib/api'
 import { quotaDimensionLabel } from '@/lib/computeAdmin'
 
 export interface PolicyRefBody {
@@ -32,6 +32,38 @@ export interface PolicyResponse {
   publisher: string
   created_by: string
   created_at_ms: number
+}
+
+// GET /admin/placement-policies — the realm-config read view, ordered by
+// policy_id ascending and served from the node-local replicated copy. A node
+// that does not serve it answers 404/405 and the caller keeps its session
+// library instead of claiming the realm has no policies.
+export interface ListPoliciesResponse {
+  policies: PolicyResponse[]
+  next_cursor: string | null
+  /** False means this page is bounded, not that the listing is authoritative. */
+  complete: boolean
+}
+
+export interface ListPoliciesParams {
+  // Server default 50, clamped to 200.
+  limit?: number
+  cursor?: string
+}
+
+export function listPlacementPolicies(
+  params: ListPoliciesParams,
+  client: ApiClientOptions,
+): Promise<ListPoliciesResponse> {
+  return apiRequest<ListPoliciesResponse>(
+    '/admin/placement-policies',
+    { query: { limit: params.limit, cursor: params.cursor } },
+    client,
+  )
+}
+
+export function isPolicyListUnsupported(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 404 || error.status === 405)
 }
 
 export interface BucketPlacementRequest {

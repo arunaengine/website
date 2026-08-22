@@ -1,4 +1,5 @@
-import { apiRequest, type ApiClientOptions } from './api'
+import { ApiError, apiRequest, apiUrl, type ApiClientOptions } from './api'
+import { fetchWithRetry } from './fetch'
 import type { BadgeVariant } from '@/components/nodes/node-display'
 
 // Durable background jobs, verified against aruna api/src/routes/jobs.rs and
@@ -37,11 +38,19 @@ export type LogicalJobState = 'queued' | 'running' | 'indeterminate' | 'succeede
 export interface JobOutputResponse {
   bucket: string
   key: string
+  /** The exact version this execution wrote; the object head may be later. */
   version_id: string
   execution_id: string
-  container_path: string
+  // Omitted when the backend recorded no container path.
+  container_path?: string
   size: number
   digest?: string
+  /**
+   * Node-local S3 endpoint owning this exact version; the responder is not
+   * necessarily the execution node. Always serialized, null when this
+   * responder does not know the owning node's endpoint.
+   */
+  endpoint_url: string | null
 }
 
 export interface JobPlacementResponse {
@@ -78,8 +87,9 @@ export interface JobFamilyResponse {
 
 export interface JobStatusResponse {
   job_id: string // ULID
-  // JobPayload::kind(): probe | execution | staging | import_rocrate |
-  // export_rocrate | write_run_crate | terminal_cleanup. Kept open for new kinds.
+  // JobKind::name(): probe | execution | write_run_crate | terminal_cleanup |
+  // staging | import_rocrate | export_rocrate | harvest | mint_persistent_id |
+  // storage_purge. Kept open for new kinds.
   kind: string
   state: JobState
   attempts: number
@@ -92,9 +102,10 @@ export interface JobStatusResponse {
   // JobResultPayload::to_public_json() — payload-specific projection.
   result?: unknown
   workspace_bucket?: string
-  // Agreed contract addition: how the run's workspace is handled
-  // ("temporary" | "kept" | "existing"); kept open for older/newer backends.
-  workspace_mode?: string
+  // WorkspaceMode::name(): none | temporary | kept | existing. Always served;
+  // "none" means the run had no workspace at all.
+  workspace_mode: string
+  // Set only on the node-local path; a job answered from the family omits it.
   run_crate?: unknown
   family?: JobFamilyResponse
 }
@@ -238,6 +249,218 @@ export function getJobAudit(
 // There is no restart endpoint.
 export function cancelJob(jobId: string, client: ApiClientOptions): Promise<JobStatusResponse> {
   return apiRequest<JobStatusResponse>(`/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' }, client)
+}
+
+// ── Frozen per-entry report ──────────────────────────────────────────────────
+// Only import_rocrate and export_rocrate jobs keep one; every other kind is a
+// plain 404. Rows are untyped on the wire (serde_json::Value), so the shared
+// envelope is typed and the detail is left open.
+
+export interface JobReportRow {
+  entry_key: string
+  // ReasonCode: imported | unlisted | failed | not_attempted | included |
+  // external | denied | missing | offline | unsupported | path_synthesized |
+  // unrewritten_reference | signature_dropped | unsupported_crate_version.
+  code: string
+  message: string | null
+  detail?: unknown
+}
+
+export interface JobReportResponse {
+  rows: JobReportRow[]
+  // Opaque; bound to this job AND to the frozen report it was issued against.
+  next_cursor?: string
+  report_digest: string
+}
+
+export interface GetJobReportParams {
+  // Server default 200, clamped to 1000.
+  limit?: number
+  cursor?: string
+}
+
+// GET /jobs/{job_id}/report. A 404 carrying code `report_pending` means the
+// job is not terminal yet and the caller should poll; any other 404 means
+// there is no readable report at all. A 409 means the cursor was issued for a
+// different job or a different frozen snapshot.
+export function getJobReport(
+  jobId: string,
+  params: GetJobReportParams,
+  client: ApiClientOptions,
+): Promise<JobReportResponse> {
+  return apiRequest<JobReportResponse>(
+    `/jobs/${encodeURIComponent(jobId)}/report`,
+    { query: { limit: params.limit, cursor: params.cursor } },
+    client,
+  )
+}
+
+// The pending 404 is a bare {code, state} document, not the standard error
+// body, so the job state rides in `state` rather than in `details`.
+export function reportPendingState(error: unknown): string | null {
+  if (!(error instanceof ApiError) || error.status !== 404) return null
+  if (error.code !== 'report_pending') return null
+  const state = error.details?.state
+  return typeof state === 'string' ? state : 'unknown'
+}
+
+export function isReportCursorConflict(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 409
+}
+
+// ── Run crate artifact ───────────────────────────────────────────────────────
+// GET|HEAD /jobs/{job_id}/artifacts/rocrate. Binary application/zip behind
+// bearer auth, so it cannot be a plain link: fetch it and hand the caller a
+// Blob. `pending` and `expired` are honest states, not failures.
+
+export type JobArtifactState = 'available' | 'pending' | 'expired' | 'absent' | 'unauthorized' | 'error'
+
+export interface JobArtifactStatus {
+  state: JobArtifactState
+  /** BLAKE3 hex of the archive, quotes stripped; only when available. */
+  etag?: string
+  size?: number
+  filename?: string
+  /** Job state the backend reported while the artifact is still pending. */
+  jobState?: string
+  message?: string
+}
+
+const ARTIFACT_TIMEOUT_MS = 120_000
+
+function artifactPath(jobId: string): string {
+  return `/jobs/${encodeURIComponent(jobId)}/artifacts/rocrate`
+}
+
+function unquote(value: string | null): string | undefined {
+  if (!value) return undefined
+  return value.replace(/^W\//, '').replace(/^"|"$/g, '') || undefined
+}
+
+// Content-Disposition filename*, else the ASCII fallback.
+function artifactFilename(header: string | null): string | undefined {
+  if (!header) return undefined
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded[1])
+    } catch {
+      /* fall through to the ASCII form */
+    }
+  }
+  return /filename="([^"]*)"/i.exec(header)?.[1] || undefined
+}
+
+async function statusFromResponse(response: Response): Promise<JobArtifactStatus> {
+  if (response.ok || response.status === 206) {
+    const length = Number(response.headers.get('Content-Length'))
+    return {
+      state: 'available',
+      etag: unquote(response.headers.get('ETag')),
+      size: Number.isFinite(length) ? length : undefined,
+      filename: artifactFilename(response.headers.get('Content-Disposition')),
+    }
+  }
+  // HEAD answers carry no body; a coded body is read when there is one.
+  let body: Record<string, unknown> = {}
+  try {
+    body = (await response.json()) as Record<string, unknown>
+  } catch {
+    /* header-only answer */
+  }
+  const code = typeof body.code === 'string' ? body.code : undefined
+  const message = typeof body.error === 'string' ? body.error : undefined
+  if (response.status === 410) return { state: 'expired', message }
+  if (response.status === 401 || response.status === 403) return { state: 'unauthorized', message }
+  if (response.status === 404) {
+    if (code !== 'artifact_pending') return { state: 'absent', message }
+    return {
+      state: 'pending',
+      jobState: typeof body.details === 'string' ? body.details : undefined,
+      message,
+    }
+  }
+  return { state: 'error', message: message ?? `${response.status} ${response.statusText}` }
+}
+
+export async function headJobArtifact(
+  jobId: string,
+  client: ApiClientOptions,
+): Promise<JobArtifactStatus> {
+  const headers = new Headers()
+  if (client.token) headers.set('Authorization', `Bearer ${client.token}`)
+  const response = await fetchWithRetry(
+    apiUrl(artifactPath(jobId), {}, client),
+    { method: 'HEAD', headers },
+    ARTIFACT_TIMEOUT_MS,
+  )
+  return statusFromResponse(response)
+}
+
+export interface JobArtifactDownload extends JobArtifactStatus {
+  blob?: Blob
+}
+
+// Full download. The caller owns the object URL it creates from `blob`.
+export async function downloadJobArtifact(
+  jobId: string,
+  client: ApiClientOptions,
+): Promise<JobArtifactDownload> {
+  const headers = new Headers()
+  if (client.token) headers.set('Authorization', `Bearer ${client.token}`)
+  const response = await fetchWithRetry(
+    apiUrl(artifactPath(jobId), {}, client),
+    { method: 'GET', headers },
+    ARTIFACT_TIMEOUT_MS,
+  )
+  if (!response.ok) return statusFromResponse(response)
+  const status = await statusFromResponse(response.clone())
+  return { ...status, blob: await response.blob() }
+}
+
+// ── Placement verdict ────────────────────────────────────────────────────────
+// The planner routes every input to the candidate it ranks best; an input the
+// candidate already holds routes locally and contributes zero bytes
+// (core/src/scheduling/cost.rs). A zero total therefore means every input was
+// already on the chosen executor's node: the compute went to the data.
+
+export type PlacementVerdict = 'compute-to-data' | 'data-to-compute' | 'unplaced'
+
+export interface PlacementVerdictInfo {
+  verdict: PlacementVerdict
+  label: string
+  explanation: string
+}
+
+/** Only the two fields the verdict depends on, so TES tags can reuse it. */
+export interface PlacementLike {
+  executor_kind?: string
+  estimated_transfer_bytes: number
+}
+
+export function placementVerdict(placement?: PlacementLike | null): PlacementVerdictInfo {
+  if (!placement?.executor_kind) {
+    return {
+      verdict: 'unplaced',
+      label: 'Not placed',
+      explanation:
+        'No executor was selected in a plan this node sealed, so there is no local verdict. Another node may have planned the request.',
+    }
+  }
+  if (placement.estimated_transfer_bytes === 0) {
+    return {
+      verdict: 'compute-to-data',
+      label: 'Compute-to-data',
+      explanation:
+        'Every input already had a usable copy on the node that was chosen to run the work, so the plan expected to move no bytes.',
+    }
+  }
+  return {
+    verdict: 'data-to-compute',
+    label: 'Data-to-compute',
+    explanation:
+      'At least one input had no usable copy on the chosen node, so the plan expected to move those bytes to it before the run.',
+  }
 }
 
 export const JOB_STATE_ORDER: JobState[] = [

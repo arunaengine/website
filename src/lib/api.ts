@@ -56,19 +56,30 @@ export function apiOrigin(baseUrl: string): string {
   }
 }
 
+// Absolute URL of an API path, so callers that need the raw Response (range
+// downloads, ETag reads) build the same URL apiRequest would.
+export function apiUrl(
+  path: string,
+  query: ApiRequestOptions['query'] = {},
+  client: ApiClientOptions = {},
+): URL {
+  const baseUrl = (client.baseUrl || defaultApiBaseUrl()).replace(/\/$/, '')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const url = new URL(`${baseUrl}${normalizedPath}`, window.location.origin)
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  }
+  return url
+}
+
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
   client: ApiClientOptions = {},
 ): Promise<T> {
-  const baseUrl = (client.baseUrl || defaultApiBaseUrl()).replace(/\/$/, '')
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  const url = new URL(`${baseUrl}${normalizedPath}`, window.location.origin)
-  for (const [key, value] of Object.entries(options.query ?? {})) {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, String(value))
-    }
-  }
+  const url = apiUrl(path, options.query, client)
 
   const headers = new Headers(options.headers)
   const token = options.token ?? client.token
@@ -288,7 +299,18 @@ export interface RealmNodePlacement {
   draining: boolean
 }
 
+// One compute backend a node advertises (info.rs ExecutorCapabilityResponse).
+// `file_staging` means the executor can materialize inputs on local disk,
+// `direct_s3` that it reads them straight from S3.
+export interface ExecutorCapability {
+  kind: string
+  file_staging: boolean
+  direct_s3: boolean
+}
+
 export interface RealmNodePublishedInfo {
+  // Empty on a node with no compute backend configured.
+  executors: ExecutorCapability[]
   labels: Record<string, string>
   urls: { api?: string | null; s3?: string | null }
   utilization: {
@@ -1391,8 +1413,20 @@ export interface RealmPlacementOverride {
 export interface RealmPlacementConfigResponse {
   strategies: RealmPlacementStrategy[]
   default_strategy_id: string | null
+  /** The immutable strategy every job family is placed by; never removable. */
+  job_family_strategy_id: string
   bindings: RealmPlacementBinding[]
   overrides: RealmPlacementOverride[]
+  transitions: RealmTransitionHealth
+}
+
+// Counts only; nothing here changes where a request routes.
+export interface RealmTransitionHealth {
+  active: number
+  incomplete_buckets: number
+  stalled_buckets: number
+  /** Transitions still incomplete after a day. */
+  overdue: number
 }
 
 // ── Group storage backends ──────────────────────────────────────────────────
@@ -1517,6 +1551,23 @@ export interface BlobLocationsResponse {
   /** False means a copy may be missing from `copies`, not that none exists. */
   complete: boolean
   limits: LocationScanLimit[]
+}
+
+// POST /blobs/replicate — asks one node to fetch a copy. Answered 202: the
+// copy is queued, not stored yet. Needs WRITE on the object (or the bucket
+// when `path` is omitted). `version_id` without `path` is a 400.
+export interface ReplicateBlobRequest {
+  bucket: string
+  path?: string
+  version_id?: string
+  node_id: string
+}
+
+export interface ReplicateBlobResponse {
+  bucket: string
+  path?: string
+  version_id?: string
+  target_node_id: string
 }
 
 export type RealmPlacementMutationRequest =

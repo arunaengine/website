@@ -31,6 +31,7 @@ function placementConfig(defaultStrategyId: string): RealmPlacementConfigRespons
     job_family_strategy_id: familyId,
     bindings: [],
     overrides: [],
+    transitions: { active: 0, incomplete_buckets: 0, stalled_buckets: 0, overdue: 0 },
   }
 }
 

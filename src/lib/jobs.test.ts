@@ -33,6 +33,7 @@ const familyFixture: JobStatusResponse = {
         container_path: '/outputs/reads_fastqc.html',
         size: 20480,
         digest: 'fa2c8cc4f28176bbeed4b736df569a34c79cd3723e9ec42f9674b4d46ac6b8b8',
+        endpoint_url: 'https://owner.node.test',
       },
     ],
     revision: 7,

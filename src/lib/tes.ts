@@ -1,4 +1,5 @@
 import type { BadgeVariant } from '@/components/nodes/node-display'
+import type { PlacementLike } from '@/lib/jobs'
 import type { WorkspaceChoice } from '@/lib/workspaces'
 
 // ── GA4GH TES v1.1 ───────────────────────────────────────────────────────────
@@ -37,7 +38,11 @@ export interface TesOutput {
   name?: string
   description?: string
   url: string
+  // May carry POSIX wildcards (*, ?, [...]) to capture several files.
   path: string
+  // Literal ancestor stripped from every match before it is appended to `url`.
+  // Required when `path` has wildcards, ignored otherwise.
+  path_prefix?: string
   type?: TesFileType
 }
 
@@ -91,8 +96,11 @@ export interface TesTask {
   tags?: Record<string, string>
   logs?: TesTaskLog[] // output only
   creation_time?: string // output only, RFC3339
-  // Aruna extension (not GA4GH): per-run workspace handling. Older backends
-  // ignore or reject the field; useTes.createTask degrades gracefully then.
+  // Aruna extension (not GA4GH): per-run workspace handling. The current
+  // facade derives the workspace from the serving node's deployment and
+  // ignores this field, so the run's effective mode is the `workspace_mode`
+  // the native job reports back. useTes.createTask degrades gracefully when a
+  // node rejects the unknown field instead.
   workspace?: WorkspaceChoice
 }
 
@@ -129,6 +137,66 @@ export const TES_GROUP_TAG = 'aruna-engine.org/group'
 // Optional dedup tag scoped per authenticated user (IDEMPOTENCY_TAG_KEY); a
 // duplicate key bound to a different task plan is rejected with 409.
 export const TES_IDEMPOTENCY_TAG = 'aruna-engine.org/idempotency-key'
+
+// Pins the executor kind the task may run on (EXECUTOR_TAG_KEY); it becomes
+// the native request's `executor_constraint`. Echoed back on BASIC and FULL.
+export const TES_EXECUTOR_TAG = 'aruna-engine.org/executor'
+
+// ── Read-only placement tags ─────────────────────────────────────────────────
+// Agreed contract: BASIC and FULL task views carry the native job's identity
+// and, once the request is placed, its planner outcome. A node that has not
+// shipped them omits the keys, so every accessor returns undefined and the
+// consuming UI hides the row rather than inventing a value.
+
+/** The native job id behind the task; always present once served. */
+export const TES_JOB_ID_TAG = 'aruna-engine.org/job-id'
+/** The family's logical state, when the responder knows it. */
+export const TES_LOGICAL_STATE_TAG = 'aruna-engine.org/logical-state'
+/** The chosen executor kind, only once the request is placed. */
+export const TES_EXECUTOR_KIND_TAG = 'aruna-engine.org/executor-kind'
+/** Planner transfer estimate, a decimal string, only once placed. */
+export const TES_TRANSFER_BYTES_TAG = 'aruna-engine.org/estimated-transfer-bytes'
+
+export const TES_READONLY_TAGS: readonly string[] = [
+  TES_JOB_ID_TAG,
+  TES_LOGICAL_STATE_TAG,
+  TES_EXECUTOR_KIND_TAG,
+  TES_TRANSFER_BYTES_TAG,
+]
+
+export interface TesPlacementTags {
+  jobId?: string
+  logicalState?: string
+  executorKind?: string
+  estimatedTransferBytes?: number
+}
+
+// Non-negative decimals only: a malformed value is dropped rather than shown.
+function tagBytes(value: string | undefined): number | undefined {
+  if (!value || !/^\d+$/.test(value.trim())) return undefined
+  const parsed = Number(value.trim())
+  return Number.isSafeInteger(parsed) ? parsed : undefined
+}
+
+export function tesPlacementTags(tags: Record<string, string> | undefined): TesPlacementTags {
+  const read = (key: string) => tags?.[key]?.trim() || undefined
+  return {
+    jobId: read(TES_JOB_ID_TAG),
+    logicalState: read(TES_LOGICAL_STATE_TAG),
+    executorKind: read(TES_EXECUTOR_KIND_TAG),
+    estimatedTransferBytes: tagBytes(read(TES_TRANSFER_BYTES_TAG)),
+  }
+}
+
+// The verdict needs both halves: an executor kind without an estimate cannot
+// say whether bytes moved, so it stays unplaced rather than guessing zero.
+export function tesPlacementLike(placement: TesPlacementTags): PlacementLike | null {
+  if (!placement.executorKind || placement.estimatedTransferBytes === undefined) return null
+  return {
+    executor_kind: placement.executorKind,
+    estimated_transfer_bytes: placement.estimatedTransferBytes,
+  }
+}
 
 // The backend emits 9 of the 11 states; PAUSED and PREEMPTED are accepted as
 // list filters but never produced (api/src/routes/tes.rs tes_state).
@@ -327,6 +395,8 @@ function pruneOutput(output: TesOutput): TesOutput {
   if (name) out.name = name
   const description = trimmed(output.description)
   if (description) out.description = description
+  const prefix = trimmed(output.path_prefix)
+  if (prefix) out.path_prefix = prefix
   if (output.type) out.type = output.type
   return out
 }
@@ -371,8 +441,13 @@ export function pruneTesTask(task: TesTask): TesTask {
   const resources = pruneResources(task.resources)
   if (resources) out.resources = resources
   if (task.volumes?.length) out.volumes = task.volumes.filter((v) => v.trim())
+  // The read-only placement tags are rejected on create, and a re-run prefill
+  // copies them straight off a fetched task, so they are dropped here.
   const tags = pruneRecord(task.tags)
-  if (tags) out.tags = tags
+  if (tags) {
+    for (const key of TES_READONLY_TAGS) delete tags[key]
+    if (Object.keys(tags).length) out.tags = tags
+  }
   if (task.workspace) {
     const bucket = trimmed(task.workspace.bucket)
     out.workspace =
