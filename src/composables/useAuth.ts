@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { apiRequest } from '@/lib/api'
 import type { RealmInfoResponse } from '@/lib/api'
+import { featureEnabled, portalConfig } from '@/lib/config'
 import {
   buildAuthorizationUrl,
   buildEndSessionUrl,
@@ -31,8 +32,32 @@ interface GetTokenResponse {
   token: string
 }
 
-function callbackUri(): string {
-  return `${window.location.origin}/auth/callback`
+/** Native shells hand the authorization URL to the system browser (RFC 8252). */
+export type AuthOpener = (url: string) => void
+
+let authOpener: AuthOpener | null = null
+
+/** Installs the system-browser opener; null restores in-page navigation. */
+export function setAuthOpener(opener: AuthOpener | null): void {
+  authOpener = opener
+}
+
+/** The registered OIDC redirect_uri; a configured origin wins over the page. */
+export function callbackUri(): string {
+  return `${portalConfig().authCallbackOrigin || window.location.origin}/auth/callback`
+}
+
+/**
+ * Sends the user to the identity provider. In system-browser mode the URL goes
+ * to the injected opener instead of this window, so a desktop shell never runs
+ * the login inside its own webview.
+ */
+export function beginAuthRedirect(url: string): void {
+  if (featureEnabled('systemBrowserAuth') && authOpener) {
+    authOpener(url)
+    return
+  }
+  window.location.assign(url)
 }
 
 async function resolveProvider() {
@@ -68,7 +93,7 @@ async function signIn(options: { onboardingSecret?: string; redirectTo?: string 
     } else {
       window.sessionStorage.removeItem(ONBOARDING_KEY)
     }
-    window.location.assign(
+    beginAuthRedirect(
       buildAuthorizationUrl({
         authorizationEndpoint: discovery.authorization_endpoint,
         clientId,

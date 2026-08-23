@@ -13,12 +13,16 @@ export interface TerminologyConfig {
 
 export interface PortalRuntimeConfig {
   apiBaseUrl: string
+  // Origin the OIDC redirect_uri is built on; empty means this page's origin.
+  // A desktop shell serves the portal from a fixed loopback origin (RFC 8252).
+  authCallbackOrigin: string
   features: Record<string, boolean>
   terminology: TerminologyConfig
 }
 
 export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
   apiBaseUrl: '/api/v1',
+  authCallbackOrigin: '',
   features: {},
   terminology: { gatewayUrl: 'https://terminology.services.base4nfdi.de/api-gateway' },
 }
@@ -26,7 +30,8 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
 // Per-flag defaults are layered under the served `features` map, so deployments
 // can still explicitly disable a surface. The backend serves placement, durable
 // jobs, cursor-paged search and the GA4GH TES facade; the Compute surface
-// degrades to an honest panel on nodes without a compute backend.
+// degrades to an honest panel on nodes without a compute backend. Flags absent
+// here default to off, which is how 'systemBrowserAuth' stays a desktop opt-in.
 const DEFAULT_FEATURES: Record<string, boolean> = {
   jobs: true,
   placementAdmin: true,
@@ -75,6 +80,9 @@ function mergeConfig(raw: Record<string, unknown>): PortalRuntimeConfig {
     terminology: { ...DEFAULT_PORTAL_CONFIG.terminology },
   }
   if (typeof raw.apiBaseUrl === 'string' && raw.apiBaseUrl.trim()) merged.apiBaseUrl = raw.apiBaseUrl.trim()
+  if (typeof raw.authCallbackOrigin === 'string' && raw.authCallbackOrigin.trim()) {
+    merged.authCallbackOrigin = raw.authCallbackOrigin.trim().replace(/\/+$/, '')
+  }
   if (raw.features && typeof raw.features === 'object' && !Array.isArray(raw.features)) {
     for (const [key, value] of Object.entries(raw.features as Record<string, unknown>)) {
       if (typeof value === 'boolean') merged.features[key] = value
