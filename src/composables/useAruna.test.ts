@@ -275,7 +275,6 @@ describe('revision-bound Profile validation presentation', () => {
       supported_constraints: ['sh:minCount', 'sh:closed', 'sh:ignoredProperties'],
       unsupported_constraint_policy: 'fail_closed' as const,
       public_profile_iri_template: 'https://w3id.org/aruna/profile/{id}',
-      legacy_profile_iri_template: 'https://w3id.org/aruna/{id}',
     }
     vi.mocked(apiRequest).mockResolvedValueOnce(capabilities)
     const { loadProfileValidationCapabilities } = useAruna()

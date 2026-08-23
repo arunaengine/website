@@ -563,7 +563,6 @@ export interface ProfileValidationCapabilitiesResponse {
   supported_constraints: string[]
   unsupported_constraint_policy: 'fail_closed'
   public_profile_iri_template: string
-  legacy_profile_iri_template: string
 }
 
 export interface ProfileValidationStatusResponse {

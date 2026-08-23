@@ -455,7 +455,6 @@ beforeEach(() => {
     supported_constraints: [],
     unsupported_constraint_policy: 'fail_closed',
     public_profile_iri_template: 'https://w3id.org/aruna/profile/{id}',
-    legacy_profile_iri_template: 'https://w3id.org/aruna/{id}',
   })
   previewDraft.mockReset()
   previewDraftNow.mockReset()
