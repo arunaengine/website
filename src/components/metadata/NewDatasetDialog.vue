@@ -24,7 +24,7 @@ import LiftNotesPanel from '@/components/metadata/profile-builder/LiftNotesPanel
 import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
 import ProfileValidationPreview from '@/components/metadata/ProfileValidationPreview.vue'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
 import { AlertTriangle, Check, FileJson, FileJson2, FileUp, Layers, Plus, Upload, X } from '@lucide/vue'
 import {
   profileReferenceIri,
@@ -192,6 +192,24 @@ const profileMigrationSummary = ref<{ migrated: number; preserved: number } | nu
 let profileLoadToken = 0
 let profileSwitchToken = 0
 let queuedProfileMigration: ProfileDraftMigration | undefined
+
+// The switch confirm is layered inside the dialog's own focus trap, so focus
+// has to be moved into it and restored by hand.
+const switchConfirmButton = ref<ComponentPublicInstance | null>(null)
+const switchCancelButton = ref<ComponentPublicInstance | null>(null)
+let focusBeforeSwitch: HTMLElement | null = null
+
+watch(profileSwitchOpen, async (open) => {
+  if (open) {
+    focusBeforeSwitch = (globalThis.document?.activeElement as HTMLElement | null) ?? null
+    await nextTick()
+    const target = profileSwitchLoading.value ? switchCancelButton.value : switchConfirmButton.value
+    ;(target?.$el as HTMLElement | undefined)?.focus?.()
+  } else {
+    focusBeforeSwitch?.focus?.()
+    focusBeforeSwitch = null
+  }
+})
 
 const builtInDatasetKeys = new Set(['name', 'description', 'datePublished', 'license'])
 // `hasPart` is NOT reserved: a profile hasPart rule binds to the always-present
@@ -1420,85 +1438,400 @@ async function submit(unprofiled = false) {
 <template>
   <Dialog :open="props.open" @update:open="requestClose">
     <DialogContent class="max-w-3xl" @interact-outside="(event: Event) => event.preventDefault()">
-      <DialogHeader>
-        <DialogTitle class="flex items-center gap-2">
-          <FileJson2 class="h-4 w-4 text-primary" /> Create Dataset
-        </DialogTitle>
-        <DialogDescription>
-          Author a new RO-Crate Dataset, or import an existing crate as a new Dataset.
-        </DialogDescription>
-      </DialogHeader>
+      <!-- Inert while an in-dialog confirm covers the form: the radix trap only spans the outer dialog. -->
+      <div class="contents" :inert="profileSwitchOpen || confirmDiscardOpen">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2">
+            <FileJson2 class="h-4 w-4 text-primary" /> Create Dataset
+          </DialogTitle>
+          <DialogDescription>
+            Author a new RO-Crate Dataset, or import an existing crate as a new Dataset.
+          </DialogDescription>
+        </DialogHeader>
 
-      <Tabs v-model="startTab">
-        <TabsList>
-          <TabsTrigger value="create"><Plus class="mr-1 size-3.5" /> Create new</TabsTrigger>
-          <TabsTrigger value="import"><FileUp class="mr-1 size-3.5" /> Import RO-Crate</TabsTrigger>
-        </TabsList>
-      </Tabs>
+        <Tabs v-model="startTab">
+          <TabsList>
+            <TabsTrigger value="create"><Plus class="mr-1 size-3.5" /> Create new</TabsTrigger>
+            <TabsTrigger value="import"><FileUp class="mr-1 size-3.5" /> Import RO-Crate</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-      <div v-if="startTab === 'import'" class="max-h-[70vh] space-y-4 overflow-y-auto px-1 scrollbar-thin">
-        <div v-if="!currentUser" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          Sign in before creating metadata.
-        </div>
-        <p class="text-xs text-muted-foreground">
-          Create a new document from an existing <code class="font-mono">ro-crate-metadata.json</code> instead of authoring it field by field. The crate is previewed before anything is created.
-        </p>
-        <div class="flex flex-wrap items-center gap-2">
-          <input ref="importFileInput" type="file" accept="application/json,application/ld+json,.json,.jsonld" class="hidden" @change="onImportFile" />
-          <Button type="button" variant="outline" size="sm" @click="importFileInput?.click()">
-            <Upload class="size-3.5" /> Upload file
-          </Button>
-          <span class="text-[11px] text-muted-foreground">or paste the JSON-LD below</span>
-        </div>
-        <div class="space-y-2">
-          <Textarea v-model="importPaste" rows="6" class="font-mono text-xs" spellcheck="false" placeholder='{ "@context": "https://w3id.org/ro/crate/1.1/context", "@graph": [ … ] }' />
-          <Button type="button" variant="outline" size="sm" :disabled="!importPaste.trim()" @click="importPreviewFrom(importPaste, 'pasted JSON')">Preview pasted JSON</Button>
-        </div>
-        <div v-if="importError" class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>{{ importError }}</span>
-        </div>
-        <template v-if="importPreview">
-          <div class="space-y-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
-            <div class="flex items-center gap-2 font-medium text-foreground">
-              <FileJson class="h-3.5 w-3.5 shrink-0 text-primary" />
-              {{ importPreview.source }}: {{ importPreview.rootName }}
-              <span v-if="importPreview.specVersion" class="ml-auto shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                RO-Crate {{ importPreview.specVersion }}
+        <div v-if="startTab === 'import'" class="max-h-[70vh] space-y-4 overflow-y-auto px-1 scrollbar-thin">
+          <div v-if="!currentUser" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            Sign in before creating metadata.
+          </div>
+          <p class="text-xs text-muted-foreground">
+            Create a new document from an existing <code class="font-mono">ro-crate-metadata.json</code> instead of authoring it field by field. The crate is previewed before anything is created.
+          </p>
+          <div class="flex flex-wrap items-center gap-2">
+            <input ref="importFileInput" type="file" accept="application/json,application/ld+json,.json,.jsonld" class="hidden" @change="onImportFile" />
+            <Button type="button" variant="outline" size="sm" @click="importFileInput?.click()">
+              <Upload class="size-3.5" /> Upload file
+            </Button>
+            <span class="text-[11px] text-muted-foreground">or paste the JSON-LD below</span>
+          </div>
+          <div class="space-y-2">
+            <Textarea v-model="importPaste" rows="6" class="font-mono text-xs" spellcheck="false" placeholder='{ "@context": "https://w3id.org/ro/crate/1.1/context", "@graph": [ … ] }' />
+            <Button type="button" variant="outline" size="sm" :disabled="!importPaste.trim()" @click="importPreviewFrom(importPaste, 'pasted JSON')">Preview pasted JSON</Button>
+          </div>
+          <div v-if="importError" class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>{{ importError }}</span>
+          </div>
+          <template v-if="importPreview">
+            <div class="space-y-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
+              <div class="flex items-center gap-2 font-medium text-foreground">
+                <FileJson class="h-3.5 w-3.5 shrink-0 text-primary" />
+                {{ importPreview.source }}: {{ importPreview.rootName }}
+                <span v-if="importPreview.specVersion" class="ml-auto shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                  RO-Crate {{ importPreview.specVersion }}
+                </span>
+              </div>
+              <p class="text-muted-foreground">
+                {{ importPreview.entityCount }} {{ importPreview.entityCount === 1 ? 'entity' : 'entities' }} in the graph,
+                {{ importPreview.fileCount }} referenced data {{ importPreview.fileCount === 1 ? 'file' : 'files' }}.
+              </p>
+            </div>
+            <div v-if="importPreview.unknownSpecVersion" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+              <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>RO-Crate {{ importPreview.unknownSpecVersion }} is not recognized by this portal. The backend may reject this import.</span>
+            </div>
+            <div v-if="unrecognizedImportProfiles.length" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+              <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                This crate declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
+                <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. Only registered Profile references can be saved. Remove the Profile tag and save unprofiled if the server rejects it.
               </span>
             </div>
-            <p class="text-muted-foreground">
-              {{ importPreview.entityCount }} {{ importPreview.entityCount === 1 ? 'entity' : 'entities' }} in the graph,
-              {{ importPreview.fileCount }} referenced data {{ importPreview.fileCount === 1 ? 'file' : 'files' }}.
-            </p>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="text-xs font-medium text-foreground">Group</label>
+                <Select v-model="groupId" :options="groupOptions" placeholder="Choose a group" class="mt-1" />
+              </div>
+              <div>
+                <label class="text-xs font-medium text-foreground">Document path</label>
+                <Input
+                  :model-value="importPath"
+                  class="mt-1"
+                  placeholder="datasets/my-dataset"
+                  @update:model-value="(value: string | number) => { importPath = String(value); importPathTouched = true }"
+                />
+                <p class="mt-1 text-[11px] text-muted-foreground">Stored as the Dataset path in Aruna.</p>
+              </div>
+            </div>
+            <label class="flex items-center justify-between rounded-md border border-border p-3 text-sm">
+              <span>
+                Public metadata
+                <span class="block text-[11px] text-muted-foreground">Public documents are visible without a bearer token.</span>
+              </span>
+              <Switch :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
+            </label>
+          </template>
+        </div>
+
+        <div v-else class="max-h-[70vh] space-y-4 overflow-y-auto px-1 scrollbar-thin">
+          <div v-if="!currentUser" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            Sign in before creating metadata.
           </div>
-          <div v-if="importPreview.unknownSpecVersion" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>RO-Crate {{ importPreview.unknownSpecVersion }} is not recognized by this portal. The backend may reject this import.</span>
-          </div>
-          <div v-if="unrecognizedImportProfiles.length" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              This crate declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
-              <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. Only registered Profile references can be saved. Remove the Profile tag and save unprofiled if the server rejects it.
-            </span>
+          <div v-else-if="!groups.length" class="flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            <span>You are not a member of any group yet; datasets belong to a group.</span>
+            <Button variant="outline" size="sm" class="shrink-0" @click="createGroupOpen = true">
+              <Plus class="h-3.5 w-3.5" /> Create a group
+            </Button>
           </div>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label class="text-xs font-medium text-foreground">Group</label>
-              <Select v-model="groupId" :options="groupOptions" placeholder="Choose a group" class="mt-1" />
+              <Select v-model="groupId" :options="groupOptions" placeholder="Choose a group" class="mt-1" :invalid="scaffoldFieldErrors.group ? 'error' : undefined" />
+              <p v-if="scaffoldFieldErrors.group" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.group }}</p>
             </div>
             <div>
-              <label class="text-xs font-medium text-foreground">Document path</label>
-              <Input
-                :model-value="importPath"
-                class="mt-1"
-                placeholder="datasets/my-dataset"
-                @update:model-value="(value: string | number) => { importPath = String(value); importPathTouched = true }"
-              />
-              <p class="mt-1 text-[11px] text-muted-foreground">Stored as the Dataset path in Aruna.</p>
+              <label class="text-xs font-medium text-foreground">Profile reference</label>
+              <Select v-model="profileSelection" :options="profileOptions" placeholder="Optional profile" class="mt-1" />
+              <p v-if="hiddenPrivateProfiles" class="mt-1 text-[11px] text-muted-foreground">
+                Private profiles are not registered for validation and are not listed.
+              </p>
+              <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
+                <template v-if="profileRuleState === 'loading'">Loading profile rules…</template>
+                <template v-else-if="profileRuleState === 'unavailable'">Profile rules are unavailable. Retry below or choose "No profile reference".</template>
+                <template v-else-if="profileInputCount">Adds {{ profileInputCount }} {{ profileInputCount === 1 ? 'field' : 'fields' }} below, <span class="text-destructive">*</span> marks required. The RO-Crate references {{ selectedProfile.name }} by its public Profile w3id.</template>
+                <template v-else-if="profileRuleState === 'empty'">No rules are defined for this profile. The RO-Crate still references {{ selectedProfile.name }} by its public Profile w3id.</template>
+                <template v-else>No controls could be generated, but the retained SHACL requirements still apply. The RO-Crate references {{ selectedProfile.name }} by its public Profile w3id.</template>
+              </p>
+              <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
+                Properties omitted by this profile remain allowed unless an explicit closed or other restricting SHACL rule constrains them.
+              </p>
             </div>
           </div>
+
+          <div v-if="profileId && profileRuleState === 'empty'" class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            No rules are defined for this profile, so it adds no controls or validation requirements.
+          </div>
+          <div v-if="profileCollisionKeys.length" class="text-xs text-destructive">
+            Profile field target collides with built-in dataset fields: {{ profileCollisionKeys.join(', ') }}.
+          </div>
+          <div v-if="scaffoldClaimedKeys.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            This profile defines {{ scaffoldClaimedKeys.join(', ') }}, those values come from the built-in inputs above, so the profile's own label, input kind and constraints for them are partially ignored.
+          </div>
+          <div v-if="hasPartScalarCollisionKeys.length" class="text-xs text-destructive">
+            A hasPart rule must be an entity reference so it can bind to the Data references section. These hasPart rules use a scalar value and can't be applied: {{ hasPartScalarCollisionKeys.join(', ') }}.
+          </div>
+
+          <div>
+            <label class="text-xs font-medium text-foreground">Title</label>
+            <Input v-model="title" class="mt-1" placeholder="Dataset title" :invalid="scaffoldInvalid('title', 'name')" @blur="fillPath" />
+            <p v-if="scaffoldFieldErrors.title" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.title }}</p>
+            <template v-if="!scaffoldFieldErrors.title">
+              <template v-for="violation in builtInViolations.name ?? []" :key="violation.ruleId + violation.pointer">
+                <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">{{ violation.message }}</p>
+                <p v-if="violation.hint" class="text-[11px] text-muted-foreground">{{ violation.hint }}</p>
+              </template>
+            </template>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-foreground">Document path</label>
+            <Input v-model="path" class="mt-1" placeholder="datasets/my-dataset" :invalid="scaffoldFieldErrors.path ? 'error' : undefined" />
+            <p v-if="scaffoldFieldErrors.path" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.path }}</p>
+            <p v-else class="mt-1 text-[11px] text-muted-foreground">Stored as the Dataset path in Aruna.</p>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-foreground">Description</label>
+            <Textarea v-model="description" class="mt-1" rows="3" :invalid="scaffoldInvalid('description')" />
+            <p v-if="scaffoldFieldErrors.description" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.description }}</p>
+            <template v-if="!scaffoldFieldErrors.description">
+              <template v-for="violation in builtInViolations.description ?? []" :key="violation.ruleId + violation.pointer">
+                <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">{{ violation.message }}</p>
+                <p v-if="violation.hint" class="text-[11px] text-muted-foreground">{{ violation.hint }}</p>
+              </template>
+            </template>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="text-xs font-medium text-foreground">Date published</label>
+              <Input v-model="datePublished" type="date" class="mt-1" :invalid="scaffoldInvalid('datePublished')" />
+              <p v-if="scaffoldFieldErrors.datePublished" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.datePublished }}</p>
+              <template v-if="!scaffoldFieldErrors.datePublished">
+                <p
+                  v-for="violation in builtInViolations.datePublished ?? []"
+                  :key="violation.ruleId + violation.pointer"
+                  class="mt-1 text-[11px]"
+                  :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
+                >{{ violation.message }}</p>
+              </template>
+            </div>
+            <!-- M3: when the profile constrains license to a fixed set, render its
+                 Select (from ProfileControlField) in place of the free-text URL input,
+                 bound to the same `license` value crate emission uses. -->
+            <div v-if="licenseControl">
+              <ProfileControlField
+                :control="licenseControl"
+                :model-value="license"
+                :violations="licenseControlViolations"
+                @update:model-value="(value: unknown) => (license = String(value ?? ''))"
+              />
+            </div>
+            <div v-else>
+              <label class="text-xs font-medium text-foreground">License URL</label>
+              <Input v-model="license" class="mt-1" :invalid="scaffoldInvalid('license')" />
+              <p v-if="scaffoldFieldErrors.license" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.license }}</p>
+              <template v-if="!scaffoldFieldErrors.license">
+                <p
+                  v-for="violation in builtInViolations.license ?? []"
+                  :key="violation.ruleId + violation.pointer"
+                  class="mt-1 text-[11px]"
+                  :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
+                >{{ violation.message }}</p>
+              </template>
+            </div>
+          </div>
+
+          <!-- Generated profile section. The summary parse structurally carries ZERO
+               profile rules, so until the full crate refines them the form would be
+               silently missing fields: show a skeleton while loading and a BLOCKING
+               error panel (with Retry) when the full-crate load failed — never a
+               silently-degraded form. -->
+          <section v-if="profileAdditionalRequirements.length || serverRequiredConstraints.length" class="space-y-2 rounded-md border border-border p-3">
+            <div>
+              <h3 class="text-xs font-semibold text-foreground">Additional requirements</h3>
+              <p class="mt-0.5 text-[11px] text-muted-foreground">Read-only SHACL requirements retained for authoritative validation.</p>
+            </div>
+            <div v-if="serverRequiredConstraints.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+              <p class="font-medium">Server validation required</p>
+              <p class="mt-1">{{ serverRequiredConstraints.join(', ') }} {{ serverRequiredConstraints.length === 1 ? 'is' : 'are' }} not represented as form controls. The server enforces these constraints when you save.</p>
+            </div>
+            <LiftNotesPanel :notes="profileAdditionalRequirements" attached />
+          </section>
+
+          <div v-if="profileId && profileRuleState === 'loading'" class="rounded-md border border-border p-3">
+            <p class="text-[11px] text-muted-foreground">Loading the profile's fields…</p>
+            <div class="mt-2 grid gap-3 sm:grid-cols-2">
+              <Skeleton v-for="n in 4" :key="n" class="h-14" />
+            </div>
+          </div>
+          <div v-else-if="profileRuleState === 'unavailable'" class="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+            <p class="text-xs font-medium text-destructive">The profile's rules are unavailable.</p>
+            <p class="mt-1 text-[11px] text-destructive/90">{{ profileLoadError }}</p>
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              Without these rules the form would be missing the profile's required fields, so creation is blocked.
+              Retry, or switch to "No profile reference" to continue without them.
+            </p>
+            <Button variant="outline" size="sm" class="mt-2" @click="loadSelectedProfileSchema(true)">Retry</Button>
+          </div>
+          <template v-else>
+            <div v-if="generatedScalarControls.length" class="grid gap-4 sm:grid-cols-2">
+              <ProfileControlField
+                v-for="control in generatedScalarControls"
+                :key="control.property"
+                :control="control"
+                :model-value="generatedValues[control.property]"
+                :violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...previewViolationsFor(control.property)]"
+                :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
+                @update:model-value="(value: unknown) => setGeneratedValue(control.property, value)"
+              />
+            </div>
+            <div v-for="control in entityControls" :key="control.property">
+              <DatasetEntityInstances
+                :control="control"
+                :sub-controls="entitySubControls[control.property] ?? []"
+                :entries="entityEntries[control.property] ?? []"
+                :entry-violations="entityEntryViolations[control.property] ?? []"
+                :presence-violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...previewViolationsFor(control.property)]"
+                :type-label="entityTypeLabelFor(control)"
+                :crate-options="crateOptions"
+                :entity-rules="profileEntityRules"
+                :depth="1"
+                @add-new="addEntityEntry(control, 'new')"
+                @add-existing="addEntityEntry(control, 'existing')"
+                @remove="(index: number) => removeEntityEntry(control.property, index)"
+                @switch-source="(index: number, source: 'new' | 'existing') => switchEntityEntrySource(control, index, source)"
+                @update="(index: number, subProperty: string, value: unknown) => setEntityEntryValue(control.property, index, subProperty, value)"
+                @update-ref="(index: number, value: string) => setEntityEntryRef(control.property, index, value)"
+                @update-custom-id="(index: number, value: string) => setEntityEntryCustomId(control.property, index, value)"
+              />
+            </div>
+          </template>
+
+          <div v-if="showKeywordsScaffold || showIdentifierScaffold" class="grid gap-4 sm:grid-cols-2">
+            <div v-if="showKeywordsScaffold">
+              <label class="text-xs font-medium text-foreground">Keywords</label>
+              <Input v-model="keywords" class="mt-1" placeholder="genomics, proteomics" />
+              <p class="mt-1 text-[11px] text-muted-foreground">Optional, comma-separated.</p>
+            </div>
+            <div v-if="showIdentifierScaffold">
+              <label class="text-xs font-medium text-foreground">Identifier</label>
+              <Input v-model="identifier" class="mt-1" placeholder="https://doi.org/10.1234/abcd" />
+              <p class="mt-1 text-[11px] text-muted-foreground">Optional persistent identifier, e.g. a DOI URL.</p>
+            </div>
+          </div>
+          <div v-if="showAuthorsScaffold">
+            <div class="flex items-center justify-between gap-3">
+              <label class="text-xs font-medium text-foreground">Authors</label>
+              <div class="flex items-center gap-1.5">
+                <Button
+                  v-if="currentUser && !creators.includes(currentUser.name)"
+                  variant="ghost"
+                  size="sm"
+                  @click="creators.push(currentUser.name)"
+                >
+                  Add yourself
+                </Button>
+                <Button variant="outline" size="sm" @click="creators.push('')">
+                  <Plus class="size-3.5" /> Add author
+                </Button>
+              </div>
+            </div>
+            <div v-for="(creator, index) in creators" :key="index" class="mt-1 flex items-center gap-2">
+              <Input v-model="creators[index]" placeholder="Ada Lovelace" />
+              <Button variant="ghost" size="icon" aria-label="Remove author" @click="creators.splice(index, 1)">
+                <X />
+              </Button>
+            </div>
+          </div>
+          <div>
+            <DatasetFilesEditor v-model="filesModel" :detailed="false" />
+            <div v-if="locationIdentityRefs.length" class="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+              <p class="font-medium">Location identity</p>
+              <ul class="mt-1 space-y-1">
+                <li v-for="entry in locationIdentityRefs" :key="entry.url">
+                  <code class="break-all font-mono">{{ entry.url }}</code> keeps its storage location as the File identifier because the content digest was unavailable.
+                </li>
+              </ul>
+            </div>
+            <!-- WS5: the profile's required contents for hasPart. A reference is
+                 matched by its @id (url) or name (label), the same way the File
+                 entities are emitted, so this checklist agrees with validation. -->
+            <div v-if="hasPartRequirements.length" class="mt-2 rounded-md border border-border bg-card px-3 py-2">
+              <p class="text-[11px] font-medium text-foreground">Required contents (from the profile)</p>
+              <ul class="mt-1 space-y-1">
+                <li v-for="requirement in hasPartRequirements" :key="requirement.key" class="text-[11px]">
+                  <span
+                    class="flex items-center gap-1.5"
+                    :class="requirement.satisfied ? 'text-muted-foreground' : requirement.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
+                  >
+                    <Check v-if="requirement.satisfied" class="size-3.5 shrink-0" />
+                    <span v-else class="h-1.5 w-1.5 shrink-0 rounded-full" :class="requirement.severity === 'error' ? 'bg-destructive' : 'bg-amber-500'" />
+                    <span class="truncate">{{ requirement.label }}<span v-if="!requirement.satisfied && requirement.severity === 'warning'"> (recommended)</span></span>
+                  </span>
+                  <span v-if="requirement.hint" class="ml-5 block text-muted-foreground">{{ requirement.hint }}</span>
+                </li>
+              </ul>
+            </div>
+            <p
+              v-for="violation in hasPartSchemaViolations"
+              :key="violation.ruleId + violation.pointer"
+              class="mt-1 text-[11px]"
+              :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
+            >
+              {{ violation.message }}
+            </p>
+          </div>
+
+          <div v-if="profileMigrationSummary" class="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground">
+            <p class="font-medium">Profile draft migrated.</p>
+            <p class="mt-1 text-muted-foreground">
+              {{ profileMigrationSummary.migrated }} {{ profileMigrationSummary.migrated === 1 ? 'field now uses' : 'fields now use' }} the new profile controls.
+              <template v-if="profileMigrationSummary.preserved">
+                {{ profileMigrationSummary.preserved }} unmatched {{ profileMigrationSummary.preserved === 1 ? 'field is' : 'fields are' }} preserved in Additional fields below for review.
+              </template>
+            </p>
+          </div>
+
+          <CustomFieldsEditor v-model:rows="customFields" />
+
+          <div>
+            <div class="flex items-center justify-between gap-3">
+              <label class="text-xs font-medium text-foreground">Subcrates</label>
+              <Button variant="outline" size="sm" @click="subcratePickerOpen = true">
+                <Plus class="h-3.5 w-3.5" /> Link subcrate
+              </Button>
+            </div>
+            <ul v-if="subcrates.length" class="mt-2 space-y-1">
+              <li v-for="link in subcrates" :key="link.iri" class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs">
+                <span class="flex min-w-0 items-center gap-1.5">
+                  <Layers class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span class="min-w-0 truncate text-foreground" :title="link.iri">{{ link.name }}</span>
+                </span>
+                <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" :aria-label="`Unlink subcrate ${link.name}`" @click="removeSubcrate(link.iri)">
+                  <X class="h-3.5 w-3.5" />
+                </Button>
+              </li>
+            </ul>
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              References to other crates (RO-Crate 1.2), written as <code class="font-mono">hasPart</code> Dataset entities. Linked crates stay independent documents.
+            </p>
+          </div>
+          <!-- Advisory server validation of the crate about to be saved;
+               hidden when the node does not serve the preview endpoint. -->
+          <ProfileValidationPreview
+            v-if="profileId && !previewUnavailable"
+            :result="previewResult"
+            :running="previewRunning"
+            :error="previewError"
+            :findings="previewMapped.panel"
+            :inline-count="previewInlineCount"
+            @run="validateAgainstProfile"
+          />
+
           <label class="flex items-center justify-between rounded-md border border-border p-3 text-sm">
             <span>
               Public metadata
@@ -1506,355 +1839,43 @@ async function submit(unprofiled = false) {
             </span>
             <Switch :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
           </label>
-        </template>
-      </div>
-
-      <div v-else class="max-h-[70vh] space-y-4 overflow-y-auto px-1 scrollbar-thin">
-        <div v-if="!currentUser" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          Sign in before creating metadata.
-        </div>
-        <div v-else-if="!groups.length" class="flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          <span>You are not a member of any group yet; datasets belong to a group.</span>
-          <Button variant="outline" size="sm" class="shrink-0" @click="createGroupOpen = true">
-            <Plus class="h-3.5 w-3.5" /> Create a group
-          </Button>
-        </div>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label class="text-xs font-medium text-foreground">Group</label>
-            <Select v-model="groupId" :options="groupOptions" placeholder="Choose a group" class="mt-1" :invalid="scaffoldFieldErrors.group ? 'error' : undefined" />
-            <p v-if="scaffoldFieldErrors.group" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.group }}</p>
-          </div>
-          <div>
-            <label class="text-xs font-medium text-foreground">Profile reference</label>
-            <Select v-model="profileSelection" :options="profileOptions" placeholder="Optional profile" class="mt-1" />
-            <p v-if="hiddenPrivateProfiles" class="mt-1 text-[11px] text-muted-foreground">
-              Private profiles are not registered for validation and are not listed.
-            </p>
-            <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
-              <template v-if="profileRuleState === 'loading'">Loading profile rules…</template>
-              <template v-else-if="profileRuleState === 'unavailable'">Profile rules are unavailable. Retry below or choose "No profile reference".</template>
-              <template v-else-if="profileInputCount">Adds {{ profileInputCount }} {{ profileInputCount === 1 ? 'field' : 'fields' }} below, <span class="text-destructive">*</span> marks required. The RO-Crate references {{ selectedProfile.name }} by its public Profile w3id.</template>
-              <template v-else-if="profileRuleState === 'empty'">No rules are defined for this profile. The RO-Crate still references {{ selectedProfile.name }} by its public Profile w3id.</template>
-              <template v-else>No controls could be generated, but the retained SHACL requirements still apply. The RO-Crate references {{ selectedProfile.name }} by its public Profile w3id.</template>
-            </p>
-            <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
-              Properties omitted by this profile remain allowed unless an explicit closed or other restricting SHACL rule constrains them.
-            </p>
-          </div>
         </div>
 
-        <div v-if="profileId && profileRuleState === 'empty'" class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          No rules are defined for this profile, so it adds no controls or validation requirements.
-        </div>
-        <div v-if="profileCollisionKeys.length" class="text-xs text-destructive">
-          Profile field target collides with built-in dataset fields: {{ profileCollisionKeys.join(', ') }}.
-        </div>
-        <div v-if="scaffoldClaimedKeys.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-          This profile defines {{ scaffoldClaimedKeys.join(', ') }}, those values come from the built-in inputs above, so the profile's own label, input kind and constraints for them are partially ignored.
-        </div>
-        <div v-if="hasPartScalarCollisionKeys.length" class="text-xs text-destructive">
-          A hasPart rule must be an entity reference so it can bind to the Data references section. These hasPart rules use a scalar value and can't be applied: {{ hasPartScalarCollisionKeys.join(', ') }}.
-        </div>
-
-        <div>
-          <label class="text-xs font-medium text-foreground">Title</label>
-          <Input v-model="title" class="mt-1" placeholder="Dataset title" :invalid="scaffoldInvalid('title', 'name')" @blur="fillPath" />
-          <p v-if="scaffoldFieldErrors.title" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.title }}</p>
-          <template v-if="!scaffoldFieldErrors.title">
-            <template v-for="violation in builtInViolations.name ?? []" :key="violation.ruleId + violation.pointer">
-              <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">{{ violation.message }}</p>
-              <p v-if="violation.hint" class="text-[11px] text-muted-foreground">{{ violation.hint }}</p>
-            </template>
-          </template>
-        </div>
-        <div>
-          <label class="text-xs font-medium text-foreground">Document path</label>
-          <Input v-model="path" class="mt-1" placeholder="datasets/my-dataset" :invalid="scaffoldFieldErrors.path ? 'error' : undefined" />
-          <p v-if="scaffoldFieldErrors.path" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.path }}</p>
-          <p v-else class="mt-1 text-[11px] text-muted-foreground">Stored as the Dataset path in Aruna.</p>
-        </div>
-        <div>
-          <label class="text-xs font-medium text-foreground">Description</label>
-          <Textarea v-model="description" class="mt-1" rows="3" :invalid="scaffoldInvalid('description')" />
-          <p v-if="scaffoldFieldErrors.description" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.description }}</p>
-          <template v-if="!scaffoldFieldErrors.description">
-            <template v-for="violation in builtInViolations.description ?? []" :key="violation.ruleId + violation.pointer">
-              <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">{{ violation.message }}</p>
-              <p v-if="violation.hint" class="text-[11px] text-muted-foreground">{{ violation.hint }}</p>
-            </template>
-          </template>
-        </div>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label class="text-xs font-medium text-foreground">Date published</label>
-            <Input v-model="datePublished" type="date" class="mt-1" :invalid="scaffoldInvalid('datePublished')" />
-            <p v-if="scaffoldFieldErrors.datePublished" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.datePublished }}</p>
-            <template v-if="!scaffoldFieldErrors.datePublished">
-              <p
-                v-for="violation in builtInViolations.datePublished ?? []"
-                :key="violation.ruleId + violation.pointer"
-                class="mt-1 text-[11px]"
-                :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
-              >{{ violation.message }}</p>
-            </template>
-          </div>
-          <!-- M3: when the profile constrains license to a fixed set, render its
-               Select (from ProfileControlField) in place of the free-text URL input,
-               bound to the same `license` value crate emission uses. -->
-          <div v-if="licenseControl">
-            <ProfileControlField
-              :control="licenseControl"
-              :model-value="license"
-              :violations="licenseControlViolations"
-              @update:model-value="(value: unknown) => (license = String(value ?? ''))"
-            />
-          </div>
-          <div v-else>
-            <label class="text-xs font-medium text-foreground">License URL</label>
-            <Input v-model="license" class="mt-1" :invalid="scaffoldInvalid('license')" />
-            <p v-if="scaffoldFieldErrors.license" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.license }}</p>
-            <template v-if="!scaffoldFieldErrors.license">
-              <p
-                v-for="violation in builtInViolations.license ?? []"
-                :key="violation.ruleId + violation.pointer"
-                class="mt-1 text-[11px]"
-                :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
-              >{{ violation.message }}</p>
-            </template>
-          </div>
-        </div>
-
-        <!-- Generated profile section. The summary parse structurally carries ZERO
-             profile rules, so until the full crate refines them the form would be
-             silently missing fields: show a skeleton while loading and a BLOCKING
-             error panel (with Retry) when the full-crate load failed — never a
-             silently-degraded form. -->
-        <section v-if="profileAdditionalRequirements.length || serverRequiredConstraints.length" class="space-y-2 rounded-md border border-border p-3">
-          <div>
-            <h3 class="text-xs font-semibold text-foreground">Additional requirements</h3>
-            <p class="mt-0.5 text-[11px] text-muted-foreground">Read-only SHACL requirements retained for authoritative validation.</p>
-          </div>
-          <div v-if="serverRequiredConstraints.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            <p class="font-medium">Server validation required</p>
-            <p class="mt-1">{{ serverRequiredConstraints.join(', ') }} {{ serverRequiredConstraints.length === 1 ? 'is' : 'are' }} not represented as form controls. The server enforces these constraints when you save.</p>
-          </div>
-          <LiftNotesPanel :notes="profileAdditionalRequirements" attached />
-        </section>
-
-        <div v-if="profileId && profileRuleState === 'loading'" class="rounded-md border border-border p-3">
-          <p class="text-[11px] text-muted-foreground">Loading the profile's fields…</p>
-          <div class="mt-2 grid gap-3 sm:grid-cols-2">
-            <Skeleton v-for="n in 4" :key="n" class="h-14" />
-          </div>
-        </div>
-        <div v-else-if="profileRuleState === 'unavailable'" class="rounded-md border border-destructive/40 bg-destructive/5 p-3">
-          <p class="text-xs font-medium text-destructive">The profile's rules are unavailable.</p>
-          <p class="mt-1 text-[11px] text-destructive/90">{{ profileLoadError }}</p>
-          <p class="mt-1 text-[11px] text-muted-foreground">
-            Without these rules the form would be missing the profile's required fields, so creation is blocked.
-            Retry, or switch to "No profile reference" to continue without them.
+        <section v-if="profiledWriteRejected" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs">
+          <p class="font-medium text-destructive">Profiled write rejected</p>
+          <p v-if="profiledWriteUnavailable" class="mt-1 text-foreground">
+            The Profile or server validator is unavailable. Validation fails closed, so nothing was saved. Retry when it is available, or remove the Profile tag and save unprofiled.
           </p>
-          <Button variant="outline" size="sm" class="mt-2" @click="loadSelectedProfileSchema(true)">Retry</Button>
-        </div>
-        <template v-else>
-          <div v-if="generatedScalarControls.length" class="grid gap-4 sm:grid-cols-2">
-            <ProfileControlField
-              v-for="control in generatedScalarControls"
-              :key="control.property"
-              :control="control"
-              :model-value="generatedValues[control.property]"
-              :violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...previewViolationsFor(control.property)]"
-              :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
-              @update:model-value="(value: unknown) => setGeneratedValue(control.property, value)"
-            />
-          </div>
-          <div v-for="control in entityControls" :key="control.property">
-            <DatasetEntityInstances
-              :control="control"
-              :sub-controls="entitySubControls[control.property] ?? []"
-              :entries="entityEntries[control.property] ?? []"
-              :entry-violations="entityEntryViolations[control.property] ?? []"
-              :presence-violations="[...profileViolations.filter((item) => item.fieldId === control.property), ...previewViolationsFor(control.property)]"
-              :type-label="entityTypeLabelFor(control)"
-              :crate-options="crateOptions"
-              :entity-rules="profileEntityRules"
-              :depth="1"
-              @add-new="addEntityEntry(control, 'new')"
-              @add-existing="addEntityEntry(control, 'existing')"
-              @remove="(index: number) => removeEntityEntry(control.property, index)"
-              @switch-source="(index: number, source: 'new' | 'existing') => switchEntityEntrySource(control, index, source)"
-              @update="(index: number, subProperty: string, value: unknown) => setEntityEntryValue(control.property, index, subProperty, value)"
-              @update-ref="(index: number, value: string) => setEntityEntryRef(control.property, index, value)"
-              @update-custom-id="(index: number, value: string) => setEntityEntryCustomId(control.property, index, value)"
-            />
-          </div>
-        </template>
-
-        <div v-if="showKeywordsScaffold || showIdentifierScaffold" class="grid gap-4 sm:grid-cols-2">
-          <div v-if="showKeywordsScaffold">
-            <label class="text-xs font-medium text-foreground">Keywords</label>
-            <Input v-model="keywords" class="mt-1" placeholder="genomics, proteomics" />
-            <p class="mt-1 text-[11px] text-muted-foreground">Optional, comma-separated.</p>
-          </div>
-          <div v-if="showIdentifierScaffold">
-            <label class="text-xs font-medium text-foreground">Identifier</label>
-            <Input v-model="identifier" class="mt-1" placeholder="https://doi.org/10.1234/abcd" />
-            <p class="mt-1 text-[11px] text-muted-foreground">Optional persistent identifier, e.g. a DOI URL.</p>
-          </div>
-        </div>
-        <div v-if="showAuthorsScaffold">
-          <div class="flex items-center justify-between gap-3">
-            <label class="text-xs font-medium text-foreground">Authors</label>
-            <div class="flex items-center gap-1.5">
-              <Button
-                v-if="currentUser && !creators.includes(currentUser.name)"
-                variant="ghost"
-                size="sm"
-                @click="creators.push(currentUser.name)"
-              >
-                Add yourself
-              </Button>
-              <Button variant="outline" size="sm" @click="creators.push('')">
-                <Plus class="size-3.5" /> Add author
-              </Button>
-            </div>
-          </div>
-          <div v-for="(creator, index) in creators" :key="index" class="mt-1 flex items-center gap-2">
-            <Input v-model="creators[index]" placeholder="Ada Lovelace" />
-            <Button variant="ghost" size="icon" aria-label="Remove author" @click="creators.splice(index, 1)">
-              <X />
-            </Button>
-          </div>
-        </div>
-        <div>
-          <DatasetFilesEditor v-model="filesModel" :detailed="false" />
-          <div v-if="locationIdentityRefs.length" class="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
-            <p class="font-medium">Location identity</p>
-            <ul class="mt-1 space-y-1">
-              <li v-for="entry in locationIdentityRefs" :key="entry.url">
-                <code class="break-all font-mono">{{ entry.url }}</code> keeps its storage location as the File identifier because the content digest was unavailable.
-              </li>
-            </ul>
-          </div>
-          <!-- WS5: the profile's required contents for hasPart. A reference is
-               matched by its @id (url) or name (label), the same way the File
-               entities are emitted, so this checklist agrees with validation. -->
-          <div v-if="hasPartRequirements.length" class="mt-2 rounded-md border border-border bg-card px-3 py-2">
-            <p class="text-[11px] font-medium text-foreground">Required contents (from the profile)</p>
-            <ul class="mt-1 space-y-1">
-              <li v-for="requirement in hasPartRequirements" :key="requirement.key" class="text-[11px]">
-                <span
-                  class="flex items-center gap-1.5"
-                  :class="requirement.satisfied ? 'text-muted-foreground' : requirement.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
-                >
-                  <Check v-if="requirement.satisfied" class="size-3.5 shrink-0" />
-                  <span v-else class="h-1.5 w-1.5 shrink-0 rounded-full" :class="requirement.severity === 'error' ? 'bg-destructive' : 'bg-amber-500'" />
-                  <span class="truncate">{{ requirement.label }}<span v-if="!requirement.satisfied && requirement.severity === 'warning'"> (recommended)</span></span>
-                </span>
-                <span v-if="requirement.hint" class="ml-5 block text-muted-foreground">{{ requirement.hint }}</span>
-              </li>
-            </ul>
-          </div>
-          <p
-            v-for="violation in hasPartSchemaViolations"
-            :key="violation.ruleId + violation.pointer"
-            class="mt-1 text-[11px]"
-            :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
-          >
-            {{ violation.message }}
-          </p>
-        </div>
-
-        <div v-if="profileMigrationSummary" class="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground">
-          <p class="font-medium">Profile draft migrated.</p>
-          <p class="mt-1 text-muted-foreground">
-            {{ profileMigrationSummary.migrated }} {{ profileMigrationSummary.migrated === 1 ? 'field now uses' : 'fields now use' }} the new profile controls.
-            <template v-if="profileMigrationSummary.preserved">
-              {{ profileMigrationSummary.preserved }} unmatched {{ profileMigrationSummary.preserved === 1 ? 'field is' : 'fields are' }} preserved in Additional fields below for review.
-            </template>
-          </p>
-        </div>
-
-        <CustomFieldsEditor v-model:rows="customFields" />
-
-        <div>
-          <div class="flex items-center justify-between gap-3">
-            <label class="text-xs font-medium text-foreground">Subcrates</label>
-            <Button variant="outline" size="sm" @click="subcratePickerOpen = true">
-              <Plus class="h-3.5 w-3.5" /> Link subcrate
-            </Button>
-          </div>
-          <ul v-if="subcrates.length" class="mt-2 space-y-1">
-            <li v-for="link in subcrates" :key="link.iri" class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs">
-              <span class="flex min-w-0 items-center gap-1.5">
-                <Layers class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span class="min-w-0 truncate text-foreground" :title="link.iri">{{ link.name }}</span>
-              </span>
-              <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" :aria-label="`Unlink subcrate ${link.name}`" @click="removeSubcrate(link.iri)">
-                <X class="h-3.5 w-3.5" />
-              </Button>
+          <ul v-if="serverFindings.length" class="mt-2 space-y-2">
+            <li v-for="(finding, index) in serverFindings" :key="`${finding.code}:${index}`" class="rounded border border-border bg-background/70 px-2 py-1.5">
+              <p class="font-medium uppercase text-destructive">{{ finding.severity }}</p>
+              <p class="mt-0.5 text-foreground">{{ finding.message }}</p>
+              <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">Focus node: {{ finding.focus_node || 'Not provided' }}</p>
+              <p class="break-all font-mono text-[10px] text-muted-foreground">Path: {{ finding.path || 'Not provided' }}</p>
             </li>
           </ul>
-          <p class="mt-1 text-[11px] text-muted-foreground">
-            References to other crates (RO-Crate 1.2), written as <code class="font-mono">hasPart</code> Dataset entities. Linked crates stay independent documents.
-          </p>
+          <p v-if="!profiledWriteUnavailable" class="mt-2 text-foreground">Fix the metadata and retry, or remove the Profile tag and save unprofiled.</p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" :disabled="saving" @click="retryProfiledWrite">Retry</Button>
+            <Button type="button" variant="outline" size="sm" :disabled="saving" @click="saveUnprofiled">Remove Profile tag and save unprofiled</Button>
+          </div>
+        </section>
+        <p v-else-if="submitError" class="text-xs text-destructive">{{ submitError }}</p>
+
+        <div v-if="startTab === 'create' && !canSubmit && !saving && currentUser && submitBlockerSummary.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          {{ submitBlockerSummary.join(' ') }}
         </div>
-        <!-- Advisory server validation of the crate about to be saved;
-             hidden when the node does not serve the preview endpoint. -->
-        <ProfileValidationPreview
-          v-if="profileId && !previewUnavailable"
-          :result="previewResult"
-          :running="previewRunning"
-          :error="previewError"
-          :findings="previewMapped.panel"
-          :inline-count="previewInlineCount"
-          @run="validateAgainstProfile"
-        />
 
-        <label class="flex items-center justify-between rounded-md border border-border p-3 text-sm">
-          <span>
-            Public metadata
-            <span class="block text-[11px] text-muted-foreground">Public documents are visible without a bearer token.</span>
-          </span>
-          <Switch :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
-        </label>
+        <DialogFooter>
+          <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
+          <Button v-if="startTab === 'import'" :disabled="!canSubmitImport || saving" @click="submitImport()">
+            {{ saving ? 'Importing…' : 'Import crate' }}
+          </Button>
+          <Button v-else :disabled="!canSubmit || saving" @click="submit()">
+            {{ saving ? 'Creating…' : 'Create dataset' }}
+          </Button>
+        </DialogFooter>
       </div>
-
-      <section v-if="profiledWriteRejected" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs">
-        <p class="font-medium text-destructive">Profiled write rejected</p>
-        <p v-if="profiledWriteUnavailable" class="mt-1 text-foreground">
-          The Profile or server validator is unavailable. Validation fails closed, so nothing was saved. Retry when it is available, or remove the Profile tag and save unprofiled.
-        </p>
-        <ul v-if="serverFindings.length" class="mt-2 space-y-2">
-          <li v-for="(finding, index) in serverFindings" :key="`${finding.code}:${index}`" class="rounded border border-border bg-background/70 px-2 py-1.5">
-            <p class="font-medium uppercase text-destructive">{{ finding.severity }}</p>
-            <p class="mt-0.5 text-foreground">{{ finding.message }}</p>
-            <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">Focus node: {{ finding.focus_node || 'Not provided' }}</p>
-            <p class="break-all font-mono text-[10px] text-muted-foreground">Path: {{ finding.path || 'Not provided' }}</p>
-          </li>
-        </ul>
-        <p v-if="!profiledWriteUnavailable" class="mt-2 text-foreground">Fix the metadata and retry, or remove the Profile tag and save unprofiled.</p>
-        <div class="mt-2 flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" :disabled="saving" @click="retryProfiledWrite">Retry</Button>
-          <Button type="button" variant="outline" size="sm" :disabled="saving" @click="saveUnprofiled">Remove Profile tag and save unprofiled</Button>
-        </div>
-      </section>
-      <p v-else-if="submitError" class="text-xs text-destructive">{{ submitError }}</p>
-
-      <div v-if="startTab === 'create' && !canSubmit && !saving && currentUser && submitBlockerSummary.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-        {{ submitBlockerSummary.join(' ') }}
-      </div>
-
-      <DialogFooter>
-        <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
-        <Button v-if="startTab === 'import'" :disabled="!canSubmitImport || saving" @click="submitImport()">
-          {{ saving ? 'Importing…' : 'Import crate' }}
-        </Button>
-        <Button v-else :disabled="!canSubmit || saving" @click="submit()">
-          {{ saving ? 'Creating…' : 'Create dataset' }}
-        </Button>
-      </DialogFooter>
 
       <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (groupId = group.group_id)" />
 
@@ -1904,8 +1925,8 @@ async function submit(unprofiled = false) {
               </ul>
             </template>
             <div class="mt-4 flex justify-end gap-2">
-              <Button variant="outline" size="sm" @click="cancelProfileSwitch">Keep current profile</Button>
-              <Button size="sm" :disabled="profileSwitchLoading" @click="confirmProfileSwitch">Switch and migrate</Button>
+              <Button ref="switchCancelButton" variant="outline" size="sm" @click="cancelProfileSwitch">Keep current profile</Button>
+              <Button ref="switchConfirmButton" size="sm" :disabled="profileSwitchLoading" @click="confirmProfileSwitch">Switch and migrate</Button>
             </div>
           </div>
         </div>

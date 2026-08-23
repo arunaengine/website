@@ -549,6 +549,8 @@ describe('New Dataset profile switching', () => {
     await flush()
 
     expect(content(root)).toContain('Moves into the new newName control because the property URI matches.')
+    // The covered form must be inert: the radix trap only spans the outer dialog.
+    expect(nodes(root).some((node) => node.props.inert === true)).toBe(true)
     click(button(root, 'Switch and migrate'))
     await flush()
 

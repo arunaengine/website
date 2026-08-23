@@ -3,13 +3,33 @@
 // close it with unsaved draft content. Rendered as an absolutely positioned
 // overlay inside a positioned DialogContent, so it stays within the dialog's
 // focus trap and centers over the dialog in both themes via design tokens.
+import { nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
 import Button from '@/components/ui/Button.vue'
 
-defineProps<{ open: boolean }>()
+const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{
   (e: 'keep'): void
   (e: 'discard'): void
 }>()
+
+// The outer dialog owns the focus trap, so this overlay moves focus in and
+// restores it itself.
+const keepButton = ref<ComponentPublicInstance | null>(null)
+let focusBefore: HTMLElement | null = null
+
+watch(
+  () => props.open,
+  async (open) => {
+    if (open) {
+      focusBefore = (globalThis.document?.activeElement as HTMLElement | null) ?? null
+      await nextTick()
+      ;(keepButton.value?.$el as HTMLElement | undefined)?.focus?.()
+    } else {
+      focusBefore?.focus?.()
+      focusBefore = null
+    }
+  },
+)
 </script>
 
 <template>
@@ -33,7 +53,7 @@ const emit = defineEmits<{
         <h2 id="discard-draft-title" class="text-sm font-semibold text-foreground">Discard this draft?</h2>
         <p class="mt-1 text-xs text-muted-foreground">Your changes will be lost and cannot be recovered.</p>
         <div class="mt-4 flex justify-center gap-2">
-          <Button variant="outline" size="sm" @click="emit('keep')">Keep editing</Button>
+          <Button ref="keepButton" variant="outline" size="sm" @click="emit('keep')">Keep editing</Button>
           <Button variant="destructive" size="sm" @click="emit('discard')">Discard</Button>
         </div>
       </div>

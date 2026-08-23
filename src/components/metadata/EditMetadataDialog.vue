@@ -24,7 +24,7 @@ import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
 import ProfileValidationPreview from '@/components/metadata/ProfileValidationPreview.vue'
 import { AlertTriangle, Layers, Pencil, Plus, X } from '@lucide/vue'
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, ref, shallowRef, watch, type ComponentPublicInstance } from 'vue'
 import {
   profileReferenceIri,
   profileRulesLoadState,
@@ -315,6 +315,27 @@ const pendingReplacementCrate = computed(() => {
 const pendingReplacementText = computed(() =>
   pendingReplacementCrate.value ? JSON.stringify(pendingReplacementCrate.value, null, 2) : '',
 )
+const switchConfirmDisabled = computed(
+  () => profileSwitchLoading.value || Boolean(profileSwitchError.value) || !pendingReplacementCrate.value,
+)
+
+// The transition confirm is layered inside the dialog's own focus trap, so
+// focus has to be moved into it and restored by hand.
+const switchConfirmButton = ref<ComponentPublicInstance | null>(null)
+const switchCancelButton = ref<ComponentPublicInstance | null>(null)
+let focusBeforeSwitch: HTMLElement | null = null
+
+watch(profileSwitchOpen, async (open) => {
+  if (open) {
+    focusBeforeSwitch = (globalThis.document?.activeElement as HTMLElement | null) ?? null
+    await nextTick()
+    const target = switchConfirmDisabled.value ? switchCancelButton.value : switchConfirmButton.value
+    ;(target?.$el as HTMLElement | undefined)?.focus?.()
+  } else {
+    focusBeforeSwitch?.focus?.()
+    focusBeforeSwitch = null
+  }
+})
 
 // Subcrate links (RO-Crate 1.2), editable as a list: unlink drops the link,
 // the picker adds new ones; the save composes them via the subcrates helpers.
@@ -1397,283 +1418,286 @@ function requestClose(next: boolean) {
 <template>
   <Dialog :open="props.open" @update:open="requestClose">
     <DialogContent class="relative max-w-2xl">
-      <DialogHeader>
-        <DialogTitle class="flex items-center gap-2"><Pencil class="h-4 w-4 text-primary" /> Edit metadata</DialogTitle>
-        <DialogDescription>
-          Replace the document's RO-Crate. Editing writes the whole crate back; the projection may briefly lag after saving.
-        </DialogDescription>
-      </DialogHeader>
+      <!-- Inert while the transition confirm covers the form: the radix trap only spans the outer dialog. -->
+      <div class="contents" :inert="profileSwitchOpen">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2"><Pencil class="h-4 w-4 text-primary" /> Edit metadata</DialogTitle>
+          <DialogDescription>
+            Replace the document's RO-Crate. Editing writes the whole crate back; the projection may briefly lag after saving.
+          </DialogDescription>
+        </DialogHeader>
 
-      <div v-if="loading" class="py-8 text-center text-sm text-muted-foreground">Loading crate…</div>
-      <div v-else-if="loadError" class="space-y-3">
-        <p class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ loadError }}</p>
-        <Button variant="outline" size="sm" @click="reload">Try again</Button>
-      </div>
-
-      <template v-else>
-        <Tabs v-model="activeTab">
-          <TabsList>
-            <TabsTrigger value="fields">Fields</TabsTrigger>
-            <TabsTrigger value="files">Files</TabsTrigger>
-            <TabsTrigger value="raw">Raw JSON</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="fields" class="space-y-3">
-            <section class="space-y-2 rounded-md border border-border p-3">
-              <div>
-                <label class="text-xs font-medium text-foreground">Profile reference</label>
-                <Select v-model="profileSelection" :options="profileOptions" class="mt-1" aria-label="Profile reference" />
-                <p class="mt-1 text-[11px] text-muted-foreground">
-                  Choose a registered profile or remove the profile reference. Published datasets and datasets with persistent identifiers can transition too.
-                </p>
-                <p v-if="hiddenPrivateProfiles" class="mt-1 text-[11px] text-muted-foreground">
-                  Private profiles are not registered for validation and are not listed.
-                </p>
-              </div>
-
-              <div v-if="externalProfileReferences.length" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-                <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <div>
-                  <p>This Dataset contains an external conformsTo reference that remains visible for reading but cannot be written back.</p>
-                  <ul class="mt-1 space-y-0.5">
-                    <li v-for="iri in externalProfileReferences" :key="iri"><code class="break-all font-mono">{{ iri }}</code></li>
-                  </ul>
-                  <p class="mt-1">Choose a registered profile or No profile reference before saving.</p>
-                </div>
-              </div>
-
-              <div v-if="selectedProfile && profileRuleState === 'loading'" class="space-y-2">
-                <p class="text-[11px] text-muted-foreground">Loading the selected profile rules…</p>
-                <Skeleton class="h-12" />
-              </div>
-              <div v-else-if="selectedProfile && profileRuleState === 'unavailable'" class="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2">
-                <p class="text-xs font-medium text-destructive">The selected profile rules are unavailable.</p>
-                <p class="mt-1 text-[11px] text-destructive/90">{{ profileLoadError }}</p>
-                <p class="mt-1 text-[11px] text-muted-foreground">The saved summary fields remain visible, but a new transition needs the full stored profile.</p>
-                <Button variant="outline" size="sm" class="mt-2" @click="retryActiveProfile">Retry</Button>
-              </div>
-              <p v-else-if="selectedProfile && profileRuleState === 'empty'" class="text-[11px] text-muted-foreground">
-                No generated rules are defined for this profile. Additional metadata remains allowed unless an explicit SHACL rule restricts it.
-              </p>
-              <p v-else-if="selectedProfile" class="text-[11px] text-muted-foreground">
-                Matching saved values are shown in the generated controls. Additional metadata remains allowed unless an explicit SHACL rule restricts it.
-              </p>
-              <p v-if="profileContextConflicts.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
-                These profile field names already map to different property URIs in this crate and are not reinterpreted: {{ profileContextConflicts.join(', ') }}. Their saved values remain custom metadata. Resolve the context conflict in Raw JSON or remove the profile reference before saving if authoritative validation rejects the crate.
-              </p>
-
-              <div v-if="profileAdditionalRequirements.length || serverRequiredConstraints.length" class="space-y-2 rounded-md border border-border bg-muted/20 p-2">
-                <p class="mb-1 text-[11px] font-medium text-foreground">Additional requirements</p>
-                <div v-if="serverRequiredConstraints.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-                  <p class="font-medium">Server validation required</p>
-                  <p class="mt-1">{{ serverRequiredConstraints.join(', ') }} {{ serverRequiredConstraints.length === 1 ? 'is' : 'are' }} not represented as form controls. The server enforces these constraints when you save.</p>
-                </div>
-                <LiftNotesPanel :notes="profileAdditionalRequirements" attached />
-              </div>
-
-              <template v-if="selectedProfile && profileRuleState !== 'loading'">
-                <div v-if="generatedScalarControls.length" class="grid gap-3 sm:grid-cols-2">
-                  <ProfileControlField
-                    v-for="control in generatedScalarControls"
-                    :key="control.property"
-                    :control="control"
-                    :model-value="generatedValues[control.property]"
-                    :violations="violationsFor(control.property)"
-                    :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
-                    @update:model-value="(value: unknown) => setGeneratedValue(control.property, value)"
-                  />
-                </div>
-                <DatasetEntityInstances
-                  v-for="control in entityControls"
-                  :key="control.property"
-                  :control="control"
-                  :sub-controls="entitySubControls[control.property] ?? []"
-                  :entries="entityEntries[control.property] ?? []"
-                  :entry-violations="[]"
-                  :presence-violations="violationsFor(control.property)"
-                  :type-label="entityTypeLabelFor(control)"
-                  :crate-options="crateOptions"
-                  :entity-rules="profileEntityRules"
-                  :depth="1"
-                  @add-new="addEntityEntry(control, 'new')"
-                  @add-existing="addEntityEntry(control, 'existing')"
-                  @remove="(index: number) => removeEntityEntry(control.property, index)"
-                  @switch-source="(index: number, source: 'new' | 'existing') => switchEntityEntrySource(control, index, source)"
-                  @update="(index: number, property: string, value: unknown) => setEntityEntryValue(control.property, index, property, value)"
-                  @update-ref="(index: number, value: string) => setEntityEntryRef(control.property, index, value)"
-                  @update-custom-id="(index: number, value: string) => setEntityEntryCustomId(control.property, index, value)"
-                />
-              </template>
-            </section>
-
-            <div>
-              <label class="text-xs font-medium text-foreground">Name</label>
-              <Input v-model="name" class="mt-1" placeholder="Dataset title" />
-            </div>
-            <div>
-              <label class="text-xs font-medium text-foreground">Description</label>
-              <Textarea v-model="description" rows="4" class="mt-1 font-sans" placeholder="Describe the dataset" />
-            </div>
-            <div v-if="showKeywordsScaffold">
-              <label class="text-xs font-medium text-foreground">Keywords</label>
-              <Input v-model="keywordsText" class="mt-1" placeholder="comma, separated, keywords" />
-            </div>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label class="text-xs font-medium text-foreground">Date published</label>
-                <Input v-model="datePublished" type="date" class="mt-1" />
-              </div>
-              <div>
-                <label class="text-xs font-medium text-foreground">License (IRI)</label>
-                <Input v-model="license" class="mt-1" placeholder="https://creativecommons.org/licenses/by/4.0" />
-              </div>
-            </div>
-
-            <div v-if="transitionReview.length" class="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
-              <p class="font-medium text-foreground">Profile transition review</p>
-              <p class="mt-1 text-muted-foreground">
-                {{ transitionMigratedCount }} {{ transitionMigratedCount === 1 ? 'field now uses' : 'fields now use' }} matching controls.
-                {{ transitionReview.length - transitionMigratedCount }} unmatched {{ transitionReview.length - transitionMigratedCount === 1 ? 'field remains' : 'fields remain' }} as custom metadata for review.
-              </p>
-              <ul class="mt-2 space-y-1">
-                <li v-for="item in transitionReview" :key="item.propertyUri" class="rounded border border-border bg-background/70 px-2 py-1.5">
-                  <span class="font-medium text-foreground">{{ item.label }}</span>
-                  <code class="ml-1 break-all font-mono text-[10px] text-muted-foreground">{{ item.propertyUri }}</code>
-                  <span class="mt-0.5 block break-all font-mono text-[10px] text-muted-foreground">{{ item.valuePreview }}</span>
-                  <span class="mt-0.5 block text-muted-foreground">
-                    {{ item.targetLabel ? `Moved into ${item.targetLabel} because the property URI matches.` : 'Preserved as custom metadata in the replacement crate. Nothing was deleted.' }}
-                  </span>
-                </li>
-              </ul>
-              <details v-if="replacementPreviewText" class="mt-2 rounded border border-border bg-background/70 p-2">
-                <summary class="cursor-pointer font-medium text-foreground">Preview exact replacement crate</summary>
-                <p class="mt-1 text-[11px] text-muted-foreground">This is a local preview of the exact Fields-tab replacement. Run the server validation preview below to check conformance; the server validates the submitted replacement authoritatively.</p>
-                <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[10px] text-foreground">{{ replacementPreviewText }}</pre>
-              </details>
-            </div>
-
-            <CustomFieldsEditor v-model:rows="customFields" :preserved="preservedFields" />
-
-            <div>
-              <label class="text-xs font-medium text-foreground">Related datasets</label>
-              <div class="mt-1.5 flex items-center gap-2">
-                <Select v-model="relatedPick" :options="relatedOptions" placeholder="Pick a loaded catalog dataset" class="flex-1" />
-                <Button variant="outline" size="sm" :disabled="!relatedPick" @click="addRelated"><Plus class="h-3.5 w-3.5" /> Link</Button>
-              </div>
-              <ul v-if="relatedIds.length" class="mt-2 space-y-1">
-                <li v-for="id in relatedIds" :key="id" class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs">
-                  <span class="min-w-0 truncate text-foreground" :title="id">{{ relatedLabel(id) }}</span>
-                  <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" aria-label="Unlink dataset" @click="removeRelated(id)">
-                    <X class="h-3.5 w-3.5" />
-                  </Button>
-                </li>
-              </ul>
-              <p class="mt-1 text-[11px] text-muted-foreground">
-                Written as <code class="font-mono">mentions</code> references; they render as browsable links on the detail page.
-              </p>
-            </div>
-
-            <div>
-              <div class="flex items-center justify-between gap-3">
-                <label class="text-xs font-medium text-foreground">Subcrates</label>
-                <Button variant="outline" size="sm" @click="subcratePickerOpen = true">
-                  <Plus class="h-3.5 w-3.5" /> Link subcrate
-                </Button>
-              </div>
-              <ul v-if="subcrates.length" class="mt-2 space-y-1">
-                <li v-for="link in subcrates" :key="link.iri" class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs">
-                  <span class="flex min-w-0 items-center gap-1.5">
-                    <Layers class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span class="min-w-0 truncate text-foreground" :title="link.iri">{{ link.name }}</span>
-                  </span>
-                  <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" :aria-label="`Unlink subcrate ${link.name}`" title="Unlink subcrate (the child document itself is kept)" @click="removeSubcrate(link.iri)">
-                    <X class="h-3.5 w-3.5" />
-                  </Button>
-                </li>
-              </ul>
-              <p class="mt-1 text-[11px] text-muted-foreground">
-                References to other crates (RO-Crate 1.2), written as <code class="font-mono">hasPart</code> Dataset entities. Linked crates stay independent documents.
-              </p>
-            </div>
-
-            <div v-if="violations.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
-              <div class="font-medium text-amber-800 dark:text-amber-300">Profile field checks: {{ selectedProfile?.name }}</div>
-              <ul class="mt-1 list-disc space-y-0.5 pl-4">
-                <li v-for="violation in violations" :key="violation.pointer + violation.message" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
-                  <span class="font-mono">{{ violation.fieldId ?? violation.pointer }}</span>: {{ violation.message }}
-                </li>
-              </ul>
-              <p class="mt-1 text-muted-foreground">These are the form's own field checks. Conformance is reported by the server validation preview below.</p>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="files">
-            <DatasetFilesEditor v-model="files" :crate="pristine" />
-            <div v-if="locationIdentityFiles.length" class="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
-              <p class="font-medium">Location identity</p>
-              <ul class="mt-1 space-y-1">
-                <li v-for="file in locationIdentityFiles" :key="file.id">
-                  <code class="break-all font-mono">{{ file.id }}</code> keeps its storage location as the File identifier because the content digest was unavailable.
-                </li>
-              </ul>
-            </div>
-            <p class="mt-2 text-[11px] text-muted-foreground">
-              Reference identifiers are kept verbatim. Removing a file drops it from the crate unless another entity still references it.
-            </p>
-          </TabsContent>
-
-          <TabsContent value="raw" class="space-y-2">
-            <Textarea v-model="rawText" rows="18" class="text-xs" spellcheck="false" />
-            <p v-if="rawError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ rawError }}</p>
-            <p v-else class="text-[11px] text-muted-foreground">The active tab wins on save; raw JSON must be a valid RO-Crate object.</p>
-          </TabsContent>
-        </Tabs>
-
-        <!-- Advisory server validation of the crate this dialog would save;
-             hidden when the node does not serve the preview endpoint. -->
-        <ProfileValidationPreview
-          v-if="selectedProfile && !previewUnavailable"
-          :result="previewResult"
-          :running="previewRunning"
-          :error="previewError"
-          :findings="previewResult?.findings ?? []"
-          @run="runProfilePreview"
-        />
-
-        <div class="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-3 py-2">
-          <div>
-            <div class="text-sm font-medium text-foreground">Public</div>
-            <div class="text-[11px] text-muted-foreground">Anyone can read this document when public.</div>
-          </div>
-          <Switch aria-label="Public" :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
+        <div v-if="loading" class="py-8 text-center text-sm text-muted-foreground">Loading crate…</div>
+        <div v-else-if="loadError" class="space-y-3">
+          <p class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ loadError }}</p>
+          <Button variant="outline" size="sm" @click="reload">Try again</Button>
         </div>
 
-        <section v-if="profiledWriteRejected" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs">
-          <p class="font-medium text-destructive">Profiled write rejected</p>
-          <p v-if="profiledWriteUnavailable" class="mt-1 text-foreground">
-            The Profile or server validator is unavailable. Validation fails closed, so nothing was saved. Retry when it is available, or remove the Profile tag and save unprofiled.
-          </p>
-          <ul v-if="serverFindings.length" class="mt-2 space-y-2">
-            <li v-for="(finding, index) in serverFindings" :key="`${finding.code}:${index}`" class="rounded border border-border bg-background/70 px-2 py-1.5">
-              <p class="font-medium uppercase text-destructive">{{ finding.severity }}</p>
-              <p class="mt-0.5 text-foreground">{{ finding.message }}</p>
-              <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">Focus node: {{ finding.focus_node || 'Not provided' }}</p>
-              <p class="break-all font-mono text-[10px] text-muted-foreground">Path: {{ finding.path || 'Not provided' }}</p>
-            </li>
-          </ul>
-          <p v-if="!profiledWriteUnavailable" class="mt-2 text-foreground">Fix the metadata and retry, or remove the Profile tag and save unprofiled.</p>
-          <div class="mt-2 flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" :disabled="saving" @click="save()">Retry</Button>
-            <Button type="button" variant="outline" size="sm" :disabled="saving" @click="save(true)">Remove Profile tag and save unprofiled</Button>
-          </div>
-        </section>
-        <p v-else-if="saveError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ saveError }}</p>
-      </template>
+        <template v-else>
+          <Tabs v-model="activeTab">
+            <TabsList>
+              <TabsTrigger value="fields">Fields</TabsTrigger>
+              <TabsTrigger value="files">Files</TabsTrigger>
+              <TabsTrigger value="raw">Raw JSON</TabsTrigger>
+            </TabsList>
 
-      <DialogFooter>
-        <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
-        <Button :disabled="loading || Boolean(loadError) || saving" @click="save()">{{ saving ? 'Saving…' : 'Save changes' }}</Button>
-      </DialogFooter>
+            <TabsContent value="fields" class="space-y-3">
+              <section class="space-y-2 rounded-md border border-border p-3">
+                <div>
+                  <label class="text-xs font-medium text-foreground">Profile reference</label>
+                  <Select v-model="profileSelection" :options="profileOptions" class="mt-1" aria-label="Profile reference" />
+                  <p class="mt-1 text-[11px] text-muted-foreground">
+                    Choose a registered profile or remove the profile reference. Published datasets and datasets with persistent identifiers can transition too.
+                  </p>
+                  <p v-if="hiddenPrivateProfiles" class="mt-1 text-[11px] text-muted-foreground">
+                    Private profiles are not registered for validation and are not listed.
+                  </p>
+                </div>
+
+                <div v-if="externalProfileReferences.length" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                  <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <div>
+                    <p>This Dataset contains an external conformsTo reference that remains visible for reading but cannot be written back.</p>
+                    <ul class="mt-1 space-y-0.5">
+                      <li v-for="iri in externalProfileReferences" :key="iri"><code class="break-all font-mono">{{ iri }}</code></li>
+                    </ul>
+                    <p class="mt-1">Choose a registered profile or No profile reference before saving.</p>
+                  </div>
+                </div>
+
+                <div v-if="selectedProfile && profileRuleState === 'loading'" class="space-y-2">
+                  <p class="text-[11px] text-muted-foreground">Loading the selected profile rules…</p>
+                  <Skeleton class="h-12" />
+                </div>
+                <div v-else-if="selectedProfile && profileRuleState === 'unavailable'" class="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2">
+                  <p class="text-xs font-medium text-destructive">The selected profile rules are unavailable.</p>
+                  <p class="mt-1 text-[11px] text-destructive/90">{{ profileLoadError }}</p>
+                  <p class="mt-1 text-[11px] text-muted-foreground">The saved summary fields remain visible, but a new transition needs the full stored profile.</p>
+                  <Button variant="outline" size="sm" class="mt-2" @click="retryActiveProfile">Retry</Button>
+                </div>
+                <p v-else-if="selectedProfile && profileRuleState === 'empty'" class="text-[11px] text-muted-foreground">
+                  No generated rules are defined for this profile. Additional metadata remains allowed unless an explicit SHACL rule restricts it.
+                </p>
+                <p v-else-if="selectedProfile" class="text-[11px] text-muted-foreground">
+                  Matching saved values are shown in the generated controls. Additional metadata remains allowed unless an explicit SHACL rule restricts it.
+                </p>
+                <p v-if="profileContextConflicts.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+                  These profile field names already map to different property URIs in this crate and are not reinterpreted: {{ profileContextConflicts.join(', ') }}. Their saved values remain custom metadata. Resolve the context conflict in Raw JSON or remove the profile reference before saving if authoritative validation rejects the crate.
+                </p>
+
+                <div v-if="profileAdditionalRequirements.length || serverRequiredConstraints.length" class="space-y-2 rounded-md border border-border bg-muted/20 p-2">
+                  <p class="mb-1 text-[11px] font-medium text-foreground">Additional requirements</p>
+                  <div v-if="serverRequiredConstraints.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                    <p class="font-medium">Server validation required</p>
+                    <p class="mt-1">{{ serverRequiredConstraints.join(', ') }} {{ serverRequiredConstraints.length === 1 ? 'is' : 'are' }} not represented as form controls. The server enforces these constraints when you save.</p>
+                  </div>
+                  <LiftNotesPanel :notes="profileAdditionalRequirements" attached />
+                </div>
+
+                <template v-if="selectedProfile && profileRuleState !== 'loading'">
+                  <div v-if="generatedScalarControls.length" class="grid gap-3 sm:grid-cols-2">
+                    <ProfileControlField
+                      v-for="control in generatedScalarControls"
+                      :key="control.property"
+                      :control="control"
+                      :model-value="generatedValues[control.property]"
+                      :violations="violationsFor(control.property)"
+                      :class="control.control === 'textarea' || control.control === 'tags' ? 'sm:col-span-2' : ''"
+                      @update:model-value="(value: unknown) => setGeneratedValue(control.property, value)"
+                    />
+                  </div>
+                  <DatasetEntityInstances
+                    v-for="control in entityControls"
+                    :key="control.property"
+                    :control="control"
+                    :sub-controls="entitySubControls[control.property] ?? []"
+                    :entries="entityEntries[control.property] ?? []"
+                    :entry-violations="[]"
+                    :presence-violations="violationsFor(control.property)"
+                    :type-label="entityTypeLabelFor(control)"
+                    :crate-options="crateOptions"
+                    :entity-rules="profileEntityRules"
+                    :depth="1"
+                    @add-new="addEntityEntry(control, 'new')"
+                    @add-existing="addEntityEntry(control, 'existing')"
+                    @remove="(index: number) => removeEntityEntry(control.property, index)"
+                    @switch-source="(index: number, source: 'new' | 'existing') => switchEntityEntrySource(control, index, source)"
+                    @update="(index: number, property: string, value: unknown) => setEntityEntryValue(control.property, index, property, value)"
+                    @update-ref="(index: number, value: string) => setEntityEntryRef(control.property, index, value)"
+                    @update-custom-id="(index: number, value: string) => setEntityEntryCustomId(control.property, index, value)"
+                  />
+                </template>
+              </section>
+
+              <div>
+                <label class="text-xs font-medium text-foreground">Name</label>
+                <Input v-model="name" class="mt-1" placeholder="Dataset title" />
+              </div>
+              <div>
+                <label class="text-xs font-medium text-foreground">Description</label>
+                <Textarea v-model="description" rows="4" class="mt-1 font-sans" placeholder="Describe the dataset" />
+              </div>
+              <div v-if="showKeywordsScaffold">
+                <label class="text-xs font-medium text-foreground">Keywords</label>
+                <Input v-model="keywordsText" class="mt-1" placeholder="comma, separated, keywords" />
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="text-xs font-medium text-foreground">Date published</label>
+                  <Input v-model="datePublished" type="date" class="mt-1" />
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-foreground">License (IRI)</label>
+                  <Input v-model="license" class="mt-1" placeholder="https://creativecommons.org/licenses/by/4.0" />
+                </div>
+              </div>
+
+              <div v-if="transitionReview.length" class="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+                <p class="font-medium text-foreground">Profile transition review</p>
+                <p class="mt-1 text-muted-foreground">
+                  {{ transitionMigratedCount }} {{ transitionMigratedCount === 1 ? 'field now uses' : 'fields now use' }} matching controls.
+                  {{ transitionReview.length - transitionMigratedCount }} unmatched {{ transitionReview.length - transitionMigratedCount === 1 ? 'field remains' : 'fields remain' }} as custom metadata for review.
+                </p>
+                <ul class="mt-2 space-y-1">
+                  <li v-for="item in transitionReview" :key="item.propertyUri" class="rounded border border-border bg-background/70 px-2 py-1.5">
+                    <span class="font-medium text-foreground">{{ item.label }}</span>
+                    <code class="ml-1 break-all font-mono text-[10px] text-muted-foreground">{{ item.propertyUri }}</code>
+                    <span class="mt-0.5 block break-all font-mono text-[10px] text-muted-foreground">{{ item.valuePreview }}</span>
+                    <span class="mt-0.5 block text-muted-foreground">
+                      {{ item.targetLabel ? `Moved into ${item.targetLabel} because the property URI matches.` : 'Preserved as custom metadata in the replacement crate. Nothing was deleted.' }}
+                    </span>
+                  </li>
+                </ul>
+                <details v-if="replacementPreviewText" class="mt-2 rounded border border-border bg-background/70 p-2">
+                  <summary class="cursor-pointer font-medium text-foreground">Preview exact replacement crate</summary>
+                  <p class="mt-1 text-[11px] text-muted-foreground">This is a local preview of the exact Fields-tab replacement. Run the server validation preview below to check conformance; the server validates the submitted replacement authoritatively.</p>
+                  <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[10px] text-foreground">{{ replacementPreviewText }}</pre>
+                </details>
+              </div>
+
+              <CustomFieldsEditor v-model:rows="customFields" :preserved="preservedFields" />
+
+              <div>
+                <label class="text-xs font-medium text-foreground">Related datasets</label>
+                <div class="mt-1.5 flex items-center gap-2">
+                  <Select v-model="relatedPick" :options="relatedOptions" placeholder="Pick a loaded catalog dataset" class="flex-1" />
+                  <Button variant="outline" size="sm" :disabled="!relatedPick" @click="addRelated"><Plus class="h-3.5 w-3.5" /> Link</Button>
+                </div>
+                <ul v-if="relatedIds.length" class="mt-2 space-y-1">
+                  <li v-for="id in relatedIds" :key="id" class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs">
+                    <span class="min-w-0 truncate text-foreground" :title="id">{{ relatedLabel(id) }}</span>
+                    <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" aria-label="Unlink dataset" @click="removeRelated(id)">
+                      <X class="h-3.5 w-3.5" />
+                    </Button>
+                  </li>
+                </ul>
+                <p class="mt-1 text-[11px] text-muted-foreground">
+                  Written as <code class="font-mono">mentions</code> references; they render as browsable links on the detail page.
+                </p>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between gap-3">
+                  <label class="text-xs font-medium text-foreground">Subcrates</label>
+                  <Button variant="outline" size="sm" @click="subcratePickerOpen = true">
+                    <Plus class="h-3.5 w-3.5" /> Link subcrate
+                  </Button>
+                </div>
+                <ul v-if="subcrates.length" class="mt-2 space-y-1">
+                  <li v-for="link in subcrates" :key="link.iri" class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs">
+                    <span class="flex min-w-0 items-center gap-1.5">
+                      <Layers class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span class="min-w-0 truncate text-foreground" :title="link.iri">{{ link.name }}</span>
+                    </span>
+                    <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" :aria-label="`Unlink subcrate ${link.name}`" title="Unlink subcrate (the child document itself is kept)" @click="removeSubcrate(link.iri)">
+                      <X class="h-3.5 w-3.5" />
+                    </Button>
+                  </li>
+                </ul>
+                <p class="mt-1 text-[11px] text-muted-foreground">
+                  References to other crates (RO-Crate 1.2), written as <code class="font-mono">hasPart</code> Dataset entities. Linked crates stay independent documents.
+                </p>
+              </div>
+
+              <div v-if="violations.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
+                <div class="font-medium text-amber-800 dark:text-amber-300">Profile field checks: {{ selectedProfile?.name }}</div>
+                <ul class="mt-1 list-disc space-y-0.5 pl-4">
+                  <li v-for="violation in violations" :key="violation.pointer + violation.message" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
+                    <span class="font-mono">{{ violation.fieldId ?? violation.pointer }}</span>: {{ violation.message }}
+                  </li>
+                </ul>
+                <p class="mt-1 text-muted-foreground">These are the form's own field checks. Conformance is reported by the server validation preview below.</p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="files">
+              <DatasetFilesEditor v-model="files" :crate="pristine" />
+              <div v-if="locationIdentityFiles.length" class="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+                <p class="font-medium">Location identity</p>
+                <ul class="mt-1 space-y-1">
+                  <li v-for="file in locationIdentityFiles" :key="file.id">
+                    <code class="break-all font-mono">{{ file.id }}</code> keeps its storage location as the File identifier because the content digest was unavailable.
+                  </li>
+                </ul>
+              </div>
+              <p class="mt-2 text-[11px] text-muted-foreground">
+                Reference identifiers are kept verbatim. Removing a file drops it from the crate unless another entity still references it.
+              </p>
+            </TabsContent>
+
+            <TabsContent value="raw" class="space-y-2">
+              <Textarea v-model="rawText" rows="18" class="text-xs" spellcheck="false" />
+              <p v-if="rawError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ rawError }}</p>
+              <p v-else class="text-[11px] text-muted-foreground">The active tab wins on save; raw JSON must be a valid RO-Crate object.</p>
+            </TabsContent>
+          </Tabs>
+
+          <!-- Advisory server validation of the crate this dialog would save;
+               hidden when the node does not serve the preview endpoint. -->
+          <ProfileValidationPreview
+            v-if="selectedProfile && !previewUnavailable"
+            :result="previewResult"
+            :running="previewRunning"
+            :error="previewError"
+            :findings="previewResult?.findings ?? []"
+            @run="runProfilePreview"
+          />
+
+          <div class="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-3 py-2">
+            <div>
+              <div class="text-sm font-medium text-foreground">Public</div>
+              <div class="text-[11px] text-muted-foreground">Anyone can read this document when public.</div>
+            </div>
+            <Switch aria-label="Public" :checked="isPublic" @update:checked="(v: boolean) => (isPublic = v)" />
+          </div>
+
+          <section v-if="profiledWriteRejected" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs">
+            <p class="font-medium text-destructive">Profiled write rejected</p>
+            <p v-if="profiledWriteUnavailable" class="mt-1 text-foreground">
+              The Profile or server validator is unavailable. Validation fails closed, so nothing was saved. Retry when it is available, or remove the Profile tag and save unprofiled.
+            </p>
+            <ul v-if="serverFindings.length" class="mt-2 space-y-2">
+              <li v-for="(finding, index) in serverFindings" :key="`${finding.code}:${index}`" class="rounded border border-border bg-background/70 px-2 py-1.5">
+                <p class="font-medium uppercase text-destructive">{{ finding.severity }}</p>
+                <p class="mt-0.5 text-foreground">{{ finding.message }}</p>
+                <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">Focus node: {{ finding.focus_node || 'Not provided' }}</p>
+                <p class="break-all font-mono text-[10px] text-muted-foreground">Path: {{ finding.path || 'Not provided' }}</p>
+              </li>
+            </ul>
+            <p v-if="!profiledWriteUnavailable" class="mt-2 text-foreground">Fix the metadata and retry, or remove the Profile tag and save unprofiled.</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" :disabled="saving" @click="save()">Retry</Button>
+              <Button type="button" variant="outline" size="sm" :disabled="saving" @click="save(true)">Remove Profile tag and save unprofiled</Button>
+            </div>
+          </section>
+          <p v-else-if="saveError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ saveError }}</p>
+        </template>
+
+        <DialogFooter>
+          <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
+          <Button :disabled="loading || Boolean(loadError) || saving" @click="save()">{{ saving ? 'Saving…' : 'Save changes' }}</Button>
+        </DialogFooter>
+      </div>
 
       <Transition
         enter-active-class="transition-opacity duration-150"
@@ -1721,8 +1745,8 @@ function requestClose(next: boolean) {
             </template>
 
             <div class="mt-4 flex justify-end gap-2">
-              <Button variant="outline" size="sm" @click="cancelProfileSwitch">Keep current profile</Button>
-              <Button size="sm" :disabled="profileSwitchLoading || Boolean(profileSwitchError) || !pendingReplacementCrate" @click="confirmProfileSwitch">Confirm transition</Button>
+              <Button ref="switchCancelButton" variant="outline" size="sm" @click="cancelProfileSwitch">Keep current profile</Button>
+              <Button ref="switchConfirmButton" size="sm" :disabled="switchConfirmDisabled" @click="confirmProfileSwitch">Confirm transition</Button>
             </div>
           </div>
         </div>
