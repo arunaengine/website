@@ -208,12 +208,12 @@ async function confirmWithdraw() {
         </DialogHeader>
         <div class="space-y-3">
           <div class="space-y-1">
-            <label class="text-xs font-medium text-foreground">Type the identifier to confirm</label>
-            <Input v-model="confirmValue" class="font-mono text-xs" :placeholder="view?.value ?? ''" />
+            <label for="pid-withdraw-confirm" class="text-xs font-medium text-foreground">Type the identifier to confirm</label>
+            <Input id="pid-withdraw-confirm" v-model="confirmValue" class="font-mono text-xs" :placeholder="view?.value ?? ''" />
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-foreground">Reason</label>
-            <Textarea v-model="reason" rows="3" :maxlength="REASON_MAX" />
+            <label for="pid-withdraw-reason" class="text-xs font-medium text-foreground">Reason</label>
+            <Textarea id="pid-withdraw-reason" v-model="reason" rows="3" :maxlength="REASON_MAX" />
             <p class="text-[11px] text-muted-foreground">
               Required, {{ REASON_MAX - trimmedReason.length }} characters left.
             </p>
