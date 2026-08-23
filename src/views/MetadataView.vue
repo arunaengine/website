@@ -739,7 +739,6 @@ watch(relatedDocs, (rows) => {
           v-if="fetchedSummary"
           :document-id="detailId"
           :is-public="fetchedSummary.public"
-          :can-write="Boolean(current) && canWrite"
         />
 
         <DetailsSection

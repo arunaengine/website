@@ -210,7 +210,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'One automatic primary w3id',
         paragraphs: [
           'Every persisted Dataset receives exactly one automatic conceptual w3id. Ordinary Datasets and Process Runs use the general Dataset identity. A Profile uses https://w3id.org/aruna/profile/{id} as its sole primary PID instead of receiving a duplicate general Dataset w3id.',
-          'Minting can continue after the Dataset write is accepted. Requested, processing, active, failed, tombstoned, and unavailable states remain visible and retryable where appropriate. Normal Dataset deletion keeps a resolvable tombstone. Ordinary Dataset owners cannot withdraw the primary PID.',
+          'Minting can continue after the Dataset write is accepted. Requested, processing, active, failed, administratively withdrawn, tombstoned, and unknown states remain visible. Normal Dataset deletion keeps a resolvable tombstone. Ordinary Dataset owners cannot withdraw the primary PID.',
         ],
       },
       {

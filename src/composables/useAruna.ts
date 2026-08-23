@@ -1882,6 +1882,10 @@ const canManageOnboarding = computed<boolean>(() => hasRealmGrant('admin/onboard
 // (api/src/routes/sync_quarantine.rs); served by every node, not just management.
 const canManageQuarantine = computed<boolean>(() => hasRealmGrant('admin/sync-quarantine', 'Write'))
 
+// The backend gates PID withdrawal on WRITE of /{realm_id}/admin/pids/{id};
+// the seeded realm_admin grant on /{realm_id}/admin/** covers it.
+const canWithdrawPids = computed<boolean>(() => hasRealmGrant('admin/pids', 'Write'))
+
 // Quota edits are only accepted by a management node; server/local nodes 403.
 const isManagementNode = computed<boolean>(() => nodeInfo.value?.node.capabilities === 'management')
 
@@ -2208,6 +2212,7 @@ export function useAruna() {
     canInspectUsers,
     canManageOnboarding,
     canManageQuarantine,
+    canWithdrawPids,
     isManagementNode,
     nodes,
     groups,
