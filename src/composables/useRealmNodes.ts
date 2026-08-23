@@ -35,7 +35,7 @@ export function useRealmNodes() {
 
   const nodes = computed<RealmNodeDisplay[]>(() =>
     (realmInfo.value?.nodes ?? []).map((node) => {
-      const isLocal = node.node_id === localNodeId.value || node.kind === 'local'
+      const isLocal = node.node_id === localNodeId.value
       return {
         nodeId: node.node_id,
         kind: node.kind,

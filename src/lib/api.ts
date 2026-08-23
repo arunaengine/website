@@ -123,7 +123,7 @@ export interface InfoResponse {
     status: string
     realm_id: string
     peer_id: string
-    capabilities: 'management' | 'server' | 'local'
+    capabilities: 'management' | 'server'
   }
   api_version?: string
   portal?: PortalStatus | null
@@ -326,7 +326,7 @@ export interface RealmNodePublishedInfo {
 
 export interface RealmNodeInfo {
   node_id: string
-  kind: 'management' | 'server' | 'local' | 'user'
+  kind: 'management' | 'server' | 'user'
   configured: boolean
   present: boolean
   connection_status: 'connected' | 'configured'
@@ -1328,7 +1328,7 @@ export interface DecideJoinRequestResponse {
 
 // Serialized aruna_core::onboarding::OnboardingMode — plain unit variants,
 // so capitalized strings on the wire.
-export type OnboardingMode = 'Management' | 'Server' | 'Local'
+export type OnboardingMode = 'Management' | 'Server'
 
 export interface CreateOnboardingSecretRequest {
   // Origin-style base URL of a management node reachable by the joiner; the
@@ -1354,8 +1354,8 @@ export interface OnboardingSecretSummary {
   // Unix seconds. u64::MAX (~1.84e19) marks the never-expiring initial
   // admin-claim secret minted at realm initialization.
   expires_at: number
-  // Node id for node claims; a user id when a Local secret was redeemed at
-  // registration (first admin claim). Serialized as null when unclaimed.
+  // Node id for node claims; a user id when the initial admin-claim secret was
+  // redeemed at registration. Serialized as null when unclaimed.
   claimed_node_id: string | null
 }
 

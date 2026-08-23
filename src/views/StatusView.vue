@@ -96,7 +96,7 @@ useIntervalFn(() => {
 const localPeerId = computed(() => nodeInfo.value?.node.peer_id ?? '')
 
 function isLocal(node: RealmNodeInfo): boolean {
-  return node.kind === 'local' || (!!localPeerId.value && node.node_id === localPeerId.value)
+  return !!localPeerId.value && node.node_id === localPeerId.value
 }
 
 // The local node's DATA comes from the already-loaded /info; its probe (see
@@ -144,7 +144,7 @@ function latencyClass(ms: number): string {
   return 'text-red-600 dark:text-red-400'
 }
 
-const kindOrder: Record<RealmNodeInfo['kind'], number> = { local: 0, management: 1, server: 2, user: 3 }
+const kindOrder: Record<RealmNodeInfo['kind'], number> = { management: 0, server: 1, user: 2 }
 
 const sortedNodes = computed(() =>
   [...(realmInfo.value?.nodes ?? [])].sort(

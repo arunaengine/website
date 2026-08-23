@@ -14,7 +14,6 @@ export type BadgeVariant =
 export const kindVariant: Record<RealmNodeInfo['kind'], BadgeVariant> = {
   management: 'royal',
   server: 'sky',
-  local: 'accent',
   user: 'secondary',
 }
 

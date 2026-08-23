@@ -64,8 +64,7 @@ const LABEL_CAP = 10
 // Honesty: the hub is the node serving this portal, and each edge reflects only
 // that node's own connection_status to it — never a fabricated mesh.
 const hub = computed<RealmNodeInfo | undefined>(() => {
-  const byId = props.localPeerId ? props.nodes.find((node) => node.node_id === props.localPeerId) : undefined
-  return byId ?? props.nodes.find((node) => node.kind === 'local')
+  return props.localPeerId ? props.nodes.find((node) => node.node_id === props.localPeerId) : undefined
 })
 
 const spokes = computed(() =>
@@ -162,7 +161,6 @@ function nodeTitle(node: RealmNodeInfo): string {
 const kindStroke: Record<RealmNodeInfo['kind'], string> = {
   management: '#335DC6',
   server: '#24A9E6',
-  local: '#55C4DE',
   user: 'hsl(var(--muted-foreground))',
 }
 

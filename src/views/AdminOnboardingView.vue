@@ -80,15 +80,6 @@ const KIND_OPTIONS: KindOption[] = [
     badgeLabel: 'storage member',
     badgeVariant: 'sky',
   },
-  {
-    value: 'Local',
-    title: 'Local',
-    description: 'Lightweight or local node. Receives neither the realm key nor a delegation.',
-    badgeLabel: 'lightweight',
-    badgeVariant: 'accent',
-    warning:
-      'A Local secret can also be redeemed once at sign-up to claim the initial realm-admin role — treat it like an admin credential.',
-  },
 ]
 
 const selectedMode = ref<OnboardingMode | null>(null)
@@ -124,12 +115,6 @@ const expiresIn = ref('3600')
 const minted = ref<CreateOnboardingSecretResponse | null>(null)
 const mintedEnrollmentId = ref<string | null>(null)
 let nodesBeforeMint: string[] = []
-
-const secretNotice = computed(() =>
-  selectedMode.value === 'Local'
-    ? 'The secret is shown once — copy it now. A Local secret can also be redeemed once at sign-up to claim the initial realm-admin role, so treat it like an admin credential.'
-    : undefined,
-)
 
 async function doMint() {
   if (!selectedMode.value || minting.value) return
@@ -184,20 +169,16 @@ function goToWatch() {
   currentStep.value = 3
 }
 
-// A registration claim is a Local secret redeemed once at sign-up: its
-// claimed_node_id is a user id ("{ulid}@{realm}", always containing '@'),
-// which no iroh node id ever does. This discriminates it from the node-boot
-// window, where claimedIsNode is also transiently false while the joining
-// node has not yet appeared in realmInfo.nodes.
+// A registration claim carries a user id ("{ulid}@{realm}", always containing
+// '@') as claimed_node_id, which no iroh node id ever does. This discriminates
+// it from the node-boot window, where claimedIsNode is also transiently false
+// while the joining node has not yet appeared in realmInfo.nodes.
 const isRegistrationClaim = computed(
-  () =>
-    !!watchState.value.claimedBy &&
-    minted.value?.mode === 'Local' &&
-    watchState.value.claimedBy.includes('@'),
+  () => !!watchState.value.claimedBy && watchState.value.claimedBy.includes('@'),
 )
 
-// connected → real node; expired → timed out; registration → a Local secret
-// redeemed at sign-up (claimedBy is a user id, never a node).
+// connected → real node; expired → timed out; registration → a secret redeemed
+// at sign-up (claimedBy is a user id, never a node).
 const watchTerminal = computed<'connected' | 'expired' | 'registration' | null>(() => {
   const w = watchState.value
   if (w.phase === 'connected') return 'connected'
@@ -408,7 +389,7 @@ const managementPortals = computed(() =>
               </div>
             </template>
             <template v-else>
-              <SecretPanel :secret="minted.onboarding_secret" :expires-at="minted.expires_at" :notice="secretNotice" />
+              <SecretPanel :secret="minted.onboarding_secret" :expires-at="minted.expires_at" />
               <div class="flex justify-end">
                 <Button @click="currentStep = 2">
                   Continue to configuration <ArrowRight class="h-4 w-4" />
@@ -493,8 +474,8 @@ const managementPortals = computed(() =>
               </template>
             </ClaimWatchStep>
             <p v-if="watchTerminal === 'registration'" class="text-[11px] leading-relaxed text-muted-foreground">
-              This Local secret was redeemed at sign-up to claim the initial realm-admin role, so there is no node to
-              bring online.
+              This secret was redeemed at sign-up to claim the initial realm-admin role, so there is no node to bring
+              online.
             </p>
           </div>
         </div>
