@@ -317,7 +317,7 @@ function profile(id: string, propertyRules: ProfilePropertyRule[]): MetadataProf
     propertyRules,
     contextTerms: Object.fromEntries(propertyRules.map((rule) => [rule.valueName, rule.propertyUri])),
     suggestedKeywords: [],
-    managed: false,
+    managed: true,
   }
 }
 

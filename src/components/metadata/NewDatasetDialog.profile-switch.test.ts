@@ -342,7 +342,7 @@ function profile(id: string, propertyRules: ProfilePropertyRule[]): MetadataProf
     entityRules: [],
     propertyRules,
     suggestedKeywords: [],
-    managed: false,
+    managed: true,
   }
 }
 
@@ -467,6 +467,15 @@ afterEach(() => {
 })
 
 describe('New Dataset profile switching', () => {
+  it('hides a private profile from the options', async () => {
+    // The backend only resolves public profiles for validation.
+    profiles.value = [profile('old', []), { ...profile('hidden', []), managed: false }]
+    const root = await mountDialog()
+
+    const options = profileSelect(root).props.options as Array<{ value: string }>
+    expect(options.some((option) => option.value === 'hidden')).toBe(false)
+  })
+
   it('authors a W3ID with contentUrl while preserving an external identity', async () => {
     createMetadata.mockResolvedValue({
       document_id: 'dataset-1',

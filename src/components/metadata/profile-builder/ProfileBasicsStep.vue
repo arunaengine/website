@@ -199,7 +199,7 @@ watch(
     <label class="flex items-center justify-between rounded-md border border-border p-3 text-sm">
       <span>
         Public profile
-        <span class="block text-[11px] text-muted-foreground">Public profiles are discoverable without a bearer token.</span>
+        <span class="block text-[11px] text-muted-foreground">Only public profiles are registered for dataset validation. A private profile is saved as a draft that datasets cannot reference.</span>
       </span>
       <Switch :checked="builder.isPublic" @update:checked="(value: boolean) => (builder.isPublic = value)" />
     </label>

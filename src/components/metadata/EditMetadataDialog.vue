@@ -213,11 +213,18 @@ let seededCustomKeys: string[] = []
 const PROFILE_INDEPENDENT_KEYS = new Set(['name', 'description', 'datePublished', 'license'])
 const PROFILE_RESERVED_KEYS = new Set(['@id', '@type', 'conformsTo'])
 
+// Only public profiles are registered for validation, so a private one can no
+// longer be chosen; the document's current profile stays listed either way.
 const availableProfiles = computed(() => {
-  const values = [...profiles.value]
+  const values = profiles.value.filter(
+    (profile) => profile.managed || profile.id === props.profile?.id,
+  )
   if (props.profile && !values.some((profile) => profile.id === props.profile?.id)) values.push(props.profile)
   return values
 })
+const hiddenPrivateProfiles = computed(
+  () => profiles.value.filter((profile) => !profile.managed && profile.id !== props.profile?.id).length,
+)
 const selectedProfile = computed(() =>
   availableProfiles.value.find((profile) => profile.id === activeProfileValue.value),
 )
@@ -1418,6 +1425,9 @@ function requestClose(next: boolean) {
                 <Select v-model="profileSelection" :options="profileOptions" class="mt-1" aria-label="Profile reference" />
                 <p class="mt-1 text-[11px] text-muted-foreground">
                   Choose a registered profile or remove the profile reference. Published datasets and datasets with persistent identifiers can transition too.
+                </p>
+                <p v-if="hiddenPrivateProfiles" class="mt-1 text-[11px] text-muted-foreground">
+                  Private profiles are not registered for validation and are not listed.
                 </p>
               </div>
 

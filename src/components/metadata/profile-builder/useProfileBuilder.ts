@@ -518,7 +518,7 @@ export function useProfileBuilder() {
   const version = ref('0.1.0')
   const datePublished = ref(todayIso())
   const license = ref(DEFAULT_LICENSE)
-  const isPublic = ref(false)
+  const isPublic = ref(true)
   const entities = ref<DraftEntityRule[]>(defaultEntities())
   const selectedEntityIndex = ref(0)
   const submitError = ref<string | null>(null)
@@ -553,7 +553,7 @@ export function useProfileBuilder() {
     version.value = '0.1.0'
     datePublished.value = todayIso()
     license.value = DEFAULT_LICENSE
-    isPublic.value = false
+    isPublic.value = true
     submitError.value = null
     importedMode.value = null
     customShapesText.value = ''

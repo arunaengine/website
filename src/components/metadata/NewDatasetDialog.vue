@@ -199,9 +199,13 @@ const builtInDatasetKeys = new Set(['name', 'description', 'datePublished', 'lic
 const reservedDatasetKeys = new Set(['@id', '@type', 'conformsTo'])
 
 const groupOptions = computed(() => groups.value.map((group) => ({ value: group.id, label: group.name })))
+// The backend only resolves a public profile for validation, so a private one
+// cannot be referenced by a dataset.
+const selectableProfiles = computed(() => profiles.value.filter((profile) => profile.managed))
+const hiddenPrivateProfiles = computed(() => profiles.value.length - selectableProfiles.value.length)
 const profileOptions = computed(() => [
   { value: NO_PROFILE_VALUE, label: 'No profile reference' },
-  ...profiles.value.map((profile) => {
+  ...selectableProfiles.value.map((profile) => {
     // Count every entity rule's properties — the same total ProfilesView shows —
     // not just the root Dataset rules.
     const count = profile.entityRules.length
@@ -1524,6 +1528,9 @@ async function submit(unprofiled = false) {
           <div>
             <label class="text-xs font-medium text-foreground">Profile reference</label>
             <Select v-model="profileSelection" :options="profileOptions" placeholder="Optional profile" class="mt-1" />
+            <p v-if="hiddenPrivateProfiles" class="mt-1 text-[11px] text-muted-foreground">
+              Private profiles are not registered for validation and are not listed.
+            </p>
             <p v-if="selectedProfile" class="mt-1 text-[11px] text-muted-foreground">
               <template v-if="profileRuleState === 'loading'">Loading profile rules…</template>
               <template v-else-if="profileRuleState === 'unavailable'">Profile rules are unavailable. Retry below or choose "No profile reference".</template>
