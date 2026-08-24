@@ -26,6 +26,8 @@ export interface DesktopContext {
   apiBaseUrl: string
   // Origin of the registered OIDC redirect_uri (RFC 8252 loopback listener).
   authCallbackOrigin?: string
+  // The realm this device remembers; present whenever the shell stores one.
+  realmUrl?: string
   features?: DesktopFeatures
   bridge?: DesktopBridge
 }
@@ -68,6 +70,8 @@ function readContext(value: unknown): DesktopContext | null {
   }
   const origin = trimmed(source.authCallbackOrigin)
   if (origin) context.authCallbackOrigin = origin.replace(/\/+$/, '')
+  const realm = trimmed(source.realmUrl)
+  if (realm) context.realmUrl = realm
   const features = readFeatures(source.features)
   if (features) context.features = features
   const bridge = readBridge(source.bridge)

@@ -20,7 +20,7 @@ function store(): Storage {
 
 // The desktop context and the runtime config are both read once per module
 // graph, so every case builds a graph of its own.
-async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL) {
+async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUrl?: string) {
   vi.resetModules()
   const invoke = vi.fn(async (command: string) => {
     if (command !== 'node_status' || !status) throw new Error('unknown command: node_status')
@@ -28,7 +28,7 @@ async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL) {
     return status
   })
   vi.stubGlobal('window', {
-    __ARUNA_DESKTOP__: { apiBaseUrl, bridge: { invoke, version: 1 } },
+    __ARUNA_DESKTOP__: { apiBaseUrl, realmUrl, bridge: { invoke, version: 1 } },
     localStorage: store(),
   })
   const config = await import('./config')
@@ -78,18 +78,26 @@ describe('realm knowledge', () => {
     await expect(welcome.realmKnown()).resolves.toBe(false)
   })
 
-  it('takes an enrolled node and a remote base as known', async () => {
+  it('takes an enrolled node and a named realm as known', async () => {
     const enrolled = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL })
     await expect(enrolled.realmKnown()).resolves.toBe(true)
 
-    const remote = await load({ state: 'stopped', enrolled: false, apiBaseUrl: null }, REALM)
+    const remote = await load(
+      { state: 'stopped', enrolled: false, apiBaseUrl: null },
+      REALM,
+      'https://aruna.example',
+    )
     await expect(remote.realmKnown()).resolves.toBe(true)
   })
 
-  it('reads a stopped node on loopback as first run', async () => {
-    // Nothing to compare the base against, so the loopback address decides.
-    const welcome = await load({ state: 'stopped', enrolled: false, apiBaseUrl: null })
-    await expect(welcome.realmKnown()).resolves.toBe(false)
+  it('trusts a loopback realm', async () => {
+    // A realm on 127.0.0.1 is still a realm; only the shell's memory decides.
+    const welcome = await load(
+      { state: 'stopped', enrolled: false, apiBaseUrl: null },
+      'http://127.0.0.1:43021/api/v1',
+      'http://127.0.0.1:43025',
+    )
+    await expect(welcome.realmKnown()).resolves.toBe(true)
   })
 
   it('answers known when the shell cannot say', async () => {

@@ -2,8 +2,7 @@
 // the local, unenrolled node, which has nothing to serve. The welcome view owns
 // the window until `validate_realm` gives the shell a realm to reopen against.
 import type { Router } from 'vue-router'
-import { portalConfig } from './config'
-import { isDesktop } from './desktop'
+import { desktopContext, isDesktop } from './desktop'
 import { realmUnreachable } from './desktopBoot'
 
 // Survives the window replacement (same origin), so an interrupted connect can
@@ -25,24 +24,15 @@ function bounded<T>(work: Promise<T>, ms: number): Promise<T> {
 /** True once the portal has a realm to talk to; an unusable shell answers true. */
 export async function realmKnown(): Promise<boolean> {
   if (!isDesktop()) return true
+  // The shell names the remembered realm; a loopback one is still a realm.
+  if (desktopContext()?.realmUrl) return true
   try {
     const { nodeStatus } = await import('./desktopBridge')
     const status = await bounded(nodeStatus(), STATUS_TIMEOUT_MS)
-    const base = portalConfig().apiBaseUrl
-    const local = status.apiBaseUrl ? base === status.apiBaseUrl : loopback(base)
-    return status.enrolled || !local
+    return status.enrolled
   } catch {
     // A shell without that command half must not strand the owner here.
     return true
-  }
-}
-
-function loopback(base: string): boolean {
-  try {
-    const host = new URL(base, 'http://desktop.invalid').hostname
-    return host === '127.0.0.1' || host === '[::1]' || host === 'localhost'
-  } catch {
-    return false
   }
 }
 
