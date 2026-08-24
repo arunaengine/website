@@ -3,7 +3,7 @@
 // so it asks for one instead of enrolling. The shell validates the address,
 // remembers it, and replaces this window against that realm's API — a success
 // here ends in a reload, which is what the reconnecting panel stands for.
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -12,12 +12,18 @@ import { validateRealm } from '@/lib/desktopBridge'
 import { pendingRealm, setPendingRealm } from '@/lib/desktopWelcome'
 import { ArrowRight, KeyRound } from '@lucide/vue'
 
+// Long enough that a working replacement is never called stalled.
+const STALL_MS = 20_000
+
 const router = useRouter()
 const address = ref('')
 const checking = ref(false)
 const failure = ref<string | null>(null)
 const connecting = ref<string | null>(null)
 const interrupted = ref<string | null>(null)
+const stalled = ref(false)
+
+let stallTimer: ReturnType<typeof setTimeout> | undefined
 
 onMounted(() => {
   // Landing here with a connect on record means the window came back without
@@ -37,6 +43,7 @@ async function connect(): Promise<void> {
     const target = await validateRealm(input)
     connecting.value = target.origin
     setPendingRealm(target.origin)
+    stallTimer = setTimeout(() => (stalled.value = true), STALL_MS)
   } catch (err) {
     // The shell classifies the failure; its wording is the whole answer.
     failure.value = err instanceof Error ? err.message : String(err)
@@ -44,6 +51,17 @@ async function connect(): Promise<void> {
     checking.value = false
   }
 }
+
+// The shell stores the realm before it reopens the window, so a replacement
+// that never arrives leaves the address to try again rather than lost work.
+function cancel(): void {
+  clearTimeout(stallTimer)
+  stalled.value = false
+  connecting.value = null
+  setPendingRealm(null)
+}
+
+onUnmounted(() => clearTimeout(stallTimer))
 
 function toEnroll(): void {
   void router.push({ name: 'device', query: { tab: 'enroll' } })
@@ -67,6 +85,13 @@ function toEnroll(): void {
         <p class="text-xs leading-relaxed text-muted-foreground">
           Aruna Desktop is reopening this window against the realm, which takes a moment.
         </p>
+        <div v-if="stalled" class="pt-1">
+          <p class="text-xs leading-relaxed text-muted-foreground">
+            The window has not reopened. The app remembers this realm, so restarting it lands there — or name another
+            address.
+          </p>
+          <Button variant="outline" size="sm" class="mt-2" @click="cancel">Back to the address</Button>
+        </div>
       </div>
 
       <div v-else class="surface space-y-4 p-6">
