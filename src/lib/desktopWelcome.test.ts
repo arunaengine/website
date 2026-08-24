@@ -135,3 +135,24 @@ describe('pending realm', () => {
     expect(welcome.pendingRealm()).toBeNull()
   })
 })
+
+describe('insecure realm', () => {
+  it('flags plain http on a remote host', async () => {
+    const welcome = await load(null)
+    expect(welcome.insecureRealm('http://aruna.example.org')).toBe(true)
+    expect(welcome.insecureRealm(' http://aruna.example.org:8080/portal ')).toBe(true)
+    expect(welcome.insecureRealm('http://localhost.example.org')).toBe(true)
+  })
+
+  it('trusts https and loopback addresses', async () => {
+    // Schemeless input is out too: the shell assumes https for it.
+    const welcome = await load(null)
+    expect(welcome.insecureRealm('https://aruna.example.org')).toBe(false)
+    expect(welcome.insecureRealm('aruna.example.org')).toBe(false)
+    expect(welcome.insecureRealm('http://localhost:5173')).toBe(false)
+    expect(welcome.insecureRealm('http://node.localhost')).toBe(false)
+    expect(welcome.insecureRealm('http://127.0.0.1:34116')).toBe(false)
+    expect(welcome.insecureRealm('http://[::1]:8080')).toBe(false)
+    expect(welcome.insecureRealm('http://')).toBe(false)
+  })
+})

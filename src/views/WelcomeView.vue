@@ -3,14 +3,14 @@
 // so it asks for one instead of enrolling. The shell validates the address,
 // remembers it, and replaces this window against that realm's API — a success
 // here ends in a reload, which is what the reconnecting panel stands for.
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { validateRealm } from '@/lib/desktopBridge'
-import { pendingRealm, setPendingRealm } from '@/lib/desktopWelcome'
+import { insecureRealm, pendingRealm, setPendingRealm } from '@/lib/desktopWelcome'
 import { ArrowRight, KeyRound } from '@lucide/vue'
 
 // Long enough that a working replacement is never called stalled.
@@ -18,6 +18,8 @@ const STALL_MS = 20_000
 
 const router = useRouter()
 const address = ref('')
+// Courtesy only: the warning never blocks the shell's own validation.
+const insecure = computed(() => insecureRealm(address.value))
 const checking = ref(false)
 const failure = ref<string | null>(null)
 const connecting = ref<string | null>(null)
@@ -135,13 +137,21 @@ function toEnroll(): void {
               v-model="address"
               class="mt-1"
               placeholder="aruna.example.org"
-              :invalid="failure ? 'error' : undefined"
+              :invalid="failure ? 'error' : insecure ? 'warning' : undefined"
               @keyup.enter="connect"
             />
             <p class="mt-1 text-[11px] text-muted-foreground">
               A host name or the portal URL you were given; https:// is assumed.
             </p>
           </div>
+
+          <p
+            v-if="insecure"
+            class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300"
+          >
+            This address uses plain http on a non-local host, and browser sign-in (PKCE) needs a secure context.
+            Use https, or a localhost or tunnel address.
+          </p>
 
           <p
             v-if="interrupted"

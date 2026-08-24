@@ -71,3 +71,24 @@ export function installWelcomeGuard(router: Router): void {
     return to.name === 'welcome' || to.name === 'device' ? true : { name: 'welcome' }
   })
 }
+
+/**
+ * True when the typed address names plain http on a non-loopback host. The
+ * portal's PKCE sign-in needs a secure context, so that connect would dead-end
+ * in the browser; loopback hosts and *.localhost stay secure contexts.
+ */
+export function insecureRealm(input: string): boolean {
+  const address = input.trim()
+  if (!/^http:\/\//i.test(address)) return false
+  try {
+    const host = new URL(address).hostname
+    return !(
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host === '[::1]' ||
+      /^127(\.\d{1,3}){3}$/.test(host)
+    )
+  } catch {
+    return false
+  }
+}
