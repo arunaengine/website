@@ -1347,8 +1347,11 @@ export interface CreateOnboardingSecretRequest {
 }
 
 export interface CreateOnboardingSecretResponse {
-  // Carried exactly once — the server keeps only a hash. No enrollment_id here.
+  // Carried exactly once — the server keeps only a hash.
   onboarding_secret: string
+  // Handle of the minted enrollment, taken by the status and revoke routes.
+  // Absent on nodes that predate it, where the device list names it instead.
+  enrollment_id?: string
   mode: OnboardingMode
   // Unix seconds.
   expires_at: number

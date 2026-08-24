@@ -98,9 +98,8 @@ export function useDeviceEnrollment() {
     }
   }
 
-  // The mint response carries no enrollment id (it lives inside the encoded
-  // secret, which must not be decoded client-side), so recover it from the
-  // caller's own device list: the new entry whose expiry matches the mint.
+  // Fallback for a node whose mint response names no enrollment: the caller's
+  // own device list does, through the new entry whose expiry matches the mint.
   function newEnrollment(before: Set<string>, expiresAt: number): string | null {
     const fresh = devices.value.filter((device) => !before.has(device.id) && device.enrollment_id)
     const exact = fresh.find((device) => device.expires_at === expiresAt)
@@ -122,7 +121,8 @@ export function useDeviceEnrollment() {
       })
       await loadDevices()
       minted.value = response
-      return { response, enrollmentId: newEnrollment(before, response.expires_at) }
+      const enrollmentId = response.enrollment_id ?? newEnrollment(before, response.expires_at)
+      return { response, enrollmentId }
     } catch (err) {
       mintError.value = message(err)
       throw err

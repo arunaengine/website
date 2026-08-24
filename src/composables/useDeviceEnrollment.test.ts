@@ -84,9 +84,28 @@ afterEach(() => {
 })
 
 describe('device mint', () => {
+  it('takes the enrollment id the mint returned', async () => {
+    // The minted id is the handle the status route takes; the device list must
+    // not be consulted to guess one.
+    const other = device({ id: 'enr-old', node_id: null, enrollment_id: 'enr-old', status: 'pending', expires_at: 1800 })
+    serve((url, method) => {
+      if (url.endsWith('/users/me/devices')) return json({ devices: [other] })
+      if (method === 'POST') {
+        return json(
+          { onboarding_secret: 'S3CRET', enrollment_id: 'enr-new', mode: 'User', expires_at: 1800 },
+          201,
+        )
+      }
+      return json({}, 404)
+    })
+
+    const { mint } = await mount()
+    await expect(mint(1800)).resolves.toMatchObject({ enrollmentId: 'enr-new' })
+  })
+
   it('recovers the enrollment id from the device list', async () => {
-    // The mint response carries no enrollment id, so the status poll depends on
-    // matching the new pending entry by its exact expiry.
+    // Fallback for a node that names no enrollment: the status poll then
+    // depends on matching the new pending entry by its exact expiry.
     const pending = device({ id: 'enr-new', node_id: null, enrollment_id: 'enr-new', status: 'pending', expires_at: 1800 })
     const stale = device({ id: 'enr-old', node_id: null, enrollment_id: 'enr-old', status: 'pending', expires_at: 900 })
     let minted = false
