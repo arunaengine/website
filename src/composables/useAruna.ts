@@ -1886,7 +1886,7 @@ const canManageQuarantine = computed<boolean>(() => hasRealmGrant('admin/sync-qu
 // the seeded realm_admin grant on /{realm_id}/admin/** covers it.
 const canWithdrawPids = computed<boolean>(() => hasRealmGrant('admin/pids', 'Write'))
 
-// Quota edits are only accepted by a management node; server/local nodes 403.
+// Quota edits are only accepted by a management node; every other kind 403s.
 const isManagementNode = computed<boolean>(() => nodeInfo.value?.node.capabilities === 'management')
 
 const nodes = computed<Node[]>(() => {
