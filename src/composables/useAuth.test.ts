@@ -35,6 +35,16 @@ describe('callbackUri', () => {
     await configure({ authCallbackOrigin: 'http://127.0.0.1:47713/' })
     expect(callbackUri()).toBe('http://127.0.0.1:47713/auth/callback')
   })
+
+  it('takes the aruna scheme in desktop mode', async () => {
+    await configure({ features: { desktop: true } })
+    expect(callbackUri()).toBe('aruna://auth/callback')
+  })
+
+  it('keeps a callback origin the shell asked for', async () => {
+    await configure({ features: { desktop: true }, authCallbackOrigin: 'http://127.0.0.1:47713' })
+    expect(callbackUri()).toBe('http://127.0.0.1:47713/auth/callback')
+  })
 })
 
 describe('beginAuthRedirect', () => {

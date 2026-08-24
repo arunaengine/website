@@ -42,9 +42,15 @@ export function setAuthOpener(opener: AuthOpener | null): void {
   authOpener = opener
 }
 
+// The shell's own origin is tauri://localhost, which no IdP accepts, so the
+// desktop default is the custom scheme it registers and routes (RFC 8252).
+const DESKTOP_CALLBACK_URI = 'aruna://auth/callback'
+
 /** The registered OIDC redirect_uri; a configured origin wins over the page. */
 export function callbackUri(): string {
-  return `${portalConfig().authCallbackOrigin || window.location.origin}/auth/callback`
+  const origin = portalConfig().authCallbackOrigin
+  if (origin) return `${origin}/auth/callback`
+  return featureEnabled('desktop') ? DESKTOP_CALLBACK_URI : `${window.location.origin}/auth/callback`
 }
 
 /**

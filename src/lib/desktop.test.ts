@@ -83,6 +83,13 @@ describe('desktop mode', () => {
     expect(portalConfig().apiBaseUrl).toBe('/api/v1')
   })
 
+  it('defaults the callback to the aruna scheme', async () => {
+    // The shell's own origin is tauri://localhost, which no IdP accepts.
+    await boot(shell())
+    const { callbackUri } = await import('@/composables/useAuth')
+    expect(callbackUri()).toBe('aruna://auth/callback')
+  })
+
   it('registers the callback origin the shell listens on', async () => {
     await boot(shell({ authCallbackOrigin: 'http://127.0.0.1:47713/' }))
     const { callbackUri } = await import('@/composables/useAuth')
