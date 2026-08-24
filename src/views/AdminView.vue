@@ -244,7 +244,9 @@ const clientErrors = computed(() => {
   if (warnInvalid.value) errs.push('Warn threshold must be a whole number between 1 and 100%.')
   if (!quotaFieldValid(draft.value.defaultQuota)) errs.push('Default group quota must be a non-negative number below ~8 PiB.')
   if (!intOrEmptyValid(draft.value.maxGroups)) errs.push('Max groups per user must be a non-negative whole number.')
-  if (!intOrEmptyValid(draft.value.maxDevices)) errs.push('Max devices per user must be a non-negative whole number.')
+  // The backend refuses zero rather than reading it as "no devices at all".
+  if (!intOrEmptyValid(draft.value.maxDevices) || Number(text(draft.value.maxDevices).trim() || 1) < 1)
+    errs.push('Max devices per user must be empty or a whole number of at least 1.')
   draft.value.overrides.forEach((o, i) => {
     if (!o.group_id) errs.push(`Group override ${i + 1} needs a group.`)
     if (!quotaFieldValid(o.quota)) errs.push(`Group override ${i + 1} quota must be a non-negative number below ~8 PiB.`)
@@ -499,8 +501,11 @@ async function save() {
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">Max devices per user</label>
-                <Input v-model="draft.maxDevices" type="number" min="0" placeholder="Unlimited" class="mt-1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Stored in the policy; not enforced yet, device enrollment is still in development.</p>
+                <Input v-model="draft.maxDevices" type="number" min="1" placeholder="Unlimited" class="mt-1" />
+                <p class="mt-1 text-[11px] text-muted-foreground">
+                  Empty means unlimited; zero is refused. Enrolled devices and outstanding enrollment codes both take a
+                  slot.
+                </p>
               </div>
             </div>
           </div>
