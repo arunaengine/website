@@ -5,6 +5,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import { apiRequest, type InfoResponse } from '@/lib/api'
+import { useAruna } from '@/composables/useAruna'
 import { nodeLogsTail, nodeStatus, type NodeStatus } from '@/lib/desktopBridge'
 import { formatDuration, truncateMiddle } from '@/lib/utils'
 import { RefreshCw } from '@lucide/vue'
@@ -12,14 +14,36 @@ import { RefreshCw } from '@lucide/vue'
 const POLL_MS = 5_000
 const LOG_LINES = 200
 
+const { authToken } = useAruna()
+
 const status = ref<NodeStatus | null>(null)
 const logs = ref<string[]>([])
 const statusError = ref<string | null>(null)
 const logsError = ref<string | null>(null)
+const identity = ref<{ nodeId: string; realm: string } | null>(null)
+const identityError = ref<string | null>(null)
 const busy = ref(false)
 
 function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
+}
+
+// The shell never reports a node id: a node names itself only to a caller with
+// a realm token, so it is read from the node's own API with the owner's.
+async function readIdentity(base: string): Promise<void> {
+  if (!authToken.value) {
+    identity.value = null
+    identityError.value = null
+    return
+  }
+  try {
+    const info = await apiRequest<InfoResponse>('/info', {}, { baseUrl: base, token: authToken.value })
+    identity.value = { nodeId: info.node.peer_id, realm: info.node.realm_id }
+    identityError.value = null
+  } catch (err) {
+    identity.value = null
+    identityError.value = message(err)
+  }
 }
 
 async function refresh(): Promise<void> {
@@ -30,6 +54,9 @@ async function refresh(): Promise<void> {
   } catch (err) {
     statusError.value = message(err)
   }
+  const base = status.value?.state === 'running' ? status.value.apiBaseUrl : null
+  if (base) await readIdentity(base)
+  else identity.value = null
   try {
     logs.value = await nodeLogsTail(LOG_LINES)
     logsError.value = null
@@ -57,9 +84,11 @@ const STATE_VARIANT = {
 const facts = computed(() => {
   const current = status.value
   if (!current) return []
+  const nodeId = identity.value?.nodeId ?? current.nodeId
+  const realm = identity.value?.realm ?? current.realm
   return [
-    { label: 'Node', value: current.nodeId ? truncateMiddle(current.nodeId, 10, 6) : 'not enrolled yet' },
-    { label: 'Realm', value: current.realm ? truncateMiddle(current.realm, 10, 6) : '—' },
+    { label: 'Node', value: nodeId ? truncateMiddle(nodeId, 10, 6) : 'not enrolled yet' },
+    { label: 'Realm', value: realm ? truncateMiddle(realm, 10, 6) : '—' },
     { label: 'Local API', value: current.apiBaseUrl ?? '—' },
     { label: 'Version', value: current.version ?? '—' },
     {
@@ -102,6 +131,9 @@ const facts = computed(() => {
           </div>
         </dl>
         <p v-if="status.message" class="mt-3 text-xs text-muted-foreground">{{ status.message }}</p>
+        <p v-if="identityError" class="mt-3 text-xs text-muted-foreground">
+          The node did not name itself: {{ identityError }}
+        </p>
         <p v-if="!status.enrolled" class="mt-3 text-xs text-muted-foreground">
           This node is not enrolled in a realm yet. Open Enroll and paste the code from the portal.
         </p>
