@@ -3,7 +3,7 @@
 // design: it mirrors the backend's authorize_device_enrollment (a realm member
 // with an unrestricted token on a management node) and never the onboarding
 // admin gates, so Settings can mount it for any signed-in member.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -47,6 +47,9 @@ const emit = defineEmits<{
   (e: 'update:step', v: number): void
   (e: 'back'): void
   (e: 'restart'): void
+  // A device list rendered next to the lane holds its own state; tell it when
+  // an enrollment appeared and when one finished joining.
+  (e: 'changed'): void
 }>()
 
 const { currentUser, isManagementNode, realmInfo } = useAruna()
@@ -104,11 +107,19 @@ async function enroll() {
   try {
     const result = await mint(ENROLLMENT_TTL_SECS)
     startWatch(result.enrollmentId, result.response.expires_at)
+    emit('changed')
     emit('update:step', HANDOFF_STEP)
   } catch {
     // mintError holds the message; rendered inline under the form.
   }
 }
+
+watch(
+  () => watchState.value.phase,
+  (phase) => {
+    if (phase === 'present') emit('changed')
+  },
+)
 
 function startOver() {
   resetWatch()

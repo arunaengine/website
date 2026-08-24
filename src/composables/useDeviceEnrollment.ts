@@ -38,7 +38,7 @@ export function deviceErrorMessage(err: unknown, limit: number | null): string {
   if (err instanceof ApiError) {
     if (err.status === 401) return 'Your session expired. Sign in again to enroll a device.'
     if (err.status === 403) {
-      return 'Enrollment refused. It needs an unrestricted token — a path-restricted one cannot enroll a device — on a management node, and the realm may forbid enrollment.'
+      return 'Refused. Managing devices needs an unrestricted token — a path-restricted one is never accepted — on a management node, and a realm policy can forbid enrollment outright.'
     }
     if (err.status === 409) {
       const cap = limit == null ? '' : ` This realm allows ${limit} per user.`

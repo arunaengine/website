@@ -10,6 +10,7 @@ import Separator from '@/components/ui/Separator.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import GroupDetail from '@/components/groups/GroupDetail.vue'
+import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
@@ -164,6 +165,7 @@ const settingsSections = [
   { id: 'default-profile', label: 'Default profile' },
   { id: 'groups', label: 'Groups & roles' },
   { id: 'credentials', label: 'CLI and service access' },
+  { id: 'devices', label: 'Devices' },
   { id: 'interop', label: 'Interoperability' },
   { id: 'appearance', label: 'Appearance' },
 ] as const
@@ -577,6 +579,10 @@ function toggleGroup(groupId: string) {
           </div>
           <p v-if="revokeError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ revokeError }}</p>
           <CreateCredentialDialog v-model:open="createCredentialOpen" />
+        </section>
+
+        <section id="devices" class="surface scroll-mt-20 overflow-hidden lg:scroll-mt-[4.5rem]">
+          <DevicesPanel />
         </section>
 
         <section id="interop" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">

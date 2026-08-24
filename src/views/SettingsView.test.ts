@@ -69,7 +69,7 @@ describe('SettingsView responsive geometry', () => {
   })
 
   it('renders every Settings section anchor in one below-lg tab row', () => {
-    const sectionIds = ['connection', 'profile', 'default-profile', 'groups', 'credentials', 'interop', 'appearance']
+    const sectionIds = ['connection', 'profile', 'default-profile', 'groups', 'credentials', 'devices', 'interop', 'appearance']
     const sectionList = source.match(/const settingsSections = \[([\s\S]*?)\] as const/)?.[1] ?? ''
     const renderedIds = Array.from(sectionList.matchAll(/\{ id: '([^']+)'/g), (match) => match[1])
     const targetIds = collectElements(root, (node) => node.tag === 'section')
