@@ -66,10 +66,16 @@ export async function loadPortalConfig(): Promise<PortalRuntimeConfig> {
     )
     if (!response.ok) return current
     const raw: unknown = await response.json()
-    if (raw && typeof raw === 'object') current = mergeConfig(raw as Record<string, unknown>)
+    if (raw && typeof raw === 'object') applyPortalConfig(raw as Record<string, unknown>)
   } catch {
     /* keep defaults */
   }
+  return current
+}
+
+/** Installs a config document: the served file, or a desktop shell's context. */
+export function applyPortalConfig(raw: Record<string, unknown>): PortalRuntimeConfig {
+  current = mergeConfig(raw)
   return current
 }
 

@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
-import { loadPortalConfig } from './lib/config'
+import { bootRuntimeConfig } from './lib/desktop'
 import { isChunkError, recoverFromChunkError } from './lib/chunk-recovery'
 import { reportGlobalError } from './composables/useGlobalErrors'
 import './assets/main.css'
@@ -27,6 +27,6 @@ window.addEventListener('vite:preloadError', (event) => {
   if (recoverFromChunkError(target)) event.preventDefault()
 })
 
-void loadPortalConfig().finally(() => {
+void bootRuntimeConfig().finally(() => {
   createApp(App).use(router).mount('#app')
 })
