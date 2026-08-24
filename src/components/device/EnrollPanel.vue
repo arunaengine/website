@@ -2,15 +2,19 @@
 // Redeems an enrollment on this device: the owner pastes the aruna://enroll
 // link the portal minted, or the bare one-time code. The realm-side half (who
 // may mint one, and the device cap) lives in the portal's Devices section.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import { enrollApply } from '@/lib/desktopBridge'
+import type { EnrollInvite } from '@/lib/desktopEvents'
 import { parseEnrollInput } from '@/lib/enrollLink'
 import { truncateMiddle } from '@/lib/utils'
 import { Check } from '@lucide/vue'
 
+// An enrollment the shell already acted on, from a deep link the owner
+// followed. It arrives applied or failed; nothing is left to redeem here.
+const props = defineProps<{ invite?: EnrollInvite | null }>()
 const emit = defineEmits<{ (e: 'enrolled'): void }>()
 
 const pasted = ref('')
@@ -21,11 +25,30 @@ const joined = ref<{ nodeId: string | null; realm: string | null } | null>(null)
 
 const parsed = computed(() => parseEnrollInput(pasted.value))
 const invalid = computed(() => pasted.value.trim().length > 0 && !parsed.value)
+const fromLink = ref(false)
+
+watch(
+  () => props.invite,
+  (next) => {
+    if (!next) return
+    fromLink.value = true
+    if (next.applied) {
+      failure.value = null
+      joined.value = { nodeId: null, realm: next.realm }
+      pasted.value = ''
+    } else {
+      joined.value = null
+      failure.value = next.error ?? 'Aruna Desktop could not use that enrollment link.'
+    }
+  },
+  { immediate: true },
+)
 
 async function apply(): Promise<void> {
   const input = parsed.value
   if (!input || applying.value) return
   applying.value = true
+  fromLink.value = false
   failure.value = null
   try {
     const name = label.value.trim()
@@ -47,6 +70,9 @@ async function apply(): Promise<void> {
       <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
         Mint a code in the portal under Settings → Devices, then open its link here or paste the code. The code is
         one-time and expires; the device joins as a user node bound to your account.
+      </p>
+      <p v-if="fromLink" class="mt-2 text-[11px] text-muted-foreground">
+        Aruna Desktop acted on the enrollment link you opened; its outcome is below.
       </p>
     </div>
 
