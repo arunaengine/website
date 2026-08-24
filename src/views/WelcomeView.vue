@@ -104,10 +104,7 @@ function toEnroll(): void {
           <div class="relative">
             <AppLogo :size="26" subtitle="the data orchestration engine" />
             <p class="mt-6 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Aruna Desktop starts out empty. Name the realm you work in and the app opens its portal here.
-            </p>
-            <p class="mt-3 max-w-sm text-xs leading-relaxed text-muted-foreground">
-              The node on this machine is enrolled later, from inside the realm, and only if you want it.
+              Your realm’s portal opens in this window.
             </p>
           </div>
         </div>
@@ -116,7 +113,7 @@ function toEnroll(): void {
           <Spinner label="Reconnecting" />
           <p class="text-sm font-medium text-foreground">Reconnecting to {{ connecting }}</p>
           <p class="text-xs leading-relaxed text-muted-foreground">
-            Aruna Desktop is reopening this window against the realm, which takes a moment.
+            Aruna Desktop is reopening this window against the realm.
           </p>
           <div v-if="stalled" class="pt-1">
             <p class="text-xs leading-relaxed text-muted-foreground">
@@ -128,7 +125,7 @@ function toEnroll(): void {
         </div>
 
         <div v-else class="flex flex-col justify-center gap-4 p-6 md:p-7">
-          <h1 class="font-display text-lg font-semibold tracking-tight text-aruna-navy">Connect to a realm</h1>
+          <h1 class="font-display text-lg font-semibold tracking-tight text-aruna-navy">Connect to your realm</h1>
 
           <div>
             <label class="text-xs font-medium text-foreground" for="realm-address">Realm address</label>
@@ -140,9 +137,7 @@ function toEnroll(): void {
               :invalid="failure ? 'error' : insecure ? 'warning' : undefined"
               @keyup.enter="connect"
             />
-            <p class="mt-1 text-[11px] text-muted-foreground">
-              A host name or the portal URL you were given; https:// is assumed.
-            </p>
+            <p class="mt-1 text-[11px] text-muted-foreground">https:// is assumed.</p>
           </div>
 
           <p
@@ -176,7 +171,7 @@ function toEnroll(): void {
               <KeyRound class="h-4 w-4" /> I have an enrollment code
             </Button>
             <p class="mt-1 text-[11px] text-muted-foreground">
-              Enrolls the node on this machine from the code alone, without a realm address.
+              Enrolls this machine’s node from the code alone.
             </p>
           </div>
         </div>
