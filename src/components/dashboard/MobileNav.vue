@@ -3,6 +3,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { featureEnabled } from '@/lib/config'
+import { isDesktop } from '@/lib/desktop'
 import Sheet from '@/components/ui/Sheet.vue'
 import SheetContent from '@/components/ui/SheetContent.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
@@ -12,6 +13,7 @@ import {
   BookOpen,
   Boxes,
   FileJson2,
+  Laptop,
   LayoutDashboard,
   ListChecks,
   MoreHorizontal,
@@ -38,6 +40,7 @@ const {
   canManageQuarantine,
   isManagementNode,
 } = useAruna()
+const desktop = isDesktop()
 const tesEnabled = featureEnabled('tes')
 const jobsEnabled = featureEnabled('jobs')
 
@@ -57,6 +60,7 @@ const moreNav = computed<NavItem[]>(() => [
   { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
   { to: '/app/status', icon: Activity, label: 'Status' },
   { to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] },
+  ...(desktop ? [{ to: '/app/device', icon: Laptop, label: 'This device' }] : []),
   { to: '/app/settings', icon: Settings, label: 'Settings' },
   ...(isRealmAdmin.value
     ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true }]

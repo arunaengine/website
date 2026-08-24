@@ -52,6 +52,11 @@ export function portalRoutes(): RouteRecordRaw[] {
         // Public user profile resolved from the realm's user directory
         { path: 'users/:id', name: 'user-profile', component: () => import('@/views/UserProfileView.vue') },
         { path: 'status', name: 'status', component: () => import('@/views/StatusView.vue') },
+        // Desktop only: these views drive the node the shell embeds, which a
+        // browser tab has no access to.
+        ...(isDesktop()
+          ? [{ path: 'device', name: 'device', component: () => import('@/views/DeviceView.vue') }]
+          : []),
         // Settings (consolidates account preferences, members, tokens)
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
         // Watched resources — served by the merged notifications backend, so no

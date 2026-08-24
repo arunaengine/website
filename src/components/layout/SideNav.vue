@@ -14,6 +14,7 @@ import {
   ChevronsRight,
   FileJson2,
   LayoutDashboard,
+  Laptop,
   ListChecks,
   Settings,
   ShieldCheck,
@@ -94,6 +95,7 @@ const sections = computed<NavSection[]>(() => [
   {
     label: 'Account',
     items: [
+      ...(desktop ? [{ to: '/app/device', icon: Laptop, label: 'This device' }] : []),
       { to: '/app/settings', icon: Settings, label: 'Settings' },
     ],
   },
