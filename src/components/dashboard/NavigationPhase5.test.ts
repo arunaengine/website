@@ -109,7 +109,7 @@ describe('Phase 5 navigation parity', () => {
 describe('Phase 5 route stability', () => {
   it('keeps the Datasets destination on the existing search and metadata paths', () => {
     const routerSource = readFileSync(
-      fileURLToPath(new URL('../../router/index.ts', import.meta.url)),
+      fileURLToPath(new URL('../../router/routes.ts', import.meta.url)),
       'utf8',
     )
 

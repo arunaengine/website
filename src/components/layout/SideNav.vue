@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { featureEnabled } from '@/lib/config'
+import { isDesktop } from '@/lib/desktop'
 import {
   Activity,
   ArrowLeft,
@@ -40,6 +41,9 @@ const {
   canManageQuarantine,
   isManagementNode,
 } = useAruna()
+
+// The shell has no landing page to go back to.
+const desktop = isDesktop()
 
 // Config resolves before the app mounts, so a plain read is safe here. The
 // unified Compute entry appears when either compute plane (TES tasks or
@@ -187,6 +191,7 @@ watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1
         <span v-if="!collapsed">Collapse</span>
       </button>
       <RouterLink
+        v-if="!desktop"
         to="/"
         :title="collapsed ? 'Back to landing' : undefined"
         :aria-label="collapsed ? 'Back to landing' : undefined"
