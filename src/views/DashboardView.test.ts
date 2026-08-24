@@ -15,6 +15,7 @@ const usageInfo = ref<Record<string, any> | null>(null)
 const bootstrapped = ref(true)
 const authPending = ref(false)
 const authStage = ref('idle')
+const authStageError = ref<string | null>(null)
 const dashboardRevision = ref(0)
 const refresh = vi.fn(async () => undefined)
 const loadInfo = vi.fn(async () => undefined)
@@ -66,7 +67,7 @@ beforeAll(async () => {
     }),
   }))
   vi.doMock('@/composables/useAuth', () => ({
-    useAuth: () => ({ authPending, signIn, stage: authStage }),
+    useAuth: () => ({ authPending, signIn, stage: authStage, stageError: authStageError }),
   }))
   vi.doMock('@/composables/useNotifications', () => ({
     useNotifications: () => ({ dashboardRevision }),
@@ -74,6 +75,7 @@ beforeAll(async () => {
   vi.doMock('@vueuse/core', () => ({
     useDocumentVisibility: () => ref('hidden'),
     useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }),
+    useVModel: (props: Record<string, unknown>, key: string) => ref(props[key]),
   }))
   vi.doMock('@/components/ui/Button.vue', () => ({ default: ButtonStub }))
   vi.doMock('@/components/dashboard/PageHeader.vue', () => ({ default: PageHeaderStub }))
@@ -103,6 +105,7 @@ beforeEach(() => {
   bootstrapped.value = true
   authPending.value = false
   authStage.value = 'idle'
+  authStageError.value = null
   refresh.mockClear()
   loadInfo.mockClear()
   listRecentMetadata.mockClear()

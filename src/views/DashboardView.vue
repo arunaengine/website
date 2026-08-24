@@ -5,10 +5,11 @@ import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
 import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
+import SignInPanel from '@/components/auth/SignInPanel.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import type { MetadataDoc } from '@/data/types'
-import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, LogIn, Plus, Activity, Users } from '@lucide/vue'
+import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
@@ -20,7 +21,7 @@ import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
 const { currentUser, metadata, profiles, nodes, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh, loadInfo, listRecentMetadata } = useAruna()
-const { authPending, signIn, stage } = useAuth()
+const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const showNewDataset = ref(false)
 const refreshing = ref(false)
@@ -152,10 +153,6 @@ const pageDescription = computed(() =>
     ? 'Live data from the local Aruna API.'
     : 'You are browsing public data as a guest. Sign in to create datasets and manage your groups.',
 )
-const signingIn = computed(() => stage.value === 'redirecting')
-function startSignIn() {
-  void signIn({ redirectTo: '/app' })
-}
 </script>
 
 <template>
@@ -178,27 +175,13 @@ function startSignIn() {
     </PageHeader>
 
     <div class="container space-y-6 py-8">
+      <SignInPanel v-if="bootstrapped && !currentUser && !authPending" />
+
       <section aria-labelledby="realm-statistics-heading" class="space-y-3.5">
         <header>
           <h2 id="realm-statistics-heading" class="font-display text-[15px] font-semibold text-foreground/85">Realm statistics</h2>
           <p class="mt-0.5 text-xs text-muted-foreground">{{ realm.name }}</p>
         </header>
-
-        <div
-          v-if="bootstrapped && !currentUser && !authPending"
-          class="surface flex flex-wrap items-center justify-between gap-4 p-5"
-        >
-          <div class="min-w-0">
-            <h3 class="font-display text-base font-semibold text-aruna-navy">{{ realm.name }}</h3>
-            <p v-if="realm.description && realm.description !== realm.name" class="mt-1 text-sm text-muted-foreground">{{ realm.description }}</p>
-            <p v-else-if="!realm.description" class="mt-1 text-sm text-muted-foreground">This realm has no description yet.</p>
-            <p v-if="!publicOverview" class="mt-1 text-xs text-muted-foreground">Public counts are unavailable from this node. Sign in for authenticated realm details.</p>
-            <div class="mt-2 break-all font-mono text-[11px] text-muted-foreground">{{ realm.id }}</div>
-          </div>
-          <Button :disabled="signingIn" @click="startSignIn">
-            <LogIn class="h-4 w-4" /> Sign in
-          </Button>
-        </div>
 
         <div :class="['grid gap-3.5 sm:grid-cols-2', currentUser ? 'lg:grid-cols-4' : 'lg:grid-cols-3']">
           <template v-if="!bootstrapped">
