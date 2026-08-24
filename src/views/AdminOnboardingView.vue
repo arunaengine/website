@@ -13,6 +13,7 @@ import KindSelectStep, { type KindOption } from '@/components/onboarding/KindSel
 import SecretPanel from '@/components/onboarding/SecretPanel.vue'
 import CodeSnippet from '@/components/onboarding/CodeSnippet.vue'
 import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
+import DeviceLane from '@/components/onboarding/DeviceLane.vue'
 import SecretsTable, { type SecretRow } from '@/components/onboarding/SecretsTable.vue'
 import { useAruna } from '@/composables/useAruna'
 import { NEVER_EXPIRES_AFTER, secretStatus, useNodeOnboarding } from '@/composables/useNodeOnboarding'
@@ -58,8 +59,32 @@ watch(
 )
 
 // --- Wizard state ---------------------------------------------------------
-const WIZARD_STEPS = ['Kind', 'Mint secret', 'Configure node', 'Watch it join']
+// Step 0 picks the lane; the server lane runs 1..4 and the device lane 1..3.
+type WizardAudience = 'realm' | 'device'
+
+const SERVER_STEPS = ['Audience', 'Kind', 'Mint secret', 'Configure node', 'Watch it join']
+const DEVICE_STEPS = ['Audience', 'Device', 'Hand off', 'Watch it join']
+
+const audience = ref<WizardAudience | null>(null)
 const currentStep = ref(0)
+const wizardSteps = computed(() => (audience.value === 'device' ? DEVICE_STEPS : SERVER_STEPS))
+
+const AUDIENCE_OPTIONS: KindOption[] = [
+  {
+    value: 'realm',
+    title: 'A server for my realm',
+    description: 'Infrastructure you operate: it stores and serves realm data around the clock.',
+    badgeLabel: 'realm node',
+    badgeVariant: 'sky',
+  },
+  {
+    value: 'device',
+    title: 'A device of mine',
+    description: 'A laptop or workstation bound to your account. Never a replication or routing target.',
+    badgeLabel: 'user device',
+    badgeVariant: 'secondary',
+  },
+]
 
 // Trust-implication copy per mode (verified against bootstrap_onboarding).
 const KIND_OPTIONS: KindOption[] = [
@@ -162,11 +187,10 @@ const configInput = computed<NodeConfigInput>(() => {
 const envBlock = computed(() => buildEnvBlock(configInput.value))
 const composeSnippet = computed(() => buildComposeSnippet(configInput.value))
 
-// --- Watch step (step 4) --------------------------------------------------
 function goToWatch() {
   if (!minted.value) return
   startWatch(mintedEnrollmentId.value, minted.value.expires_at, nodesBeforeMint)
-  currentStep.value = 3
+  currentStep.value = 4
 }
 
 // A registration claim carries a user id ("{ulid}@{realm}", always containing
@@ -236,6 +260,7 @@ function reset() {
   minted.value = null
   mintedEnrollmentId.value = null
   selectedMode.value = null
+  audience.value = null
   currentStep.value = 0
   void refreshSecrets()
 }
@@ -338,12 +363,32 @@ const managementPortals = computed(() =>
     <div v-else class="container max-w-[1100px] space-y-6 py-8">
       <section class="surface">
         <div class="border-b border-border px-5 py-4">
-          <WizardSteps :steps="WIZARD_STEPS" :current="currentStep" />
+          <WizardSteps :steps="wizardSteps" :current="currentStep" />
         </div>
 
         <div class="p-5">
-          <!-- Step 1 — Kind -->
+          <!-- Step 1 — Audience -->
           <div v-if="currentStep === 0" class="space-y-5">
+            <p class="text-sm text-muted-foreground">
+              Who is this node for? Realm servers and personal devices join under different rules and get different
+              trust.
+            </p>
+            <KindSelectStep
+              :options="AUDIENCE_OPTIONS"
+              :model-value="audience"
+              @update:model-value="(v) => (audience = v as WizardAudience)"
+            />
+            <div class="flex justify-end">
+              <Button :disabled="!audience" @click="currentStep = 1">
+                Continue <ArrowRight class="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <DeviceLane v-else-if="audience === 'device'" v-model:step="currentStep" @restart="reset" />
+
+          <!-- Step 2 — Kind -->
+          <div v-else-if="currentStep === 1" class="space-y-5">
             <p class="text-sm text-muted-foreground">
               Choose what the new node is trusted to do in the realm. This is baked into the onboarding secret.
             </p>
@@ -353,14 +398,14 @@ const managementPortals = computed(() =>
               @update:model-value="(v) => (selectedMode = v as OnboardingMode)"
             />
             <div class="flex justify-end">
-              <Button :disabled="!selectedMode" @click="currentStep = 1">
+              <Button :disabled="!selectedMode" @click="currentStep = 2">
                 Continue <ArrowRight class="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          <!-- Step 2 — Mint -->
-          <div v-else-if="currentStep === 1" class="space-y-5">
+          <!-- Step 3 — Mint -->
+          <div v-else-if="currentStep === 2" class="space-y-5">
             <template v-if="!minted">
               <p class="text-sm text-muted-foreground">
                 Minting a <span class="font-medium text-foreground">{{ selectedMode }}</span> onboarding secret. It is
@@ -382,7 +427,7 @@ const managementPortals = computed(() =>
                 {{ mintError }}
               </p>
               <div class="flex justify-between">
-                <Button variant="outline" @click="currentStep = 0"><ArrowLeft class="h-4 w-4" /> Back</Button>
+                <Button variant="outline" @click="currentStep = 1"><ArrowLeft class="h-4 w-4" /> Back</Button>
                 <Button :disabled="minting || !seedUrl.trim()" @click="doMint">
                   {{ minting ? 'Minting…' : 'Mint secret' }}
                 </Button>
@@ -391,15 +436,15 @@ const managementPortals = computed(() =>
             <template v-else>
               <SecretPanel :secret="minted.onboarding_secret" :expires-at="minted.expires_at" />
               <div class="flex justify-end">
-                <Button @click="currentStep = 2">
+                <Button @click="currentStep = 3">
                   Continue to configuration <ArrowRight class="h-4 w-4" />
                 </Button>
               </div>
             </template>
           </div>
 
-          <!-- Step 3 — Configure -->
-          <div v-else-if="currentStep === 2" class="space-y-5">
+          <!-- Step 4 — Configure -->
+          <div v-else-if="currentStep === 3" class="space-y-5">
             <p class="text-sm text-muted-foreground">
               Configure the new node and copy one of the snippets below onto it. The onboarding secret is embedded in both.
             </p>
@@ -449,12 +494,12 @@ const managementPortals = computed(() =>
             </p>
 
             <div class="flex justify-between">
-              <Button variant="outline" @click="currentStep = 1"><ArrowLeft class="h-4 w-4" /> Back</Button>
+              <Button variant="outline" @click="currentStep = 2"><ArrowLeft class="h-4 w-4" /> Back</Button>
               <Button @click="goToWatch"><ServerCog class="h-4 w-4" /> Start the node &amp; watch it join</Button>
             </div>
           </div>
 
-          <!-- Step 4 — Watch -->
+          <!-- Step 5 — Watch -->
           <div v-else class="space-y-5">
             <p class="text-sm text-muted-foreground">
               Boot the node with the configuration above. This page polls the realm and updates as the node claims the

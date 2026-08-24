@@ -256,6 +256,7 @@ const AdminOnboardingView = compileClientComponent(new URL('./AdminOnboardingVie
   '@/components/onboarding/SecretPanel.vue': moduleDefault(SecretPanelStub),
   '@/components/onboarding/CodeSnippet.vue': moduleDefault(CodeSnippetStub),
   '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(GenericStub),
+  '@/components/onboarding/DeviceLane.vue': moduleDefault(GenericStub),
   '@/components/onboarding/SecretsTable.vue': moduleDefault(GenericStub),
   '@/composables/useAruna': useArunaModule,
   '@/composables/useNodeOnboarding': useNodeOnboardingModule,
@@ -589,6 +590,8 @@ describe('numeric Input consumers', () => {
 
   it('renders Admin Onboarding snippets after typing a numeric weight', async () => {
     const mounted = await mount(AdminOnboardingView, '/app/admin')
+    await click(element(mounted.root, (node) => node.tag === 'button' && content(node).includes('server for my realm')))
+    await click(button(mounted.root, 'Continue'))
     await click(element(mounted.root, (node) => node.tag === 'button' && content(node).includes('Management')))
     await click(button(mounted.root, 'Continue'))
     await click(button(mounted.root, 'Mint secret'))
