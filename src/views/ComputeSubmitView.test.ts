@@ -260,6 +260,9 @@ const AdminOnboardingView = compileClientComponent(new URL('./AdminOnboardingVie
   '@/components/onboarding/SecretsTable.vue': moduleDefault(GenericStub),
   '@/composables/useAruna': useArunaModule,
   '@/composables/useNodeOnboarding': useNodeOnboardingModule,
+  '@/composables/useUserDirectory': {
+    useUserDirectory: () => ({ resolveUsers: vi.fn(async () => []), cachedUser: () => null }),
+  },
   '@/lib/onboarding-config': OnboardingConfig,
   '@/components/nodes/node-display': NodeDisplay,
   '@/lib/utils': Utils,

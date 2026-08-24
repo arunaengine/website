@@ -16,10 +16,11 @@ import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWa
 import DeviceLane from '@/components/onboarding/DeviceLane.vue'
 import SecretsTable, { type SecretRow } from '@/components/onboarding/SecretsTable.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useUserDirectory } from '@/composables/useUserDirectory'
 import { NEVER_EXPIRES_AFTER, secretStatus, useNodeOnboarding } from '@/composables/useNodeOnboarding'
 import { buildComposeSnippet, buildEnvBlock, normalizeSeedUrl, type NodeConfigInput } from '@/lib/onboarding-config'
 import { kindVariant } from '@/components/nodes/node-display'
-import { truncateMiddle } from '@/lib/utils'
+import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { apiOrigin, type CreateOnboardingSecretResponse, type OnboardingMode, type RealmNodeInfo } from '@/lib/api'
 import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw, ServerCog, ServerCrash, ShieldCheck } from '@lucide/vue'
 
@@ -37,6 +38,7 @@ const {
   startWatch,
   resetWatch,
 } = useNodeOnboarding()
+const { resolveUsers, cachedUser } = useUserDirectory()
 
 // The gate cascade opens the wizard only for a realm admin with the onboarding
 // permission ON a management node — mirrors the honest states AdminView uses.
@@ -266,6 +268,11 @@ function reset() {
 }
 
 // --- Outstanding secrets table -------------------------------------------
+// Device secrets carry an owner; resolve the ids through the shared directory
+// so the column reads like every other user id in the app.
+const owners = computed(() => secrets.value.map((s) => s.owner).filter((id): id is string => !!id))
+watch(owners, (ids) => void resolveUsers(ids), { immediate: true })
+
 const secretRows = computed<SecretRow[]>(() =>
   secrets.value.map((s) => {
     const never = s.expires_at > NEVER_EXPIRES_AFTER
@@ -275,6 +282,10 @@ const secretRows = computed<SecretRow[]>(() =>
       id: s.enrollment_id,
       kindLabel: s.mode,
       kindVariant: kindVariant[s.mode.toLowerCase() as RealmNodeInfo['kind']] ?? 'outline',
+      owner: s.owner ?? null,
+      ownerLabel: s.owner
+        ? (cachedUser(s.owner)?.name ?? shortUserId(s.owner, owners.value))
+        : undefined,
       expiresAt: never ? null : s.expires_at,
       expiresHint: never ? 'initial admin-claim secret' : undefined,
       status: secretStatus(s),
@@ -552,6 +563,8 @@ const managementPortals = computed(() =>
             :rows="secretRows"
             :busy-ids="[...revokingIds]"
             :can-revoke="true"
+            kind-header="Mode"
+            :show-owner="true"
             @revoke="revoke"
           />
         </div>

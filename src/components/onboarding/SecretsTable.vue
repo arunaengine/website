@@ -20,6 +20,10 @@ export interface SecretRow {
   id: string
   kindLabel: string
   kindVariant: BadgeVariant
+  // Owner a device enrollment is bound to (aruna#271): the raw user id plus the
+  // caller's resolved display for it. Only rendered when showOwner is set.
+  owner?: string | null
+  ownerLabel?: string
   // null = never expires.
   expiresAt: number | null
   expiresHint?: string
@@ -44,8 +48,18 @@ const props = withDefaults(
     // In-progress label shown while a row is being revoked/evicted (aruna#271
     // uses "Evicting…"); default to today's value.
     busyLabel?: string
+    // First-column header and whether the owner column renders at all; a
+    // self-scoped device list has one owner and gains nothing from it.
+    kindHeader?: string
+    showOwner?: boolean
   }>(),
-  { revokeLabel: 'Revoke', emptyText: 'No outstanding onboarding secrets.', busyLabel: 'Revoking…' },
+  {
+    revokeLabel: 'Revoke',
+    emptyText: 'No outstanding onboarding secrets.',
+    busyLabel: 'Revoking…',
+    kindHeader: 'Kind',
+    showOwner: false,
+  },
 )
 const emit = defineEmits<{ (e: 'revoke', id: string): void }>()
 
@@ -99,7 +113,8 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
     <table class="w-full text-left text-sm">
       <thead>
         <tr class="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-          <th class="px-3 py-2 font-medium">Kind</th>
+          <th class="px-3 py-2 font-medium">{{ props.kindHeader }}</th>
+          <th v-if="props.showOwner" class="px-3 py-2 font-medium">Owner</th>
           <th class="px-3 py-2 font-medium">Enrollment id</th>
           <th class="px-3 py-2 font-medium">Expires</th>
           <th class="px-3 py-2 font-medium">Status</th>
@@ -110,6 +125,12 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
         <tr v-for="row in rows" :key="row.id" class="align-middle">
           <td class="px-3 py-2.5">
             <Badge :variant="row.kindVariant" class="text-[10px] uppercase">{{ row.kindLabel }}</Badge>
+          </td>
+          <td v-if="props.showOwner" class="px-3 py-2.5">
+            <span v-if="row.owner" class="text-xs text-foreground/90" :title="row.owner">
+              {{ row.ownerLabel ?? row.owner }}
+            </span>
+            <span v-else class="text-xs text-muted-foreground">—</span>
           </td>
           <td class="px-3 py-2.5">
             <div class="flex items-center gap-1.5">
@@ -165,7 +186,7 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
           </td>
         </tr>
         <tr v-if="!rows.length">
-          <td colspan="5" class="px-3 py-8 text-center text-xs text-muted-foreground">
+          <td :colspan="props.showOwner ? 6 : 5" class="px-3 py-8 text-center text-xs text-muted-foreground">
             {{ props.emptyText }}
           </td>
         </tr>
