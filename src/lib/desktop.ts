@@ -3,6 +3,7 @@
 // runs, and its absence is plain web behaviour. The object is read once, on
 // first use, so every module sees the same snapshot.
 import { applyPortalConfig, DEFAULT_PORTAL_CONFIG, loadPortalConfig } from './config'
+import { reportGlobalError } from '@/composables/useGlobalErrors'
 
 /**
  * Command channel into the shell. `version` pins the command set the shell
@@ -109,4 +110,10 @@ export async function bootRuntimeConfig(): Promise<void> {
     // The shell may switch system-browser auth off, but never the desktop flag.
     features: { systemBrowserAuth: true, ...context.features, desktop: true },
   })
+  try {
+    const bridge = await import('./desktopBridge')
+    bridge.installAuthOpener()
+  } catch {
+    reportGlobalError('Aruna Desktop features could not be loaded, please restart the app.')
+  }
 }
