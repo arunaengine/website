@@ -20,10 +20,11 @@ function store(): Storage {
 
 // The desktop context and the runtime config are both read once per module
 // graph, so every case builds a graph of its own.
-async function load(status: Status | null, apiBaseUrl = LOCAL) {
+async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL) {
   vi.resetModules()
   const invoke = vi.fn(async (command: string) => {
     if (command !== 'node_status' || !status) throw new Error('unknown command: node_status')
+    if (status === 'stall') return new Promise<never>(() => {})
     return status
   })
   vi.stubGlobal('window', {
@@ -53,8 +54,23 @@ async function routerWith(welcome: typeof import('./desktopWelcome'), start = '/
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
+
+// Drives the boot probe of this module graph against a realm that never answers.
+async function killRealm(): Promise<void> {
+  const boot = await import('./desktopBoot')
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new TypeError('Failed to fetch')
+    }),
+  )
+  const probe = boot.probeRealm()
+  await vi.advanceTimersByTimeAsync(4_000)
+  await probe
+}
 
 describe('realm knowledge', () => {
   it('reads an unenrolled local node as first run', async () => {
@@ -79,6 +95,15 @@ describe('realm knowledge', () => {
   it('answers known when the shell cannot say', async () => {
     const welcome = await load(null)
     await expect(welcome.realmKnown()).resolves.toBe(true)
+  })
+
+  it('gives up on a shell that never answers', async () => {
+    // A hanging command must not hold navigation for the rest of the run.
+    vi.useFakeTimers()
+    const welcome = await load('stall')
+    const known = welcome.realmKnown()
+    await vi.advanceTimersByTimeAsync(6_000)
+    await expect(known).resolves.toBe(true)
   })
 })
 
@@ -112,6 +137,17 @@ describe('welcome guard', () => {
     await router.push({ name: 'welcome' })
     expect(router.currentRoute.value.name).toBe('dashboard')
     expect(welcome.pendingRealm()).toBeNull()
+  })
+
+  it('opens the welcome view for a dead realm', async () => {
+    // The realm is remembered, so only its failed boot may reopen the form.
+    vi.useFakeTimers()
+    const welcome = await load({ state: 'stopped', enrolled: true, apiBaseUrl: null }, REALM)
+    await killRealm()
+    const router = await routerWith(welcome, '/app')
+
+    await router.push({ name: 'welcome' })
+    expect(router.currentRoute.value.name).toBe('welcome')
   })
 
   it('installs nothing outside the shell', async () => {

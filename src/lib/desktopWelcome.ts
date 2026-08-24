@@ -4,17 +4,30 @@
 import type { Router } from 'vue-router'
 import { portalConfig } from './config'
 import { isDesktop } from './desktop'
+import { realmUnreachable } from './desktopBoot'
 
 // Survives the window replacement (same origin), so an interrupted connect can
 // still be named on the way back.
 const PENDING_KEY = 'aruna.desktop.connecting'
+
+// A shell command that never answers must not hold the window: navigation
+// continues, and the app's own realm probe surfaces a realm that is not there.
+const STATUS_TIMEOUT_MS = 5_000
+
+function bounded<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Aruna Desktop did not answer.')), ms)
+  })
+  return Promise.race([work, limit]).finally(() => clearTimeout(timer))
+}
 
 /** True once the portal has a realm to talk to; an unusable shell answers true. */
 export async function realmKnown(): Promise<boolean> {
   if (!isDesktop()) return true
   try {
     const { nodeStatus } = await import('./desktopBridge')
-    const status = await nodeStatus()
+    const status = await bounded(nodeStatus(), STATUS_TIMEOUT_MS)
     const base = portalConfig().apiBaseUrl
     const local = status.apiBaseUrl ? base === status.apiBaseUrl : loopback(base)
     return status.enrolled || !local
@@ -62,6 +75,8 @@ export function installWelcomeGuard(router: Router): void {
   router.beforeEach(async (to) => {
     // The system browser returns through the callback whatever else is true.
     if (to.name === 'auth-callback') return true
+    // A realm that never answered must be replaceable, remembered or not.
+    if (to.name === 'welcome' && realmUnreachable()) return true
     if (known === null) known = await realmKnown()
     if (known) {
       setPendingRealm(null)
