@@ -385,7 +385,12 @@ const managementPortals = computed(() =>
             </div>
           </div>
 
-          <DeviceLane v-else-if="audience === 'device'" v-model:step="currentStep" @restart="reset" />
+          <DeviceLane
+            v-else-if="audience === 'device'"
+            v-model:step="currentStep"
+            @back="currentStep = 0"
+            @restart="reset"
+          />
 
           <!-- Step 2 — Kind -->
           <div v-else-if="currentStep === 1" class="space-y-5">

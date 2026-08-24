@@ -62,6 +62,8 @@ export function useDeviceEnrollment() {
   const devicesError = ref<string | null>(null)
   const minting = ref(false)
   const mintError = ref<string | null>(null)
+  // The enrollment in flight: the secret exists only here until the view leaves.
+  const minted = ref<CreateOnboardingSecretResponse | null>(null)
   const busyIds = ref<Set<string>>(new Set())
   const watch = ref<DeviceWatch>(idleWatch())
 
@@ -119,6 +121,7 @@ export function useDeviceEnrollment() {
         body: JSON.stringify({ seed_url: '', mode: 'User', expires_in_seconds: expiresInSeconds }),
       })
       await loadDevices()
+      minted.value = response
       return { response, enrollmentId: newEnrollment(before, response.expires_at) }
     } catch (err) {
       mintError.value = message(err)
@@ -228,6 +231,7 @@ export function useDeviceEnrollment() {
   function resetWatch() {
     stopWatch()
     watch.value = idleWatch()
+    minted.value = null
   }
 
   // Consumers cannot leak the interval: it is cleared when the view unmounts.
@@ -239,6 +243,7 @@ export function useDeviceEnrollment() {
     devicesError,
     minting,
     mintError,
+    minted,
     busyIds,
     watch,
     deviceLimit,

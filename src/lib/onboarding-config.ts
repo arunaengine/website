@@ -20,12 +20,22 @@ export interface NodeConfigInput {
   labels?: string // → ARUNA_NODE_LABELS, raw 'k=v,k2=v2'
 }
 
+import type { RealmNodeInfo } from './api'
+
 // Trim, drop trailing slashes, and drop one trailing '/api/v1': the node appends
 // /api/v1/onboarding/bootstrap itself (aruna/src/config.rs), so seed_url must be
 // an origin-style URL without the API prefix.
 export function normalizeSeedUrl(raw: string): string {
   const trimmed = raw.trim().replace(/\/+$/, '')
   return trimmed.replace(/\/api\/v1$/, '').replace(/\/+$/, '')
+}
+
+// Management nodes that published a reachable portal. The portal is served from
+// each node's REST origin, so the '/api/v1' suffix comes off the published url.
+export function managementPortals(nodes: RealmNodeInfo[]): Array<{ id: string; url: string }> {
+  return nodes
+    .filter((node) => node.kind === 'management' && node.info?.urls?.api)
+    .map((node) => ({ id: node.node_id, url: normalizeSeedUrl(node.info!.urls!.api!) }))
 }
 
 // Optional placement hints, appended only when the admin set them. Weight must
