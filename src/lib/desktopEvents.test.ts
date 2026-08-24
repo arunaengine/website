@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { EnrollInvite } from './desktopEvents'
+import type { EnrollInvite } from './desktopBridge'
 
 type Emit = (payload: unknown) => void
 

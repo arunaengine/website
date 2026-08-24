@@ -125,6 +125,23 @@ describe('bridge commands', () => {
     await expect(bridge.validateRealm('aruna.example')).rejects.toMatchObject({ message: refused })
   })
 
+  it('answers a shell holding no invitation with null', async () => {
+    const bridge = await withShell(() => null)
+    await expect(bridge.lastEnrollInvite()).resolves.toBeNull()
+    expect(invoke).toHaveBeenCalledWith('enroll_invite_last', undefined)
+  })
+
+  it('normalizes the retained invitation', async () => {
+    // The retained answer is the emitted event, so it is read the same way.
+    const bridge = await withShell(() => ({ seed: ' https://seed.test ', applied: 'yes', error: 'the code expired' }))
+    await expect(bridge.lastEnrollInvite()).resolves.toEqual({
+      seed: 'https://seed.test',
+      realm: null,
+      applied: false,
+      error: 'the code expired',
+    })
+  })
+
   it('answers a cancelled folder dialog with null', async () => {
     const bridge = await withShell(() => null)
     await expect(bridge.pickDirectory({ title: 'Storage' })).resolves.toBeNull()

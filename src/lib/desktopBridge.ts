@@ -64,6 +64,17 @@ export interface EnrollResult {
   realm: string | null
 }
 
+/**
+ * What the shell made of an `aruna://enroll` link; never carries the secret.
+ * The retained answer and the live event share this shape.
+ */
+export interface EnrollInvite {
+  seed: string | null
+  realm: string | null
+  applied: boolean
+  error: string | null
+}
+
 /** What a realm address turned out to be once the shell reached it. */
 export interface RealmTarget {
   origin: string
@@ -117,6 +128,17 @@ function asNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+/** Reads an invitation the shell either retained or emitted. */
+export function readInvite(payload: unknown): EnrollInvite {
+  const raw = payload && typeof payload === 'object' && !Array.isArray(payload) ? (payload as Record<string, unknown>) : {}
+  return {
+    seed: asText(raw.seed),
+    realm: asText(raw.realm),
+    applied: raw.applied === true,
+    error: asText(raw.error),
+  }
+}
+
 function readSettings(command: string, value: unknown): NodeSettings {
   const raw = asRecord(command, value)
   return {
@@ -167,6 +189,16 @@ export async function enrollApply(payload: EnrollPayload): Promise<EnrollResult>
   const command = 'enroll_apply'
   const raw = asRecord(command, await call(command, { ...payload }))
   return { nodeId: asText(raw.nodeId), realm: asText(raw.realm) }
+}
+
+/**
+ * The enrollment the shell last acted on, kept across windows so a link
+ * followed into a cold start is still shown. Null when it holds none.
+ */
+export async function lastEnrollInvite(): Promise<EnrollInvite | null> {
+  const command = 'enroll_invite_last'
+  const answer = await call(command)
+  return answer == null ? null : readInvite(asRecord(command, answer))
 }
 
 /**
