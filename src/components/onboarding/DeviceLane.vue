@@ -3,7 +3,7 @@
 // design: it mirrors the backend's authorize_device_enrollment (a realm member
 // with an unrestricted token on a management node) and never the onboarding
 // admin gates, so Settings can mount it for any signed-in member.
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -70,9 +70,18 @@ const {
 const canEnroll = computed(() => !!currentUser.value && isManagementNode.value)
 const portals = computed(() => managementPortals(realmInfo.value?.nodes ?? []))
 
-onMounted(() => {
-  if (canEnroll.value) void loadDevices()
-})
+// The gate opens only once bootstrap has answered, so wait for it rather than
+// reading an empty device list at mount.
+let loadedOnce = false
+watch(
+  canEnroll,
+  (open) => {
+    if (!open || loadedOnce) return
+    loadedOnce = true
+    void loadDevices()
+  },
+  { immediate: true },
+)
 
 const PLATFORM_OPTIONS = [
   { value: 'linux', label: 'Linux' },

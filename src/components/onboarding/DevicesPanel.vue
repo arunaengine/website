@@ -2,7 +2,7 @@
 // My devices (aruna#271). Self-scoped: /users/me/devices only ever answers with
 // the caller's own user nodes and the enrollments still in flight, so this
 // needs no admin gate. Rows reuse SecretsTable through its view-model props.
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import DeviceLane from '@/components/onboarding/DeviceLane.vue'
 import SecretsTable, { type SecretRow } from '@/components/onboarding/SecretsTable.vue'
@@ -22,9 +22,18 @@ const { devices, devicesError, busyIds, deviceCount, deviceLimit, loadDevices, r
 const adding = ref(false)
 const deviceStep = ref(FIRST_STEP)
 
-onMounted(() => {
-  if (currentUser.value) void loadDevices()
-})
+// The session restores asynchronously, so load once it has a user rather than
+// firing an anonymous request at mount.
+let loadedOnce = false
+watch(
+  currentUser,
+  (user) => {
+    if (!user || loadedOnce) return
+    loadedOnce = true
+    void loadDevices()
+  },
+  { immediate: true },
+)
 
 function openAdd() {
   deviceStep.value = FIRST_STEP
