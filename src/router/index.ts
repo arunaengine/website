@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { portalRoutes } from './routes'
+import { installWelcomeGuard } from '@/lib/desktopWelcome'
 
 function hashTargetExists(hash: string): boolean {
   try {
@@ -29,5 +30,9 @@ const router = createRouter({
     return { top: 0 }
   },
 })
+
+// No-op on the web; in the shell it holds navigation at the welcome view until
+// a realm is known.
+installWelcomeGuard(router)
 
 export default router

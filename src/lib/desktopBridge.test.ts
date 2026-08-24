@@ -107,6 +107,24 @@ describe('bridge commands', () => {
     expect(invoke).toHaveBeenCalledWith('enroll_apply', { secret: 'S3CRET', seedUrl: 'https://node.test' })
   })
 
+  it('reads back the realm the shell accepted', async () => {
+    const bridge = await withShell(() => ({ origin: 'https://aruna.example', realm: 'R1', portal: true }))
+    await expect(bridge.validateRealm(' aruna.example ')).resolves.toEqual({
+      origin: 'https://aruna.example',
+      realm: 'R1',
+      apiVersion: null,
+      portal: true,
+    })
+    expect(invoke).toHaveBeenCalledWith('validate_realm', { input: ' aruna.example ' })
+  })
+
+  it('carries a refused realm through as written', async () => {
+    // The shell classifies the failure; the welcome view shows its wording.
+    const refused = 'https://aruna.example refused the connection; nothing is listening there'
+    const bridge = await withShell(() => Promise.reject(refused))
+    await expect(bridge.validateRealm('aruna.example')).rejects.toMatchObject({ message: refused })
+  })
+
   it('answers a cancelled folder dialog with null', async () => {
     const bridge = await withShell(() => null)
     await expect(bridge.pickDirectory({ title: 'Storage' })).resolves.toBeNull()

@@ -2,6 +2,7 @@
 // Device home, mounted only in desktop mode: the shell's own views live here
 // so one portal build serves both the browser and Aruna Desktop.
 import { ref } from 'vue'
+import { useRoute } from 'vue-router'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -10,7 +11,8 @@ import EnrollPanel from '@/components/device/EnrollPanel.vue'
 import LocalPanel from '@/components/device/LocalPanel.vue'
 import NodePanel from '@/components/device/NodePanel.vue'
 
-const tab = ref('node')
+// The welcome view sends an owner holding a code straight to the right tab.
+const tab = ref(useRoute().query.tab === 'enroll' ? 'enroll' : 'node')
 
 function onEnrolled() {
   tab.value = 'node'

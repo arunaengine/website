@@ -43,6 +43,11 @@ describe('web routes', () => {
     const routes = await build()
     expect(appChildren(routes).some((route) => route.path === 'device')).toBe(false)
   })
+
+  it('mounts no welcome view', async () => {
+    const routes = await build()
+    expect(find(routes, '/welcome')).toBeUndefined()
+  })
 })
 
 describe('desktop routes', () => {
@@ -61,6 +66,14 @@ describe('desktop routes', () => {
 
     expect(device?.name).toBe('device')
     expect(typeof device?.component).toBe('function')
+  })
+
+  it('mounts the welcome view outside the app shell', async () => {
+    const routes = await build({ apiBaseUrl: '/api/v1' })
+    const welcome = find(routes, '/welcome')
+
+    expect(welcome?.name).toBe('welcome')
+    expect(typeof welcome?.component).toBe('function')
   })
 
   it('keeps the auth callback route', async () => {

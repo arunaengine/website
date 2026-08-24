@@ -18,6 +18,11 @@ export function portalRoutes(): RouteRecordRaw[] {
       name: 'auth-callback',
       component: () => import('@/views/AuthCallbackView.vue'),
     },
+    // Desktop first run: outside the app shell, because with no realm behind it
+    // the shell's navigation has nothing to link to.
+    ...(isDesktop()
+      ? [{ path: '/welcome', name: 'welcome', component: () => import('@/views/WelcomeView.vue') }]
+      : []),
     {
       path: '/app',
       component: () => import('@/views/AppLayout.vue'),

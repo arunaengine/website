@@ -64,6 +64,15 @@ export interface EnrollResult {
   realm: string | null
 }
 
+/** What a realm address turned out to be once the shell reached it. */
+export interface RealmTarget {
+  origin: string
+  realm: string | null
+  apiVersion: string | null
+  // False when only the API answered: an Aruna node serving no portal.
+  portal: boolean
+}
+
 const STATES: NodeStatus['state'][] = ['stopped', 'starting', 'running', 'error']
 
 function detail(err: unknown): string {
@@ -158,6 +167,22 @@ export async function enrollApply(payload: EnrollPayload): Promise<EnrollResult>
   const command = 'enroll_apply'
   const raw = asRecord(command, await call(command, { ...payload }))
   return { nodeId: asText(raw.nodeId), realm: asText(raw.realm) }
+}
+
+/**
+ * Checks a realm address and remembers it as this device's realm. Success is a
+ * pending reload, not a value to render: the shell replaces the window so the
+ * portal boots against that realm's API.
+ */
+export async function validateRealm(input: string): Promise<RealmTarget> {
+  const command = 'validate_realm'
+  const raw = asRecord(command, await call(command, { input }))
+  return {
+    origin: asText(raw.origin) ?? '',
+    realm: asText(raw.realm),
+    apiVersion: asText(raw.apiVersion),
+    portal: raw.portal === true,
+  }
 }
 
 /**
