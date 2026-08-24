@@ -54,7 +54,7 @@ beforeAll(async () => {
   vi.doMock('@/components/ui/Input.vue', () => ({ default: InputStub }))
   vi.doMock('@/components/ui/Select.vue', () => ({ default: SelectStub }))
   vi.doMock('@/components/onboarding/QrCode.vue', () => ({ default: QrStub }))
-  vi.doMock('vue-router', () => ({ RouterLink: PassThrough }))
+  vi.doMock('vue-router', () => ({ RouterLink: PassThrough, useRouter: () => ({ push: vi.fn() }) }))
   DeviceLane = (await import('./DeviceLane.vue')).default
 })
 
@@ -154,6 +154,27 @@ describe('device hand-off step', () => {
     expect(rendered).toContain('S3CRET-VALUE')
     expect(rendered).toContain('ONBOARDING_SECRET=S3CRET-VALUE')
     expect(rendered).toContain('STORAGE_PATH=/data')
+  })
+})
+
+describe('hand-off inside the desktop app', () => {
+  let inShell: Component
+
+  beforeAll(async () => {
+    // The desktop context is read once per module graph, so the lane is
+    // imported again with the shell's global in place.
+    vi.resetModules()
+    Object.assign(globalThis, { __ARUNA_DESKTOP__: { apiBaseUrl: '/api/v1' } })
+    inShell = (await import('./DeviceLane.vue')).default
+  })
+
+  it('enrolls this machine instead of emitting a link', async () => {
+    minted.value = enrollment()
+    const markup = decode(await renderToString(createSSRApp({ render: () => h(inShell, { step: 2 }) })))
+
+    expect(markup).not.toContain(`href="${ENROLL_URL}"`)
+    expect(markup).toContain('Enroll this device now')
+    expect(markup).toContain('already runs in Aruna Desktop')
   })
 })
 

@@ -4,7 +4,7 @@
 // with an unrestricted token on a management node) and never the onboarding
 // admin gates, so Settings can mount it for any signed-in member.
 import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -18,6 +18,8 @@ import QrCode from '@/components/onboarding/QrCode.vue'
 import SecretPanel from '@/components/onboarding/SecretPanel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceEnrollment } from '@/composables/useDeviceEnrollment'
+import { isDesktop } from '@/lib/desktop'
+import { parseEnrollInput } from '@/lib/enrollLink'
 import { buildDeviceEnv, managementPortals } from '@/lib/onboarding-config'
 import { truncateMiddle } from '@/lib/utils'
 import {
@@ -51,6 +53,10 @@ const emit = defineEmits<{
   // an enrollment appeared and when one finished joining.
   (e: 'changed'): void
 }>()
+
+const router = useRouter()
+// Inside Aruna Desktop the deep link would only re-enter this same app.
+const inDesktop = isDesktop()
 
 const { currentUser, isManagementNode, realmInfo } = useAruna()
 const {
@@ -120,6 +126,27 @@ async function enroll() {
     emit('update:step', HANDOFF_STEP)
   } catch {
     // mintError holds the message; rendered inline under the form.
+  }
+}
+
+const applying = ref(false)
+const applyError = ref<string | null>(null)
+
+// Hands the code to the node this app embeds and follows it to the device page.
+async function applyHere(): Promise<void> {
+  const input = enrollUrl.value ? parseEnrollInput(enrollUrl.value) : null
+  if (!input || applying.value) return
+  applying.value = true
+  applyError.value = null
+  try {
+    const { enrollApply } = await import('@/lib/desktopBridge')
+    const name = deviceName.value.trim()
+    await enrollApply({ ...input, ...(name ? { label: name } : {}) })
+    void router.push({ name: 'device' })
+  } catch (err) {
+    applyError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    applying.value = false
   }
 }
 
@@ -267,11 +294,27 @@ const watchStages = computed<WatchStage[]>(() => {
 
           <TabsContent value="desktop" class="space-y-3">
             <p class="text-xs leading-relaxed text-muted-foreground">
-              Hands the code to Aruna Desktop for {{ platformLabel }} over an
-              <code class="font-mono">aruna://enroll</code> deep link, so it is never pasted by hand.
+              <template v-if="inDesktop">
+                This portal already runs in Aruna Desktop, so the code goes straight to the node on this machine.
+              </template>
+              <template v-else>
+                Hands the code to Aruna Desktop for {{ platformLabel }} over an
+                <code class="font-mono">aruna://enroll</code> deep link, so it is never pasted by hand.
+              </template>
             </p>
-            <Button v-if="enrollUrl" as="a" :href="enrollUrl"><Laptop class="h-4 w-4" /> Open in Aruna Desktop</Button>
-            <p v-else class="text-xs text-muted-foreground">This node returned no deep link for the enrollment.</p>
+            <p v-if="!enrollUrl" class="text-xs text-muted-foreground">
+              This node returned no deep link for the enrollment.
+            </p>
+            <Button v-else-if="inDesktop" :disabled="applying" @click="applyHere">
+              <Laptop class="h-4 w-4" /> {{ applying ? 'Enrolling…' : 'Enroll this device now' }}
+            </Button>
+            <Button v-else as="a" :href="enrollUrl"><Laptop class="h-4 w-4" /> Open in Aruna Desktop</Button>
+            <p
+              v-if="applyError"
+              class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+            >
+              {{ applyError }}
+            </p>
           </TabsContent>
 
           <TabsContent value="qr" class="space-y-3">
