@@ -1,10 +1,11 @@
 // The hand-off Aruna Desktop performs on this machine: it applies a minted
 // enrollment to the node the shell embeds, and reads the claim watch as the
 // stages an owner sees. Shared by the onboarding lane and the first-run step.
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import type { WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
-import { useDeviceEnrollment, type DeviceWatch } from '@/composables/useDeviceEnrollment'
+import { useDeviceEnrollment, WATCH_INTERVAL_MS, type DeviceWatch } from '@/composables/useDeviceEnrollment'
 import {
+  bounded,
   clearEnrolled,
   setSetupWatch,
   setupWatch,
@@ -70,6 +71,8 @@ export function useDeviceSetup() {
   const watching = ref(false)
   const enrolledHere = ref(false)
 
+  let timer: ReturnType<typeof setInterval> | undefined
+
   const busy = computed(() => applying.value || minting.value)
   const error = computed(() => mintError.value ?? applyError.value)
   const joined = computed(() => state.value.phase === 'present' || enrolledHere.value)
@@ -85,12 +88,37 @@ export function useDeviceSetup() {
       setSetupWatch({ enrollmentId, expiresAt: response.expires_at })
       watching.value = true
       startWatch(enrollmentId, response.expires_at)
+      void follow()
     } catch (err) {
       // mint already worded its own failures.
       if (!mintError.value) applyError.value = err instanceof Error ? err.message : String(err)
     } finally {
       applying.value = false
     }
+  }
+
+  async function probe(): Promise<void> {
+    try {
+      const { nodeStatus } = await import('@/lib/desktopBridge')
+      // A probe must never outlive its own tick.
+      if ((await bounded(nodeStatus(), WATCH_INTERVAL_MS)).enrolled) enrolledHere.value = true
+    } catch {
+      // The realm-side watch still reports what the shell cannot.
+    }
+  }
+
+  // The shell spends the secret and settles the enrollment inside node_status
+  // alone, so the step keeps asking: without it the device joins the realm and
+  // the shell never learns of it.
+  function follow(): Promise<void> {
+    if (timer !== undefined) return Promise.resolve()
+    timer = setInterval(() => void probe(), WATCH_INTERVAL_MS)
+    return probe()
+  }
+
+  function unfollow(): void {
+    clearInterval(timer)
+    timer = undefined
   }
 
   /**
@@ -102,21 +130,19 @@ export function useDeviceSetup() {
     if (!record) return
     watching.value = true
     startWatch(record.enrollmentId, record.expiresAt)
-    try {
-      const { nodeStatus } = await import('@/lib/desktopBridge')
-      if ((await nodeStatus()).enrolled) enrolledHere.value = true
-    } catch {
-      // The realm-side watch still reports what the shell cannot.
-    }
+    await follow()
   }
 
   /** Answers the prompt for good: a joined device is not asked again either. */
   function done(): void {
+    unfollow()
     setSetupWatch(null)
     skipSetup()
     clearEnrolled()
     resetWatch()
   }
+
+  onUnmounted(unfollow)
 
   return { applying: busy, error, watching, joined, stages, state, apply, resume, done }
 }

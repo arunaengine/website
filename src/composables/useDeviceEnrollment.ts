@@ -18,7 +18,7 @@ import {
 } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
 
-const WATCH_INTERVAL_MS = 5_000
+export const WATCH_INTERVAL_MS = 5_000
 
 // pending → the secret is live and unclaimed; claimed → a device redeemed it;
 // present → it is a member of the realm configuration. Devices never publish

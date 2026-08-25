@@ -1,6 +1,6 @@
 import { createSSRApp, h, ref } from 'vue'
 import { renderToString } from '@vue/server-renderer'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DeviceWatch } from '@/composables/useDeviceEnrollment'
 
 const REALM = 'https://aruna.example'
@@ -16,6 +16,7 @@ const enrollApply = vi.fn()
 const nodeStatus = vi.fn()
 
 vi.mock('@/composables/useDeviceEnrollment', () => ({
+  WATCH_INTERVAL_MS: 5_000,
   useDeviceEnrollment: () => ({
     minting: ref(false),
     mintError,
@@ -52,6 +53,10 @@ beforeEach(() => {
   nodeStatus.mockResolvedValue({ enrolled: false })
 })
 
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 // useDeviceEnrollment registers onUnmounted, so the composable needs an instance.
 async function mounted() {
   let api!: ReturnType<typeof setup>
@@ -75,6 +80,7 @@ describe('applying a setup', () => {
     expect(welcome.setupWatch()).toEqual({ enrollmentId: 'enr-2', expiresAt: 99 })
     expect(startWatch).toHaveBeenCalledWith('enr-2', 99)
     expect(api.watching.value).toBe(true)
+    api.done()
   })
 
   it('keeps a failed apply on the form', async () => {
@@ -101,6 +107,7 @@ describe('resuming a setup', () => {
     expect(api.watching.value).toBe(true)
     expect(startWatch).toHaveBeenCalledWith('enr-1', 42)
     expect(api.joined.value).toBe(false)
+    api.done()
   })
 
   it('reads an enrolled node as joined', async () => {
@@ -110,6 +117,7 @@ describe('resuming a setup', () => {
 
     await api.resume()
     expect(api.joined.value).toBe(true)
+    api.done()
   })
 
   it('asks for the device with nothing on record', async () => {
@@ -119,6 +127,30 @@ describe('resuming a setup', () => {
 
     expect(api.watching.value).toBe(false)
     expect(startWatch).not.toHaveBeenCalled()
+  })
+})
+
+describe('following the node', () => {
+  it('completes on the enrollment the shell settled', async () => {
+    // The shell spends the secret inside node_status alone, so the step must
+    // keep asking while the realm side still shows the claim pending.
+    vi.useFakeTimers()
+    mint.mockResolvedValue({ response: { enroll_url: ENROLL_URL, expires_at: 99 }, enrollmentId: 'enr-3' })
+    nodeStatus.mockResolvedValueOnce({ enrolled: false }).mockResolvedValue({ enrolled: true })
+    const api = await mounted()
+
+    await api.apply('')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(api.joined.value).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(nodeStatus).toHaveBeenCalledTimes(2)
+    expect(api.joined.value).toBe(true)
+
+    api.done()
+    expect(welcome.setupWatch()).toBeNull()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(nodeStatus).toHaveBeenCalledTimes(2)
   })
 })
 

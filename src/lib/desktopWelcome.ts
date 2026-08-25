@@ -20,7 +20,8 @@ const WATCH_KEY = 'aruna.desktop.setupWatch'
 // continues, and the app's own realm probe surfaces a realm that is not there.
 const STATUS_TIMEOUT_MS = 5_000
 
-function bounded<T>(work: Promise<T>, ms: number): Promise<T> {
+/** Rejects when a shell command outlives its budget, so nothing waits on it. */
+export function bounded<T>(work: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const limit = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error('Aruna Desktop did not answer.')), ms)
