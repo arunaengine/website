@@ -35,6 +35,9 @@ export interface NodeStatus {
   nodeId: string | null
   realm: string | null
   enrolled: boolean
+  // The listener is answering, not merely spawned; a shell that reports none
+  // is taken at its state alone.
+  ready: boolean
   // Base URL of the node's own listener, for the local S3 and REST surfaces.
   apiBaseUrl: string | null
   version: string | null
@@ -190,6 +193,7 @@ export function readStatus(payload: unknown): NodeStatus {
     nodeId: asText(raw.nodeId),
     realm: asText(raw.realm),
     enrolled: raw.enrolled === true,
+    ready: raw.ready !== false,
     apiBaseUrl: asText(raw.apiBaseUrl),
     version: asText(raw.version),
     uptimeSeconds: asNumber(raw.uptimeSeconds),

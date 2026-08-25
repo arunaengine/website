@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const RUNNING = {
   state: 'running',
   enrolled: true,
+  ready: true,
   apiBaseUrl: 'http://127.0.0.1:34116/api/v1',
   nodeId: 'n1',
   realm: 'R1',
@@ -67,6 +68,22 @@ describe('watching the node', () => {
     expect(unlisten).not.toHaveBeenCalled()
     device.stop()
     expect(unlisten).toHaveBeenCalledTimes(1)
+  })
+
+  it('holds the device base until the node answers', async () => {
+    // A listener that has only been spawned is not one to call.
+    const device = await load()
+    device.start()
+    await vi.waitFor(() => expect(onNodeStatus).toHaveBeenCalled())
+
+    push({ ...RUNNING, ready: false })
+    expect(device.nodeBaseUrl.value).toBeNull()
+    expect(device.label.value).toBe('starting')
+
+    push(RUNNING)
+    expect(device.nodeBaseUrl.value).toBe(RUNNING.apiBaseUrl)
+    expect(device.label.value).toBe('online')
+    device.stop()
   })
 
   it('drops a listener that arrived after the last stop', async () => {

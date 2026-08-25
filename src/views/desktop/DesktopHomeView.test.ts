@@ -109,6 +109,7 @@ beforeEach(() => {
     nodeId: '01HZY7QK4N8ZP3V2C6M9AB',
     realm: 'realm-id',
     enrolled: true,
+    ready: true,
     apiBaseUrl: 'http://127.0.0.1:9000/api/v1',
     version: '0.4.0',
     uptimeSeconds: 3600,

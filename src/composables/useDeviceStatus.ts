@@ -73,9 +73,9 @@ function stop(): void {
 
 const state = computed<NodeStatus['state'] | 'unknown'>(() => status.value?.state ?? 'unknown')
 
-/** The node's own REST base, only while it is up enough to answer. */
+/** The node's own REST base, only once its listener actually answers. */
 const nodeBaseUrl = computed(() =>
-  status.value?.state === 'running' ? status.value.apiBaseUrl : null,
+  status.value?.state === 'running' && status.value.ready ? status.value.apiBaseUrl : null,
 )
 
 // What the owner is told in one word; a shell that cannot be reached is not the
@@ -84,7 +84,8 @@ const label = computed(() => {
   if (error.value) return 'no shell'
   switch (state.value) {
     case 'running':
-      return status.value?.enrolled ? 'online' : 'not enrolled'
+      if (!status.value?.enrolled) return 'not enrolled'
+      return status.value.ready ? 'online' : 'starting'
     case 'starting':
       return 'starting'
     case 'stopped':
