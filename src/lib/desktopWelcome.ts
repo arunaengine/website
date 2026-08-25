@@ -75,7 +75,7 @@ function sameOrigin(one: string, other: string): boolean {
 // one the shell already names.
 function namesRealm(origin: string): boolean {
   const realm = desktopContext()?.realmUrl
-  return Boolean(realm) && sameOrigin(realm as string, origin)
+  return realm !== undefined && sameOrigin(realm, origin)
 }
 
 /** Resolves once the shell context names this realm, or the wait runs out. */
