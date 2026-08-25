@@ -19,10 +19,11 @@ import { useEnrollWatch } from '@/composables/useEnrollWatch'
 // The welcome view sends an owner holding a code straight to the right tab.
 const tab = ref(useRoute().query.tab === 'enroll' ? 'enroll' : 'node')
 const { invite, start, clear } = useEnrollWatch()
-const { status, refresh } = useDeviceStatus()
+const { status, loaded, refresh } = useDeviceStatus()
 
-// Enrolling is a first-run step: the tab stays only while it can still happen.
-const enrolled = computed(() => status.value?.enrolled === true)
+// Enrolling is a first-run step, so the tab goes away once the node joined -
+// but only once the shell actually said so.
+const enrolled = computed(() => loaded.value && status.value?.enrolled === true)
 const showEnroll = computed(() => !enrolled.value || Boolean(invite.value) || tab.value === 'enroll')
 
 watch(invite, (next) => {

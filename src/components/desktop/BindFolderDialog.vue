@@ -44,14 +44,16 @@ const error = ref<string | null>(null)
 const pickError = ref<string | null>(null)
 
 // Only realm nodes hold the other half of a folder; other devices never do.
-const nodeOptions = computed(() =>
+const nodeChoices = computed(() =>
   realmNodes.nodes.value
     .filter((node) => node.kind !== 'user')
     .map((node) => ({
       value: node.nodeId,
       label: `${node.label}${node.reachable ? '' : ' (offline)'}`,
+      reachable: node.reachable,
     })),
 )
+const nodeOptions = computed(() => nodeChoices.value.map(({ value, label }) => ({ value, label })))
 const groupOptions = computed(() => myGroups.value.map((group) => ({ value: group.id, label: group.name })))
 
 const MODE_OPTIONS = [
@@ -70,7 +72,7 @@ watch(
     if (!open) return
     root.value = ''
     groupId.value = groupOptions.value[0]?.value ?? ''
-    nodeId.value = nodeOptions.value.find((option) => !option.label.includes('offline'))?.value ?? ''
+    nodeId.value = (nodeChoices.value.find((node) => node.reachable) ?? nodeChoices.value[0])?.value ?? ''
     bucket.value = ''
     prefix.value = ''
     mode.value = 'two_way'
