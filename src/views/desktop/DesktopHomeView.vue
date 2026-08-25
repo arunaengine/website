@@ -253,7 +253,7 @@ onMounted(() => void reload())
               </p>
               <ul class="mt-2 space-y-1">
                 <li v-for="draft in drafts.slice(0, 3)" :key="draft.draft_id" class="truncate text-[11px] text-muted-foreground">
-                  {{ draft.label || draft.draft_id }}
+                  {{ draft.path || draft.draft_id }}
                 </li>
               </ul>
             </template>

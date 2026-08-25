@@ -430,11 +430,11 @@ export async function getTransfers(client: DeviceClient): Promise<DeviceTransfer
 
 // ── Local compute ────────────────────────────────────────────────────────────
 
-/** Ceilings the owner set under This device; null means the node sets it. */
-export interface ComputeCaps {
-  cpu_cores: number | null
-  ram_bytes: number | null
-  disk_bytes: number | null
+/** Ceilings the owner set under This device; null means the node decides. */
+export interface ComputeLimits {
+  max_cpu_cores: number | null
+  max_ram_bytes: number | null
+  max_disk_bytes: number | null
   max_concurrent: number | null
 }
 
@@ -442,8 +442,8 @@ export interface DeviceCompute {
   enabled: boolean
   /** Executor kind the node resolved: docker, apptainer, or none. */
   backend: string | null
-  health: string
-  caps: ComputeCaps
+  healthy: boolean
+  limits: ComputeLimits
   running: number
   queued: number
   /** A paused node accepts no local runs at all. */
@@ -453,16 +453,16 @@ export interface DeviceCompute {
 
 export function readCompute(value: unknown): DeviceCompute {
   const raw = record(value)
-  const caps = record(raw.caps)
+  const limits = record(raw.limits)
   return {
     enabled: raw.enabled === true,
     backend: text(raw.backend),
-    health: text(raw.health) ?? 'unknown',
-    caps: {
-      cpu_cores: size(caps.cpu_cores),
-      ram_bytes: size(caps.ram_bytes),
-      disk_bytes: size(caps.disk_bytes),
-      max_concurrent: size(caps.max_concurrent),
+    healthy: raw.healthy === true,
+    limits: {
+      max_cpu_cores: size(limits.max_cpu_cores),
+      max_ram_bytes: size(limits.max_ram_bytes),
+      max_disk_bytes: size(limits.max_disk_bytes),
+      max_concurrent: size(limits.max_concurrent),
     },
     running: count(raw.running),
     queued: count(raw.queued),
@@ -480,20 +480,26 @@ export async function getCompute(client: DeviceClient): Promise<DeviceCompute> {
 /** Metadata authored offline on this device, waiting to be published. */
 export interface DeviceDraft {
   draft_id: string
-  kind: string | null
-  label: string | null
-  state: string | null
-  updated_at_ms: number | null
+  group_id: string | null
+  /** Catalog path the draft will be published at; its name to the owner. */
+  path: string
+  public: boolean
+  status: string | null
+  /** The document it becomes, once the realm accepted it. */
+  document_id: string | null
+  created_at_ms: number | null
 }
 
 export function readDraft(value: unknown): DeviceDraft {
   const raw = record(value)
   return {
-    draft_id: text(raw.draft_id) ?? text(raw.id) ?? '',
-    kind: text(raw.kind),
-    label: text(raw.label) ?? text(raw.title) ?? text(raw.name),
-    state: text(raw.state),
-    updated_at_ms: size(raw.updated_at_ms),
+    draft_id: text(raw.draft_id) ?? '',
+    group_id: text(raw.group_id),
+    path: text(raw.path) ?? '',
+    public: raw.public === true,
+    status: text(raw.status),
+    document_id: text(raw.document_id),
+    created_at_ms: size(raw.created_at_ms),
   }
 }
 

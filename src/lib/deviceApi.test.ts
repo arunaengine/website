@@ -6,6 +6,7 @@ import {
   isDeviceUnsupported,
   isStaleExpectation,
   readCompute,
+  readDraft,
   readEntry,
   readFolder,
   readTransfer,
@@ -120,13 +121,47 @@ describe('transfer and compute mapping', () => {
     const off = readCompute({})
     expect(off.enabled).toBe(false)
     expect(off.backend).toBeNull()
-    expect(off.caps.max_concurrent).toBeNull()
+    expect(off.healthy).toBe(false)
+    expect(off.limits.max_concurrent).toBeNull()
 
-    const on = readCompute({ enabled: true, backend: 'docker', caps: { cpu_cores: 4 }, running: 1, paused: true })
+    const on = readCompute({
+      enabled: true,
+      backend: 'docker',
+      healthy: true,
+      limits: { max_cpu_cores: 4, max_ram_bytes: 8_000_000_000 },
+      running: 1,
+      paused: true,
+    })
     expect(on.enabled).toBe(true)
-    expect(on.caps.cpu_cores).toBe(4)
+    expect(on.healthy).toBe(true)
+    expect(on.limits.max_cpu_cores).toBe(4)
+    expect(on.limits.max_ram_bytes).toBe(8_000_000_000)
     expect(on.running).toBe(1)
     expect(on.paused).toBe(true)
+  })
+
+  it('reads a draft as the node stores it', () => {
+    const draft = readDraft({
+      draft_id: 'd1',
+      group_id: 'g1',
+      path: 'datasets/field-notes',
+      public: true,
+      status: 'pending',
+      document_id: null,
+      created_at_ms: 1_700_000,
+    })
+
+    expect(draft).toEqual({
+      draft_id: 'd1',
+      group_id: 'g1',
+      path: 'datasets/field-notes',
+      public: true,
+      status: 'pending',
+      document_id: null,
+      created_at_ms: 1_700_000,
+    })
+    expect(readDraft({}).path).toBe('')
+    expect(readDraft({}).public).toBe(false)
   })
 })
 

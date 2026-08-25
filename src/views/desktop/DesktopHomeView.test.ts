@@ -177,8 +177,8 @@ describe('desktop home', () => {
     compute.value = {
       enabled: false,
       backend: null,
-      health: 'unknown',
-      caps: { cpu_cores: null, ram_bytes: null, disk_bytes: null, max_concurrent: null },
+      healthy: false,
+      limits: { max_cpu_cores: null, max_ram_bytes: null, max_disk_bytes: null, max_concurrent: null },
       running: 0,
       queued: 0,
       paused: false,

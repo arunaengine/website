@@ -277,10 +277,13 @@ const chosenMissing = computed(() => {
 
       <div v-if="liveState === 'ready' && compute" class="flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-muted-foreground">
         <span>backend <span class="font-mono text-foreground">{{ compute.backend ?? 'none' }}</span></span>
-        <span>health <span class="font-mono text-foreground">{{ compute.health }}</span></span>
+        <span>health <span class="font-mono text-foreground">{{ compute.healthy ? 'ok' : 'not ready' }}</span></span>
         <span>running <span class="font-mono text-foreground">{{ compute.running }}</span></span>
         <span>queued <span class="font-mono text-foreground">{{ compute.queued }}</span></span>
-        <span v-if="compute.caps.ram_bytes">memory cap <span class="font-mono text-foreground">{{ formatBytes(compute.caps.ram_bytes) }}</span></span>
+        <span v-if="compute.limits.max_ram_bytes"
+          >memory cap
+          <span class="font-mono text-foreground">{{ formatBytes(compute.limits.max_ram_bytes) }}</span></span
+        >
       </div>
       <p v-else-if="liveState === 'unsupported'" class="text-[11px] text-muted-foreground">
         This node version does not report its compute state yet.
