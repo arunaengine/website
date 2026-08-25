@@ -168,7 +168,9 @@ async function install(merged: DesktopContext): Promise<void> {
   // The old verdict was about the old base, so the new one is probed again.
   const { probeRealm } = await import('./desktopBoot')
   void probeRealm()
-  await aruna.refresh()
+  // The context is installed; what the new base answers is not worth holding
+  // the window, let alone the first paint, for.
+  void aruna.refresh()
 }
 
 // The context taken last, which is what a new one is judged against: reports
@@ -179,7 +181,8 @@ let applying: Promise<void> = Promise.resolve()
 /**
  * Installs a context the shell reported, after the one before it: a changed
  * API base is switched in place and the session is re-bootstrapped against it,
- * keeping the token only while the realm behind it is the same one. Requests
+ * keeping the token only while the realm behind it is the same one. Answers as
+ * soon as the context is in place, never on the realm behind it. Requests
  * still in flight are ignored by the session epoch useAruna bumps.
  */
 export function applyShellContext(next: unknown): Promise<void> {

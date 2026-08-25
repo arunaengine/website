@@ -281,6 +281,29 @@ describe('welcome guard', () => {
     expect(router.currentRoute.value.query.tab).toBe('enroll')
   })
 
+  it('keeps the first navigation on its way', async () => {
+    // At boot nothing has landed yet, so the only target is the one in flight.
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, LOCAL, 'https://aruna.example')
+    const router = blankRouter()
+    welcome.installDesktopGuard(router)
+
+    bootstrapped.value = false
+    const trip = router.push('/app/device?tab=enroll')
+    await turns()
+
+    const desktop = await import('./desktop')
+    await desktop.applyShellContext({
+      apiBaseUrl: LOCAL,
+      realmUrl: 'https://aruna.example',
+      features: { compute: true },
+    })
+    bootstrapped.value = true
+    await trip
+
+    await lands(router, 'device')
+    expect(router.currentRoute.value.query.tab).toBe('enroll')
+  })
+
   it('routes a deep link the shell followed', async () => {
     const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, LOCAL, 'https://aruna.example')
     const router = await routerWith(welcome, '/app')

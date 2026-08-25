@@ -183,9 +183,10 @@ export function installDesktopGuard(router: Router): void {
   watch(shellContext, () => {
     knownOnce = null
     clearEnrolled()
-    // Nothing has landed yet; the first navigation reads the new context.
-    if (router.currentRoute.value === START_LOCATION) return
+    // Nothing has landed and nothing is on its way: the next navigation reads
+    // the new context by itself.
     const target = pending ?? router.currentRoute.value
+    if (!pending && target === START_LOCATION) return
     void router.replace({ path: target.path, query: target.query, hash: target.hash, force: true })
   })
   // A deep link the shell followed is a route change, never a reload.

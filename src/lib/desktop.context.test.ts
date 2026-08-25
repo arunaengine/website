@@ -130,6 +130,17 @@ describe('applying a context', () => {
     expect(refresh).not.toHaveBeenCalled()
   })
 
+  it('answers before the new base does', async () => {
+    // The first paint must never wait on what the realm behind the switch says.
+    const { desktop } = await boot({ apiBaseUrl: LOCAL, realmUrl: 'https://aruna.example' })
+    refresh.mockReturnValueOnce(new Promise<undefined>(() => {}))
+
+    await desktop.applyShellContext({ apiBaseUrl: REALM, realmUrl: 'https://aruna.example' })
+
+    expect(desktop.desktopContext()?.apiBaseUrl).toBe(REALM)
+    expect(refresh).toHaveBeenCalled()
+  })
+
   it('ignores a malformed context', async () => {
     const { desktop } = await boot({ apiBaseUrl: LOCAL })
 
