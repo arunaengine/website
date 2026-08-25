@@ -2,7 +2,7 @@
 // wins by default, so the states that wait for a decision are named as such and
 // sort to the top; nothing here ever describes an automatic overwrite.
 import type { BadgeVariant } from '@/components/nodes/node-display'
-import type { EntryState, FolderEntry } from './deviceApi'
+import { folderName, type EntryState, type FolderEntry } from './deviceApi'
 
 export type EntryTone = 'settled' | 'moving' | 'decide' | 'error'
 
@@ -64,4 +64,13 @@ const TONE_BADGE: Record<EntryTone, BadgeVariant> = {
 
 export function entryBadge(state: EntryState): BadgeVariant {
   return TONE_BADGE[entryMeta(state).tone]
+}
+
+/**
+ * Arms a folder-wide replacement of local files. Giving up many copies at once
+ * takes the folder's own name, typed exactly; nothing else counts.
+ */
+export function folderConfirmed(root: string, typed: string): boolean {
+  const name = folderName(root)
+  return name.length > 0 && typed.trim() === name
 }

@@ -14,6 +14,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import { folderName, isStaleExpectation, type FolderEntry, type SyncedFolder } from '@/lib/deviceApi'
+import { folderConfirmed } from '@/lib/syncStates'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { Loader2 } from '@lucide/vue'
 
@@ -65,8 +66,7 @@ const remoteFacts = computed(() => [
   { label: 'blake3', value: hash(entry.value?.remote?.blake3 ?? null) },
 ])
 
-// The folder form is armed only by the folder's own name, typed exactly.
-const confirmed = computed(() => (entry.value ? true : confirmText.value === name.value))
+const confirmed = computed(() => (entry.value ? true : folderConfirmed(props.folder.root, confirmText.value)))
 const canReplace = computed(() => confirmed.value && !busy.value)
 
 async function replace(): Promise<void> {
