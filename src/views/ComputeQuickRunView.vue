@@ -39,7 +39,6 @@ import { useS3 } from '@/composables/useS3'
 import {
   TES_GROUP_TAG,
   TES_IDEMPOTENCY_TAG,
-  TES_TARGET_TAG,
   captureContainerPath,
   captureOutput,
   expandDataRefEntry,
@@ -53,6 +52,8 @@ import {
   type TesTask,
 } from '@/lib/tes'
 import { RUNTIMES, TES_NETWORK_TAG, detectQuickRun, type Runtime } from '@/lib/quickRuntimes'
+import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/lib/nativeSubmit'
+import { submitJob } from '@/lib/jobs'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { fetchWithTimeout } from '@/lib/fetch'
 import {
@@ -770,6 +771,34 @@ const submittedTaskId = ref<string | null>(null)
 // Snapshot of the declared destinations for the result view.
 const submittedOutputs = ref<{ bucket: string; key: string; path: string }[]>([])
 
+/**
+ * Sends the run to this machine as a native job, which is the only surface
+ * that accepts a local target. Answers false when the realm is the target, and
+ * reports its own refusal when the draft has no native form.
+ */
+async function submitLocally(draft: TesTask): Promise<boolean> {
+  const client = runTarget.localClient.value
+  if (!client) return false
+  if (dependencies.value.length) {
+    submitError.value =
+      'A run on this computer has no network access, so the dependencies cannot be installed. Remove them, or run this in the realm.'
+    return true
+  }
+  const mapping = tesFormToExecutionRequest({
+    groupId: groupId.value,
+    task: draft,
+    placement: defaultPlacement(),
+  })
+  if (isNativeBlocked(mapping)) {
+    submitError.value = mapping.blocked
+    return true
+  }
+  await submitJob({ ...mapping.request, target: 'local' }, client)
+  // Local runs are followed in Runs; the result panel polls the realm's TES.
+  void router.push({ name: 'runs' })
+  return true
+}
+
 async function submit() {
   submitError.value = null
   submitting.value = true
@@ -798,21 +827,13 @@ async function submit() {
       )
     }
     await Promise.all(uploads)
-    const local = runTarget.localClient.value
-    const created = await createTask(
-      local ? { ...submittedTask, tags: { ...submittedTask.tags, [TES_TARGET_TAG]: 'local' } } : submittedTask,
-      local ?? undefined,
-    )
+    if (await submitLocally(submittedTask)) return
+    const created = await createTask(submittedTask)
     submittedOutputs.value = outputRows.value.map((row) => ({
       bucket: row.bucket.trim(),
       key: normalizedOutputKey(row.path),
       path: row.containerPath.trim(),
     }))
-    // The result panel follows the realm's task; a local run is watched in Runs.
-    if (local) {
-      void router.push({ name: 'runs' })
-      return
-    }
     submittedTaskId.value = created.id
   } catch (err) {
     submitError.value = isTesUnsupported(err)

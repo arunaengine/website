@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { ApiError, apiRequest, type ApiClientOptions } from '@/lib/api'
+import { ApiError, apiRequest } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
 import { useAruna } from '@/composables/useAruna'
 import {
@@ -32,9 +32,9 @@ export function isTesUnsupported(err: unknown): boolean {
 
 // Sibling composable to useAruna: it does not export its raw request() helper,
 // but it does export the apiBaseUrl/authToken refs, so we build the same client.
-function request<T>(path: string, options = {}, client?: ApiClientOptions) {
+function request<T>(path: string, options = {}) {
   const { apiBaseUrl, authToken } = useAruna()
-  return apiRequest<T>(path, options, client ?? { baseUrl: apiBaseUrl.value, token: authToken.value })
+  return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
 }
 
 // GET /ga4gh/tes/v1/service-info (api/src/routes/tes.rs service_info).
@@ -87,9 +87,7 @@ export interface TesCreateTaskResult extends TesCreateTaskResponse {
 // POST /ga4gh/tes/v1/tasks (api/src/routes/tes.rs create_task). Under the
 // portal's bearer auth the backend requires the owning-group tag, so it is
 // validated here before the request leaves the browser.
-// `client` sends the task somewhere other than the realm the portal signed
-// into: in Aruna Desktop, the node on this machine.
-async function createTask(task: TesTask, client?: ApiClientOptions): Promise<TesCreateTaskResult> {
+async function createTask(task: TesTask): Promise<TesCreateTaskResult> {
   assertEnabled()
   if (!task?.tags?.[TES_GROUP_TAG]) {
     throw new Error(`A task must carry the owning group tag (${TES_GROUP_TAG}).`)
@@ -100,11 +98,10 @@ async function createTask(task: TesTask, client?: ApiClientOptions): Promise<Tes
   busy.value = true
   try {
     try {
-      return await request<TesCreateTaskResponse>(
-        '/ga4gh/tes/v1/tasks',
-        { method: 'POST', body: JSON.stringify(task) },
-        client,
-      )
+      return await request<TesCreateTaskResponse>('/ga4gh/tes/v1/tasks', {
+        method: 'POST',
+        body: JSON.stringify(task),
+      })
     } catch (err) {
       // Workspace choice is an Aruna extension: a node that predates it may
       // reject the unknown field with 400/422. Retry once without it; if the
@@ -113,11 +110,10 @@ async function createTask(task: TesTask, client?: ApiClientOptions): Promise<Tes
       if (task.workspace && err instanceof ApiError && (err.status === 400 || err.status === 422)) {
         const { workspace: _workspace, ...rest } = task
         try {
-          const created = await request<TesCreateTaskResponse>(
-            '/ga4gh/tes/v1/tasks',
-            { method: 'POST', body: JSON.stringify(rest) },
-            client,
-          )
+          const created = await request<TesCreateTaskResponse>('/ga4gh/tes/v1/tasks', {
+            method: 'POST',
+            body: JSON.stringify(rest),
+          })
           return { ...created, workspaceIgnored: true }
         } catch {
           throw err

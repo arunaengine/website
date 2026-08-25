@@ -27,7 +27,6 @@ import { useS3 } from '@/composables/useS3'
 import {
   TES_EXECUTOR_TAG,
   TES_GROUP_TAG,
-  TES_TARGET_TAG,
   captureContainerPath,
   captureOutput,
   expandDataRefEntry,
@@ -508,7 +507,11 @@ const nativeInvalid = computed(() =>
     ? nativeMapping.value.blocked
     : null,
 )
-const useNative = computed(() => !nativeUnsupported.value && nativeSubmitRequired(placement.value))
+// A run on this computer is always the native request: the device accepts the
+// target there, and the TES facade is the realm's surface.
+const useNative = computed(
+  () => runTarget.local.value || (!nativeUnsupported.value && nativeSubmitRequired(placement.value)),
+)
 const nativeDropped = computed(() => (useNative.value ? droppedNativeFields(task.value) : []))
 
 // ── Submit ───────────────────────────────────────────────────────────────────
@@ -554,17 +557,12 @@ async function submit() {
       await submitNative()
       return
     }
-    const local = runTarget.localClient.value
-    // The device maps the target tag the same way the native request maps it.
-    const submitted = local
-      ? { ...task.value, tags: { ...task.value.tags, [TES_TARGET_TAG]: 'local' } }
-      : task.value
-    const created = await createTask(submitted, local ?? undefined)
+    const created = await createTask(task.value)
     if (created.workspaceIgnored) {
       submittedWithoutWorkspace.value = created.id
       return
     }
-    void router.push(local ? { name: 'runs' } : { name: 'compute-task', params: { taskId: created.id } })
+    void router.push({ name: 'compute-task', params: { taskId: created.id } })
   } catch (err) {
     if (useNative.value) {
       submitRetryable.value = isSubmitRetryable(err)

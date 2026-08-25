@@ -145,8 +145,9 @@ export const TES_IDEMPOTENCY_TAG = 'aruna-engine.org/idempotency-key'
 // the native request's `executor_constraint`. Echoed back on BASIC and FULL.
 export const TES_EXECUTOR_TAG = 'aruna-engine.org/executor'
 
-// Sends the task to the owner's own device instead of the realm (TARGET_TAG_KEY,
-// value 'local'). Only that device's own API accepts it.
+// Realm-side alias for the native request's `target` (TARGET_TAG_KEY). The
+// portal never sends it: a run on the owner's own device goes out as the native
+// POST /jobs/ request, which is the only surface that accepts a local target.
 export const TES_TARGET_TAG = 'aruna-engine.org/target'
 
 // ── Read-only placement tags ─────────────────────────────────────────────────
