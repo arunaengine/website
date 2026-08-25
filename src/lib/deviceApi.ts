@@ -285,9 +285,12 @@ export function entryExpectation(entry: FolderEntry): ActionExpectation | null {
   return { fingerprint, blake3, ...(remoteVersion ? { remote_version: remoteVersion } : {}) }
 }
 
+/** One entry, or every pending entry in the folder. */
+export type ActionScope = 'entry' | 'all_pending'
+
 export interface ActionRecord {
   action: string
-  scope: 'entry' | 'folder'
+  scope: ActionScope
   path: string | null
   actor: string | null
   at_ms: number | null
@@ -301,7 +304,7 @@ export function readAction(value: unknown): ActionRecord {
   const raw = record(value)
   return {
     action: text(raw.action) ?? '',
-    scope: raw.scope === 'folder' ? 'folder' : 'entry',
+    scope: raw.scope === 'all_pending' ? 'all_pending' : 'entry',
     path: text(raw.path),
     actor: text(raw.actor),
     at_ms: size(raw.at_ms),

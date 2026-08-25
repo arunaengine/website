@@ -4,6 +4,7 @@ import {
   entryExpectation,
   isDeviceUnsupported,
   isStaleExpectation,
+  readAction,
   readCompute,
   readDraft,
   readEntry,
@@ -153,6 +154,14 @@ describe('transfer and compute mapping', () => {
     })
     expect(readDraft({}).path).toBe('')
     expect(readDraft({}).public).toBe(false)
+  })
+})
+
+describe('action audit', () => {
+  it('reads the scope the node recorded', () => {
+    expect(readAction({ action: 'replace_local', scope: 'all_pending', confirm: 'x' }).scope).toBe('all_pending')
+    expect(readAction({ action: 'keep_local' }).scope).toBe('entry')
+    expect(readAction({ action: 'keep_local', scope: 'folder' }).scope).toBe('entry')
   })
 })
 
