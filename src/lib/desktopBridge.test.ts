@@ -65,17 +65,24 @@ describe('bridge availability', () => {
 
 describe('bridge commands', () => {
   it('normalizes the node status', async () => {
+    // A shell that reports no readiness is taken at its state alone.
     const bridge = await withShell(() => ({ state: 'sideways', nodeId: ' n1 ', enrolled: true, uptimeSeconds: 90 }))
     await expect(bridge.nodeStatus()).resolves.toEqual({
       state: 'error',
       nodeId: 'n1',
       realm: null,
       enrolled: true,
+      ready: true,
       apiBaseUrl: null,
       version: null,
       uptimeSeconds: 90,
       message: null,
     })
+  })
+
+  it('reads a node that is not listening yet', async () => {
+    const bridge = await withShell(() => ({ state: 'running', enrolled: true, ready: false }))
+    await expect(bridge.nodeStatus()).resolves.toMatchObject({ state: 'running', ready: false })
   })
 
   it('takes the log tail in either answer shape', async () => {
