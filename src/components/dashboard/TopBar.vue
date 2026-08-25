@@ -13,44 +13,81 @@ import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
 import SearchOverlay from '@/components/dashboard/SearchOverlay.vue'
 import { ChevronDown, Plus, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
-import { ref, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRealm } from '@/composables/useRealm'
 import { useTheme } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useDeviceStatus } from '@/composables/useDeviceStatus'
+
+// 'desktop' is the Aruna Desktop chrome: no realm switcher and no dataset
+// shortcut, and the machine's own node takes the leading slot instead.
+const props = withDefaults(defineProps<{ variant?: 'portal' | 'desktop' }>(), { variant: 'portal' })
 
 const showNewDataset = ref(false)
 const { realm, role } = useRealm()
 const { currentUser, authError, loading } = useAruna()
 const { hasSession, signIn, signOut, stage, authPending } = useAuth()
 const { isDark, toggleTheme } = useTheme()
+const { label: nodeLabel, state: nodeState, start: watchNode } = useDeviceStatus()
 const route = useRoute()
 const router = useRouter()
+
+const desktop = computed(() => props.variant === 'desktop')
 
 // A token is stored but the API rejected it (expired/revoked session).
 const sessionBroken = computed(() => hasSession.value && !currentUser.value && Boolean(authError.value))
 const signingIn = computed(() => stage.value === 'redirecting')
 
+const NODE_DOT: Record<string, string> = {
+  running: 'bg-emerald-500',
+  starting: 'bg-sky-500 animate-pulse',
+  stopped: 'bg-muted-foreground/60',
+  error: 'bg-destructive',
+  unknown: 'bg-muted-foreground/40',
+}
+const nodeDot = computed(() => NODE_DOT[nodeState.value] ?? NODE_DOT.unknown)
+
+onMounted(() => {
+  if (desktop.value) watchNode()
+})
+
 function onSignIn() {
   void signIn({ redirectTo: route.fullPath })
 }
 
+// Signing out of the shell lands on its own sign-in step; there is no landing
+// page behind it.
 async function handleSignOut() {
   await signOut()
-  router.push({ name: 'landing' })
+  router.push({ name: desktop.value ? 'welcome-sign-in' : 'landing' })
 }
 </script>
 
 <template>
   <div class="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur-xl">
     <div class="container flex h-14 items-center gap-1 min-[480px]:gap-3">
-      <RealmSwitcher class="max-w-36 min-[480px]:max-w-none" />
+      <!-- The machine plate: this device's node, and the realm it answers to. -->
+      <RouterLink
+        v-if="desktop"
+        :to="{ name: 'device' }"
+        class="flex h-9 min-w-0 shrink items-center gap-2 rounded-md border border-border/70 bg-card px-2.5 transition-colors hover:border-border hover:bg-muted"
+        :title="`This device: ${nodeLabel}`"
+      >
+        <span :class="['h-1.5 w-1.5 shrink-0 rounded-full', nodeDot]" aria-hidden="true" />
+        <span class="text-[12px] font-medium leading-none text-foreground">{{ nodeLabel }}</span>
+        <span class="hidden h-3 w-px shrink-0 bg-border sm:block" aria-hidden="true" />
+        <span class="hidden max-w-32 truncate text-[12px] leading-none text-muted-foreground sm:block">{{
+          realm.shortName
+        }}</span>
+      </RouterLink>
+      <RealmSwitcher v-else class="max-w-36 min-[480px]:max-w-none" />
 
       <SearchOverlay />
 
       <Button
-        v-if="currentUser"
+        v-if="currentUser && !desktop"
         variant="outline"
         size="sm"
         class="hidden h-9 md:inline-flex"
