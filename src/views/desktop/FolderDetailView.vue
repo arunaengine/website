@@ -51,6 +51,7 @@ const listError = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const stateFilter = ref<EntryState | ''>('')
 const replaceTarget = ref<FolderEntry | null>(null)
+const replaceAction = ref<'replace_local' | 'remove_local'>('replace_local')
 const replaceOpen = ref(false)
 const confirmUnbind = ref(false)
 
@@ -123,8 +124,11 @@ async function act(entry: FolderEntry, action: EntryAction): Promise<void> {
   }
 }
 
-function openReplace(entry: FolderEntry | null): void {
+// Every path that gives up local bytes goes through the dialog, so the owner
+// sees both copies before deciding.
+function openDecision(entry: FolderEntry | null, action: 'replace_local' | 'remove_local' = 'replace_local'): void {
   replaceTarget.value = entry
+  replaceAction.value = action
   replaceOpen.value = true
 }
 
@@ -227,7 +231,7 @@ function when(ms: number | null | undefined): string {
               Your copies are untouched. The realm versions sit beside them until you say which one stays.
             </p>
           </div>
-          <Button variant="outline" size="sm" @click="openReplace(null)">Replace all of them…</Button>
+          <Button variant="outline" size="sm" @click="openDecision(null)">Replace all of them…</Button>
         </div>
       </section>
 
@@ -283,12 +287,17 @@ function when(ms: number | null | undefined): string {
             <div v-if="entryPending(entry)" class="flex shrink-0 flex-wrap items-center gap-1.5">
               <template v-if="entry.state === 'conflict' || entry.state === 'pending_replace'">
                 <Button variant="ghost" size="sm" :disabled="busy" @click="act(entry, 'keep_local')">Keep mine</Button>
-                <Button variant="outline" size="sm" :disabled="busy" @click="openReplace(entry)">Replace mine…</Button>
+                <Button variant="outline" size="sm" :disabled="busy" @click="openDecision(entry)">Replace mine…</Button>
               </template>
               <template v-else-if="entry.state === 'remote_deleted'">
                 <Button variant="ghost" size="sm" :disabled="busy" @click="act(entry, 'keep_local')">Keep mine</Button>
-                <Button variant="outline" size="sm" :disabled="busy" @click="act(entry, 'remove_local')">
-                  Move mine to trash
+                <Button
+                  variant="outline"
+                  size="sm"
+                  :disabled="busy"
+                  @click="openDecision(entry, 'remove_local')"
+                >
+                  Move mine to trash…
                 </Button>
               </template>
               <Button v-else variant="outline" size="sm" :disabled="busy" @click="act(entry, 'resolve')">
@@ -327,6 +336,7 @@ function when(ms: number | null | undefined): string {
       v-model:open="replaceOpen"
       :folder="folder"
       :entry="replaceTarget"
+      :action="replaceAction"
       @replaced="refresh"
     />
   </div>
