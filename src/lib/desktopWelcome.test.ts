@@ -228,12 +228,15 @@ describe('sign in gate', () => {
   })
 
   it('keeps the realm form and the callback reachable', async () => {
+    // A window reopened on /welcome after a connect must land on sign-in, not the form.
     const welcome = await load({ state: 'stopped', enrolled: true, apiBaseUrl: null }, REALM, undefined, {
       token: '',
     })
     const router = await routerWith(welcome)
 
     await router.push({ name: 'welcome' })
+    expect(router.currentRoute.value.name).toBe('welcome-sign-in')
+    await router.push({ name: 'welcome', query: { change: '1' } })
     expect(router.currentRoute.value.name).toBe('welcome')
     await router.push({ name: 'auth-callback' })
     expect(router.currentRoute.value.name).toBe('auth-callback')

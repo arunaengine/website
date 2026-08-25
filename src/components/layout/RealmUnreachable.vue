@@ -16,7 +16,7 @@ function retry(): void {
 }
 
 function toWelcome(): void {
-  void router.push({ name: 'welcome' })
+  void router.push({ name: 'welcome', query: { change: '1' } })
 }
 </script>
 

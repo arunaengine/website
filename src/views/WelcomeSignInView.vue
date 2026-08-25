@@ -37,7 +37,7 @@ onMounted(() => void probeRealm())
       <SignInPanel />
 
       <div class="text-center">
-        <RouterLink :to="{ name: 'welcome' }">
+        <RouterLink :to="{ name: 'welcome', query: { change: '1' } }">
           <Button variant="ghost" size="sm">Change realm</Button>
         </RouterLink>
       </div>

@@ -192,7 +192,9 @@ export function installDesktopGuard(router: Router): void {
     const resuming = to.name === 'welcome-device' && setupWatch() !== null
     if (await signedOut()) {
       if (resuming) return true
-      return to.name === 'welcome' || to.name === 'welcome-sign-in' ? true : { name: 'welcome-sign-in' }
+      // The realm step is done; only an explicit change reopens the form.
+      const changing = to.name === 'welcome' && to.query.change !== undefined
+      return changing || to.name === 'welcome-sign-in' ? true : { name: 'welcome-sign-in' }
     }
     if (to.name === 'device' || resuming) return true
     if (!setupSkipped() && !(await deviceEnrolled())) {

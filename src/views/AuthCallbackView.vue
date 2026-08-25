@@ -50,7 +50,7 @@ onMounted(async () => {
           <p class="mt-2 text-sm text-muted-foreground">{{ stageError }}</p>
           <div class="mt-6 flex justify-center gap-2">
             <Button @click="retry">Try again</Button>
-            <RouterLink v-if="inDesktop" :to="{ name: 'welcome' }">
+            <RouterLink v-if="inDesktop" :to="{ name: 'welcome', query: { change: '1' } }">
               <Button variant="outline">Change realm</Button>
             </RouterLink>
             <RouterLink v-else to="/app">
