@@ -4,6 +4,8 @@
 // here ever starts.
 import { computed, ref } from 'vue'
 import { isDesktop } from '@/lib/desktop'
+import { useAruna } from '@/composables/useAruna'
+import type { DeviceClient } from '@/lib/deviceApi'
 import type { NodeStatus } from '@/lib/desktopBridge'
 
 // The shell pushes `node-status` on every transition, so the poll is only the
@@ -77,6 +79,13 @@ const label = computed(() => {
   }
 })
 
+// The device routes answer to the owner's own token against the node's own
+// listener; without either there is nothing to call.
+const { authToken } = useAruna()
+const deviceClient = computed<DeviceClient | null>(() =>
+  nodeBaseUrl.value && authToken.value ? { baseUrl: nodeBaseUrl.value, token: authToken.value } : null,
+)
+
 export function useDeviceStatus() {
-  return { status, error, loaded, state, label, nodeBaseUrl, refresh, start }
+  return { status, error, loaded, state, label, nodeBaseUrl, deviceClient, refresh, start }
 }
