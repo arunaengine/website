@@ -15,15 +15,19 @@ import ExecutorStepsEditor from '@/components/compute/ExecutorStepsEditor.vue'
 import TesInputsEditor from '@/components/compute/TesInputsEditor.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
+import RunTargetPicker from '@/components/compute/RunTargetPicker.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useComputeDataView } from '@/composables/useComputeDataView'
+import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useRunTarget } from '@/composables/useRunTarget'
 import { useS3 } from '@/composables/useS3'
 import {
   TES_EXECUTOR_TAG,
   TES_GROUP_TAG,
+  TES_TARGET_TAG,
   captureContainerPath,
   captureOutput,
   expandDataRefEntry,
@@ -62,6 +66,9 @@ const router = useRouter()
 const route = useRoute()
 const { tesEnabled, busy, createTask, getTask } = useTes()
 const { apiBaseUrl, authToken, currentUser, myGroups } = useAruna()
+const { realm } = useRealm()
+// Desktop only: this machine can run the task itself.
+const runTarget = useRunTarget()
 const { signIn, stage, authPending } = useAuth()
 
 const signingIn = computed(() => stage.value === 'redirecting')
@@ -526,11 +533,16 @@ async function submitNative() {
     submitError.value = mapping.blocked
     return
   }
-  const created = await submitJob(mapping.request, {
-    baseUrl: apiBaseUrl.value,
-    token: authToken.value,
-  })
-  void router.push({ name: 'job-detail', params: { jobId: created.job_id } })
+  const local = runTarget.localClient.value
+  const created = await submitJob(
+    local ? { ...mapping.request, target: 'local' } : mapping.request,
+    local ?? { baseUrl: apiBaseUrl.value, token: authToken.value },
+  )
+  void router.push(
+    local
+      ? { name: 'run-detail', params: { jobId: created.job_id } }
+      : { name: 'job-detail', params: { jobId: created.job_id } },
+  )
 }
 
 async function submit() {
@@ -542,12 +554,17 @@ async function submit() {
       await submitNative()
       return
     }
-    const created = await createTask(task.value)
+    const local = runTarget.localClient.value
+    // The device maps the target tag the same way the native request maps it.
+    const submitted = local
+      ? { ...task.value, tags: { ...task.value.tags, [TES_TARGET_TAG]: 'local' } }
+      : task.value
+    const created = await createTask(submitted, local ?? undefined)
     if (created.workspaceIgnored) {
       submittedWithoutWorkspace.value = created.id
       return
     }
-    void router.push({ name: 'compute-task', params: { taskId: created.id } })
+    void router.push(local ? { name: 'runs' } : { name: 'compute-task', params: { taskId: created.id } })
   } catch (err) {
     if (useNative.value) {
       submitRetryable.value = isSubmitRetryable(err)
@@ -633,6 +650,12 @@ async function submit() {
             <label class="text-xs font-medium text-foreground">Description <span class="text-muted-foreground">(optional)</span></label>
             <Textarea v-model="description" class="mt-1" rows="3" />
           </div>
+          <RunTargetPicker
+            v-if="runTarget.available.value"
+            v-model="runTarget.target.value"
+            :compute="runTarget.compute.value"
+            :realm-name="realm.shortName"
+          />
           <div>
             <label class="text-xs font-medium text-foreground">Group</label>
             <Select v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />

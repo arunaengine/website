@@ -27,15 +27,19 @@ import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import QuickRunResult from '@/components/compute/QuickRunResult.vue'
 import InputLocalityHint from '@/components/compute/InputLocalityHint.vue'
+import RunTargetPicker from '@/components/compute/RunTargetPicker.vue'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useComputeDataView } from '@/composables/useComputeDataView'
+import { useRealm } from '@/composables/useRealm'
+import { useRunTarget } from '@/composables/useRunTarget'
 import { useS3 } from '@/composables/useS3'
 import {
   TES_GROUP_TAG,
   TES_IDEMPOTENCY_TAG,
+  TES_TARGET_TAG,
   captureContainerPath,
   captureOutput,
   expandDataRefEntry,
@@ -77,6 +81,9 @@ const router = useRouter()
 const route = useRoute()
 const { tesEnabled, busy, createTask, getTask } = useTes()
 const { currentUser, myGroups } = useAruna()
+const { realm } = useRealm()
+// Desktop only: this machine can run the script itself.
+const runTarget = useRunTarget()
 const { signIn, stage, authPending } = useAuth()
 const s3 = useS3()
 
@@ -791,12 +798,21 @@ async function submit() {
       )
     }
     await Promise.all(uploads)
-    const created = await createTask(submittedTask)
+    const local = runTarget.localClient.value
+    const created = await createTask(
+      local ? { ...submittedTask, tags: { ...submittedTask.tags, [TES_TARGET_TAG]: 'local' } } : submittedTask,
+      local ?? undefined,
+    )
     submittedOutputs.value = outputRows.value.map((row) => ({
       bucket: row.bucket.trim(),
       key: normalizedOutputKey(row.path),
       path: row.containerPath.trim(),
     }))
+    // The result panel follows the realm's task; a local run is watched in Runs.
+    if (local) {
+      void router.push({ name: 'runs' })
+      return
+    }
     submittedTaskId.value = created.id
   } catch (err) {
     submitError.value = isTesUnsupported(err)
@@ -1044,6 +1060,12 @@ function dismissRerun() {
       <section class="surface space-y-5 p-6">
         <!-- Step 1: Runtime -->
         <div v-if="step === 0" class="space-y-3">
+          <RunTargetPicker
+            v-if="runTarget.available.value"
+            v-model="runTarget.target.value"
+            :compute="runTarget.compute.value"
+            :realm-name="realm.shortName"
+          />
           <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runtime</div>
           <div class="grid gap-3 sm:grid-cols-3">
             <button

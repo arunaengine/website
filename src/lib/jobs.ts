@@ -304,6 +304,11 @@ export interface SubmitExecutionRequest {
   /** Scoped to the caller; the same key with a different plan is a 409. */
   idempotency_key?: string
   workspace?: WorkspaceRequest
+  /**
+   * Where the job runs. 'local' is the owner's own device and is accepted only
+   * by that device's API; absent means the realm, as it always did.
+   */
+  target?: 'realm' | 'local'
 }
 
 export interface SubmitJobResponse {

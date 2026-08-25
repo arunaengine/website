@@ -3,10 +3,10 @@ import { compile } from '@vue/compiler-dom'
 import { compileScript, parse } from '@vue/compiler-sfc'
 import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
-import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
+import { computed, createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as VueUse from '@vueuse/core'
 import * as Api from '@/lib/api'
 import * as NodeDisplay from '@/components/nodes/node-display'
@@ -120,6 +120,7 @@ const EmptyStateStub = defineComponent({
 const useArunaModule = {
   useAruna: () => ({
     apiBaseUrl: ref('https://node.example.org/api/v1'),
+    authToken: ref('realm-token'),
     bootstrapped: ref(true),
     currentUser: ref({ id: 'user-id', display_name: 'Test User' }),
     myGroups: ref([{ id: 'group-id', name: 'Test Group' }]),
@@ -197,6 +198,25 @@ const Input = compileClientComponent(new URL('../components/ui/Input.vue', impor
   '@/lib/utils': Utils,
   '@vueuse/core': VueUse,
 })
+const RunTargetPicker = compileClientComponent(
+  new URL('../components/compute/RunTargetPicker.vue', import.meta.url),
+  { vue: VueRuntime, '@lucide/vue': icons },
+)
+
+// Desktop-only run target, driven by the test: on the web it never appears.
+const runTargetChoice = ref<'realm' | 'local'>('realm')
+const runTargetAvailable = ref(false)
+const runningLocally = computed(() => runTargetAvailable.value && runTargetChoice.value === 'local')
+const runTarget = {
+  target: runTargetChoice,
+  available: runTargetAvailable,
+  local: runningLocally,
+  localClient: computed(() =>
+    runningLocally.value ? { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' } : null,
+  ),
+  compute: ref({ enabled: true, backend: 'docker', running: 0 }),
+}
+const submitJob = vi.fn(async () => ({ job_id: 'local-job-id', created: true }))
 const sharedComponents = {
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -239,11 +259,14 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({ executorKinds: ref(['docker']) }),
   },
+  '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Realm' }) }) },
+  '@/composables/useRunTarget': { useRunTarget: () => runTarget },
+  '@/components/compute/RunTargetPicker.vue': moduleDefault(RunTargetPicker),
   '@/lib/tes': Tes,
   '@/lib/workspaces': Workspaces,
   // Real modules: the TES-versus-native switch is the behaviour under test.
   '@/lib/nativeSubmit': NativeSubmit,
-  '@/lib/jobs': Jobs,
+  '@/lib/jobs': { ...Jobs, submitJob },
   '@/lib/placementPolicies': PlacementPolicies,
 })
 const AdminOnboardingView = compileClientComponent(new URL('./AdminOnboardingView.vue', import.meta.url), {
@@ -445,6 +468,8 @@ async function mount(component: Component, path?: string): Promise<Mounted> {
         { path: '/app/compute', name: 'compute', component: Stub },
         { path: '/app/compute/new', name: 'compute-new', component: Stub },
         { path: '/app/compute/:taskId', name: 'compute-task', component: Stub },
+        { path: '/app/runs', name: 'runs', component: Stub },
+        { path: '/app/runs/:jobId', name: 'run-detail', component: Stub },
         { path: '/app/admin', name: 'admin', component: Stub },
       ],
     })
@@ -604,6 +629,69 @@ describe('numeric Input consumers', () => {
 
     expect(content(mounted.root)).toContain('ARUNA_NODE_WEIGHT=7.5')
     expect(content(mounted.root)).toContain('ARUNA_NODE_WEIGHT: "7.5"')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+})
+
+describe('run target', () => {
+  beforeEach(() => {
+    runTargetAvailable.value = false
+    runTargetChoice.value = 'realm'
+    submitJob.mockClear()
+  })
+
+  it('offers no choice outside the desktop shell', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+
+    expect(content(mounted.root)).not.toContain('Run on')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('sends a local run to this device with the local target', async () => {
+    runTargetAvailable.value = true
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+
+    expect(content(mounted.root)).toContain('Run on')
+    await click(button(mounted.root, 'This computer'))
+    expect(content(mounted.root)).toContain('copied to this computer')
+
+    await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
+    await mounted.router!.push('/app/compute/new?step=1')
+    await flush()
+    await fillValidWorkload(mounted.root)
+    await mounted.router!.push('/app/compute/new?step=2')
+    await flush()
+    await click(submitButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(submitJob).toHaveBeenCalledTimes(1)
+    const [request, client] = submitJob.mock.calls[0] as unknown as [Record<string, unknown>, Record<string, unknown>]
+    expect(request.target).toBe('local')
+    expect(client).toEqual({ baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' })
+    expect(mounted.router!.currentRoute.value.name).toBe('run-detail')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('leaves a realm run on the realm API', async () => {
+    runTargetAvailable.value = true
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+
+    await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
+    await mounted.router!.push('/app/compute/new?step=1')
+    await flush()
+    await fillValidWorkload(mounted.root)
+    await mounted.router!.push('/app/compute/new?step=2')
+    await flush()
+    await click(submitButton(mounted.root))
+    await flush()
+
+    const [request, client] = submitJob.mock.calls[0] as unknown as [Record<string, unknown>, Record<string, unknown>]
+    expect(request.target).toBeUndefined()
+    expect(client).toEqual({ baseUrl: 'https://node.example.org/api/v1', token: 'realm-token' })
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

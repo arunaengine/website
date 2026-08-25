@@ -145,6 +145,10 @@ export const TES_IDEMPOTENCY_TAG = 'aruna-engine.org/idempotency-key'
 // the native request's `executor_constraint`. Echoed back on BASIC and FULL.
 export const TES_EXECUTOR_TAG = 'aruna-engine.org/executor'
 
+// Sends the task to the owner's own device instead of the realm (TARGET_TAG_KEY,
+// value 'local'). Only that device's own API accepts it.
+export const TES_TARGET_TAG = 'aruna-engine.org/target'
+
 // ── Read-only placement tags ─────────────────────────────────────────────────
 // Agreed contract: BASIC and FULL task views carry the native job's identity
 // and, once the request is placed, its planner outcome. A node that has not
