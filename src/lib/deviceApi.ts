@@ -104,6 +104,12 @@ export interface SyncedFolder {
   message: string | null
 }
 
+/** How a bound folder is named to its owner: the last segment of its root. */
+export function folderName(root: string): string {
+  const parts = root.split(/[\\/]/).filter(Boolean)
+  return parts[parts.length - 1] ?? root
+}
+
 export interface BindFolderRequest {
   root: string
   group_id: string

@@ -237,6 +237,11 @@ export async function pickDirectory(options: { title?: string; startPath?: strin
   return asText(await call('pick_directory', { ...options }))
 }
 
+/** Shows a file or folder in the system file manager. */
+export async function revealPath(path: string): Promise<void> {
+  await call('reveal_path', { path })
+}
+
 /** Hands a URL to the system browser (never the shell's own webview). */
 export async function openExternal(url: string): Promise<void> {
   await call('open_external', { url })
