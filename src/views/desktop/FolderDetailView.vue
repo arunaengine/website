@@ -15,14 +15,21 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import {
   entryExpectation,
-  entryPending,
   folderName,
   isStaleExpectation,
   type EntryAction,
   type EntryState,
   type FolderEntry,
 } from '@/lib/deviceApi'
-import { ENTRY_META, entryBadge, entryMeta, orderEntries } from '@/lib/syncStates'
+import {
+  ENTRY_META,
+  entryBadge,
+  entryMeta,
+  entryNeedsYou,
+  needsYouCount,
+  orderEntries,
+  replaceableCount,
+} from '@/lib/syncStates'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { ArrowLeft, ArrowRight, FolderOpen, Link2Off, Pause, Play, RefreshCw } from '@lucide/vue'
 
@@ -61,10 +68,12 @@ const STATE_OPTIONS = [
 ]
 
 const visible = computed(() => orderEntries(rows.value))
-const pending = computed(() => visible.value.filter(entryPending))
-const pendingReplacements = computed(
-  () => (folder.value?.counters.conflicts ?? 0) + (folder.value?.counters.pending_replacements ?? 0),
-)
+const needsYouHere = computed(() => visible.value.filter((entry) => entryNeedsYou(entry.state)))
+const counters = computed(() => folder.value?.counters ?? null)
+const waiting = computed(() => (counters.value ? needsYouCount(counters.value) : 0))
+// A folder-wide replace covers conflicts and pending replacements; a remote
+// deletion is a removal, and removals stay one file at a time.
+const replaceable = computed(() => (counters.value ? replaceableCount(counters.value) : 0))
 
 async function loadPage(reset = true): Promise<void> {
   if (!folderId.value) return
@@ -84,6 +93,16 @@ async function loadPage(reset = true): Promise<void> {
   } catch (err) {
     listState.value = 'error'
     listError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+/** A failed file is retried by sweeping the folder again, not by an action. */
+async function retry(): Promise<void> {
+  actionError.value = null
+  try {
+    await sync(folderId.value)
+  } catch (err) {
+    actionError.value = err instanceof Error ? err.message : String(err)
   }
 }
 
@@ -194,7 +213,7 @@ function when(ms: number | null | undefined): string {
           <Pause v-else class="h-3.5 w-3.5" />
           {{ folder.state === 'paused' ? 'Resume' : 'Pause' }}
         </Button>
-        <Button v-if="folder && folder.state !== 'paused'" size="sm" :disabled="busy" @click="sync(folder.folder_id)">
+        <Button v-if="folder && folder.state !== 'paused'" size="sm" :disabled="busy" @click="retry">
           Sync now
         </Button>
       </template>
@@ -218,21 +237,27 @@ function when(ms: number | null | undefined): string {
       </div>
 
       <!-- The decision band: the only place a local file can be given up. -->
-      <section
-        v-if="folder && pendingReplacements > 0"
-        class="rounded-lg border border-amber-500/40 bg-amber-500/[0.07] px-4 py-3.5"
-      >
+      <section v-if="folder && waiting > 0" class="rounded-lg border border-amber-500/40 bg-amber-500/[0.07] px-4 py-3.5">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0">
             <h2 class="text-sm font-semibold text-amber-900 dark:text-amber-200">
-              {{ pendingReplacements }} {{ pendingReplacements === 1 ? 'file waits' : 'files wait' }} for your decision
+              {{ waiting }} {{ waiting === 1 ? 'file waits' : 'files wait' }} for your decision
             </h2>
             <p class="mt-0.5 text-[12px] leading-relaxed text-amber-900/80 dark:text-amber-200/80">
-              Your copies are untouched. The realm versions sit beside them until you say which one stays.
+              <span>{{ folder.counters.conflicts }} both changed</span> ·
+              <span>{{ folder.counters.pending_replacements }} waiting to be replaced</span> ·
+              <span>{{ folder.counters.remote_deleted }} deleted in the realm</span>. Your copies are untouched until
+              you say otherwise.
             </p>
           </div>
-          <Button variant="outline" size="sm" @click="openDecision(null)">Replace all of them…</Button>
+          <Button v-if="replaceable > 0" variant="outline" size="sm" @click="openDecision(null)">
+            Replace {{ replaceable }} of them…
+          </Button>
         </div>
+        <p v-if="folder.counters.errors" class="mt-2 text-[11px] text-amber-900/80 dark:text-amber-200/80">
+          {{ folder.counters.errors }} {{ folder.counters.errors === 1 ? 'file' : 'files' }} failed and are listed
+          separately.
+        </p>
       </section>
 
       <div class="flex flex-wrap items-center gap-2">
@@ -243,8 +268,8 @@ function when(ms: number | null | undefined): string {
           label="State"
           aria-label="Filter entries by state"
         />
-        <span v-if="pending.length" class="text-[11px] text-muted-foreground"
-          >{{ pending.length }} on this page need you</span
+        <span v-if="needsYouHere.length" class="text-[11px] text-muted-foreground"
+          >{{ needsYouHere.length }} on this page need you</span
         >
       </div>
 
@@ -284,7 +309,10 @@ function when(ms: number | null | undefined): string {
               </div>
             </div>
 
-            <div v-if="entryPending(entry)" class="flex shrink-0 flex-wrap items-center gap-1.5">
+            <div
+              v-if="entryNeedsYou(entry.state) || entry.state === 'error'"
+              class="flex shrink-0 flex-wrap items-center gap-1.5"
+            >
               <template v-if="entry.state === 'conflict' || entry.state === 'pending_replace'">
                 <Button variant="ghost" size="sm" :disabled="busy" @click="act(entry, 'keep_local')">Keep mine</Button>
                 <Button variant="outline" size="sm" :disabled="busy" @click="openDecision(entry)">Replace mine…</Button>
@@ -300,9 +328,18 @@ function when(ms: number | null | undefined): string {
                   Move mine to trash…
                 </Button>
               </template>
-              <Button v-else variant="outline" size="sm" :disabled="busy" @click="act(entry, 'resolve')">
-                Try again
-              </Button>
+              <template v-else>
+                <Button variant="ghost" size="sm" :disabled="busy" @click="act(entry, 'resolve')">Mark handled</Button>
+                <Button
+                  v-if="folder"
+                  variant="outline"
+                  size="sm"
+                  :disabled="busy || folder.state === 'paused'"
+                  @click="retry"
+                >
+                  Retry sync
+                </Button>
+              </template>
             </div>
           </div>
         </li>

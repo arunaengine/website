@@ -20,7 +20,7 @@ import {
   type FolderEntry,
   type SyncedFolder,
 } from '@/lib/deviceApi'
-import { folderConfirmed } from '@/lib/syncStates'
+import { folderConfirmed, replaceableCount } from '@/lib/syncStates'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { Loader2 } from '@lucide/vue'
 
@@ -45,9 +45,7 @@ const entry = computed(() => props.entry ?? null)
 const removing = computed(() => Boolean(entry.value) && props.action === 'remove_local')
 const name = computed(() => folderName(props.folder.root))
 const trashPath = computed(() => `${props.folder.root.replace(/[/\\]+$/, '')}/.aruna/trash/`)
-const pendingCount = computed(
-  () => props.folder.counters.conflicts + props.folder.counters.pending_replacements,
-)
+const pendingCount = computed(() => replaceableCount(props.folder.counters))
 
 watch(
   () => props.open,
@@ -139,8 +137,9 @@ async function apply(): Promise<void> {
             version. Your current bytes are gone afterwards.
           </template>
           <template v-else>
-            Every file in <span class="font-medium text-foreground">{{ name }}</span> that is waiting for a decision is
-            overwritten with the realm version. Their current bytes are gone afterwards.
+            In <span class="font-medium text-foreground">{{ name }}</span
+            >, the incoming version replaces your copy for every conflict and pending replacement. Their current bytes
+            are gone afterwards.
           </template>
         </DialogDescription>
       </DialogHeader>
@@ -190,7 +189,10 @@ async function apply(): Promise<void> {
             />
           </label>
           <p class="text-[11px] text-muted-foreground">
-            Files that are already in sync are untouched. Only the ones waiting for you are replaced.
+            {{ folder.counters.conflicts }} both changed and {{ folder.counters.pending_replacements }} waiting to be
+            replaced. Files in sync are untouched, and the
+            {{ folder.counters.remote_deleted }} deleted in the realm stay where they are: removals are decided one file
+            at a time.
           </p>
         </div>
 

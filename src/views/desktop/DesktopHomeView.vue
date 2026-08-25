@@ -26,7 +26,7 @@ import { Boxes, Cpu, FileText, FolderSync, Play, Plus, RefreshCw, Waves } from '
 const { realm } = useRealm()
 const { currentUser } = useAruna()
 const { status, label: nodeLabel, state: nodeState, deviceClient, refresh } = useDeviceStatus()
-const { folders, listState: foldersState, pendingTotal, ensureLoaded: ensureFolders } = useSyncedFolders()
+const { folders, listState: foldersState, needsYouTotal, ensureLoaded: ensureFolders } = useSyncedFolders()
 const { all: syncTransfers, active: activeTransfers, state: transfersState, load: loadTransfers } =
   useDeviceTransfers()
 const { items: uploadItems } = useUploadQueue()
@@ -158,10 +158,10 @@ onMounted(() => void reload())
                 </li>
               </ul>
               <RouterLink
-                v-if="pendingTotal"
+                v-if="needsYouTotal"
                 :to="{ name: 'folders' }"
                 class="mt-3 inline-flex rounded-md bg-amber-500/10 px-2.5 py-1 text-[12px] font-medium text-amber-800 hover:bg-amber-500/15 dark:text-amber-200"
-              >{{ pendingTotal }} waiting for your decision</RouterLink>
+              >{{ needsYouTotal }} waiting for your decision</RouterLink>
             </template>
             <div v-else class="space-y-2">
               <p class="text-sm text-muted-foreground">No folder on this computer is bound yet.</p>

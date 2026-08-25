@@ -157,9 +157,6 @@ export function readFolder(value: unknown): SyncedFolder {
   }
 }
 
-/** Entries needing the owner's decision; nothing here is ever applied for them. */
-export const PENDING_ENTRY_STATES = ['conflict', 'pending_replace', 'remote_deleted', 'error'] as const
-
 export type EntryState =
   | 'in_sync'
   | 'local_new'
@@ -234,11 +231,6 @@ export function readEntry(value: unknown): FolderEntry {
     message: text(raw.message),
     updated_at_ms: size(raw.updated_at_ms),
   }
-}
-
-/** True while the entry is waiting for the owner instead of the sync. */
-export function entryPending(entry: FolderEntry): boolean {
-  return (PENDING_ENTRY_STATES as readonly string[]).includes(entry.state)
 }
 
 export interface EntryPage {

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from './api'
 import {
   entryExpectation,
-  entryPending,
   isDeviceUnsupported,
   isStaleExpectation,
   readCompute,
@@ -67,15 +66,6 @@ describe('entry mapping', () => {
     expect(entry.remote?.version_id).toBe('v2')
     expect(entry.reason).toBe('base_unknown')
     expect(entry.conflicted_copy).toContain('conflicted copy')
-    expect(entryPending(entry)).toBe(true)
-  })
-
-  it('marks only the states that wait for a decision', () => {
-    const pending = ['conflict', 'pending_replace', 'remote_deleted', 'error']
-    const automatic = ['in_sync', 'local_new', 'local_changed', 'remote_new', 'remote_changed']
-
-    for (const state of pending) expect(entryPending(readEntry({ path: 'p', state }))).toBe(true)
-    for (const state of automatic) expect(entryPending(readEntry({ path: 'p', state }))).toBe(false)
   })
 
   it('drops a side the node did not describe', () => {

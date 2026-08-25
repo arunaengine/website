@@ -103,6 +103,8 @@ describe('replacing a whole folder', () => {
     const html = await render({ entry: null })
 
     expect(html).toContain('Replace 3 local files')
-    expect(html).toContain('already in sync are untouched')
+    expect(html).toContain('every conflict and pending replacement')
+    expect(html).toContain('Files in sync are untouched')
+    expect(html).toContain('removals are decided one file at a time')
   })
 })

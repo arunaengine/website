@@ -24,6 +24,7 @@ import {
   type EntryState,
   type SyncedFolder,
 } from '@/lib/deviceApi'
+import { needsYouCount } from '@/lib/syncStates'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 
 export type FoldersState = 'idle' | 'loading' | 'ready' | 'offline' | 'unsupported' | 'forbidden' | 'error'
@@ -145,11 +146,8 @@ function actionLog(folderId: string): Promise<ActionRecord[]> {
 }
 
 const available = computed(() => listState.value !== 'unsupported' && listState.value !== 'forbidden')
-const pendingTotal = computed(() =>
-  folders.value.reduce(
-    (sum, folder) => sum + folder.counters.conflicts + folder.counters.pending_replacements,
-    0,
-  ),
+const needsYouTotal = computed(() =>
+  folders.value.reduce((sum, folder) => sum + needsYouCount(folder.counters), 0),
 )
 
 export function useSyncedFolders() {
@@ -159,7 +157,7 @@ export function useSyncedFolders() {
     listError,
     busy,
     available,
-    pendingTotal,
+    needsYouTotal,
     load,
     ensureLoaded,
     bind,

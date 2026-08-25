@@ -14,6 +14,7 @@ import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import { folderName, type SyncedFolder } from '@/lib/deviceApi'
+import { needsYouCount } from '@/lib/syncStates'
 import { relativeTime } from '@/lib/utils'
 import { ArrowRight, FolderSync, Pause, Play, Plus, RefreshCw } from '@lucide/vue'
 
@@ -33,8 +34,7 @@ function remoteLabel(folder: SyncedFolder): string {
 }
 
 function needsYou(folder: SyncedFolder): number {
-  const { conflicts, pending_replacements, remote_deleted, errors } = folder.counters
-  return conflicts + pending_replacements + remote_deleted + errors
+  return needsYouCount(folder.counters)
 }
 
 async function run(work: Promise<unknown>): Promise<void> {
@@ -168,6 +168,11 @@ async function run(work: Promise<unknown>): Promise<void> {
               :to="{ name: 'folder', params: { folderId: folder.folder_id } }"
               class="font-medium text-amber-700 hover:underline dark:text-amber-300"
             >{{ needsYou(folder) }} need your decision</RouterLink>
+            <RouterLink
+              v-if="folder.counters.errors"
+              :to="{ name: 'folder', params: { folderId: folder.folder_id } }"
+              class="font-medium text-destructive hover:underline"
+            >{{ folder.counters.errors }} failed</RouterLink>
             <span v-if="folder.last_reconcile_ms" class="ml-auto"
               >checked {{ relativeTime(new Date(folder.last_reconcile_ms).toISOString()) }}</span
             >

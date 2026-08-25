@@ -70,8 +70,12 @@ beforeAll(async () => {
     useSyncedFolders: () => ({
       folders,
       listState: foldersState,
-      pendingTotal: computed(() =>
-        folders.value.reduce((sum, entry) => sum + entry.counters.conflicts + entry.counters.pending_replacements, 0),
+      needsYouTotal: computed(() =>
+        folders.value.reduce(
+          (sum, entry) =>
+            sum + entry.counters.conflicts + entry.counters.pending_replacements + entry.counters.remote_deleted,
+          0,
+        ),
       ),
       ensureLoaded: vi.fn(async () => undefined),
     }),

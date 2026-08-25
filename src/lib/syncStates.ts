@@ -2,7 +2,7 @@
 // wins by default, so the states that wait for a decision are named as such and
 // sort to the top; nothing here ever describes an automatic overwrite.
 import type { BadgeVariant } from '@/components/nodes/node-display'
-import { folderName, type EntryState, type FolderEntry } from './deviceApi'
+import { folderName, type EntryState, type FolderCounters, type FolderEntry } from './deviceApi'
 
 export type EntryTone = 'settled' | 'moving' | 'decide' | 'error'
 
@@ -43,6 +43,25 @@ export const ENTRY_META: Record<EntryState, EntryMeta> = {
 
 export function entryMeta(state: EntryState): EntryMeta {
   return ENTRY_META[state] ?? ENTRY_META.error
+}
+
+// The three states the sync will not move past on its own. An entry in error
+// is counted apart: it failed, it is not waiting on a decision.
+const NEEDS_YOU: readonly EntryState[] = ['conflict', 'pending_replace', 'remote_deleted']
+
+/** True while the entry waits for the owner rather than for the sync. */
+export function entryNeedsYou(state: EntryState): boolean {
+  return NEEDS_YOU.includes(state)
+}
+
+/** How many files in a folder are waiting for the owner. */
+export function needsYouCount(counters: FolderCounters): number {
+  return counters.conflicts + counters.pending_replacements + counters.remote_deleted
+}
+
+/** The subset a folder-wide replace covers; a removal stays per file. */
+export function replaceableCount(counters: FolderCounters): number {
+  return counters.conflicts + counters.pending_replacements
 }
 
 const TONE_ORDER: Record<EntryTone, number> = { decide: 0, error: 1, moving: 2, settled: 3 }
