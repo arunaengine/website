@@ -2,13 +2,12 @@
 // home card, the list and the detail view share one loaded set and one loading
 // state; every call needs the local node up and the owner signed in.
 import { computed, ref } from 'vue'
+import { useDeviceQuery } from '@/composables/useDeviceQuery'
 import {
   applyEntryAction,
   applyFolderAction,
   bindFolder,
   getFolder,
-  isDeviceForbidden,
-  isDeviceUnsupported,
   listEntries,
   listFolderActions,
   listFolders,
@@ -28,48 +27,20 @@ import {
 import { needsYouCount } from '@/lib/syncStates'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 
-export type FoldersState = 'idle' | 'loading' | 'ready' | 'offline' | 'unsupported' | 'forbidden' | 'error'
-
-const folders = ref<SyncedFolder[]>([])
-const listState = ref<FoldersState>('idle')
-const listError = ref<string | null>(null)
+const query = useDeviceQuery<SyncedFolder[]>(listFolders, [])
+const folders = query.data
+const listState = query.state
+const listError = query.error
 const busy = ref(false)
 
 const { deviceClient } = useDeviceStatus()
-
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
-function noteFailure(err: unknown): void {
-  if (isDeviceUnsupported(err)) listState.value = 'unsupported'
-  else if (isDeviceForbidden(err)) listState.value = 'forbidden'
-  else {
-    listState.value = 'error'
-    listError.value = message(err)
-  }
-}
 
 /** Throws when the node is not answering, so callers report one honest reason. */
 function client(): DeviceClient {
   return requireDevice(deviceClient.value, 'its folders')
 }
 
-async function load(): Promise<void> {
-  if (!deviceClient.value) {
-    folders.value = []
-    listState.value = 'offline'
-    return
-  }
-  if (listState.value !== 'ready') listState.value = 'loading'
-  listError.value = null
-  try {
-    folders.value = await listFolders(client())
-    listState.value = 'ready'
-  } catch (err) {
-    noteFailure(err)
-  }
-}
+const load = query.run
 
 /** Paints the loaded set once; the views call it on mount. */
 async function ensureLoaded(): Promise<void> {
@@ -145,6 +116,7 @@ function actionLog(folderId: string): Promise<ActionRecord[]> {
 }
 
 const available = computed(() => listState.value !== 'unsupported' && listState.value !== 'forbidden')
+
 const needsYouTotal = computed(() =>
   folders.value.reduce((sum, folder) => sum + needsYouCount(folder.counters), 0),
 )

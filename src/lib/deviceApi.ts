@@ -37,6 +37,19 @@ export function isStaleExpectation(err: unknown): boolean {
   return err instanceof ApiError && err.status === 412
 }
 
+/**
+ * What every device-backed surface can be in. 'offline' is this machine's node
+ * being absent, 'unsupported' the node not serving the route yet.
+ */
+export type DeviceState = 'idle' | 'loading' | 'ready' | 'offline' | 'unsupported' | 'forbidden' | 'error'
+
+/** One reading of a failed device call, shared by every surface. */
+export function classify(err: unknown): 'unsupported' | 'forbidden' | 'error' {
+  if (isDeviceUnsupported(err)) return 'unsupported'
+  if (isDeviceForbidden(err)) return 'forbidden'
+  return 'error'
+}
+
 function request<T>(path: string, client: DeviceClient, options: ApiRequestOptions = {}): Promise<T> {
   return apiRequest<T>(path, options, client)
 }

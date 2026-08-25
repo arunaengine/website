@@ -7,10 +7,10 @@ import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import DesktopHeader from '@/components/desktop/DesktopHeader.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
+import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import { folderName, type SyncedFolder } from '@/lib/deviceApi'
@@ -69,42 +69,14 @@ async function run(work: Promise<unknown>): Promise<void> {
         {{ actionError }}
       </p>
 
-      <div v-if="listState === 'offline'" class="surface px-5 py-10 text-center">
-        <p class="text-sm font-medium text-foreground">This device's node is not running.</p>
-        <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-          Folders are kept by the node on this machine. Start it under This device and they come back.
-        </p>
-        <RouterLink :to="{ name: 'device' }" class="mt-4 inline-flex">
-          <Button variant="outline" size="sm">Open This device</Button>
-        </RouterLink>
-      </div>
+      <DeviceSurfaceState :state="listState" subject="its folders" :error="listError" @retry="load" />
 
-      <div v-else-if="listState === 'unsupported'" class="surface px-5 py-10 text-center">
-        <p class="text-sm font-medium text-foreground">This node does not sync folders yet.</p>
-        <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-          Its version serves no folder routes. Update the node and the surface fills itself in.
-        </p>
-      </div>
-
-      <div v-else-if="listState === 'forbidden'" class="surface px-5 py-10 text-center">
-        <p class="text-sm font-medium text-foreground">This session cannot manage the device.</p>
-        <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-          Folders answer to the owner's own token. Sign in as the account this device belongs to.
-        </p>
-      </div>
-
-      <ErrorPanel
-        v-else-if="listState === 'error'"
-        :message="listError || 'The folder list could not be loaded.'"
-        @retry="load"
-      />
-
-      <div v-else-if="loading" class="space-y-3">
+      <div v-if="loading && listState !== 'offline'" class="space-y-3">
         <Skeleton v-for="n in 2" :key="n" class="h-28" />
       </div>
 
       <EmptyState
-        v-else-if="!folders.length"
+        v-else-if="listState === 'ready' && !folders.length"
         title="No folders bound yet"
         description="Bind a folder and its files travel to the realm; a two-way folder also picks up what the realm gains."
       >
@@ -112,7 +84,7 @@ async function run(work: Promise<unknown>): Promise<void> {
         <Button size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Bind a folder</Button>
       </EmptyState>
 
-      <ul v-else class="space-y-3">
+      <ul v-else-if="folders.length" class="space-y-3">
         <li v-for="folder in folders" :key="folder.folder_id" class="surface overflow-hidden">
           <div class="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5">
             <div class="min-w-0">

@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import DesktopHeader from '@/components/desktop/DesktopHeader.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
+import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
@@ -18,7 +19,7 @@ import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import { useRealm } from '@/composables/useRealm'
 import { featureEnabled } from '@/lib/config'
-import { folderName, listDrafts, type DeviceDraft } from '@/lib/deviceApi'
+import { classify, folderName, listDrafts, type DeviceDraft, type DeviceState } from '@/lib/deviceApi'
 import { isTerminalJobState, listJobs, type JobStatusResponse } from '@/lib/jobs'
 import { formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import { Boxes, Cpu, FileText, FolderSync, Play, Plus, RefreshCw, Waves } from '@lucide/vue'
@@ -26,7 +27,13 @@ import { Boxes, Cpu, FileText, FolderSync, Play, Plus, RefreshCw, Waves } from '
 const { realm } = useRealm()
 const { currentUser } = useAruna()
 const { status, label: nodeLabel, state: nodeState, deviceClient, refresh } = useDeviceStatus()
-const { folders, listState: foldersState, needsYouTotal, ensureLoaded: ensureFolders } = useSyncedFolders()
+const {
+  folders,
+  listState: foldersState,
+  listError: foldersError,
+  needsYouTotal,
+  ensureLoaded: ensureFolders,
+} = useSyncedFolders()
 const { all: syncTransfers, active: activeTransfers, state: transfersState, load: loadTransfers } =
   useDeviceTransfers()
 const { items: uploadItems } = useUploadQueue()
@@ -36,9 +43,9 @@ const jobsEnabled = featureEnabled('jobs')
 const realmRuns = useJobsList({ pageSize: 10 })
 
 const localRuns = ref<JobStatusResponse[]>([])
-const localRunsMissing = ref(false)
+const localRunsState = ref<DeviceState>('idle')
 const drafts = ref<DeviceDraft[]>([])
-const draftsMissing = ref(false)
+const draftsState = ref<DeviceState>('idle')
 const showBind = ref(false)
 
 const online = computed(() => nodeState.value === 'running')
@@ -64,25 +71,33 @@ const activeUploads = computed(
 
 async function loadLocalRuns(): Promise<void> {
   const client = deviceClient.value
-  if (!client) return
+  if (!client) {
+    localRuns.value = []
+    localRunsState.value = 'offline'
+    return
+  }
   try {
     localRuns.value = (await listJobs({ limit: 5 }, client)).jobs
-    localRunsMissing.value = false
-  } catch {
+    localRunsState.value = 'ready'
+  } catch (err) {
     localRuns.value = []
-    localRunsMissing.value = true
+    localRunsState.value = classify(err)
   }
 }
 
 async function loadDrafts(): Promise<void> {
   const client = deviceClient.value
-  if (!client) return
+  if (!client) {
+    drafts.value = []
+    draftsState.value = 'offline'
+    return
+  }
   try {
     drafts.value = await listDrafts(client)
-    draftsMissing.value = false
-  } catch {
+    draftsState.value = 'ready'
+  } catch (err) {
     drafts.value = []
-    draftsMissing.value = true
+    draftsState.value = classify(err)
   }
 }
 
@@ -141,12 +156,13 @@ onMounted(() => void reload())
           </header>
           <div class="flex-1 px-5 py-4">
             <Skeleton v-if="foldersState === 'loading'" class="h-16" />
-            <p v-else-if="foldersState === 'offline'" class="text-sm text-muted-foreground">
-              The node on this machine is not running, so its folders are not listed.
-            </p>
-            <p v-else-if="foldersState === 'unsupported'" class="text-sm text-muted-foreground">
-              This node version does not sync folders yet.
-            </p>
+            <DeviceSurfaceState
+              v-else-if="foldersState !== 'ready'"
+              :state="foldersState"
+              subject="its folders"
+              :error="foldersError"
+              compact
+            />
             <template v-else-if="folders.length">
               <p class="text-sm text-foreground">
                 <span class="font-display text-xl font-bold">{{ folders.length }}</span>
@@ -187,9 +203,13 @@ onMounted(() => void reload())
             <p class="mt-1 text-[11px] text-muted-foreground">
               {{ syncTransfers.length }} from folder sync · {{ uploadItems.length }} from this window
             </p>
-            <p v-if="transfersState === 'unsupported'" class="mt-2 text-[11px] text-muted-foreground">
-              This node version does not report folder transfers yet.
-            </p>
+            <DeviceSurfaceState
+              v-if="transfersState !== 'ready'"
+              class="mt-2"
+              :state="transfersState"
+              subject="its transfers"
+              compact
+            />
             <ul class="mt-2 space-y-1">
               <li v-for="transfer in syncTransfers.slice(0, 3)" :key="transfer.id" class="truncate font-mono text-[11px] text-muted-foreground">
                 {{ transfer.direction === 'upload' ? '↑' : '↓' }} {{ transfer.path }}
@@ -221,9 +241,12 @@ onMounted(() => void reload())
             <p v-if="compute && !compute.enabled" class="text-[11px] text-muted-foreground">
               This computer runs no jobs itself yet. Turn it on under This device.
             </p>
-            <p v-else-if="localRunsMissing" class="text-[11px] text-muted-foreground">
-              This node version does not list local runs yet.
-            </p>
+            <DeviceSurfaceState
+              v-else-if="localRunsState !== 'ready'"
+              :state="localRunsState"
+              subject="its runs"
+              compact
+            />
             <ul v-else class="space-y-1">
               <li v-for="job in localRuns.slice(0, 3)" :key="job.job_id" class="truncate text-[11px] text-muted-foreground">
                 <span class="capitalize text-foreground">{{ job.kind }}</span> · {{ job.state }} ·
@@ -243,9 +266,13 @@ onMounted(() => void reload())
             <RouterLink :to="{ name: 'device' }" class="text-xs font-medium text-primary hover:underline">This device</RouterLink>
           </header>
           <div class="flex-1 px-5 py-4">
-            <p v-if="draftsMissing" class="text-sm text-muted-foreground">
-              This node version keeps no drafts, or serves no draft list.
-            </p>
+            <Skeleton v-if="draftsState === 'idle' || draftsState === 'loading'" class="h-12" />
+            <DeviceSurfaceState
+              v-else-if="draftsState !== 'ready'"
+              :state="draftsState"
+              subject="its drafts"
+              compact
+            />
             <template v-else-if="drafts.length">
               <p class="text-sm text-foreground">
                 <span class="font-display text-xl font-bold">{{ drafts.length }}</span>

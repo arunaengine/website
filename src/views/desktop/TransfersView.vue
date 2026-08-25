@@ -7,10 +7,10 @@ import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import DesktopHeader from '@/components/desktop/DesktopHeader.vue'
+import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import type { DeviceTransfer, TransferState } from '@/lib/deviceApi'
@@ -67,39 +67,21 @@ onMounted(() => void load())
           <span class="text-[11px] text-muted-foreground">{{ transfers.uploads.length }} up · {{ transfers.downloads.length }} down</span>
         </div>
 
-        <div v-if="state === 'offline'" class="surface px-5 py-8 text-center">
-          <p class="text-sm font-medium text-foreground">This device's node is not running.</p>
-          <RouterLink :to="{ name: 'device' }" class="mt-3 inline-flex">
-            <Button variant="outline" size="sm">Open This device</Button>
-          </RouterLink>
-        </div>
+        <DeviceSurfaceState :state="state" subject="its transfers" :error="error" @retry="load" />
 
-        <p
-          v-else-if="state === 'unsupported'"
-          class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-        >
-          This node version does not report its transfers yet.
-        </p>
-
-        <p v-else-if="state === 'forbidden'" class="surface px-5 py-8 text-center text-sm text-muted-foreground">
-          Transfers answer to the owner's own token. Sign in as the account this device belongs to.
-        </p>
-
-        <ErrorPanel v-else-if="state === 'error'" :message="error || 'Transfers could not be read.'" @retry="load" />
-
-        <div v-else-if="state === 'loading'" class="space-y-2">
+        <div v-if="state === 'loading'" class="space-y-2">
           <Skeleton v-for="n in 2" :key="n" class="h-12" />
         </div>
 
         <EmptyState
-          v-else-if="!ordered.length"
+          v-else-if="state === 'ready' && !ordered.length"
           title="Nothing in flight"
           description="Files move when a bound folder changes on either side."
         >
           <template #icon><Waves class="h-6 w-6" /></template>
         </EmptyState>
 
-        <ul v-else class="surface divide-y divide-border overflow-hidden">
+        <ul v-else-if="ordered.length" class="surface divide-y divide-border overflow-hidden">
           <li v-for="transfer in ordered" :key="transfer.id" class="flex items-center gap-3 px-4 py-2.5">
             <ArrowUpFromLine v-if="transfer.direction === 'upload'" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <ArrowDownToLine v-else class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

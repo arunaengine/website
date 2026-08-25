@@ -211,10 +211,12 @@ describe('desktop home', () => {
     expect(html).not.toContain('folder bound')
   })
 
-  it('offers nothing to publish when the device holds no drafts', async () => {
-    // Drafts load on mount, so a first paint honestly reports none.
+  it('invents no drafts while the first read is still in flight', async () => {
+    // Drafts load on mount, which a server render never reaches.
     const html = await render()
 
-    expect(html).toContain('Nothing authored offline is waiting')
+    expect(html).toContain('Drafts on this device')
+    expect(html).not.toContain('waiting to be published')
+    expect(html).not.toContain('does not serve')
   })
 })

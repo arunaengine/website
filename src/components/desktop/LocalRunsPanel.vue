@@ -11,6 +11,7 @@ import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
+import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { JOB_CLIENT, useJobsList } from '@/composables/useJobs'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
@@ -61,15 +62,7 @@ watch(reachable, (now) => now && reload())
       told about them.
     </p>
 
-    <div v-if="!reachable" class="surface px-5 py-10 text-center">
-      <p class="text-sm font-medium text-foreground">This device's node is not running.</p>
-      <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        Local runs are listed by the node on this machine. Start it under This device.
-      </p>
-      <RouterLink :to="{ name: 'device' }" class="mt-4 inline-flex">
-        <Button variant="outline" size="sm">Open This device</Button>
-      </RouterLink>
-    </div>
+    <DeviceSurfaceState v-if="!reachable" state="offline" subject="its runs" />
 
     <template v-else>
       <p
