@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { featureEnabled } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
+import type { NavItem, NavSection } from '@/components/layout/nav'
 import {
   Activity,
   ArrowLeft,
@@ -22,18 +23,9 @@ import {
   Workflow,
 } from '@lucide/vue'
 
-interface NavItem {
-  to: string
-  icon: unknown
-  label: string
-  exact?: boolean
-  match?: string[]
-}
-
-interface NavSection {
-  label: string
-  items: NavItem[]
-}
+// A layout that owns its own destinations (the desktop shell) passes them in;
+// without them the sidebar computes the portal's own.
+const props = defineProps<{ sections?: NavSection[]; backLink?: boolean }>()
 
 const {
   isRealmAdmin,
@@ -67,7 +59,7 @@ const adminItems = computed<NavItem[]>(() => [
     : []),
 ])
 
-const sections = computed<NavSection[]>(() => [
+const portalSections = computed<NavSection[]>(() => [
   {
     label: 'Workspace',
     items: [
@@ -112,6 +104,9 @@ const sections = computed<NavSection[]>(() => [
       ]
     : []),
 ])
+
+const sections = computed<NavSection[]>(() => props.sections ?? portalSections.value)
+const showBackLink = computed(() => props.backLink ?? !desktop)
 
 const route = useRoute()
 
@@ -193,7 +188,7 @@ watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1
         <span v-if="!collapsed">Collapse</span>
       </button>
       <RouterLink
-        v-if="!desktop"
+        v-if="showBackLink"
         to="/"
         :title="collapsed ? 'Back to landing' : undefined"
         :aria-label="collapsed ? 'Back to landing' : undefined"
