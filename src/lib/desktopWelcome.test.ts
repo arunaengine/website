@@ -35,6 +35,9 @@ function store(): Storage {
 // Shared across module graphs, so a second realm sees what the first stored.
 let storage = store()
 
+// What the shell pushes at the window, by event name.
+const listeners = new Map<string, (message: { payload: unknown }) => void>()
+
 // The desktop context and the runtime config are both read once per module
 // graph, so every case builds a graph of its own.
 async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUrl?: string, session: Session = {}) {
@@ -51,6 +54,13 @@ async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUr
   authToken.value = session.token ?? 'token'
   bootstrapped.value = session.bootstrapped ?? true
   currentUser.value = session.user === false ? null : { id: 'u1' }
+  listeners.clear()
+  vi.doMock('@tauri-apps/api/event', () => ({
+    listen: async (event: string, handler: (message: { payload: unknown }) => void) => {
+      listeners.set(event, handler)
+      return () => listeners.delete(event)
+    },
+  }))
   vi.doMock('@/composables/useAruna', () => ({
     useAruna: () => ({ authToken, bootstrapped, currentUser, setApiBaseUrl, refresh }),
   }))
@@ -91,6 +101,12 @@ async function turns(count = 20): Promise<void> {
 // is for where it lands rather than for a number of turns.
 function lands(router: Router, name: string) {
   return vi.waitFor(() => expect(router.currentRoute.value.name).toBe(name))
+}
+
+// The listener installs itself through a dynamic import, so the push waits.
+async function emit(event: string, payload: unknown): Promise<void> {
+  await vi.waitFor(() => expect(listeners.has(event)).toBe(true))
+  listeners.get(event)?.({ payload })
 }
 
 afterEach(() => {
@@ -232,6 +248,50 @@ describe('welcome guard', () => {
     await desktop.applyShellContext({ apiBaseUrl: LOCAL })
 
     await lands(router, 'welcome')
+  })
+
+  it('keeps the navigation on its way through a context change', async () => {
+    // The shell switches context while a deep link is still resolving; the
+    // link must land, query and all, rather than the window standing still.
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, LOCAL, 'https://aruna.example')
+    const router = await routerWith(welcome, '/app')
+
+    bootstrapped.value = false
+    const trip = router.push('/app/device?tab=enroll')
+    await turns()
+
+    const desktop = await import('./desktop')
+    await desktop.applyShellContext({
+      apiBaseUrl: LOCAL,
+      realmUrl: 'https://aruna.example',
+      features: { compute: true },
+    })
+    bootstrapped.value = true
+    await trip
+
+    await lands(router, 'device')
+    expect(router.currentRoute.value.query.tab).toBe('enroll')
+  })
+
+  it('routes a deep link the shell followed', async () => {
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, LOCAL, 'https://aruna.example')
+    const router = await routerWith(welcome, '/app')
+
+    await emit('navigate', { path: '/app/device?tab=enroll' })
+
+    await lands(router, 'device')
+    expect(router.currentRoute.value.query.tab).toBe('enroll')
+  })
+
+  it('refuses a destination outside this window', async () => {
+    // Nothing the shell pushes may send the window at a foreign origin.
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, LOCAL, 'https://aruna.example')
+    const router = await routerWith(welcome, '/app')
+
+    await emit('navigate', { path: 'https://evil.test/app/device' })
+    await turns()
+
+    expect(router.currentRoute.value.name).toBe('dashboard')
   })
 
   it('installs nothing outside the shell', async () => {

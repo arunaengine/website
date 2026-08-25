@@ -81,6 +81,9 @@ function readContext(value: unknown): DesktopContext | null {
   return context
 }
 
+// How long a boot waits for the shell to name its current context.
+const BOOT_CONTEXT_MS = 3_000
+
 /** The live shell context; null on the web. Replaced whole on every change. */
 export const shellContext = shallowRef<DesktopContext | null>(
   typeof window === 'undefined' ? null : readContext(window.__ARUNA_DESKTOP__),
@@ -192,5 +195,10 @@ export async function bootRuntimeConfig(): Promise<void> {
   } catch {
     reportGlobalError('Aruna Desktop features could not be loaded, please restart the app.')
   }
-  void followShellContext()
+  // The injected context can already be stale, so the app boots on what the
+  // shell holds now; a shell that will not answer must not hold the window.
+  await Promise.race([
+    followShellContext(),
+    new Promise((resolve) => setTimeout(resolve, BOOT_CONTEXT_MS)),
+  ])
 }

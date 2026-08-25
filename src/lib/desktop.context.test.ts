@@ -154,6 +154,17 @@ describe('following the shell', () => {
     await applied(() => desktop.desktopContext()?.apiBaseUrl, REALM)
   })
 
+  it('boots on the context the shell holds now', async () => {
+    // The injected object can already be stale, so the app must not mount on it.
+    held = { apiBaseUrl: REALM, realmUrl: 'https://aruna.example' }
+    const { desktop } = await boot({ apiBaseUrl: LOCAL })
+    const { portalConfig } = await import('./config')
+
+    await desktop.bootRuntimeConfig()
+
+    expect(portalConfig().apiBaseUrl).toBe(REALM)
+  })
+
   it('follows nothing outside the shell', async () => {
     vi.resetModules()
     vi.stubGlobal('window', {})

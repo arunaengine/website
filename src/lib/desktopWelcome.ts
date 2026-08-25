@@ -3,7 +3,7 @@
 // own the window until `validate_realm` gives the shell a realm to switch to,
 // the owner signed in, and the device prompt was answered.
 import { watch, type Ref } from 'vue'
-import type { RouteRecordName, Router } from 'vue-router'
+import { START_LOCATION, type RouteLocationNormalized, type RouteRecordName, type Router } from 'vue-router'
 import { desktopContext, isDesktop, refreshShellContext, shellContext } from './desktop'
 import { realmUnreachable } from './desktopBoot'
 
@@ -162,16 +162,33 @@ let knownOnce: boolean | null = null
  * Holds desktop navigation at the welcome routes until the app has a realm to
  * talk to, a signed-in owner, and an answer to the device prompt. Both probes
  * belong to the context they were made in: a context the shell reports drops
- * them and runs the current navigation again, so the window follows along.
+ * them and runs the navigation on its way again, so a deep link the shell
+ * followed still lands where it was going.
  */
 export function installDesktopGuard(router: Router): void {
   if (!isDesktop()) return
+  // The navigation in flight, so a context change re-runs that one instead of
+  // cancelling it in favour of where the window still stands.
+  let pending: RouteLocationNormalized | null = null
+  router.beforeEach((to) => {
+    pending = to
+    return true
+  })
+  router.afterEach(() => {
+    pending = null
+  })
   watch(shellContext, () => {
     knownOnce = null
     clearEnrolled()
-    const current = router.currentRoute.value
-    void router.replace({ path: current.path, query: current.query, hash: current.hash, force: true })
+    // Nothing has landed yet; the first navigation reads the new context.
+    if (router.currentRoute.value === START_LOCATION) return
+    const target = pending ?? router.currentRoute.value
+    void router.replace({ path: target.path, query: target.query, hash: target.hash, force: true })
   })
+  // A deep link the shell followed is a route change, never a reload.
+  void import('./desktopEvents').then(({ onShellNavigate }) =>
+    onShellNavigate((path) => void router.push(path)),
+  )
   router.beforeEach(async (to) => {
     // The system browser returns through the callback whatever else is true.
     if (to.name === 'auth-callback') return true

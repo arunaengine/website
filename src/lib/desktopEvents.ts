@@ -7,6 +7,7 @@ import { readInvite, readStatus, type EnrollInvite, type NodeStatus } from './de
 const ENROLL_EVENT = 'enroll-invite'
 const STATUS_EVENT = 'node-status'
 const CONTEXT_EVENT = 'context-changed'
+const NAVIGATE_EVENT = 'navigate'
 
 export type Unlisten = () => void
 
@@ -35,6 +36,18 @@ export function onNodeStatus(handler: (status: NodeStatus) => void): Promise<Unl
  */
 export function onShellContext(handler: (context: unknown) => void): Promise<Unlisten | null> {
   return subscribe(CONTEXT_EVENT, handler)
+}
+
+/**
+ * Watches where the shell wants this window: a deep link it followed arrives
+ * as a portal-relative path, never as a reload. Anything else is dropped, so
+ * no event can send the window at a foreign origin.
+ */
+export function onShellNavigate(handler: (path: string) => void): Promise<Unlisten | null> {
+  return subscribe(NAVIGATE_EVENT, (payload) => {
+    const raw = payload && typeof payload === 'object' ? (payload as { path?: unknown }).path : payload
+    if (typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//')) handler(raw)
+  })
 }
 
 /**
