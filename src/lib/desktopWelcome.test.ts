@@ -17,6 +17,8 @@ interface Session {
 
 const Blank = defineComponent(() => () => h('div'))
 
+const setApiBaseUrl = vi.fn()
+const refresh = vi.fn(async () => undefined)
 const authToken = ref('token')
 const bootstrapped = ref(true)
 const currentUser = ref<{ id: string } | null>({ id: 'u1' })
@@ -50,7 +52,7 @@ async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUr
   bootstrapped.value = session.bootstrapped ?? true
   currentUser.value = session.user === false ? null : { id: 'u1' }
   vi.doMock('@/composables/useAruna', () => ({
-    useAruna: () => ({ authToken, bootstrapped, currentUser }),
+    useAruna: () => ({ authToken, bootstrapped, currentUser, setApiBaseUrl, refresh }),
   }))
   const config = await import('./config')
   config.applyPortalConfig({ apiBaseUrl })
@@ -83,6 +85,12 @@ async function routerWith(welcome: typeof import('./desktopWelcome'), start = '/
 // Lets pending guard work settle without advancing the clock.
 async function turns(count = 20): Promise<void> {
   for (let i = 0; i < count; i++) await Promise.resolve()
+}
+
+// A context change re-runs the navigation through dynamic imports, so the wait
+// is for where it lands rather than for a number of turns.
+function lands(router: Router, name: string) {
+  return vi.waitFor(() => expect(router.currentRoute.value.name).toBe(name))
 }
 
 afterEach(() => {
@@ -201,6 +209,34 @@ describe('welcome guard', () => {
     expect(router.currentRoute.value.name).toBe('welcome')
   })
 
+  it('follows a realm the shell reports later', async () => {
+    // Nothing reopens the window, so a context alone must move the first run on.
+    const welcome = await load({ state: 'running', enrolled: false, apiBaseUrl: LOCAL }, LOCAL, undefined, {
+      token: '',
+    })
+    const router = await routerWith(welcome, '/welcome')
+    expect(router.currentRoute.value.name).toBe('welcome')
+
+    const desktop = await import('./desktop')
+    await desktop.applyShellContext({ apiBaseUrl: LOCAL, realmUrl: 'https://aruna.example' })
+
+    await lands(router, 'welcome-sign-in')
+  })
+
+  it('reopens the realm form after a wipe', async () => {
+    // The realm the guard was told about is gone, so its answer must be too.
+    const status = { state: 'running', enrolled: true, apiBaseUrl: LOCAL }
+    const welcome = await load(status, LOCAL, 'https://aruna.example')
+    const router = await routerWith(welcome, '/app/settings')
+    expect(router.currentRoute.value.name).toBe('settings')
+
+    status.enrolled = false
+    const desktop = await import('./desktop')
+    await desktop.applyShellContext({ apiBaseUrl: LOCAL })
+
+    await lands(router, 'welcome')
+  })
+
   it('installs nothing outside the shell', async () => {
     vi.resetModules()
     vi.stubGlobal('window', { localStorage: store() })
@@ -307,6 +343,22 @@ describe('device setup gate', () => {
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
 
+  it('opens the app once the device joined', async () => {
+    // Enrollment restarts the node and moves this window onto it; the guard
+    // must ask the shell again instead of holding the setup step.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}')))
+    const status = { state: 'running', enrolled: false, apiBaseUrl: LOCAL }
+    const welcome = await load(status, REALM, 'https://aruna.example')
+    const router = await routerWith(welcome, '/app')
+    expect(router.currentRoute.value.name).toBe('welcome-device')
+
+    status.enrolled = true
+    const desktop = await import('./desktop')
+    await desktop.applyShellContext({ apiBaseUrl: LOCAL, realmUrl: 'https://aruna.example' })
+
+    await lands(router, 'dashboard')
+  })
+
   it('asks again for another realm', async () => {
     // The skip belongs to the realm the device would have joined.
     const first = await load({ state: 'running', enrolled: false, apiBaseUrl: LOCAL }, REALM, 'https://one.example')
@@ -317,39 +369,6 @@ describe('device setup gate', () => {
     expect(second.setupSkipped()).toBe(false)
     const router = await routerWith(second)
     expect(router.currentRoute.value.name).toBe('welcome-device')
-  })
-
-  it('holds the step open for a resumed setup', async () => {
-    // The shell replaces the window mid-setup; the watch must survive it.
-    const welcome = await load(
-      { state: 'running', enrolled: true, apiBaseUrl: LOCAL },
-      REALM,
-      'https://aruna.example',
-    )
-    welcome.setSetupWatch({ enrollmentId: 'enr-1', expiresAt: 4102444800 })
-    const router = await routerWith(welcome, '/app')
-
-    await router.push({ name: 'welcome-device' })
-    expect(router.currentRoute.value.name).toBe('welcome-device')
-  })
-})
-
-describe('setup watch', () => {
-  it('survives until it is cleared', async () => {
-    const welcome = await load(null, LOCAL, 'https://aruna.example')
-    expect(welcome.setupWatch()).toBeNull()
-
-    welcome.setSetupWatch({ enrollmentId: 'enr-1', expiresAt: 42 })
-    expect(welcome.setupWatch()).toEqual({ enrollmentId: 'enr-1', expiresAt: 42 })
-
-    welcome.setSetupWatch(null)
-    expect(welcome.setupWatch()).toBeNull()
-  })
-
-  it('ignores a record without an expiry', async () => {
-    const welcome = await load(null, LOCAL, 'https://aruna.example')
-    storage.setItem('aruna.desktop.setupWatch:https://aruna.example', '{"enrollmentId":"enr-1"}')
-    expect(welcome.setupWatch()).toBeNull()
   })
 })
 

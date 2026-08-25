@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // Desktop first run, after sign-in: the node this machine runs is offered once
 // and may be skipped. Setting up mints an enrollment against the realm and
-// redeems it here; the shell then restarts the node and replaces this window,
-// so the watch is picked up from what the setup left on record.
-import { onMounted, ref, watch } from 'vue'
+// redeems it here; the shell restarts the node and switches this window's
+// context underneath the step, which keeps watching across it.
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppLogo from '@/components/layout/AppLogo.vue'
 import ClaimWatchStep from '@/components/onboarding/ClaimWatchStep.vue'
@@ -15,10 +15,8 @@ import { ArrowRight, Laptop } from '@lucide/vue'
 
 const router = useRouter()
 const { realm } = useAruna()
-const { applying, error, watching, joined, stages, state, apply, resume, done } = useDeviceSetup()
+const { applying, error, watching, joined, stages, state, apply, done } = useDeviceSetup()
 const deviceName = ref('')
-
-onMounted(() => void resume())
 
 // A joined device has nothing left to watch, so the portal opens on its own.
 watch(joined, (yes) => {
@@ -69,7 +67,7 @@ function leave(): void {
         <div v-if="watching" class="flex flex-col justify-center gap-4 p-6 md:p-7">
           <h1 class="font-display text-lg font-semibold tracking-tight text-aruna-navy">Joining the realm</h1>
           <p class="text-xs leading-relaxed text-muted-foreground">
-            The app restarts the node with its new identity, so this window may reopen while it joins.
+            The app restarts the node with its new identity; this window stays where it is while it joins.
           </p>
           <ClaimWatchStep :stages="stages" :error="state.lastError">
             <template #actions>

@@ -14,6 +14,8 @@ const startWatch = vi.fn()
 const resetWatch = vi.fn()
 const enrollApply = vi.fn()
 const nodeStatus = vi.fn()
+const setApiBaseUrl = vi.fn()
+const refresh = vi.fn(async () => undefined)
 
 vi.mock('@/composables/useDeviceEnrollment', () => ({
   WATCH_INTERVAL_MS: 5_000,
@@ -28,9 +30,13 @@ vi.mock('@/composables/useDeviceEnrollment', () => ({
 }))
 
 vi.mock('@/lib/desktopBridge', () => ({ enrollApply, nodeStatus }))
+vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ setApiBaseUrl, refresh }) }))
+vi.mock('@/composables/useDeviceQuery', () => ({ resetDeviceQueries: vi.fn() }))
+vi.mock('@/lib/desktopBoot', () => ({ probeRealm: vi.fn(), realmUnreachable: () => false }))
 
 let setup: typeof import('./useDeviceSetup').useDeviceSetup
 let welcome: typeof import('@/lib/desktopWelcome')
+let applyShellContext: typeof import('@/lib/desktop').applyShellContext
 
 beforeAll(async () => {
   vi.stubGlobal('window', {
@@ -43,6 +49,7 @@ beforeAll(async () => {
   })
   setup = (await import('./useDeviceSetup')).useDeviceSetup
   welcome = await import('@/lib/desktopWelcome')
+  applyShellContext = (await import('@/lib/desktop')).applyShellContext
 })
 
 beforeEach(() => {
@@ -77,7 +84,6 @@ describe('applying a setup', () => {
       realm: 'R1',
       label: 'work-laptop',
     })
-    expect(welcome.setupWatch()).toEqual({ enrollmentId: 'enr-2', expiresAt: 99 })
     expect(startWatch).toHaveBeenCalledWith('enr-2', 99)
     expect(api.watching.value).toBe(true)
     api.done()
@@ -91,42 +97,6 @@ describe('applying a setup', () => {
 
     expect(api.watching.value).toBe(false)
     expect(api.error.value).toContain('no enrollment link')
-    expect(welcome.setupWatch()).toBeNull()
-  })
-})
-
-describe('resuming a setup', () => {
-  it('picks the watch back up after a reload', async () => {
-    // The shell replaces the window once the node restarts; the form must not
-    // come back and ask for the device again.
-    welcome.setSetupWatch({ enrollmentId: 'enr-1', expiresAt: 42 })
-    const api = await mounted()
-
-    await api.resume()
-
-    expect(api.watching.value).toBe(true)
-    expect(startWatch).toHaveBeenCalledWith('enr-1', 42)
-    expect(api.joined.value).toBe(false)
-    api.done()
-  })
-
-  it('reads an enrolled node as joined', async () => {
-    welcome.setSetupWatch({ enrollmentId: 'enr-1', expiresAt: 42 })
-    nodeStatus.mockResolvedValue({ enrolled: true })
-    const api = await mounted()
-
-    await api.resume()
-    expect(api.joined.value).toBe(true)
-    api.done()
-  })
-
-  it('asks for the device with nothing on record', async () => {
-    const api = await mounted()
-
-    await api.resume()
-
-    expect(api.watching.value).toBe(false)
-    expect(startWatch).not.toHaveBeenCalled()
   })
 })
 
@@ -148,20 +118,37 @@ describe('following the node', () => {
     expect(api.joined.value).toBe(true)
 
     api.done()
-    expect(welcome.setupWatch()).toBeNull()
     await vi.advanceTimersByTimeAsync(10_000)
     expect(nodeStatus).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps watching across a context switch', async () => {
+    // The shell restarts the node and points this window at it mid-setup;
+    // nothing is left on record to resume from.
+    vi.useFakeTimers()
+    mint.mockResolvedValue({ response: { enroll_url: ENROLL_URL, expires_at: 99 }, enrollmentId: 'enr-4' })
+    nodeStatus.mockResolvedValueOnce({ enrolled: false }).mockResolvedValue({ enrolled: true })
+    const api = await mounted()
+
+    await api.apply('')
+    await vi.advanceTimersByTimeAsync(0)
+    await applyShellContext({ apiBaseUrl: 'http://127.0.0.1:47713/api/v1', realmUrl: REALM })
+
+    expect(api.watching.value).toBe(true)
+    expect(setApiBaseUrl).toHaveBeenCalledWith('http://127.0.0.1:47713/api/v1', { keepToken: true })
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(api.joined.value).toBe(true)
+    api.done()
   })
 })
 
 describe('leaving the setup', () => {
   it('answers the prompt for this realm', async () => {
-    welcome.setSetupWatch({ enrollmentId: 'enr-1', expiresAt: 42 })
     const api = await mounted()
 
     api.done()
 
-    expect(welcome.setupWatch()).toBeNull()
     expect(welcome.setupSkipped()).toBe(true)
     expect(resetWatch).toHaveBeenCalled()
   })

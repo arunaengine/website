@@ -4,13 +4,7 @@
 import { computed, onUnmounted, ref } from 'vue'
 import type { WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useDeviceEnrollment, WATCH_INTERVAL_MS, type DeviceWatch } from '@/composables/useDeviceEnrollment'
-import {
-  bounded,
-  clearEnrolled,
-  setSetupWatch,
-  setupWatch,
-  skipSetup,
-} from '@/lib/desktopWelcome'
+import { bounded, clearEnrolled, skipSetup } from '@/lib/desktopWelcome'
 import { parseEnrollInput } from '@/lib/enrollLink'
 import { truncateMiddle } from '@/lib/utils'
 
@@ -61,8 +55,9 @@ export function watchStages(state: DeviceWatch): WatchStage[] {
 
 /**
  * First-run device setup: mints an enrollment for this account, redeems it on
- * the embedded node and follows it until the device joined. Must be called
- * during component setup (useDeviceEnrollment registers onUnmounted).
+ * the embedded node and follows it until the device joined. The step keeps its
+ * watch in memory while the node restarts under it. Must be called during
+ * component setup (useDeviceEnrollment registers onUnmounted).
  */
 export function useDeviceSetup() {
   const { minting, mintError, watch: state, mint, startWatch, resetWatch } = useDeviceEnrollment()
@@ -85,7 +80,6 @@ export function useDeviceSetup() {
     try {
       const { response, enrollmentId } = await mint(ENROLLMENT_TTL_SECS)
       await applyEnrollment(response.enroll_url, label)
-      setSetupWatch({ enrollmentId, expiresAt: response.expires_at })
       watching.value = true
       startWatch(enrollmentId, response.expires_at)
       void follow()
@@ -121,22 +115,9 @@ export function useDeviceSetup() {
     timer = undefined
   }
 
-  /**
-   * Picks a watch left on record back up: the shell replaces the window while
-   * the node restarts, so the enrollment is followed instead of asked for again.
-   */
-  async function resume(): Promise<void> {
-    const record = setupWatch()
-    if (!record) return
-    watching.value = true
-    startWatch(record.enrollmentId, record.expiresAt)
-    await follow()
-  }
-
   /** Answers the prompt for good: a joined device is not asked again either. */
   function done(): void {
     unfollow()
-    setSetupWatch(null)
     skipSetup()
     clearEnrolled()
     resetWatch()
@@ -144,5 +125,5 @@ export function useDeviceSetup() {
 
   onUnmounted(unfollow)
 
-  return { applying: busy, error, watching, joined, stages, state, apply, resume, done }
+  return { applying: busy, error, watching, joined, stages, state, apply, done }
 }
