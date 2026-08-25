@@ -1,11 +1,21 @@
-import { readFileSync } from 'node:fs'
-import { compile } from '@vue/compiler-dom'
-import { compileScript, parse } from '@vue/compiler-sfc'
-import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
-import { computed, createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
+import { computed, defineComponent, h, ref, type Component } from 'vue'
 import * as RouterRuntime from 'vue-router'
-import { createMemoryHistory, createRouter, type Router } from 'vue-router'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import {
+  button,
+  click,
+  compileClientComponent,
+  content,
+  element,
+  flush,
+  input,
+  moduleDefault,
+  mountApp,
+  nodes,
+  typeValue,
+  type HostNode,
+} from '@/test/clientRender'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as VueUse from '@vueuse/core'
 import * as Api from '@/lib/api'
@@ -162,36 +172,7 @@ const useNodeOnboardingModule = {
   }),
 }
 const icons = new Proxy({}, { get: () => GenericStub })
-const moduleDefault = (component: Component) => ({ __esModule: true, default: component })
-
-// Vitest runs this repository in SSR mode and there is no DOM test dependency.
-// Compile only the three SFCs under test for the small in-memory client renderer.
-function compileClientComponent(url: URL, modules: Record<string, unknown>): Component {
-  const source = readFileSync(url, 'utf8')
-  const { descriptor } = parse(source, { filename: url.pathname })
-  if (!descriptor.template) throw new Error(`Missing template in ${url.pathname}`)
-  const script = compileScript(descriptor, { id: url.pathname, inlineTemplate: false })
-  const scriptJavascript = transpileModule(script.content, {
-    compilerOptions: { module: ModuleKind.CommonJS, target: ScriptTarget.ES2022 },
-  }).outputText
-  const cjs = { exports: {} as Record<string, unknown> }
-  const localRequire = (id: string) => {
-    if (!(id in modules)) throw new Error(`Missing test module ${id} for ${url.pathname}`)
-    return modules[id]
-  }
-  new Function('require', 'exports', 'module', scriptJavascript)(localRequire, cjs.exports, cjs)
-  const component = cjs.exports.default as Component
-  const { code } = compile(descriptor.template.content, {
-    mode: 'function',
-    prefixIdentifiers: true,
-    bindingMetadata: script.bindings,
-  })
-  const renderJavascript = transpileModule(code, {
-    compilerOptions: { module: ModuleKind.None, target: ScriptTarget.ES2022 },
-  }).outputText
-  Object.assign(component, { render: new Function('Vue', renderJavascript)(VueRuntime) })
-  return component
-}
+const RouteStub = defineComponent(() => () => h('div'))
 
 const Input = compileClientComponent(new URL('../components/ui/Input.vue', import.meta.url), {
   vue: VueRuntime,
@@ -217,6 +198,7 @@ const runTarget = {
   compute: ref({ enabled: true, backend: 'docker', running: 0 }),
 }
 const submitJob = vi.fn(async () => ({ job_id: 'local-job-id', created: true }))
+const createTask = vi.fn(async () => ({ id: 'task-id' }))
 const sharedComponents = {
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -244,7 +226,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
     useTes: () => ({
       tesEnabled: ref(true),
       busy: ref(false),
-      createTask: vi.fn(async () => ({ id: 'task-id' })),
+      createTask,
       getTask: vi.fn(),
     }),
   },
@@ -292,131 +274,6 @@ const AdminOnboardingView = compileClientComponent(new URL('./AdminOnboardingVie
   '@/lib/api': Api,
 })
 
-type HostKind = 'root' | 'element' | 'text' | 'comment'
-
-interface HostNode {
-  kind: HostKind
-  tag: string
-  text: string
-  value: unknown
-  props: Record<string, unknown>
-  children: HostNode[]
-  parent: HostNode | null
-  listeners: Map<string, Set<(event: { target: HostNode }) => void>>
-  addEventListener: (type: string, listener: (event: { target: HostNode }) => void) => void
-  removeEventListener: (type: string, listener: (event: { target: HostNode }) => void) => void
-  getRootNode: () => HostNode
-  focus: () => void
-}
-
-function hostNode(kind: HostKind, tag = '', text = ''): HostNode {
-  const node: HostNode = {
-    kind,
-    tag,
-    text,
-    value: '',
-    props: {},
-    children: [],
-    parent: null,
-    listeners: new Map(),
-    addEventListener(type, listener) {
-      const listeners = node.listeners.get(type) ?? new Set()
-      listeners.add(listener)
-      node.listeners.set(type, listeners)
-    },
-    removeEventListener(type, listener) {
-      node.listeners.get(type)?.delete(listener)
-    },
-    getRootNode() {
-      let root = node
-      while (root.parent) root = root.parent
-      return root
-    },
-    focus() {},
-  }
-  return node
-}
-
-function insert(child: HostNode, parent: HostNode, anchor: HostNode | null = null) {
-  if (child.parent) {
-    const oldIndex = child.parent.children.indexOf(child)
-    if (oldIndex >= 0) child.parent.children.splice(oldIndex, 1)
-  }
-  child.parent = parent
-  const index = anchor ? parent.children.indexOf(anchor) : -1
-  if (index >= 0) parent.children.splice(index, 0, child)
-  else parent.children.push(child)
-}
-
-const renderer = createRenderer<HostNode, HostNode>({
-  patchProp(node, key, _previous, value) {
-    node.props[key] = value
-    if (key === 'value') node.value = value
-    else if (key === 'type') Object.assign(node, { type: value })
-  },
-  insert,
-  remove(node) {
-    if (!node.parent) return
-    const index = node.parent.children.indexOf(node)
-    if (index >= 0) node.parent.children.splice(index, 1)
-    node.parent = null
-  },
-  createElement(tag) {
-    return hostNode('element', tag)
-  },
-  createText(text) {
-    return hostNode('text', '', text)
-  },
-  createComment(text) {
-    return hostNode('comment', '', text)
-  },
-  setText(node, text) {
-    node.text = text
-  },
-  setElementText(node, text) {
-    node.text = text
-    node.children = []
-  },
-  parentNode(node) {
-    return node.parent
-  },
-  nextSibling(node) {
-    if (!node.parent) return null
-    const index = node.parent.children.indexOf(node)
-    return node.parent.children[index + 1] ?? null
-  },
-  insertStaticContent(content, parent, anchor) {
-    const node = hostNode('text', '', content)
-    insert(node, parent, anchor)
-    return [node, node]
-  },
-})
-
-function nodes(root: HostNode): HostNode[] {
-  return [root, ...root.children.flatMap(nodes)]
-}
-
-function content(node: HostNode): string {
-  return `${node.text}${node.children.map(content).join('')}`
-}
-
-function element(root: HostNode, predicate: (node: HostNode) => boolean): HostNode {
-  const match = nodes(root).find((node) => node.kind === 'element' && predicate(node))
-  if (!match) throw new Error('Expected element was not rendered')
-  return match
-}
-
-function input(root: HostNode, key: string, value: unknown): HostNode {
-  return element(root, (node) => node.tag === 'input' && node.props[key] === value)
-}
-
-function button(root: HostNode, label: string): HostNode {
-  return element(root, (node) => {
-    const text = content(node).trim()
-    return node.tag === 'button' && (text === label || text.startsWith(label))
-  })
-}
-
 // The submit button's label follows the submission surface it will use; these
 // tests are about validity gating, not about which surface was picked.
 function submitButton(root: HostNode): HostNode {
@@ -426,60 +283,26 @@ function submitButton(root: HostNode): HostNode {
   })
 }
 
-async function flush() {
-  await Promise.resolve()
-  await nextTick()
-  await Promise.resolve()
-  await nextTick()
-}
-
-async function typeValue(node: HostNode, value: string) {
-  node.value = value
-  for (const listener of node.listeners.get('input') ?? []) listener({ target: node })
-  if (typeof node.props.onInput === 'function') node.props.onInput({ target: node })
-  await flush()
-}
-
-async function click(node: HostNode) {
-  const handler = node.props.onClick
-  if (typeof handler === 'function') await handler({ target: node })
-  else if (Array.isArray(handler)) await Promise.all(handler.map((entry) => entry({ target: node })))
-  await flush()
-}
-
-interface Mounted {
-  app: App<HostNode>
-  root: HostNode
-  router?: Router
-  errors: unknown[]
-}
-
-async function mount(component: Component, path?: string): Promise<Mounted> {
-  const root = hostNode('root')
-  const app = renderer.createApp(component)
-  const errors: unknown[] = []
-  app.config.errorHandler = (error) => errors.push(error)
-  let router: Router | undefined
-  if (path) {
-    const Stub = defineComponent(() => () => h('div'))
-    router = createRouter({
-      history: createMemoryHistory(),
-      routes: [
-        { path: '/app/compute', name: 'compute', component: Stub },
-        { path: '/app/compute/new', name: 'compute-new', component: Stub },
-        { path: '/app/compute/:taskId', name: 'compute-task', component: Stub },
-        { path: '/app/runs', name: 'runs', component: Stub },
-        { path: '/app/runs/:jobId', name: 'run-detail', component: Stub },
-        { path: '/app/admin', name: 'admin', component: Stub },
-      ],
-    })
+// The wizard reads its step from the route, so every case mounts with one.
+async function mount(component: Component, path?: string) {
+  const router = path
+    ? createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: '/app/compute', name: 'compute', component: RouteStub },
+          { path: '/app/compute/new', name: 'compute-new', component: RouteStub },
+          { path: '/app/compute/:taskId', name: 'compute-task', component: RouteStub },
+          { path: '/app/runs', name: 'runs', component: RouteStub },
+          { path: '/app/runs/:jobId', name: 'run-detail', component: RouteStub },
+          { path: '/app/admin', name: 'admin', component: RouteStub },
+        ],
+      })
+    : undefined
+  if (router && path) {
     await router.push(path)
     await router.isReady()
-    app.use(router)
   }
-  app.mount(root)
-  await flush()
-  return { app, root, router, errors }
+  return { ...(await mountApp(component, { router })), router }
 }
 
 async function fillValidWorkload(root: HostNode) {
@@ -639,6 +462,7 @@ describe('run target', () => {
     runTargetAvailable.value = false
     runTargetChoice.value = 'realm'
     submitJob.mockClear()
+    createTask.mockClear()
   })
 
   it('offers no choice outside the desktop shell', async () => {
@@ -672,6 +496,39 @@ describe('run target', () => {
     expect(request.target).toBe('local')
     expect(client).toEqual({ baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' })
     expect(mounted.router!.currentRoute.value.name).toBe('run-detail')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('uses the native request even with no native-only option chosen', async () => {
+    // A run on this computer is never the TES facade, whatever the draft asks for.
+    runTargetAvailable.value = true
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+
+    await click(button(mounted.root, 'This computer'))
+    await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
+    await mounted.router!.push('/app/compute/new?step=1')
+    await flush()
+    // Everything a realm run needs, and nothing that forces the native surface.
+    await typeValue(input(mounted.root, 'placeholder', 'ubuntu:22.04'), 'alpine:3.20')
+    await typeValue(input(mounted.root, 'aria-label', 'Command line'), 'echo hello')
+    await typeValue(input(mounted.root, 'aria-label', 'Container path to capture'), '/outputs/result.txt')
+    await typeValue(input(mounted.root, 'aria-label', 'Destination bucket'), 'results')
+    await typeValue(input(mounted.root, 'aria-label', 'Destination key'), 'runs/result.txt')
+    await typeValue(input(mounted.root, 'placeholder', '1'), '1')
+    await typeValue(input(mounted.root, 'placeholder', '2'), '1')
+    await typeValue(input(mounted.root, 'placeholder', '10'), '1')
+    await mounted.router!.push('/app/compute/new?step=2')
+    await flush()
+
+    expect(content(mounted.root)).toContain('POST /jobs/')
+    await click(submitButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(createTask).not.toHaveBeenCalled()
+    expect(submitJob).toHaveBeenCalledTimes(1)
+    expect((submitJob.mock.calls[0] as unknown[])[0]).toMatchObject({ target: 'local' })
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
