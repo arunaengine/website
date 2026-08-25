@@ -2,8 +2,7 @@
 // Runs this machine executed itself. Both the list and the detail drawer talk
 // to the node's own API, so the job client is provided down this subtree.
 import { computed, onMounted, provide, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'

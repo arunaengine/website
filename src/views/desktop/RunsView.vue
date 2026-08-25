@@ -3,8 +3,7 @@
 // computer, or in the realm. The realm half is the portal's own compute
 // surface, reused as it is.
 import { computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
