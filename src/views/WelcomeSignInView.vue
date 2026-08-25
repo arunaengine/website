@@ -2,13 +2,20 @@
 // Desktop first run, once a realm is known: signing in is the way into the
 // app, so it owns the window instead of sitting on a guest dashboard. The
 // panel itself is the portal's, and the redirect returns through /auth/callback.
+import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppLogo from '@/components/layout/AppLogo.vue'
+import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import Button from '@/components/ui/Button.vue'
-import { realmOrigin } from '@/lib/desktopBoot'
+import { probeRealm, realmOrigin, realmReach } from '@/lib/desktopBoot'
 
 const origin = realmOrigin()
+// This page boots the app for a returning owner, so a dead realm is named here
+// rather than behind a sign-in button that can only fail.
+const unreachable = computed(() => realmReach.value === 'unreachable')
+
+onMounted(() => void probeRealm())
 </script>
 
 <template>
@@ -19,7 +26,9 @@ const origin = realmOrigin()
     />
     <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
 
-    <div class="relative w-full max-w-3xl space-y-4">
+    <RealmUnreachable v-if="unreachable" class="relative" />
+
+    <div v-else class="relative w-full max-w-3xl space-y-4">
       <div class="flex flex-col items-center gap-1">
         <AppLogo :size="26" />
         <p class="hash break-all text-center">{{ origin }}</p>
