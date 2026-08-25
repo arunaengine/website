@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -95,16 +93,13 @@ describe('desktop shell', () => {
     expect(html).toContain('Admin')
   })
 
-  it('carries no mobile bar and no realm switcher', () => {
-    // Both belong to the browser portal; the shell is one desktop window.
-    const source = readFileSync(fileURLToPath(new URL('./DesktopLayout.vue', import.meta.url)), 'utf8')
-    const topBar = readFileSync(
-      fileURLToPath(new URL('../components/dashboard/TopBar.vue', import.meta.url)),
-      'utf8',
-    )
+  it('carries one navigation and no mobile bar', async () => {
+    // The bottom bar belongs to the browser portal; the shell is one window,
+    // and it renders the More sheet that would come with it.
+    const html = await renderToString(createSSRApp(DesktopLayout))
 
-    expect(source).not.toContain('MobileNav')
-    expect(source).not.toContain('RealmSwitcher')
-    expect(topBar).toContain('<RealmSwitcher v-else')
+    expect(html.match(/<nav/g)).toHaveLength(1)
+    expect(html).not.toContain('More')
+    expect(html).not.toContain('md:hidden')
   })
 })
