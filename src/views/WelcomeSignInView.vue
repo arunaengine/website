@@ -10,7 +10,8 @@ import SignInPanel from '@/components/auth/SignInPanel.vue'
 import Button from '@/components/ui/Button.vue'
 import { probeRealm, realmOrigin, realmReach } from '@/lib/desktopBoot'
 
-const origin = realmOrigin()
+// Follows the shell: a realm switched under this window renames it in place.
+const origin = computed(() => realmOrigin())
 // This page boots the app for a returning owner, so a dead realm is named here
 // rather than behind a sign-in button that can only fail.
 const unreachable = computed(() => realmReach.value === 'unreachable')

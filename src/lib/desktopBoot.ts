@@ -4,7 +4,7 @@
 // failure is a dead realm.
 import { readonly, ref } from 'vue'
 import { portalConfig } from './config'
-import { isDesktop } from './desktop'
+import { desktopContext, isDesktop } from './desktop'
 import { fetchWithTimeout } from './fetch'
 
 // One attempt is bounded far below the API client's 30s, and the ladder spans
@@ -28,9 +28,9 @@ export function realmUnreachable(): boolean {
   return reach.value === 'unreachable'
 }
 
-/** The origin the portal talks to, as the owner typed or was handed it. */
+/** The origin the portal talks to; follows the shell's context as it changes. */
 export function realmOrigin(): string {
-  const base = portalConfig().apiBaseUrl
+  const base = desktopContext()?.apiBaseUrl ?? portalConfig().apiBaseUrl
   try {
     return new URL(base, globalThis.location?.href).origin
   } catch {

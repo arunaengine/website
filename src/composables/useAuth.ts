@@ -211,7 +211,9 @@ async function signOut() {
       const { clientId, discoveryUrl } = await resolveProvider()
       const discovery = await fetchDiscovery(discoveryUrl)
       if (discovery.end_session_endpoint) {
-        window.location.assign(
+        // The shell ends the SSO session in the system browser, so its own
+        // window stays on the app instead of navigating to the provider.
+        beginAuthRedirect(
           buildEndSessionUrl({
             endSessionEndpoint: discovery.end_session_endpoint,
             idTokenHint: idToken,
@@ -219,7 +221,7 @@ async function signOut() {
             clientId,
           }),
         )
-        return
+        if (!featureEnabled('desktop')) return
       }
     } catch {
       // Keycloak unreachable — the local session is already cleared.
