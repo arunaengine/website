@@ -241,8 +241,10 @@ describe('welcome guard', () => {
     await lands(router, 'welcome-sign-in')
   })
 
-  it('reopens the realm form after a wipe', async () => {
-    // The realm the guard was told about is gone, so its answer must be too.
+  it('asks for the device again after a wipe', async () => {
+    // A wipe destroys the local identity, not the realm: the window moves back
+    // to the realm's own base and the setup step comes back with it.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}')))
     const status = { state: 'running', enrolled: true, apiBaseUrl: LOCAL }
     const welcome = await load(status, LOCAL, 'https://aruna.example')
     const router = await routerWith(welcome, '/app/settings')
@@ -250,9 +252,10 @@ describe('welcome guard', () => {
 
     status.enrolled = false
     const desktop = await import('./desktop')
-    await desktop.applyShellContext({ apiBaseUrl: LOCAL })
+    await desktop.applyShellContext({ apiBaseUrl: REALM, realmUrl: 'https://aruna.example' })
 
-    await lands(router, 'welcome')
+    await lands(router, 'welcome-device')
+    expect(setApiBaseUrl).toHaveBeenCalledWith(REALM, { keepToken: true })
   })
 
   it('keeps the navigation on its way through a context change', async () => {

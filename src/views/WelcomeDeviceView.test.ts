@@ -33,7 +33,6 @@ vi.mock('@/composables/useAruna', () => ({
     refresh: vi.fn(async () => undefined),
   }),
 }))
-vi.mock('@/composables/useDeviceQuery', () => ({ resetDeviceQueries: vi.fn() }))
 vi.mock('@/lib/desktopBoot', () => ({ probeRealm: vi.fn(), realmUnreachable: () => false }))
 
 // The real composable answers the prompt for this realm before it leaves, so

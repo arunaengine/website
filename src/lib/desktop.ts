@@ -160,11 +160,7 @@ async function install(merged: DesktopContext): Promise<void> {
   const kept = sameRealm(merged, current)
   installConfig(merged)
   const aruna = switched || !kept ? (await import('@/composables/useAruna')).useAruna() : null
-  if (aruna && switched) {
-    aruna.setApiBaseUrl(merged.apiBaseUrl, { keepToken: kept })
-    const { resetDeviceQueries } = await import('@/composables/useDeviceQuery')
-    resetDeviceQueries()
-  }
+  if (aruna && switched) aruna.setApiBaseUrl(merged.apiBaseUrl, { keepToken: kept })
   // A realm swapped without moving the base takes the session with it.
   if (aruna && !kept) aruna.setAuthToken('')
   shellContext.value = merged

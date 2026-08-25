@@ -28,9 +28,12 @@ export function realmUnreachable(): boolean {
   return reach.value === 'unreachable'
 }
 
-/** The origin the portal talks to; follows the shell's context as it changes. */
+/**
+ * The realm this window belongs to, as the shell remembers it; the API base
+ * stands in only while no realm is on record, and on the web.
+ */
 export function realmOrigin(): string {
-  const base = desktopContext()?.apiBaseUrl ?? portalConfig().apiBaseUrl
+  const base = desktopContext()?.realmUrl ?? portalConfig().apiBaseUrl
   try {
     return new URL(base, globalThis.location?.href).origin
   } catch {

@@ -1,16 +1,9 @@
 // One read of the device's REST surface, with the states every desktop view
 // renders: the node absent, the route unserved, the token refused, or a plain
 // failure. The three device composables share it so they cannot drift apart.
-import { getCurrentScope, onScopeDispose, shallowRef, type Ref } from 'vue'
+import { shallowRef, type Ref } from 'vue'
 import { classify, type DeviceClient, type DeviceState } from '@/lib/deviceApi'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
-
-const caches = new Set<() => void>()
-
-/** Drops every loaded device cache; the API base changed under them. */
-export function resetDeviceQueries(): void {
-  for (const drop of caches) drop()
-}
 
 export interface DeviceQuery<T> {
   data: Ref<T>
@@ -43,17 +36,6 @@ export function useDeviceQuery<T>(read: (client: DeviceClient) => Promise<T>, em
       error.value = err instanceof Error ? err.message : String(err)
     }
   }
-
-  function drop(): void {
-    data.value = empty
-    state.value = 'idle'
-    error.value = null
-  }
-
-  // The module singletons live as long as the window; a per-view query leaves
-  // with its own scope.
-  caches.add(drop)
-  if (getCurrentScope()) onScopeDispose(() => caches.delete(drop))
 
   return { data, state, error, run }
 }

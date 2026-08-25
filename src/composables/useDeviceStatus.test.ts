@@ -39,11 +39,6 @@ async function load() {
   return (await import('./useDeviceStatus')).useDeviceStatus()
 }
 
-// Lets the lazily imported listener install itself.
-async function flush(): Promise<void> {
-  for (let turn = 0; turn < 10; turn++) await Promise.resolve()
-}
-
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -83,8 +78,7 @@ describe('watching the node', () => {
     await vi.waitFor(() => expect(onNodeStatus).toHaveBeenCalled())
     device.stop()
     settle(unlisten)
-    await flush()
 
-    expect(unlisten).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(unlisten).toHaveBeenCalledTimes(1))
   })
 })

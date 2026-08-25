@@ -10,7 +10,6 @@ const unlisten = vi.fn()
 const setApiBaseUrl = vi.fn()
 const setAuthToken = vi.fn()
 const refresh = vi.fn(async () => undefined)
-const resetDeviceQueries = vi.fn()
 const probeRealm = vi.fn(async () => undefined)
 const authToken = { value: 'realm-token' }
 
@@ -42,7 +41,6 @@ async function boot(shell: Record<string, unknown>, channel = listen()) {
   vi.doMock('@/composables/useAruna', () => ({
     useAruna: () => ({ setApiBaseUrl, setAuthToken, refresh, authToken }),
   }))
-  vi.doMock('@/composables/useDeviceQuery', () => ({ resetDeviceQueries }))
   vi.doMock('./desktopBoot', () => ({ probeRealm }))
   vi.doMock('@tauri-apps/api/event', () => ({ listen: channel }))
   return { desktop: await import('./desktop'), invoke, channel }
@@ -73,7 +71,6 @@ describe('applying a context', () => {
 
     expect(portalConfig().apiBaseUrl).toBe(REALM)
     expect(setApiBaseUrl).toHaveBeenCalledWith(REALM, { keepToken: true })
-    expect(resetDeviceQueries).toHaveBeenCalled()
     expect(refresh).toHaveBeenCalled()
     expect(probeRealm).toHaveBeenCalled()
     expect(desktop.desktopContext()?.realmUrl).toBe('https://aruna.example')
