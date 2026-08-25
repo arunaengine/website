@@ -12,16 +12,15 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
-import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
+import ClaimWatchStep from '@/components/onboarding/ClaimWatchStep.vue'
 import CodeSnippet from '@/components/onboarding/CodeSnippet.vue'
 import QrCode from '@/components/onboarding/QrCode.vue'
 import SecretPanel from '@/components/onboarding/SecretPanel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceEnrollment } from '@/composables/useDeviceEnrollment'
+import { applyEnrollment, ENROLLMENT_TTL_SECS, watchStages } from '@/composables/useDeviceSetup'
 import { isDesktop } from '@/lib/desktop'
-import { parseEnrollInput } from '@/lib/enrollLink'
 import { buildDeviceEnv, managementPortals } from '@/lib/onboarding-config'
-import { truncateMiddle } from '@/lib/utils'
 import {
   ArrowLeft,
   ArrowRight,
@@ -39,10 +38,6 @@ import {
 const DETAILS_STEP = 1
 const HANDOFF_STEP = 2
 const WATCH_STEP = 3
-
-// One hour, the mint default. Long enough to install the desktop app, short
-// enough that a code left on screen stops working the same session.
-const ENROLLMENT_TTL_SECS = 3600
 
 defineProps<{ step: number }>()
 const emit = defineEmits<{
@@ -134,14 +129,11 @@ const applyError = ref<string | null>(null)
 
 // Hands the code to the node this app embeds and follows it to the device page.
 async function applyHere(): Promise<void> {
-  const input = enrollUrl.value ? parseEnrollInput(enrollUrl.value) : null
-  if (!input || applying.value) return
+  if (applying.value) return
   applying.value = true
   applyError.value = null
   try {
-    const { enrollApply } = await import('@/lib/desktopBridge')
-    const name = deviceName.value.trim()
-    await enrollApply({ ...input, ...(name ? { label: name } : {}) })
+    await applyEnrollment(enrollUrl.value, deviceName.value.trim())
     void router.push({ name: 'device' })
   } catch (err) {
     applyError.value = err instanceof Error ? err.message : String(err)
@@ -162,38 +154,7 @@ function startOver() {
   emit('restart')
 }
 
-const watchStages = computed<WatchStage[]>(() => {
-  const state = watchState.value
-  const short = state.nodeId ? truncateMiddle(state.nodeId, 8, 6) : undefined
-  const stages: WatchStage[] = [{ key: 'minted', label: 'Enrollment code created', state: 'done' }]
-
-  if (state.phase === 'expired') {
-    stages.push({
-      key: 'claim',
-      label: 'Claimed by the device',
-      state: 'failed',
-      detail: 'The code expired before any device claimed it.',
-    })
-    stages.push({ key: 'join', label: 'Joined the realm', state: 'pending' })
-    return stages
-  }
-
-  const claimed = state.phase === 'claimed' || state.phase === 'present'
-  const joined = state.phase === 'present'
-  stages.push({
-    key: 'claim',
-    label: claimed ? 'Claimed by the device' : 'Waiting for the device to claim the code',
-    state: claimed ? 'done' : 'active',
-    detail: claimed ? short : undefined,
-  })
-  stages.push({
-    key: 'join',
-    label: joined ? 'Joined the realm' : 'Joining the realm',
-    state: joined ? 'done' : claimed ? 'active' : 'pending',
-    detail: joined ? short : undefined,
-  })
-  return stages
-})
+const stages = computed(() => watchStages(watchState.value))
 </script>
 
 <template>
@@ -362,7 +323,7 @@ const watchStages = computed<WatchStage[]>(() => {
           This page polls the enrollment until the device redeems the code and appears in the realm. A device never
           publishes presence, so membership is the last stage there is to see.
         </p>
-        <ClaimWatchStep :stages="watchStages" :error="watchState.lastError">
+        <ClaimWatchStep :stages="stages" :error="watchState.lastError">
           <template #actions>
             <RouterLink :to="{ name: 'settings', hash: '#devices' }">
               <Button variant="outline" size="sm"><ExternalLink class="h-4 w-4" /> My devices</Button>
