@@ -13,6 +13,8 @@ interface Session {
   token?: string
   bootstrapped?: boolean
   user?: boolean
+  // The realm answered 401/403, as opposed to not answering at all.
+  rejected?: boolean
 }
 
 const Blank = defineComponent(() => () => h('div'))
@@ -22,6 +24,7 @@ const refresh = vi.fn(async () => undefined)
 const authToken = ref('token')
 const bootstrapped = ref(true)
 const currentUser = ref<{ id: string } | null>({ id: 'u1' })
+const authRejected = ref(false)
 
 function store(): Storage {
   const entries = new Map<string, string>()
@@ -54,6 +57,7 @@ async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUr
   authToken.value = session.token ?? 'token'
   bootstrapped.value = session.bootstrapped ?? true
   currentUser.value = session.user === false ? null : { id: 'u1' }
+  authRejected.value = session.rejected === true
   listeners.clear()
   vi.doMock('@tauri-apps/api/event', () => ({
     listen: async (event: string, handler: (message: { payload: unknown }) => void) => {
@@ -62,7 +66,7 @@ async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUr
     },
   }))
   vi.doMock('@/composables/useAruna', () => ({
-    useAruna: () => ({ authToken, bootstrapped, currentUser, setApiBaseUrl, refresh }),
+    useAruna: () => ({ authToken, authRejected, bootstrapped, currentUser, setApiBaseUrl, refresh }),
   }))
   const config = await import('./config')
   config.applyPortalConfig({ apiBaseUrl })
@@ -335,12 +339,27 @@ describe('sign in gate', () => {
     expect(router.currentRoute.value.name).toBe('auth-callback')
   })
 
-  it('reads a rejected token as signed out', async () => {
+  it('reads a refused token as signed out', async () => {
     const welcome = await load({ state: 'stopped', enrolled: true, apiBaseUrl: null }, REALM, undefined, {
       user: false,
+      rejected: true,
     })
     const router = await routerWith(welcome)
     expect(router.currentRoute.value.name).toBe('welcome-sign-in')
+  })
+
+  it('keeps a session the realm never answered for', async () => {
+    // A base that is not answering yet is no refusal, and must never sign the
+    // owner out; the realm probe is what names a base that is not there.
+    const welcome = await load(
+      { state: 'running', enrolled: true, apiBaseUrl: LOCAL },
+      REALM,
+      'https://aruna.example',
+      { user: false },
+    )
+    const router = await routerWith(welcome, '/app/settings')
+
+    expect(router.currentRoute.value.name).toBe('settings')
   })
 
   it('waits out a restoring session', async () => {

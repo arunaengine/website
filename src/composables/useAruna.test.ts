@@ -719,3 +719,23 @@ describe('SPARQL completeness', () => {
     expect(artifact).toHaveProperty('results.0.key', 'reads/sample.fastq')
   })
 })
+
+describe('a session the realm refused', () => {
+  afterEach(() => {
+    useAruna().setAuthToken('')
+  })
+
+  it('tells a refusal from a base that never answered', async () => {
+    const aruna = useAruna()
+    aruna.setAuthToken('token')
+    const request = vi.mocked(apiRequest)
+
+    request.mockRejectedValue(new TypeError('Failed to fetch'))
+    await aruna.refresh()
+    expect(aruna.authRejected.value).toBe(false)
+
+    request.mockRejectedValue(new ApiError(401, 'The token is not valid.'))
+    await aruna.refresh()
+    expect(aruna.authRejected.value).toBe(true)
+  })
+})

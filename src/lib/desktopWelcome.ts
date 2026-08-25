@@ -147,13 +147,16 @@ function settled(flag: Ref<boolean>, ms: number): Promise<void> {
   })
 }
 
+// Signed out means no token, or a realm that refused the one held. A bootstrap
+// that failed on transport proves nothing, so the window stays where it is and
+// the realm probe surfaces a base that is not answering.
 async function signedOut(): Promise<boolean> {
   const { useAruna } = await import('@/composables/useAruna')
-  const { authToken, bootstrapped, currentUser } = useAruna()
+  const { authToken, authRejected, bootstrapped, currentUser } = useAruna()
   if (!authToken.value) return true
   if (!bootstrapped.value) await settled(bootstrapped, BOOTSTRAP_TIMEOUT_MS)
-  // A session still restoring is not a signed-out one.
-  return bootstrapped.value && !currentUser.value
+  if (!bootstrapped.value || currentUser.value) return false
+  return authRejected.value
 }
 
 let knownOnce: boolean | null = null

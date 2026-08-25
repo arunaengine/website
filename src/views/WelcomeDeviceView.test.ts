@@ -25,6 +25,7 @@ vi.mock('@/lib/desktopBridge', () => ({ nodeStatus }))
 vi.mock('@/composables/useAruna', () => ({
   useAruna: () => ({
     authToken: ref('token'),
+    authRejected: ref(false),
     bootstrapped: ref(true),
     currentUser: ref({ id: 'u1' }),
     setApiBaseUrl: vi.fn(),

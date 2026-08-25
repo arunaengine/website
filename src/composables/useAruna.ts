@@ -218,6 +218,9 @@ const loading = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const authError = ref<string | null>(null)
+// The realm refused this token, as opposed to never answering: only a refusal
+// makes a stored session a signed-out one.
+const authRejected = ref(false)
 
 const nodeInfo = ref<InfoResponse | null>(null)
 const realmInfo = ref<RealmInfoResponse | null>(null)
@@ -309,6 +312,7 @@ function clearIdentityState(clearPublic = false) {
   recentlyCreatedMetadataIds.clear()
   acceptedProfileItems.clear()
   authError.value = null
+  authRejected.value = false
   if (clearPublic) {
     nodeInfo.value = null
     realmInfo.value = null
@@ -316,11 +320,18 @@ function clearIdentityState(clearPublic = false) {
   }
 }
 
+// 401 and 403 are the realm rejecting the token; anything else (transport,
+// 5xx, a node still starting) leaves the session unproven, not signed out.
+function refusedToken(reason: unknown): boolean {
+  return reason instanceof ApiError && (reason.status === 401 || reason.status === 403)
+}
+
 async function refresh() {
   const context = refreshContext()
   loading.value = true
   error.value = null
   authError.value = null
+  authRejected.value = false
   try {
     const [publicResult, authResult] = await Promise.allSettled([
       Promise.all([loadInfo(context), loadMetadata(context)]),
@@ -331,6 +342,7 @@ async function refresh() {
     if (authResult.status === 'rejected') {
       if (context.client.token) {
         authError.value = errorMessage(authResult.reason)
+        authRejected.value = refusedToken(authResult.reason)
         userInfo.value = null
         apiGroups.value = []
         credentials.value = []
@@ -2203,6 +2215,7 @@ export function useAruna() {
     saving,
     error,
     authError,
+    authRejected: readonly(authRejected),
     bootstrapped,
     sessionEpoch: readonly(sessionEpoch),
     nodeInfo,
