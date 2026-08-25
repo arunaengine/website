@@ -20,6 +20,7 @@ interface Session {
 const Blank = defineComponent(() => () => h('div'))
 
 const setApiBaseUrl = vi.fn()
+const setAuthToken = vi.fn()
 const refresh = vi.fn(async () => undefined)
 const authToken = ref('token')
 const bootstrapped = ref(true)
@@ -66,7 +67,7 @@ async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUr
     },
   }))
   vi.doMock('@/composables/useAruna', () => ({
-    useAruna: () => ({ authToken, authRejected, bootstrapped, currentUser, setApiBaseUrl, refresh }),
+    useAruna: () => ({ authToken, authRejected, bootstrapped, currentUser, setApiBaseUrl, setAuthToken, refresh }),
   }))
   const config = await import('./config')
   config.applyPortalConfig({ apiBaseUrl })

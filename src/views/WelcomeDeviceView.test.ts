@@ -29,6 +29,7 @@ vi.mock('@/composables/useAruna', () => ({
     bootstrapped: ref(true),
     currentUser: ref({ id: 'u1' }),
     setApiBaseUrl: vi.fn(),
+    setAuthToken: vi.fn(),
     refresh: vi.fn(async () => undefined),
   }),
 }))

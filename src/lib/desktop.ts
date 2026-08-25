@@ -140,17 +140,33 @@ function supersedes(next: DesktopContext, current: DesktopContext): boolean {
   return signature(next) !== signature(current)
 }
 
+// The token belongs to one realm; the realm's own base and the local node of
+// that realm share it, and any other realm starts from nothing.
+function sameRealm(next: DesktopContext, current: DesktopContext): boolean {
+  const one = next.realmUrl ?? ''
+  const other = current.realmUrl ?? ''
+  if (one === other) return true
+  try {
+    return new URL(one).origin === new URL(other).origin
+  } catch {
+    return false
+  }
+}
+
 async function install(merged: DesktopContext): Promise<void> {
   const current = shellContext.value
   if (!current) return
   const switched = merged.apiBaseUrl !== current.apiBaseUrl
+  const kept = sameRealm(merged, current)
   installConfig(merged)
-  const aruna = switched ? (await import('@/composables/useAruna')).useAruna() : null
-  if (aruna) {
-    aruna.setApiBaseUrl(merged.apiBaseUrl, { keepToken: true })
+  const aruna = switched || !kept ? (await import('@/composables/useAruna')).useAruna() : null
+  if (aruna && switched) {
+    aruna.setApiBaseUrl(merged.apiBaseUrl, { keepToken: kept })
     const { resetDeviceQueries } = await import('@/composables/useDeviceQuery')
     resetDeviceQueries()
   }
+  // A realm swapped without moving the base takes the session with it.
+  if (aruna && !kept) aruna.setAuthToken('')
   shellContext.value = merged
   if (!aruna) return
   // The old verdict was about the old base, so the new one is probed again.
@@ -166,8 +182,8 @@ let applying: Promise<void> = Promise.resolve()
 
 /**
  * Installs a context the shell reported, after the one before it: a changed
- * API base is switched in place, the session is re-bootstrapped against it and
- * the realm-issued token is kept, which the local node accepts too. Requests
+ * API base is switched in place and the session is re-bootstrapped against it,
+ * keeping the token only while the realm behind it is the same one. Requests
  * still in flight are ignored by the session epoch useAruna bumps.
  */
 export function applyShellContext(next: unknown): Promise<void> {

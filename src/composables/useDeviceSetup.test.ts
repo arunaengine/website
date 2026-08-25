@@ -30,7 +30,7 @@ vi.mock('@/composables/useDeviceEnrollment', () => ({
 }))
 
 vi.mock('@/lib/desktopBridge', () => ({ enrollApply, nodeStatus }))
-vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ setApiBaseUrl, refresh }) }))
+vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ setApiBaseUrl, setAuthToken: vi.fn(), refresh }) }))
 vi.mock('@/composables/useDeviceQuery', () => ({ resetDeviceQueries: vi.fn() }))
 vi.mock('@/lib/desktopBoot', () => ({ probeRealm: vi.fn(), realmUnreachable: () => false }))
 

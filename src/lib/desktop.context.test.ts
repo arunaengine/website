@@ -8,6 +8,7 @@ type Emit = (payload: unknown) => void
 let emit: Emit = () => {}
 const unlisten = vi.fn()
 const setApiBaseUrl = vi.fn()
+const setAuthToken = vi.fn()
 const refresh = vi.fn(async () => undefined)
 const resetDeviceQueries = vi.fn()
 const probeRealm = vi.fn(async () => undefined)
@@ -39,7 +40,7 @@ async function boot(shell: Record<string, unknown>, channel = listen()) {
     location: { origin: 'http://127.0.0.1:47713' },
   })
   vi.doMock('@/composables/useAruna', () => ({
-    useAruna: () => ({ setApiBaseUrl, refresh, authToken }),
+    useAruna: () => ({ setApiBaseUrl, setAuthToken, refresh, authToken }),
   }))
   vi.doMock('@/composables/useDeviceQuery', () => ({ resetDeviceQueries }))
   vi.doMock('./desktopBoot', () => ({ probeRealm }))
@@ -61,7 +62,7 @@ afterEach(() => {
 
 describe('applying a context', () => {
   it('switches the api base in place', async () => {
-    const { desktop } = await boot({ apiBaseUrl: LOCAL })
+    const { desktop } = await boot({ apiBaseUrl: LOCAL, realmUrl: 'https://aruna.example' })
     const { portalConfig } = await import('./config')
 
     await desktop.applyShellContext({
@@ -79,22 +80,45 @@ describe('applying a context', () => {
   })
 
   it('keeps the session and the bridge across the switch', async () => {
-    // The realm issued the token, and the local node accepts it; the shell
+    // The realm issued the token, and its own local node accepts it; the shell
     // hands back no bridge, so the injected one must survive.
-    const { desktop } = await boot({ apiBaseUrl: REALM })
+    const { desktop } = await boot({ apiBaseUrl: REALM, realmUrl: 'https://aruna.example' })
 
-    await desktop.applyShellContext({ apiBaseUrl: LOCAL })
+    await desktop.applyShellContext({ apiBaseUrl: LOCAL, realmUrl: 'https://aruna.example/' })
 
-    expect(authToken.value).toBe('realm-token')
+    expect(setApiBaseUrl).toHaveBeenCalledWith(LOCAL, { keepToken: true })
+    expect(setAuthToken).not.toHaveBeenCalled()
     expect(desktop.desktopBridge()).not.toBeNull()
   })
 
-  it('takes a new realm without re-bootstrapping', async () => {
-    const { desktop } = await boot({ apiBaseUrl: LOCAL })
+  it('drops the session when the realm changes', async () => {
+    // Another realm never inherits the token this one issued.
+    const { desktop } = await boot({ apiBaseUrl: REALM, realmUrl: 'https://aruna.example' })
 
-    await desktop.applyShellContext({ apiBaseUrl: LOCAL, realmUrl: 'https://aruna.example' })
+    await desktop.applyShellContext({ apiBaseUrl: LOCAL, realmUrl: 'https://other.example' })
 
-    expect(desktop.desktopContext()?.realmUrl).toBe('https://aruna.example')
+    expect(setApiBaseUrl).toHaveBeenCalledWith(LOCAL, { keepToken: false })
+    expect(desktop.desktopContext()?.realmUrl).toBe('https://other.example')
+  })
+
+  it('drops the session when only the realm changed', async () => {
+    const { desktop } = await boot({ apiBaseUrl: LOCAL, realmUrl: 'https://aruna.example' })
+
+    await desktop.applyShellContext({ apiBaseUrl: LOCAL, realmUrl: 'https://other.example' })
+
+    expect(setAuthToken).toHaveBeenCalledWith('')
+  })
+
+  it('takes saved settings without re-bootstrapping', async () => {
+    const { desktop } = await boot({ apiBaseUrl: LOCAL, realmUrl: 'https://aruna.example' })
+
+    await desktop.applyShellContext({
+      apiBaseUrl: LOCAL,
+      realmUrl: 'https://aruna.example',
+      features: { compute: true },
+    })
+
+    expect(desktop.desktopContext()?.features?.compute).toBe(true)
     expect(setApiBaseUrl).not.toHaveBeenCalled()
     expect(refresh).not.toHaveBeenCalled()
   })
