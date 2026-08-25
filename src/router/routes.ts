@@ -9,6 +9,42 @@ function landingRoute(): RouteRecordRaw {
   return { path: '/', name: 'landing', component: () => import('@/views/LandingView.vue') }
 }
 
+// One frontend, two shells: Aruna Desktop mounts a layout built around the
+// machine, the web keeps the portal layout. Both lazy, so neither build carries
+// the other's chunk.
+function appLayout() {
+  return isDesktop() ? import('@/views/DesktopLayout.vue') : import('@/views/AppLayout.vue')
+}
+
+// Home of the app shell: the machine in desktop mode, the realm dashboard on
+// the web. The route name stays 'dashboard' for every link that points at it.
+function homeRoute(): RouteRecordRaw {
+  return {
+    path: '',
+    name: 'dashboard',
+    component: isDesktop()
+      ? () => import('@/views/desktop/DesktopHomeView.vue')
+      : () => import('@/views/DashboardView.vue'),
+  }
+}
+
+// Views that drive the node the shell embeds; a browser tab has no access to it.
+function desktopRoutes(): RouteRecordRaw[] {
+  if (!isDesktop()) return []
+  return [
+    { path: 'folders', name: 'folders', component: () => import('@/views/desktop/SyncedFoldersView.vue') },
+    {
+      path: 'folders/:folderId',
+      name: 'folder',
+      component: () => import('@/views/desktop/FolderDetailView.vue'),
+    },
+    { path: 'transfers', name: 'transfers', component: () => import('@/views/desktop/TransfersView.vue') },
+    { path: 'runs', name: 'runs', component: () => import('@/views/desktop/RunsView.vue') },
+    { path: 'runs/:jobId', name: 'run-detail', component: () => import('@/views/desktop/RunsView.vue') },
+    { path: 'device', name: 'device', component: () => import('@/views/DeviceView.vue') },
+  ]
+}
+
 /** Built per boot: desktop mode swaps the landing route for the app shell. */
 export function portalRoutes(): RouteRecordRaw[] {
   return [
@@ -37,9 +73,9 @@ export function portalRoutes(): RouteRecordRaw[] {
       : []),
     {
       path: '/app',
-      component: () => import('@/views/AppLayout.vue'),
+      component: appLayout,
       children: [
-        { path: '', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
+        homeRoute(),
         // Buckets — primary research surface (formerly "Data manager")
         { path: 'buckets', name: 'buckets', component: () => import('@/views/DataManagerView.vue') },
         { path: 'buckets/:bucketId', name: 'bucket', component: () => import('@/views/DataManagerView.vue') },
@@ -69,11 +105,7 @@ export function portalRoutes(): RouteRecordRaw[] {
         // Public user profile resolved from the realm's user directory
         { path: 'users/:id', name: 'user-profile', component: () => import('@/views/UserProfileView.vue') },
         { path: 'status', name: 'status', component: () => import('@/views/StatusView.vue') },
-        // Desktop only: these views drive the node the shell embeds, which a
-        // browser tab has no access to.
-        ...(isDesktop()
-          ? [{ path: 'device', name: 'device', component: () => import('@/views/DeviceView.vue') }]
-          : []),
+        ...desktopRoutes(),
         // Settings (consolidates account preferences, members, tokens)
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
         // Watched resources — served by the merged notifications backend, so no
