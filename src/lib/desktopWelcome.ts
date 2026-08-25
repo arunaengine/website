@@ -9,6 +9,11 @@ import { realmUnreachable } from './desktopBoot'
 // still be named on the way back.
 const PENDING_KEY = 'aruna.desktop.connecting'
 
+// The device setup prompt is answered once per realm, and the enrollment it
+// applied is followed across the window replacement that ends it.
+const SKIPPED_KEY = 'aruna.desktop.setupSkipped'
+const WATCH_KEY = 'aruna.desktop.setupWatch'
+
 // A shell command that never answers must not hold the window: navigation
 // continues, and the app's own realm probe surfaces a realm that is not there.
 const STATUS_TIMEOUT_MS = 5_000
@@ -51,6 +56,63 @@ export function setPendingRealm(origin: string | null): void {
     else window.localStorage.removeItem(PENDING_KEY)
   } catch {
     /* the hint is optional; storage may be denied */
+  }
+}
+
+// A device is set up against the realm it joins, so a second realm asks again.
+function scoped(key: string): string {
+  const realm = desktopContext()?.realmUrl
+  if (!realm) return key
+  try {
+    return `${key}:${new URL(realm).origin}`
+  } catch {
+    return `${key}:${realm}`
+  }
+}
+
+/** True once this realm's device setup was answered, by a skip or a join. */
+export function setupSkipped(): boolean {
+  try {
+    return window.localStorage.getItem(scoped(SKIPPED_KEY)) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function skipSetup(): void {
+  try {
+    window.localStorage.setItem(scoped(SKIPPED_KEY), '1')
+  } catch {
+    /* the prompt returns on the next boot; storage may be denied */
+  }
+}
+
+/** The enrollment applied to this device, until it joined the realm. */
+export interface SetupWatch {
+  enrollmentId: string | null
+  expiresAt: number
+}
+
+export function setupWatch(): SetupWatch | null {
+  try {
+    const raw = window.localStorage.getItem(scoped(WATCH_KEY))
+    if (!raw) return null
+    const value = JSON.parse(raw) as Partial<SetupWatch>
+    if (typeof value?.expiresAt !== 'number') return null
+    const enrollmentId = typeof value.enrollmentId === 'string' ? value.enrollmentId : null
+    return { enrollmentId, expiresAt: value.expiresAt }
+  } catch {
+    return null
+  }
+}
+
+export function setSetupWatch(value: SetupWatch | null): void {
+  try {
+    const key = scoped(WATCH_KEY)
+    if (value) window.localStorage.setItem(key, JSON.stringify(value))
+    else window.localStorage.removeItem(key)
+  } catch {
+    /* the setup step falls back to asking again; storage may be denied */
   }
 }
 
