@@ -9,6 +9,7 @@ import {
   readEntry,
   readFolder,
   readTransfer,
+  requireDevice,
 } from './deviceApi'
 
 describe('folder mapping', () => {
@@ -152,6 +153,19 @@ describe('transfer and compute mapping', () => {
     })
     expect(readDraft({}).path).toBe('')
     expect(readDraft({}).public).toBe(false)
+  })
+})
+
+describe('device client', () => {
+  it('refuses instead of falling back to the realm API', () => {
+    // A device surface with no node must never list the realm's data as local.
+    expect(() => requireDevice(null, 'its runs')).toThrow(/not running/)
+    expect(() => requireDevice(undefined, 'its folders')).toThrow(/its folders/)
+  })
+
+  it('hands back the local node client when there is one', () => {
+    const client = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
+    expect(requireDevice(client, 'its runs')).toBe(client)
   })
 })
 

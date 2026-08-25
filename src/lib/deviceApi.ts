@@ -13,6 +13,15 @@ export interface DeviceClient extends ApiClientOptions {
   baseUrl: string
 }
 
+/**
+ * The device client, or a refusal. Device-scoped surfaces must never fall back
+ * to the realm API: an absent client means this machine's node is not there.
+ */
+export function requireDevice(client: DeviceClient | null | undefined, subject: string): DeviceClient {
+  if (!client) throw new Error(`This device is not running, so ${subject} cannot be reached.`)
+  return client
+}
+
 /** The node does not serve this route (yet); the surface degrades inline. */
 export function isDeviceUnsupported(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 404 || err.status === 405 || err.status === 501)

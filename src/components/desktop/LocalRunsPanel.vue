@@ -14,6 +14,7 @@ import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
 import { JOB_CLIENT, useJobsList } from '@/composables/useJobs'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { requireDevice } from '@/lib/deviceApi'
 import { formatJobProgress, jobProgressPercent, type JobStatusResponse } from '@/lib/jobs'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
 import { Cpu, RefreshCw } from '@lucide/vue'
@@ -23,17 +24,14 @@ const router = useRouter()
 const { deviceClient } = useDeviceStatus()
 const { compute, ensureLoaded } = useDeviceCompute()
 
-// Never falls back to the realm base: without a device client nothing loads.
-const jobClient = () => ({
-  baseUrl: deviceClient.value?.baseUrl ?? '',
-  token: deviceClient.value?.token ?? '',
-})
+// Refuses rather than falling back: an empty base would list the realm's jobs
+// as if they had run here.
+const jobClient = () => requireDevice(deviceClient.value, 'its runs')
 provide(JOB_CLIENT, jobClient)
 
-const list = useJobsList({ client: jobClient, pageSize: 25 })
-const { jobs, listState, listError, refreshing, nextCursor } = list
-
 const reachable = computed(() => deviceClient.value !== null)
+const list = useJobsList({ client: jobClient, pageSize: 25, pollWhile: () => reachable.value })
+const { jobs, listState, listError, refreshing, nextCursor } = list
 
 const openJobId = computed(() =>
   route.name === 'run-detail' && route.params.jobId ? String(route.params.jobId) : '',

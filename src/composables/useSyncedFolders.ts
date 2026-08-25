@@ -12,6 +12,7 @@ import {
   listEntries,
   listFolderActions,
   listFolders,
+  requireDevice,
   setFolderPaused,
   syncFolder,
   unbindFolder,
@@ -51,9 +52,7 @@ function noteFailure(err: unknown): void {
 
 /** Throws when the node is not answering, so callers report one honest reason. */
 function client(): DeviceClient {
-  const current = deviceClient.value
-  if (!current) throw new Error('This device is not running, so its folders cannot be reached.')
-  return current
+  return requireDevice(deviceClient.value, 'its folders')
 }
 
 async function load(): Promise<void> {
