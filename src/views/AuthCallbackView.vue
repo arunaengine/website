@@ -2,12 +2,15 @@
 import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
 import { useAuth } from '@/composables/useAuth'
+import { isDesktop } from '@/lib/desktop'
 import { onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { Loader2 } from '@lucide/vue'
 
 const router = useRouter()
 const { completeSignIn, signIn, stage, stageError } = useAuth()
+// The shell has no guest surface to fall back to: signing in is the way in.
+const inDesktop = isDesktop()
 
 function retry() {
   void signIn({ redirectTo: '/app' })
@@ -47,7 +50,10 @@ onMounted(async () => {
           <p class="mt-2 text-sm text-muted-foreground">{{ stageError }}</p>
           <div class="mt-6 flex justify-center gap-2">
             <Button @click="retry">Try again</Button>
-            <RouterLink to="/app">
+            <RouterLink v-if="inDesktop" :to="{ name: 'welcome' }">
+              <Button variant="outline">Change realm</Button>
+            </RouterLink>
+            <RouterLink v-else to="/app">
               <Button variant="outline">Browse as guest</Button>
             </RouterLink>
           </div>

@@ -24,6 +24,11 @@ export function portalRoutes(): RouteRecordRaw[] {
       ? [
           { path: '/welcome', name: 'welcome', component: () => import('@/views/WelcomeView.vue') },
           {
+            path: '/welcome/sign-in',
+            name: 'welcome-sign-in',
+            component: () => import('@/views/WelcomeSignInView.vue'),
+          },
+          {
             path: '/welcome/device',
             name: 'welcome-device',
             component: () => import('@/views/WelcomeDeviceView.vue'),
