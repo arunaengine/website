@@ -1,8 +1,15 @@
 // The hand-off Aruna Desktop performs on this machine: it applies a minted
 // enrollment to the node the shell embeds, and reads the claim watch as the
 // stages an owner sees. Shared by the onboarding lane and the first-run step.
+import { computed, ref } from 'vue'
 import type { WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
-import type { DeviceWatch } from '@/composables/useDeviceEnrollment'
+import { useDeviceEnrollment, type DeviceWatch } from '@/composables/useDeviceEnrollment'
+import {
+  clearEnrolled,
+  setSetupWatch,
+  setupWatch,
+  skipSetup,
+} from '@/lib/desktopWelcome'
 import { parseEnrollInput } from '@/lib/enrollLink'
 import { truncateMiddle } from '@/lib/utils'
 
@@ -49,4 +56,67 @@ export function watchStages(state: DeviceWatch): WatchStage[] {
     detail: joined ? short : undefined,
   })
   return stages
+}
+
+/**
+ * First-run device setup: mints an enrollment for this account, redeems it on
+ * the embedded node and follows it until the device joined. Must be called
+ * during component setup (useDeviceEnrollment registers onUnmounted).
+ */
+export function useDeviceSetup() {
+  const { minting, mintError, watch: state, mint, startWatch, resetWatch } = useDeviceEnrollment()
+  const applying = ref(false)
+  const applyError = ref<string | null>(null)
+  const watching = ref(false)
+  const enrolledHere = ref(false)
+
+  const busy = computed(() => applying.value || minting.value)
+  const error = computed(() => mintError.value ?? applyError.value)
+  const joined = computed(() => state.value.phase === 'present' || enrolledHere.value)
+  const stages = computed(() => watchStages(state.value))
+
+  async function apply(label: string): Promise<void> {
+    if (busy.value) return
+    applying.value = true
+    applyError.value = null
+    try {
+      const { response, enrollmentId } = await mint(ENROLLMENT_TTL_SECS)
+      await applyEnrollment(response.enroll_url, label)
+      setSetupWatch({ enrollmentId, expiresAt: response.expires_at })
+      watching.value = true
+      startWatch(enrollmentId, response.expires_at)
+    } catch (err) {
+      // mint already worded its own failures.
+      if (!mintError.value) applyError.value = err instanceof Error ? err.message : String(err)
+    } finally {
+      applying.value = false
+    }
+  }
+
+  /**
+   * Picks a watch left on record back up: the shell replaces the window while
+   * the node restarts, so the enrollment is followed instead of asked for again.
+   */
+  async function resume(): Promise<void> {
+    const record = setupWatch()
+    if (!record) return
+    watching.value = true
+    startWatch(record.enrollmentId, record.expiresAt)
+    try {
+      const { nodeStatus } = await import('@/lib/desktopBridge')
+      if ((await nodeStatus()).enrolled) enrolledHere.value = true
+    } catch {
+      // The realm-side watch still reports what the shell cannot.
+    }
+  }
+
+  /** Answers the prompt for good: a joined device is not asked again either. */
+  function done(): void {
+    setSetupWatch(null)
+    skipSetup()
+    clearEnrolled()
+    resetWatch()
+  }
+
+  return { applying: busy, error, watching, joined, stages, state, apply, resume, done }
 }

@@ -21,7 +21,14 @@ export function portalRoutes(): RouteRecordRaw[] {
     // Desktop first run: outside the app shell, because with no realm behind it
     // the shell's navigation has nothing to link to.
     ...(isDesktop()
-      ? [{ path: '/welcome', name: 'welcome', component: () => import('@/views/WelcomeView.vue') }]
+      ? [
+          { path: '/welcome', name: 'welcome', component: () => import('@/views/WelcomeView.vue') },
+          {
+            path: '/welcome/device',
+            name: 'welcome-device',
+            component: () => import('@/views/WelcomeDeviceView.vue'),
+          },
+        ]
       : []),
     {
       path: '/app',

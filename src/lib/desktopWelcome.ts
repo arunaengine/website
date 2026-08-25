@@ -41,6 +41,26 @@ export async function realmKnown(): Promise<boolean> {
   }
 }
 
+let enrolledOnce: boolean | null = null
+
+/** True once the node the shell embeds joined a realm; probed once per boot. */
+export async function deviceEnrolled(): Promise<boolean> {
+  if (enrolledOnce !== null) return enrolledOnce
+  try {
+    const { nodeStatus } = await import('./desktopBridge')
+    enrolledOnce = (await bounded(nodeStatus(), STATUS_TIMEOUT_MS)).enrolled
+  } catch {
+    // A shell that cannot answer must not hold the owner at the setup step.
+    enrolledOnce = true
+  }
+  return enrolledOnce
+}
+
+/** Drops the probe, so a finished enrollment is seen without a restart. */
+export function clearEnrolled(): void {
+  enrolledOnce = null
+}
+
 /** The realm a validate_realm call accepted, until the shell reopens on it. */
 export function pendingRealm(): string | null {
   try {
