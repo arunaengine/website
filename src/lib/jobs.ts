@@ -64,7 +64,8 @@ export interface JobPlacementResponse {
 }
 
 export interface JobFamilyResponse {
-  submission_id: string
+  /** Absent on a device: a local run belongs to no submission family. */
+  submission_id?: string | undefined
   request_digest: string
   canonical_job_id: string
   aliases: string[]
@@ -198,7 +199,8 @@ export interface JobAuditConflict {
 }
 
 export interface JobAuditResponse {
-  submission_id: string
+  /** Absent on a device: a local run belongs to no submission family. */
+  submission_id?: string | undefined
   request_digest: string
   scope: JobAuditScope
   records: JobAuditRecord[]
@@ -316,7 +318,8 @@ export interface SubmitJobResponse {
   job_id: string
   /** False on an idempotent replay: nothing new was admitted. */
   created: boolean
-  submission_id: string
+  /** Absent for a local run, which a device admits without a family. */
+  submission_id?: string | undefined
   canonical_job_id: string
   /** Point-in-time; a replay of a running request reports that instead. */
   state: string

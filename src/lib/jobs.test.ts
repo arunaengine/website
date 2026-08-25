@@ -304,6 +304,19 @@ describe('native job submission', () => {
     expect(created.job_id).toBe('01JOB')
   })
 
+  it('admits a local run that names no submission family', async () => {
+    // A device has no family, so the response carries no submission id.
+    const { submission_id: _absent, ...local } = submitBody(true, 'queued')
+    stubFetch(() => jsonResponse(201, { ...local, origin_node_url: 'http://127.0.0.1:9000/api/v1' }))
+
+    const created = await submitJob({ ...submission, target: 'local' }, client)
+
+    expect(created.job_id).toBe('01JOB')
+    expect(created.created).toBe(true)
+    expect(created.submission_id).toBeUndefined()
+    expect(created.origin_node_url).toBe('http://127.0.0.1:9000/api/v1')
+  })
+
   it('reads an idempotent replay from created rather than the status', async () => {
     // A 200 replay reports the family's current state, not "queued".
     stubFetch(() => jsonResponse(200, submitBody(false, 'running')))
