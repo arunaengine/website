@@ -118,6 +118,49 @@ describe('applying a context', () => {
   })
 })
 
+describe('ordering contexts', () => {
+  it('ends on the one the shell reported last', async () => {
+    // A blip through another base must not leave the window on it.
+    const { desktop } = await boot({ apiBaseUrl: LOCAL, revision: 1 })
+
+    void desktop.applyShellContext({ apiBaseUrl: REALM, revision: 2 })
+    void desktop.applyShellContext({ apiBaseUrl: LOCAL, revision: 3 })
+    await desktop.applyShellContext({ apiBaseUrl: REALM, revision: 4 })
+
+    expect(desktop.desktopContext()?.apiBaseUrl).toBe(REALM)
+    expect(desktop.desktopContext()?.revision).toBe(4)
+  })
+
+  it('ignores an answer the shell already replaced', async () => {
+    // shell_context can answer with what an event has since superseded.
+    const { desktop } = await boot({ apiBaseUrl: LOCAL, revision: 1 })
+
+    await desktop.applyShellContext({ apiBaseUrl: REALM, realmUrl: 'https://aruna.example', revision: 3 })
+    await desktop.applyShellContext({ apiBaseUrl: LOCAL, revision: 2 })
+
+    expect(desktop.desktopContext()?.apiBaseUrl).toBe(REALM)
+    expect(desktop.desktopContext()?.revision).toBe(3)
+  })
+
+  it('re-reports a context without applying it twice', async () => {
+    const { desktop } = await boot({ apiBaseUrl: LOCAL, revision: 1 })
+
+    await desktop.applyShellContext({ apiBaseUrl: REALM, revision: 2 })
+    await desktop.applyShellContext({ apiBaseUrl: REALM, revision: 3 })
+
+    expect(setApiBaseUrl).toHaveBeenCalledTimes(1)
+  })
+
+  it('follows a shell that numbers nothing', async () => {
+    // BRIDGE_VERSION 2 sends no revision; what the context says decides.
+    const { desktop } = await boot({ apiBaseUrl: LOCAL })
+
+    await desktop.applyShellContext({ apiBaseUrl: REALM })
+
+    expect(desktop.desktopContext()?.apiBaseUrl).toBe(REALM)
+  })
+})
+
 describe('following the shell', () => {
   it('applies what the event carries and lets go', async () => {
     const { desktop, channel } = await boot({ apiBaseUrl: LOCAL })

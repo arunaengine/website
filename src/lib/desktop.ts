@@ -28,6 +28,8 @@ export interface DesktopFeatures {
 export interface DesktopContext {
   // API base the shell wants the portal to talk to, absolute or same-origin.
   apiBaseUrl: string
+  // Monotonic per shell run: only a later context replaces the one in use.
+  revision?: number
   // Origin of the registered OIDC redirect_uri (RFC 8252 loopback listener).
   authCallbackOrigin?: string
   // The realm this device remembers; present whenever the shell stores one.
@@ -69,6 +71,9 @@ function readContext(value: unknown): DesktopContext | null {
   const source = value as Record<string, unknown>
   const context: DesktopContext = {
     apiBaseUrl: trimmed(source.apiBaseUrl) || DEFAULT_PORTAL_CONFIG.apiBaseUrl,
+  }
+  if (typeof source.revision === 'number' && Number.isFinite(source.revision)) {
+    context.revision = source.revision
   }
   const origin = trimmed(source.authCallbackOrigin)
   if (origin) context.authCallbackOrigin = origin.replace(/\/+$/, '')
@@ -114,7 +119,7 @@ function installConfig(context: DesktopContext): void {
 }
 
 // What the portal actually follows; the bridge is out because the shell keeps
-// handing back the one it injected.
+// handing back the one it injected, and the revision only orders the reports.
 function signature(context: DesktopContext): string {
   return JSON.stringify([
     context.apiBaseUrl,
@@ -125,18 +130,19 @@ function signature(context: DesktopContext): string {
 }
 
 /**
- * Installs a context the shell reported. A changed API base is switched in
- * place: the caches that belong to the old base are dropped and the session is
- * re-bootstrapped against the new one, keeping the realm-issued token, which
- * the local node accepts too. Requests still in flight are ignored by the
- * session epoch useAruna bumps.
+ * Worth taking when the shell numbered it later than the context last taken -
+ * a shell that numbers none is judged on what the context says instead - and
+ * when it actually says something else.
  */
-export async function applyShellContext(next: unknown): Promise<void> {
+function supersedes(next: DesktopContext, current: DesktopContext): boolean {
+  const numbered = next.revision !== undefined && current.revision !== undefined
+  if (numbered && next.revision! <= current.revision!) return false
+  return signature(next) !== signature(current)
+}
+
+async function install(merged: DesktopContext): Promise<void> {
   const current = shellContext.value
-  const parsed = readContext(next)
-  if (!current || !parsed) return
-  const merged: DesktopContext = { ...parsed, ...(current.bridge ? { bridge: current.bridge } : {}) }
-  if (signature(merged) === signature(current)) return
+  if (!current) return
   const switched = merged.apiBaseUrl !== current.apiBaseUrl
   installConfig(merged)
   const aruna = switched ? (await import('@/composables/useAruna')).useAruna() : null
@@ -151,6 +157,29 @@ export async function applyShellContext(next: unknown): Promise<void> {
   const { probeRealm } = await import('./desktopBoot')
   void probeRealm()
   await aruna.refresh()
+}
+
+// The context taken last, which is what a new one is judged against: reports
+// arrive faster than a switch completes.
+let queued: DesktopContext | null = null
+let applying: Promise<void> = Promise.resolve()
+
+/**
+ * Installs a context the shell reported, after the one before it: a changed
+ * API base is switched in place, the session is re-bootstrapped against it and
+ * the realm-issued token is kept, which the local node accepts too. Requests
+ * still in flight are ignored by the session epoch useAruna bumps.
+ */
+export function applyShellContext(next: unknown): Promise<void> {
+  const current = queued ?? shellContext.value
+  const parsed = readContext(next)
+  if (!current || !parsed) return applying
+  const merged: DesktopContext = { ...parsed, ...(current.bridge ? { bridge: current.bridge } : {}) }
+  if (!supersedes(merged, current)) return applying
+  queued = merged
+  // One failed switch must never wedge the ones behind it.
+  applying = applying.then(() => install(merged)).catch(() => {})
+  return applying
 }
 
 /** Asks the shell for its context; a shell without that command is no failure. */
