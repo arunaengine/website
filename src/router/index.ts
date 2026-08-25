@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { portalRoutes } from './routes'
-import { installWelcomeGuard } from '@/lib/desktopWelcome'
+import { installDesktopGuard } from '@/lib/desktopWelcome'
 
 function hashTargetExists(hash: string): boolean {
   try {
@@ -31,8 +31,8 @@ const router = createRouter({
   },
 })
 
-// No-op on the web; in the shell it holds navigation at the welcome view until
-// a realm is known.
-installWelcomeGuard(router)
+// No-op on the web; in the shell it holds navigation at the welcome routes
+// until the first run is done.
+installDesktopGuard(router)
 
 export default router

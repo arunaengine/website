@@ -1,7 +1,9 @@
 // Desktop first run: with no realm remembered the shell points the portal at
-// the local, unenrolled node, which has nothing to serve. The welcome view owns
-// the window until `validate_realm` gives the shell a realm to reopen against.
-import type { Router } from 'vue-router'
+// the local, unenrolled node, which has nothing to serve. The welcome routes
+// own the window until `validate_realm` gives the shell a realm to reopen
+// against, the owner signed in, and the device prompt was answered.
+import { watch, type Ref } from 'vue'
+import type { RouteRecordName, Router } from 'vue-router'
 import { desktopContext, isDesktop } from './desktop'
 import { realmUnreachable } from './desktopBoot'
 
@@ -136,12 +138,44 @@ export function setSetupWatch(value: SetupWatch | null): void {
   }
 }
 
+// A stored session is restored against the realm before the guard may call it
+// signed out, but a slow realm must not hold the window either.
+const BOOTSTRAP_TIMEOUT_MS = 10_000
+
+const WELCOME_ROUTES = new Set<RouteRecordName>(['welcome', 'welcome-sign-in', 'welcome-device'])
+
+// Resolves once the flag turns true, or once the wait runs out.
+function settled(flag: Ref<boolean>, ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    let stop = () => {}
+    const finish = () => {
+      clearTimeout(timer)
+      stop()
+      resolve()
+    }
+    const timer = setTimeout(finish, ms)
+    stop = watch(flag, (done) => {
+      if (done) finish()
+    })
+  })
+}
+
+async function signedOut(): Promise<boolean> {
+  const { useAruna } = await import('@/composables/useAruna')
+  const { authToken, bootstrapped, currentUser } = useAruna()
+  if (!authToken.value) return true
+  if (!bootstrapped.value) await settled(bootstrapped, BOOTSTRAP_TIMEOUT_MS)
+  // A session still restoring is not a signed-out one.
+  return bootstrapped.value && !currentUser.value
+}
+
 /**
- * Sends desktop navigation to the welcome view while no realm is known, and
- * away from it once one is. Probed once per boot: the shell replaces the whole
- * window when the answer changes.
+ * Holds desktop navigation at the welcome routes until the app has a realm to
+ * talk to, a signed-in owner, and an answer to the device prompt. The realm and
+ * the enrollment are probed once per boot: the shell replaces the whole window
+ * when either answer changes.
  */
-export function installWelcomeGuard(router: Router): void {
+export function installDesktopGuard(router: Router): void {
   if (!isDesktop()) return
   let known: boolean | null = null
   router.beforeEach(async (to) => {
@@ -150,12 +184,20 @@ export function installWelcomeGuard(router: Router): void {
     // A realm that never answered must be replaceable, remembered or not.
     if (to.name === 'welcome' && realmUnreachable()) return true
     if (known === null) known = await realmKnown()
-    if (known) {
-      setPendingRealm(null)
-      return to.name === 'welcome' ? { name: 'dashboard' } : true
-    }
     // The device page enrolls from a code alone, so it stays reachable.
-    return to.name === 'welcome' || to.name === 'device' ? true : { name: 'welcome' }
+    if (!known) return to.name === 'welcome' || to.name === 'device' ? true : { name: 'welcome' }
+    setPendingRealm(null)
+    // A setup left mid-flight is watched out wherever the session stands.
+    const resuming = to.name === 'welcome-device' && setupWatch() !== null
+    if (await signedOut()) {
+      if (resuming) return true
+      return to.name === 'welcome' || to.name === 'welcome-sign-in' ? true : { name: 'welcome-sign-in' }
+    }
+    if (to.name === 'device' || resuming) return true
+    if (!setupSkipped() && !(await deviceEnrolled())) {
+      return to.name === 'welcome-device' ? true : { name: 'welcome-device' }
+    }
+    return WELCOME_ROUTES.has(to.name as RouteRecordName) ? { name: 'dashboard' } : true
   })
 }
 

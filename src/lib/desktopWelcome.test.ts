@@ -1,4 +1,4 @@
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,7 +7,19 @@ const REALM = 'https://aruna.example/api/v1'
 
 type Status = Record<string, unknown>
 
+// What the dashboard reads to tell a session apart: no token at all, a token
+// still being checked, and a token the realm accepted.
+interface Session {
+  token?: string
+  bootstrapped?: boolean
+  user?: boolean
+}
+
 const Blank = defineComponent(() => () => h('div'))
+
+const authToken = ref('token')
+const bootstrapped = ref(true)
+const currentUser = ref<{ id: string } | null>({ id: 'u1' })
 
 function store(): Storage {
   const entries = new Map<string, string>()
@@ -18,9 +30,12 @@ function store(): Storage {
   } as unknown as Storage
 }
 
+// Shared across module graphs, so a second realm sees what the first stored.
+let storage = store()
+
 // The desktop context and the runtime config are both read once per module
 // graph, so every case builds a graph of its own.
-async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUrl?: string) {
+async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUrl?: string, session: Session = {}) {
   vi.resetModules()
   const invoke = vi.fn(async (command: string) => {
     if (command !== 'node_status' || !status) throw new Error('unknown command: node_status')
@@ -29,33 +44,51 @@ async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUr
   })
   vi.stubGlobal('window', {
     __ARUNA_DESKTOP__: { apiBaseUrl, realmUrl, bridge: { invoke, version: 1 } },
-    localStorage: store(),
+    localStorage: storage,
   })
+  authToken.value = session.token ?? 'token'
+  bootstrapped.value = session.bootstrapped ?? true
+  currentUser.value = session.user === false ? null : { id: 'u1' }
+  vi.doMock('@/composables/useAruna', () => ({
+    useAruna: () => ({ authToken, bootstrapped, currentUser }),
+  }))
   const config = await import('./config')
   config.applyPortalConfig({ apiBaseUrl })
   return await import('./desktopWelcome')
 }
 
-async function routerWith(welcome: typeof import('./desktopWelcome'), start = '/app'): Promise<Router> {
-  const router = createRouter({
+function blankRouter(): Router {
+  return createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/welcome', name: 'welcome', component: Blank },
+      { path: '/welcome/sign-in', name: 'welcome-sign-in', component: Blank },
+      { path: '/welcome/device', name: 'welcome-device', component: Blank },
       { path: '/app', name: 'dashboard', component: Blank },
       { path: '/app/device', name: 'device', component: Blank },
       { path: '/auth/callback', name: 'auth-callback', component: Blank },
       { path: '/app/settings', name: 'settings', component: Blank },
     ],
   })
-  welcome.installWelcomeGuard(router)
+}
+
+async function routerWith(welcome: typeof import('./desktopWelcome'), start = '/app'): Promise<Router> {
+  const router = blankRouter()
+  welcome.installDesktopGuard(router)
   await router.push(start)
   await router.isReady()
   return router
 }
 
+// Lets pending guard work settle without advancing the clock.
+async function turns(count = 20): Promise<void> {
+  for (let i = 0; i < count; i++) await Promise.resolve()
+}
+
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
+  storage = store()
 })
 
 // Drives the boot probe of this module graph against a realm that never answers.
@@ -136,6 +169,16 @@ describe('welcome guard', () => {
     expect(router.currentRoute.value.name).toBe('auth-callback')
   })
 
+  it('holds the sign in step until a realm is known', async () => {
+    const welcome = await load({ state: 'running', enrolled: false, apiBaseUrl: LOCAL })
+    const router = await routerWith(welcome)
+
+    await router.push({ name: 'welcome-sign-in' })
+    expect(router.currentRoute.value.name).toBe('welcome')
+    await router.push({ name: 'welcome-device' })
+    expect(router.currentRoute.value.name).toBe('welcome')
+  })
+
   it('leaves the welcome view once a realm answers', async () => {
     // The shell reopens the window on the same path, so /welcome must move on.
     const welcome = await load({ state: 'stopped', enrolled: true, apiBaseUrl: null }, REALM)
@@ -166,6 +209,144 @@ describe('welcome guard', () => {
 
     await router.push({ name: 'settings' })
     expect(router.currentRoute.value.name).toBe('settings')
+  })
+})
+
+describe('sign in gate', () => {
+  it('sends a signed out owner to the sign in step', async () => {
+    const welcome = await load({ state: 'stopped', enrolled: true, apiBaseUrl: null }, REALM, undefined, {
+      token: '',
+    })
+    const router = await routerWith(welcome)
+    expect(router.currentRoute.value.name).toBe('welcome-sign-in')
+
+    // No guest surface in the shell: the app pages stay closed.
+    await router.push({ name: 'settings' })
+    expect(router.currentRoute.value.name).toBe('welcome-sign-in')
+    await router.push({ name: 'device' })
+    expect(router.currentRoute.value.name).toBe('welcome-sign-in')
+  })
+
+  it('keeps the realm form and the callback reachable', async () => {
+    const welcome = await load({ state: 'stopped', enrolled: true, apiBaseUrl: null }, REALM, undefined, {
+      token: '',
+    })
+    const router = await routerWith(welcome)
+
+    await router.push({ name: 'welcome' })
+    expect(router.currentRoute.value.name).toBe('welcome')
+    await router.push({ name: 'auth-callback' })
+    expect(router.currentRoute.value.name).toBe('auth-callback')
+  })
+
+  it('reads a rejected token as signed out', async () => {
+    const welcome = await load({ state: 'stopped', enrolled: true, apiBaseUrl: null }, REALM, undefined, {
+      user: false,
+    })
+    const router = await routerWith(welcome)
+    expect(router.currentRoute.value.name).toBe('welcome-sign-in')
+  })
+
+  it('waits out a restoring session', async () => {
+    // A stored token that has not been checked must never flash the sign-in page.
+    const welcome = await load({ state: 'stopped', enrolled: true, apiBaseUrl: null }, REALM, undefined, {
+      bootstrapped: false,
+    })
+    const router = blankRouter()
+    welcome.installDesktopGuard(router)
+
+    let arrived = false
+    const trip = router.push('/app/settings').then(() => void (arrived = true))
+    await turns()
+    expect(arrived).toBe(false)
+
+    bootstrapped.value = true
+    await trip
+    expect(router.currentRoute.value.name).toBe('settings')
+  })
+})
+
+describe('device setup gate', () => {
+  it('prompts an unenrolled device once signed in', async () => {
+    const welcome = await load(
+      { state: 'running', enrolled: false, apiBaseUrl: LOCAL },
+      REALM,
+      'https://aruna.example',
+    )
+    const router = await routerWith(welcome)
+    expect(router.currentRoute.value.name).toBe('welcome-device')
+
+    // The device page enrolls from a pasted code, so it stays open.
+    await router.push({ name: 'device' })
+    expect(router.currentRoute.value.name).toBe('device')
+  })
+
+  it('opens the dashboard for an enrolled device', async () => {
+    const welcome = await load(
+      { state: 'running', enrolled: true, apiBaseUrl: LOCAL },
+      REALM,
+      'https://aruna.example',
+    )
+    const router = await routerWith(welcome, '/app/settings')
+
+    await router.push({ name: 'welcome-device' })
+    expect(router.currentRoute.value.name).toBe('dashboard')
+  })
+
+  it('asks no more once the prompt was answered', async () => {
+    const welcome = await load(
+      { state: 'running', enrolled: false, apiBaseUrl: LOCAL },
+      REALM,
+      'https://aruna.example',
+    )
+    welcome.skipSetup()
+    const router = await routerWith(welcome)
+    expect(router.currentRoute.value.name).toBe('dashboard')
+  })
+
+  it('asks again for another realm', async () => {
+    // The skip belongs to the realm the device would have joined.
+    const first = await load({ state: 'running', enrolled: false, apiBaseUrl: LOCAL }, REALM, 'https://one.example')
+    first.skipSetup()
+    expect(first.setupSkipped()).toBe(true)
+
+    const second = await load({ state: 'running', enrolled: false, apiBaseUrl: LOCAL }, REALM, 'https://two.example')
+    expect(second.setupSkipped()).toBe(false)
+    const router = await routerWith(second)
+    expect(router.currentRoute.value.name).toBe('welcome-device')
+  })
+
+  it('holds the step open for a resumed setup', async () => {
+    // The shell replaces the window mid-setup; the watch must survive it.
+    const welcome = await load(
+      { state: 'running', enrolled: true, apiBaseUrl: LOCAL },
+      REALM,
+      'https://aruna.example',
+    )
+    welcome.setSetupWatch({ enrollmentId: 'enr-1', expiresAt: 4102444800 })
+    const router = await routerWith(welcome, '/app')
+
+    await router.push({ name: 'welcome-device' })
+    expect(router.currentRoute.value.name).toBe('welcome-device')
+  })
+})
+
+describe('setup watch', () => {
+  it('survives until it is cleared', async () => {
+    const welcome = await load(null, LOCAL, 'https://aruna.example')
+    expect(welcome.setupWatch()).toBeNull()
+
+    welcome.setSetupWatch({ enrollmentId: 'enr-1', expiresAt: 42 })
+    expect(welcome.setupWatch()).toEqual({ enrollmentId: 'enr-1', expiresAt: 42 })
+
+    welcome.setSetupWatch(null)
+    expect(welcome.setupWatch()).toBeNull()
+  })
+
+  it('ignores a record without an expiry', async () => {
+    const welcome = await load(null, LOCAL, 'https://aruna.example')
+    storage.setItem('aruna.desktop.setupWatch:https://aruna.example', '{"enrollmentId":"enr-1"}')
+    expect(welcome.setupWatch()).toBeNull()
   })
 })
 
