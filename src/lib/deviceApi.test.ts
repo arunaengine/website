@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from './api'
 import {
+  entryExpectation,
   entryPending,
   isDeviceUnsupported,
   isStaleExpectation,
@@ -56,8 +57,8 @@ describe('entry mapping', () => {
       path: 'notes/day.md',
       state: 'pending_replace',
       reason: 'base_unknown',
-      local: { size: 12, modified_at_ms: 5, blake3: 'aa' },
-      remote: { size: 40, modified_at_ms: 9, blake3: 'bb', version_id: 'v2' },
+      local: { size: 12, modified_at_ms: 5, fingerprint: 'fp1', blake3: 'aa' },
+      remote: { size: 40, modified_at_ms: 9, fingerprint: 'fp2', blake3: 'bb', version_id: 'v2' },
       conflicted_copy: 'notes/day (conflicted copy 2026-08-25 1200, realm).md',
     })
 
@@ -80,7 +81,32 @@ describe('entry mapping', () => {
     const entry = readEntry({ path: 'new.bin', state: 'remote_new', remote: { size: 3 } })
 
     expect(entry.local).toBeNull()
-    expect(entry.remote).toEqual({ size: 3, modified_at_ms: null, blake3: null, version_id: null })
+    expect(entry.remote).toEqual({
+      size: 3,
+      modified_at_ms: null,
+      fingerprint: null,
+      blake3: null,
+      version_id: null,
+    })
+  })
+
+  it('demands both local hashes before anything may touch the file', () => {
+    const hashed = readEntry({
+      path: 'a.bin',
+      state: 'conflict',
+      local: { fingerprint: 'fp1', blake3: 'aa' },
+      remote: { version_id: 'v3' },
+    })
+
+    expect(entryExpectation(hashed)).toEqual({ fingerprint: 'fp1', blake3: 'aa', remote_version: 'v3' })
+    expect(entryExpectation(readEntry({ path: 'b.bin', state: 'conflict', local: { blake3: 'aa' } }))).toBeNull()
+    expect(entryExpectation(readEntry({ path: 'c.bin', state: 'remote_new' }))).toBeNull()
+  })
+
+  it('leaves out a remote version the entry does not name', () => {
+    const local = readEntry({ path: 'd.bin', state: 'local_changed', local: { fingerprint: 'fp', blake3: 'bb' } })
+
+    expect(entryExpectation(local)).toEqual({ fingerprint: 'fp', blake3: 'bb' })
   })
 })
 

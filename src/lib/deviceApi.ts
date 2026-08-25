@@ -188,7 +188,10 @@ const ENTRY_STATES: readonly EntryState[] = [
 /** One side of an entry, as the device last saw it. */
 export interface EntrySide {
   size: number | null
+  /** Local: the file's stat mtime. Remote: when the version was written. */
   modified_at_ms: number | null
+  /** Weak fingerprint the sync compares before it hashes anything. */
+  fingerprint: string | null
   blake3: string | null
   version_id: string | null
 }
@@ -212,6 +215,7 @@ function readSide(value: unknown): EntrySide | null {
   return {
     size: size(raw.size),
     modified_at_ms: size(raw.modified_at_ms),
+    fingerprint: text(raw.fingerprint),
     blake3: text(raw.blake3),
     version_id: text(raw.version_id),
   }
@@ -244,11 +248,27 @@ export interface EntryPage {
 
 export type EntryAction = 'replace_local' | 'keep_local' | 'remove_local' | 'resolve'
 
-/** What the owner saw when they decided; a drifted file makes the node refuse. */
+/**
+ * What the owner saw when they decided. Both local hashes are required: the
+ * node compares them before it touches the file and answers 412 when either
+ * moved on. `remote_version` names the version an action takes.
+ */
 export interface ActionExpectation {
-  fingerprint?: string
-  blake3?: string
+  fingerprint: string
+  blake3: string
   remote_version?: string
+}
+
+/**
+ * The expectation for an entry, or null when the device has not hashed the
+ * local file yet - nothing that touches it may be requested without both.
+ */
+export function entryExpectation(entry: FolderEntry): ActionExpectation | null {
+  const fingerprint = entry.local?.fingerprint
+  const blake3 = entry.local?.blake3
+  if (!fingerprint || !blake3) return null
+  const remoteVersion = entry.remote?.version_id
+  return { fingerprint, blake3, ...(remoteVersion ? { remote_version: remoteVersion } : {}) }
 }
 
 export interface ActionRecord {

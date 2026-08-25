@@ -14,6 +14,7 @@ import ReplaceLocalDialog from '@/components/desktop/ReplaceLocalDialog.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import {
+  entryExpectation,
   entryPending,
   folderName,
   isStaleExpectation,
@@ -104,11 +105,13 @@ watch(folderId, () => void refresh())
 
 async function act(entry: FolderEntry, action: EntryAction): Promise<void> {
   actionError.value = null
+  const expected = entryExpectation(entry)
+  if (!expected) {
+    actionError.value = 'This device has not hashed that file yet, so nothing can be applied to it. Sync the folder and try again.'
+    return
+  }
   try {
-    const updated = await entryAction(folderId.value, entry.path, action, {
-      blake3: entry.local?.blake3 ?? undefined,
-      remote_version: entry.remote?.version_id ?? undefined,
-    })
+    const updated = await entryAction(folderId.value, entry.path, action, expected)
     rows.value = rows.value.map((row) => (row.path === entry.path ? updated : row))
     await refreshFolder(folderId.value).catch(() => undefined)
   } catch (err) {

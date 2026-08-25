@@ -21,8 +21,20 @@ const folder: SyncedFolder = {
 const entry: FolderEntry = {
   path: 'notes/day.md',
   state: 'conflict',
-  local: { size: 2048, modified_at_ms: Date.now(), blake3: 'aaaabbbbccccdddd', version_id: null },
-  remote: { size: 4096, modified_at_ms: Date.now(), blake3: 'eeeeffff11112222', version_id: 'v7' },
+  local: {
+    size: 2048,
+    modified_at_ms: Date.now(),
+    fingerprint: 'fp-local',
+    blake3: 'aaaabbbbccccdddd',
+    version_id: null,
+  },
+  remote: {
+    size: 4096,
+    modified_at_ms: Date.now(),
+    fingerprint: 'fp-remote',
+    blake3: 'eeeeffff11112222',
+    version_id: 'v7',
+  },
   reason: null,
   conflicted_copy: 'notes/day (conflicted copy 2026-08-25 1200, realm).md',
   message: null,

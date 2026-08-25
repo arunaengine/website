@@ -13,7 +13,13 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
-import { folderName, isStaleExpectation, type FolderEntry, type SyncedFolder } from '@/lib/deviceApi'
+import {
+  entryExpectation,
+  folderName,
+  isStaleExpectation,
+  type FolderEntry,
+  type SyncedFolder,
+} from '@/lib/deviceApi'
 import { folderConfirmed } from '@/lib/syncStates'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { Loader2 } from '@lucide/vue'
@@ -75,10 +81,12 @@ async function replace(): Promise<void> {
   try {
     const target = entry.value
     if (target) {
-      await entryAction(props.folder.folder_id, target.path, 'replace_local', {
-        blake3: target.local?.blake3 ?? undefined,
-        remote_version: target.remote?.version_id ?? undefined,
-      })
+      const expected = entryExpectation(target)
+      if (!expected) {
+        error.value = 'This device has not hashed your copy yet, so it cannot be given up. Sync the folder and look again.'
+        return
+      }
+      await entryAction(props.folder.folder_id, target.path, 'replace_local', expected)
     } else {
       await folderReplace(props.folder.folder_id, confirmText.value)
     }
