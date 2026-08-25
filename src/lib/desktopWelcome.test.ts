@@ -261,7 +261,7 @@ describe('sign in gate', () => {
   })
 
   it('keeps the realm form and the callback reachable', async () => {
-    // A window reopened on /welcome after a connect must land on sign-in, not the form.
+    // Landing on /welcome with a realm on record must show sign-in, not the form.
     const welcome = await load({ state: 'stopped', enrolled: true, apiBaseUrl: null }, REALM, undefined, {
       token: '',
     })
