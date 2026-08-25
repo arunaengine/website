@@ -1,5 +1,5 @@
-import { computed, onUnmounted, ref, watch } from 'vue'
-import { ApiError } from '@/lib/api'
+import { computed, getCurrentInstance, inject, onUnmounted, ref, watch, type InjectionKey } from 'vue'
+import { ApiError, type ApiClientOptions } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
@@ -53,6 +53,22 @@ function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
+export type JobClient = () => ApiClientOptions
+
+/**
+ * Points the job surfaces at another API than the realm the portal signed into
+ * — in Aruna Desktop, the node running on this machine. Provided by the view
+ * that owns the local runs, so its detail panels follow it.
+ */
+export const JOB_CLIENT: InjectionKey<JobClient> = Symbol('aruna.jobClient')
+
+// A component's own provide is invisible to itself, so the owner also passes
+// its client in explicitly.
+function useJobClient(explicit?: JobClient): JobClient {
+  if (explicit) return explicit
+  return (getCurrentInstance() ? inject(JOB_CLIENT, null) : null) ?? client
+}
+
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
@@ -76,6 +92,8 @@ export interface JobsListOptions {
   // Extra poll gate (e.g. "panel is open"); the interval itself always guards
   // on flag, sign-in, visibility, single page and an active job being listed.
   pollWhile?: () => boolean
+  /** API holding these jobs; defaults to the realm the portal talks to. */
+  client?: JobClient
 }
 
 // Per-instance list state — call from setup. The jobs view and the staging
@@ -83,6 +101,7 @@ export interface JobsListOptions {
 // singleton (useNotifications) but a factory (ComputeView's list, extracted).
 export function useJobsList(options: JobsListOptions = {}) {
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
+  const resolveClient = useJobClient(options.client)
   const { currentUser } = useAruna()
   const { authPending } = useAuth()
 
@@ -124,7 +143,7 @@ export function useJobsList(options: JobsListOptions = {}) {
     if (!silent) refreshing.value = true
     if (!silent && !jobs.value.length) listState.value = 'loading'
     try {
-      const page = await listJobs({ limit: pageSize, state: stateFilter.value || undefined }, client())
+      const page = await listJobs({ limit: pageSize, state: stateFilter.value || undefined }, resolveClient())
       if (id !== requestId) return
       jobs.value = page.jobs
       nextCursor.value = page.next_cursor ?? null
@@ -160,7 +179,7 @@ export function useJobsList(options: JobsListOptions = {}) {
     try {
       const page = await listJobs(
         { limit: pageSize, cursor: nextCursor.value, state: stateFilter.value || undefined },
-        client(),
+        resolveClient(),
       )
       if (id !== requestId) return
       const known = new Set(jobs.value.map((job) => job.job_id))
@@ -220,7 +239,8 @@ export type JobDetailState = 'idle' | 'loading' | 'ready' | 'error' | 'unsupport
 
 // Single-job fetch that keeps polling while the job is non-terminal
 // (TaskDetailPanel pattern). `jobId` returning null clears and stops.
-export function useJobDetail(jobId: () => string | null) {
+export function useJobDetail(jobId: () => string | null, options: { client?: JobClient } = {}) {
+  const resolveClient = useJobClient(options.client)
   const job = ref<JobStatusResponse | null>(null)
   const loadState = ref<JobDetailState>('idle')
   const loadError = ref<string | null>(null)
@@ -251,7 +271,7 @@ export function useJobDetail(jobId: () => string | null) {
     const id = jobId()
     if (!id) return
     try {
-      job.value = await requestGetJob(id, client())
+      job.value = await requestGetJob(id, resolveClient())
       lastPollError.value = null
       if (isTerminalJobState(job.value.state)) stopPolling()
     } catch (err) {
@@ -268,7 +288,7 @@ export function useJobDetail(jobId: () => string | null) {
     lastPollError.value = null
     cancelError.value = null
     try {
-      job.value = await requestGetJob(id, client())
+      job.value = await requestGetJob(id, resolveClient())
       loadState.value = 'ready'
       if (!isTerminalJobState(job.value.state)) startPolling()
     } catch (err) {
@@ -292,7 +312,7 @@ export function useJobDetail(jobId: () => string | null) {
     cancelling.value = true
     cancelError.value = null
     try {
-      job.value = await requestCancelJob(id, client())
+      job.value = await requestCancelJob(id, resolveClient())
       // 202 keeps the job live until the executor observes the flag.
       if (!isTerminalJobState(job.value.state)) startPolling()
       return true
@@ -324,29 +344,31 @@ export function useJobDetail(jobId: () => string | null) {
 }
 
 export function useJobs() {
+  const resolveClient = useJobClient()
+
   function getJob(jobId: string): Promise<JobStatusResponse> {
     assertEnabled()
-    return requestGetJob(jobId, client())
+    return requestGetJob(jobId, resolveClient())
   }
 
   function getJobAudit(jobId: string, params: GetJobAuditParams): Promise<JobAuditResponse> {
     assertEnabled()
-    return requestGetJobAudit(jobId, params, client())
+    return requestGetJobAudit(jobId, params, resolveClient())
   }
 
   function getJobReport(jobId: string, params: GetJobReportParams): Promise<JobReportResponse> {
     assertEnabled()
-    return requestGetJobReport(jobId, params, client())
+    return requestGetJobReport(jobId, params, resolveClient())
   }
 
   function headJobArtifact(jobId: string): Promise<JobArtifactStatus> {
     assertEnabled()
-    return requestHeadArtifact(jobId, client())
+    return requestHeadArtifact(jobId, resolveClient())
   }
 
   function downloadJobArtifact(jobId: string): Promise<JobArtifactDownload> {
     assertEnabled()
-    return requestDownloadArtifact(jobId, client())
+    return requestDownloadArtifact(jobId, resolveClient())
   }
 
   return { jobsEnabled, getJob, getJobAudit, getJobReport, headJobArtifact, downloadJobArtifact }
