@@ -3,10 +3,11 @@ import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
 import { useAuth } from '@/composables/useAuth'
 import { isDesktop } from '@/lib/desktop'
-import { onMounted } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
+import { onMounted, watch } from 'vue'
+import { useRoute, useRouter, RouterLink, type LocationQuery } from 'vue-router'
 import { Loader2 } from '@lucide/vue'
 
+const route = useRoute()
 const router = useRouter()
 const { completeSignIn, signIn, stage, stageError } = useAuth()
 // The shell has no guest surface to fall back to: signing in is the way in.
@@ -22,14 +23,36 @@ const stageLabels: Record<string, string> = {
   done: 'Signed in, taking you to the portal.',
 }
 
-onMounted(async () => {
+function searchOf(query: LocationQuery): URLSearchParams {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    const single = Array.isArray(value) ? value[0] : value
+    if (typeof single === 'string') search.set(key, single)
+  }
+  return search
+}
+
+async function exchange(): Promise<void> {
+  stage.value = 'idle'
+  stageError.value = null
   try {
-    const target = await completeSignIn(new URLSearchParams(window.location.search))
+    const target = await completeSignIn(searchOf(route.query))
     await router.replace(target)
   } catch {
     // stageError is rendered below.
   }
-})
+}
+
+onMounted(exchange)
+
+// A second return lands on this same route, so the view is reused: without
+// this the new code would never be exchanged.
+watch(
+  () => route.fullPath,
+  () => {
+    if (route.name === 'auth-callback') void exchange()
+  },
+)
 </script>
 
 <template>
