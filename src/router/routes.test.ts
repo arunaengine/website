@@ -47,6 +47,8 @@ describe('web routes', () => {
   it('mounts no welcome view', async () => {
     const routes = await build()
     expect(find(routes, '/welcome')).toBeUndefined()
+    expect(find(routes, '/welcome/sign-in')).toBeUndefined()
+    expect(find(routes, '/welcome/device')).toBeUndefined()
   })
 })
 
@@ -74,6 +76,15 @@ describe('desktop routes', () => {
 
     expect(welcome?.name).toBe('welcome')
     expect(typeof welcome?.component).toBe('function')
+  })
+
+  it('mounts the first run steps outside the app shell', async () => {
+    // Sign-in and device setup precede the shell, which has nothing to link to.
+    const routes = await build({ apiBaseUrl: '/api/v1' })
+
+    expect(find(routes, '/welcome/sign-in')?.name).toBe('welcome-sign-in')
+    expect(find(routes, '/welcome/device')?.name).toBe('welcome-device')
+    expect(appChildren(routes).some((route) => route.name === 'welcome-sign-in')).toBe(false)
   })
 
   it('keeps the auth callback route', async () => {
