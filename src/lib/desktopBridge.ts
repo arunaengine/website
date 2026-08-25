@@ -149,13 +149,14 @@ function readSettings(command: string, value: unknown): NodeSettings {
   }
 }
 
-/** Supervisor status of the embedded node. */
-export async function nodeStatus(): Promise<NodeStatus> {
-  const command = 'node_status'
-  const raw = asRecord(command, await call(command))
-  const state = STATES.find((known) => known === raw.state) ?? 'error'
+/** Reads a supervisor status the shell either answered with or pushed. */
+export function readStatus(payload: unknown): NodeStatus {
+  const raw =
+    payload && typeof payload === 'object' && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {}
   return {
-    state,
+    state: STATES.find((known) => known === raw.state) ?? 'error',
     nodeId: asText(raw.nodeId),
     realm: asText(raw.realm),
     enrolled: raw.enrolled === true,
@@ -164,6 +165,12 @@ export async function nodeStatus(): Promise<NodeStatus> {
     uptimeSeconds: asNumber(raw.uptimeSeconds),
     message: asText(raw.message),
   }
+}
+
+/** Supervisor status of the embedded node. */
+export async function nodeStatus(): Promise<NodeStatus> {
+  const command = 'node_status'
+  return readStatus(asRecord(command, await call(command)))
 }
 
 /** The last `lines` log lines of the embedded node, oldest first. */

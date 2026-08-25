@@ -1,0 +1,82 @@
+// Supervisor state of the node this machine runs, shared by every desktop
+// surface: the top bar pill, the home node card and the device REST wrappers,
+// which need the node's own listener base. Desktop only; on the web nothing
+// here ever starts.
+import { computed, ref } from 'vue'
+import { isDesktop } from '@/lib/desktop'
+import type { NodeStatus } from '@/lib/desktopBridge'
+
+// The shell pushes `node-status` on every transition, so the poll is only the
+// fallback for a shell that emits none.
+const POLL_MS = 15_000
+
+const status = ref<NodeStatus | null>(null)
+const error = ref<string | null>(null)
+const loaded = ref(false)
+let started = false
+
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
+async function refresh(): Promise<void> {
+  if (!isDesktop()) return
+  try {
+    const { nodeStatus } = await import('@/lib/desktopBridge')
+    status.value = await nodeStatus()
+    error.value = null
+  } catch (err) {
+    error.value = message(err)
+  } finally {
+    loaded.value = true
+  }
+}
+
+// Started once for the session, like the upload queue: the desktop shell is a
+// single window whose node outlives every view.
+function start(): void {
+  if (started || !isDesktop()) return
+  started = true
+  void refresh()
+  void import('@/lib/desktopEvents').then(({ onNodeStatus }) =>
+    onNodeStatus((next) => {
+      status.value = next
+      error.value = null
+      loaded.value = true
+    }),
+  )
+  if (typeof window !== 'undefined') {
+    window.setInterval(() => {
+      if (typeof document === 'undefined' || !document.hidden) void refresh()
+    }, POLL_MS)
+  }
+}
+
+const state = computed<NodeStatus['state'] | 'unknown'>(() => status.value?.state ?? 'unknown')
+
+/** The node's own REST base, only while it is up enough to answer. */
+const nodeBaseUrl = computed(() =>
+  status.value?.state === 'running' ? status.value.apiBaseUrl : null,
+)
+
+// What the owner is told in one word; a shell that cannot be reached is not the
+// same as a node that is down, so it says so.
+const label = computed(() => {
+  if (error.value) return 'no shell'
+  switch (state.value) {
+    case 'running':
+      return status.value?.enrolled ? 'online' : 'not enrolled'
+    case 'starting':
+      return 'starting'
+    case 'stopped':
+      return 'stopped'
+    case 'error':
+      return 'error'
+    default:
+      return 'checking'
+  }
+})
+
+export function useDeviceStatus() {
+  return { status, error, loaded, state, label, nodeBaseUrl, refresh, start }
+}
