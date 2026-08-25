@@ -15,7 +15,11 @@ const POLL_MS = 15_000
 const status = ref<NodeStatus | null>(null)
 const error = ref<string | null>(null)
 const loaded = ref(false)
-let started = false
+// Refcounted: the shell's own views hold it open, and nothing polls the node
+// from the welcome routes, which have their own way of watching it.
+let watchers = 0
+let timer: number | undefined
+let unlisten: (() => void) | null = null
 
 function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -34,24 +38,37 @@ async function refresh(): Promise<void> {
   }
 }
 
-// Started once for the session, like the upload queue: the desktop shell is a
-// single window whose node outlives every view.
+/** Follows the node while a view needs it; balance every call with stop(). */
 function start(): void {
-  if (started || !isDesktop()) return
-  started = true
+  if (!isDesktop()) return
+  watchers += 1
+  if (watchers > 1) return
   void refresh()
-  void import('@/lib/desktopEvents').then(({ onNodeStatus }) =>
-    onNodeStatus((next) => {
+  void import('@/lib/desktopEvents').then(async ({ onNodeStatus }) => {
+    const off = await onNodeStatus((next) => {
       status.value = next
       error.value = null
       loaded.value = true
-    }),
-  )
+    })
+    // A stop that landed while the listener was loading takes it right back.
+    if (watchers > 0) unlisten = off
+    else off?.()
+  })
   if (typeof window !== 'undefined') {
-    window.setInterval(() => {
+    timer = window.setInterval(() => {
       if (typeof document === 'undefined' || !document.hidden) void refresh()
     }, POLL_MS)
   }
+}
+
+function stop(): void {
+  if (!isDesktop() || watchers === 0) return
+  watchers -= 1
+  if (watchers > 0) return
+  if (timer !== undefined) window.clearInterval(timer)
+  timer = undefined
+  unlisten?.()
+  unlisten = null
 }
 
 const state = computed<NodeStatus['state'] | 'unknown'>(() => status.value?.state ?? 'unknown')
@@ -87,5 +104,5 @@ const deviceClient = computed<DeviceClient | null>(() =>
 )
 
 export function useDeviceStatus() {
-  return { status, error, loaded, state, label, nodeBaseUrl, deviceClient, refresh, start }
+  return { status, error, loaded, state, label, nodeBaseUrl, deviceClient, refresh, start, stop }
 }

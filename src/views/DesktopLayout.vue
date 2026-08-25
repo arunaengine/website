@@ -8,7 +8,7 @@ import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import TransfersPanel from '@/components/data/TransfersPanel.vue'
 import { RouterView, useRoute } from 'vue-router'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
@@ -34,7 +34,7 @@ const mainEl = ref<HTMLElement | null>(null)
 const unreachable = computed(() => realmReach.value === 'unreachable')
 
 const { isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine, isManagementNode } = useAruna()
-const { start: watchNode } = useDeviceStatus()
+const { start: watchNode, stop: unwatchNode } = useDeviceStatus()
 
 const adminItems = computed(() => [
   ...(isRealmAdmin.value ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true }] : []),
@@ -75,6 +75,7 @@ onMounted(() => {
   void probeRealm()
   watchNode()
 })
+onUnmounted(unwatchNode)
 
 // Same focus hand-off as the portal shell: a route change moves focus to the
 // main landmark unless a hash owns the scroll position.

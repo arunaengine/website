@@ -13,7 +13,7 @@ import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
 import SearchOverlay from '@/components/dashboard/SearchOverlay.vue'
 import { ChevronDown, Plus, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRealm } from '@/composables/useRealm'
 import { useTheme } from '@/composables/useTheme'
@@ -30,7 +30,7 @@ const { realm, role } = useRealm()
 const { currentUser, authError, loading } = useAruna()
 const { hasSession, signIn, signOut, stage, authPending } = useAuth()
 const { isDark, toggleTheme } = useTheme()
-const { label: nodeLabel, state: nodeState, start: watchNode } = useDeviceStatus()
+const { label: nodeLabel, state: nodeState, start: watchNode, stop: unwatchNode } = useDeviceStatus()
 const route = useRoute()
 const router = useRouter()
 
@@ -51,6 +51,9 @@ const nodeDot = computed(() => NODE_DOT[nodeState.value] ?? NODE_DOT.unknown)
 
 onMounted(() => {
   if (desktop.value) watchNode()
+})
+onUnmounted(() => {
+  if (desktop.value) unwatchNode()
 })
 
 function onSignIn() {
