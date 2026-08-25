@@ -1800,14 +1800,19 @@ function setAuthToken(token: string) {
   loading.value = false
 }
 
-function setApiBaseUrl(url: string) {
+// `keepToken` is the desktop shell moving this window between its own bases:
+// the realm-issued token is valid on the local node too, so the session
+// survives the switch. Any other caller is addressing a foreign node.
+function setApiBaseUrl(url: string, options: { keepToken?: boolean } = {}) {
   const next = url.trim() || defaultApiBaseUrl()
   if (next === apiBaseUrl.value) return
   sessionEpoch.value++
   apiBaseUrl.value = next
   storeValue(API_BASE_KEY, apiBaseUrl.value === defaultApiBaseUrl() ? '' : apiBaseUrl.value)
-  authToken.value = ''
-  storeValue(TOKEN_KEY, '')
+  if (!options.keepToken) {
+    authToken.value = ''
+    storeValue(TOKEN_KEY, '')
+  }
   clearIdentityState(true)
   loading.value = false
   bootstrapped.value = false

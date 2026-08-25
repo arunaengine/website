@@ -1,13 +1,17 @@
 // Desktop context injected by the Aruna Desktop shell. One portal build serves
 // both uses: the shell defines `window.__ARUNA_DESKTOP__` before the bundle
-// runs, and its absence is plain web behaviour. The object is read once, on
-// first use, so every module sees the same snapshot.
+// runs, and its absence is plain web behaviour. The shell never replaces this
+// window: it reports every later context, so the context lives in a ref and
+// the portal follows it (aruna notes, decision 20).
+import { shallowRef } from 'vue'
 import { applyPortalConfig, DEFAULT_PORTAL_CONFIG, loadPortalConfig } from './config'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
+import type { Unlisten } from './desktopEvents'
 
 /**
  * Command channel into the shell. `version` pins the command set the shell
- * implements; a wrapper the shell does not answer surfaces BridgeUnavailable.
+ * implements; a wrapper the shell does not answer surfaces BridgeUnavailable,
+ * which is how an older shell degrades rather than breaks.
  */
 export interface DesktopBridge {
   invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown>
@@ -37,8 +41,6 @@ declare global {
     __ARUNA_DESKTOP__?: unknown
   }
 }
-
-let snapshot: DesktopContext | null | undefined
 
 function trimmed(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -79,12 +81,14 @@ function readContext(value: unknown): DesktopContext | null {
   return context
 }
 
-/** The injected context, or null on the web. Read once and cached. */
+/** The live shell context; null on the web. Replaced whole on every change. */
+export const shellContext = shallowRef<DesktopContext | null>(
+  typeof window === 'undefined' ? null : readContext(window.__ARUNA_DESKTOP__),
+)
+
+/** The context the shell reported last, or null on the web. */
 export function desktopContext(): DesktopContext | null {
-  if (snapshot === undefined) {
-    snapshot = typeof window === 'undefined' ? null : readContext(window.__ARUNA_DESKTOP__)
-  }
-  return snapshot
+  return shellContext.value
 }
 
 /** True inside the Aruna Desktop shell; the guard for every desktop-only path. */
@@ -95,6 +99,79 @@ export function isDesktop(): boolean {
 /** The shell's command channel, or null when it injected none. */
 export function desktopBridge(): DesktopBridge | null {
   return desktopContext()?.bridge ?? null
+}
+
+function installConfig(context: DesktopContext): void {
+  applyPortalConfig({
+    apiBaseUrl: context.apiBaseUrl,
+    authCallbackOrigin: context.authCallbackOrigin ?? '',
+    // The shell may switch system-browser auth off, but never the desktop flag.
+    features: { systemBrowserAuth: true, ...context.features, desktop: true },
+  })
+}
+
+// What the portal actually follows; the bridge is out because the shell keeps
+// handing back the one it injected.
+function signature(context: DesktopContext): string {
+  return JSON.stringify([
+    context.apiBaseUrl,
+    context.authCallbackOrigin ?? '',
+    context.realmUrl ?? '',
+    context.features ?? {},
+  ])
+}
+
+/**
+ * Installs a context the shell reported. A changed API base is switched in
+ * place: the caches that belong to the old base are dropped and the session is
+ * re-bootstrapped against the new one, keeping the realm-issued token, which
+ * the local node accepts too. Requests still in flight are ignored by the
+ * session epoch useAruna bumps.
+ */
+export async function applyShellContext(next: unknown): Promise<void> {
+  const current = shellContext.value
+  const parsed = readContext(next)
+  if (!current || !parsed) return
+  const merged: DesktopContext = { ...parsed, ...(current.bridge ? { bridge: current.bridge } : {}) }
+  if (signature(merged) === signature(current)) return
+  const switched = merged.apiBaseUrl !== current.apiBaseUrl
+  installConfig(merged)
+  const aruna = switched ? (await import('@/composables/useAruna')).useAruna() : null
+  if (aruna) {
+    aruna.setApiBaseUrl(merged.apiBaseUrl, { keepToken: true })
+    const { resetDeviceQueries } = await import('@/composables/useDeviceQuery')
+    resetDeviceQueries()
+  }
+  shellContext.value = merged
+  if (!aruna) return
+  // The old verdict was about the old base, so the new one is probed again.
+  const { probeRealm } = await import('./desktopBoot')
+  void probeRealm()
+  await aruna.refresh()
+}
+
+/** Asks the shell for its context; a shell without that command is no failure. */
+export async function refreshShellContext(): Promise<void> {
+  if (!desktopBridge()) return
+  try {
+    const { shellContext: current } = await import('./desktopBridge')
+    await applyShellContext(await current())
+  } catch {
+    // BridgeUnavailable: an older shell reports its context by event alone.
+  }
+}
+
+/**
+ * Follows the shell's context for the life of the window: the event carries
+ * every change, and the one command answers what changed before this listener
+ * was installed.
+ */
+export async function followShellContext(): Promise<Unlisten | null> {
+  if (!desktopBridge()) return null
+  const { onShellContext } = await import('./desktopEvents')
+  const off = await onShellContext((context) => void applyShellContext(context))
+  await refreshShellContext()
+  return off
 }
 
 /**
@@ -108,16 +185,12 @@ export async function bootRuntimeConfig(): Promise<void> {
     await loadPortalConfig()
     return
   }
-  applyPortalConfig({
-    apiBaseUrl: context.apiBaseUrl,
-    authCallbackOrigin: context.authCallbackOrigin ?? '',
-    // The shell may switch system-browser auth off, but never the desktop flag.
-    features: { systemBrowserAuth: true, ...context.features, desktop: true },
-  })
+  installConfig(context)
   try {
     const bridge = await import('./desktopBridge')
     bridge.installAuthOpener()
   } catch {
     reportGlobalError('Aruna Desktop features could not be loaded, please restart the app.')
   }
+  void followShellContext()
 }

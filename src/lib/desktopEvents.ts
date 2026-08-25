@@ -6,6 +6,7 @@ import { readInvite, readStatus, type EnrollInvite, type NodeStatus } from './de
 
 const ENROLL_EVENT = 'enroll-invite'
 const STATUS_EVENT = 'node-status'
+const CONTEXT_EVENT = 'context-changed'
 
 export type Unlisten = () => void
 
@@ -25,6 +26,15 @@ async function subscribe(event: string, handler: (payload: unknown) => void): Pr
  */
 export function onNodeStatus(handler: (status: NodeStatus) => void): Promise<Unlisten | null> {
   return subscribe(STATUS_EVENT, (payload) => handler(readStatus(payload)))
+}
+
+/**
+ * Watches the shell's own context: the API base, the callback origin and the
+ * realm this device remembers. The payload is left raw for the context reader;
+ * a shell that cannot be listened to leaves the portal on what it was given.
+ */
+export function onShellContext(handler: (context: unknown) => void): Promise<Unlisten | null> {
+  return subscribe(CONTEXT_EVENT, handler)
 }
 
 /**

@@ -239,9 +239,19 @@ export async function lastEnrollInvite(): Promise<EnrollInvite | null> {
 }
 
 /**
- * Checks a realm address and remembers it as this device's realm. Success is a
- * pending reload, not a value to render: the shell replaces the window so the
- * portal boots against that realm's API.
+ * The context the shell holds right now, in the shape it injected minus the
+ * bridge. Read by the context follower; a shell without the command reports
+ * its context by event alone.
+ */
+export async function shellContext(): Promise<Record<string, unknown>> {
+  const command = 'shell_context'
+  return asRecord(command, await call(command))
+}
+
+/**
+ * Checks a realm address and remembers it as this device's realm. Success is
+ * not a value to render: the shell switches this window's context to that
+ * realm, which arrives as a context change.
  */
 export async function validateRealm(input: string): Promise<RealmTarget> {
   const command = 'validate_realm'
