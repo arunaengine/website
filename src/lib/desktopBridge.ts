@@ -43,12 +43,28 @@ export interface NodeStatus {
   message: string | null
 }
 
+/** Which executor local runs use, and how much of the machine they may take. */
+export interface ComputeSettings {
+  backend: 'auto' | 'docker' | 'apptainer' | 'off'
+  maxCpuCores: number | null
+  maxRamBytes: number | null
+  maxDiskBytes: number | null
+  maxConcurrent: number | null
+  keepFailed: boolean
+}
+
 /** Owner-controlled local settings (aruna notes, decision 10). */
 export interface NodeSettings {
   storagePath: string
-  offeredDirectories: string[]
   paused: boolean
   autoStart: boolean
+  compute: ComputeSettings
+}
+
+/** What the shell found on this machine when it looked for an executor. */
+export interface ComputeProbe {
+  docker: { available: boolean; version: string | null; socket: string | null }
+  apptainer: { available: boolean; version: string | null; cgroupOk: boolean }
 }
 
 export interface EnrollPayload {
@@ -139,13 +155,27 @@ export function readInvite(payload: unknown): EnrollInvite {
   }
 }
 
+const BACKENDS: ComputeSettings['backend'][] = ['auto', 'docker', 'apptainer', 'off']
+
+function readCompute(value: unknown): ComputeSettings {
+  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  return {
+    backend: BACKENDS.find((known) => known === raw.backend) ?? 'auto',
+    maxCpuCores: asNumber(raw.maxCpuCores),
+    maxRamBytes: asNumber(raw.maxRamBytes),
+    maxDiskBytes: asNumber(raw.maxDiskBytes),
+    maxConcurrent: asNumber(raw.maxConcurrent),
+    keepFailed: raw.keepFailed === true,
+  }
+}
+
 function readSettings(command: string, value: unknown): NodeSettings {
   const raw = asRecord(command, value)
   return {
     storagePath: asText(raw.storagePath) ?? '',
-    offeredDirectories: asList(raw.offeredDirectories),
     paused: raw.paused === true,
     autoStart: raw.autoStart === true,
+    compute: readCompute(raw.compute),
   }
 }
 
@@ -235,6 +265,26 @@ export async function wipeDevice(confirm: string): Promise<void> {
 /** Native folder dialog; null when the owner cancelled it. */
 export async function pickDirectory(options: { title?: string; startPath?: string } = {}): Promise<string | null> {
   return asText(await call('pick_directory', { ...options }))
+}
+
+/** Looks for a container runtime on this machine; never changes settings. */
+export async function computeProbe(): Promise<ComputeProbe> {
+  const command = 'compute_probe'
+  const raw = asRecord(command, await call(command))
+  const docker = asRecord(command, raw.docker ?? {})
+  const apptainer = asRecord(command, raw.apptainer ?? {})
+  return {
+    docker: {
+      available: docker.available === true,
+      version: asText(docker.version),
+      socket: asText(docker.socket),
+    },
+    apptainer: {
+      available: apptainer.available === true,
+      version: asText(apptainer.version),
+      cgroupOk: apptainer.cgroupOk === true,
+    },
+  }
 }
 
 /** Shows a file or folder in the system file manager. */

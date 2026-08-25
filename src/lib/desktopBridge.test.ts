@@ -91,9 +91,16 @@ describe('bridge commands', () => {
     const bridge = await withShell(() => ({ storagePath: '/data', paused: true }))
     await expect(bridge.setNodeSettings({ paused: true })).resolves.toEqual({
       storagePath: '/data',
-      offeredDirectories: [],
       paused: true,
       autoStart: false,
+      compute: {
+        backend: 'auto',
+        maxCpuCores: null,
+        maxRamBytes: null,
+        maxDiskBytes: null,
+        maxConcurrent: null,
+        keepFailed: false,
+      },
     })
     expect(invoke).toHaveBeenCalledWith('node_settings_set', { settings: { paused: true } })
   })
