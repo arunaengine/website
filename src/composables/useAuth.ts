@@ -212,16 +212,19 @@ async function signOut() {
       const discovery = await fetchDiscovery(discoveryUrl)
       if (discovery.end_session_endpoint) {
         // The shell ends the SSO session in the system browser, so its own
-        // window stays on the app instead of navigating to the provider.
+        // window stays on the app instead of navigating to the provider. Its
+        // origin is not a registered redirect target, and naming one the
+        // provider refuses would leave the session standing, so it names none.
+        const inShell = featureEnabled('desktop')
         beginAuthRedirect(
           buildEndSessionUrl({
             endSessionEndpoint: discovery.end_session_endpoint,
             idTokenHint: idToken,
-            postLogoutRedirectUri: window.location.origin,
+            postLogoutRedirectUri: inShell ? undefined : window.location.origin,
             clientId,
           }),
         )
-        if (!featureEnabled('desktop')) return
+        if (!inShell) return
       }
     } catch {
       // Keycloak unreachable — the local session is already cleared.

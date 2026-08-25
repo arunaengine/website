@@ -102,15 +102,19 @@ export async function exchangeAuthorizationCode(input: {
   return (await response.json()) as OidcTokenResponse
 }
 
+// A redirect target is optional: a provider refuses one it has not registered,
+// and a caller with nowhere to come back to must still be able to log out.
 export function buildEndSessionUrl(input: {
   endSessionEndpoint: string
   idTokenHint?: string
-  postLogoutRedirectUri: string
+  postLogoutRedirectUri?: string
   clientId: string
 }): string {
   const url = new URL(input.endSessionEndpoint)
   if (input.idTokenHint) url.searchParams.set('id_token_hint', input.idTokenHint)
-  url.searchParams.set('post_logout_redirect_uri', input.postLogoutRedirectUri)
+  if (input.postLogoutRedirectUri) {
+    url.searchParams.set('post_logout_redirect_uri', input.postLogoutRedirectUri)
+  }
   url.searchParams.set('client_id', input.clientId)
   return url.toString()
 }

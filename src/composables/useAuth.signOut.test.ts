@@ -61,6 +61,8 @@ describe('signing out', () => {
 
     expect(setAuthToken).toHaveBeenCalledWith('')
     expect(opener).toHaveBeenCalledWith(expect.stringContaining('https://idp.test/logout'))
+    // The shell's own origin is no registered redirect target, so it names none.
+    expect(opener).toHaveBeenCalledWith(expect.not.stringContaining('post_logout_redirect_uri'))
     expect(assign).not.toHaveBeenCalled()
     expect(refresh).toHaveBeenCalled()
   })
@@ -70,7 +72,7 @@ describe('signing out', () => {
 
     await auth.useAuth().signOut()
 
-    expect(assign).toHaveBeenCalledWith(expect.stringContaining('https://idp.test/logout'))
+    expect(assign).toHaveBeenCalledWith(expect.stringContaining('post_logout_redirect_uri'))
     expect(refresh).not.toHaveBeenCalled()
   })
 })
