@@ -147,7 +147,10 @@ export function nodes(root: HostNode): HostNode[] {
   return [root, ...root.children.flatMap(nodes)]
 }
 
+// Comment placeholders (v-if, fragment anchors) are not content: a matcher
+// must see the text a person would read.
 export function content(node: HostNode): string {
+  if (node.kind === 'comment') return ''
   return `${node.text}${node.children.map(content).join('')}`
 }
 
