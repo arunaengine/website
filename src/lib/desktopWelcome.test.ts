@@ -188,14 +188,11 @@ describe('welcome guard', () => {
   })
 
   it('leaves the welcome view once a realm answers', async () => {
-    // The shell reopens the window on the same path, so /welcome must move on.
     const welcome = await load({ state: 'stopped', enrolled: true, apiBaseUrl: null }, REALM)
     const router = await routerWith(welcome, '/app/settings')
-    welcome.setPendingRealm('https://aruna.example')
 
     await router.push({ name: 'welcome' })
     expect(router.currentRoute.value.name).toBe('dashboard')
-    expect(welcome.pendingRealm()).toBeNull()
   })
 
   it('opens the welcome view for a dead realm', async () => {
@@ -372,14 +369,30 @@ describe('device setup gate', () => {
   })
 })
 
-describe('pending realm', () => {
-  it('survives until it is cleared', async () => {
-    const welcome = await load(null)
-    expect(welcome.pendingRealm()).toBeNull()
-    welcome.setPendingRealm('https://aruna.example')
-    expect(welcome.pendingRealm()).toBe('https://aruna.example')
-    welcome.setPendingRealm(null)
-    expect(welcome.pendingRealm()).toBeNull()
+describe('awaiting a realm', () => {
+  it('answers as soon as the context names it', async () => {
+    const welcome = await load(null, LOCAL)
+    const desktop = await import('./desktop')
+    const arrived = welcome.awaitRealm('https://aruna.example')
+
+    await desktop.applyShellContext({ apiBaseUrl: LOCAL, realmUrl: 'https://aruna.example/' })
+
+    await expect(arrived).resolves.toBe(true)
+  })
+
+  it('takes the realm the shell already names', async () => {
+    const welcome = await load(null, LOCAL, 'https://aruna.example')
+    await expect(welcome.awaitRealm('https://aruna.example')).resolves.toBe(true)
+  })
+
+  it('gives up on a shell that never switches', async () => {
+    // A stalled shell must leave the form usable rather than hold it open.
+    vi.useFakeTimers()
+    const welcome = await load(null, LOCAL)
+    const arrived = welcome.awaitRealm('https://aruna.example', 5_000)
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    await expect(arrived).resolves.toBe(false)
   })
 })
 

@@ -1,15 +1,11 @@
 // Desktop first run: with no realm remembered the shell points the portal at
 // the local, unenrolled node, which has nothing to serve. The welcome routes
-// own the window until `validate_realm` gives the shell a realm to reopen
-// against, the owner signed in, and the device prompt was answered.
+// own the window until `validate_realm` gives the shell a realm to switch to,
+// the owner signed in, and the device prompt was answered.
 import { watch, type Ref } from 'vue'
 import type { RouteRecordName, Router } from 'vue-router'
-import { desktopContext, isDesktop, shellContext } from './desktop'
+import { desktopContext, isDesktop, refreshShellContext, shellContext } from './desktop'
 import { realmUnreachable } from './desktopBoot'
-
-// Survives the window replacement (same origin), so an interrupted connect can
-// still be named on the way back.
-const PENDING_KEY = 'aruna.desktop.connecting'
 
 // The device setup prompt is answered once per realm, by a skip or a join.
 const SKIPPED_KEY = 'aruna.desktop.setupSkipped'
@@ -17,6 +13,11 @@ const SKIPPED_KEY = 'aruna.desktop.setupSkipped'
 // A shell command that never answers must not hold the window: navigation
 // continues, and the app's own realm probe surfaces a realm that is not there.
 const STATUS_TIMEOUT_MS = 5_000
+
+// The shell reports the realm it switched to; the poll only covers an event
+// that never arrived, and neither may hold the form for long.
+const REALM_WAIT_MS = 5_000
+const CONTEXT_POLL_MS = 500
 
 /** Rejects when a shell command outlives its budget, so nothing waits on it. */
 export function bounded<T>(work: Promise<T>, ms: number): Promise<T> {
@@ -62,22 +63,38 @@ export function clearEnrolled(): void {
   enrolledOnce = null
 }
 
-/** The realm a validate_realm call accepted, until the shell reopens on it. */
-export function pendingRealm(): string | null {
+function sameOrigin(one: string, other: string): boolean {
   try {
-    return window.localStorage.getItem(PENDING_KEY)
+    return new URL(one).origin === new URL(other).origin
   } catch {
-    return null
+    return one === other
   }
 }
 
-export function setPendingRealm(origin: string | null): void {
-  try {
-    if (origin) window.localStorage.setItem(PENDING_KEY, origin)
-    else window.localStorage.removeItem(PENDING_KEY)
-  } catch {
-    /* the hint is optional; storage may be denied */
-  }
+// Only the realm this connect asked for ends it; changing realms starts from
+// one the shell already names.
+function namesRealm(origin: string): boolean {
+  const realm = desktopContext()?.realmUrl
+  return Boolean(realm) && sameOrigin(realm as string, origin)
+}
+
+/** Resolves once the shell context names this realm, or the wait runs out. */
+export function awaitRealm(origin: string, ms = REALM_WAIT_MS): Promise<boolean> {
+  if (namesRealm(origin)) return Promise.resolve(true)
+  return new Promise((resolve) => {
+    let stop = () => {}
+    const finish = (arrived: boolean) => {
+      clearTimeout(timer)
+      clearInterval(poll)
+      stop()
+      resolve(arrived)
+    }
+    const timer = setTimeout(() => finish(false), ms)
+    const poll = setInterval(() => void refreshShellContext(), CONTEXT_POLL_MS)
+    stop = watch(shellContext, () => {
+      if (namesRealm(origin)) finish(true)
+    })
+  })
 }
 
 // A device is set up against the realm it joins, so a second realm asks again.
@@ -163,7 +180,6 @@ export function installDesktopGuard(router: Router): void {
     if (knownOnce === null) knownOnce = await realmKnown()
     // The device page enrolls from a code alone, so it stays reachable.
     if (!knownOnce) return to.name === 'welcome' || to.name === 'device' ? true : { name: 'welcome' }
-    setPendingRealm(null)
     if (await signedOut()) {
       // The realm step is done; only an explicit change reopens the form.
       const changing = to.name === 'welcome' && to.query.change !== undefined

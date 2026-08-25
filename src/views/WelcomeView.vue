@@ -1,20 +1,16 @@
 <script setup lang="ts">
 // Desktop first run (aruna notes, decision 13): the app starts with no realm,
 // so it asks for one instead of enrolling. The shell validates the address,
-// remembers it, and replaces this window against that realm's API — a success
-// here ends in a reload, which is what the reconnecting panel stands for.
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+// remembers it and switches this window's context to that realm; nothing is
+// reopened, so the step just waits for the context and moves on.
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
-import Spinner from '@/components/ui/Spinner.vue'
 import { validateRealm } from '@/lib/desktopBridge'
-import { insecureRealm, pendingRealm, setPendingRealm } from '@/lib/desktopWelcome'
+import { awaitRealm, insecureRealm } from '@/lib/desktopWelcome'
 import { ArrowRight, KeyRound } from '@lucide/vue'
-
-// Long enough that a working replacement is never called stalled.
-const STALL_MS = 20_000
 
 const router = useRouter()
 const address = ref('')
@@ -23,17 +19,10 @@ const insecure = computed(() => insecureRealm(address.value))
 const checking = ref(false)
 const failure = ref<string | null>(null)
 const connecting = ref<string | null>(null)
-const interrupted = ref<string | null>(null)
-const stalled = ref(false)
 
-let stallTimer: ReturnType<typeof setTimeout> | undefined
-
-onMounted(() => {
-  // Landing here with a connect on record means the window came back without
-  // the realm; say so rather than showing an empty form again.
-  interrupted.value = pendingRealm()
-  if (interrupted.value) address.value = interrupted.value
-  setPendingRealm(null)
+const action = computed(() => {
+  if (connecting.value) return 'Connecting…'
+  return checking.value ? 'Checking…' : 'Connect'
 })
 
 async function connect(): Promise<void> {
@@ -41,30 +30,22 @@ async function connect(): Promise<void> {
   if (!input || checking.value) return
   checking.value = true
   failure.value = null
-  interrupted.value = null
   try {
     const target = await validateRealm(input)
     connecting.value = target.origin
-    setPendingRealm(target.origin)
-    stallTimer = setTimeout(() => (stalled.value = true), STALL_MS)
+    if (await awaitRealm(target.origin)) {
+      await router.replace({ name: 'welcome-sign-in' })
+      return
+    }
+    failure.value = `Aruna Desktop stored ${target.origin} but has not switched to it. Try again.`
   } catch (err) {
     // The shell classifies the failure; its wording is the whole answer.
     failure.value = err instanceof Error ? err.message : String(err)
   } finally {
     checking.value = false
+    connecting.value = null
   }
 }
-
-// The shell stores the realm before it reopens the window, so a replacement
-// that never arrives leaves the address to try again rather than lost work.
-function cancel(): void {
-  clearTimeout(stallTimer)
-  stalled.value = false
-  connecting.value = null
-  setPendingRealm(null)
-}
-
-onUnmounted(() => clearTimeout(stallTimer))
 
 function toEnroll(): void {
   void router.push({ name: 'device', query: { tab: 'enroll' } })
@@ -109,22 +90,7 @@ function toEnroll(): void {
           </div>
         </div>
 
-        <div v-if="connecting" class="flex flex-col justify-center gap-2 p-6 md:p-7" aria-busy="true">
-          <Spinner label="Reconnecting" />
-          <p class="text-sm font-medium text-foreground">Reconnecting to {{ connecting }}</p>
-          <p class="text-xs leading-relaxed text-muted-foreground">
-            Aruna Desktop is reopening this window against the realm.
-          </p>
-          <div v-if="stalled" class="pt-1">
-            <p class="text-xs leading-relaxed text-muted-foreground">
-              The window has not reopened. The app remembers this realm, so restarting it lands there — or name
-              another address.
-            </p>
-            <Button variant="outline" size="sm" class="mt-2" @click="cancel">Back to the address</Button>
-          </div>
-        </div>
-
-        <div v-else class="flex flex-col justify-center gap-4 p-6 md:p-7">
+        <div class="flex flex-col justify-center gap-4 p-6 md:p-7">
           <h1 class="font-display text-lg font-semibold tracking-tight text-aruna-navy">Connect to your realm</h1>
 
           <div>
@@ -148,12 +114,8 @@ function toEnroll(): void {
             Use https, or a localhost or tunnel address.
           </p>
 
-          <p
-            v-if="interrupted"
-            class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
-          >
-            The app was connecting to {{ interrupted }} when this window last closed. Try it again, or name another
-            realm.
+          <p v-if="connecting" class="text-xs text-muted-foreground" aria-live="polite">
+            Connecting to {{ connecting }}…
           </p>
           <p
             v-if="failure"
@@ -163,7 +125,7 @@ function toEnroll(): void {
           </p>
 
           <Button class="w-full" :disabled="!address.trim() || checking" @click="connect">
-            {{ checking ? 'Checking…' : 'Connect' }} <ArrowRight class="h-4 w-4" />
+            {{ action }} <ArrowRight class="h-4 w-4" />
           </Button>
 
           <div class="border-t border-border/70 pt-3">
