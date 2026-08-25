@@ -9,7 +9,7 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
-import DesktopHeader from '@/components/desktop/DesktopHeader.vue'
+import PageHeader from '@/components/dashboard/PageHeader.vue'
 import LocalRunsPanel from '@/components/desktop/LocalRunsPanel.vue'
 import JobsPanel from '@/components/jobs/JobsPanel.vue'
 import TasksPanel from '@/components/compute/TasksPanel.vue'
@@ -43,7 +43,7 @@ onMounted(() => void ensureLoaded())
 
 <template>
   <div>
-    <DesktopHeader title="Runs" description="Work you started, wherever it is executing.">
+    <PageHeader eyebrow="This computer" title="Runs" description="Work you started, wherever it is executing.">
       <template #actions>
         <RouterLink :to="{ name: 'compute-quick' }">
           <Button variant="outline" size="sm">Quick run</Button>
@@ -52,7 +52,7 @@ onMounted(() => void ensureLoaded())
           <Button size="sm"><Plus class="h-4 w-4" /> New task</Button>
         </RouterLink>
       </template>
-    </DesktopHeader>
+    </PageHeader>
 
     <div class="container py-5">
       <Tabs v-model="tab">

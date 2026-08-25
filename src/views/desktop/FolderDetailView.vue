@@ -9,7 +9,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import DesktopHeader from '@/components/desktop/DesktopHeader.vue'
+import PageHeader from '@/components/dashboard/PageHeader.vue'
 import ReplaceLocalDialog from '@/components/desktop/ReplaceLocalDialog.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
@@ -182,11 +182,12 @@ function when(ms: number | null | undefined): string {
 
 <template>
   <div>
-    <DesktopHeader
+    <PageHeader
+      eyebrow="This computer"
       :title="folder ? folderName(folder.root) : 'Folder'"
       :description="folder?.root"
     >
-      <template #title-suffix>
+      <template #breadcrumbs>
         <Badge v-if="folder" variant="outline" class="text-[10px] uppercase">{{
           folder.mode === 'two_way' ? 'two-way' : 'upload only'
         }}</Badge>
@@ -217,7 +218,7 @@ function when(ms: number | null | undefined): string {
           Sync now
         </Button>
       </template>
-    </DesktopHeader>
+    </PageHeader>
 
     <div class="container space-y-4 py-5">
       <p

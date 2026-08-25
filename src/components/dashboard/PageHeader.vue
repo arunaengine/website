@@ -3,11 +3,17 @@ import RealmBadge from '@/components/ui/RealmBadge.vue'
 import { useRealm } from '@/composables/useRealm'
 import { cn } from '@/lib/utils'
 
-defineProps<{
-  title: string
-  description?: string
-  class?: string
-}>()
+// `eyebrow` names which surface the page belongs to: the portal, or the
+// machine Aruna Desktop runs on.
+withDefaults(
+  defineProps<{
+    title: string
+    description?: string
+    eyebrow?: string
+    class?: string
+  }>(),
+  { eyebrow: 'Portal' },
+)
 
 const { realm } = useRealm()
 </script>
@@ -21,7 +27,7 @@ const { realm } = useRealm()
     <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-aruna-aqua/60 to-transparent" />
     <div class="container flex flex-col gap-3 pb-5 pt-6">
       <div class="flex items-center gap-2 text-[11px] text-muted-foreground">
-        <span class="eyebrow">Portal</span>
+        <span class="eyebrow">{{ eyebrow }}</span>
         <span>·</span>
         <RealmBadge :realm="realm" />
         <slot name="breadcrumbs" />

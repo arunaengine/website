@@ -9,7 +9,7 @@ import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import DesktopHeader from '@/components/desktop/DesktopHeader.vue'
+import PageHeader from '@/components/dashboard/PageHeader.vue'
 import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useUploadQueue } from '@/composables/useUploadQueue'
@@ -54,11 +54,11 @@ onMounted(() => void load())
 
 <template>
   <div>
-    <DesktopHeader title="Transfers" description="What this computer is sending and receiving right now.">
+    <PageHeader eyebrow="This computer" title="Transfers" description="What this computer is sending and receiving right now.">
       <template #actions>
         <Button variant="outline" size="sm" @click="load"><RefreshCw class="h-3.5 w-3.5" /> Refresh</Button>
       </template>
-    </DesktopHeader>
+    </PageHeader>
 
     <div class="container space-y-6 py-5">
       <section class="space-y-3">

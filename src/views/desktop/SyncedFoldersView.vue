@@ -8,7 +8,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import DesktopHeader from '@/components/desktop/DesktopHeader.vue'
+import PageHeader from '@/components/dashboard/PageHeader.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -49,7 +49,8 @@ async function run(work: Promise<unknown>): Promise<void> {
 
 <template>
   <div>
-    <DesktopHeader
+    <PageHeader
+      eyebrow="This computer"
       title="Synced folders"
       description="Folders on this computer that keep in step with a bucket in the realm."
     >
@@ -59,7 +60,7 @@ async function run(work: Promise<unknown>): Promise<void> {
         </Button>
         <Button size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Bind a folder</Button>
       </template>
-    </DesktopHeader>
+    </PageHeader>
 
     <div class="container space-y-4 py-5">
       <p

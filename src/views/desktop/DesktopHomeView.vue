@@ -7,7 +7,7 @@ import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import DesktopHeader from '@/components/desktop/DesktopHeader.vue'
+import PageHeader from '@/components/dashboard/PageHeader.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -118,15 +118,19 @@ onMounted(() => void reload())
 
 <template>
   <div>
-    <DesktopHeader title="This computer" :description="`Signed in to ${realm.name}.`">
-      <template #title-suffix>
+    <PageHeader
+      eyebrow="This computer"
+      title="Your data on this machine"
+      :description="`Signed in to ${realm.name}.`"
+    >
+      <template #breadcrumbs>
         <Badge :variant="nodeTone">{{ nodeLabel }}</Badge>
       </template>
       <template #actions>
         <Button variant="outline" size="sm" @click="reload"><RefreshCw class="h-3.5 w-3.5" /> Refresh</Button>
         <Button size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Bind a folder</Button>
       </template>
-    </DesktopHeader>
+    </PageHeader>
 
     <div class="container space-y-5 py-5">
       <!-- The machine plate: what the node on this disk is, in one line. -->
