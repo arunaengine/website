@@ -84,10 +84,10 @@ const label = computed(() => {
   if (error.value) return 'no shell'
   switch (state.value) {
     case 'running':
-      if (!status.value?.enrolled) return 'not enrolled'
-      return status.value.ready ? 'online' : 'starting'
+      if (status.value?.enrolled) return status.value.ready ? 'online' : 'starting'
+      return status.value?.enrolling ? 'connecting' : 'not set up'
     case 'starting':
-      return 'starting'
+      return status.value?.enrolling ? 'connecting' : 'starting'
     case 'stopped':
       return 'stopped'
     case 'error':

@@ -109,6 +109,7 @@ beforeEach(() => {
     nodeId: '01HZY7QK4N8ZP3V2C6M9AB',
     realm: 'realm-id',
     enrolled: true,
+    enrolling: false,
     ready: true,
     apiBaseUrl: 'http://127.0.0.1:9000/api/v1',
     version: '0.4.0',
@@ -195,6 +196,14 @@ describe('desktop home', () => {
     expect(html).toContain('on this computer')
     expect(html).toContain('in Testrealm')
     expect(html).toContain('runs no jobs itself yet')
+  })
+
+  it('names the state of a node with no identity yet', async () => {
+    status.value = { ...status.value!, nodeId: null, enrolled: false, enrolling: true }
+    expect(await render()).toContain('joining the realm')
+
+    status.value = { ...status.value!, enrolling: false }
+    expect(await render()).toContain('not set up')
   })
 
   it('says the node is down instead of showing an empty folder list', async () => {

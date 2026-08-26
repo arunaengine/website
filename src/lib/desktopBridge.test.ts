@@ -72,6 +72,7 @@ describe('bridge commands', () => {
       nodeId: 'n1',
       realm: null,
       enrolled: true,
+      enrolling: false,
       ready: true,
       apiBaseUrl: null,
       version: null,
@@ -83,6 +84,11 @@ describe('bridge commands', () => {
   it('reads a node that is not listening yet', async () => {
     const bridge = await withShell(() => ({ state: 'running', enrolled: true, ready: false }))
     await expect(bridge.nodeStatus()).resolves.toMatchObject({ state: 'running', ready: false })
+  })
+
+  it('reads a node that is redeeming a code', async () => {
+    const bridge = await withShell(() => ({ state: 'starting', enrolling: true }))
+    await expect(bridge.nodeStatus()).resolves.toMatchObject({ enrolled: false, enrolling: true })
   })
 
   it('takes the log tail in either answer shape', async () => {
@@ -166,6 +172,12 @@ describe('bridge commands', () => {
     const bridge = await withShell(() => null)
     await bridge.wipeDevice('wipe')
     expect(invoke).toHaveBeenCalledWith('wipe_device', { confirm: 'wipe' })
+  })
+
+  it('asks the shell to quit without arguments', async () => {
+    const bridge = await withShell(() => null)
+    await bridge.appQuit()
+    expect(invoke).toHaveBeenCalledWith('app_quit', undefined)
   })
 })
 

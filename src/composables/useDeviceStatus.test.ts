@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const RUNNING = {
   state: 'running',
   enrolled: true,
+  enrolling: false,
   ready: true,
   apiBaseUrl: 'http://127.0.0.1:34116/api/v1',
   nodeId: 'n1',
@@ -83,6 +84,23 @@ describe('watching the node', () => {
     push(RUNNING)
     expect(device.nodeBaseUrl.value).toBe(RUNNING.apiBaseUrl)
     expect(device.label.value).toBe('online')
+    device.stop()
+  })
+
+  it('says connecting while the code is redeemed', async () => {
+    // A device that never joined is not set up; one redeeming a code is joining.
+    const device = await load()
+    device.start()
+    await vi.waitFor(() => expect(onNodeStatus).toHaveBeenCalled())
+
+    push({ ...RUNNING, enrolled: false, enrolling: true })
+    expect(device.label.value).toBe('connecting')
+
+    push({ ...RUNNING, state: 'starting', enrolled: false, enrolling: true })
+    expect(device.label.value).toBe('connecting')
+
+    push({ ...RUNNING, enrolled: false })
+    expect(device.label.value).toBe('not set up')
     device.stop()
   })
 

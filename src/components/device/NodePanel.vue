@@ -7,9 +7,9 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { apiRequest, type InfoResponse } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
-import { nodeLogsTail, nodeStatus, type NodeStatus } from '@/lib/desktopBridge'
+import { appQuit, nodeLogsTail, nodeStatus, type NodeStatus } from '@/lib/desktopBridge'
 import { formatDuration, truncateMiddle } from '@/lib/utils'
-import { RefreshCw } from '@lucide/vue'
+import { Power, RefreshCw } from '@lucide/vue'
 
 const POLL_MS = 5_000
 const LOG_LINES = 200
@@ -23,6 +23,8 @@ const logsError = ref<string | null>(null)
 const identity = ref<{ nodeId: string; realm: string } | null>(null)
 const identityError = ref<string | null>(null)
 const busy = ref(false)
+const quitting = ref(false)
+const quitError = ref<string | null>(null)
 
 function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -74,6 +76,18 @@ onMounted(() => {
 })
 onUnmounted(() => clearInterval(timer))
 
+// The app is gone once the quit lands, so the button only returns on failure.
+async function quit(): Promise<void> {
+  quitting.value = true
+  quitError.value = null
+  try {
+    await appQuit()
+  } catch (err) {
+    quitError.value = message(err)
+    quitting.value = false
+  }
+}
+
 const STATE_VARIANT = {
   running: 'success',
   starting: 'sky',
@@ -81,13 +95,22 @@ const STATE_VARIANT = {
   error: 'destructive',
 } as const
 
+// A node redeeming a code is between states, so it says what it is doing.
+const badge = computed(() => {
+  const current = status.value
+  if (!current) return null
+  if (current.enrolling) return { label: 'connecting', variant: 'sky' as const }
+  return { label: current.state, variant: STATE_VARIANT[current.state] }
+})
+
 const facts = computed(() => {
   const current = status.value
   if (!current) return []
   const nodeId = identity.value?.nodeId ?? current.nodeId
   const realm = identity.value?.realm ?? current.realm
+  const noNode = current.enrolling ? 'joining the realm' : 'not set up'
   return [
-    { label: 'Node', value: nodeId ? truncateMiddle(nodeId, 10, 6) : 'not enrolled yet' },
+    { label: 'Node', value: nodeId ? truncateMiddle(nodeId, 10, 6) : noNode },
     { label: 'Realm', value: realm ? truncateMiddle(realm, 10, 6) : 'n/a' },
     { label: 'Local API', value: current.apiBaseUrl ?? 'n/a' },
     { label: 'Version', value: current.version ?? 'n/a' },
@@ -110,13 +133,22 @@ const facts = computed(() => {
           </p>
         </div>
         <div class="flex shrink-0 items-center gap-2">
-          <Badge v-if="status" :variant="STATE_VARIANT[status.state]">{{ status.state }}</Badge>
+          <Badge v-if="badge" :variant="badge.variant">{{ badge.label }}</Badge>
           <Button variant="outline" size="sm" :disabled="busy" aria-label="Refresh node status" @click="refresh">
             <RefreshCw class="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="outline" size="sm" :disabled="quitting" @click="quit">
+            <Power class="h-3.5 w-3.5" /> {{ quitting ? 'Quitting' : 'Quit' }}
           </Button>
         </div>
       </div>
 
+      <p
+        v-if="quitError"
+        class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+      >
+        {{ quitError }}
+      </p>
       <p
         v-if="statusError"
         class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
@@ -134,7 +166,10 @@ const facts = computed(() => {
         <p v-if="identityError" class="mt-3 text-xs text-muted-foreground">
           The node did not name itself: {{ identityError }}
         </p>
-        <p v-if="!status.enrolled" class="mt-3 text-xs text-muted-foreground">
+        <p v-if="status.enrolling" class="mt-3 text-xs text-muted-foreground">
+          Connecting to the realm with the enrollment code.
+        </p>
+        <p v-else-if="!status.enrolled" class="mt-3 text-xs text-muted-foreground">
           This node is not enrolled in a realm yet. Open Enroll and paste the code from the portal.
         </p>
       </template>
@@ -150,7 +185,7 @@ const facts = computed(() => {
       </p>
       <pre
         v-else-if="logs.length"
-        class="mt-3 max-h-80 overflow-auto whitespace-pre rounded-md bg-muted/40 px-3 py-2 font-mono text-[11px] leading-5 text-foreground/90"
+        class="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted/40 px-3 py-2 font-mono text-[11px] leading-5 text-foreground/90"
         >{{ logs.join('\n') }}</pre
       >
       <p v-else class="mt-3 text-xs text-muted-foreground">The node has written no log lines yet.</p>

@@ -36,6 +36,8 @@ export interface NodeStatus {
   nodeId: string | null
   realm: string | null
   enrolled: boolean
+  // An enrollment code is armed and the device has not joined the realm yet.
+  enrolling: boolean
   // The listener is answering, not merely spawned; a shell that reports none
   // is taken at its state alone.
   ready: boolean
@@ -196,6 +198,7 @@ export function readStatus(payload: unknown): NodeStatus {
     nodeId: asText(raw.nodeId),
     realm: asText(raw.realm),
     enrolled: raw.enrolled === true,
+    enrolling: raw.enrolling === true,
     ready: raw.ready !== false,
     apiBaseUrl: asText(raw.apiBaseUrl),
     version: asText(raw.version),
@@ -278,6 +281,11 @@ export async function validateRealm(input: string): Promise<RealmTarget> {
  */
 export async function wipeDevice(confirm: string): Promise<void> {
   await call('wipe_device', { confirm })
+}
+
+/** Stops the node gracefully and closes Aruna Desktop. */
+export async function appQuit(): Promise<void> {
+  await call('app_quit')
 }
 
 /** Native folder dialog; null when the owner cancelled it. */

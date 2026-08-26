@@ -53,9 +53,11 @@ const nodeTone = computed(() =>
   online.value ? (status.value?.enrolled ? 'success' : 'warn') : nodeState.value === 'error' ? 'destructive' : 'secondary',
 )
 
+const nodeFallback = computed(() => (status.value?.enrolling ? 'joining the realm' : 'not set up'))
+
 const facts = computed(() => [
   { label: 'Realm', value: realm.value.shortName },
-  { label: 'Node', value: status.value?.nodeId ? truncateMiddle(status.value.nodeId, 8, 6) : 'not enrolled' },
+  { label: 'Node', value: status.value?.nodeId ? truncateMiddle(status.value.nodeId, 8, 6) : nodeFallback.value },
   { label: 'Version', value: status.value?.version ?? 'n/a' },
   {
     label: 'Uptime',
