@@ -19,7 +19,9 @@ export function useDeviceQuery<T>(read: (client: DeviceClient) => Promise<T>, em
   const state = shallowRef<DeviceState>('idle')
   const error = shallowRef<string | null>(null)
 
-  async function run(): Promise<void> {
+  let inflight: Promise<void> | null = null
+
+  async function readOnce(): Promise<void> {
     const client = deviceClient.value
     if (!client) {
       data.value = empty
@@ -35,6 +37,14 @@ export function useDeviceQuery<T>(read: (client: DeviceClient) => Promise<T>, em
       state.value = classify(err)
       error.value = err instanceof Error ? err.message : String(err)
     }
+  }
+
+  /** One read at a time: a caller that asks again joins the one in flight. */
+  function run(): Promise<void> {
+    inflight ??= readOnce().finally(() => {
+      inflight = null
+    })
+    return inflight
   }
 
   return { data, state, error, run }

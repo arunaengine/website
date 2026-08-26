@@ -92,11 +92,19 @@ describe('sync polling', () => {
   it('tightens the poll while the device owes the realm work', async () => {
     const sync = await load()
     await sync.load()
-    expect(sync.pollMs.value).toBe(15_000)
+    expect(sync.pollMs.value).toBe(5_000)
 
     answer = statusOf({ pendingTotal: 2 })
     await sync.load()
     expect(sync.pollMs.value).toBe(3_000)
+  })
+
+  it('reads once for two callers at the same time', async () => {
+    const sync = await load()
+
+    await Promise.all([sync.load(), sync.load()])
+
+    expect(read).toHaveBeenCalledTimes(1)
   })
 
   it('tightens the poll from the moment a run is asked for', async () => {

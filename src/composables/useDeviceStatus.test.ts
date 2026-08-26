@@ -32,14 +32,27 @@ vi.mock('@/lib/desktopBridge', () => ({ nodeStatus }))
 vi.mock('@/lib/desktopEvents', () => ({ onNodeStatus }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ authToken: ref('token') }) }))
 
+const listeners = new Map<string, Set<() => void>>()
+
+function fire(type: string): void {
+  for (const listener of listeners.get(type) ?? []) listener()
+}
+
 // The status is a module singleton shared by every desktop surface, so each
 // case takes a graph of its own instead of a leftover refcount.
 async function load() {
   vi.resetModules()
   vi.clearAllMocks()
+  listeners.clear()
   vi.stubGlobal('window', {
     setInterval: globalThis.setInterval.bind(globalThis),
     clearInterval: globalThis.clearInterval.bind(globalThis),
+    addEventListener: (type: string, listener: () => void) => {
+      listeners.set(type, (listeners.get(type) ?? new Set()).add(listener))
+    },
+    removeEventListener: (type: string, listener: () => void) => {
+      listeners.get(type)?.delete(listener)
+    },
   })
   return (await import('./useDeviceStatus')).useDeviceStatus()
 }
@@ -125,6 +138,20 @@ describe('watching the node', () => {
     push({ ...RUNNING, ready: false })
     await vi.waitFor(() => expect(device.identity.value).toBeNull())
     device.stop()
+  })
+
+  it('reads again when the window comes back', async () => {
+    const device = await load()
+    device.start()
+    await vi.waitFor(() => expect(nodeStatus).toHaveBeenCalledTimes(1))
+
+    fire('focus')
+    await vi.waitFor(() => expect(nodeStatus).toHaveBeenCalledTimes(2))
+
+    // The last watcher takes the wake handler with it.
+    device.stop()
+    fire('focus')
+    expect(nodeStatus).toHaveBeenCalledTimes(2)
   })
 
   it('drops a listener that arrived after the last stop', async () => {

@@ -16,9 +16,7 @@ import {
 import { useDeviceQuery } from '@/composables/useDeviceQuery'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { isDesktop } from '@/lib/desktop'
-
-const IDLE_POLL_MS = 15_000
-const ACTIVE_POLL_MS = 3_000
+import { follow, onWake, POLL_ACTIVE_MS, POLL_IDLE_MS } from '@/lib/poll'
 
 const EMPTY: DeviceSyncStatus = {
   realmReachable: false,
@@ -69,7 +67,7 @@ const needsOwner = computed(
 
 /** Tightens while the device owes the realm work, or a run was just asked for. */
 const pollMs = computed(() =>
-  running.value || status.value.pendingTotal > 0 ? ACTIVE_POLL_MS : IDLE_POLL_MS,
+  running.value || status.value.pendingTotal > 0 ? POLL_ACTIVE_MS : POLL_IDLE_MS,
 )
 
 async function runSync(): Promise<void> {
@@ -88,27 +86,20 @@ async function runSync(): Promise<void> {
   await read()
 }
 
+const unserved = () => query.state.value === 'unsupported' || query.state.value === 'forbidden'
+
 // Re-armed after every read so a status that turns busy shortens the next wait.
-function follow(): void {
-  if (typeof window === 'undefined') return
-  let timer: number | undefined
-  let stopped = false
-  const tick = async () => {
-    const idle = typeof document !== 'undefined' && document.hidden
-    const served = query.state.value !== 'unsupported' && query.state.value !== 'forbidden'
-    if (!idle && served) await read()
-    // A read still in flight when the view left must not re-arm the timer.
-    if (!stopped) timer = window.setTimeout(tick, pollMs.value)
-  }
-  timer = window.setTimeout(tick, pollMs.value)
+function watchStatus(): void {
+  const stop = follow(read, () => pollMs.value, unserved)
+  const unwake = onWake(() => void read())
   onUnmounted(() => {
-    stopped = true
-    window.clearTimeout(timer)
+    stop()
+    unwake()
   })
 }
 
 export function useDeviceSync(options: { poll?: boolean } = {}) {
-  if (options.poll !== false) follow()
+  if (options.poll !== false) watchStatus()
   return {
     status,
     state: query.state,

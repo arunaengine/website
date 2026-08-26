@@ -7,10 +7,10 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { appQuit, nodeLogsTail, nodeStatus, type NodeStatus } from '@/lib/desktopBridge'
+import { follow, onWake, POLL_IDLE_MS } from '@/lib/poll'
 import { formatDuration, truncateMiddle } from '@/lib/utils'
 import { Power, RefreshCw } from '@lucide/vue'
 
-const POLL_MS = 5_000
 const LOG_LINES = 200
 
 // The node id comes from the node's own API, which the shared status already
@@ -30,6 +30,7 @@ function message(err: unknown): string {
 }
 
 async function refresh(): Promise<void> {
+  if (busy.value) return
   busy.value = true
   try {
     status.value = await nodeStatus()
@@ -47,12 +48,17 @@ async function refresh(): Promise<void> {
   }
 }
 
-let timer: ReturnType<typeof setInterval> | undefined
+let stopPoll: (() => void) | null = null
+let unwake: (() => void) | null = null
 onMounted(() => {
   void refresh()
-  timer = setInterval(() => void refresh(), POLL_MS)
+  stopPoll = follow(refresh, () => POLL_IDLE_MS)
+  unwake = onWake(() => void refresh())
 })
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => {
+  stopPoll?.()
+  unwake?.()
+})
 
 // The app is gone once the quit lands, so the button only returns on failure.
 async function quit(): Promise<void> {

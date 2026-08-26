@@ -6,12 +6,9 @@ import { computed, ref, watch } from 'vue'
 import { isDesktop } from '@/lib/desktop'
 import { useAruna } from '@/composables/useAruna'
 import { apiRequest, type InfoResponse } from '@/lib/api'
+import { onWake, POLL_IDLE_MS } from '@/lib/poll'
 import type { DeviceClient } from '@/lib/deviceApi'
 import type { NodeStatus } from '@/lib/desktopBridge'
-
-// The shell pushes `node-status` on every transition, so the poll is only the
-// fallback for a shell that emits none.
-const POLL_MS = 15_000
 
 const status = ref<NodeStatus | null>(null)
 const error = ref<string | null>(null)
@@ -23,13 +20,14 @@ const identityError = ref<string | null>(null)
 let watchers = 0
 let timer: number | undefined
 let unlisten: (() => void) | null = null
+let unwake: (() => void) | null = null
+let reading: Promise<void> | null = null
 
 function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-async function refresh(): Promise<void> {
-  if (!isDesktop()) return
+async function read(): Promise<void> {
   try {
     const { nodeStatus } = await import('@/lib/desktopBridge')
     status.value = await nodeStatus()
@@ -39,6 +37,15 @@ async function refresh(): Promise<void> {
   } finally {
     loaded.value = true
   }
+}
+
+/** Reads the shell's status once; a read already in flight is shared. */
+function refresh(): Promise<void> {
+  if (!isDesktop()) return Promise.resolve()
+  reading ??= read().finally(() => {
+    reading = null
+  })
+  return reading
 }
 
 /** Follows the node while a view needs it; balance every call with stop(). */
@@ -57,10 +64,13 @@ function start(): void {
     if (watchers > 0) unlisten = off
     else off?.()
   })
+  // The shell pushes `node-status` on every transition, so the poll is only
+  // the fallback for a shell that emits none.
   if (typeof window !== 'undefined') {
     timer = window.setInterval(() => {
       if (typeof document === 'undefined' || !document.hidden) void refresh()
-    }, POLL_MS)
+    }, POLL_IDLE_MS)
+    unwake = onWake(() => void refresh())
   }
 }
 
@@ -72,6 +82,8 @@ function stop(): void {
   timer = undefined
   unlisten?.()
   unlisten = null
+  unwake?.()
+  unwake = null
 }
 
 const state = computed<NodeStatus['state'] | 'unknown'>(() => status.value?.state ?? 'unknown')
