@@ -71,7 +71,7 @@ const {
 } = useDeviceEnrollment()
 
 const canEnroll = computed(() => !!currentUser.value && isManagementNode.value)
-const portals = computed(() => managementPortals(realmInfo.value?.nodes ?? []))
+const portals = computed(() => managementPortals(realmInfo.value))
 
 // The gate opens only once bootstrap has answered, so wait for it rather than
 // reading an empty device list at mount.

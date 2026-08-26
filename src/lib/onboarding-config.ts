@@ -20,7 +20,7 @@ export interface NodeConfigInput {
   labels?: string // → ARUNA_NODE_LABELS, raw 'k=v,k2=v2'
 }
 
-import type { RealmNodeInfo } from './api'
+import type { RealmInfoResponse } from './api'
 
 // Trim, drop trailing slashes, and drop one trailing '/api/v1': the node appends
 // /api/v1/onboarding/bootstrap itself (aruna/src/config.rs), so seed_url must be
@@ -30,12 +30,20 @@ export function normalizeSeedUrl(raw: string): string {
   return trimmed.replace(/\/api\/v1$/, '').replace(/\/+$/, '')
 }
 
-// Management nodes that published a reachable portal. The portal is served from
-// each node's REST origin, so the '/api/v1' suffix comes off the published url.
-export function managementPortals(nodes: RealmNodeInfo[]): Array<{ id: string; url: string }> {
-  return nodes
+// Management nodes that published a reachable portal. The realm info names
+// them to anyone; the node list, a realm token's view, fills in for an older
+// backend. The portal is served from each node's REST origin, so the '/api/v1'
+// suffix comes off the published url.
+export function managementPortals(
+  info: Pick<RealmInfoResponse, 'management_urls' | 'nodes'> | null | undefined,
+): Array<{ id: string; url: string }> {
+  const published = info?.management_urls ?? []
+  const fromNodes = (info?.nodes ?? [])
     .filter((node) => node.kind === 'management' && node.info?.urls?.api)
     .map((node) => ({ id: node.node_id, url: normalizeSeedUrl(node.info!.urls!.api!) }))
+  const portals = published.length ? published.map((url) => ({ id: url, url: normalizeSeedUrl(url) })) : fromNodes
+  const seen = new Set<string>()
+  return portals.filter((portal) => portal.url && !seen.has(portal.url) && seen.add(portal.url))
 }
 
 // Optional placement hints, appended only when the admin set them. Weight must

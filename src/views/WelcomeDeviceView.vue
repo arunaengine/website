@@ -21,10 +21,13 @@ const { realm, nodeInfo, isManagementNode, realmInfo } = useAruna()
 const { applying, error, watching, joined, stages, state, apply, done } = useDeviceSetup()
 const deviceName = ref('')
 
-// Only a management node mints an enrollment. The node kind is answered to a
-// realm token alone, so a node that has not said what it is does not gate.
-const wrongNode = computed(() => nodeInfo.value?.node.capabilities != null && !isManagementNode.value)
-const portals = computed(() => managementPortals(realmInfo.value?.nodes ?? []))
+// Only a management node mints an enrollment. A node that has not said what
+// it is does not gate: the realm info answers anyone, the node info a token.
+const kindKnown = computed(
+  () => realmInfo.value?.is_management_node != null || nodeInfo.value?.node.capabilities != null,
+)
+const wrongNode = computed(() => kindKnown.value && !isManagementNode.value)
+const portals = computed(() => managementPortals(realmInfo.value))
 
 // A joined device has nothing left to watch, so the portal opens on its own.
 watch(joined, (yes) => {

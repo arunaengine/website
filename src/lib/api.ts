@@ -258,6 +258,10 @@ export interface RealmInfoResponse {
     groups: number | null
     nodes_configured: number | null
   }
+  // Public on newer backends: whether this node is a management node, and the
+  // api base urls of the realm's management nodes, this node's own first.
+  is_management_node?: boolean
+  management_urls?: string[]
   oidc_providers: Array<{
     id: string
     issuer: string

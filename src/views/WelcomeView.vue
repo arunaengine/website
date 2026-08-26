@@ -34,7 +34,10 @@ async function connect(): Promise<void> {
     const target = await validateRealm(input)
     connecting.value = target.origin
     if (await awaitRealm(target.origin)) {
-      await router.replace({ name: 'welcome-sign-in' })
+      // The shell may have followed the address to a management node; the
+      // sign-in step says so, since the origin it shows is not the typed one.
+      const query = target.redirectedFrom ? { from: target.redirectedFrom } : {}
+      await router.replace({ name: 'welcome-sign-in', query })
       return
     }
     failure.value = `Aruna Desktop stored ${target.origin} but has not switched to it. Try again.`

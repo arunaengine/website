@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 const PassThrough = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const PORTALS = [{ id: 'n1', url: 'https://mgmt.test' }]
+const validateRealm = vi.fn(async (input: string) => ({ origin: input, realm: 'R1', apiVersion: 'v1', portal: false }))
 
 vi.mock('@/composables/useAruna', () => ({
   useAruna: () => ({ apiBaseUrl: ref('https://server.test/api/v1') }),
@@ -25,6 +26,8 @@ describe('management node gate', () => {
     // imported again with the shell's global in place.
     vi.resetModules()
     vi.doMock('@/components/ui/Button.vue', () => ({ default: PassThrough }))
+    vi.doMock('@/lib/desktopBridge', () => ({ validateRealm }))
+    vi.doMock('@/lib/desktopWelcome', () => ({ awaitRealm: async () => true }))
     Object.assign(globalThis, { window: globalThis, __ARUNA_DESKTOP__: { apiBaseUrl: '/api/v1' } })
     inShell = (await import('./ManagementNodeGate.vue')).default
   })
@@ -39,10 +42,18 @@ describe('management node gate', () => {
     expect(markup).not.toContain('Switch')
   })
 
-  it('offers to switch inside the shell', async () => {
+  it('moves the shell on its own', async () => {
+    // The desktop follows the first management node without a click.
     const rendered = await text(inShell)
-    expect(rendered).toContain('Switch Aruna Desktop to a management node')
+    expect(rendered).toContain('Switching Aruna Desktop to https://mgmt.test')
     expect(rendered).toContain('sign in again')
+    await vi.waitFor(() => expect(validateRealm).toHaveBeenCalledWith('https://mgmt.test'))
+  })
+
+  it('leaves the shell alone without portals', async () => {
+    validateRealm.mockClear()
+    await text(inShell, [])
+    expect(validateRealm).not.toHaveBeenCalled()
   })
 
   it('points at an administrator without portals', async () => {

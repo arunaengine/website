@@ -3,7 +3,7 @@
 // app, so it owns the window instead of sitting on a guest dashboard. The
 // panel itself is the portal's, and the redirect returns through /auth/callback.
 import { computed, onMounted } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import AppLogo from '@/components/layout/AppLogo.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
@@ -12,6 +12,8 @@ import { probeRealm, realmOrigin, realmReach } from '@/lib/desktopBoot'
 
 // Follows the shell: a realm switched under this window renames it in place.
 const origin = computed(() => realmOrigin())
+const route = useRoute()
+const followed = computed(() => (typeof route.query.from === 'string' ? route.query.from : null))
 // This page boots the app for a returning owner, so a dead realm is named here
 // rather than behind a sign-in button that can only fail.
 const unreachable = computed(() => realmReach.value === 'unreachable')
@@ -33,6 +35,10 @@ onMounted(() => void probeRealm())
       <div class="flex flex-col items-center gap-1">
         <AppLogo :size="26" />
         <p class="hash break-all text-center">{{ origin }}</p>
+        <p v-if="followed" class="max-w-md text-center text-[11px] text-muted-foreground">
+          Aruna Desktop followed {{ followed }} here: this is one of the realm's management nodes, the only kind
+          that signs a device in and enrolls it.
+        </p>
       </div>
 
       <SignInPanel />

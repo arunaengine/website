@@ -101,6 +101,8 @@ export interface RealmTarget {
   apiVersion: string | null
   // False when only the API answered: an Aruna node serving no portal.
   portal: boolean
+  // The address the owner typed when the shell followed it to a management node.
+  redirectedFrom: string | null
 }
 
 const STATES: NodeStatus['state'][] = ['stopped', 'starting', 'running', 'error']
@@ -265,6 +267,7 @@ export async function validateRealm(input: string): Promise<RealmTarget> {
     realm: asText(raw.realm),
     apiVersion: asText(raw.apiVersion),
     portal: raw.portal === true,
+    redirectedFrom: asText(raw.redirectedFrom),
   }
 }
 

@@ -21,6 +21,7 @@ const validateRealm = vi.fn(async (_input: string) => ({
   realm: 'R1',
   apiVersion: 'v1',
   portal: true,
+  redirectedFrom: null as string | null,
 }))
 const awaitRealm = vi.fn(async (_origin: string) => true)
 
@@ -86,6 +87,24 @@ describe('connecting to a realm', () => {
     expect(validateRealm).toHaveBeenCalledWith('aruna.example')
     expect(awaitRealm).toHaveBeenCalledWith(ORIGIN)
     expect(router.currentRoute.value.name).toBe('welcome-sign-in')
+    mounted.app.unmount()
+  })
+
+  it('names the address the shell followed', async () => {
+    // A typed server node is followed to a management node; the sign-in
+    // step is told which address the owner actually typed.
+    validateRealm.mockResolvedValueOnce({
+      origin: ORIGIN,
+      realm: 'R1',
+      apiVersion: 'v1',
+      portal: false,
+      redirectedFrom: 'https://server.example',
+    })
+    const router = await routed()
+    const mounted = await connect(router)
+
+    expect(router.currentRoute.value.name).toBe('welcome-sign-in')
+    expect(router.currentRoute.value.query.from).toBe('https://server.example')
     mounted.app.unmount()
   })
 

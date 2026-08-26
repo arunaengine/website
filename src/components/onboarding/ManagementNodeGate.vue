@@ -1,16 +1,17 @@
 <script setup lang="ts">
 // Only a management node redeems an enrollment, so only it may mint one. On
 // the web the owner opens the portal there; inside Aruna Desktop the app moves
-// to that node itself, which drops the session and asks for a sign-in there.
-import { computed, ref } from 'vue'
+// to the first one on its own, which drops the session and asks for a sign-in
+// there. The owner only has to act when that move fails.
+import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import { useAruna } from '@/composables/useAruna'
 import { isDesktop } from '@/lib/desktop'
 import { normalizeSeedUrl } from '@/lib/onboarding-config'
-import { ArrowRightLeft, ExternalLink, ServerCrash } from '@lucide/vue'
+import { ArrowRightLeft, ExternalLink, LoaderCircle, ServerCrash } from '@lucide/vue'
 
-defineProps<{ portals: Array<{ id: string; url: string }> }>()
+const props = defineProps<{ portals: Array<{ id: string; url: string }> }>()
 
 const { apiBaseUrl } = useAruna()
 const inDesktop = isDesktop()
@@ -35,6 +36,19 @@ async function switchTo(url: string): Promise<void> {
     switching.value = null
   }
 }
+
+// One move per mount: the realm info may name the nodes a moment after the
+// gate shows, and a failed move is retried by the owner, not in a loop.
+let moved = false
+watch(
+  () => props.portals[0]?.url,
+  (url) => {
+    if (!inDesktop || !url || moved) return
+    moved = true
+    void switchTo(url)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -47,24 +61,39 @@ async function switchTo(url: string): Promise<void> {
         <span class="break-all font-mono text-foreground">{{ origin }}</span> is not one.
       </p>
 
-      <template v-if="portals.length">
-        <p class="mt-3 text-xs font-medium text-foreground">
-          {{ inDesktop ? 'Switch Aruna Desktop to a management node' : 'Open the portal on a management node' }}
+      <p v-if="!portals.length" class="mt-3 text-xs leading-relaxed text-muted-foreground">
+        {{
+          inDesktop
+            ? 'Connect Aruna Desktop to a management node instead. A realm administrator knows its address.'
+            : 'A realm administrator knows the address of a management portal.'
+        }}
+      </p>
+
+      <template v-else-if="inDesktop">
+        <p v-if="switching" class="mt-3 flex items-center gap-2 text-xs text-foreground" aria-live="polite">
+          <LoaderCircle class="h-3.5 w-3.5 shrink-0 animate-spin" />
+          <span>
+            Switching Aruna Desktop to
+            <span class="break-all font-mono">{{ switching }}</span>
+          </span>
         </p>
+        <template v-else>
+          <RefusalNote v-if="failure" :message="failure" class="mt-3" />
+          <Button size="sm" variant="outline" class="mt-3" @click="switchTo(portals[0].url)">
+            <ArrowRightLeft class="h-3.5 w-3.5" /> Switch to {{ portals[0].url }}
+          </Button>
+        </template>
+        <p class="mt-2 text-[11px] text-muted-foreground">
+          Switching ends this session; sign in again on the management node.
+        </p>
+      </template>
+
+      <template v-else>
+        <p class="mt-3 text-xs font-medium text-foreground">Open the portal on a management node</p>
         <ul class="mt-2 space-y-2">
           <li v-for="portal in portals" :key="portal.id" class="flex items-center justify-between gap-3">
             <span class="min-w-0 break-all font-mono text-xs text-foreground">{{ portal.url }}</span>
-            <Button
-              v-if="inDesktop"
-              size="sm"
-              variant="outline"
-              :disabled="!!switching"
-              @click="switchTo(portal.url)"
-            >
-              <ArrowRightLeft class="h-3.5 w-3.5" /> {{ switching === portal.url ? 'Switching…' : 'Switch' }}
-            </Button>
             <a
-              v-else
               :href="portal.url"
               target="_blank"
               rel="noopener noreferrer"
@@ -74,19 +103,7 @@ async function switchTo(url: string): Promise<void> {
             </a>
           </li>
         </ul>
-        <p v-if="inDesktop" class="mt-2 text-[11px] text-muted-foreground">
-          Switching ends this session; sign in again on the new node.
-        </p>
       </template>
-      <p v-else class="mt-3 text-xs leading-relaxed text-muted-foreground">
-        {{
-          inDesktop
-            ? 'Connect Aruna Desktop to a management node instead. A realm administrator knows its address.'
-            : 'A realm administrator knows the address of a management portal.'
-        }}
-      </p>
-
-      <RefusalNote v-if="failure" :message="failure" class="mt-3" />
     </div>
   </div>
 </template>
