@@ -68,9 +68,12 @@ async function apply(): Promise<void> {
     <div>
       <h3 class="font-display text-sm font-semibold text-aruna-navy">Enroll this device</h3>
       <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-        Mint a code in the portal under Settings → Devices, then open its link here or paste the code. The code is
-        one-time and expires; the device joins as a user node bound to your account.
+        Mint a code in the portal under Settings → Devices, then open its link here or paste the code.
       </p>
+      <ul class="mt-2 list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
+        <li>The code is one-time and expires.</li>
+        <li>This device joins as a user node bound to your account.</li>
+      </ul>
       <p v-if="fromLink" class="mt-2 text-[11px] text-muted-foreground">
         Aruna Desktop acted on the enrollment link you opened; its outcome is below.
       </p>

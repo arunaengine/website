@@ -26,6 +26,7 @@ import { buildDeviceEnv, managementPortals } from '@/lib/onboarding-config'
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   ClipboardPaste,
   ExternalLink,
   Laptop,
@@ -178,10 +179,20 @@ const stages = computed(() => watchStages(watchState.value))
     <template v-else>
       <!-- Step 1 — Device -->
       <div v-if="step === DETAILS_STEP" class="space-y-5">
-        <p class="text-sm text-muted-foreground">
-          A device joins as a user node bound to your account: it never stores realm replicas and never routes for other
-          members. Enrolling mints a one-time code you carry to the device.
-        </p>
+        <div class="space-y-2 text-sm text-muted-foreground">
+          <p>A device joins as a user node bound to your account. Enrolling mints a one-time code you carry to it.</p>
+          <ul class="space-y-1 text-xs">
+            <li class="flex items-start gap-2">
+              <Check class="mt-0.5 h-3.5 w-3.5 shrink-0 text-aruna-aqua" /> Holds only your own data
+            </li>
+            <li class="flex items-start gap-2">
+              <Check class="mt-0.5 h-3.5 w-3.5 shrink-0 text-aruna-aqua" /> Stores no replicas for other members
+            </li>
+            <li class="flex items-start gap-2">
+              <Check class="mt-0.5 h-3.5 w-3.5 shrink-0 text-aruna-aqua" /> Routes nothing for other members
+            </li>
+          </ul>
+        </div>
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
             <label class="text-xs font-medium text-foreground" for="device-name">Device name</label>

@@ -93,7 +93,7 @@ const WelcomeDeviceView = compileClientComponent(new URL('./WelcomeDeviceView.vu
   '@/components/ui/RefusalNote.vue': moduleDefault(NoteStub),
   '@/composables/useAruna': {
     useAruna: () => ({
-      realm: ref({ name: 'Test realm' }),
+      realm: ref({ name: 'Test realm', color: '#0ea5e9' }),
       nodeInfo,
       isManagementNode: computed(() => nodeInfo.value?.node.capabilities === 'management'),
       realmInfo: ref(null),

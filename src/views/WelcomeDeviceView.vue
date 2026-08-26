@@ -14,7 +14,7 @@ import RefusalNote from '@/components/ui/RefusalNote.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceSetup } from '@/composables/useDeviceSetup'
 import { managementPortals } from '@/lib/onboarding-config'
-import { ArrowRight, Laptop } from '@lucide/vue'
+import { ArrowRight, Check, Laptop } from '@lucide/vue'
 
 const router = useRouter()
 const { realm, nodeInfo, isManagementNode, realmInfo } = useAruna()
@@ -65,17 +65,38 @@ function leave(): void {
           />
           <div class="relative">
             <AppLogo :size="26" subtitle="the data orchestration engine" />
-            <p class="mt-6 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Aruna Desktop runs a node of your own on this machine. It joins {{ realm.name }} as your device: it
-              never stores replicas for other members and never routes their data.
+            <h2 class="mt-6 font-display text-base font-semibold tracking-tight text-aruna-navy">
+              Your own node, on this machine
+            </h2>
+            <p class="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+              Joins
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full border bg-card/80 px-2.5 py-0.5 text-xs font-semibold text-foreground"
+                :style="{ borderColor: `${realm.color}55` }"
+              >
+                <span class="h-1.5 w-1.5 rounded-full" :style="{ backgroundColor: realm.color }" />
+                {{ realm.name }}
+              </span>
+              as your device.
             </p>
+            <ul class="mt-4 max-w-sm space-y-2 text-sm text-muted-foreground">
+              <li class="flex items-start gap-2">
+                <Check class="mt-0.5 h-4 w-4 shrink-0 text-aruna-aqua" /> Holds only your own data
+              </li>
+              <li class="flex items-start gap-2">
+                <Check class="mt-0.5 h-4 w-4 shrink-0 text-aruna-aqua" /> Stores no replicas for other members
+              </li>
+              <li class="flex items-start gap-2">
+                <Check class="mt-0.5 h-4 w-4 shrink-0 text-aruna-aqua" /> Routes nothing for other members
+              </li>
+            </ul>
           </div>
         </div>
 
         <div v-if="watching" class="flex flex-col justify-center gap-4 p-6 md:p-7">
           <h1 class="font-display text-lg font-semibold tracking-tight text-aruna-navy">Joining the realm</h1>
           <p class="text-xs leading-relaxed text-muted-foreground">
-            The app restarts the node with its new identity; this window stays where it is while it joins.
+            Aruna Desktop restarts the node with its new identity. This window stays put while it joins.
           </p>
           <ClaimWatchStep :stages="stages" :error="state.lastError">
             <template #actions>
@@ -94,8 +115,7 @@ function leave(): void {
               <label class="text-xs font-medium text-foreground" for="setup-device-name">Device name</label>
               <Input id="setup-device-name" v-model="deviceName" class="mt-1" placeholder="work-laptop" />
               <p class="mt-1 text-[11px] text-muted-foreground">
-                Optional, and only how the realm lists this device. Where it stores data is yours to change later
-                under This device.
+                Optional; only how the realm lists this device. Its storage location is set later under This device.
               </p>
             </div>
 
@@ -109,7 +129,7 @@ function leave(): void {
           <div class="border-t border-border/70 pt-3">
             <Button variant="ghost" size="sm" class="-ml-2" @click="leave">Skip for now</Button>
             <p class="mt-1 text-[11px] text-muted-foreground">
-              The portal opens without a node of your own. This device is set up later under This device → Enroll.
+              The portal opens without a node of your own. Enroll this device later under This device.
             </p>
           </div>
         </div>
