@@ -2,9 +2,10 @@
 // surface: the top bar pill, the home node card and the device REST wrappers,
 // which need the node's own listener base. Desktop only; on the web nothing
 // here ever starts.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { isDesktop } from '@/lib/desktop'
 import { useAruna } from '@/composables/useAruna'
+import { apiRequest, type InfoResponse } from '@/lib/api'
 import type { DeviceClient } from '@/lib/deviceApi'
 import type { NodeStatus } from '@/lib/desktopBridge'
 
@@ -15,6 +16,8 @@ const POLL_MS = 15_000
 const status = ref<NodeStatus | null>(null)
 const error = ref<string | null>(null)
 const loaded = ref(false)
+const identity = ref<{ nodeId: string; realm: string } | null>(null)
+const identityError = ref<string | null>(null)
 // Refcounted: the shell's own views hold it open, and nothing polls the node
 // from the welcome routes, which have their own way of watching it.
 let watchers = 0
@@ -104,6 +107,42 @@ const deviceClient = computed<DeviceClient | null>(() =>
   nodeBaseUrl.value && authToken.value ? { baseUrl: nodeBaseUrl.value, token: authToken.value } : null,
 )
 
+// The shell never reports a node id: a node names itself only to a caller with
+// a realm token, so it is read from the node's own API with the owner's.
+async function readIdentity(client: DeviceClient): Promise<void> {
+  try {
+    const info = await apiRequest<InfoResponse>('/info', {}, client)
+    identity.value = { nodeId: info.node.peer_id, realm: info.node.realm_id }
+    identityError.value = null
+  } catch (err) {
+    identity.value = null
+    identityError.value = message(err)
+  }
+}
+
+watch(
+  deviceClient,
+  (client) => {
+    identity.value = null
+    identityError.value = null
+    if (client) void readIdentity(client)
+  },
+  { immediate: true },
+)
+
 export function useDeviceStatus() {
-  return { status, error, loaded, state, label, nodeBaseUrl, deviceClient, refresh, start, stop }
+  return {
+    status,
+    error,
+    loaded,
+    state,
+    label,
+    nodeBaseUrl,
+    deviceClient,
+    identity,
+    identityError,
+    refresh,
+    start,
+    stop,
+  }
 }

@@ -24,6 +24,9 @@ const onNodeStatus = vi.fn(async (handler: Push) => {
   return unlisten
 })
 
+const apiRequest = vi.fn(async () => ({ node: { peer_id: 'peer-1', realm_id: 'realm-1' } }))
+
+vi.mock('@/lib/api', () => ({ apiRequest }))
 vi.mock('@/lib/desktop', () => ({ isDesktop: () => true }))
 vi.mock('@/lib/desktopBridge', () => ({ nodeStatus }))
 vi.mock('@/lib/desktopEvents', () => ({ onNodeStatus }))
@@ -101,6 +104,26 @@ describe('watching the node', () => {
 
     push({ ...RUNNING, enrolled: false })
     expect(device.label.value).toBe('not set up')
+    device.stop()
+  })
+
+  it('reads the node id from the node itself', async () => {
+    // The shell reports none, so the identity comes from the node's own /info.
+    const device = await load()
+    device.start()
+
+    await vi.waitFor(() => expect(device.identity.value?.nodeId).toBe('peer-1'))
+    expect(apiRequest).toHaveBeenCalledWith('/info', {}, { baseUrl: RUNNING.apiBaseUrl, token: 'token' })
+    device.stop()
+  })
+
+  it('drops the identity once the node stops answering', async () => {
+    const device = await load()
+    device.start()
+    await vi.waitFor(() => expect(device.identity.value).not.toBeNull())
+
+    push({ ...RUNNING, ready: false })
+    await vi.waitFor(() => expect(device.identity.value).toBeNull())
     device.stop()
   })
 

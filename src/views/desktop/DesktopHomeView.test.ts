@@ -8,6 +8,7 @@ const status = ref<NodeStatus | null>(null)
 const nodeState = ref('running')
 const nodeLabel = ref('online')
 const deviceClient = ref<{ baseUrl: string; token: string } | null>(null)
+const identity = ref<{ nodeId: string; realm: string } | null>(null)
 const folders = ref<SyncedFolder[]>([])
 const foldersState = ref('ready')
 const syncTransfers = ref<DeviceTransfer[]>([])
@@ -70,6 +71,7 @@ beforeAll(async () => {
       status,
       state: nodeState,
       label: nodeLabel,
+      identity,
       deviceClient,
       refresh: vi.fn(async () => undefined),
     }),
@@ -139,6 +141,7 @@ beforeEach(() => {
   nodeState.value = 'running'
   nodeLabel.value = 'online'
   deviceClient.value = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
+  identity.value = null
   folders.value = [folder()]
   foldersState.value = 'ready'
   syncTransfers.value = []
@@ -232,6 +235,18 @@ describe('desktop home', () => {
 
     status.value = { ...status.value!, enrolling: false }
     expect(await render()).toContain('not set up')
+  })
+
+  it('takes the node id from the node itself', async () => {
+    // The shell reports none, so an enrolled device must not read as unset.
+    status.value = { ...status.value!, nodeId: null }
+    expect(await render()).toContain('joined')
+
+    identity.value = { nodeId: '01HZY7QK4N8ZP3V2C6M9AB', realm: 'realm-id' }
+    const html = await render()
+
+    expect(html).toContain('01HZY7QK')
+    expect(html).not.toContain('joined')
   })
 
   it('says the node is down instead of showing an empty folder list', async () => {

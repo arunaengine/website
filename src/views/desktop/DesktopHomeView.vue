@@ -27,7 +27,7 @@ import { Boxes, Cpu, FileText, FolderSync, Play, Plus, RefreshCw, Waves } from '
 
 const { realm } = useRealm()
 const { currentUser } = useAruna()
-const { status, label: nodeLabel, state: nodeState, deviceClient, refresh } = useDeviceStatus()
+const { status, label: nodeLabel, state: nodeState, identity, deviceClient, refresh } = useDeviceStatus()
 const {
   folders,
   listState: foldersState,
@@ -55,11 +55,17 @@ const nodeTone = computed(() =>
   online.value ? (status.value?.enrolled ? 'success' : 'warn') : nodeState.value === 'error' ? 'destructive' : 'secondary',
 )
 
-const nodeFallback = computed(() => (status.value?.enrolling ? 'joining the realm' : 'not set up'))
+// The node names itself only through its own API, so the shell's empty node id
+// is no reason to call an enrolled device unconfigured.
+const nodeId = computed(() => identity.value?.nodeId ?? status.value?.nodeId ?? null)
+const nodeFallback = computed(() => {
+  if (status.value?.enrolled) return 'joined'
+  return status.value?.enrolling ? 'joining the realm' : 'not set up'
+})
 
 const facts = computed(() => [
   { label: 'Realm', value: realm.value.shortName },
-  { label: 'Node', value: status.value?.nodeId ? truncateMiddle(status.value.nodeId, 8, 6) : nodeFallback.value },
+  { label: 'Node', value: nodeId.value ? truncateMiddle(nodeId.value, 8, 6) : nodeFallback.value },
   { label: 'Version', value: status.value?.version ?? 'n/a' },
   {
     label: 'Uptime',
