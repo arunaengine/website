@@ -328,7 +328,9 @@ function toggleGroup(groupId: string) {
 </script>
 
 <template>
-  <div>
+  <!-- The submenu switches on this column's own width, not the window's: the
+       desktop shell's side navigation already takes about 240px of it. -->
+  <div class="@container">
     <PageHeader title="Settings" description="API connection, current user, profiles, groups and credentials from the local Aruna API.">
       <template #actions>
         <Button variant="outline" @click="refresh"><RefreshCw class="h-4 w-4" /> Refresh</Button>
@@ -336,8 +338,8 @@ function toggleGroup(groupId: string) {
       </template>
     </PageHeader>
 
-    <div class="container grid min-w-0 gap-6 py-8 lg:grid-cols-[260px_1fr]">
-      <nav class="hidden flex-col gap-1 text-sm lg:flex">
+    <div class="container grid min-w-0 gap-6 py-8 @4xl:grid-cols-[260px_1fr]">
+      <nav class="hidden flex-col gap-1 text-sm @4xl:flex">
         <a
           v-for="section in settingsSections"
           :key="section.id"
@@ -348,7 +350,7 @@ function toggleGroup(groupId: string) {
         <RouterLink v-if="watchesAvailable" :to="{ name: 'settings-watches' }" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Watched resources &rarr;</RouterLink>
       </nav>
 
-      <div class="relative min-w-0 lg:hidden">
+      <div class="relative min-w-0 @4xl:hidden">
         <nav
           ref="mobileSettingsTabs"
           aria-label="Settings sections"

@@ -68,7 +68,7 @@ describe('SettingsView responsive geometry', () => {
     expect(collectElements(root, (node) => node.tag === 'Switch')).toHaveLength(0)
   })
 
-  it('renders every Settings section anchor in one below-lg tab row', () => {
+  it('renders every Settings section anchor in one narrow-container tab row', () => {
     const sectionIds = ['connection', 'profile', 'default-profile', 'groups', 'credentials', 'devices', 'interop', 'appearance']
     const sectionList = source.match(/const settingsSections = \[([\s\S]*?)\] as const/)?.[1] ?? ''
     const renderedIds = Array.from(sectionList.matchAll(/\{ id: '([^']+)'/g), (match) => match[1])
@@ -81,7 +81,7 @@ describe('SettingsView responsive geometry', () => {
     const nav = navPath?.at(-1)
     expect(nav).toBeDefined()
     expect(classTokens(nav!)).toContain('overflow-x-auto')
-    expect(navPath?.some((node) => classTokens(node).includes('lg:hidden'))).toBe(true)
+    expect(navPath?.some((node) => classTokens(node).includes('@4xl:hidden'))).toBe(true)
     expect(nav?.loc.source).toContain('v-for="section in settingsSections"')
     expect(nav?.loc.source).toContain(`:href="'#' + section.id"`)
     expect(nav?.loc.source).toContain('@keydown="onMobileTabsKeydown"')
@@ -92,6 +92,19 @@ describe('SettingsView responsive geometry', () => {
       const target = collectElements(root, (node) => staticAttribute(node, 'id') === sectionId)[0]
       expect(classTokens(target)).toContain('scroll-mt-20')
     }
+  })
+
+  it('switches the submenu on the content container instead of the viewport', () => {
+    const shell = collectElements(root, (node) => classTokens(node).includes('@container'))
+    const grid = collectElements(root, (node) => classTokens(node).includes('@4xl:grid-cols-[260px_1fr]'))
+    const sideNav = collectElements(root, (node) => node.tag === 'nav' && classTokens(node).includes('@4xl:flex'))
+
+    expect(shell).toHaveLength(1)
+    expect(grid).toHaveLength(1)
+    expect(sideNav).toHaveLength(1)
+    // A container query cannot read its own container, so the grid must be nested.
+    expect(shell[0]).not.toBe(grid[0])
+    expect(source).not.toContain('lg:grid-cols-[260px_1fr]')
   })
 
   it('places the credentials table inside a horizontal overflow boundary', () => {
