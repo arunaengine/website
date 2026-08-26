@@ -4,6 +4,7 @@
 // to that node itself, which drops the session and asks for a sign-in there.
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
 import { useAruna } from '@/composables/useAruna'
 import { isDesktop } from '@/lib/desktop'
 import { normalizeSeedUrl } from '@/lib/onboarding-config'
@@ -85,12 +86,7 @@ async function switchTo(url: string): Promise<void> {
         }}
       </p>
 
-      <p
-        v-if="failure"
-        class="mt-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-      >
-        {{ failure }}
-      </p>
+      <RefusalNote v-if="failure" :message="failure" class="mt-3" />
     </div>
   </div>
 </template>

@@ -3,6 +3,7 @@
 // in the caller (the onboarding view here; the device-enrollment flow in
 // aruna#271), so this component stays free of onboarding copy and API calls.
 // Terminal CTAs go in the #actions slot.
+import RefusalNote from '@/components/ui/RefusalNote.vue'
 import { Check, Circle, LoaderCircle, X } from '@lucide/vue'
 
 export interface WatchStage {
@@ -52,12 +53,7 @@ defineProps<{ stages: WatchStage[]; error?: string | null }>()
         </div>
       </li>
     </ol>
-    <p
-      v-if="error"
-      class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300"
-    >
-      {{ error }}
-    </p>
+    <RefusalNote v-if="error" :message="error" tone="warning" />
     <div v-if="$slots.actions" class="flex flex-wrap items-center gap-2"><slot name="actions" /></div>
   </div>
 </template>

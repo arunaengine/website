@@ -4,6 +4,7 @@
 // needs no admin gate. Rows reuse SecretsTable through its view-model props.
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
 import DeviceLane from '@/components/onboarding/DeviceLane.vue'
 import SecretsTable, { type SecretRow } from '@/components/onboarding/SecretsTable.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
@@ -122,12 +123,7 @@ const rows = computed<SecretRow[]>(() =>
     <div class="p-5">
       <p v-if="!currentUser" class="text-xs text-muted-foreground">Sign in to see the devices on your account.</p>
       <template v-else>
-        <p
-          v-if="devicesError"
-          class="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-        >
-          {{ devicesError }}
-        </p>
+        <RefusalNote v-if="devicesError" :message="devicesError" class="mb-3" />
         <SecretsTable
           :rows="rows"
           :busy-ids="[...busyIds]"

@@ -10,6 +10,7 @@ import ClaimWatchStep from '@/components/onboarding/ClaimWatchStep.vue'
 import ManagementNodeGate from '@/components/onboarding/ManagementNodeGate.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceSetup } from '@/composables/useDeviceSetup'
 import { managementPortals } from '@/lib/onboarding-config'
@@ -98,12 +99,7 @@ function leave(): void {
               </p>
             </div>
 
-            <p
-              v-if="error"
-              class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs leading-relaxed text-destructive"
-            >
-              {{ error }}
-            </p>
+            <RefusalNote v-if="error" :message="error" />
 
             <Button class="w-full" :disabled="applying" @click="apply(deviceName.trim())">
               <Laptop class="h-4 w-4" /> {{ applying ? 'Setting up…' : 'Set up this device' }}

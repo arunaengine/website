@@ -11,7 +11,7 @@ const loadInfo = vi.fn(async () => {})
 
 vi.mock('@/composables/useAruna', () => ({
   useAruna: () => ({
-    apiBaseUrl: ref('/api/v1'),
+    apiBaseUrl: ref('https://node.test/api/v1'),
     authToken: ref('token'),
     realmInfo,
     loadInfo,
@@ -157,6 +157,7 @@ describe('device mint', () => {
 
     expect(mintError.value).toContain('unrestricted token')
     expect(mintError.value).toContain('management node')
+    expect(mintError.value).toContain('the node in use is https://node.test')
   })
 })
 

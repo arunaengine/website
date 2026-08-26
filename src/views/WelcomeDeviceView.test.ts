@@ -76,6 +76,9 @@ const InputStub = defineComponent({
 })
 const ClaimWatchStub = defineComponent((_, { slots }) => () => h('div', ['claim watch', slots.actions?.()]))
 const GateStub = defineComponent(() => () => h('div', 'management gate'))
+const NoteStub = defineComponent((props: { message: string }) => () => h('div', props.message), {
+  props: ['message'],
+})
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
 const WelcomeDeviceView = compileClientComponent(new URL('./WelcomeDeviceView.vue', import.meta.url), {
@@ -87,6 +90,7 @@ const WelcomeDeviceView = compileClientComponent(new URL('./WelcomeDeviceView.vu
   '@/components/onboarding/ManagementNodeGate.vue': moduleDefault(GateStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/RefusalNote.vue': moduleDefault(NoteStub),
   '@/composables/useAruna': {
     useAruna: () => ({
       realm: ref({ name: 'Test realm' }),

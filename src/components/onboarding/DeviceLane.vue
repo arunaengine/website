@@ -7,6 +7,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Select from '@/components/ui/Select.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
@@ -199,12 +200,7 @@ const stages = computed(() => watchStages(watchState.value))
         <p class="text-[11px] text-muted-foreground">
           {{ capLabel }} Enrolled devices and codes you have not redeemed yet both take a slot.
         </p>
-        <p
-          v-if="mintError"
-          class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-        >
-          {{ mintError }}
-        </p>
+        <RefusalNote v-if="mintError" :message="mintError" />
         <div class="flex flex-wrap justify-between gap-2">
           <Button variant="outline" @click="emit('back')"><ArrowLeft class="h-4 w-4" /> Back</Button>
           <Button v-if="minted" variant="outline" @click="emit('update:step', HANDOFF_STEP)">
@@ -249,12 +245,7 @@ const stages = computed(() => watchStages(watchState.value))
               <Laptop class="h-4 w-4" /> {{ applying ? 'Enrolling…' : 'Enroll this device now' }}
             </Button>
             <Button v-else as="a" :href="enrollUrl"><Laptop class="h-4 w-4" /> Open in Aruna Desktop</Button>
-            <p
-              v-if="applyError"
-              class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-            >
-              {{ applyError }}
-            </p>
+            <RefusalNote v-if="applyError" :message="applyError" />
           </TabsContent>
 
           <TabsContent value="qr" class="space-y-3">

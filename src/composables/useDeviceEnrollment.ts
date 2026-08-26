@@ -17,6 +17,7 @@ import {
   type UserDevicesResponse,
 } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
+import { normalizeSeedUrl } from '@/lib/onboarding-config'
 
 export const WATCH_INTERVAL_MS = 5_000
 
@@ -33,18 +34,33 @@ export interface DeviceWatch {
   lastError: string | null
 }
 
-// Every failure the enrollment routes document, in the owner's words.
-export function deviceErrorMessage(err: unknown, limit: number | null): string {
+// Every failure the enrollment routes document, one line each: the first
+// names the failure and the lines after it say what to do. `node` is the API
+// base the request went to, which a 403 names because the node kind decides.
+export function deviceErrorMessage(err: unknown, limit: number | null, node = ''): string {
   if (err instanceof ApiError) {
-    if (err.status === 401) return 'Your session expired. Sign in again to enroll a device.'
+    if (err.status === 401) return 'Your session expired.\nSign in again to enroll a device.'
     if (err.status === 403) {
-      return 'Refused. Managing devices needs an unrestricted token — a path-restricted one is never accepted — on a management node, and a realm policy can forbid enrollment outright.'
+      const origin = normalizeSeedUrl(node)
+      const where = origin ? `; the node in use is ${origin}` : ''
+      return [
+        'This node refused to manage devices.',
+        `Devices are managed on a management node only${where}.`,
+        'It takes an unrestricted token; a path-restricted one is refused.',
+        'A realm policy can deny device enrollment.',
+      ].join('\n')
     }
     if (err.status === 409) {
-      const cap = limit == null ? '' : ` This realm allows ${limit} per user.`
-      return `Device cap reached.${cap} Remove a device below, or retry: a concurrent enrollment answers the same way.`
+      const cap = limit == null ? [] : [`This realm allows ${limit} per user.`]
+      return [
+        'Device cap reached.',
+        ...cap,
+        'Remove a device below, or retry: a concurrent enrollment answers the same way.',
+      ].join('\n')
     }
-    if (err.status === 503) return 'The node is out of storage capacity for new enrollments. Try again in a moment.'
+    if (err.status === 503) {
+      return 'This node is out of storage capacity for new enrollments.\nTry again in a moment.'
+    }
     return err.message
   }
   return err instanceof Error ? err.message : String(err)
@@ -78,7 +94,7 @@ export function useDeviceEnrollment() {
   const atCap = computed(() => deviceLimit.value != null && deviceCount.value >= deviceLimit.value)
 
   function message(err: unknown): string {
-    return deviceErrorMessage(err, deviceLimit.value)
+    return deviceErrorMessage(err, deviceLimit.value, apiBaseUrl.value)
   }
 
   function nowSecs(): number {

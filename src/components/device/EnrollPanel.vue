@@ -5,6 +5,7 @@
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import { enrollApply, type EnrollInvite } from '@/lib/desktopBridge'
 import { parseEnrollInput } from '@/lib/enrollLink'
@@ -98,12 +99,7 @@ async function apply(): Promise<void> {
       <Input id="device-label" v-model="label" placeholder="work-laptop" class="mt-1" />
     </div>
 
-    <p
-      v-if="failure"
-      class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-    >
-      {{ failure }}
-    </p>
+    <RefusalNote v-if="failure" :message="failure" />
 
     <div v-if="joined" class="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
       <Check class="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
