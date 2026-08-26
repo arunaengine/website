@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, ref } from 'vue'
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,6 +20,8 @@ const REALM = 'https://aruna.example'
 // What the shell says about the node this machine runs; mutated per case.
 const status = { state: 'running', enrolled: false, apiBaseUrl: LOCAL }
 const nodeStatus = vi.fn(async () => status)
+// What the realm node says it is; null until a realm token asked.
+const nodeInfo = ref<{ node: { capabilities: string } } | null>(null)
 
 vi.mock('@/lib/desktopBridge', () => ({ nodeStatus }))
 vi.mock('@/composables/useAruna', () => ({
@@ -73,6 +75,7 @@ const InputStub = defineComponent({
   },
 })
 const ClaimWatchStub = defineComponent((_, { slots }) => () => h('div', ['claim watch', slots.actions?.()]))
+const GateStub = defineComponent(() => () => h('div', 'management gate'))
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
 const WelcomeDeviceView = compileClientComponent(new URL('./WelcomeDeviceView.vue', import.meta.url), {
@@ -81,10 +84,19 @@ const WelcomeDeviceView = compileClientComponent(new URL('./WelcomeDeviceView.vu
   '@lucide/vue': icons,
   '@/components/layout/AppLogo.vue': moduleDefault(EmptyStub),
   '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(ClaimWatchStub),
+  '@/components/onboarding/ManagementNodeGate.vue': moduleDefault(GateStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
-  '@/composables/useAruna': { useAruna: () => ({ realm: ref({ name: 'Test realm' }) }) },
+  '@/composables/useAruna': {
+    useAruna: () => ({
+      realm: ref({ name: 'Test realm' }),
+      nodeInfo,
+      isManagementNode: computed(() => nodeInfo.value?.node.capabilities === 'management'),
+      realmInfo: ref(null),
+    }),
+  },
   '@/composables/useDeviceSetup': { useDeviceSetup: () => setup },
+  '@/lib/onboarding-config': { managementPortals: () => [] },
 })
 
 const entries = new Map<string, string>()
@@ -124,6 +136,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   entries.clear()
   status.enrolled = false
+  nodeInfo.value = null
   setup.watching.value = false
   setup.joined.value = false
 })
@@ -171,6 +184,20 @@ describe('setting up this device', () => {
 
     await lands(router, 'dashboard')
     expect(setup.done).toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('holds a server node at the gate', async () => {
+    // Only a management node mints; the step says so instead of letting the
+    // owner run into the 403, and the skip stays open.
+    nodeInfo.value = { node: { capabilities: 'server' } }
+    const router = await guarded()
+    const mounted = await mountApp(WelcomeDeviceView, { router })
+
+    const rendered = content(mounted.root)
+    expect(rendered).toContain('management gate')
+    expect(rendered).not.toContain('Set up this device')
+    expect(rendered).toContain('Skip for now')
     mounted.app.unmount()
   })
 

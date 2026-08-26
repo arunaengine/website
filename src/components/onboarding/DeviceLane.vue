@@ -14,6 +14,7 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import ClaimWatchStep from '@/components/onboarding/ClaimWatchStep.vue'
 import CodeSnippet from '@/components/onboarding/CodeSnippet.vue'
+import ManagementNodeGate from '@/components/onboarding/ManagementNodeGate.vue'
 import QrCode from '@/components/onboarding/QrCode.vue'
 import SecretPanel from '@/components/onboarding/SecretPanel.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -28,7 +29,6 @@ import {
   ExternalLink,
   Laptop,
   QrCode as QrCodeIcon,
-  ServerCrash,
   ShieldCheck,
   Terminal,
 } from '@lucide/vue'
@@ -171,28 +171,7 @@ const stages = computed(() => watchStages(watchState.value))
 
     <!-- Gate 2: only a management node redeems enrollment, so only it may mint -->
     <section v-else-if="!isManagementNode" class="surface p-6">
-      <div class="flex items-start gap-3">
-        <ServerCrash class="mt-0.5 h-6 w-6 shrink-0 text-muted-foreground/70" />
-        <div>
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Enrollment runs on management nodes</h3>
-          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-            This node cannot redeem an enrollment, so it cannot mint one either. Open the portal on a management node to
-            add a device.
-          </p>
-        </div>
-      </div>
-      <div v-if="portals.length" class="mt-4 space-y-2">
-        <a
-          v-for="portal in portals"
-          :key="portal.id"
-          :href="portal.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="flex items-center gap-1.5 break-all text-sm text-primary hover:underline"
-        >
-          <ExternalLink class="h-3.5 w-3.5 shrink-0" /> {{ portal.url }}
-        </a>
-      </div>
+      <ManagementNodeGate :portals="portals" />
     </section>
 
     <template v-else>

@@ -23,7 +23,12 @@ const deviceLimit = ref<number | null>(null)
 const watchState = ref<DeviceWatch>({ phase: 'idle', enrollmentId: null, nodeId: null, lastError: null })
 
 vi.mock('@/composables/useAruna', () => ({
-  useAruna: () => ({ currentUser, isManagementNode, realmInfo: ref({ nodes: [] }) }),
+  useAruna: () => ({
+    currentUser,
+    isManagementNode,
+    realmInfo: ref({ nodes: [] }),
+    apiBaseUrl: ref('https://node.test/api/v1'),
+  }),
 }))
 
 vi.mock('@/composables/useDeviceEnrollment', () => ({
@@ -102,7 +107,7 @@ describe('device lane gates', () => {
     // authorize_device_enrollment requires a management node, so the lane must
     // say so instead of letting the mint fail with a 403.
     isManagementNode.value = false
-    expect(await text(1)).toContain('Enrollment runs on management nodes')
+    expect(await text(1)).toContain('This node does not enroll devices')
   })
 })
 

@@ -3,20 +3,27 @@
 // and may be skipped. Setting up mints an enrollment against the realm and
 // redeems it here; the shell restarts the node and switches this window's
 // context underneath the step, which keeps watching across it.
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppLogo from '@/components/layout/AppLogo.vue'
 import ClaimWatchStep from '@/components/onboarding/ClaimWatchStep.vue'
+import ManagementNodeGate from '@/components/onboarding/ManagementNodeGate.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceSetup } from '@/composables/useDeviceSetup'
+import { managementPortals } from '@/lib/onboarding-config'
 import { ArrowRight, Laptop } from '@lucide/vue'
 
 const router = useRouter()
-const { realm } = useAruna()
+const { realm, nodeInfo, isManagementNode, realmInfo } = useAruna()
 const { applying, error, watching, joined, stages, state, apply, done } = useDeviceSetup()
 const deviceName = ref('')
+
+// Only a management node mints an enrollment. The node kind is answered to a
+// realm token alone, so a node that has not said what it is does not gate.
+const wrongNode = computed(() => nodeInfo.value?.node.capabilities != null && !isManagementNode.value)
+const portals = computed(() => managementPortals(realmInfo.value?.nodes ?? []))
 
 // A joined device has nothing left to watch, so the portal opens on its own.
 watch(joined, (yes) => {
@@ -77,27 +84,31 @@ function leave(): void {
         </div>
 
         <div v-else class="flex flex-col justify-center gap-4 p-6 md:p-7">
-          <h1 class="font-display text-lg font-semibold tracking-tight text-aruna-navy">Set up this device</h1>
+          <ManagementNodeGate v-if="wrongNode" :portals="portals" />
 
-          <div>
-            <label class="text-xs font-medium text-foreground" for="setup-device-name">Device name</label>
-            <Input id="setup-device-name" v-model="deviceName" class="mt-1" placeholder="work-laptop" />
-            <p class="mt-1 text-[11px] text-muted-foreground">
-              Optional, and only how the realm lists this device. Where it stores data is yours to change later
-              under This device.
+          <template v-else>
+            <h1 class="font-display text-lg font-semibold tracking-tight text-aruna-navy">Set up this device</h1>
+
+            <div>
+              <label class="text-xs font-medium text-foreground" for="setup-device-name">Device name</label>
+              <Input id="setup-device-name" v-model="deviceName" class="mt-1" placeholder="work-laptop" />
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                Optional, and only how the realm lists this device. Where it stores data is yours to change later
+                under This device.
+              </p>
+            </div>
+
+            <p
+              v-if="error"
+              class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs leading-relaxed text-destructive"
+            >
+              {{ error }}
             </p>
-          </div>
 
-          <p
-            v-if="error"
-            class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs leading-relaxed text-destructive"
-          >
-            {{ error }}
-          </p>
-
-          <Button class="w-full" :disabled="applying" @click="apply(deviceName.trim())">
-            <Laptop class="h-4 w-4" /> {{ applying ? 'Setting up…' : 'Set up this device' }}
-          </Button>
+            <Button class="w-full" :disabled="applying" @click="apply(deviceName.trim())">
+              <Laptop class="h-4 w-4" /> {{ applying ? 'Setting up…' : 'Set up this device' }}
+            </Button>
+          </template>
 
           <div class="border-t border-border/70 pt-3">
             <Button variant="ghost" size="sm" class="-ml-2" @click="leave">Skip for now</Button>
