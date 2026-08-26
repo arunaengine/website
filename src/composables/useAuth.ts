@@ -54,16 +54,23 @@ export function callbackUri(): string {
 }
 
 /**
- * Sends the user to the identity provider. In system-browser mode the URL goes
- * to the injected opener instead of this window, so a desktop shell never runs
- * the login inside its own webview.
+ * Sends the user to the identity provider. A desktop shell takes the URL
+ * through the injected opener, into the system browser or a window of its
+ * own, so the login never runs inside this webview.
  */
 export function beginAuthRedirect(url: string): void {
-  if (featureEnabled('systemBrowserAuth') && authOpener) {
+  if ((featureEnabled('systemBrowserAuth') || featureEnabled('embeddedAuth')) && authOpener) {
     authOpener(url)
     return
   }
   window.location.assign(url)
+}
+
+/** Drops a sign-in the provider never answered, such as a closed login window. */
+export function cancelSignIn(): void {
+  if (stage.value !== 'redirecting') return
+  stage.value = 'idle'
+  stageError.value = null
 }
 
 async function resolveProvider() {
@@ -239,6 +246,7 @@ export function useAuth() {
     stage,
     stageError,
     signIn,
+    cancelSignIn,
     completeSignIn,
     signOut,
     /** A bearer token is configured (session may still be loading or invalid). */

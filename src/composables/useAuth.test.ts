@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { beginAuthRedirect, callbackUri, setAuthOpener } from './useAuth'
+import { beginAuthRedirect, callbackUri, cancelSignIn, setAuthOpener, useAuth } from './useAuth'
 import { loadPortalConfig } from '@/lib/config'
 
 const PAGE_ORIGIN = 'https://portal.test'
@@ -70,5 +70,27 @@ describe('beginAuthRedirect', () => {
     await configure({ features: { systemBrowserAuth: true } })
     beginAuthRedirect(AUTH_URL)
     expect(assign).toHaveBeenCalledWith(AUTH_URL)
+  })
+
+  it('hands the url to the opener in embedded mode', async () => {
+    await configure({ features: { embeddedAuth: true } })
+    const opener = vi.fn()
+    setAuthOpener(opener)
+    beginAuthRedirect(AUTH_URL)
+    expect(opener).toHaveBeenCalledWith(AUTH_URL)
+    expect(assign).not.toHaveBeenCalled()
+  })
+})
+
+describe('cancelSignIn', () => {
+  it('only drops a sign-in still waiting on the provider', async () => {
+    await configure({})
+    const { stage } = useAuth()
+    stage.value = 'redirecting'
+    cancelSignIn()
+    expect(stage.value).toBe('idle')
+    stage.value = 'exchanging'
+    cancelSignIn()
+    expect(stage.value).toBe('exchanging')
   })
 })

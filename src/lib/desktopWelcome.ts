@@ -189,10 +189,12 @@ export function installDesktopGuard(router: Router): void {
     if (!pending && target === START_LOCATION) return
     void router.replace({ path: target.path, query: target.query, hash: target.hash, force: true })
   })
-  // A deep link the shell followed is a route change, never a reload.
-  void import('./desktopEvents').then(({ onShellNavigate }) =>
-    onShellNavigate((path) => void router.push(path)),
-  )
+  // A deep link the shell followed is a route change, never a reload; a
+  // sign-in window closed early puts the sign-in button back.
+  void import('./desktopEvents').then(({ onAuthCancelled, onShellNavigate }) => {
+    void onShellNavigate((path) => void router.push(path))
+    void onAuthCancelled(() => void import('@/composables/useAuth').then((auth) => auth.cancelSignIn()))
+  })
   router.beforeEach(async (to) => {
     // The system browser returns through the callback whatever else is true.
     if (to.name === 'auth-callback') return true

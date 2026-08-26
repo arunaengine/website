@@ -8,6 +8,7 @@ const ENROLL_EVENT = 'enroll-invite'
 const STATUS_EVENT = 'node-status'
 const CONTEXT_EVENT = 'context-changed'
 const NAVIGATE_EVENT = 'navigate'
+const AUTH_CANCELLED_EVENT = 'auth-cancelled'
 
 export type Unlisten = () => void
 
@@ -48,6 +49,11 @@ export function onShellNavigate(handler: (path: string) => void): Promise<Unlist
     const raw = payload && typeof payload === 'object' ? (payload as { path?: unknown }).path : payload
     if (typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//')) handler(raw)
   })
+}
+
+/** Watches for a sign-in window the owner closed before the provider answered. */
+export function onAuthCancelled(handler: () => void): Promise<Unlisten | null> {
+  return subscribe(AUTH_CANCELLED_EVENT, () => handler())
 }
 
 /**

@@ -22,6 +22,8 @@ export interface DesktopBridge {
 export interface DesktopFeatures {
   desktop?: boolean
   systemBrowserAuth?: boolean
+  // Sign-in runs in a window of the app's own instead of the system browser.
+  embeddedAuth?: boolean
   [flag: string]: boolean | undefined
 }
 

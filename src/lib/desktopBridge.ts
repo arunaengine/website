@@ -3,6 +3,7 @@
 // below is a command the shell implements; one it does not answer surfaces
 // BridgeUnavailable instead of a stubbed value.
 import { desktopBridge } from './desktop'
+import { featureEnabled } from './config'
 import { setAuthOpener } from '@/composables/useAuth'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 
@@ -314,15 +315,34 @@ export async function openExternal(url: string): Promise<void> {
   await call('open_external', { url })
 }
 
+/** Opens the sign-in page in a window of the app's own, which catches the redirect back. */
+export async function openAuth(url: string): Promise<void> {
+  await call('auth_open', { url })
+}
+
+// The app's own window when the shell offers it; a shell without that command
+// still has the system browser (RFC 8252).
+async function openSignIn(url: string): Promise<void> {
+  if (featureEnabled('embeddedAuth')) {
+    try {
+      await openAuth(url)
+      return
+    } catch (err) {
+      if (!(err instanceof BridgeUnavailable)) throw err
+    }
+  }
+  await openExternal(url)
+}
+
 /**
- * Routes sign-in through the system browser (RFC 8252). Without a bridge the
- * opener stays uninstalled, so beginAuthRedirect falls back to this window.
+ * Routes sign-in out of this window. Without a bridge the opener stays
+ * uninstalled, so beginAuthRedirect falls back to navigating this window.
  */
 export function installAuthOpener(): void {
   if (!desktopBridge()) return
   setAuthOpener((url) => {
-    void openExternal(url).catch((err) => {
-      reportGlobalError(`Aruna Desktop could not open your browser for sign-in: ${detail(err)}`)
+    void openSignIn(url).catch((err) => {
+      reportGlobalError(`Aruna Desktop could not open the sign-in: ${detail(err)}`)
     })
   })
 }

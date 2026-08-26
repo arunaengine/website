@@ -17,10 +17,13 @@ const onboardingSecret = ref('')
 const signingIn = computed(() => stage.value === 'redirecting')
 const publicOverview = computed(() => realmInfo.value?.public_overview)
 
-// Desktop shells hand the redirect to the system browser (RFC 8252).
-const signInHint = featureEnabled('systemBrowserAuth')
-  ? 'Sign-in opens in your browser at the realm’s identity provider, then returns to the app.'
-  : 'Sign-in continues at the realm’s identity provider, then returns here.'
+// Aruna Desktop signs in through a window of its own; an older shell hands
+// the redirect to the system browser (RFC 8252).
+const signInHint = featureEnabled('embeddedAuth')
+  ? 'Sign-in opens in a window of this app at the realm’s identity provider, then returns here.'
+  : featureEnabled('systemBrowserAuth')
+    ? 'Sign-in opens in your browser at the realm’s identity provider, then returns to the app.'
+    : 'Sign-in continues at the realm’s identity provider, then returns here.'
 
 function startSignIn() {
   void signIn({ onboardingSecret: onboardingSecret.value, redirectTo: '/app' })

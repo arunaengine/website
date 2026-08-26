@@ -121,6 +121,18 @@ describe('desktop mode', () => {
     expect(assign).not.toHaveBeenCalled()
   })
 
+  it('sends the sign-in url to the login window', async () => {
+    // A shell that offers embedded sign-in gets the URL for its own window.
+    const invoke = vi.fn(async () => null)
+    await boot(shell({ bridge: { invoke, version: 4 }, features: { embeddedAuth: true, systemBrowserAuth: false } }))
+    const { beginAuthRedirect } = await import('@/composables/useAuth')
+
+    beginAuthRedirect(AUTH_URL)
+    await Promise.resolve()
+    expect(invoke).toHaveBeenCalledWith('auth_open', { url: AUTH_URL })
+    expect(assign).not.toHaveBeenCalled()
+  })
+
   it('navigates this window when the shell injects no bridge', async () => {
     // Better a webview login than a dead sign-in button.
     await boot(shell())
