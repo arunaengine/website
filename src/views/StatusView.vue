@@ -16,10 +16,10 @@ import { aggregateByLocation } from '@/lib/placement'
 import { formatBytes, formatNumber, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
 import { ApiError } from '@/lib/api'
-import { Boxes, ChevronRight, Globe2, HardDrive, MapPin, MapPinned, RefreshCw } from '@lucide/vue'
+import { Boxes, ChevronRight, Globe2, HardDrive, Laptop, MapPin, MapPinned, RefreshCw } from '@lucide/vue'
 
 const route = useRoute()
-const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, loadInfo } = useAruna()
+const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, currentUser, loadInfo } = useAruna()
 
 const REFRESH_INTERVAL_MS = 60_000
 // The very first latency round waits out page-load network contention (asset
@@ -68,7 +68,7 @@ function probeBase(node: RealmNodeInfo): string | null {
 }
 
 async function probeRealmNodes() {
-  const targets = (realmInfo.value?.nodes ?? [])
+  const targets = infraNodes.value
     .map((node) => ({ id: node.node_id, base: probeBase(node) }))
     .filter((target): target is { id: string; base: string } => !!target.base)
   // Drop probes of nodes that left the realm; current nodes keep their last
@@ -146,8 +146,18 @@ function latencyClass(ms: number): string {
 
 const kindOrder: Record<RealmNodeInfo['kind'], number> = { management: 0, server: 1, user: 2 }
 
+// Devices (kind 'user') run on their owner's machine, not on realm
+// infrastructure: they are summarized only, never listed, probed or aggregated.
+const infraNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
+const deviceNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind === 'user'))
+const connectedDevices = computed(() => deviceNodes.value.filter((node) => node.present).length)
+const ownedDevices = computed(() => {
+  const userId = currentUser.value?.id
+  return userId ? deviceNodes.value.filter((node) => node.owner === userId).length : 0
+})
+
 const sortedNodes = computed(() =>
-  [...(realmInfo.value?.nodes ?? [])].sort(
+  [...infraNodes.value].sort(
     (a, b) => kindOrder[a.kind] - kindOrder[b.kind] || a.node_id.localeCompare(b.node_id),
   ),
 )
@@ -163,7 +173,7 @@ const replicationLabel = computed(() => {
 
 // Placement location aggregates over the live /info/realm data (aruna#269). Pure
 // derivation of the already-served placement map: no gate, no assumed endpoint.
-const locationAggregates = computed(() => aggregateByLocation(realmInfo.value?.nodes ?? []))
+const locationAggregates = computed(() => aggregateByLocation(infraNodes.value))
 const mappedLocationCount = computed(() => locationAggregates.value.filter((a) => a.mapped).length)
 
 const unreachableNodes = computed(() =>
@@ -390,10 +400,18 @@ watch(
               <NodeDetailPanel :node="node" :is-local="isLocal(node)" :probe="probeFor(node)" />
             </div>
           </li>
-          <li v-if="!sortedNodes.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
+          <li v-if="!sortedNodes.length && !deviceNodes.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
             No nodes reported for this realm yet.
           </li>
         </ul>
+        <div v-if="deviceNodes.length" class="flex items-center gap-3 border-t border-border px-5 py-3 text-sm">
+          <Laptop class="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span class="font-medium text-foreground">Devices</span>
+          <span class="tabular-nums text-muted-foreground">
+            {{ deviceNodes.length }} enrolled, {{ connectedDevices }} connected
+          </span>
+          <Badge v-if="ownedDevices" variant="outline" class="tabular-nums">{{ ownedDevices }} yours</Badge>
+        </div>
       </section>
 
       <section v-if="nodeInfo" class="surface overflow-hidden">

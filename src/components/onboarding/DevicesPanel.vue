@@ -16,7 +16,7 @@ import type { UserDevice } from '@/lib/api'
 const DEVICE_STEPS = ['Device', 'Hand off', 'Watch it join']
 const FIRST_STEP = 1
 
-const { currentUser, realmInfo } = useAruna()
+const { currentUser } = useAruna()
 const { devices, devicesError, busyIds, deviceCount, deviceLimit, loadDevices, revoke } =
   useDeviceEnrollment()
 
@@ -68,8 +68,6 @@ const STATUS: Record<UserDevice['status'], Pick<SecretRow, 'status' | 'statusLab
 
 const rows = computed<SecretRow[]>(() =>
   devices.value.map((device) => {
-    const known =
-      !!device.node_id && (realmInfo.value?.nodes ?? []).some((node) => node.node_id === device.node_id)
     return {
       id: device.id,
       kindLabel: 'device',
@@ -77,7 +75,8 @@ const rows = computed<SecretRow[]>(() =>
       expiresAt: device.expires_at ?? null,
       expiresHint: device.status === 'enrolled' ? 'enrolled devices do not expire' : undefined,
       claimedBy: device.node_id,
-      claimedLink: known ? { name: 'status', query: { node: device.node_id! } } : null,
+      // Devices are summarized on the Status page, never listed, so no row to open.
+      claimedLink: null,
       ...STATUS[device.status],
     }
   }),

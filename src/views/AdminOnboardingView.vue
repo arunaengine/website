@@ -290,7 +290,9 @@ const secretRows = computed<SecretRow[]>(() =>
       expiresHint: never ? 'initial admin-claim secret' : undefined,
       status: secretStatus(s),
       claimedBy: s.claimed_node_id,
-      claimedLink: claimedIsNode ? { name: 'status', query: { node: s.claimed_node_id! } } : null,
+      // A device has no Status row of its own; it is counted there, not listed.
+      claimedLink:
+        claimedIsNode && s.mode !== 'User' ? { name: 'status', query: { node: s.claimed_node_id! } } : null,
     }
   }),
 )
@@ -524,7 +526,7 @@ const managementPortals = computed(() =>
             <ClaimWatchStep :stages="watchStages" :error="watchState.lastError">
               <template #actions>
                 <RouterLink
-                  v-if="watchTerminal === 'connected' && watchState.claimedBy"
+                  v-if="watchTerminal === 'connected' && watchState.claimedBy && selectedMode !== 'User'"
                   :to="{ name: 'status', query: { node: watchState.claimedBy } }"
                 >
                   <Button size="sm"><ExternalLink class="h-4 w-4" /> Open in Status</Button>
