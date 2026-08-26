@@ -23,7 +23,7 @@ import { featureEnabled } from '@/lib/config'
 import { classify, folderName, listDrafts, type DeviceDraft, type DeviceState } from '@/lib/deviceApi'
 import { isTerminalJobState, listJobs, type JobStatusResponse } from '@/lib/jobs'
 import { formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Boxes, Cpu, FileText, FolderSync, Play, Plus, RefreshCw, Waves } from '@lucide/vue'
+import { Boxes, Cpu, FileText, Play, Plus, RefreshCw } from '@lucide/vue'
 
 const { realm } = useRealm()
 const { currentUser } = useAruna()
@@ -160,81 +160,8 @@ onMounted(() => void reload())
       </p>
 
       <div class="grid gap-4 lg:grid-cols-2">
-        <!-- Folders -->
-        <section class="surface flex flex-col overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-3">
-            <div class="flex items-center gap-2">
-              <FolderSync class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Synced folders</h2>
-            </div>
-            <RouterLink :to="{ name: 'folders' }" class="text-xs font-medium text-primary hover:underline">Open</RouterLink>
-          </header>
-          <div class="flex-1 px-5 py-4">
-            <Skeleton v-if="foldersState === 'loading'" class="h-16" />
-            <DeviceSurfaceState
-              v-else-if="foldersState !== 'ready'"
-              :state="foldersState"
-              subject="its folders"
-              :error="foldersError"
-              compact
-            />
-            <template v-else-if="folders.length">
-              <p class="text-sm text-foreground">
-                <span class="font-display text-xl font-bold">{{ folders.length }}</span>
-                {{ folders.length === 1 ? 'folder' : 'folders' }} bound
-              </p>
-              <ul class="mt-2 space-y-1">
-                <li v-for="folder in folders.slice(0, 3)" :key="folder.folder_id" class="truncate font-mono text-[11px] text-muted-foreground">
-                  {{ folderName(folder.root) }} · {{ folder.counters.in_sync }} in sync
-                </li>
-              </ul>
-              <RouterLink
-                v-if="needsYouTotal"
-                :to="{ name: 'folders' }"
-                class="mt-3 inline-flex rounded-md bg-amber-500/10 px-2.5 py-1 text-[12px] font-medium text-amber-800 hover:bg-amber-500/15 dark:text-amber-200"
-              >{{ needsYouTotal }} waiting for your decision</RouterLink>
-            </template>
-            <div v-else class="space-y-2">
-              <p class="text-sm text-muted-foreground">No folder on this computer is bound yet.</p>
-              <Button variant="outline" size="sm" @click="showBind = true">Bind a folder</Button>
-            </div>
-          </div>
-        </section>
-
-        <!-- Transfers -->
-        <section class="surface flex flex-col overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-3">
-            <div class="flex items-center gap-2">
-              <Waves class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Transfers</h2>
-            </div>
-            <RouterLink :to="{ name: 'transfers' }" class="text-xs font-medium text-primary hover:underline">Open</RouterLink>
-          </header>
-          <div class="flex-1 px-5 py-4">
-            <p class="text-sm text-foreground">
-              <span class="font-display text-xl font-bold">{{ activeTransfers.length + activeUploads }}</span>
-              in flight
-            </p>
-            <p class="mt-1 text-[11px] text-muted-foreground">
-              {{ syncTransfers.length }} from folder sync · {{ uploadItems.length }} from this window
-            </p>
-            <DeviceSurfaceState
-              v-if="transfersState !== 'ready'"
-              class="mt-2"
-              :state="transfersState"
-              subject="its transfers"
-              compact
-            />
-            <ul class="mt-2 space-y-1">
-              <li v-for="transfer in syncTransfers.slice(0, 3)" :key="transfer.id" class="truncate font-mono text-[11px] text-muted-foreground">
-                {{ transfer.direction === 'upload' ? '↑' : '↓' }} {{ transfer.path }}
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <!-- Sync -->
-        <section class="surface flex flex-col overflow-hidden">
+        <!-- Sync: the folders, what is still owed, and what is moving now -->
+        <section class="surface flex flex-col overflow-hidden lg:col-span-2">
           <header class="flex items-center justify-between border-b border-border px-5 py-3">
             <div class="flex items-center gap-2">
               <RefreshCw class="h-4 w-4 text-primary" />
@@ -242,27 +169,87 @@ onMounted(() => void reload())
             </div>
             <RouterLink :to="{ name: 'sync' }" class="text-xs font-medium text-primary hover:underline">Open</RouterLink>
           </header>
-          <div class="flex-1 px-5 py-4">
-            <DeviceSurfaceState
-              v-if="syncState !== 'ready'"
-              :state="syncState"
-              subject="its sync status"
-              compact
-            />
-            <template v-else>
-              <p class="text-sm text-foreground">
-                <span class="font-display text-xl font-bold">{{ syncStatus.pendingTotal }}</span>
-                {{ syncStatus.pendingTotal === 1 ? 'change' : 'changes' }} pending
+          <div class="grid flex-1 gap-5 px-5 py-4 sm:grid-cols-3">
+            <div class="min-w-0">
+              <p class="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Folders</p>
+              <Skeleton v-if="foldersState === 'loading'" class="mt-2 h-12" />
+              <DeviceSurfaceState
+                v-else-if="foldersState !== 'ready'"
+                class="mt-2"
+                :state="foldersState"
+                subject="its folders"
+                :error="foldersError"
+                compact
+              />
+              <template v-else-if="folders.length">
+                <p class="mt-1 text-sm text-foreground">
+                  <span class="font-display text-xl font-bold">{{ folders.length }}</span>
+                  {{ folders.length === 1 ? 'folder' : 'folders' }} bound
+                </p>
+                <ul class="mt-2 space-y-1">
+                  <li v-for="folder in folders.slice(0, 3)" :key="folder.folder_id" class="truncate font-mono text-[11px] text-muted-foreground">
+                    {{ folderName(folder.root) }} · {{ folder.counters.in_sync }} in sync
+                  </li>
+                </ul>
+                <RouterLink
+                  v-if="needsYouTotal"
+                  :to="{ name: 'sync' }"
+                  class="mt-3 inline-flex rounded-md bg-amber-500/10 px-2.5 py-1 text-[12px] font-medium text-amber-800 hover:bg-amber-500/15 dark:text-amber-200"
+                >{{ needsYouTotal }} waiting for your decision</RouterLink>
+              </template>
+              <div v-else class="mt-1 space-y-2">
+                <p class="text-sm text-muted-foreground">No folder on this computer is bound yet.</p>
+                <Button variant="outline" size="sm" @click="showBind = true">Bind a folder</Button>
+              </div>
+            </div>
+
+            <div class="min-w-0">
+              <p class="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Changes</p>
+              <DeviceSurfaceState
+                v-if="syncState !== 'ready'"
+                class="mt-2"
+                :state="syncState"
+                subject="its sync status"
+                compact
+              />
+              <template v-else>
+                <p class="mt-1 text-sm text-foreground">
+                  <span class="font-display text-xl font-bold">{{ syncStatus.pendingTotal }}</span>
+                  {{ syncStatus.pendingTotal === 1 ? 'change' : 'changes' }} pending
+                </p>
+                <p class="mt-1 text-[11px] text-muted-foreground">
+                  {{ syncStatus.realmReachable ? 'The realm is answering.' : 'Offline: your edits go out once it answers.' }}
+                </p>
+                <RouterLink
+                  v-if="needsOwner"
+                  :to="{ name: 'sync', query: { tab: 'documents' } }"
+                  class="mt-3 inline-flex rounded-md bg-amber-500/10 px-2.5 py-1 text-[12px] font-medium text-amber-800 hover:bg-amber-500/15 dark:text-amber-200"
+                >{{ needsOwner }} {{ needsOwner === 1 ? 'needs' : 'need' }} your attention</RouterLink>
+              </template>
+            </div>
+
+            <div class="min-w-0">
+              <p class="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Transfers</p>
+              <p class="mt-1 text-sm text-foreground">
+                <span class="font-display text-xl font-bold">{{ activeTransfers.length + activeUploads }}</span>
+                in flight
               </p>
               <p class="mt-1 text-[11px] text-muted-foreground">
-                {{ syncStatus.realmReachable ? 'The realm is answering.' : 'Offline: your edits go out once it answers.' }}
+                {{ syncTransfers.length }} from folder sync · {{ uploadItems.length }} from this window
               </p>
-              <RouterLink
-                v-if="needsOwner"
-                :to="{ name: 'sync' }"
-                class="mt-3 inline-flex rounded-md bg-amber-500/10 px-2.5 py-1 text-[12px] font-medium text-amber-800 hover:bg-amber-500/15 dark:text-amber-200"
-              >{{ needsOwner }} {{ needsOwner === 1 ? 'needs' : 'need' }} your attention</RouterLink>
-            </template>
+              <DeviceSurfaceState
+                v-if="transfersState !== 'ready'"
+                class="mt-2"
+                :state="transfersState"
+                subject="its transfers"
+                compact
+              />
+              <ul class="mt-2 space-y-1">
+                <li v-for="transfer in syncTransfers.slice(0, 3)" :key="transfer.id" class="truncate font-mono text-[11px] text-muted-foreground">
+                  {{ transfer.direction === 'upload' ? '↑' : '↓' }} {{ transfer.path }}
+                </li>
+              </ul>
+            </div>
           </div>
         </section>
 

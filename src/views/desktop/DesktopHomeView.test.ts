@@ -51,9 +51,11 @@ function folder(overrides: Partial<SyncedFolder> = {}): SyncedFolder {
 }
 
 const EmptyStub = defineComponent(() => () => null)
+// Renders the route it points at, so the home's destinations are testable.
 const RouterLinkStub = defineComponent({
   props: { to: { type: [String, Object], required: true } },
-  setup: (_, { slots }) => () => h('a', slots.default?.()),
+  setup: (props, { slots }) => () =>
+    h('a', { href: typeof props.to === 'string' ? props.to : `#${(props.to as { name?: string }).name}` }, slots.default?.()),
 })
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const BadgeStub = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
@@ -181,6 +183,15 @@ describe('desktop home', () => {
     expect(html).toContain('data-2026')
     expect(html).toContain('412 in sync')
     expect(html).toContain('2 waiting for your decision')
+  })
+
+  it('keeps every sync surface in one card', async () => {
+    const html = await render()
+
+    expect(html).toContain('#sync')
+    expect(html).not.toContain('#folders')
+    expect(html).not.toContain('#transfers')
+    expect(html).toContain('Sync')
   })
 
   it('counts transfers from both halves of the machine', async () => {

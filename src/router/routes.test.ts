@@ -97,10 +97,8 @@ describe('desktop routes', () => {
   it('mounts the machine views under the app shell', async () => {
     const routes = await build({ apiBaseUrl: '/api/v1' })
     const expected = [
-      ['folders', 'folders'],
-      ['folders/:folderId', 'folder'],
-      ['transfers', 'transfers'],
       ['sync', 'sync'],
+      ['folders/:folderId', 'folder'],
       ['runs', 'runs'],
       ['runs/:jobId', 'run-detail'],
     ]
@@ -109,6 +107,15 @@ describe('desktop routes', () => {
       expect(child(routes, path)?.name).toBe(name)
       expect(typeof child(routes, path)?.component).toBe('function')
     }
+  })
+
+  it('sends the old folder and transfer paths to the sync section', async () => {
+    const routes = await build({ apiBaseUrl: '/api/v1' })
+
+    expect(child(routes, 'folders')?.redirect).toEqual({ name: 'sync' })
+    expect(child(routes, 'folders')?.component).toBeUndefined()
+    expect(child(routes, 'transfers')?.redirect).toEqual({ name: 'sync', query: { tab: 'transfers' } })
+    expect(child(routes, 'transfers')?.component).toBeUndefined()
   })
 
   it('swaps the shell and the home view, keeping the dashboard name', async () => {

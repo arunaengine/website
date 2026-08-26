@@ -130,7 +130,7 @@ async function mount() {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/app/folders', name: 'folders', component: Stub },
+      { path: '/app/sync', name: 'sync', component: Stub },
       { path: '/app/folders/:folderId', name: 'folder', component: Stub },
       { path: '/app/device', name: 'device', component: Stub },
     ],

@@ -155,7 +155,7 @@ async function detach(): Promise<void> {
   actionError.value = null
   try {
     await unbind(folderId.value)
-    void router.push({ name: 'folders' })
+    void router.push({ name: 'sync' })
   } catch (err) {
     actionError.value = err instanceof Error ? err.message : String(err)
   }
@@ -194,7 +194,7 @@ function when(ms: number | null | undefined): string {
         <Badge v-if="folder?.state === 'paused'" variant="secondary" class="text-[10px] uppercase">paused</Badge>
       </template>
       <template #actions>
-        <RouterLink :to="{ name: 'folders' }">
+        <RouterLink :to="{ name: 'sync' }">
           <Button variant="ghost" size="sm"><ArrowLeft class="h-3.5 w-3.5" /> Folders</Button>
         </RouterLink>
         <Button v-if="folder" variant="outline" size="sm" @click="reveal(folder.root)">

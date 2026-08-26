@@ -18,7 +18,6 @@ import {
   BookOpen,
   Boxes,
   FileJson2,
-  FolderSync,
   LayoutDashboard,
   Laptop,
   Play,
@@ -26,7 +25,6 @@ import {
   Settings,
   ShieldCheck,
   Users,
-  Waves,
   Workflow,
 } from '@lucide/vue'
 
@@ -48,9 +46,7 @@ const adminItems = computed(() => [
 
 const items = computed<NavItem[]>(() => [
   { to: '/app', icon: LayoutDashboard, label: 'Home', exact: true },
-  { to: '/app/folders', icon: FolderSync, label: 'Synced folders' },
-  { to: '/app/transfers', icon: Waves, label: 'Transfers' },
-  { to: '/app/sync', icon: RefreshCw, label: 'Sync' },
+  { to: '/app/sync', icon: RefreshCw, label: 'Sync', match: ['/app/sync', '/app/folders', '/app/transfers'] },
   { to: '/app/runs', icon: Play, label: 'Runs' },
   { to: '/app/device', icon: Laptop, label: 'This device' },
   { to: '/app/buckets', icon: Boxes, label: 'Buckets' },

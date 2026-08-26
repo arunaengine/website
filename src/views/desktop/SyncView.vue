@@ -1,27 +1,53 @@
 <script setup lang="ts">
-// What this device holds offline and what it still owes the realm. Documents
-// first, because a document that will not publish is the owner's to fix; the
-// folders below it are counted, not decided, here.
+// One section for everything this computer syncs: the folders bound to the
+// realm, the documents it keeps offline, and the bytes in motion right now.
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Tabs from '@/components/ui/Tabs.vue'
+import TabsList from '@/components/ui/TabsList.vue'
+import TabsTrigger from '@/components/ui/TabsTrigger.vue'
+import TabsContent from '@/components/ui/TabsContent.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
+import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
+import DeviceTransfersPanel from '@/components/desktop/DeviceTransfersPanel.vue'
+import FoldersPanel from '@/components/desktop/FoldersPanel.vue'
 import { useDeviceSync } from '@/composables/useDeviceSync'
-import type { DatasetSyncState, DocumentSyncState, SyncDocument } from '@/lib/deviceApi'
+import { useSyncedFolders } from '@/composables/useSyncedFolders'
+import type { DocumentSyncState, SyncDocument } from '@/lib/deviceApi'
 import { relativeTime } from '@/lib/utils'
 import type { BadgeVariant } from '@/components/nodes/node-display'
-import { CloudOff, FileText, FolderSync, RefreshCw } from '@lucide/vue'
+import { CloudOff, FileText, Plus, RefreshCw } from '@lucide/vue'
 
-const { status, state, loading, error, runError, running, needsOwner, runSync, load } = useDeviceSync()
+const { status, state, loading, error, runError, running, runSync, load } = useDeviceSync()
+const { load: loadFolders, needsYouTotal } = useSyncedFolders()
 
+const route = useRoute()
+const router = useRouter()
 const filter = ref('all')
+const showBind = ref(false)
+
+const TABS = ['folders', 'documents', 'transfers']
+
+const tab = computed(() => {
+  const asked = route.query.tab
+  return typeof asked === 'string' && TABS.includes(asked) ? asked : 'folders'
+})
+
+function setTab(next: string): void {
+  void router.replace({ name: 'sync', query: next === 'folders' ? {} : { tab: next } })
+}
 
 onMounted(() => void load())
+
+async function reload(): Promise<void> {
+  await Promise.all([load(), loadFolders()])
+}
 
 const DOC_BADGE: Record<DocumentSyncState, BadgeVariant> = {
   synced: 'success',
@@ -39,13 +65,6 @@ const DOC_LABEL: Record<DocumentSyncState, string> = {
   invalid: 'invalid',
   failed: 'failed',
   local_only: 'local only',
-}
-
-const DATASET_BADGE: Record<DatasetSyncState, BadgeVariant> = {
-  synced: 'success',
-  pending: 'sky',
-  paused: 'secondary',
-  error: 'destructive',
 }
 
 function attention(doc: SyncDocument): boolean {
@@ -93,9 +112,7 @@ const lastSync = computed(() =>
 
 const canRun = computed(() => state.value === 'ready' && status.value.realmReachable && !running.value)
 
-const nothingHeld = computed(
-  () => state.value === 'ready' && !documents.value.length && !status.value.datasets.length,
-)
+const nothingHeld = computed(() => state.value === 'ready' && !documents.value.length)
 </script>
 
 <template>
@@ -103,7 +120,7 @@ const nothingHeld = computed(
     <PageHeader
       eyebrow="This computer"
       title="Sync"
-      description="What this computer keeps offline, and what it still owes the realm."
+      description="What this computer keeps in step with the realm, and what it still owes it."
     >
       <template #breadcrumbs>
         <span>·</span>
@@ -117,6 +134,8 @@ const nothingHeld = computed(
         <span class="text-xs text-muted-foreground">
           {{ status.pendingTotal }} {{ status.pendingTotal === 1 ? 'change' : 'changes' }} pending
         </span>
+        <Button variant="outline" size="sm" @click="reload"><RefreshCw class="h-3.5 w-3.5" /> Refresh</Button>
+        <Button variant="outline" size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Bind a folder</Button>
         <Button size="sm" :disabled="!canRun" @click="runSync">
           <RefreshCw class="h-3.5 w-3.5" /> {{ running ? 'Syncing' : 'Sync now' }}
         </Button>
@@ -139,93 +158,82 @@ const nothingHeld = computed(
         The realm cannot be reached. Your edits are kept here and go out on their own once it answers.
       </p>
 
-      <DeviceSurfaceState :state="state" subject="its sync status" :error="error" @retry="load" />
+      <Tabs :model-value="tab" @update:model-value="setTab">
+        <TabsList>
+          <TabsTrigger value="folders">
+            Folders
+            <span v-if="needsYouTotal" class="ml-1.5 text-[11px] text-amber-700 dark:text-amber-300"
+              >{{ needsYouTotal }}</span
+            >
+          </TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="transfers">Transfers</TabsTrigger>
+        </TabsList>
 
-      <div v-if="loading && state !== 'offline'" class="space-y-3">
-        <Skeleton v-for="n in 2" :key="n" class="h-28" />
-      </div>
+        <TabsContent value="folders">
+          <FoldersPanel @bind="showBind = true" />
+        </TabsContent>
 
-      <EmptyState
-        v-else-if="nothingHeld"
-        title="Nothing is kept on this computer yet"
-        description="A document becomes available offline when you create it here, edit it here, or select it for offline use on its page."
-      >
-        <template #icon><FileText class="h-6 w-6" /></template>
-      </EmptyState>
+        <TabsContent value="documents" class="space-y-4">
+          <DeviceSurfaceState :state="state" subject="its sync status" :error="error" @retry="load" />
 
-      <template v-else-if="state === 'ready'">
-        <section class="surface overflow-hidden">
-          <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
-            <div class="flex items-center gap-2">
-              <FileText class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Documents</h2>
-              <span v-if="needsOwner" class="text-[11px] font-medium text-amber-700 dark:text-amber-300"
-                >{{ needsOwner }} waiting for you</span
-              >
-            </div>
-            <FilterChips v-model="filter" :options="chips" aria-label="Filter documents by sync state" />
-          </header>
+          <div v-if="loading && state !== 'offline'" class="space-y-3">
+            <Skeleton v-for="n in 2" :key="n" class="h-28" />
+          </div>
 
-          <p v-if="!shown.length" class="px-5 py-6 text-sm text-muted-foreground">
-            No document is in this state.
-          </p>
-          <ul v-else class="divide-y divide-border/70">
-            <li v-for="doc in shown" :key="doc.documentId" class="px-5 py-3">
-              <div class="flex flex-wrap items-center gap-2">
-                <Badge :variant="DOC_BADGE[doc.state]" class="uppercase">{{ DOC_LABEL[doc.state] }}</Badge>
-                <RouterLink
-                  :to="{ name: 'metadata-detail', params: { id: doc.documentId } }"
-                  class="min-w-0 truncate font-mono text-[12px] text-foreground hover:text-primary hover:underline"
-                  >{{ doc.path || doc.documentId }}</RouterLink
-                >
-                <span v-if="doc.pendingEdits" class="ml-auto text-[11px] text-muted-foreground">
-                  {{ doc.pendingEdits }} {{ doc.pendingEdits === 1 ? 'edit' : 'edits' }} waiting
-                </span>
+          <EmptyState
+            v-else-if="nothingHeld"
+            title="Nothing is kept on this computer yet"
+            description="A document becomes available offline when you create it here, edit it here, or select it for offline use on its page."
+          >
+            <template #icon><FileText class="h-6 w-6" /></template>
+          </EmptyState>
+
+          <section v-else-if="state === 'ready'" class="surface overflow-hidden">
+            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
+              <div class="flex items-center gap-2">
+                <FileText class="h-4 w-4 text-primary" />
+                <h2 class="font-display text-sm font-semibold text-aruna-navy">Documents</h2>
               </div>
-              <p
-                v-if="doc.state === 'invalid' || doc.state === 'failed'"
-                :class="[
-                  'mt-1 text-[11px]',
-                  doc.state === 'failed' ? 'text-destructive' : 'text-amber-700 dark:text-amber-300',
-                ]"
-              >
-                {{ reason(doc) }}
-              </p>
-            </li>
-          </ul>
-        </section>
+              <FilterChips v-model="filter" :options="chips" aria-label="Filter documents by sync state" />
+            </header>
 
-        <section class="surface overflow-hidden">
-          <header class="flex items-center gap-2 border-b border-border px-5 py-3">
-            <FolderSync class="h-4 w-4 text-primary" />
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Datasets</h2>
-          </header>
-
-          <p v-if="!status.datasets.length" class="px-5 py-6 text-sm text-muted-foreground">
-            No folder on this computer is synced yet.
-          </p>
-          <ul v-else class="divide-y divide-border/70">
-            <li v-for="set in status.datasets" :key="set.folderId" class="flex flex-wrap items-center gap-2 px-5 py-3">
-              <Badge :variant="DATASET_BADGE[set.state]" class="uppercase">{{ set.state }}</Badge>
-              <RouterLink
-                :to="{ name: 'folder', params: { folderId: set.folderId } }"
-                class="min-w-0 truncate text-[13px] font-medium text-foreground hover:text-primary hover:underline"
-                >{{ set.label || set.folderId }}</RouterLink
-              >
-              <span class="ml-auto flex flex-wrap items-center gap-x-4 text-[11px] text-muted-foreground">
-                <span>{{ set.pendingUploads }} uploading</span>
-                <span>{{ set.unsyncedFiles }} not synced</span>
-                <RouterLink
-                  v-if="set.conflicts"
-                  :to="{ name: 'folder', params: { folderId: set.folderId } }"
-                  class="font-medium text-amber-700 hover:underline dark:text-amber-300"
-                  >{{ set.conflicts }} need your decision</RouterLink
+            <p v-if="!shown.length" class="px-5 py-6 text-sm text-muted-foreground">
+              No document is in this state.
+            </p>
+            <ul v-else class="divide-y divide-border/70">
+              <li v-for="doc in shown" :key="doc.documentId" class="px-5 py-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge :variant="DOC_BADGE[doc.state]" class="uppercase">{{ DOC_LABEL[doc.state] }}</Badge>
+                  <RouterLink
+                    :to="{ name: 'metadata-detail', params: { id: doc.documentId } }"
+                    class="min-w-0 truncate font-mono text-[12px] text-foreground hover:text-primary hover:underline"
+                    >{{ doc.path || doc.documentId }}</RouterLink
+                  >
+                  <span v-if="doc.pendingEdits" class="ml-auto text-[11px] text-muted-foreground">
+                    {{ doc.pendingEdits }} {{ doc.pendingEdits === 1 ? 'edit' : 'edits' }} waiting
+                  </span>
+                </div>
+                <p
+                  v-if="doc.state === 'invalid' || doc.state === 'failed'"
+                  :class="[
+                    'mt-1 text-[11px]',
+                    doc.state === 'failed' ? 'text-destructive' : 'text-amber-700 dark:text-amber-300',
+                  ]"
                 >
-              </span>
-            </li>
-          </ul>
-        </section>
-      </template>
+                  {{ reason(doc) }}
+                </p>
+              </li>
+            </ul>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="transfers">
+          <DeviceTransfersPanel />
+        </TabsContent>
+      </Tabs>
     </div>
+
+    <BindFolderDialog v-model:open="showBind" @bound="loadFolders" />
   </div>
 </template>

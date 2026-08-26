@@ -61,8 +61,6 @@ describe('desktop shell', () => {
 
     expect(destinations(html)).toEqual([
       '/app',
-      '/app/folders',
-      '/app/transfers',
       '/app/sync',
       '/app/runs',
       '/app/device',
@@ -71,7 +69,7 @@ describe('desktop shell', () => {
       '/app/settings',
       '/app/docs/v1',
     ])
-    expect(html).toContain('Synced folders')
+    expect(html).toContain('Sync')
     expect(html).toContain('This device')
   })
 

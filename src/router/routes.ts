@@ -32,14 +32,16 @@ function homeRoute(): RouteRecordRaw {
 function desktopRoutes(): RouteRecordRaw[] {
   if (!isDesktop()) return []
   return [
-    { path: 'folders', name: 'folders', component: () => import('@/views/desktop/SyncedFoldersView.vue') },
+    { path: 'sync', name: 'sync', component: () => import('@/views/desktop/SyncView.vue') },
     {
       path: 'folders/:folderId',
       name: 'folder',
       component: () => import('@/views/desktop/FolderDetailView.vue'),
     },
-    { path: 'transfers', name: 'transfers', component: () => import('@/views/desktop/TransfersView.vue') },
-    { path: 'sync', name: 'sync', component: () => import('@/views/desktop/SyncView.vue') },
+    // Folders and transfers became tabs of the one Sync section; their own
+    // paths stay reachable for anything that still points at them.
+    { path: 'folders', redirect: { name: 'sync' } },
+    { path: 'transfers', redirect: { name: 'sync', query: { tab: 'transfers' } } },
     { path: 'runs', name: 'runs', component: () => import('@/views/desktop/RunsView.vue') },
     { path: 'runs/:jobId', name: 'run-detail', component: () => import('@/views/desktop/RunsView.vue') },
     { path: 'device', name: 'device', component: () => import('@/views/DeviceView.vue') },
