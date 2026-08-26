@@ -1,7 +1,7 @@
 import { createSSRApp, h, ref } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { RealmInfoResponse, UserDevice } from '@/lib/api'
+import { ApiError, type RealmInfoResponse, type UserDevice } from '@/lib/api'
 
 const PAGE_ORIGIN = 'https://portal.test'
 const ENROLL_URL = 'aruna://enroll?secret=abc%2Bdef%3D&seed=https%3A%2F%2Fnode.test&realm=R1'
@@ -11,14 +11,14 @@ const loadInfo = vi.fn(async () => {})
 
 vi.mock('@/composables/useAruna', () => ({
   useAruna: () => ({
-    apiBaseUrl: ref('https://node.test/api/v1'),
+    apiBaseUrl: ref('/api/v1'),
     authToken: ref('token'),
     realmInfo,
     loadInfo,
   }),
 }))
 
-const { useDeviceEnrollment } = await import('@/composables/useDeviceEnrollment')
+const { deviceErrorMessage, useDeviceEnrollment } = await import('@/composables/useDeviceEnrollment')
 
 interface Call {
   url: string
@@ -157,7 +157,15 @@ describe('device mint', () => {
 
     expect(mintError.value).toContain('unrestricted token')
     expect(mintError.value).toContain('management node')
-    expect(mintError.value).toContain('the node in use is https://node.test')
+  })
+
+  it('names the node behind a refusal', () => {
+    // A relative base names no node; an absolute one is shown as its origin.
+    const refused = new ApiError(403, 'forbidden')
+    expect(deviceErrorMessage(refused, null, 'https://node.test/api/v1')).toContain(
+      'the node in use is https://node.test',
+    )
+    expect(deviceErrorMessage(refused, null, '/api/v1')).not.toContain('node in use')
   })
 })
 
