@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
@@ -12,6 +12,7 @@ import { connectionLabel, connectionVariant, isDegradedStatus, kindVariant, stat
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
+import { onWake, POLL_SLOW_MS } from '@/lib/poll'
 import { aggregateByLocation } from '@/lib/placement'
 import { formatBytes, formatNumber, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
@@ -21,7 +22,6 @@ import { Boxes, ChevronRight, Globe2, HardDrive, Laptop, MapPin, MapPinned, Refr
 const route = useRoute()
 const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, currentUser, loadInfo } = useAruna()
 
-const REFRESH_INTERVAL_MS = 60_000
 // The very first latency round waits out page-load network contention (asset
 // and bootstrap requests share the connection pool); the cells show a muted
 // "measuring" meanwhile. Subsequent rounds fire immediately.
@@ -86,12 +86,13 @@ async function probeRealmNodes() {
 }
 
 onMounted(() => void refreshStatus())
-// Minute cadence, paused while the tab is hidden (DashboardView's pattern);
+onUnmounted(onWake(() => void refreshStatus()))
+// Realm cadence, paused while the tab is hidden (DashboardView's pattern);
 // refreshStatus only swaps refs, so scroll and the open panel are untouched.
 const visibility = useDocumentVisibility()
 useIntervalFn(() => {
   if (visibility.value === 'visible' && !refreshing.value) void refreshStatus()
-}, REFRESH_INTERVAL_MS)
+}, POLL_SLOW_MS)
 
 const localPeerId = computed(() => nodeInfo.value?.node.peer_id ?? '')
 

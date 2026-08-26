@@ -1,6 +1,7 @@
 import { computed, getCurrentInstance, inject, onUnmounted, ref, watch, type InjectionKey } from 'vue'
 import { ApiError, type ApiClientOptions } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
+import { onWake, POLL_IDLE_MS } from '@/lib/poll'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import {
@@ -25,8 +26,6 @@ import {
 // Durable job monitoring. Every network path remains feature-gated so a runtime
 // portal config can explicitly disable the surface.
 
-const LIST_POLL_INTERVAL_MS = 10_000
-const DETAIL_POLL_INTERVAL_MS = 5_000
 const DEFAULT_PAGE_SIZE = 50
 
 const jobsEnabled = computed(() => featureEnabled('jobs'))
@@ -207,7 +206,7 @@ export function useJobsList(options: JobsListOptions = {}) {
 
   // Auto-refresh re-fetches page one only (a multi-page list must not silently
   // truncate) and only while some listed job is still active.
-  const pollTimer = window.setInterval(() => {
+  function pollList(): void {
     if (document.hidden) return
     if (!jobsEnabled.value || !currentUser.value) return
     if (options.pollWhile && !options.pollWhile()) return
@@ -216,8 +215,14 @@ export function useJobsList(options: JobsListOptions = {}) {
     if (pagesLoaded.value !== 1) return
     if (!hasActive.value) return
     void load({ silent: true })
-  }, LIST_POLL_INTERVAL_MS)
-  onUnmounted(() => window.clearInterval(pollTimer))
+  }
+
+  const pollTimer = window.setInterval(pollList, POLL_IDLE_MS)
+  const unwake = onWake(pollList)
+  onUnmounted(() => {
+    window.clearInterval(pollTimer)
+    unwake()
+  })
 
   return {
     jobs,
@@ -264,7 +269,7 @@ export function useJobDetail(jobId: () => string | null, options: { client?: Job
         return
       }
       void poll()
-    }, DETAIL_POLL_INTERVAL_MS)
+    }, POLL_IDLE_MS)
   }
 
   async function poll() {
