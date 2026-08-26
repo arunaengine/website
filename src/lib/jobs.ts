@@ -6,7 +6,7 @@ import type { BadgeVariant } from '@/components/nodes/node-display'
 // core/src/structs/job.rs. The surface is owner-scoped and rejects
 // path-restricted (delegated) tokens with 403.
 
-// JobState::name() — stable machine-readable names, closed set.
+// JobState::name(): stable machine-readable names, closed set.
 export type JobState =
   | 'queued'
   | 'claimed'
@@ -100,7 +100,7 @@ export interface JobStatusResponse {
   finished_at?: string
   progress: JobProgressResponse
   error?: JobErrorResponse
-  // JobResultPayload::to_public_json() — payload-specific projection.
+  // JobResultPayload::to_public_json(): payload-specific projection.
   result?: unknown
   workspace_bucket?: string
   // WorkspaceMode::name(): none | temporary | kept | existing. Always served;
@@ -218,7 +218,7 @@ export interface GetJobAuditParams {
   limit?: number
 }
 
-// GET /jobs/ — the caller's jobs, newest first. There is NO kind filter.
+// GET /jobs/: the caller's jobs, newest first. There is NO kind filter.
 export function listJobs(params: ListJobsParams, client: ApiClientOptions): Promise<JobListResponse> {
   return apiRequest<JobListResponse>(
     '/jobs/',
@@ -227,7 +227,7 @@ export function listJobs(params: ListJobsParams, client: ApiClientOptions): Prom
   )
 }
 
-// GET /jobs/{job_id} — 404 here means THIS job is unknown (foreign or pruned),
+// GET /jobs/{job_id}: 404 here means THIS job is unknown (foreign or pruned),
 // not necessarily an absent endpoint.
 export function getJob(jobId: string, client: ApiClientOptions): Promise<JobStatusResponse> {
   return apiRequest<JobStatusResponse>(`/jobs/${encodeURIComponent(jobId)}`, {}, client)
@@ -247,14 +247,14 @@ export function getJobAudit(
   )
 }
 
-// POST /jobs/{job_id}/cancel — idempotent; 202 while live, 200 once terminal.
+// POST /jobs/{job_id}/cancel: idempotent; 202 while live, 200 once terminal.
 // There is no restart endpoint.
 export function cancelJob(jobId: string, client: ApiClientOptions): Promise<JobStatusResponse> {
   return apiRequest<JobStatusResponse>(`/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' }, client)
 }
 
 // ── Native submission ────────────────────────────────────────────────────────
-// POST /jobs/ — the surface the GA4GH facade maps onto. It expresses what TES
+// POST /jobs/: the surface the GA4GH facade maps onto. It expresses what TES
 // cannot: per-input composition modes, an exact version pin, the collision
 // policy, workspace prefixes to inventory, and the workspace mode.
 
@@ -328,7 +328,7 @@ export interface SubmitJobResponse {
   status_url: string
 }
 
-// POST /jobs/ — 201 when admitted, 200 when the idempotency key already names
+// POST /jobs/: 201 when admitted, 200 when the idempotency key already names
 // this exact plan. `created` tells them apart, so the status is not needed.
 export function submitJob(
   request: SubmitExecutionRequest,
@@ -638,7 +638,7 @@ export function formatJobProgress(progress: JobProgressResponse): string {
   return total != null ? `${current} / ${total} ${unit}` : `${current} ${unit}`
 }
 
-// null when the total is unknown or zero — callers skip the bar then.
+// null when the total is unknown or zero; callers skip the bar then.
 export function jobProgressPercent(progress: JobProgressResponse): number | null {
   if (progress.total == null || progress.total <= 0) return null
   return Math.min(100, (progress.current / progress.total) * 100)

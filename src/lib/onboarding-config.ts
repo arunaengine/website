@@ -1,6 +1,6 @@
 // Pure, unit-testable helpers that render a joining node's configuration
 // (aruna#277). They emit ONLY the environment keys verified against
-// aruna/src/config.rs::load and the shipped deploy scripts — no invented keys.
+// aruna/src/config.rs::load and the shipped deploy scripts; no invented keys.
 //
 // Deliberately NOT emitted: realm-level settings such as the realm description
 // and the OIDC provider list. Those are realm-scoped and are synced to the
@@ -51,7 +51,7 @@ function optionalEnvLines(input: NodeConfigInput, format: (key: string, value: s
 // dotenv-style block for `.env` / process env. dotenvy accepts '#' comments.
 export function buildEnvBlock(input: NodeConfigInput): string {
   const lines = [
-    '# Aruna node — realm join configuration',
+    '# Aruna node: realm join configuration',
     'STORAGE_PATH=/data',
     `SOCKET_ADDRESS=0.0.0.0:${input.httpPort}`,
     `P2P_SOCKET_ADDRESS=0.0.0.0:${input.p2pPort}`,
@@ -110,7 +110,7 @@ function slugLabel(name: string): string {
 }
 
 // Device-agent .env for enrolling a laptop as a 'user' node (aruna#271). Reuses
-// buildEnvBlock — the device runs the same aruna binary, and
+// buildEnvBlock: the device runs the same aruna binary, and
 // STORAGE_PATH/SOCKET_ADDRESS/S3_HOST/S3_ADDRESS are required by its config
 // loader even on a personal device. No new env keys are introduced (so the
 // key-allowlist grep over this module still covers everything).
@@ -125,7 +125,7 @@ export function buildDeviceEnv(input: DeviceEnvInput): string {
     labels: slug ? `device=${slug}` : undefined,
   }
   const header = [
-    '# Aruna user device — self-service enrollment (aruna#271)',
+    '# Aruna user device: self-service enrollment (aruna#271)',
     "# This device joins as a 'user' node: bound to your account at enrollment,",
     '# never mints tokens, never serves as a replication or routing target.',
   ].join('\n')

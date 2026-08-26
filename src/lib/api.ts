@@ -155,7 +155,7 @@ export interface InterfaceStatus {
   url?: string | null
 }
 
-// /info services.blob — verified against aruna api/src/routes/info.rs
+// /info services.blob: verified against aruna api/src/routes/info.rs
 // (BlobServiceStatus / BackendStatus). `backends` lists every registered
 // backend; the headline `status` is the default backend's. Nodes that predate
 // configurable storage omit `backends` entirely.
@@ -209,7 +209,7 @@ export interface UsageResponse {
 export interface GroupQuotaStatus {
   // Effective group quota (override else default); null means unlimited.
   quota_bytes: number | null
-  // Quota × grace — the enforced hard cap; null means unlimited.
+  // Quota × grace: the enforced hard cap; null means unlimited.
   ceiling_bytes: number | null
   warn_threshold_percent: number
   // True when group usage has reached the warn threshold; false when unlimited.
@@ -226,7 +226,7 @@ export interface UsageTotals {
 }
 
 // ---------------------------------------------------------------------------
-// Usage history — arunaengine/aruna#250 workplan item 3 ("history snapshots
+// Usage history: arunaengine/aruna#250 workplan item 3 ("history snapshots
 // with their endpoint"). The backend does NOT serve this yet; the types below
 // document the assumed contract so the portal side flips on trivially:
 //   GET /groups/{id}/usage/history?from=<rfc3339>&to=<rfc3339>&resolution=hour|day|week
@@ -426,11 +426,11 @@ export interface CreateGroupRoleRequest {
   name: string
   permissions: Record<string, GroupPermissionLevel>
   assigned_users?: string[]
-  // Public roles apply to every principal — including anonymous requests.
+  // Public roles apply to every principal, including anonymous requests.
   public?: boolean
 }
 
-// GET /groups/{id}/data-paths — browsable data permission paths that feed the
+// GET /groups/{id}/data-paths: browsable data permission paths that feed the
 // role picker's data/ tree. Verified against aruna api/src/routes/groups.rs on
 // branch feat/pb-datapaths (in flight, 2026-07-17): member-gated (403 for
 // non-members, 401 unauthenticated), local node only in v1, and permission
@@ -489,7 +489,7 @@ export interface UserSearchResponse {
   next_start_after?: string | null
 }
 
-// GET /users — realm user directory (verified against aruna
+// GET /users: realm user directory (verified against aruna
 // api/src/routes/users.rs: ListUsersResponse over GetUserResponse, which is
 // exactly ApiUser). `limit` defaults to 100, clamped 1..=1000;
 // `next_start_after` is the exclusive user-id cursor, absent on the last page.
@@ -499,7 +499,7 @@ export interface ListUsersResponse {
   next_start_after?: string | null
 }
 
-// GET /users/{id} — resolves any user id within the caller's realm.
+// GET /users/{id}: resolves any user id within the caller's realm.
 export interface GetUserResponse {
   user_id: string
   name: string
@@ -537,7 +537,7 @@ export interface MetadataRoCrateResponse {
 }
 
 // GET /metadata/{id} and the response body of PUT /metadata/{id}/rocrate,
-// POST /metadata (flattened) — the registry summary without rocrate_summary.
+// POST /metadata (flattened): the registry summary without rocrate_summary.
 export type MetadataDocumentSummary = Omit<MetadataDocumentListItem, 'rocrate_summary'>
 
 export interface ReplaceMetadataRoCrateRequest {
@@ -604,7 +604,7 @@ export interface ProfileValidationPreviewResponse {
 }
 
 /**
- * POST /metadata/profile-validation/preview — advisory validation of a draft
+ * POST /metadata/profile-validation/preview: advisory validation of a draft
  * crate before it is saved. Rate limited like revalidate; 404/405 means the
  * node does not serve the preview at all.
  */
@@ -634,12 +634,12 @@ export function profileValidationFindings(error: unknown): ProfileValidationFind
   })
 }
 
-// GET /metadata/search — verified against aruna api/src/routes/metadata.rs and
+// GET /metadata/search: verified against aruna api/src/routes/metadata.rs and
 // operations/src/metadata/{api.rs,search_cursor.rs} (aruna feat/portal-backend).
 // Contract: `q` is required and trimmed to >= 2 chars (shorter ⇒ 400); `limit`
 // defaults to 25 and is clamped 1..=100; `mode=local|distributed`. `group_id`
 // and `conforms_to` (exact conformsTo profile IRI) filter documents server-side.
-// `cursor` is an accepted, query- and filter-bound opaque token — a cursor whose
+// `cursor` is an accepted, query- and filter-bound opaque token: a cursor whose
 // fingerprint does not match the query or filters is rejected with 400.
 // Hits are ordered by descending score and deduplicated server-side per
 // (graph_iri, subject_iri), so one document may span multiple hits. `title` is
@@ -679,13 +679,13 @@ export interface MetadataSearchOptions {
   signal?: AbortSignal
 }
 
-// GET /search/buckets — federated bucket-name search (verified against aruna
+// GET /search/buckets: federated bucket-name search (verified against aruna
 // api/src/routes/search.rs on feat/portal_extensions). `q` is a case-insensitive
 // bucket-name substring, trimmed to >= 2 chars (shorter ⇒ 400); `limit` defaults
 // to 10 and is clamped 1..=50. Partiality is signalled via nodes_failed with the
 // failing node ids listed in failed_nodes. Requires an authenticated session.
 export interface BucketSearchHit {
-  /** `arn:aruna:<realm>:<node>:s3/<bucket>` — parse with parseArunaArn. */
+  /** `arn:aruna:<realm>:<node>:s3/<bucket>`. Parse with parseArunaArn. */
   arn: string
   bucket: string
   node_id: string
@@ -701,7 +701,7 @@ export interface BucketSearchResponse {
   failed_nodes: string[]
 }
 
-// GET /search/objects — authenticated live-head inventory search. The backend
+// GET /search/objects: authenticated live-head inventory search. The backend
 // applies group READ and token path restrictions per hit and deliberately
 // exposes no total. Distributed strict fails instead of returning a partial
 // page; best-effort and local answers carry their exact coverage.
@@ -767,10 +767,10 @@ export interface ObjectSearchOptions {
   signal?: AbortSignal
 }
 
-// GET /search — unified realm search (aruna api/src/routes/search.rs). Returns
+// GET /search: unified realm search (aruna api/src/routes/search.rs). Returns
 // only the requested sections; `types` defaults to all four. `cursor` continues
 // exactly one section and is rejected with 400 when more than one type is asked
-// for (buckets never page — a buckets cursor is always 400). `limit` is
+// for (buckets never page; a buckets cursor is always 400). `limit` is
 // per-section (default 10, clamped 1..=100). `group_id`, `conforms_to` and
 // `mode` apply to the documents section only.
 export type SearchSectionType = 'documents' | 'buckets' | 'groups' | 'users'
@@ -820,7 +820,7 @@ export interface UnifiedSearchResponse {
   users?: SearchUsersSection
 }
 
-// POST /users/resolve — batch id → profile resolution (cap 100 ids). `attributes`
+// POST /users/resolve: batch id → profile resolution (cap 100 ids). `attributes`
 // is the safe scholarly subset only; sensitive keys (e.g. email) are excluded.
 export interface ResolveUserResult {
   user_id: string
@@ -884,8 +884,8 @@ export interface S3SessionResponse {
   }
 }
 
-// Source connectors (GET/POST /groups/{group_id}/connectors — verified against
-// aruna api/src/routes/connectors.rs). Real, served contract — no gating.
+// Source connectors (GET/POST /groups/{group_id}/connectors, verified against
+// aruna api/src/routes/connectors.rs). Real, served contract; no gating.
 export type SourceConnectorKind = 'http' | 's3' | 'webdav' | 'ftp' | 'aruna_native'
 
 export interface SourceConnectorSummary {
@@ -918,7 +918,7 @@ export interface SourceConnectorRequest {
 }
 
 // Connector check & browse (agreed portal↔backend contract; the endpoints are
-// new — older nodes answer 404/501 and callers degrade by hiding/disabling the
+// new; older nodes answer 404/501 and callers degrade by hiding/disabling the
 // affordance with a short hint):
 //   POST /groups/{gid}/connectors/check            (inline config, incl. secrets)
 //   POST /groups/{gid}/connectors/{cid}/check      (stored config + secrets)
@@ -975,7 +975,7 @@ export interface StagingBatchResponse {
   results: StagingBatchResult[]
 }
 
-// Blob staging (POST /staging/ — verified against aruna api/src/routes/staging.rs).
+// Blob staging (POST /staging/, verified against aruna api/src/routes/staging.rs).
 // Internally tagged: the `strategy` discriminant sits beside the flattened
 // target fields. Synchronous one-shot materialization (201 on success);
 // 'sync' exists in the API enum but returns 501 on today's backends.
@@ -1052,8 +1052,8 @@ export interface CreateStagingJobResponse {
 // ---------------------------------------------------------------------------
 // Reference visibility (agreed contract):
 //   GET /staging/references?bucket=<b>&prefix=<p>&limit=&cursor=
-// reports which keys in a bucket are backed by a reference — an external
-// connector source or another Aruna node — instead of node-local bytes. The
+// reports which keys in a bucket are backed by a reference (an external
+// connector source or another Aruna node) instead of node-local bytes. The
 // listing MAY include non-referenced entries (referenced: false); consumers
 // aggregate client-side on `referenced`.
 // ---------------------------------------------------------------------------
@@ -1279,7 +1279,7 @@ export interface CreateWatchRequest {
 }
 
 // ── Join requests (aruna#248) ────────────────────────────────────────────────
-// ASSUMED API — these endpoints are NOT yet provided by the backend. Shapes are
+// ASSUMED API: these endpoints are NOT yet provided by the backend. Shapes are
 // derived from aruna#248 (create / decide / list / withdraw, approve assigns
 // roles like AddGroupMemberRequest) and existing group-route conventions
 // (snake_case, ULID ids, RFC3339 timestamps, `{ requests: [...] }` wrapper).
@@ -1332,13 +1332,13 @@ export interface DecideJoinRequestResponse {
 // self-service for any realm member holding an unrestricted token, and the
 // status route additionally answers the owner of the secret it names.
 
-// Serialized aruna_core::onboarding::RequestedOnboardingMode — plain unit
+// Serialized aruna_core::onboarding::RequestedOnboardingMode: plain unit
 // variants, so capitalized strings on the wire.
 export type OnboardingMode = 'Management' | 'Server' | 'User'
 
 export interface CreateOnboardingSecretRequest {
   // Origin-style base URL of a management node reachable by the joiner; the
-  // node calls {seed_url}/api/v1/onboarding/bootstrap — never include /api/v1.
+  // node calls {seed_url}/api/v1/onboarding/bootstrap; never include /api/v1.
   // Empty means "the node serving this request", which is what a device sends.
   seed_url: string
   mode: OnboardingMode
@@ -1347,7 +1347,7 @@ export interface CreateOnboardingSecretRequest {
 }
 
 export interface CreateOnboardingSecretResponse {
-  // Carried exactly once — the server keeps only a hash.
+  // Carried exactly once; the server keeps only a hash.
   onboarding_secret: string
   // Handle of the minted enrollment, taken by the status and revoke routes.
   // Absent on nodes that predate it, where the device list names it instead.
@@ -1356,7 +1356,7 @@ export interface CreateOnboardingSecretResponse {
   // Unix seconds.
   expires_at: number
   // aruna://enroll deep link for a 'User' mint, carrying secret/seed/realm;
-  // null for infrastructure modes. Opaque — never re-encode it.
+  // null for infrastructure modes. Opaque; never re-encode it.
   enroll_url?: string | null
 }
 
@@ -1477,7 +1477,7 @@ export interface RealmTransitionHealth {
 }
 
 // ── Group storage backends ──────────────────────────────────────────────────
-// GET/POST /groups/{gid}/storage-backends, GET/PUT/DELETE .../{bid} — verified
+// GET/POST /groups/{gid}/storage-backends, GET/PUT/DELETE .../{bid}: verified
 // against aruna api/src/routes/group_backends.rs, with the per-kind key
 // allowlists in operations/src/group_backends/validation.rs. Every route takes
 // group ADMIN. Secrets live in their own keyspace and are never returned.
@@ -1513,14 +1513,14 @@ export interface GroupBackendRequest {
   secret_config: Record<string, string>
 }
 
-// POST .../{bid}/credentials — writes the credentials alone, allowed on a
+// POST .../{bid}/credentials: writes the credentials alone, allowed on a
 // disabled backend too so a leaked key can always be invalidated.
 export interface BackendCredentialsRequest {
   secret_config: Record<string, string>
 }
 
 // ── Storage routing ─────────────────────────────────────────────────────────
-// GET/PUT /buckets/{bucket}/storage-routing and /groups/{gid}/storage-routing —
+// GET/PUT /buckets/{bucket}/storage-routing and /groups/{gid}/storage-routing:
 // verified against aruna api/src/routes/storage_routing.rs. Group ADMIN.
 // A target names exactly one of `backend_id` (binds that group backend) or
 // `class` (a preference that may fall through to the node default); operator
@@ -1551,7 +1551,7 @@ export interface GroupRoutingResponse {
 }
 
 // ── Object storage locations ────────────────────────────────────────────────
-// GET /blobs/locations?bucket=&path=&version_id= — verified against aruna
+// GET /blobs/locations?bucket=&path=&version_id=. Verified against aruna
 // api/src/routes/blobs.rs. Reports where the copies of ONE version physically
 // live, one entry per destination: `node_id` repeats when a node holds the
 // version under several paths, so only `(node_id, bucket, key)` identifies one.
@@ -1600,7 +1600,7 @@ export interface BlobLocationsResponse {
   limits: LocationScanLimit[]
 }
 
-// POST /blobs/replicate — asks one node to fetch a copy. Answered 202: the
+// POST /blobs/replicate: asks one node to fetch a copy. Answered 202: the
 // copy is queued, not stored yet. Needs WRITE on the object (or the bucket
 // when `path` is omitted). `version_id` without `path` is a 400.
 export interface ReplicateBlobRequest {

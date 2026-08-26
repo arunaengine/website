@@ -162,7 +162,7 @@ const replicationLabel = computed(() => {
 })
 
 // Placement location aggregates over the live /info/realm data (aruna#269). Pure
-// derivation of the already-served placement map — no gate, no assumed endpoint.
+// derivation of the already-served placement map: no gate, no assumed endpoint.
 const locationAggregates = computed(() => aggregateByLocation(realmInfo.value?.nodes ?? []))
 const mappedLocationCount = computed(() => locationAggregates.value.filter((a) => a.mapped).length)
 

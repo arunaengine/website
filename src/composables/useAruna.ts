@@ -365,7 +365,7 @@ async function refresh() {
 
 async function loadInfo(context = refreshContext()) {
   // Partial tolerance: one endpoint failing or degrading (e.g. realm
-  // discovery with offline nodes) must not blank the others' data — keep the
+  // discovery with offline nodes) must not blank the others' data; keep the
   // last-known values and only fail when both core calls are down.
   // /info/usage is not deployed everywhere yet; hide the stats on failure.
   const [info, realm, usage] = await Promise.allSettled([
@@ -1199,7 +1199,7 @@ async function deleteGroupConnector(groupId: string, connectorId: string): Promi
   }
 }
 
-// Connector check & browse (agreed contract; new endpoints — callers treat
+// Connector check & browse (agreed contract; new endpoints: callers treat
 // 404/405/501 as "not supported by this node yet" and degrade).
 async function checkConnectorConfig(
   groupId: string,
@@ -1385,14 +1385,14 @@ async function replicateBlob(input: ReplicateBlobRequest): Promise<ReplicateBlob
 }
 
 // Synchronous one-shot staging: the node pulls source_path from the connector
-// and materializes it as bucket/key (201 on success). Slow for big blobs —
+// and materializes it as bucket/key (201 on success). Slow for big blobs;
 // callers must show a running state. The axum route is literally "/staging/".
 async function stageBlob(input: StageBlobSubmission): Promise<StageBlobResponse> {
   return request<StageBlobResponse>('/staging/', { method: 'POST', body: JSON.stringify(input) })
 }
 
 // Batch staging (agreed contract): many items/prefixes through one connector in
-// one call. Older nodes answer 404/501 — callers fall back to per-item staging.
+// one call. Older nodes answer 404/501; callers fall back to per-item staging.
 async function stageBatch(input: StagingBatchRequest): Promise<StagingBatchResponse> {
   return request<StagingBatchResponse>('/staging/batch', { method: 'POST', body: JSON.stringify(input) })
 }
@@ -1687,7 +1687,7 @@ async function searchObjects(
   })
 }
 
-// GET /search/buckets — federated bucket-name substring search. Auth required.
+// GET /search/buckets: federated bucket-name substring search. Auth required.
 async function searchBuckets(
   q: string,
   options: { limit?: number; signal?: AbortSignal } = {},
@@ -1740,7 +1740,7 @@ async function getSyncRelationship(
 
 // The source endpoint is always the node that receives the POST (the request
 // body carries no source node id). Creating a remote-source relationship
-// ("sync to this node") therefore POSTs to the remote node's API base — the
+// ("sync to this node") therefore POSTs to the remote node's API base; the
 // bearer token is realm-wide, like the S3 credentials. 409 duplicate, 502
 // target unreachable, 501 while mode "reference" is unimplemented.
 async function createSyncRelationship(

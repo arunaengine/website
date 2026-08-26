@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // App shell of Aruna Desktop. Same bones as AppLayout, but the navigation is
 // built around the machine: what is on this disk first, the realm second. No
-// mobile bar — this shell only ever runs in a desktop window.
+// mobile bar: this shell only ever runs in a desktop window.
 import SideNav from '@/components/layout/SideNav.vue'
 import TopBar from '@/components/dashboard/TopBar.vue'
 import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'

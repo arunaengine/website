@@ -1125,7 +1125,7 @@ function dismissRerun() {
           </div>
         </div>
 
-        <!-- Step 2: Script & data — mounts sit next to the editor so container
+        <!-- Step 2: Script & data. Mounts sit next to the editor so container
              paths are visible while the script is written. -->
         <div v-else-if="step === 1" class="space-y-5">
           <!-- Credentials gate -->
@@ -1478,7 +1478,7 @@ function dismissRerun() {
 
         </div>
 
-        <!-- Step 4: Review — mirrors the data step's in/out structure. -->
+        <!-- Step 4: Review. Mirrors the data step's in/out structure. -->
         <div v-else class="space-y-4">
           <div class="grid gap-4 text-xs lg:grid-cols-2">
             <section class="surface-muted space-y-2 p-4">

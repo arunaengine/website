@@ -172,11 +172,11 @@ async function reveal(path: string): Promise<void> {
 }
 
 function bytes(value: number | null | undefined): string {
-  return value === null || value === undefined ? '—' : formatBytes(value)
+  return value === null || value === undefined ? 'n/a' : formatBytes(value)
 }
 
 function when(ms: number | null | undefined): string {
-  return ms ? relativeTime(new Date(ms).toISOString()) : '—'
+  return ms ? relativeTime(new Date(ms).toISOString()) : 'n/a'
 }
 </script>
 

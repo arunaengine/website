@@ -37,7 +37,7 @@ function assertEnabled() {
   }
 }
 
-// "Flag on, backend without the job framework yet" — consumers render the
+// "Flag on, backend without the job framework yet": consumers render the
 // honest not-served-yet panel instead of a raw error (useTes pattern).
 export function isJobsUnsupported(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 404 || err.status === 405)
@@ -57,7 +57,7 @@ export type JobClient = () => ApiClientOptions
 
 /**
  * Points the job surfaces at another API than the realm the portal signed into
- * — in Aruna Desktop, the node running on this machine. Provided by the view
+ * (in Aruna Desktop, the node running on this machine). Provided by the view
  * that owns the local runs, so its detail panels follow it.
  */
 export const JOB_CLIENT: InjectionKey<JobClient> = Symbol('aruna.jobClient')
@@ -96,7 +96,7 @@ export interface JobsListOptions {
   client?: JobClient
 }
 
-// Per-instance list state — call from setup. The jobs view and the staging
+// Per-instance list state; call from setup. The jobs view and the staging
 // panel hold independent pages/filters, so this is deliberately NOT a module
 // singleton (useNotifications) but a factory (ComputeView's list, extracted).
 export function useJobsList(options: JobsListOptions = {}) {
@@ -161,7 +161,7 @@ export function useJobsList(options: JobsListOptions = {}) {
         listError.value = errorMessage(err)
       }
     } finally {
-      // Clear unconditionally for non-silent calls — a silent poll that
+      // Clear unconditionally for non-silent calls: a silent poll that
       // superseded this request id must not leave the spinner stuck on.
       if (!silent) refreshing.value = false
     }

@@ -141,7 +141,7 @@ const ramGb = ref<string | number>('')
 const diskGb = ref<string | number>('')
 const preemptible = ref(false)
 
-// Workspace handling for the run's scratch storage — an explicit, required
+// Workspace handling for the run's scratch storage: an explicit, required
 // choice (agreed contract; a node that predates it ignores the field and the
 // submit path reports that).
 const WORKSPACE_OPTIONS: { mode: WorkspaceMode; label: string; hint: string }[] = [

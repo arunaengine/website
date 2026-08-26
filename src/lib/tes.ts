@@ -216,7 +216,7 @@ export const TES_TERMINAL_STATES: ReadonlySet<TesState> = new Set<TesState>([
   'PREEMPTED',
 ])
 
-// UNKNOWN | QUEUED | INITIALIZING | RUNNING | PAUSED | CANCELING — anything the
+// UNKNOWN | QUEUED | INITIALIZING | RUNNING | PAUSED | CANCELING: anything the
 // backend is still working on. Used to decide whether to keep polling.
 const TES_ACTIVE_STATES: ReadonlySet<TesState> = new Set<TesState>([
   'UNKNOWN',
@@ -254,7 +254,7 @@ export const TES_STATE_META: Record<TesState, { label: string; variant: BadgeVar
 
 // ── Data references ──────────────────────────────────────────────────────────
 // Same canonical id the profile publish flow emits (useProfilePublish.ts keeps
-// its own module-private copy; intentionally not refactored here — diff scope).
+// its own module-private copy; intentionally not refactored here: diff scope).
 export const W3ID_DATA_PREFIX = 'https://w3id.org/aruna/data/'
 
 const HEX64 = /^[0-9a-f]{64}$/i

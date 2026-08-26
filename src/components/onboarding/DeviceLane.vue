@@ -103,7 +103,7 @@ const enrollUrl = computed(() => minted.value?.enroll_url ?? null)
 
 const capLabel = computed(() =>
   deviceLimit.value == null
-    ? `${deviceCount.value} enrolled — this realm sets no device limit.`
+    ? `${deviceCount.value} enrolled; this realm sets no device limit.`
     : `${deviceCount.value} of ${deviceLimit.value} devices.`,
 )
 
@@ -177,7 +177,7 @@ const stages = computed(() => watchStages(watchState.value))
     </section>
 
     <template v-else>
-      <!-- Step 1 — Device -->
+      <!-- Step 1: Device -->
       <div v-if="step === DETAILS_STEP" class="space-y-5">
         <div class="space-y-2 text-sm text-muted-foreground">
           <p>A device joins as a user node bound to your account. Enrolling mints a one-time code you carry to it.</p>
@@ -226,7 +226,7 @@ const stages = computed(() => watchStages(watchState.value))
         </p>
       </div>
 
-      <!-- Step 2 — Hand off -->
+      <!-- Step 2: Hand off -->
       <div v-else-if="step === HANDOFF_STEP" class="space-y-5">
         <p class="text-sm text-muted-foreground">
           Four ways to carry the one-time code to the device. It is shown only here, and only until it expires.
@@ -298,7 +298,7 @@ const stages = computed(() => watchStages(watchState.value))
         </div>
       </div>
 
-      <!-- Step 3 — Watch -->
+      <!-- Step 3: Watch -->
       <div v-else class="space-y-5">
         <p class="text-sm text-muted-foreground">
           This page polls the enrollment until the device redeems the code and appears in the realm. A device never

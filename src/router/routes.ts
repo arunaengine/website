@@ -76,7 +76,7 @@ export function portalRoutes(): RouteRecordRaw[] {
       component: appLayout,
       children: [
         homeRoute(),
-        // Buckets — primary research surface (formerly "Data manager")
+        // Buckets: primary research surface (formerly "Data manager")
         { path: 'buckets', name: 'buckets', component: () => import('@/views/DataManagerView.vue') },
         { path: 'buckets/:bucketId', name: 'bucket', component: () => import('@/views/DataManagerView.vue') },
         // Retired bucket-builder route: the consolidated Add data dialog replaced
@@ -100,7 +100,7 @@ export function portalRoutes(): RouteRecordRaw[] {
         { path: 'profiles/:profileId', name: 'profile-detail', component: () => import('@/views/ProfilesView.vue') },
         // Versioned, repository-owned portal guidance.
         { path: 'docs/v1/:topic?', name: 'docs', component: () => import('@/views/DocsView.vue') },
-        // Groups — dedicated management page
+        // Groups: dedicated management page
         { path: 'groups/:id?', name: 'groups', component: () => import('@/views/GroupsView.vue') },
         // Public user profile resolved from the realm's user directory
         { path: 'users/:id', name: 'user-profile', component: () => import('@/views/UserProfileView.vue') },
@@ -108,27 +108,27 @@ export function portalRoutes(): RouteRecordRaw[] {
         ...desktopRoutes(),
         // Settings (consolidates account preferences, members, tokens)
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
-        // Watched resources — served by the merged notifications backend, so no
+        // Watched resources: served by the merged notifications backend, so no
         // feature flag; the view degrades inline when the endpoints are absent.
         { path: 'settings/watches', name: 'settings-watches', component: () => import('@/views/WatchesView.vue') },
-        // Realm admin — usage, quota policy and placement (tabs of one view)
+        // Realm admin: usage, quota policy and placement (tabs of one view)
         { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
         { path: 'admin/placement', redirect: { path: '/app/admin', query: { tab: 'placement' } } },
-        // Realm admin — read-only user directory
+        // Realm admin: read-only user directory
         { path: 'admin/users', name: 'admin-users', component: () => import('@/views/AdminUsersView.vue') },
-        // Realm admin — node onboarding secrets (management nodes only)
+        // Realm admin: node onboarding secrets (management nodes only)
         {
           path: 'admin/onboarding',
           name: 'admin-onboarding',
           component: () => import('@/views/AdminOnboardingView.vue'),
         },
-        // Realm admin — rejected replicated sync events held by this node
+        // Realm admin: rejected replicated sync events held by this node
         {
           path: 'admin/quarantine',
           name: 'admin-quarantine',
           component: () => import('@/views/AdminQuarantineView.vue'),
         },
-        // Compute — GA4GH TES tasks and durable system jobs in one surface
+        // Compute: GA4GH TES tasks and durable system jobs in one surface
         // (each half is feature-gated in-view)
         { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
         { path: 'compute/quick', name: 'compute-quick', component: () => import('@/views/ComputeQuickRunView.vue') },

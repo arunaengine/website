@@ -41,7 +41,7 @@ const {
 const { resolveUsers, cachedUser } = useUserDirectory()
 
 // The gate cascade opens the wizard only for a realm admin with the onboarding
-// permission ON a management node — mirrors the honest states AdminView uses.
+// permission ON a management node. Mirrors the honest states AdminView uses.
 const canUseWizard = computed(
   () => bootstrapped.value && !!currentUser.value && canManageOnboarding.value && isManagementNode.value,
 )
@@ -244,7 +244,7 @@ const watchStages = computed<WatchStage[]>(() => {
         key: 'connect',
         label: 'Connected to the realm',
         state: 'pending',
-        detail: 'Not applicable — the secret was redeemed at sign-up.',
+        detail: 'Not applicable: the secret was redeemed at sign-up.',
       })
     } else {
       stages.push({ key: 'connect', label: 'Connecting to the realm', state: 'active' })
@@ -338,7 +338,7 @@ const managementPortals = computed(() =>
       </section>
     </div>
 
-    <!-- Gate 3: not a management node — honest explainer, no API call -->
+    <!-- Gate 3: not a management node; honest explainer, no API call -->
     <div v-else-if="!isManagementNode" class="container max-w-[1400px] py-8">
       <section class="surface mx-auto max-w-2xl p-6">
         <div class="flex items-start gap-3">
@@ -346,7 +346,7 @@ const managementPortals = computed(() =>
           <div>
             <h2 class="font-display text-base font-semibold text-aruna-navy">Onboarding runs on management nodes</h2>
             <p class="mt-1.5 text-sm text-muted-foreground">
-              This is a {{ nodeInfo?.node.capabilities ?? 'non-management' }} node — onboarding secrets can only be
+              This is a {{ nodeInfo?.node.capabilities ?? 'non-management' }} node. Onboarding secrets can only be
               minted on a <strong class="font-medium text-foreground">management node</strong>.
             </p>
           </div>
@@ -378,7 +378,7 @@ const managementPortals = computed(() =>
         </div>
 
         <div class="p-5">
-          <!-- Step 1 — Audience -->
+          <!-- Step 1: Audience -->
           <div v-if="currentStep === 0" class="space-y-5">
             <p class="text-sm text-muted-foreground">
               Who is this node for? Realm servers and personal devices join under different rules and get different
@@ -403,7 +403,7 @@ const managementPortals = computed(() =>
             @restart="reset"
           />
 
-          <!-- Step 2 — Kind -->
+          <!-- Step 2: Kind -->
           <div v-else-if="currentStep === 1" class="space-y-5">
             <p class="text-sm text-muted-foreground">
               Choose what the new node is trusted to do in the realm. This is baked into the onboarding secret.
@@ -420,7 +420,7 @@ const managementPortals = computed(() =>
             </div>
           </div>
 
-          <!-- Step 3 — Mint -->
+          <!-- Step 3: Mint -->
           <div v-else-if="currentStep === 2" class="space-y-5">
             <template v-if="!minted">
               <p class="text-sm text-muted-foreground">
@@ -459,7 +459,7 @@ const managementPortals = computed(() =>
             </template>
           </div>
 
-          <!-- Step 4 — Configure -->
+          <!-- Step 4: Configure -->
           <div v-else-if="currentStep === 3" class="space-y-5">
             <p class="text-sm text-muted-foreground">
               Configure the new node and copy one of the snippets below onto it. The onboarding secret is embedded in both.
@@ -505,7 +505,7 @@ const managementPortals = computed(() =>
             <CodeSnippet title="docker-compose.yml" :code="composeSnippet" />
 
             <p class="text-[11px] leading-relaxed text-muted-foreground">
-              Realm description and OIDC providers are realm-level and sync automatically during onboarding — do not set
+              Realm description and OIDC providers are realm-level and sync automatically during onboarding. Do not set
               them on the new node. The secret above is embedded in these snippets and exists only in this page until you leave.
             </p>
 
@@ -515,7 +515,7 @@ const managementPortals = computed(() =>
             </div>
           </div>
 
-          <!-- Step 5 — Watch -->
+          <!-- Step 5: Watch -->
           <div v-else class="space-y-5">
             <p class="text-sm text-muted-foreground">
               Boot the node with the configuration above. This page polls the realm and updates as the node claims the

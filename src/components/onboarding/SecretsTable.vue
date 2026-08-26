@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Outstanding-secrets table over VIEW-MODEL rows (SecretRow), not the raw API
 // type, so the device-enrollment flow (aruna#271) can map its own enrollments
-// into the same table — with presence labels ("online"/"offline") via the
+// into the same table, with presence labels ("online"/"offline") via the
 // optional per-row statusLabel/statusVariant overrides and an "Evict" action
 // via the revokeLabel prop. All labels/variants/links are supplied by the
 // caller; no onboarding copy or API calls live here. Revoke is an inline
-// two-step confirm — no extra dialog component. Every extension is an optional
+// two-step confirm; no extra dialog component. Every extension is an optional
 // prop defaulting to today's behaviour, so the AdminOnboardingView call site is
 // unchanged.
 import { computed, onUnmounted, ref } from 'vue'
@@ -130,7 +130,7 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
             <span v-if="row.owner" class="text-xs text-foreground/90" :title="row.owner">
               {{ row.ownerLabel ?? row.owner }}
             </span>
-            <span v-else class="text-xs text-muted-foreground">—</span>
+            <span v-else class="text-xs text-muted-foreground">n/a</span>
           </td>
           <td class="px-3 py-2.5">
             <div class="flex items-center gap-1.5">

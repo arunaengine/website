@@ -56,10 +56,10 @@ const nodeTone = computed(() =>
 const facts = computed(() => [
   { label: 'Realm', value: realm.value.shortName },
   { label: 'Node', value: status.value?.nodeId ? truncateMiddle(status.value.nodeId, 8, 6) : 'not enrolled' },
-  { label: 'Version', value: status.value?.version ?? '—' },
+  { label: 'Version', value: status.value?.version ?? 'n/a' },
   {
     label: 'Uptime',
-    value: status.value?.uptimeSeconds == null ? '—' : formatDuration(status.value.uptimeSeconds * 1000),
+    value: status.value?.uptimeSeconds == null ? 'n/a' : formatDuration(status.value.uptimeSeconds * 1000),
   },
 ])
 

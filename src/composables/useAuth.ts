@@ -153,7 +153,7 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
       codeVerifier: verifier,
     })
     // Aruna validates the audience against the client id, which Keycloak only
-    // sets on the ID token — the access token is for the account API.
+    // sets on the ID token; the access token is for the account API.
     const oidcToken = tokens.id_token ?? tokens.access_token
     if (tokens.id_token) window.sessionStorage.setItem(ID_TOKEN_KEY, tokens.id_token)
 
@@ -227,7 +227,7 @@ async function signOut() {
         if (!inShell) return
       }
     } catch {
-      // Keycloak unreachable — the local session is already cleared.
+      // Keycloak unreachable: the local session is already cleared.
     }
   }
   await aruna.refresh()

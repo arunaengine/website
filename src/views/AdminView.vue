@@ -72,7 +72,7 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
   buttons?.[(target + count) % count]?.focus()
 }
 
-// Mirrors aruna's `impl Default for QuotaConfig` — the effective policy when a
+// Mirrors aruna's `impl Default for QuotaConfig`: the effective policy when a
 // backend serves no quota block. null = unlimited.
 const DEFAULT_QUOTA: RealmQuotaConfig = {
   default_group_quota_bytes: null,

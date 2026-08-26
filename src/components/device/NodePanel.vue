@@ -88,12 +88,12 @@ const facts = computed(() => {
   const realm = identity.value?.realm ?? current.realm
   return [
     { label: 'Node', value: nodeId ? truncateMiddle(nodeId, 10, 6) : 'not enrolled yet' },
-    { label: 'Realm', value: realm ? truncateMiddle(realm, 10, 6) : '—' },
-    { label: 'Local API', value: current.apiBaseUrl ?? '—' },
-    { label: 'Version', value: current.version ?? '—' },
+    { label: 'Realm', value: realm ? truncateMiddle(realm, 10, 6) : 'n/a' },
+    { label: 'Local API', value: current.apiBaseUrl ?? 'n/a' },
+    { label: 'Version', value: current.version ?? 'n/a' },
     {
       label: 'Uptime',
-      value: current.uptimeSeconds == null ? '—' : formatDuration(current.uptimeSeconds * 1000),
+      value: current.uptimeSeconds == null ? 'n/a' : formatDuration(current.uptimeSeconds * 1000),
     },
   ]
 })

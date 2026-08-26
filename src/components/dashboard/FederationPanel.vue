@@ -34,7 +34,7 @@ const kindCounts = computed<Array<[RealmNodeInfo['kind'], number]>>(() => {
 })
 
 // Published labels flattened across nodes into `key=value → count`, most common
-// first. Only real, self-published labels — no fabricated per-node numbers.
+// first. Only real, self-published labels, no fabricated per-node numbers.
 const labelCounts = computed<Array<[string, number]>>(() => {
   const counts = new Map<string, number>()
   for (const node of props.nodes) {
@@ -46,7 +46,7 @@ const labelCounts = computed<Array<[string, number]>>(() => {
   return [...counts.entries()].sort((a, b) => b[1] - a[1])
 })
 
-// Topology coordinate system — everything below lives in this viewBox.
+// Topology coordinate system: everything below lives in this viewBox.
 const VW = 600
 const VH = 360
 const CX = VW / 2
@@ -62,7 +62,7 @@ const ARC_R = RING + 4
 const LABEL_CAP = 10
 
 // Honesty: the hub is the node serving this portal, and each edge reflects only
-// that node's own connection_status to it — never a fabricated mesh.
+// that node's own connection_status to it, never a fabricated mesh.
 const hub = computed<RealmNodeInfo | undefined>(() => {
   return props.localPeerId ? props.nodes.find((node) => node.node_id === props.localPeerId) : undefined
 })
@@ -212,7 +212,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
       </div>
 
       <template v-else>
-        <!-- Topology — a single SVG so connections truly terminate at nodes -->
+        <!-- Topology: a single SVG so connections truly terminate at nodes -->
         <div class="border-b border-border/60 bg-background">
           <svg
             :viewBox="`0 0 ${VW} ${VH}`"

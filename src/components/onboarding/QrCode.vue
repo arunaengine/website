@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Self-contained QR renderer for the enrollment hand-off (aruna#271). The
 // module matrix is drawn as one path rather than injecting uqr's SVG string,
-// and the colours stay literal black on white in both themes — an inverted QR
+// and the colours stay literal black on white in both themes; an inverted QR
 // code is unreliable to scan.
 import { computed } from 'vue'
 import { encode } from 'uqr'
