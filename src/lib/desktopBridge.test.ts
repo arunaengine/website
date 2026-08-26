@@ -128,6 +128,7 @@ describe('bridge commands', () => {
       realm: 'R1',
       apiVersion: null,
       portal: true,
+      redirectedFrom: null,
     })
     expect(invoke).toHaveBeenCalledWith('validate_realm', { input: ' aruna.example ' })
   })
