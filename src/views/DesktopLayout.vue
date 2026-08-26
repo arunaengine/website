@@ -12,7 +12,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
-import type { NavSection } from '@/components/layout/nav'
+import type { NavItem } from '@/components/layout/nav'
 import {
   Activity,
   BookOpen,
@@ -46,31 +46,18 @@ const adminItems = computed(() => [
   ...(canManageQuarantine.value ? [{ to: '/app/admin/quarantine', icon: Activity, label: 'Quarantine' }] : []),
 ])
 
-const sections = computed<NavSection[]>(() => [
-  {
-    label: 'Machine',
-    items: [
-      { to: '/app', icon: LayoutDashboard, label: 'Home', exact: true },
-      { to: '/app/folders', icon: FolderSync, label: 'Synced folders' },
-      { to: '/app/transfers', icon: Waves, label: 'Transfers' },
-      { to: '/app/sync', icon: RefreshCw, label: 'Sync' },
-      { to: '/app/runs', icon: Play, label: 'Runs' },
-      { to: '/app/device', icon: Laptop, label: 'This device' },
-    ],
-  },
-  {
-    label: 'Realm',
-    items: [
-      { to: '/app/buckets', icon: Boxes, label: 'Buckets' },
-      { to: '/app/search', icon: FileJson2, label: 'Datasets', match: ['/app/search', '/app/metadata'] },
-      { to: '/app/settings', icon: Settings, label: 'Settings' },
-    ],
-  },
-  ...(adminItems.value.length ? [{ label: 'Admin', items: adminItems.value }] : []),
-  {
-    label: 'Help',
-    items: [{ to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] }],
-  },
+const items = computed<NavItem[]>(() => [
+  { to: '/app', icon: LayoutDashboard, label: 'Home', exact: true },
+  { to: '/app/folders', icon: FolderSync, label: 'Synced folders' },
+  { to: '/app/transfers', icon: Waves, label: 'Transfers' },
+  { to: '/app/sync', icon: RefreshCw, label: 'Sync' },
+  { to: '/app/runs', icon: Play, label: 'Runs' },
+  { to: '/app/device', icon: Laptop, label: 'This device' },
+  { to: '/app/buckets', icon: Boxes, label: 'Buckets' },
+  { to: '/app/search', icon: FileJson2, label: 'Datasets', match: ['/app/search', '/app/metadata'] },
+  { to: '/app/settings', icon: Settings, label: 'Settings' },
+  { to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] },
+  ...adminItems.value,
 ])
 
 onMounted(() => {
@@ -97,7 +84,7 @@ watch(
       class="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:ring-2 focus:ring-ring"
       >Skip to content</a
     >
-    <SideNav :sections="sections" :back-link="false" />
+    <SideNav :items="items" :back-link="false" />
     <div class="flex min-w-0 flex-1 flex-col">
       <TopBar variant="desktop" />
       <GlobalErrorBanner />

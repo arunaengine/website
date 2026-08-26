@@ -75,6 +75,24 @@ describe('Phase 5 navigation parity', () => {
     expect(mobile).toContain('More')
   })
 
+  it('offers the sidebar destinations as one flat list', async () => {
+    const html = await render(SideNav)
+
+    expect(portalPaths(html)).toEqual([
+      '/app',
+      '/app/buckets',
+      '/app/compute',
+      '/app/search',
+      '/app/profiles',
+      '/app/groups',
+      '/app/status',
+      '/app/settings',
+      '/app/docs/v1',
+    ])
+    expect(html.match(/<ul/g)).toHaveLength(1)
+    for (const heading of ['Workspace', 'Catalog', 'Account']) expect(html).not.toContain(heading)
+  })
+
   it('applies each permitted Admin destination identically on desktop and mobile', async () => {
     for (const permission of Object.values(permissions)) permission.value = true
 

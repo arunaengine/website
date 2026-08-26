@@ -71,9 +71,17 @@ describe('desktop shell', () => {
       '/app/settings',
       '/app/docs/v1',
     ])
-    expect(html).toContain('Machine')
     expect(html).toContain('Synced folders')
     expect(html).toContain('This device')
+  })
+
+  it('carries one flat list with no group headings', async () => {
+    permissions.isRealmAdmin.value = true
+
+    const html = await renderToString(createSSRApp(DesktopLayout))
+
+    expect(html.match(/<ul/g)).toHaveLength(1)
+    for (const heading of ['Machine', 'Realm', 'Help']) expect(html).not.toContain(heading)
   })
 
   it('wears the desktop chrome and no way back to a landing page', async () => {
