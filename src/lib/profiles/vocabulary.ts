@@ -1,7 +1,7 @@
 // Bundled ontology vocabulary for the profile builder's autocomplete: the
 // schema.org core release (CC BY-SA 3.0, https://schema.org/docs/terms.html)
 // plus the DCMI Metadata Terms (CC BY 4.0). vocab.json is generated from the
-// official releases — no GPL-licensed sources. Loaded lazily (dynamic import)
+// official releases; no GPL-licensed sources. Loaded lazily (dynamic import)
 // so the ~400 KB data lands in its own async chunk, fetched only when a picker
 // actually needs suggestions.
 import type { ProfileValueKind } from './types'

@@ -62,7 +62,7 @@ let counter = 0
 
 // Bounded concurrency of whole files; each file additionally parallelizes 3
 // parts internally (useS3's queueSize), so the worst case is 3×3 in-flight
-// part PUTs — the browser's per-host connection pool serializes the rest.
+// part PUTs; the browser's per-host connection pool serializes the rest.
 const MAX_CONCURRENT_FILES = 3
 
 const lastCompleted = ref<{ bucket: string; key: string; nodeId: string | null; at: number } | null>(null)
@@ -165,7 +165,7 @@ async function run(item: UploadQueueItem): Promise<void> {
     }
   } catch (err) {
     // cancel() may have flipped the state to 'canceled' during the await, which
-    // TS's synchronous control-flow analysis cannot see — widen before compare.
+    // TS's synchronous control-flow analysis cannot see; widen before compare.
     if ((item.state as UploadItemState) !== 'canceled') {
       if (item.session && s3.sessionState(item.session) !== 'usable') {
         pauseForSession(item, 'The S3 session expired while this upload was running.')

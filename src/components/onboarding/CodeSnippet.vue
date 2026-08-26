@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Reusable titled code block with a copy button (aruna#277). Layout mirrors the
-// CLI-usage block in CreateCredentialDialog. Purely presentational — the
+// CLI-usage block in CreateCredentialDialog. Purely presentational: the
 // device-enrollment flow (aruna#271) reuses it for its agent-config snippet, so
 // keep it free of onboarding-specific copy and API calls.
 import CopyButton from '@/components/nodes/CopyButton.vue'

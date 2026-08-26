@@ -173,7 +173,7 @@ const canWriteData = computed(() => {
 })
 
 // Group admin (api ensure_group_admin), the gate storage, routing and request
-// policies share — not the write rights objects need.
+// policies share, not the write rights objects need.
 const canAdminGroup = computed(() => {
   const detail = group.value
   if (!detail) return false
@@ -228,7 +228,7 @@ async function reload() {
       }
     }
     // Documents are loaded separately: a failure here must not blank the panel.
-    // One bounded page, never a walk — the panel only previews DOC_LIMIT rows
+    // One bounded page, never a walk; the panel only previews DOC_LIMIT rows
     // and links to Discover for the rest.
     docsLoading.value = true
     try {

@@ -60,7 +60,7 @@ export interface SearchResultLine {
    * usually a snippet, so a null doc never hides a result.
    */
   doc: MetadataDoc | null
-  /** Best known display title — catalog title, else server title (aruna#258), else null. Never fabricated. */
+  /** Best known display title: catalog title, else server title (aruna#258), else null. Never fabricated. */
   title: string | null
   /** Server snippet when provided (aruna#258), else the catalog description, else null. */
   snippet: string | null
@@ -69,8 +69,8 @@ export interface SearchResultLine {
 // The backend deduplicates hits per (graph_iri, subject_iri) with score-desc
 // ordering, so a single document can surface as several hits within one page
 // and across pages. The portal renders one card per document, so collapse by
-// document_id everywhere; first occurrence wins, which — given the server's
-// score-desc order — keeps the highest-scoring hit for each document.
+// document_id everywhere; first occurrence wins, which (given the server's
+// score-desc order) keeps the highest-scoring hit for each document.
 function dedupeByDocument(
   list: MetadataSearchHit[],
   seen = new Set<string>(),
@@ -119,7 +119,7 @@ export function useMetadataSearch(
   const truncated = ref(false)
 
   // Two-character minimum, aligned with useUnifiedSearch (the backend rejects
-  // shorter queries with 400 anyway) — except with a conformsTo filter, which
+  // shorter queries with 400 anyway), except with a conformsTo filter, which
   // the backend accepts on its own as a profile listing.
   const active = computed(() => query.value.trim().length >= 2 || Boolean(filters.conformsTo?.value))
   // The backend signals partial results through nodes_failed (a per-node id list
@@ -361,7 +361,7 @@ export function useMetadataSearch(
       if (err instanceof ApiError && [400, 409, 410].includes(err.status) && restartedFor !== term) {
         // Server rejected the cursor (query changed / cursor expired, per the
         // aruna#258 contract): restart transparently from the first page, forced
-        // past the cache that issued the rejected cursor — but only once per
+        // past the cache that issued the rejected cursor, but only once per
         // query. A backend that keeps rejecting falls through to pageError.
         restartedFor = term
         void runSearch(term, true, true)

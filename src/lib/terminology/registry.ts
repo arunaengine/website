@@ -1,7 +1,7 @@
 // Ordered terminology-provider registry with streaming search.
 //
 // searchAll(query, cb) delivers the bundled provider's results immediately and
-// streams each remote provider's results as they land — per-provider callbacks,
+// streams each remote provider's results as they land: per-provider callbacks,
 // never all-or-nothing, so a slow or dead gateway can only ever ADD hits on top
 // of the bundled floor. Remote lookups go through the session/persisted cache
 // (stale-while-revalidate) and short negative caching of failures; per-provider
@@ -183,7 +183,7 @@ async function searchRemote(
     deliver(registration, 'ok', dedupe(provider.id, filter(hits)))
   } catch (err) {
     // Caller cancellations say nothing about the provider; report the rest as
-    // degraded — never a hard failure, bundled results already stand.
+    // degraded: never a hard failure, bundled results already stand.
     if (isCancellation(err)) return
     const status: ProviderStatus = isTimeout(err) ? 'timeout' : 'error'
     noteProviderFailure(provider.id, status)

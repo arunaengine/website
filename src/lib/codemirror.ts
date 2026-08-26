@@ -22,6 +22,6 @@ export function highlightExtension(dark: boolean): Extension {
 }
 
 // The app's font-mono stack (tailwind.config.js) for editor scrollers. Set on
-// .cm-scroller so gutters and content share one typography — a proportional
+// .cm-scroller so gutters and content share one typography; a proportional
 // gutter font skews the line numbers against the code lines.
 export const EDITOR_FONT = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace"

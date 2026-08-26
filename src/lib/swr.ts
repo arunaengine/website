@@ -2,7 +2,7 @@
 // Held outside the component (in the module scope of the composable that owns
 // it) so unmounting a view keeps the last good value: the next visit paints it
 // immediately and revalidates behind it. Same read model as the persisted tier
-// of lib/terminology/cache.ts, without the localStorage layer — these lists are
+// of lib/terminology/cache.ts, without the localStorage layer; these lists are
 // per-session and must not outlive the tab.
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 
@@ -21,7 +21,7 @@ export interface SwrCache<T> {
   loaded: Ref<boolean>
   /** Outstanding failure, kept alongside the data it could not replace. */
   error: Ref<SwrFailure | null>
-  /** Nothing cached and a load in flight — the only state that may show a blocking spinner. */
+  /** Nothing cached and a load in flight: the only state that may show a blocking spinner. */
   loading: ComputedRef<boolean>
   /** Cached data on screen while a revalidation runs behind it. */
   refreshing: ComputedRef<boolean>

@@ -263,7 +263,7 @@ async function fetchList({ more = false, silent = false } = {}) {
     }
   } finally {
     // Only non-silent calls ever set `refreshing`, so clear it unconditionally
-    // for them — a silent poll that superseded this request id must not leave
+    // for them; a silent poll that superseded this request id must not leave
     // the spinner stuck on (a later poll never touches `refreshing`).
     if (!silent) refreshing.value = false
   }
@@ -322,7 +322,7 @@ onUnmounted(() => {
       Tasks are runs <span class="font-medium text-foreground">you submit</span> to this node, start one with Quick run or describe a full GA4GH TES task.
     </p>
 
-    <!-- Service banner: capability and version only — the realm identity
+    <!-- Service banner: capability and version only; the realm identity
          already sits in the page header badge. -->
     <p v-if="serviceState === 'ready' && serviceInfo" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       <span class="font-medium text-foreground">Task execution service</span>

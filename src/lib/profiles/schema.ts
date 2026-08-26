@@ -95,7 +95,7 @@ function schemaBody(rules: ProfilePropertyRule[], resolveDefName?: ResolveDefNam
     if (rule.kind === 'entity') {
       // Entity refs stay presence-array-only (byte-stable) UNLESS they carry
       // machine constraints (entity-source policy / cardinality / required
-      // instances), which are encoded as a `properties` entry — a documented
+      // instances), which are encoded as a `properties` entry: a documented
       // extension of the "presence arrays only" convention (D4).
       const entityProperty = entityConstraintProperty(rule, resolveDefName)
       if (entityProperty) properties[rule.valueName] = entityProperty
@@ -116,7 +116,7 @@ export function schemaPropertyFromRule(rule: ProfilePropertyRule): JsonSchemaPro
 
   const scalar = scalarPropertyFromKind(rule.kind)
   const isList = rule.kind === 'keyword-list' || Boolean(rule.multipleValues)
-  // select-url validates as a URL string constrained to its allowed set — only
+  // select-url validates as a URL string constrained to its allowed set, only
   // when every option is a string (mixed/object options carry no scalar enum).
   const urlEnum = rule.kind === 'select-url' ? stringOptions(rule.valueOptions) : undefined
 
@@ -141,7 +141,7 @@ export function schemaPropertyFromRule(rule: ProfilePropertyRule): JsonSchemaPro
   }
   // Scalar constraints belong on the value's scalar shape. For multi-valued
   // properties that shape is `items` (each element is validated against it), not
-  // the enclosing array — where pattern/minLength/minimum are meaningless.
+  // the enclosing array, where pattern/minLength/minimum are meaningless.
   const target = property.type === 'array' ? (property.items ??= {}) : property
   if (rule.pattern && target.type === 'string') target.pattern = rule.pattern
   if (rule.minLength !== undefined && target.type === 'string') target.minLength = rule.minLength

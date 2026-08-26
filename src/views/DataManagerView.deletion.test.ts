@@ -288,7 +288,7 @@ describe('Data Manager explicit multi-file deletion', () => {
 
   it('keeps new UI copy free of em dashes and the retired label namespace', () => {
     const renderedTemplate = `${template}\n${datasetReferencesTemplate}`.replace(/<!--[\s\S]*?-->/g, '')
-    expect(renderedTemplate).not.toContain('—')
+    expect(renderedTemplate).not.toContain('\u2014')
     expect(dataManagerSource).not.toMatch(/aruna[.]io/)
   })
 })

@@ -735,7 +735,7 @@ function isLegacyPortalCorsRule(rule: CORSRule): boolean {
   )
 }
 
-// Small generated artifacts (profile mode/schema/html) — a single PutObject,
+// Small generated artifacts (profile mode/schema/html): a single PutObject,
 // no multipart machinery.
 async function putTextObject(bucket: string, key: string, text: string, contentType: string): Promise<void> {
   await client().send(
@@ -1097,7 +1097,7 @@ export function isS3QuotaError(err: unknown): boolean {
 
 // A request that never produced an HTTP response: the endpoint is unreachable
 // or the browser blocked it (CORS rejections surface as an opaque fetch
-// TypeError). Distinct from auth/quota errors, which prove the node answered —
+// TypeError). Distinct from auth/quota errors, which prove the node answered;
 // remote browsing degrades to an info panel on this class of failure.
 export function isS3NetworkError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false

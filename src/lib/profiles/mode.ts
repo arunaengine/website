@@ -6,7 +6,7 @@
 // keys `id` (property URI), `name` (compact term), `label`, `help`, `required`,
 // `multiple`, `type` (array of type tokens), `values` (Select options). NO code,
 // snippets, or asset files from the GPL-3 Describo/Crate-O projects are copied
-// or vendored — only the wire format is shared. Unknown keys round-trip verbatim.
+// or vendored; only the wire format is shared. Unknown keys round-trip verbatim.
 
 import { propertyRulesFromSchema } from './schema'
 import { isDatasetType, isRecord, sameSchemaOrgType, SCHEMA_ORG as SCHEMA, termNameFromUri } from './uri'
@@ -171,7 +171,7 @@ export function modeToEntityRules(mode: ModeFile, schema?: JsonSchema): ProfileE
       label,
       description,
       type,
-      // className is the original `classes` key — the compact alias to preserve on
+      // className is the original `classes` key: the compact alias to preserve on
       // export even when `type` resolved to an external (e.g. OBO) URI via context.
       className,
       propertyRules,
@@ -335,7 +335,7 @@ function ruleFromInput(
     // Absent `multiple` means single (matches the documented default + scalars).
     rule.multipleValues = Boolean(input.multiple)
     // Entity-source policy, list cardinality and required instances have no
-    // mode-file vocabulary — they ride on the schema and rehydrate from the
+    // mode-file vocabulary; they ride on the schema and rehydrate from the
     // hydrated carrier.
     if (hydrated?.entitySources) rule.entitySources = hydrated.entitySources
     if (hydrated?.minItems !== undefined) rule.minItems = hydrated.minItems
@@ -349,7 +349,7 @@ function ruleFromInput(
     rule.valueOptions = rawValues ?? []
     if (multiple) rule.multipleValues = true
     // List cardinality, default and example ride on the schema (the mode input
-    // can't carry them), so they must rehydrate here too — the early return above
+    // can't carry them), so they must rehydrate here too: the early return above
     // otherwise skips the scalar hydration block below and drops them (C1: a
     // multi-valued select-url loses minItems/maxItems on import). Only-when-set to
     // preserve byte-stability, matching the entity branch.
@@ -417,7 +417,7 @@ function kindFromTokens(
     case 'ANY':
     default:
       if (hydrated?.kind === 'email') return 'email'
-      // L11: a multi-valued Text round-trips as a keyword-list by design — the mode
+      // L11: a multi-valued Text round-trips as a keyword-list by design; the mode
       // format has no `Text`+`multiple` token distinct from a keyword list, so the
       // two are indistinguishable on import. Accepted limitation.
       return multiple ? 'keyword-list' : 'text'

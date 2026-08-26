@@ -10,7 +10,7 @@ import { ChevronUp, ChevronDown, FileJson2, Info, Plus, Trash2 } from '@lucide/v
 import type { DataEntity } from '@/lib/dataEntities'
 
 // Shared editor for a dataset's data entities: add (SelectDataDialog buckets or
-// external URL), remove, rename, reorder (hasPart order), and — when detailed —
+// external URL), remove, rename, reorder (hasPart order), and, when detailed,
 // edit encodingFormat/contentSize/description per file. @ids are kept verbatim;
 // the reference target is changed by removing and re-adding, never by editing.
 // When the host passes the crate, each row gains an info dialog showing the

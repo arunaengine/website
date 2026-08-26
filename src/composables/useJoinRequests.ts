@@ -12,7 +12,7 @@ import { useAruna } from '@/composables/useAruna'
 
 // Join requests (aruna#248). The backend does not serve these endpoints yet;
 // every path here is gated behind the `joinRequests` feature flag, so with the
-// default config (features: {}) this module is inert — no HTTP call can fire
+// default config (features: {}) this module is inert: no HTTP call can fire
 // because every mutation/loader starts with assertEnabled().
 
 const ownRequests = ref<JoinRequest[]>([])
@@ -26,8 +26,8 @@ let ownRequestsInflight: Promise<void> | null = null
 // Sign-out via the non-Keycloak fallback and account switches (manual token swap)
 // change currentUser without a page reload, so the module-singleton own-request
 // cache would otherwise survive and render the previous account's requests.
-// Mirror useNotifications: reset on account change. Reset only — no HTTP, no
-// featureEnabled read — so the flag-off zero-HTTP guarantee is untouched. Keying
+// Mirror useNotifications: reset on account change. Reset only (no HTTP, no
+// featureEnabled read), so the flag-off zero-HTTP guarantee is untouched. Keying
 // on the id (not just null) also covers a direct A→B token swap; consumers' own
 // watches then refetch because ownRequestsLoaded is false again.
 if (typeof window !== 'undefined') {
@@ -45,7 +45,7 @@ if (typeof window !== 'undefined') {
 
 const joinRequestsEnabled = computed(() => featureEnabled('joinRequests'))
 
-// Own PENDING request per group id — drives button/badge state.
+// Own PENDING request per group id: drives button/badge state.
 const pendingByGroup = computed<Map<string, JoinRequest>>(
   () =>
     new Map(
@@ -72,7 +72,7 @@ function request<T>(path: string, options = {}) {
   return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
 }
 
-// GET /users/join-requests — own pending + recently decided requests.
+// GET /users/join-requests: own pending + recently decided requests.
 // not yet provided by the backend (aruna#248). A missing backend must degrade
 // to an inline notice, so this catches and stores the error rather than throwing.
 async function loadOwnRequests(): Promise<void> {
@@ -102,7 +102,7 @@ async function ensureOwnRequestsLoaded(): Promise<void> {
   await ownRequestsInflight
 }
 
-// POST /groups/{groupId}/join-requests — not yet provided by the backend (aruna#248).
+// POST /groups/{groupId}/join-requests: not yet provided by the backend (aruna#248).
 async function requestJoin(groupId: string, message?: string): Promise<JoinRequest> {
   assertEnabled()
   busy.value = true
@@ -120,7 +120,7 @@ async function requestJoin(groupId: string, message?: string): Promise<JoinReque
   }
 }
 
-// DELETE /groups/{group_id}/join-requests/{request_id} — not yet provided by
+// DELETE /groups/{group_id}/join-requests/{request_id}: not yet provided by
 // the backend (aruna#248). Requester withdraws a still-pending request (204).
 async function withdrawRequest(req: JoinRequest): Promise<void> {
   assertEnabled()
@@ -135,7 +135,7 @@ async function withdrawRequest(req: JoinRequest): Promise<void> {
   }
 }
 
-// GET /groups/{groupId}/join-requests?status=pending — admin inbox. The status
+// GET /groups/{groupId}/join-requests?status=pending: admin inbox. The status
 // filter is part of the assumed contract; the client additionally filters
 // status === 'pending' defensively. not yet provided by the backend (aruna#248).
 async function listGroupJoinRequests(groupId: string): Promise<JoinRequest[]> {
@@ -146,7 +146,7 @@ async function listGroupJoinRequests(groupId: string): Promise<JoinRequest[]> {
   return response.requests.filter((r) => r.status === 'pending')
 }
 
-// POST /groups/{groupId}/join-requests/{requestId}/decide — approve (assigns
+// POST /groups/{groupId}/join-requests/{requestId}/decide: approve (assigns
 // role_ids, defaulting to the "user" role like AddGroupMemberRequest) or deny.
 // not yet provided by the backend (aruna#248).
 async function decideJoinRequest(

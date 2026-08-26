@@ -204,7 +204,7 @@ const summary = computed(() => props.policy.expression.trim() || 'No expression 
         <p v-for="error in analysis.errors" :key="error" class="font-mono text-destructive">{{ error }}</p>
         <p v-if="analysis.unknown_variables.length" class="text-amber-700 dark:text-amber-300">
           Unknown variables: <span class="font-mono">{{ analysis.unknown_variables.join(', ') }}</span>
-          — these are always absent, so the policy fails closed at request time.
+          (these are always absent, so the policy fails closed at request time).
         </p>
         <p v-if="analysis.unknown_functions.length" class="text-amber-700 dark:text-amber-300">
           Unknown functions: <span class="font-mono">{{ analysis.unknown_functions.join(', ') }}</span>

@@ -1,6 +1,6 @@
 // Shared URI helpers for the profile feature: schema.org / aruna constants, type
 // and term URI normalization, and the small structural guards used across the lib
-// and its Vue consumers. Single source of truth — no per-module copies.
+// and its Vue consumers. Single source of truth: no per-module copies.
 
 export const SCHEMA_ORG = 'http://schema.org/'
 export const ARUNA_PROFILE_PREFIX = 'https://w3id.org/aruna/profiles/'
@@ -9,7 +9,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
 
-// A schema.org Dataset type — used to pick the root entity rule (its rules drive
+// A schema.org Dataset type, used to pick the root entity rule (its rules drive
 // the dataset dialog / root JSON Schema; every other type becomes a `$defs` entry).
 export function isDatasetType(type: string): boolean {
   return type === 'Dataset' || type.endsWith('/Dataset')
@@ -38,7 +38,7 @@ export function normalizeTypeUri(value: unknown): string {
   return isAbsoluteUri(text) ? text : `${SCHEMA_ORG}${text}`
 }
 
-// An absolute URI (any scheme) — property term URIs must resolve in a crate
+// An absolute URI (any scheme): property term URIs must resolve in a crate
 // @context, and reference inputs must be dereferenceable. Minted and
 // external-ontology terms both satisfy this.
 export function isAbsoluteUri(value: string): boolean {
@@ -69,7 +69,7 @@ export function isInvalidReferenceUri(value: string): boolean {
 // `@context` can safely merge both without collisions. The profile builder (wave
 // B) enforces these on the raw draft input; the lib only provides + documents
 // them. Any label→name derivation helper (e.g. `propertyName()`) must emit names
-// that pass `isValidPropertyTermName` — notably it must sanitize leading digits
+// that pass `isValidPropertyTermName`; notably it must sanitize leading digits
 // and a leading uppercase letter.
 const PROPERTY_TERM_NAME = /^[a-z][A-Za-z0-9]*$/
 const CLASS_NAME = /^[A-Z][A-Za-z0-9]*$/

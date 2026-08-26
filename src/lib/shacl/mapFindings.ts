@@ -5,7 +5,7 @@ import { crateLocalId } from './crateIri'
 
 // Splits server preview findings into the two evaluator surfaces: findings that
 // resolve to a rendered root-Dataset control render INLINE beside it (as
-// display-only ProfileViolations — they never gate submission, the bespoke
+// display-only ProfileViolations: they never gate submission, the bespoke
 // validator owns that), everything else goes to the preview panel.
 // Dependency-free, so a dialog can import it without the RDF stack.
 
@@ -42,7 +42,7 @@ export function mapPreviewFindings(
     }
     const severity = finding.severity === 'violation' ? 'error' : 'warning'
     if (bespokeKeys.has(`${rule.valueName} ${severity}`)) continue
-    // One message per field+severity+text — repeated shapes over the same path
+    // One message per field+severity+text: repeated shapes over the same path
     // must not stack identical lines.
     const key = `${rule.valueName} ${severity} ${finding.message}`
     if (seenInline.has(key)) continue

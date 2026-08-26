@@ -192,7 +192,7 @@ const detailAttributes = computed(() =>
 
 // Member lists are only served for groups the caller belongs to (backend
 // map_roles_with_visibility), so this join covers exactly the groups the
-// admin shares with the inspected user — never the user's full memberships.
+// admin shares with the inspected user, never the user's full memberships.
 const sharedGroups = computed(() => {
   const userId = selected.value?.user_id
   if (!userId) return []

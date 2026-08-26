@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Reusable radio-card selector (aruna#277). Every option — including all trust
-// copy and badges — arrives as data, so the device-enrollment flow (aruna#271)
+// Reusable radio-card selector (aruna#277). Every option (including all trust
+// copy and badges) arrives as data, so the device-enrollment flow (aruna#271)
 // reuses it with its own single "User device" option set. No onboarding copy or
 // API calls live here.
 import { computed, ref, type ComponentPublicInstance } from 'vue'
@@ -33,7 +33,7 @@ function select(value: string) {
   emit('update:modelValue', value)
 }
 
-// Roving-focus arrow navigation: move selection and focus together, wrapping —
+// Roving-focus arrow navigation: move selection and focus together, wrapping;
 // standard radiogroup keyboard behaviour.
 function onKey(event: KeyboardEvent, index: number) {
   if (props.disabled) return

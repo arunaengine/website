@@ -40,8 +40,8 @@ watch(scope, (key) => {
 })
 
 function onFailure(err: unknown) {
-  // Rejected credentials are not transient — every follow-up call fails the
-  // same way — so the list is dropped and the recovery panel takes over. Any
+  // Rejected credentials are not transient (every follow-up call fails the
+  // same way), so the list is dropped and the recovery panel takes over. Any
   // other failure keeps the last good list and reports itself next to it.
   return { message: s3ErrorMessage(err), discard: isS3AuthError(err) }
 }

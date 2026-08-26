@@ -23,8 +23,8 @@ import type { ProviderStatus, TermHit } from '@/lib/terminology/types'
 // Inline vocabulary suggestions under a term/class input. Section 1 searches
 // the bundled schema.org + Dublin Core vocabulary (instant, always available,
 // offline); section 2 streams additional hits from remote terminology services
-// (TS4NFDI gateway) as they land. Renders nothing while empty —
-// free text always stays possible; this only makes reuse easier than minting.
+// (TS4NFDI gateway) as they land. Renders nothing while empty.
+// Free text always stays possible; this only makes reuse easier than minting.
 // Remote degradation is soft by design: bundled results always stand, remote
 // failures surface as a dismissible hint plus a status dot, never an error.
 const props = defineProps<{

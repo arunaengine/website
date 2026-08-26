@@ -1,6 +1,6 @@
 // Human-readable labels for license IRIs: the in-crate license entity's name
 // wins, then a well-known Creative Commons / SPDX mapping, then the readable
-// IRI tail — so a license tile never shows a truncated bare URL.
+// IRI tail, so a license tile never shows a truncated bare URL.
 
 import { readableIri } from '@/lib/identifiers'
 

@@ -1,6 +1,6 @@
 // Bundled-vocabulary terminology provider: a thin TermHit adapter over the
 // existing schema.org + Dublin Core vocabulary (profiles/vocabulary.ts). Always
-// available and effectively instant — the data ships with the portal, so this
+// available and effectively instant; the data ships with the portal, so this
 // provider is the graceful-degradation floor when remote services are down.
 import { loadVocabulary, searchVocabTerms, type VocabTerm } from '../../profiles/vocabulary'
 import type { TermHit, TerminologyProvider, TermKind } from '../types'

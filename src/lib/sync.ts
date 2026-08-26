@@ -3,7 +3,7 @@
 import type { SyncMode, SyncRelationshipState } from './api'
 
 // `arn:aruna:<realm>:<node>:s3/<bucket>[/<prefix>]` (aruna core ArunaArn
-// Display impl). The prefix keeps its exact server form — it may end in '/'.
+// Display impl). The prefix keeps its exact server form; it may end in '/'.
 export interface ParsedArunaArn {
   realmId: string
   nodeId: string

@@ -1,6 +1,6 @@
 // Per-run workspace buckets. The backend job framework creates one scratch
 // bucket per run, named ws-<jobId> (see runCrate.ts workspaceBucket). They are
-// system-managed plumbing, so pickers and browsers hide them by default —
+// system-managed plumbing, so pickers and browsers hide them by default;
 // direct routes (provenance/job deep links) keep working because the bucket
 // views take the name from the route, not from a listing.
 const WORKSPACE_BUCKET_RE = /^ws-/

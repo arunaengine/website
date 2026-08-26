@@ -33,7 +33,7 @@ export interface PersistentIdView {
   withdrawn_at_ms: number | null
 }
 
-// GET /metadata/{document_id}/pids — the typed status is authoritative;
+// GET /metadata/{document_id}/pids: the typed status is authoritative;
 // `unknown` means the authority record is missing or unreachable, never
 // "unminted".
 export function listPersistentIds(
@@ -47,7 +47,7 @@ export function listPersistentIds(
   )
 }
 
-// DELETE /pid/{document_id} — exceptional administrative withdrawal. Terminal
+// DELETE /pid/{document_id}: exceptional administrative withdrawal. Terminal
 // and idempotent: the landing page answers 410 Gone forever afterwards.
 export function withdrawPid(
   documentId: string,
@@ -72,7 +72,7 @@ const PID_STATE_META = {
   processing: { label: 'Registering', variant: 'secondary' },
   active: { label: 'Active', variant: 'success' },
   failed: { label: 'Registration failed', variant: 'destructive' },
-  'admin-withdrawn': { label: 'Withdrawn — permanent', variant: 'destructive' },
+  'admin-withdrawn': { label: 'Withdrawn (permanent)', variant: 'destructive' },
   tombstoned: { label: 'Tombstoned', variant: 'outline' },
   unknown: { label: 'Status unknown', variant: 'warn' },
 } satisfies Record<PersistentIdState, { label: string; variant: PidBadgeVariant }>

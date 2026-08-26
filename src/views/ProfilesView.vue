@@ -223,7 +223,7 @@ function downloadJson(data: unknown, filename: string) {
 // Full-fidelity export (D1): the profile's stored crate carries mode + schema
 // losslessly. Prefer the already-loaded crate; when it is not loaded yet, fetch it
 // on demand (L9) rather than rebuilding with fabricated basics. Only if the fetch
-// fails do we rebuild from the record's fields — and then omit datePublished /
+// fails do we rebuild from the record's fields, and then omit datePublished /
 // license (buildProfileCrate drops empty ones) instead of inventing them.
 const downloadingCrate = ref(false)
 async function downloadProfileCrate(profile: MetadataProfile) {
@@ -256,7 +256,7 @@ async function downloadProfileCrate(profile: MetadataProfile) {
   downloadJson(finalCrate, `${profile.id}.crate.json`)
 }
 
-// Secondary export: the Describo/Crate-O mode file — form structure only. The
+// Secondary export: the Describo/Crate-O mode file: form structure only. The
 // verbatim imported mode when present, else generated from the entity rules.
 function downloadModeFile(profile: MetadataProfile) {
   const mode =
@@ -293,7 +293,7 @@ function groupByObligation(rules: ProfilePropertyRule[]) {
     .filter((group) => group.rules.length)
 }
 
-// Compact, human-readable constraint chips — only the ones that are actually set.
+// Compact, human-readable constraint chips: only the ones that are actually set.
 function constraintSummary(rule: ProfilePropertyRule): string[] {
   const parts: string[] = []
   if (rule.pattern) parts.push(`pattern ${rule.pattern}`)

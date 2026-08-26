@@ -18,9 +18,9 @@ const PAGE_SIZE = 20
 
 const { apiBaseUrl, authToken, currentUser } = useAruna()
 
-// false once the backend answered 404/405 — endpoints not deployed; bell hidden.
+// false once the backend answered 404/405: endpoints not deployed; bell hidden.
 const supported = ref(true)
-// true once the backend answered 403 — e.g. a path-restricted token; bell hidden.
+// true once the backend answered 403, e.g. a path-restricted token; bell hidden.
 const forbidden = ref(false)
 const unreadCount = ref(0)
 const unreadCapped = ref(false)

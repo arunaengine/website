@@ -241,8 +241,8 @@ async function submit() {
         <div class="space-y-1 text-xs">
           <span class="font-medium text-foreground">Target bucket</span>
           <!-- The picker input IS the bucket-name field: typing searches
-               existing buckets (narrowed to the chosen node) while any name —
-               matched or not — stays valid, because the backend auto-creates
+               existing buckets (narrowed to the chosen node) while any name,
+               matched or not, stays valid, because the backend auto-creates
                missing target buckets. -->
           <BucketSearchBox
             v-model="targetBucket"

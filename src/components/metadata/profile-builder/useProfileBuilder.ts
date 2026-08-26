@@ -32,8 +32,8 @@ import type { LiftNote } from '@/lib/shacl/lift'
 
 // Two levels of builder-session lock on a baseline draft rule. `full` is the old
 // all-or-nothing read-only (the Root Dataset entity itself). `structural` fixes a
-// rule's identity — it cannot be removed and its propertyUri/valueName/label stay
-// put — while leaving the specific affordances the RO-Crate baseline allows open
+// rule's identity: it cannot be removed and its propertyUri/valueName/label stay
+// put, while leaving the specific affordances the RO-Crate baseline allows open
 // (name/description obligation stays MUST; license/datePublished obligation is
 // MUST↔SHOULD; license kind switches url↔select-url). Never serialized.
 export type DraftLock = 'full' | 'structural'
@@ -89,7 +89,7 @@ export interface DraftPropertyRule {
   // Entity-kind fulfilment policy: which sources may satisfy the property
   // (describe new / reuse external URI / reuse crate entity). Absent = ['new']
   // (the legacy inline default; stays byte-stable). Meaningless on scalar
-  // kinds — normalize drops it.
+  // kinds; normalize drops it.
   entitySources?: ProfileEntitySource[]
   // Entity-kind + multi-valued "required contents" (WS5): specific instances the
   // list MUST/SHOULD contain (e.g. a hasPart File named index.html).
@@ -103,7 +103,7 @@ export interface DraftPropertyRule {
   // read-only summary card). select-url options travel through `urlOptions` instead.
   valueOptions?: unknown[]
   // Builder-session only: baseline RO-Crate rules render read-only (see DraftLock).
-  // Never serialized — normalizeProperty drops it (there is no profile-edit flow).
+  // Never serialized; normalizeProperty drops it (there is no profile-edit flow).
   lock?: DraftLock
 }
 
@@ -208,7 +208,7 @@ export function slugify(value: string): string {
 // Turn a label / id into a lower-camelCase RO-Crate property name. The result
 // must satisfy isValidPropertyTermName (`^[a-z][A-Za-z0-9]*$`), so leading
 // non-letters are stripped ("3D scan" -> "dScan") and the first surviving letter
-// is lowercased — a derived name always passes validation.
+// is lowercased; a derived name always passes validation.
 export function propertyName(value: string): string {
   const words = value.split(/[^a-zA-Z0-9]+/).filter(Boolean)
   const camel = words
@@ -237,7 +237,7 @@ function todayIso(): string {
 }
 
 // L1: a select-url whose imported options include ANY non-string value is preserved
-// verbatim and read-only (mirroring select-object) — we never coerce structured
+// verbatim and read-only (mirroring select-object); we never coerce structured
 // values to "[object Object]". All-string option sets stay fully authorable.
 export function hasPreservedUrlOptions(options: readonly unknown[] | undefined): boolean {
   return Boolean(options?.some((option) => typeof option !== 'string'))
@@ -419,7 +419,7 @@ export function draftFromEntityRule(rule: ProfileEntityRule, isRoot = false): Dr
 // baseline property rules. The entity is fully locked; the four property rules are
 // `structural` (not removable, identity fixed) because the RO-Crate specification
 // mandates them: "The Root Data Entity MUST have all of the properties listed
-// below" — a presence requirement, so they default to obligation MUST. RO-Crate
+// below", a presence requirement, so they default to obligation MUST. RO-Crate
 // 1.2 treats datePublished/license as SHOULD, so their obligation is author-
 // selectable (MUST↔SHOULD, portal default MUST); name/description stay MUST.
 // License kind is switchable url↔select-url. Authors extend from here with their
@@ -588,7 +588,7 @@ export function useProfileBuilder() {
     if (basics.datePublished) datePublished.value = basics.datePublished
     if (basics.license) license.value = basics.license
     if (!slugTouched.value && basics.name) slug.value = slugify(basics.name)
-    // L2: the first Dataset-typed rule is the RO-Crate root — only its baseline four
+    // L2: the first Dataset-typed rule is the RO-Crate root; only its baseline four
     // rules re-lock as structural (a nested Dataset sub-entity is left untouched).
     const rootIndex = result.entityRules.findIndex((entity) => isDatasetType(normalizeTypeUri(entity.type)))
     const drafts = result.entityRules.map((entity, index) => draftFromEntityRule(entity, index === rootIndex))
@@ -794,7 +794,7 @@ export function useProfileBuilder() {
     const type = normalizeTypeUri(entity.type)
     if (!id || !label || !type) return undefined
     // className (D3/H4): preserve the draft's className for ALL types, including
-    // schema.org, falling back to the derived name only when empty — mirrors
+    // schema.org, falling back to the derived name only when empty; mirrors
     // rocrate.ts normalizeEntityRules so an imported schema.org-typed alias (e.g. a
     // Person class keyed `Author`) survives a builder normalize→export cycle
     // instead of being flattened back to termNameFromUri(type).
@@ -815,7 +815,7 @@ export function useProfileBuilder() {
     const id = safeIdSegment(toText(property.id) || toText(property.label) || `property-${index + 1}`)
     const label = trimmed(property.label)
     // Validate the value name exactly as typed (D2): auto-derive from the id/label
-    // ONLY when the field is empty, and never strip characters from a typed name —
+    // ONLY when the field is empty, and never strip characters from a typed name;
     // an invalid name surfaces as a blocking rulesErrors entry instead of being
     // silently rewritten ("assay type" -> "assaytype").
     const valueName = trimmed(property.valueName) || propertyName(id)
@@ -826,7 +826,7 @@ export function useProfileBuilder() {
     const propertyUri = explicitUri || mintTermUri(trimmed(slug.value) || 'profile', valueName)
     const isEntity = property.kind === 'entity'
     const isMulti = property.multipleValues || property.kind === 'keyword-list'
-    // Required contents (WS5/M2): only for MULTI-VALUED entity references — a single
+    // Required contents (WS5/M2): only for MULTI-VALUED entity references; a single
     // reference has no list to constrain, and emitting them for a non-multiple rule
     // would strand rows that the editor no longer shows. Empty-value rows are dropped
     // (an empty match can never be satisfied).
@@ -837,7 +837,7 @@ export function useProfileBuilder() {
       : []
     // Entity-source policy only carries for entity references that the generated
     // form actually renders as an entity control. hasPart binds to the dataset
-    // dialog's data-references section, so a policy there is meaningless — drop
+    // dialog's data-references section, so a policy there is meaningless; drop
     // it. Required-contents lists KEEP their policy: schema.json encodes `items`
     // alongside `contains`, so both round-trip (the v2 lossy combo is gone).
     const entitySources =
@@ -916,7 +916,7 @@ export function useProfileBuilder() {
     return deriveEntityObligation(normalizeTypeUri(entityType), normalizedEntities.value)
   }
 
-  // Every entity-reference property that points at this type (L8) — the single
+  // Every entity-reference property that points at this type (L8), the single
   // shared traversal behind the editor's "Referenced by" panel and the master
   // list's unreferenced-rule warning. An empty result means the rule is inert.
   function entityReferences(entityType: string) {
@@ -925,7 +925,7 @@ export function useProfileBuilder() {
 
   // Non-blocking authoring hints. Two kinds:
   //  - a custom (non-schema.org) term whose compact name only *resembles* a
-  //    curated schema.org property (different case) — suggest the schema.org term;
+  //    curated schema.org property (different case), suggest the schema.org term;
   //    an exact-name shadow is a blocking error instead (see rulesErrors).
   //  - an entity-reference target type with no entity rule in this profile, so no
   //    sub-form gets generated for it.
@@ -954,7 +954,7 @@ export function useProfileBuilder() {
         }
       }
     }
-    // H1: an entity rule that nothing references is inert — it generates no dataset
+    // H1: an entity rule that nothing references is inert; it generates no dataset
     // inputs and no validation. Surface each unreferenced non-Dataset rule loudly so
     // the "entity rule ignored" trap is unmissable at review. An IMPORTED rule is
     // exempt: a class-targeted shape stands on its own in the file it came from,
@@ -1055,7 +1055,7 @@ export function useProfileBuilder() {
           errors.push(`${entityName} / ${propLabel}: property name "${typedValueName}" collides with an entity class name, rename it so property and class names stay distinct.`)
         }
         // WS5/M2: only validate the required-contents rows that would actually be
-        // emitted — entity references that are multi-valued. Otherwise a row hidden by
+        // emitted: entity references that are multi-valued. Otherwise a row hidden by
         // a multiple-off toggle could still gate Next with an invisible error.
         if (property.kind === 'entity' && property.multipleValues) {
           property.requiredInstances.forEach((row, rowIndex) => {
@@ -1089,7 +1089,7 @@ export function useProfileBuilder() {
       classNames.add(entity.className)
       // H5: a class name that (case-insensitively) matches a curated entity type
       // while its type URI differs would redefine that standard type's alias in the
-      // crate @context — block it.
+      // crate @context; block it.
       const curatedShadow = CURATED_ENTITY_TYPES.find(
         (curated) => curated.label.toLowerCase() === entity.className.toLowerCase(),
       )
@@ -1124,7 +1124,7 @@ export function useProfileBuilder() {
           reportedUriConflicts.add(property.valueName)
         }
         // A non-schema.org term whose compact name exactly matches a curated
-        // schema.org property shadows that base-context term — a hard error.
+        // schema.org property shadows that base-context term: a hard error.
         if (!isSchemaOrgUri(property.propertyUri) && curatedNames.has(property.valueName)) {
           errors.push(`${entity.label} / ${property.label}: "${property.valueName}" maps to a non-schema.org URI but shadows the schema.org "${property.valueName}" term in the base @context, use the schema.org term or rename the property.`)
         }
@@ -1152,7 +1152,7 @@ export function useProfileBuilder() {
           errors.push(`${entity.label} / ${property.label}: preserved choice property has no options, remove it or re-import.`)
         }
         if (property.kind === 'enum' && !property.enumOptions?.length) errors.push(`${entity.label} / ${property.label} needs at least one allowed value.`)
-        // WS2: list cardinality — min >= 1, max >= min. minItems/maxItems are only
+        // WS2: list cardinality (min >= 1, max >= min). minItems/maxItems are only
         // set on multi-valued rules (normalizeProperty guards that).
         if (property.minItems !== undefined && property.minItems < 1) {
           errors.push(`${entity.label} / ${property.label}: minimum entries must be at least 1.`)

@@ -106,7 +106,7 @@ export interface ProfilePropertyRule {
 // A rule about an RO-Crate entity type and the property rules that apply to
 // entities of that type. Obligation is NOT stored: it is derived from which
 // property rules reference the type (see deriveEntityObligation in mode.ts).
-// Order is array order everywhere — there is no stored position.
+// Order is array order everywhere; there is no stored position.
 export interface ProfileEntityRule {
   id: string
   label: string
@@ -114,9 +114,9 @@ export interface ProfileEntityRule {
   type: string
   // Canonical class short name: the mode `classes` key / JSON-LD compact alias
   // for this entity type (e.g. `Specimen` even when the context maps it to an OBO
-  // PURL). ALL exports key on it — mode.classes, schema `$defs`, the context
+  // PURL). ALL exports key on it: mode.classes, schema `$defs`, the context
   // className→type mapping, the rawImport class-preservation lookup, and dataset
-  // `@type` emission — so an imported alias survives a round-trip instead of being
+  // `@type` emission, so an imported alias survives a round-trip instead of being
   // re-derived from the type URI. `normalizeEntityRules` defaults an empty
   // className to `termNameFromUri(type)`; the builder default is the same and is
   // shown/editable for custom types.
@@ -152,7 +152,7 @@ export interface JsonSchemaProperty {
   items?: JsonSchemaProperty
   minItems?: number
   maxItems?: number
-  // `const` pins a value — used inside a `contains` object subschema to match a
+  // `const` pins a value, used inside a `contains` object subschema to match a
   // required instance by `name` or `@id`. `contains` / `minContains` /
   // `maxContains` assert a list contains matching items; `allOf` composes several
   // such assertions. `properties` / `required` shape the `contains` object.
@@ -176,7 +176,7 @@ export interface JsonSchemaProperty {
 // it; the portal reads it to raise non-blocking warnings. The root schema
 // describes the Dataset entity; non-Dataset entity rules serialize as `$defs`
 // entries keyed by class short name. Entity-kind property rules appear in the
-// presence arrays only — they are `{"@id"}` references, not scalar keys, so
+// presence arrays only: they are `{"@id"}` references, not scalar keys, so
 // they get no `properties` entry (valid JSON Schema: `required` may list names
 // that have no matching `properties` entry).
 export interface JsonSchema {

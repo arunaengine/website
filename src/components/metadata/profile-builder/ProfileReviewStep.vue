@@ -112,9 +112,9 @@ const constraintSummary = computed(() =>
     .filter((entity) => entity.rules.length),
 )
 
-// Preview honesty: the form preview is built from the ROUND-TRIPPED parse —
+// Preview honesty: the form preview is built from the ROUND-TRIPPED parse,
 // the emitted crate (buildProfileCrate) parsed back the way the dataset dialog
-// will parse it — not from the in-memory rules. The round-trip is lossy by
+// will parse it, not from the in-memory rules. The round-trip is lossy by
 // design in documented spots (e.g. a text rule with multiple values flattens to
 // a keyword list); the preview showing that loss is the point.
 const roundTrip = computed<{ parsed: ReturnType<typeof parseProfileCrate> | null; error: string | null }>(() => {

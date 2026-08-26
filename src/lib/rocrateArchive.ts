@@ -123,7 +123,7 @@ export interface ArchiveReportPage<T> {
 }
 
 // GET /jobs/{id}/report answers 404 with `{code: 'report_pending', state}` while
-// the job has not frozen its report yet — pending, not an error.
+// the job has not frozen its report yet: pending, not an error.
 export type ArchiveReportResult<T> =
   | { status: 'pending'; state: string }
   | { status: 'ready'; page: ArchiveReportPage<T> }
@@ -236,7 +236,7 @@ const ARTIFACT_MESSAGES: Record<number, string> = {
   410: 'The export artifact expired and was cleaned up. Run the export again.',
 }
 
-// POST /metadata/rocrate/uploads — raw streamed body, no timeout.
+// POST /metadata/rocrate/uploads: raw streamed body, no timeout.
 export async function uploadArchive(
   file: File,
   client: ApiClientOptions,
@@ -254,7 +254,7 @@ export async function uploadArchive(
   return (await response.json()) as UploadArchiveResponse
 }
 
-// POST /metadata/rocrate/imports — 202 with the job id; replays on a repeated
+// POST /metadata/rocrate/imports: 202 with the job id; replays on a repeated
 // idempotency key instead of starting a second import (`created: false`).
 export async function submitImport(
   request: SubmitImportRequest,
@@ -269,7 +269,7 @@ export async function submitImport(
   return (await response.json()) as SubmitImportResponse
 }
 
-// POST /metadata/{document_id}/rocrate/exports — 202 with the job id.
+// POST /metadata/{document_id}/rocrate/exports: 202 with the job id.
 export async function submitExport(
   documentId: string,
   client: ApiClientOptions,
@@ -285,7 +285,7 @@ export async function submitExport(
   return (await response.json()) as SubmitExportResponse
 }
 
-// GET /jobs/{id}/report — a 404 carrying `code: 'report_pending'` means the job
+// GET /jobs/{id}/report: a 404 carrying `code: 'report_pending'` means the job
 // has not frozen its report yet; every other 404 is a real miss.
 export async function fetchArchiveReport<T>(
   jobId: string,
@@ -322,7 +322,7 @@ function dispositionName(header: string | null): string | null {
   return plain ? plain[1] : null
 }
 
-// GET /jobs/{id}/artifacts/rocrate — bearer-authenticated, so the browser cannot
+// GET /jobs/{id}/artifacts/rocrate: bearer-authenticated, so the browser cannot
 // simply follow a link; the body is buffered into a blob and saved.
 export async function downloadArchiveArtifact(jobId: string, client: ApiClientOptions): Promise<string> {
   const path = `/jobs/${encodeURIComponent(jobId)}/artifacts/rocrate`

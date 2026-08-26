@@ -44,7 +44,7 @@ export function normalizeDocumentPath(path: string): string {
 }
 
 // Mirrors aruna core/src/structs/notification_watch.rs data_watch_resource_path:
-// `s3/{group_id}/{node_id}/{bucket}/{key}` — uploads emit exactly this shape.
+// `s3/{group_id}/{node_id}/{bucket}/{key}`; uploads emit exactly this shape.
 // The trailing slash after the bucket is required even for an empty key prefix.
 export function dataWatchPathPrefix(groupId: string, nodeId: string, bucket: string, keyPrefix = ''): string {
   return `s3/${groupId}/${nodeId}/${bucket}/${keyPrefix}`
@@ -55,7 +55,7 @@ export interface S3NodeCandidate {
   s3Url?: string | null
 }
 
-// The node segment must be the node whose S3 endpoint receives the upload —
+// The node segment must be the node whose S3 endpoint receives the upload;
 // uploads emit that node's id, so a watch registered under any other node id
 // never fires. Resolves the endpoint's owner, falling back to the local node.
 export function s3EndpointNodeId(

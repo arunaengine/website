@@ -3,7 +3,7 @@
 // Providers are interchangeable sources of term hits: the bundled vocabulary
 // (schema.org + Dublin Core, always available, offline) and optional remote
 // services such as the TS4NFDI federated gateway. Nothing outside this module
-// tree couples to a concrete service — consumers see only TermHit — and
+// tree couples to a concrete service (consumers see only TermHit), and
 // published profiles never depend on a live provider: a picked term is baked
 // (URI + label + description) into the profile crate at emission time, so forms
 // render offline regardless of provider availability.
@@ -47,5 +47,5 @@ export interface TerminologyProvider {
 }
 
 // Per-provider outcome of the latest search: 'timeout'/'error' mean degraded
-// (bundled results still flow — a provider failure is NEVER a hard failure).
+// (bundled results still flow; a provider failure is NEVER a hard failure).
 export type ProviderStatus = 'ok' | 'timeout' | 'error'

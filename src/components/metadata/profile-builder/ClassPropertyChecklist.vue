@@ -13,7 +13,7 @@ import { draftProperty, trimmed, type DraftEntityRule, type ProfileBuilder } fro
 // ordinary MAY rule. The list is the CURATED catalog only: the bundled
 // vocabulary carries no domain/class data (only range-derived kinds) and the
 // remote terminology providers are search-only, so any broader list would fake
-// class-scoping from text search — which plan 6.5 forbids. Terms already used
+// class-scoping from text search, which plan 6.5 forbids. Terms already used
 // on the shape are shown checked and disabled, so duplicates are impossible.
 const props = defineProps<{
   builder: ProfileBuilder

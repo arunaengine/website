@@ -53,7 +53,7 @@ async function submit() {
     open.value = false
   } catch (err) {
     // A 404 here means the realm advertises the flag but the backend has no
-    // endpoint — surface the raw message honestly.
+    // endpoint; surface the raw message honestly.
     submitError.value = err instanceof Error ? err.message : String(err)
   }
 }

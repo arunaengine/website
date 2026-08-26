@@ -38,14 +38,14 @@ import {
 } from './useProfileBuilder'
 
 const props = defineProps<{
-  // The builder — used to read the profile's entity rules for grouped target
+  // The builder, used to read the profile's entity rules for grouped target
   // options and to run the "create entity rule" quick action.
   builder: ProfileBuilder
   property: DraftPropertyRule
   entityTypeName: string
   // Owning entity type URI (drives the curated property-term catalogue).
   ownerType: string
-  // Live profile slug — used to preview the minted URI of custom terms.
+  // Live profile slug, used to preview the minted URI of custom terms.
   slug: string
 }>()
 const emit = defineEmits<{ (e: 'remove'): void }>()
@@ -64,7 +64,7 @@ const anyLock = computed(() => Boolean(property.value.lock))
 const structural = computed(() => property.value.lock === 'structural')
 const isEntity = computed(() => property.value.kind === 'entity')
 
-// Which structural baseline rule this is, by term URI — drives the opened
+// Which structural baseline rule this is, by term URI; drives the opened
 // affordances. license: kind url↔select-url, everything else frozen. The
 // obligation select (and its baseline clamp mirror) lives on PropertyRuleRow,
 // via obligationEditDisabled/obligationOptionsFor in useProfileBuilder.
@@ -119,7 +119,7 @@ const isPreservedSelect = computed(() => property.value.kind === 'select-object'
 const preservedOptionCount = computed(() => property.value.valueOptions?.length ?? 0)
 
 // L1: a select-url that imported non-string options is preserved verbatim and shown
-// read-only (like select-object) — never coerced into the editable URL list.
+// read-only (like select-object), never coerced into the editable URL list.
 const isPreservedUrlOptions = computed(
   () => property.value.kind === 'select-url' && hasPreservedUrlOptions(property.value.valueOptions),
 )
@@ -177,7 +177,7 @@ const hasPartKindError = computed(() =>
 )
 
 // M2: hasPart is inherently a repeatable relation, so selecting it as an entity
-// reference defaults the rule to multi-valued. A default, not a lock — this fires
+// reference defaults the rule to multi-valued. A default, not a lock: this fires
 // only on ENTERING the hasPart+entity state, so a deliberate toggle-off is never
 // snapped back and an already-multiple import is never disturbed.
 watch(
@@ -220,7 +220,7 @@ const referenceHelp = computed(() => {
   return `Dataset authors may ${phrases.join(', or ')}.`
 })
 
-// WS5/M1/M2: the required-contents editor is authorable ONLY for the hasPart term —
+// WS5/M1/M2: the required-contents editor is authorable ONLY for the hasPart term;
 // that is the one relation the dataset dialog enforces. Imported required instances
 // on other rules are preserved (see normalizeProperty) and surfaced in the review
 // step, just not editable here. It stays visible whenever rows already exist, even
@@ -254,7 +254,7 @@ function autofillName() {
 
 // ---------------------------------------------------------------------------
 // Property term picker: curated schema.org terms for the owning type + saved
-// custom terms, plus two escapes — paste an External URI, or mint a Custom term
+// custom terms, plus two escapes: paste an External URI, or mint a Custom term
 // (portal-hosted, URI derived from slug + property name at serialization time).
 // ---------------------------------------------------------------------------
 const EXTERNAL_SENTINEL = '__external_uri__'
@@ -298,7 +298,7 @@ const pickerValue = computed(() => {
   return trimmed(property.value.propertyUri) || MINT_SENTINEL
 })
 
-// The absolute URI this rule serializes to — mirrors normalizeProperty so the
+// The absolute URI this rule serializes to; mirrors normalizeProperty so the
 // hint always shows the real term, including the minted one for custom terms.
 const resolvedUri = computed(() => {
   const explicit = trimmed(property.value.propertyUri)
@@ -324,7 +324,7 @@ function onTermSelect(value: string) {
     if (!trimmed(property.value.label)) property.value.label = term.label
     // WS1: apply the term's suggested kind / target types as defaults, but only
     // when the author has not diverged from the factory defaults (kind 'text', no
-    // targets) — never a lock, just a helpful starting point.
+    // targets). Never a lock, just a helpful starting point.
     if (term.suggestedKind && property.value.kind === 'text') {
       property.value.kind = term.suggestedKind
     }
@@ -335,7 +335,7 @@ function onTermSelect(value: string) {
 }
 
 // Remember a pasted external URI so it shows as a normal option next time.
-// Only an absolute URI commits — search text typed to drive the vocabulary
+// Only an absolute URI commits; search text typed to drive the vocabulary
 // suggestions below must never be saved as a bogus custom term.
 function commitExternalUri() {
   const uri = trimmed(property.value.propertyUri)
@@ -366,7 +366,7 @@ function applyVocabTerm(term: VocabTerm) {
   if (!trimmed(property.value.label)) property.value.label = term.label
   if (!trimmed(property.value.description) && term.description) property.value.description = term.description
   // Apply the term's suggested kind / targets as defaults only while the rule
-  // still sits on the factory defaults — never overwrite a deliberate choice.
+  // still sits on the factory defaults; never overwrite a deliberate choice.
   const suggested = vocabKind(term)
   if (suggested && suggested !== 'text' && property.value.kind === 'text') property.value.kind = suggested
   if (term.targets?.length && property.value.kind === 'entity' && !property.value.entityTypes.length) {
@@ -405,7 +405,7 @@ const selectedTargets = computed(() =>
     }),
 )
 
-// Selected targets that no entity rule defines — no sub-form is generated for
+// Selected targets that no entity rule defines; no sub-form is generated for
 // them until one is created (offered inline as a quick action).
 const unresolvedTargets = computed(() =>
   property.value.entityTypes
@@ -436,8 +436,8 @@ function createEntityRule(uri: string) {
 // allowed sources, list cardinality, allowed values/URLs, constraints, required
 // contents). It stays collapsed by default so the card leads with the primary
 // decisions. It auto-opens once, seeded on mount, when the rule already carries
-// advanced content — an imported rule, any non-default constraint, or a field
-// that is currently invalid — so those settings are never silently hidden. It
+// advanced content (an imported rule, any non-default constraint, or a field
+// that is currently invalid), so those settings are never silently hidden. It
 // then only ever opens (never auto-closes) if a field inside later turns
 // invalid, mirroring the old technical-details disclosure that opened itself on
 // a name error.
@@ -585,7 +585,7 @@ watch(advancedNeedsAttention, (needsAttention) => {
         button-label="Add target type"
         @pick="addTarget"
       />
-      <!-- A selected other-type target has no rule, so no sub-form is generated —
+      <!-- A selected other-type target has no rule, so no sub-form is generated:
            offer to create one in a click. -->
       <div
         v-for="target in unresolvedTargets"
@@ -703,7 +703,7 @@ watch(advancedNeedsAttention, (needsAttention) => {
           <p v-else class="mt-0.5 text-[11px] text-muted-foreground">Comma-separated list of the values users may pick.</p>
         </div>
 
-        <!-- WS3: select-url is authorable — an add/remove list of the allowed absolute
+        <!-- WS3: select-url is authorable, an add/remove list of the allowed absolute
              URLs users may pick from. At least one is required. L1: an imported set that
              carries non-string (structured) options is preserved verbatim and read-only. -->
         <div v-if="property.kind === 'select-url'">

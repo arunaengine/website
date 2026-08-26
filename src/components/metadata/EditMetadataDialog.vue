@@ -102,7 +102,7 @@ interface ProfileTransitionReviewItem {
 const props = defineProps<{
   open: boolean
   documentId: string
-  // The document's resolved profile, when one exists — drives the (non-blocking)
+  // The document's resolved profile, when one exists; drives the (non-blocking)
   // validation panel in the Fields tab.
   profile?: MetadataProfile | null
 }>()

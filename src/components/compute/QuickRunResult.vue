@@ -174,7 +174,7 @@ const firstBucket = computed(() => props.outputs[0]?.bucket ?? '')
       </div>
       <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
 
-      <!-- In / out — mirrors the wizard's data step. -->
+      <!-- In / out, mirrors the wizard's data step. -->
       <div class="grid gap-4 lg:grid-cols-2">
         <section class="surface-muted space-y-2 p-4">
           <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">

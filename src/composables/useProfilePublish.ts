@@ -26,7 +26,7 @@ export interface PublishDestination {
 // the bucket exists, carries permissive read CORS, and is covered by a public
 // (Everyone-principal) READ role so the URLs work without credentials.
 //
-// Constraint: the ACTIVE S3 key must belong to the profile's group — buckets
+// Constraint: the ACTIVE S3 key must belong to the profile's group: buckets
 // are owned by the creating key's group, and the public role's permission path
 // is built for the profile's group. A mismatched key fails role creation or
 // leaves the artifacts unreadable; the thrown errors say which.
@@ -128,7 +128,7 @@ export function useProfilePublish() {
   }
 
   // A browser request that died before any HTTP response almost always means
-  // the destination bucket's stored CORS rules rejected the preflight — e.g. a
+  // the destination bucket's stored CORS rules rejected the preflight, e.g. a
   // profiles bucket written by an older portal version whose rule allowed only
   // GET/HEAD, which blocks every write including the fix itself. Name the
   // bucket and the way out instead of surfacing the SDK's bare "Failed to

@@ -155,8 +155,8 @@ const createGroupOpen = ref(false)
 const profileSchema = ref<JsonSchema | undefined>()
 const profileControls = ref<ProfileControl[]>([])
 // The raw Dataset property rules behind profileControls, kept so hasPart rules can
-// be detected by propertyUri (isHasPartUri) and their requiredInstances validated
-// — ProfileControl carries neither propertyUri nor a way back to the rule.
+// be detected by propertyUri (isHasPartUri) and their requiredInstances validated;
+// ProfileControl carries neither propertyUri nor a way back to the rule.
 const profileDatasetRules = ref<ProfilePropertyRule[]>([])
 const profileEntityRules = ref<ProfileEntityRule[]>([])
 const profileContextTerms = ref<Record<string, string>>({})
@@ -173,7 +173,7 @@ const profileShapes = ref<string[]>([])
 const profileAdditionalRequirements = ref<LiftNote[]>([])
 const profileLoading = ref(false)
 const profileLoadError = ref<string | null>(null)
-// True when the full-crate load (or its S3 artifact resolution) FAILED — as
+// True when the full-crate load (or its S3 artifact resolution) FAILED, as
 // opposed to the informational "profile has no machine-readable rules" case.
 // The initial summary parse structurally contains zero profile rules (the
 // backend summary strips File entities), so a failed refinement means the form
@@ -224,7 +224,7 @@ const hiddenPrivateProfiles = computed(() => profiles.value.length - selectableP
 const profileOptions = computed(() => [
   { value: NO_PROFILE_VALUE, label: 'No profile reference' },
   ...selectableProfiles.value.map((profile) => {
-    // Count every entity rule's properties — the same total ProfilesView shows —
+    // Count every entity rule's properties (the same total ProfilesView shows),
     // not just the root Dataset rules.
     const count = profile.entityRules.length
       ? profile.entityRules.reduce((sum, rule) => sum + rule.propertyRules.length, 0)
@@ -305,7 +305,7 @@ const dataRefsValid = computed(() => dataRefs.value.every((entry) => !dataRefUrl
 // instances validated against the data references. A NON-entity (scalar/url)
 // hasPart rule can't be represented by that section and would collide with its
 // hasPart emission, so it is surfaced as a blocking configuration collision (M5),
-// exactly the way reserved keys are — never a silent brick.
+// exactly the way reserved keys are, never a silent brick.
 const hasPartDatasetRules = computed(() => profileDatasetRules.value.filter((rule) => isHasPartUri(rule.propertyUri)))
 const hasPartRules = computed(() => hasPartDatasetRules.value.filter((rule) => rule.kind === 'entity'))
 const hasPartScalarCollisionKeys = computed(() => hasPartDatasetRules.value.filter((rule) => rule.kind !== 'entity').map((rule) => rule.valueName))
@@ -347,7 +347,7 @@ const hasPartRequirements = computed(() =>
   hasPartRules.value.flatMap((rule) => {
     // Severity comes straight from validateRequiredInstances (all of a rule's
     // instances share one severity) so the checklist never drifts from the gating
-    // logic — MUST → error, SHOULD/MAY → warning (H3). Empty entries yield a
+    // logic: MUST → error, SHOULD/MAY → warning (H3). Empty entries yield a
     // violation per non-empty instance; its severity is the rule's severity.
     const severity: ProfileViolation['severity'] = validateRequiredInstances(rule, [])[0]?.severity ?? 'error'
     return (rule.requiredInstances ?? [])
@@ -376,7 +376,7 @@ const entitySubControls = computed<Record<string, ProfileControl[]>>(() => {
 // The values record fed to the Dataset schema validator: scalar profile values
 // plus each entity control's effective entry values, so presence and list
 // cardinality act on the COMBINED entry count (described-new instances always
-// count; reuse blanks and stale crate ids are pruned — H1/M4 — so validation
+// count; reuse blanks and stale crate ids are pruned (H1/M4), so validation
 // matches what will actually be emitted).
 const normalizedGeneratedValues = computed(() => {
   const values: Record<string, unknown> = {
@@ -415,7 +415,7 @@ const profileCollisionKeys = computed(() => profileControls.value.map((control) 
 // recurses through nested sub-forms: described-new entries get the target
 // shape's scalar validation, flat reference-format checks and nested trees;
 // reuse entries get the reference-format check ONLY (reuse-by-URI is never
-// re-validated against the shape — plan 5.4, stated in the UI).
+// re-validated against the shape; plan 5.4, stated in the UI).
 const entityEntryViolations = computed<Record<string, EntryViolationNode[]>>(() => {
   const ctx = { entityRules: profileEntityRules.value, crateIds: crateIdSet.value }
   const map: Record<string, EntryViolationNode[]> = {}
@@ -463,7 +463,7 @@ const showIdentifierScaffold = computed(() => !profileValueNames.value.has('iden
 // select-url) renders its Select in place of the free-text License URL scaffold,
 // two-way bound to `license` (the value crate emission uses). `license` is a
 // built-in key, so this control is filtered out of generatedScalarControls and
-// would otherwise be invisible — only the after-the-fact enum error would show.
+// would otherwise be invisible; only the after-the-fact enum error would show.
 const licenseControl = computed(() =>
   profileControls.value.find(
     (control) => control.property === 'license' && (control.kind === 'enum' || control.kind === 'select-url') && (control.enumOptions?.length ?? 0) > 0,
@@ -631,7 +631,7 @@ const scaffoldClaimedKeys = computed(() =>
 // --- Server validation preview: the exact crate buildRoCrate would save, sent
 // to the node's advisory preview endpoint. Debounced on every form change while
 // a profile is active, plus the explicit "Run preview" action. Findings NEVER
-// gate submission — the bespoke validator above stays the synchronous first
+// gate submission; the bespoke validator above stays the synchronous first
 // line, and the write path validates authoritatively.
 const {
   result: previewResult,
@@ -1648,7 +1648,7 @@ async function submit(unprofiled = false) {
           <!-- Generated profile section. The summary parse structurally carries ZERO
                profile rules, so until the full crate refines them the form would be
                silently missing fields: show a skeleton while loading and a BLOCKING
-               error panel (with Retry) when the full-crate load failed — never a
+               error panel (with Retry) when the full-crate load failed, never a
                silently-degraded form. -->
           <section v-if="profileAdditionalRequirements.length || serverRequiredConstraints.length" class="space-y-2 rounded-md border border-border p-3">
             <div>

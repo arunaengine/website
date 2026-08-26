@@ -167,7 +167,7 @@ const currentStepErrors = computed(() => {
   return formErrors.value
 })
 
-// The step callout only lists errors with no field anchor — basics errors are
+// The step callout only lists errors with no field anchor; basics errors are
 // rendered inline at their inputs (or by the token banner), so step 1 shows
 // only unanchored leftovers, plus a pointer while the Create tab is hidden.
 const currentStepCallout = computed(() => {
@@ -301,7 +301,7 @@ async function submit() {
       propertyRules: builder.datasetEntity?.propertyRules ?? [],
       schema: builder.generatedSchema,
       // D9: carry the GENERATED mode (our rules merged over any imported mode), so
-      // the fallback profile matches what was written to the crate — not the raw
+      // the fallback profile matches what was written to the crate, not the raw
       // imported mode, which would omit builder edits.
       mode: entityRulesToMode(basics, entityRules, builder.importedMode ?? undefined),
       suggestedKeywords: [],

@@ -152,7 +152,7 @@ const STRATEGY_OPTIONS = [
 // ── Connector tab ───────────────────────────────────────────────────────────
 const connectorSel = ref('')
 const connectorStrategy = ref<'snapshot' | 'reference'>('snapshot')
-// Set when the entries endpoint is absent on this node — the typed source path
+// Set when the entries endpoint is absent on this node; the typed source path
 // stays available as the fallback.
 const entriesUnsupported = ref(false)
 // Set when the node answered but the source refused a listing (502/504); the
@@ -237,7 +237,7 @@ function addTypedConnectorPath() {
 // ── Other buckets tab ───────────────────────────────────────────────────────
 // Import from any bucket in the realm: search local and remote buckets, browse
 // them through their per-node S3 client, then multi-select
-// objects/folders and create sync relationships into the current bucket —
+// objects/folders and create sync relationships into the current bucket:
 // mode "once" copies now, mode "reference" exposes without copying. The
 // create request POSTs to the SOURCE node's API (the source is always the
 // node receiving the request).

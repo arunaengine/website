@@ -2,7 +2,7 @@
 //
 // Endpoint: GET <gatewayUrl>/search?query=…&targetDbSchema=ols&omitArtefactsWithoutIri=true
 // The gateway URL comes from portal runtime config (terminology.gatewayUrl).
-// The portal never depends on the service being reachable — the bundled
+// The portal never depends on the service being reachable; the bundled
 // vocabulary always stands on its own when the gateway is offline.
 //
 // The response shape is loosely typed across gateway backends, so every hit is
@@ -22,8 +22,8 @@ export const TS4NFDI_PROVIDER_ID = 'ts4nfdi'
 
 // Remote budget: the gateway is a SLOW federated fan-out (verified live
 // 2026-07-21: healthy responses in 2-10+ seconds; CORS is open). The picker is
-// non-blocking — bundled results render instantly and remote hits stream in
-// under a pending indicator — so a generous budget costs only a longer spinner,
+// non-blocking (bundled results render instantly and remote hits stream in
+// under a pending indicator), so a generous budget costs only a longer spinner,
 // while a tight one made the service look permanently broken. A dead or
 // CORS-blocked gateway still fails fast, and per-provider negative caching
 // keeps a hung one from re-stalling every keystroke.

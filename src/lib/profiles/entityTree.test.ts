@@ -238,7 +238,7 @@ describe('nested entity emission', () => {
 
   it('dedupes shared nested ids', () => {
     // Two described-new entries naming the same @id merge into one entity and
-    // one reference — at nested depth exactly like at the top level.
+    // one reference, at nested depth exactly like at the top level.
     const control = sampleControl()
     const apControl = subControl(control, 'additionalProperty')
     const first = newEntityEntry(apControl, ENTITIES, 2)

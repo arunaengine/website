@@ -85,7 +85,7 @@ function startSignIn() {
       </template>
     </PageHeader>
 
-    <!-- Gate 1: both features disabled — no API call is ever issued here. -->
+    <!-- Gate 1: both features disabled; no API call is ever issued here. -->
     <div v-if="!anyEnabled" class="container py-8">
       <EmptyState
         title="Compute is not enabled"
@@ -105,7 +105,7 @@ function startSignIn() {
       </section>
     </div>
 
-    <!-- Gate 2: not signed in — tasks and jobs are scoped to the account. -->
+    <!-- Gate 2: not signed in; tasks and jobs are scoped to the account. -->
     <div v-else-if="!currentUser" class="container py-8">
       <section class="surface mx-auto max-w-xl p-8 text-center">
         <Cpu class="mx-auto h-8 w-8 text-muted-foreground/70" />

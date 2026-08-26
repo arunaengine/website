@@ -11,7 +11,7 @@ import { isWorkspaceBucket } from '@/lib/workspaces'
 import { computed, ref, watch } from 'vue'
 import { Boxes, KeyRound, Link2, Loader2 } from '@lucide/vue'
 
-// Read-only bucket/object browser (no uploads, deletes or routing — the Data
+// Read-only bucket/object browser (no uploads, deletes or routing; the Data
 // Manager keeps its own richer inline browser). Two shapes:
 //  - default: own bucket sidebar, clicking an object emits `select` (pickers).
 //  - controlled (`bucket` prop set): browses exactly that bucket, optionally

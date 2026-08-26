@@ -11,7 +11,7 @@ import { isValidPropertyTermName, normalizeTypeUri, sameSchemaOrgType } from '@/
 import { draftProperty, propertyName, trimmed, type DraftEntityRule, type ProfileBuilder } from './useProfileBuilder'
 
 // The ONE way to add a property rule (plan 6.3): a single searchable picker with
-// progressively broader results — common (curated) properties for the owner
+// progressively broader results. Common (curated) properties for the owner
 // type first, then bundled/remote terminology matches, then an explicit custom
 // escape. Every path inserts the same ordinary editable draft rule; terminology
 // picks default to MAY because a terminology cannot decide profile policy.

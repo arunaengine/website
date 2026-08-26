@@ -2521,7 +2521,7 @@ const isEmpty = computed(
               </div>
             </div>
 
-            <!-- Persistent drop target — same upload path and guards as the
+            <!-- Persistent drop target: same upload path and guards as the
                  toolbar Upload button. -->
             <button
               type="button"

@@ -172,7 +172,7 @@ function executorLog(i: number) {
   return latestLog.value?.logs?.[i]
 }
 
-// The canonical TES progression IMPLIED by the current state — TES exposes no
+// The canonical TES progression IMPLIED by the current state; TES exposes no
 // recorded state history, so this is a projection, not a timeline.
 function stagesFor(state: TesState | undefined): WatchStage[] {
   const s = (q: WatchStage['state'], i: WatchStage['state'], r: WatchStage['state'], f: WatchStage['state'], rd?: string, fd?: string): WatchStage[] => [
@@ -219,7 +219,7 @@ function resolveUrl(url: string): ResolvedLink {
   if (parsed) {
     // Slash-less parent prefix, matching DataManagerView.navigateTo (which
     // appends its own trailing '/'); a trailing slash here would list the
-    // bucket at "prefix//" — an always-empty folder view.
+    // bucket at "prefix//", an always-empty folder view.
     const prefix = parsed.key.includes('/') ? parsed.key.slice(0, parsed.key.lastIndexOf('/')) : ''
     return { kind: 's3', bucketId: parsed.bucket, prefix }
   }

@@ -1,6 +1,6 @@
 // Profile-aware presenter behind the metadata landing page. One linear pass
-// assigns every crate entity exactly one home — hero, data table, related list,
-// person/organization card, or context block — and turns the root's and every
+// assigns every crate entity exactly one home (hero, data table, related list,
+// person/organization card, or context block) and turns the root's and every
 // context entity's remaining properties into labeled, profile-ordered fields.
 
 import { crateGraph, crateRootId, entityKind, isDataEntity, stringProp } from '@/lib/dataEntities'

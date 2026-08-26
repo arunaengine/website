@@ -28,7 +28,7 @@ import { ref, watch } from 'vue'
 import { Database, KeyRound, Loader2, LogIn, Plus, ShieldAlert } from '@lucide/vue'
 
 // Picker for a dataset data reference: browse the node's own S3 data or paste
-// an external URL. Emits one `{ label, url }` entry per add — the same shape
+// an external URL. Emits one `{ label, url }` entry per add, the same shape
 // NewDatasetDialog's dataRefs rows hold.
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{

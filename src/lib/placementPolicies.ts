@@ -34,7 +34,7 @@ export interface PolicyResponse {
   created_at_ms: number
 }
 
-// GET /admin/placement-policies — the realm-config read view, ordered by
+// GET /admin/placement-policies: the realm-config read view, ordered by
 // policy_id ascending and served from the node-local replicated copy. A node
 // that does not serve it answers 404/405 and the caller keeps its session
 // library instead of claiming the realm has no policies.

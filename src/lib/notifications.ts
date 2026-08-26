@@ -28,7 +28,7 @@ function keyPrefix(key: string): string {
   return key.split('/').slice(0, -1).join('/')
 }
 
-// Registry of backend notification kinds (stable `name()` strings — see
+// Registry of backend notification kinds (stable `name()` strings; see
 // aruna docs/design/notifications.md §9, append-only). Later portal branches
 // extend this by ADDING entries here: e.g. issue #248 adds `join_request_*`
 // kinds linking to the group's requests tab, issue #250 adds quota-transition
@@ -44,7 +44,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     icon: UserMinus,
     title: (n, ctx) => `You were removed from ${groupLabel(n, ctx)}`,
     detail: () => undefined,
-    // Membership is gone, so the detail page would 403 — link to the list.
+    // Membership is gone, so the detail page would 403; link to the list.
     link: () => ({ name: 'groups' }),
   },
   group_member_added: {

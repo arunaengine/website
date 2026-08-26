@@ -68,7 +68,7 @@ export function readQuarantine(recordId: string, client: ApiClientOptions): Prom
   return apiRequest<QuarantineInspect>(`/admin/sync-quarantine/${encodeURIComponent(recordId)}`, {}, client)
 }
 
-// POST acknowledge — idempotent; returns the updated record.
+// POST acknowledge: idempotent; returns the updated record.
 export function ackQuarantine(recordId: string, client: ApiClientOptions): Promise<QuarantineRecord> {
   return apiRequest<QuarantineRecord>(
     `/admin/sync-quarantine/${encodeURIComponent(recordId)}/acknowledge`,
@@ -77,7 +77,7 @@ export function ackQuarantine(recordId: string, client: ApiClientOptions): Promi
   )
 }
 
-// DELETE — one bounded pass: scans up to `limit` rows from `cursor`, removes
+// DELETE. One bounded pass: scans up to `limit` rows from `cursor`, removes
 // the acknowledged ones and returns `next_cursor` when rows remain unscanned,
 // so a full prune is a caller-driven loop of passes.
 export function pruneQuarantine(query: QuarantineQuery, client: ApiClientOptions): Promise<QuarantinePruneResult> {

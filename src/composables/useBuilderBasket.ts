@@ -1,6 +1,6 @@
 // Per-view basket that accumulates heterogeneous import rows and submits them:
 // connector and internal (aruna_native) rows through synchronous staging, local
-// files through the persistent upload queue. A FACTORY, not a module singleton —
+// files through the persistent upload queue. A FACTORY, not a module singleton:
 // each builder view owns its own basket, cleared when the view unmounts.
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { stagingErrorMessage, useStaging } from './useStaging'
@@ -143,7 +143,7 @@ export function useBuilderBasket(ctx: {
     return added
   }
 
-  // A picked folder's files carry webkitRelativePath — keep the folder
+  // A picked folder's files carry webkitRelativePath; keep the folder
   // structure in the source label and the target key.
   function uploadSource(file: File): string {
     const relative = file.webkitRelativePath

@@ -71,7 +71,7 @@ export function aggregateByLocation(nodes: RealmNodeInfo[]): LocationAggregate[]
   })
 }
 
-// Unique placement locations, sorted, mapped nodes only — the realm's "known
+// Unique placement locations, sorted, mapped nodes only: the realm's "known
 // locations" list that feeds the affinity pin chips (issue #269).
 export function knownLocations(nodes: RealmNodeInfo[]): string[] {
   const locations = new Set<string>()

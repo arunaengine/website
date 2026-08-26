@@ -1,5 +1,5 @@
 // Two-tier cache for remote terminology lookups plus brief negative caching of
-// provider failures. The bundled provider never goes through here — it is
+// provider failures. The bundled provider never goes through here; it is
 // already instant and offline.
 //
 //  - Session tier: an in-memory Map keyed `providerId|query`; hits are served
@@ -21,9 +21,9 @@ const FAILURE_TTL_MS = 30_000
 
 interface PersistedEntry {
   hits: TermHit[]
-  // Write time — drives staleness.
+  // Write time: drives staleness.
   at: number
-  // Last-read time — drives LRU eviction.
+  // Last-read time: drives LRU eviction.
   used: number
 }
 
@@ -74,7 +74,7 @@ export function readTermCache(providerId: string, query: string): CachedHits | n
   const store = readStore()
   const entry = store[key]
   if (!validEntry(entry)) return null
-  // Touch for LRU; skip the write if touching fails — purely an optimization.
+  // Touch for LRU; skip the write if touching fails, purely an optimization.
   entry.used = Date.now()
   writeStore(store)
   return { hits: entry.hits, stale: Date.now() - entry.at > FRESH_MS }
@@ -98,7 +98,7 @@ export function writeTermCache(providerId: string, query: string, hits: TermHit[
 }
 
 // Negative caching: remember that a provider just failed (and how), so the
-// registry can skip it — and still report the degraded status — for a moment.
+// registry can skip it (and still report the degraded status) for a moment.
 export function noteProviderFailure(providerId: string, status: ProviderStatus): void {
   recentFailures.set(providerId, { status, at: Date.now() })
 }

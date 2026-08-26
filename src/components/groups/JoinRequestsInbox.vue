@@ -34,7 +34,7 @@ async function reload() {
     requests.value = await listGroupJoinRequests(props.groupId)
     setCount()
   } catch (err) {
-    // A 404 here means a backend without aruna#248 yet — render it inline.
+    // A 404 here means a backend without aruna#248 yet; render it inline.
     loadError.value = err instanceof Error ? err.message : String(err)
   } finally {
     loading.value = false

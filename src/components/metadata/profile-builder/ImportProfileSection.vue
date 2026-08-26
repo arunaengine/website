@@ -33,7 +33,7 @@ const pendingShacl = ref<{ text: string; fileName: string; lift: LiftResult } | 
 const shaclNotice = ref<{ fileName: string; shapeCount: number } | null>(null)
 
 // "Start from an existing profile": prefill the builder from any stored or
-// built-in profile on this node — the same ingest path as an uploaded crate.
+// built-in profile on this node, the same ingest path as an uploaded crate.
 const { profiles, loadRoCrate } = useAruna()
 const storedId = ref('')
 const storedBusy = ref(false)

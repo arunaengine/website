@@ -96,7 +96,7 @@ function endpointOf(connector: SourceConnectorSummary): string {
 
 // Stored-config connection test (agreed contract:
 // POST /groups/{gid}/connectors/{cid}/check). Once one call answers 404/501 the
-// affordance hides — the node predates the endpoint.
+// affordance hides; the node predates the endpoint.
 const checkUnsupported = ref(false)
 const checkingId = ref<string | null>(null)
 const checkResults = ref<Record<string, ConnectorCheckResponse | { ok: false; error: string }>>({})

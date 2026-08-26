@@ -19,8 +19,8 @@ import type {
 } from './types'
 
 // Recursive reuse-or-create entity model. An entity-kind sub-control whose
-// target type has an entity rule in the profile nests a full sub-form — its
-// instance value is an `EntityEntry[]` of its own — up to MAX_ENTITY_DEPTH
+// target type has an entity rule in the profile nests a full sub-form (its
+// instance value is an `EntityEntry[]` of its own) up to MAX_ENTITY_DEPTH
 // levels of described-new forms below the Dataset root. At the cap, and for
 // target types without a rule, the value stays the flat URI-reference shape
 // ('' single / string[] multiple), each emitted as a `{"@id"}` reference.
@@ -33,7 +33,7 @@ export function nestsSubForm(control: ProfileControl, depth: number): boolean {
 }
 
 // The sub-form seeded for an entity reference whose target type has no entity
-// rule in the profile — a single Name (Text) field so instances aren't fieldless.
+// rule in the profile: a single Name (Text) field so instances aren't fieldless.
 export const MINIMAL_ENTITY_RULE: ProfilePropertyRule = {
   id: 'name',
   label: 'Name',
@@ -62,14 +62,14 @@ export function entitySchemaFor(control: ProfileControl): JsonSchema {
 }
 
 // Display label of an entity reference: the resolved entity rule's type, else the
-// first target type URI — never the literal 'entity' unless nothing is set.
+// first target type URI, never the literal 'entity' unless nothing is set.
 export function entityTypeLabelFor(control: ProfileControl): string {
   const type = control.entityRule?.type ?? control.entityTypes?.[0] ?? ''
   return entityTypeLabel(type) || 'entity'
 }
 
 // @type of an EMITTED entity instance: the resolved entity rule's canonical
-// className — the JSON-LD compact alias mapped in the crate @context (D3), so an
+// className, the JSON-LD compact alias mapped in the crate @context (D3), so an
 // imported alias (e.g. `Specimen` over an OBO PURL) survives instead of being
 // re-derived from the type URI. For a ruleless target: a schema.org type emits its
 // bare label (resolvable via the base context); a custom type emits its context
@@ -168,7 +168,7 @@ export interface EntryViolationNode {
 // Per-entry violations for one control's entry list at `depth`. Described-new
 // entries get the target shape's scalar validation, flat-reference format
 // checks, and recursive nested trees; reuse entries get the reference-format
-// check ONLY (reuse-by-URI is never re-validated against the shape — plan 5.4).
+// check ONLY (reuse-by-URI is never re-validated against the shape, plan 5.4).
 export function validateEntries(
   entries: EntityEntry[],
   control: ProfileControl,
@@ -276,7 +276,7 @@ function refFormatViolation(property: string): ProfileViolation {
   }
 }
 
-// Blocking error count across a violation forest — the submit gate.
+// Blocking error count across a violation forest: the submit gate.
 export function countEntryErrors(nodes: EntryViolationNode[]): number {
   let count = 0
   for (const node of nodes) {

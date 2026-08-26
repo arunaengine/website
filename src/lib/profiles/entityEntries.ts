@@ -6,7 +6,7 @@ import type { ProfileEntitySource } from './types'
 // Phase 4): each field manages ONE ordered list of entries, where every entry
 // is either a described-new instance (sub-form values) or a reuse reference
 // (an absolute URI, or a crate-local data-reference id). The two reuse
-// flavours share one entry kind — which inputs a reuse entry offers comes from
+// flavours share one entry kind: which inputs a reuse entry offers comes from
 // the rule's entitySources policy, and a value is classified structurally
 // (crate ids are picked from the current data references, everything else
 // must be an absolute URI).
@@ -65,7 +65,7 @@ export function normalizedCustomId(entry: EntityEntry): string | undefined {
 // contributes nothing: blanks are dropped (an empty row never satisfies
 // presence and never emits), and a crate-only policy drops ids that no longer
 // resolve to a current data reference (a removed data reference must resurface
-// its presence violation instead of emitting a dangling {"@id"} — M4). A
+// its presence violation instead of emitting a dangling {"@id"}, M4). A
 // policy that allows external reuse keeps any non-blank value: invalid URIs
 // count as provided but are blocked by the format check (entryRefInvalid).
 export function effectiveEntryRef(
@@ -84,7 +84,7 @@ export function effectiveEntryRef(
 // Blocking format error for a reuse entry: a non-blank reference that is
 // neither a current data reference (when crate reuse is allowed) nor an
 // absolute URI (when external reuse is allowed). Crate-only stale ids are NOT
-// format errors — they are pruned (effectiveEntryRef) so the presence check
+// format errors: they are pruned (effectiveEntryRef) so the presence check
 // fires instead. Reuse-by-URI is checked as a reference only; the target's
 // own shape rules apply exclusively to described-new entries (plan 5.4).
 export function entryRefInvalid(
@@ -102,7 +102,7 @@ export function entryRefInvalid(
 
 // The values a control's entries contribute to schema validation: described-new
 // entries contribute their instance record (an entry the author added counts
-// as present even while its fields are still empty — its own sub-form errors
+// as present even while its fields are still empty; its own sub-form errors
 // flag what is missing), reuse entries contribute their effective reference.
 // Presence and list cardinality therefore act on the COMBINED entry count.
 // Entries pointing at the same @id each count here (identity is only known at

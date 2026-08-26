@@ -24,7 +24,7 @@ afterEach(() => {
 
 describe('apiRequest url building', () => {
   it('keeps the path segment of an absolute base', async () => {
-    // new URL('/info', base) would drop '/api/v1' — the split serves an
+    // new URL('/info', base) would drop '/api/v1'; the split serves an
     // absolute base, so the join must concatenate instead.
     const urls = stubBrowser()
     await apiRequest('/info', {}, { baseUrl: 'https://api.test/api/v1' })

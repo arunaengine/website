@@ -35,7 +35,7 @@ export function validateProfileData(schema: JsonSchema | undefined, values: Reco
 // blocking `error`; SHOULD and MAY → `warning` (MAY is the builder default, so an
 // optional required-contents rule never hard-blocks dataset creation). `entries`
 // are the candidate references' `{ id, name }`; an instance is satisfied by any
-// entry whose `@id` OR `name` matches it exactly. Pure — the dataset dialog and
+// entry whose `@id` OR `name` matches it exactly. Pure: the dataset dialog and
 // the jiti suite call it directly against the collected data-reference entries.
 export function validateRequiredInstances(
   rule: ProfilePropertyRule,

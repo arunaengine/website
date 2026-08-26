@@ -2,13 +2,13 @@
 @config "../../tailwind.config.js";
 
 /* ============================================================
-   ARUNA DESIGN SYSTEM V2 — semantic tokens
+   ARUNA DESIGN SYSTEM V2: semantic tokens
    Surfaces are neutral (near-black / cool white).
-   Brand blues are accents only — never surfaces.
+   Brand blues are accents only; never surfaces.
    ============================================================ */
 @layer base {
   :root {
-    /* Light theme — cool whites */
+    /* Light theme: cool whites */
     --background: 225 29% 97%; /* #F6F7FA */
     --foreground: 227 39% 10%; /* #0F1322 */
 
@@ -27,7 +27,7 @@
 
     --muted: 223 23% 94%; /* #ECEEF3 */
     /* a11y (#295): 46% lightness gave only 4.48:1 on --background and 4.16–4.40:1
-       on bg-muted tints — below WCAG AA 4.5:1 for the pervasive 10–13px labels.
+       on bg-muted tints, below WCAG AA 4.5:1 for the pervasive 10–13px labels.
        40% lifts every combination to >=5.2:1. Dark token already passes, untouched. */
     --muted-foreground: 220 9% 40%; /* #5D6470 */
 
@@ -40,13 +40,13 @@
     --border: 223 16% 91%; /* #E5E7EC */
     --input: 218 14% 84%; /* #D1D5DC */
     --field: 0 0% 100%; /* input surfaces */
-    --ring: 202 90% 42%; /* #0B85CB deep sky — 3.7:1 on bg for a visible focus ring */
+    --ring: 202 90% 42%; /* #0B85CB deep sky, 3.7:1 on bg for a visible focus ring */
 
     --radius: 0.5rem; /* cards 8 · buttons 6 · badges 4 · panels 10 */
   }
 
   .dark {
-    /* Dark theme (brand default) — near-black neutrals */
+    /* Dark theme (brand default): near-black neutrals */
     --background: 240 12% 5%; /* #0B0B0E */
     --foreground: 223 33% 96%; /* #F1F3F8 */
 
@@ -56,23 +56,23 @@
     --popover: 240 9% 13%; /* #1E1E24 elevated */
     --popover-foreground: 223 33% 96%;
 
-    --primary: 215 63% 57%; /* #4E86D7 tagline blue — links/accents */
+    --primary: 215 63% 57%; /* #4E86D7 tagline blue: links/accents */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 9% 13%; /* #1E1E24 */
     --secondary-foreground: 224 20% 82%; /* #C7CCDA */
 
-    --muted: 240 7% 15%; /* #232329 — lifted so subtle fills/hovers read on near-black */
-    --muted-foreground: 223 18% 66%; /* #99A2B8 — 7.1:1 on card, comfortably AA */
+    --muted: 240 7% 15%; /* #232329: lifted so subtle fills/hovers read on near-black */
+    --muted-foreground: 223 18% 66%; /* #99A2B8, 7.1:1 on card, comfortably AA */
 
-    --accent: 221 39% 30%; /* #2F426A — visible blue-tinted hover (was near-invisible @19%) */
+    --accent: 221 39% 30%; /* #2F426A: visible blue-tinted hover (was near-invisible @19%) */
     --accent-foreground: 223 33% 96%;
 
     --destructive: 0 84% 60%; /* #ef4444 */
     --destructive-foreground: 223 33% 96%;
 
-    --border: 240 6% 26%; /* #3E3E46 — clearer structural edges (was #26262C, ~1.3:1) */
-    --input: 240 6% 34%; /* #51515C — interactive control edge, ~2.5:1 (was ~1.5:1) */
+    --border: 240 6% 26%; /* #3E3E46: clearer structural edges (was #26262C, ~1.3:1) */
+    --input: 240 6% 34%; /* #51515C: interactive control edge, ~2.5:1 (was ~1.5:1) */
     --field: 240 8% 12%; /* #1C1C21 input surfaces */
     --ring: 191 67% 60%; /* #55C4DE aqua */
   }
@@ -100,7 +100,7 @@
 }
 
 @layer components {
-  /* The "ARUNA" wordmark is never set in a UI font — use the image
+  /* The "ARUNA" wordmark is never set in a UI font; use the image
      assets in /brand. The tagline below it may be typed in Inter. */
   .tagline {
     font-family: 'Inter', sans-serif;
@@ -189,7 +189,7 @@
 }
 
 @layer utilities {
-  /* Subtle brand gradient — hero/splash surfaces only */
+  /* Subtle brand gradient: hero/splash surfaces only */
   .wash-primary {
     background-image: radial-gradient(
         ellipse at 15% -10%,
@@ -228,7 +228,7 @@
 }
 
 /* Remap brand text onto dark surfaces. Kept outside the Tailwind layers and
-   at zero extra specificity so an explicit dark:text-* utility always wins —
+   at zero extra specificity so an explicit dark:text-* utility always wins;
    the old in-layer rule hijacked dark:text-aruna-navy into white-on-white. */
 .dark :where(.text-aruna-navy) {
   color: hsl(var(--foreground));

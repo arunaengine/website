@@ -195,7 +195,7 @@ export function buildProfileCrate(input: BuildProfileCrateInput): Record<string,
       },
       {
         // The mode file is editor guidance, not a formal validation artifact, so
-        // it takes the DX-PROF `guidance` role (a documented judgment call — the
+        // it takes the DX-PROF `guidance` role (a documented judgment call: the
         // vocabulary has no dedicated "form definition" role).
         '@id': '#mode-resource',
         '@type': DX_RESOURCE_DESCRIPTOR,
@@ -285,7 +285,7 @@ export async function parseProfileCrateForControls(rocrate: unknown): Promise<Pa
 // and return a crate copy whose artifact entities carry the text inline, so the
 // synchronous parser keeps working unchanged. Crates with embedded text (old or
 // private profiles) pass through untouched. Only entities referenced by a
-// DX-PROF ResourceDescriptor are fetched — a dataset crate's data files never
+// DX-PROF ResourceDescriptor are fetched. A dataset crate's data files never
 // qualify. Throws when a referenced artifact cannot be fetched.
 // `baseUrl` is the location the crate itself was read from. A crate authored as
 // a directory names its artifacts by crate-relative path ("constraints/x.ttl"),
@@ -312,7 +312,7 @@ export async function resolveProfileArtifacts(
   }
   if (!pending.length) return rocrate
 
-  // An artifact the crate addresses directly must resolve — a published profile
+  // An artifact the crate addresses directly must resolve: a published profile
   // is incomplete without it. One found only by resolving a relative path against
   // the crate's location is best effort: a directory crate lists its prose and
   // licence files too, and a missing or CORS-blocked one of those must not stop
@@ -525,7 +525,7 @@ function artifactByRole(
 // mode file's own context, so consumers can resolve custom terms. The mode
 // context is the durable source: craqle's export replaces the crate `@context`
 // with the bare reference URL, but mode.json text survives verbatim. A mapping
-// is skipped only when the base RO-Crate context already provides it — a
+// is skipped only when the base RO-Crate context already provides it: a
 // schema.org URI whose local name IS the term. An alias term over a schema.org
 // URI (e.g. `Author` -> schema.org/Person) must be kept: emitted dataset crates
 // use the alias as `@type` (entityTypeName in NewDatasetDialog emits the
@@ -639,7 +639,7 @@ function profileHtml(profile: ProfileBasics, entities: ProfileEntityRule[]): str
   return `<h1>${escapeHtml(profile.name)}</h1><p>${escapeHtml(profile.description)}</p><h2>RO-Crate rules</h2>${sections}`
 }
 
-// Human-readable lines for the machine constraints — list cardinality, reference
+// Human-readable lines for the machine constraints: list cardinality, reference
 // mode, allowed URL sets, required instances. Returns '' for rules that set none,
 // so legacy-shaped profiles emit byte-identical profile.html (invariant 3).
 function ruleConstraintHtml(rule: ProfilePropertyRule): string {
@@ -714,7 +714,7 @@ function idMatches(value: unknown, id: string): boolean {
 
 // Matches whichever way round the crate wrote the type: an expanded IRI against
 // a compact expectation ("Dataset"), and a COMPACT `@type` against an expanded
-// one — externally authored crates map the DX-PROF terms in their `@context` and
+// one. Externally authored crates map the DX-PROF terms in their `@context` and
 // write `"@type": "ResourceDescriptor"`, which an IRI-only test never matched.
 function typeContains(entity: Record<string, unknown>, expected: string): boolean {
   return idValues(entity['@type']).some(

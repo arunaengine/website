@@ -250,7 +250,7 @@ async function resolveDoc(id: string) {
 }
 
 watch(
-  // Wait for the initial bootstrap before deciding — the catalog list is empty
+  // Wait for the initial bootstrap before deciding: the catalog list is empty
   // during the very first load, so an unknown id must not read as not-found.
   [detailId, bootstrapped],
   async ([id, ready]) => {
@@ -284,7 +284,7 @@ const contextualExclude = computed(() => {
 })
 
 // Hero License tile: the in-crate license entity's display name, then a
-// well-known SPDX / CC label, then the readable IRI tail — never a bare URL.
+// well-known SPDX / CC label, then the readable IRI tail, never a bare URL.
 const licenseLabel = computed(() => {
   const iri = current.value?.license
   if (!iri) return ''
@@ -435,12 +435,12 @@ watch(detailId, () => {
 onBeforeUnmount(() => backlinkController?.abort())
 
 // A compute run crate (written by the backend at runs/{jobId}) parses into a
-// provenance model; anything else — including a runs/ document whose expected
-// CreateAction is missing — renders the generic data-entity table below.
+// provenance model; anything else (including a runs/ document whose expected
+// CreateAction is missing) renders the generic data-entity table below.
 const runProvenance = computed(() => parseRunCrate(currentCrate.value, currentPath.value))
 
 // While the displayed run is still executing, silently re-fetch its crate so
-// provenance grows live (no loading flag — the article must not flicker).
+// provenance grows live (no loading flag: the article must not flicker).
 const runActive = computed(() => {
   const run = runProvenance.value
   if (!run) return false

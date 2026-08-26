@@ -40,7 +40,7 @@ function langExtension(lang: ScriptLang): Extension {
 }
 
 // The mono stack lives on .cm-scroller so gutter and content share font,
-// size and line-height — an inherited proportional font in the gutters made
+// size and line-height; an inherited proportional font in the gutters made
 // the line numbers misaligned and visually off.
 const theme = EditorView.theme({
   '&': { fontSize: '12.5px', backgroundColor: 'transparent', color: 'hsl(var(--foreground))' },

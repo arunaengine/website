@@ -32,18 +32,18 @@ import type {
 // much of it as the rule model can express becomes an editable rule; whatever is
 // left over is reported as a note instead of refusing the whole file. (The
 // earlier all-or-nothing lift rejected any file using sh:not, sh:sparql, an
-// arbitrary sh:or, or sh:nodeKind sh:Literal — which is most generated SHACL, so
+// arbitrary sh:or, or sh:nodeKind sh:Literal, which is most generated SHACL, so
 // authors got a default draft and no fields.)
 //
 // Two note kinds, both surfaced to the author:
-//   'partial'  — a field WAS generated, but this detail is not editable here and
+//   'partial'  - a field WAS generated, but this detail is not editable here and
 //                only keeps working while the file stays attached.
-//   'no-field' — nothing in the builder represents this at all (cross-property
+//   'no-field' - nothing in the builder represents this at all (cross-property
 //                SPARQL rules, shapes pinned to one specific node).
 // A file with any note should stay attached as shapes.custom.ttl so the parts we
 // could not model keep validating alongside the generated shapes.
 //
-// This module imports n3, so UI callers must load it via dynamic import — the
+// This module imports n3, so UI callers must load it via dynamic import; the
 // RDF stack stays out of the main bundle (plan section 13).
 //
 // Known-lossy mappings (documented, acceptable per plan):
@@ -177,7 +177,7 @@ const PROPERTY_SHAPE_KNOWN = new Set([
   `${SH}description`,
   `${SH}order`,
   `${SH}message`,
-  // Read, but only partly representable — each reports its own note.
+  // Read, but only partly representable; each reports its own note.
   `${SH}or`,
   `${SH}not`,
   `${SH}hasValue`,
@@ -270,7 +270,7 @@ export function liftShapes(turtle: string): LiftResult {
   // Node shapes: everything explicitly typed sh:NodeShape, plus subjects that
   // declare a target or attach property shapes. Blank nodes that appear as an
   // OBJECT anywhere are nested shapes (sh:or branches, qualified value shapes,
-  // sh:not) — never top-level node shapes.
+  // sh:not), never top-level node shapes.
   const nestedBlank = new Set<string>()
   for (const quad of store.getQuads(null, null, null, null)) {
     if (quad.object.termType === 'BlankNode') nestedBlank.add(termKey(quad.object))
@@ -376,7 +376,7 @@ export function liftShapes(turtle: string): LiftResult {
     }
 
     // A shape another property points at describes the entities that property
-    // references, so it becomes their own form — never the crate root, which is
+    // references, so it becomes their own form, never the crate root, which is
     // what a target-less shape falls back to.
     const indexed = index.types.get(shapeKey)?.[0]
     if (indexed && index.derived.has(shapeKey)) {
@@ -385,7 +385,7 @@ export function liftShapes(turtle: string): LiftResult {
     const key = targetClass ?? nodeClass ?? indexed ?? (info.referenced ? undefined : ROOT_KEY)
 
     // A shape pinned to one specific node describes that node, not a class of
-    // entities an author fills in — unless the file does say which type that node
+    // entities an author fills in, unless the file does say which type that node
     // is, in which case the rules belong to that type's form (the usual "this one
     // entity must conform to the shape for its class" binding).
     if (hasTargetNode && (!key || key === ROOT_KEY)) {
@@ -424,7 +424,7 @@ export function liftShapes(turtle: string): LiftResult {
   // Which group drives the root Dataset form: the target-less group the
   // projection emits, else a group typed Dataset, else a group whose shapes
   // merely REQUIRE schema:Dataset (the common "my class is also a Dataset"
-  // form) — that one gets retyped, which is worth a note.
+  // form). That one gets retyped, which is worth a note.
   const ordered = [...groups.values()]
   const rootGroup =
     ordered.find((group) => group.key === ROOT_KEY) ??
@@ -460,7 +460,7 @@ export function liftShapes(turtle: string): LiftResult {
 
     // Group every property shape in the group by path, so the presence / value /
     // recommended shapes a generator splits a single field across merge back
-    // into one rule — including when they live in SEPARATE node shapes that
+    // into one rule, including when they live in SEPARATE node shapes that
     // share a target class.
     const byPath = new Map<string, Quad_Subject[]>()
     const pathOrder: string[] = []
@@ -541,8 +541,8 @@ export function liftShapes(turtle: string): LiftResult {
 // Emission order recovered from sh:order, applied before the rules are stored.
 const ruleOrder = new WeakMap<ProfilePropertyRule, number>()
 
-// sh:order decides; ties — including every rule of a file that declares no order
-// at all — fall back to label then term, so an unordered import is stable and
+// sh:order decides; ties (including every rule of a file that declares no order
+// at all) fall back to label then term, so an unordered import is stable and
 // predictable instead of following RDF-store insertion order.
 function compareRuleOrder(a: ProfilePropertyRule, b: ProfilePropertyRule): number {
   const byOrder = (ruleOrder.get(a) ?? Number.MAX_SAFE_INTEGER) - (ruleOrder.get(b) ?? Number.MAX_SAFE_INTEGER)
@@ -558,7 +558,7 @@ interface Facets {
   // sh:node objects kept as terms, so an inline (blank) value shape stays
   // distinguishable from a named one.
   nodeTargets: Term[]
-  // Classes and shapes an sh:or offers as ALTERNATIVE targets — a genuine union
+  // Classes and shapes an sh:or offers as ALTERNATIVE targets: a genuine union
   // the rule model expresses as several target types, unlike the conjunctive
   // facets above.
   unionClasses: string[]
@@ -777,7 +777,7 @@ function readFacets(
     }
     if (branch) continue
     // An alternative whose branches only pick a type is a union of target types,
-    // which an entity rule holds in full — no branch is lost, so no note.
+    // which an entity rule holds in full; no branch is lost, so no note.
     const union = unionTargets(store, branches, index)
     if (union) {
       facets.unionClasses.push(...union.classes)
@@ -785,7 +785,7 @@ function readFacets(
       continue
     }
     // Any other alternative: take the first branch as the field's shape (it is
-    // the primary form in every generator we have seen — the real value, with
+    // the primary form in every generator we have seen: the real value, with
     // fallbacks such as "missing" tokens listed after it) and say so.
     const first = branches[0]
     if (first.termType === 'BlankNode' || first.termType === 'NamedNode') {
@@ -825,7 +825,7 @@ function resolveKind(
     facets.unionNodes.length > 0
   // A term the catalogue describes as holding a URL and referencing nothing
   // (license, identifier, url, sameAs), with nothing said about it beyond "the
-  // value is an IRI", is that URL — not a reference to an entity of unknown
+  // value is an IRI", is that URL, not a reference to an entity of unknown
   // type. Trade-off: an entity rule on one of those terms that allowed only
   // external reuse comes back as a URL field, the same form it emitted.
   const urlCatalog = catalogTerm(path)
@@ -843,7 +843,7 @@ function resolveKind(
       const canonical = uri && canonicalIri(uri)
       if (canonical && !targets.some((target) => sameSchemaOrgType(target, canonical))) targets.push(canonical)
     }
-    // A class IRI names the class — unless it points at a shape, which says which
+    // A class IRI names the class, unless it points at a shape, which says which
     // type its values are instead.
     const classTarget = (uri: string) => index.types.get(termKey(namedNode(uri))) ?? [uri]
     if (facets.classIri) {
@@ -892,7 +892,7 @@ function resolveKind(
     // about the input; the RO-Crate baseline terms have one obvious form each,
     // and the builder locks these four rules anyway. Beyond those, a term the
     // portal's own catalogue describes is imported the way the builder would
-    // create it — but only when the file states nothing about the value at all.
+    // create it, but only when the file states nothing about the value at all.
     else {
       const catalog = facets.datatype === undefined && !facets.patterns.length ? catalogTerm(path) : undefined
       kind = baselineKind(path) ?? catalog?.suggestedKind ?? 'text'
@@ -1135,7 +1135,7 @@ function shapeTypes(
 }
 
 // `sh:property [ sh:path rdf:type ; sh:hasValue X ]`, an sh:in list, or a
-// qualified value shape over an sh:in list — the ways a shape states the type
+// qualified value shape over an sh:in list: the ways a shape states the type
 // (or the accepted types) of the entities it describes.
 function typesFromRdfProperty(store: Store, propertyShape: Quad_Subject): string[] {
   if (objectValue(store, propertyShape, `${SH}path`) !== RDF_TYPE) return []
@@ -1189,7 +1189,7 @@ function datatypeAlternation(store: Store, branches: Quad_Object[]): string | un
 
 // Last resort for a value shape that names no class: its own name. A curated
 // type of that name wins (PersonShape describes schema.org Persons), otherwise
-// the type is minted beside the shape — but only when the shape's own namespace
+// the type is minted beside the shape, but only when the shape's own namespace
 // is an http(s) one. A file written against a relative base resolves under the
 // crate base IRI, and an arcp:// "class" would travel into the exported profile.
 const SHAPE_NAME_SUFFIX = /[-_]?(node)?shape$/i

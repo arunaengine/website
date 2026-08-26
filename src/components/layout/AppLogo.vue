@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useTheme } from '@/composables/useTheme'
 
 // The ARUNA wordmark is a custom typeface and must never be typed in a
-// UI font — only the pre-aligned image lockups from /brand are used.
+// UI font; only the pre-aligned image lockups from /brand are used.
 const props = withDefaults(
   defineProps<{
     /** Rendered height of the mark in px */

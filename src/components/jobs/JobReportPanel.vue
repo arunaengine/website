@@ -176,7 +176,7 @@ const summary = computed(() => {
               <td class="px-3 py-2">
                 <Badge :variant="codeVariant(row.code)" class="text-[10px]">{{ codeLabel(row.code) }}</Badge>
               </td>
-              <td class="max-w-96 break-words px-3 py-2 text-muted-foreground">{{ row.message || '—' }}</td>
+              <td class="max-w-96 break-words px-3 py-2 text-muted-foreground">{{ row.message || 'n/a' }}</td>
             </tr>
           </tbody>
         </table>

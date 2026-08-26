@@ -152,14 +152,14 @@ export function useNodeOnboarding() {
     try {
       await request<void>(`/admin/onboarding/secrets/${encodeURIComponent(id)}`, { method: 'DELETE' })
     } catch (err) {
-      // A 404 means the secret was already pruned or claimed-and-expired — the
+      // A 404 means the secret was already pruned or claimed-and-expired; the
       // row is gone either way, so treat it as a successful revoke.
       if (!(err instanceof ApiError && err.status === 404)) {
         failure = errorMessage(err)
       }
     } finally {
       // Refresh first (it clears listError on success), THEN surface the revoke
-      // failure — otherwise a still-working list endpoint erases the message.
+      // failure; otherwise a still-working list endpoint erases the message.
       await refreshSecrets().catch(() => undefined)
       if (failure) listError.value = failure
       markRevoking(id, false)
@@ -213,7 +213,7 @@ export function useNodeOnboarding() {
           patchWatch({ claimedIsNode: true, phase: connected ? 'connected' : 'waiting-presence' })
           if (connected) stopWatch()
         } else {
-          // claimedBy matches no realm node — either the joining node has not
+          // claimedBy matches no realm node: either the joining node has not
           // booted yet (keep polling) or it is a Local secret redeemed at
           // registration (admin claim), whose user id "{ulid}@{realm}" carries
           // an '@' that no iroh node id has and never appears as a node: stop.

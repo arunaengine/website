@@ -2,14 +2,14 @@
 //
 // Two independent signals:
 //  - browserOnline: navigator.onLine + window online/offline events. False
-//    means the device has no network — but a portal served by the LOCAL node
+//    means the device has no network, but a portal served by the LOCAL node
 //    (laptop user node) still reaches its API over loopback.
-//  - networkFailing: flipped by apiRequest — true on a non-abort fetch
+//  - networkFailing: flipped by apiRequest, true on a non-abort fetch
 //    rejection (the serving node is unreachable), false again on any
 //    completed HTTP response (any status proves reachability).
 //
 // offline = either signal; writesDisabled = offline (per aruna#273, writes
-// always need connectivity — a lease-holding local node is read-only).
+// always need connectivity; a lease-holding local node is read-only).
 //
 // Lives in lib/ (not composables/) because src/lib/api.ts must report fetch
 // outcomes here and lib must not import from the composable layer. Imports

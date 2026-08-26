@@ -159,7 +159,7 @@ function nestedRemove(index: number, field: ProfileControl, nestedIndex: number)
   setNested(index, field.property, removedEntry(nestedEntries(index, field.property), nestedIndex))
 }
 // The replaced entry's values are dropped deliberately (a fresh start per
-// source keeps the emission unambiguous) — mirrors the top-level switch.
+// source keeps the emission unambiguous); mirrors the top-level switch.
 function nestedSwitch(index: number, field: ProfileControl, nestedIndex: number, source: 'new' | 'existing') {
   const list = nestedEntries(index, field.property)
   const current = list[nestedIndex]
@@ -324,7 +324,7 @@ function emptyStateText(): string {
       <!-- Described-new entry: the target shape's sub-form. Entity fields whose
            target type has an entity rule recurse into this component (up to
            MAX_ENTITY_DEPTH); at the cap or without a rule they stay flat URI
-           references — a single one a plain URI input via ProfileControlField, a
+           references: a single one a plain URI input via ProfileControlField, a
            multiple one (D5) a repeatable add/remove list of URI inputs, each
            emitted as a {"@id"} ref. -->
       <div v-else-if="isOpen(entry.__uid)" class="grid gap-3 border-t border-border p-3 sm:grid-cols-2">

@@ -8,7 +8,7 @@ import type { ProfileControl, ProfileEntityRule } from './types'
 // Emission helpers for profile-driven dataset crates, shared with
 // NewDatasetDialog.buildRoCrate: entity instances and select-object choices
 // become flattened contextual entities plus {"@id"} references. They live in
-// the lib — not the dialog component — so the newer emission paths (notably a
+// the lib, not the dialog component, so the newer emission paths (notably a
 // NESTED multiple select-object inside an entity instance) stay unit-testable.
 
 // Registers a flattened contextual entity on the crate graph. The caller owns
@@ -82,7 +82,7 @@ export function buildEntityInstance(
       }
     } else if (control.control === 'select-object') {
       // The chosen option(s) are emitted verbatim as contextual entities +
-      // {"@id"} ref(s) — an array of refs when the sub-control is `multiple`.
+      // {"@id"} ref(s): an array of refs when the sub-control is `multiple`.
       const ref = emitSelectObject(control, instance[control.property], ctx.addEntity)
       if (ref) props[control.property] = ref
     }
@@ -141,8 +141,8 @@ function selectObjectRef(
 
 // Shallow-flatten a select-object option into flat-graph shape (H6). Clones the
 // option first, so graph merging never mutates the live control.valueOptions state
-// by reference (H8). For each top-level property that is a nested record — or an
-// array of records — nested records WITH an '@id' are hoisted as their own
+// by reference (H8). For each top-level property that is a nested record (or an
+// array of records), nested records WITH an '@id' are hoisted as their own
 // contextual entities (cloned) and replaced with {"@id"} references; nested records
 // WITHOUT an '@id' are DROPPED from the emitted entity (they cannot be referenced,
 // and stay untouched inside the profile's mode.json). Scalars and non-record array
@@ -228,7 +228,7 @@ export function emitEntityEntries(
 
 // True for the schema.org `hasPart` property URI (http/https). The dataset dialog's
 // Data-references section already emits `hasPart`, so a profile rule on this term
-// must bind to that section instead of rendering a second generic control — the
+// must bind to that section instead of rendering a second generic control: the
 // double-emission guard for wave B2 (never emit `hasPart` twice).
 export function isHasPartUri(propertyUri: string): boolean {
   return sameSchemaOrgType(propertyUri, `${SCHEMA_ORG}hasPart`)

@@ -5,7 +5,7 @@ import { ARUNA_PROFILE_PREFIX, isDatasetType, normalizeTypeUri, sameSchemaOrgTyp
 import type { ProfileBasics, ProfileEntityRule, ProfilePropertyRule } from '../profiles/types'
 
 // SHACL projection of the profile rule model (plan section 7): emits shapes.ttl
-// as deterministic Turtle via plain string emission — deliberately NOT the N3
+// as deterministic Turtle via plain string emission, deliberately NOT the N3
 // writer, so this module can be imported by the synchronous profile-crate
 // emitter (rocrate.ts, main bundle) while the n3 parser stays in the lazy lift
 // chunk. The Turtle syntax is exercised against a real parser by the lift
@@ -29,8 +29,8 @@ export const DATETIME_PATTERN = '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}'
 // emitter actually serializes (the table itself flags url/select-url as
 // provisional, "settle against fixtures"):
 // - url / select-url: profile url controls flow through normalizeProfileValues
-//   as plain JSON strings — only entity references, select-object choices and
-//   the built-in license become {"@id"} — and the RO-Crate context does not
+//   as plain JSON strings (only entity references, select-object choices and
+//   the built-in license become {"@id"}) and the RO-Crate context does not
 //   @id-coerce them, so their RDF form is a STRING LITERAL. Hence
 //   xsd:string + URL_PATTERN (and sh:in over the allowed strings for
 //   select-url), never sh:nodeKind sh:IRI.
@@ -174,7 +174,7 @@ function buildRuleShapes(
     const shapeIri = `${baseIri}-required-${index + 1}`
     const lines = [`${iri(shapeIri)} a sh:PropertyShape`, `  ${path}`, ...meta]
     if (instance.id) {
-      // Crate-local ids stay relative and resolve against the @base header —
+      // Crate-local ids stay relative and resolve against the @base header,
       // the same base the validator anchors the data graph under.
       if (!isAbsolute(instance.id)) needsBase = true
       lines.push(`  sh:hasValue ${iri(instance.id)}`)
@@ -207,7 +207,7 @@ function valueConstraintLines(rule: ProfilePropertyRule, ns: string, entities: P
       lines.push('  sh:nodeKind sh:IRI')
       const sources = effectiveEntitySources(rule.entitySources)
       // External reuse allowed: a bare reference carries no rdf:type in the
-      // graph, so class/shape conformance is unprovable — nodeKind IRI only.
+      // graph, so class/shape conformance is unprovable; nodeKind IRI only.
       if (!sources.includes('existing-external')) {
         const types = (rule.entityTypes ?? []).map(normalizeTypeUri).filter(Boolean)
         const branches = types.map((type) => classBranch(type, ns, entities))

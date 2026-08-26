@@ -116,7 +116,7 @@ export function useObjectPreview() {
 
   // Reference marker for buckets the connected node's /staging/references
   // listing does not cover (remote-node buckets): a single HeadObject on the
-  // previewed object reveals the aruna-* reference metadata. Never throws —
+  // previewed object reveals the aruna-* reference metadata. Never throws;
   // the marker simply stays off.
   async function probeReferenced(target: PreviewTarget) {
     const probeId = ++referenceProbeId
