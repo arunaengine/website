@@ -38,7 +38,16 @@ const StatCardStub = defineComponent({
 })
 const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
 const GroupQuotaCardsStub = defineComponent(() => () => h('div', 'group quota cards'))
-const FederationPanelStub = defineComponent(() => () => h('div', 'federation panel'))
+// Renders what it was handed, so the view's own node/device split is testable.
+const FederationPanelStub = defineComponent({
+  props: { nodes: { type: Array, default: () => [] }, devices: { type: Array, default: () => [] } },
+  setup: (props) => () =>
+    h('div', [
+      'federation panel',
+      ...(props.nodes as Array<{ node_id: string }>).map((node) => h('span', ` ${node.node_id} `)),
+      h('em', `${props.devices.length} devices`),
+    ]),
+})
 const EmptyStub = defineComponent(() => () => null)
 
 let DashboardView: Component
@@ -184,5 +193,23 @@ describe('authenticated dashboard ordering', () => {
     expect(text).toContain('Loaded profiles')
     expect(text).toContain('Replica-inclusive placement records held')
     expect(text).toContain('1 of 2 nodes reporting')
+  })
+
+  it('keeps devices out of node health and counts them apart', async () => {
+    currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
+    realmInfo.value = {
+      metadata_replication: { default_replication_factor: null },
+      nodes: [
+        { node_id: 'server-node', kind: 'server', present: true },
+        { node_id: 'owned-device', kind: 'user', present: true },
+      ],
+    }
+
+    const text = await renderedText()
+
+    expect(text).toContain('server-node')
+    expect(text).not.toContain('owned-device')
+    expect(text).toContain('1 devices')
+    expect(text).toMatch(/1 \/ 1 Nodes online/)
   })
 })

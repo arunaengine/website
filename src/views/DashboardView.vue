@@ -20,7 +20,7 @@ import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, nodes, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh, loadInfo, listRecentMetadata } = useAruna()
+const { currentUser, metadata, profiles, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh, loadInfo, listRecentMetadata } = useAruna()
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const showNewDataset = ref(false)
@@ -61,17 +61,20 @@ useIntervalFn(() => {
   if (visibility.value === 'visible' && !refreshing.value) void loadInfo()
 }, 30_000)
 
-const onlineNodes = computed(() => nodes.value.filter((node) => node.status === 'healthy').length)
+// Devices (kind 'user') run on their owner's machine, not on realm
+// infrastructure: they are summarized only, never listed or aggregated.
+const infraNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
+const deviceNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind === 'user'))
+
+const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
 
 // Honest realm figure: the sum of documents each node reports holding (replicas
 // included), shown only once at least one node publishes the count.
 const docsHeld = computed(() => {
-  const reporting = (realmInfo.value?.nodes ?? []).filter(
-    (node) => node.info?.utilization.documents_held !== undefined,
-  )
+  const reporting = infraNodes.value.filter((node) => node.info?.utilization.documents_held !== undefined)
   if (!reporting.length) return null
   const total = reporting.reduce((sum, node) => sum + (node.info?.utilization.documents_held ?? 0), 0)
-  return { total, nodes: reporting.length, totalNodes: realmInfo.value?.nodes.length ?? reporting.length }
+  return { total, nodes: reporting.length, totalNodes: infraNodes.value.length }
 })
 
 // Realm-wide total of live documents, not a per-caller figure. The loaded
@@ -106,7 +109,7 @@ const stats = computed(() =>
         },
         {
           label: 'Nodes online',
-          value: `${onlineNodes.value} / ${nodes.value.length}`,
+          value: `${onlineNodes.value} / ${infraNodes.value.length}`,
           icon: Activity,
           tone: 'bg-aruna-tagline/15 text-aruna-tagline',
         },
@@ -247,7 +250,8 @@ const pageDescription = computed(() =>
       <section v-if="currentUser" aria-labelledby="node-health-heading" class="space-y-3.5">
         <h2 id="node-health-heading" class="font-display text-[15px] font-semibold text-foreground/85">Node health</h2>
         <FederationPanel
-          :nodes="realmInfo?.nodes ?? []"
+          :nodes="infraNodes"
+          :devices="deviceNodes"
           :replication-factor="realmInfo?.metadata_replication.default_replication_factor"
           :local-peer-id="nodeInfo?.node.peer_id"
         />

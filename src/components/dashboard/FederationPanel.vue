@@ -7,9 +7,12 @@ import NodesHealth from '@/components/dashboard/NodesHealth.vue'
 import type { RealmNodeInfo } from '@/lib/api'
 import { connectionLabel, connectionVariant, kindVariant } from '@/components/nodes/node-display'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
+import { Laptop } from '@lucide/vue'
 
 const props = defineProps<{
   nodes: RealmNodeInfo[]
+  /** Devices of the realm's users: summarized here, never drawn as nodes. */
+  devices?: RealmNodeInfo[]
   replicationFactor?: number | null
   /** peer id of the node this portal is connected to */
   localPeerId?: string
@@ -22,6 +25,7 @@ function openNode(id: string) {
 }
 
 const connectedCount = computed(() => props.nodes.filter((node) => node.connection_status === 'connected').length)
+const connectedDevices = computed(() => (props.devices ?? []).filter((device) => device.present).length)
 const replicationLabel = computed(() => {
   if (props.replicationFactor === null) return 'all eligible nodes'
   return props.replicationFactor === undefined ? 'unknown' : `×${props.replicationFactor}`
@@ -386,6 +390,14 @@ function loadArc(cx: number, cy: number, permille: number): string {
         <!-- Node health grid: only data the realm actually reports -->
         <NodesHealth :nodes="nodes" :local-peer-id="localPeerId" @select="openNode" />
       </template>
+
+      <div v-if="devices?.length" class="flex items-center gap-3 border-t border-border px-5 py-3 text-sm">
+        <Laptop class="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span class="font-medium text-foreground">Devices</span>
+        <span class="tabular-nums text-muted-foreground">
+          {{ devices.length }} enrolled, {{ connectedDevices }} connected
+        </span>
+      </div>
     </div>
   </section>
 </template>
