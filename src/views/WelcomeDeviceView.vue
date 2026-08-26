@@ -64,7 +64,7 @@ function leave(): void {
             src="/brand/icon-mark.png"
             alt=""
             draggable="false"
-            class="pointer-events-none absolute -bottom-[60%] -right-[40%] w-[120%] max-w-none select-none opacity-[0.15] dark:opacity-[0.22]"
+            class="pointer-events-none absolute -right-[40%] bottom-0 w-[120%] max-w-none translate-y-[55%] select-none opacity-[0.15] dark:opacity-[0.22]"
           />
           <div class="relative">
             <AppLogo :size="26" subtitle="the data orchestration engine" />
