@@ -1,7 +1,7 @@
 import { createSSRApp, computed, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DeviceCompute, DeviceTransfer, SyncedFolder } from '@/lib/deviceApi'
+import type { DeviceCompute, DeviceSyncStatus, DeviceTransfer, SyncedFolder } from '@/lib/deviceApi'
 import type { NodeStatus } from '@/lib/desktopBridge'
 
 const status = ref<NodeStatus | null>(null)
@@ -13,6 +13,14 @@ const foldersState = ref('ready')
 const syncTransfers = ref<DeviceTransfer[]>([])
 const transfersState = ref('ready')
 const compute = ref<DeviceCompute | null>(null)
+const syncStatus = ref<DeviceSyncStatus>({
+  realmReachable: true,
+  lastSyncMs: null,
+  pendingTotal: 0,
+  documents: [],
+  datasets: [],
+})
+const syncState = ref('ready')
 const realmJobs = ref<Array<{ job_id: string; state: string }>>([])
 const uploadItems = ref<Array<{ id: number; state: string }>>([])
 
@@ -91,6 +99,18 @@ beforeAll(async () => {
   vi.doMock('@/composables/useDeviceCompute', () => ({
     useDeviceCompute: () => ({ compute, ensureLoaded: vi.fn(async () => undefined) }),
   }))
+  vi.doMock('@/composables/useDeviceSync', () => ({
+    useDeviceSync: () => ({
+      status: syncStatus,
+      state: syncState,
+      needsOwner: computed(
+        () =>
+          syncStatus.value.documents.filter((doc) => doc.state === 'invalid' || doc.state === 'failed').length +
+          syncStatus.value.datasets.reduce((sum, set) => sum + set.conflicts, 0),
+      ),
+      load: vi.fn(async () => undefined),
+    }),
+  }))
   vi.doMock('@/composables/useJobs', () => ({
     useJobsList: () => ({ jobs: realmJobs, load: vi.fn(async () => undefined) }),
   }))
@@ -126,6 +146,14 @@ beforeEach(() => {
   compute.value = null
   realmJobs.value = []
   uploadItems.value = []
+  syncStatus.value = {
+    realmReachable: true,
+    lastSyncMs: null,
+    pendingTotal: 0,
+    documents: [],
+    datasets: [],
+  }
+  syncState.value = 'ready'
 })
 
 function render(): Promise<string> {
@@ -219,6 +247,36 @@ describe('desktop home', () => {
     expect(html).toContain('not running')
     expect(html).toContain('The node was stopped by its owner.')
     expect(html).not.toContain('folder bound')
+  })
+
+  it('separates what the sync owes from what it cannot fix alone', async () => {
+    syncStatus.value = {
+      realmReachable: false,
+      lastSyncMs: null,
+      pendingTotal: 3,
+      documents: [
+        {
+          documentId: 'd1',
+          path: 'lab/run.json',
+          groupId: 'g1',
+          state: 'invalid',
+          pendingEdits: 1,
+          localOnly: false,
+          validationFindings: 2,
+          lastError: null,
+          lastSyncedMs: null,
+        },
+      ],
+      datasets: [
+        { folderId: 'f1', label: 'data-2026', state: 'pending', pendingUploads: 2, unsyncedFiles: 2, conflicts: 1 },
+      ],
+    }
+
+    const html = await render()
+
+    expect(html).toContain('3</span> changes pending')
+    expect(html).toContain('2 need your attention')
+    expect(html).toContain('Offline: your edits go out once it answers.')
   })
 
   it('invents no drafts while the first read is still in flight', async () => {

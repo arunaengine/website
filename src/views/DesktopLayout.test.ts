@@ -63,6 +63,7 @@ describe('desktop shell', () => {
       '/app',
       '/app/folders',
       '/app/transfers',
+      '/app/sync',
       '/app/runs',
       '/app/device',
       '/app/buckets',

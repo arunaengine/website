@@ -13,6 +13,7 @@ import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { useDeviceSync } from '@/composables/useDeviceSync'
 import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useJobsList } from '@/composables/useJobs'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
@@ -38,6 +39,7 @@ const { all: syncTransfers, active: activeTransfers, state: transfersState, load
   useDeviceTransfers()
 const { items: uploadItems } = useUploadQueue()
 const { compute, ensureLoaded: ensureCompute } = useDeviceCompute()
+const { status: syncStatus, state: syncState, needsOwner, load: loadSync } = useDeviceSync()
 
 const jobsEnabled = featureEnabled('jobs')
 const realmRuns = useJobsList({ pageSize: 10 })
@@ -109,6 +111,7 @@ async function reload(): Promise<void> {
     ensureFolders(),
     loadTransfers(),
     ensureCompute(),
+    loadSync(),
     loadLocalRuns(),
     loadDrafts(),
     jobsEnabled && currentUser.value ? realmRuns.load() : Promise.resolve(),
@@ -221,6 +224,39 @@ onMounted(() => void reload())
                 {{ transfer.direction === 'upload' ? '↑' : '↓' }} {{ transfer.path }}
               </li>
             </ul>
+          </div>
+        </section>
+
+        <!-- Sync -->
+        <section class="surface flex flex-col overflow-hidden">
+          <header class="flex items-center justify-between border-b border-border px-5 py-3">
+            <div class="flex items-center gap-2">
+              <RefreshCw class="h-4 w-4 text-primary" />
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Sync</h2>
+            </div>
+            <RouterLink :to="{ name: 'sync' }" class="text-xs font-medium text-primary hover:underline">Open</RouterLink>
+          </header>
+          <div class="flex-1 px-5 py-4">
+            <DeviceSurfaceState
+              v-if="syncState !== 'ready'"
+              :state="syncState"
+              subject="its sync status"
+              compact
+            />
+            <template v-else>
+              <p class="text-sm text-foreground">
+                <span class="font-display text-xl font-bold">{{ syncStatus.pendingTotal }}</span>
+                {{ syncStatus.pendingTotal === 1 ? 'change' : 'changes' }} pending
+              </p>
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                {{ syncStatus.realmReachable ? 'The realm is answering.' : 'Offline: your edits go out once it answers.' }}
+              </p>
+              <RouterLink
+                v-if="needsOwner"
+                :to="{ name: 'sync' }"
+                class="mt-3 inline-flex rounded-md bg-amber-500/10 px-2.5 py-1 text-[12px] font-medium text-amber-800 hover:bg-amber-500/15 dark:text-amber-200"
+              >{{ needsOwner }} {{ needsOwner === 1 ? 'needs' : 'need' }} your attention</RouterLink>
+            </template>
           </div>
         </section>
 

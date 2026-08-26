@@ -524,3 +524,137 @@ export async function listDrafts(client: DeviceClient): Promise<DeviceDraft[]> {
   const answer = await request<unknown>('/device/drafts', client)
   return list(Array.isArray(answer) ? answer : record(answer).drafts).map(readDraft)
 }
+
+// ── Offline documents and sync ───────────────────────────────────────────────
+// The sync plane answers in camelCase, unlike the folder routes above.
+
+export type DocumentSyncState = 'synced' | 'pending' | 'publishing' | 'invalid' | 'failed' | 'local_only'
+
+const DOCUMENT_SYNC_STATES: readonly DocumentSyncState[] = [
+  'synced',
+  'pending',
+  'publishing',
+  'invalid',
+  'failed',
+  'local_only',
+]
+
+export type DatasetSyncState = 'synced' | 'pending' | 'paused' | 'error'
+
+const DATASET_SYNC_STATES: readonly DatasetSyncState[] = ['synced', 'pending', 'paused', 'error']
+
+/** One metadata document this device keeps a replica of. */
+export interface SyncDocument {
+  documentId: string
+  path: string
+  groupId: string
+  state: DocumentSyncState
+  pendingEdits: number
+  /** Authored here and not accepted by a realm yet. */
+  localOnly: boolean
+  /** Findings that hold the document back; the last valid version stays shown. */
+  validationFindings: number
+  lastError: string | null
+  lastSyncedMs: number | null
+}
+
+/** A synced folder, as the sync status counts it. */
+export interface SyncDataset {
+  folderId: string
+  label: string
+  state: DatasetSyncState
+  pendingUploads: number
+  unsyncedFiles: number
+  conflicts: number
+}
+
+export interface DeviceSyncStatus {
+  realmReachable: boolean
+  lastSyncMs: number | null
+  pendingTotal: number
+  documents: SyncDocument[]
+  datasets: SyncDataset[]
+}
+
+/** A document the device knows, and whether the owner keeps it offline. */
+export interface DeviceDocument {
+  documentId: string
+  path: string
+  groupId: string
+  selected: boolean
+  origin: 'device' | 'realm'
+  localClockSize: number
+  realmClockSize: number
+}
+
+function readSyncDocument(value: unknown): SyncDocument {
+  const raw = record(value)
+  return {
+    documentId: text(raw.documentId) ?? '',
+    path: text(raw.path) ?? '',
+    groupId: text(raw.groupId) ?? '',
+    state: member(DOCUMENT_SYNC_STATES, raw.state, 'pending'),
+    pendingEdits: count(raw.pendingEdits),
+    localOnly: raw.localOnly === true,
+    validationFindings: count(raw.validationFindings),
+    lastError: text(raw.lastError),
+    lastSyncedMs: size(raw.lastSyncedMs),
+  }
+}
+
+function readSyncDataset(value: unknown): SyncDataset {
+  const raw = record(value)
+  return {
+    folderId: text(raw.folderId) ?? '',
+    label: text(raw.label) ?? '',
+    state: member(DATASET_SYNC_STATES, raw.state, 'pending'),
+    pendingUploads: count(raw.pendingUploads),
+    unsyncedFiles: count(raw.unsyncedFiles),
+    conflicts: count(raw.conflicts),
+  }
+}
+
+export function readDeviceDocument(value: unknown): DeviceDocument {
+  const raw = record(value)
+  return {
+    documentId: text(raw.documentId) ?? '',
+    path: text(raw.path) ?? '',
+    groupId: text(raw.groupId) ?? '',
+    selected: raw.selected === true,
+    origin: raw.origin === 'device' ? 'device' : 'realm',
+    localClockSize: count(raw.localClockSize),
+    realmClockSize: count(raw.realmClockSize),
+  }
+}
+
+export async function deviceSyncStatus(client: DeviceClient): Promise<DeviceSyncStatus> {
+  const raw = record(await request<unknown>('/device/sync/status', client))
+  return {
+    realmReachable: raw.realmReachable === true,
+    lastSyncMs: size(raw.lastSyncMs),
+    pendingTotal: count(raw.pendingTotal),
+    documents: list(raw.documents).map(readSyncDocument),
+    datasets: list(raw.datasets).map(readSyncDataset),
+  }
+}
+
+/** Asks for a sync now. Idempotent: a run already in flight answers false. */
+export async function runDeviceSync(client: DeviceClient): Promise<boolean> {
+  return record(await post<unknown>('/device/sync/run', client)).started === true
+}
+
+export async function listDeviceDocuments(client: DeviceClient): Promise<DeviceDocument[]> {
+  const answer = await request<unknown>('/device/documents', client)
+  return list(record(answer).documents).map(readDeviceDocument)
+}
+
+/** Keeps the document on this device, or lets the replica go. */
+export async function setDocumentSelection(
+  documentId: string,
+  selected: boolean,
+  client: DeviceClient,
+): Promise<DeviceDocument> {
+  const path = `/device/documents/${encodeURIComponent(documentId)}/selection`
+  const answer = await request<unknown>(path, client, { method: 'PUT', body: JSON.stringify({ selected }) })
+  return readDeviceDocument(answer)
+}

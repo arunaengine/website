@@ -39,6 +39,7 @@ function desktopRoutes(): RouteRecordRaw[] {
       component: () => import('@/views/desktop/FolderDetailView.vue'),
     },
     { path: 'transfers', name: 'transfers', component: () => import('@/views/desktop/TransfersView.vue') },
+    { path: 'sync', name: 'sync', component: () => import('@/views/desktop/SyncView.vue') },
     { path: 'runs', name: 'runs', component: () => import('@/views/desktop/RunsView.vue') },
     { path: 'runs/:jobId', name: 'run-detail', component: () => import('@/views/desktop/RunsView.vue') },
     { path: 'device', name: 'device', component: () => import('@/views/DeviceView.vue') },

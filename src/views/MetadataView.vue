@@ -23,6 +23,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import Switch from '@/components/ui/Switch.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
@@ -56,6 +57,7 @@ import {
 } from '@/lib/backlinks'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { useJobs } from '@/composables/useJobs'
+import { useOfflineDoc } from '@/composables/useDeviceSync'
 import { ArrowDownUp, ArrowLeft, ChevronDown, Code2, FileArchive, Folder, Info, ListChecks, Eye, FileJson2, ExternalLink as ExternalLinkIcon, Layers, Link2, Pencil, Trash2, Star, Upload } from '@lucide/vue'
 import DataEntityDialog from '@/components/metadata/DataEntityDialog.vue'
 
@@ -155,6 +157,16 @@ const resolvingDoc = ref(false)
 const acceptedPreparing = ref(false)
 
 const detailId = computed(() => (route.params.id as string) || '')
+
+// Desktop only: keeping a document on this machine is the shell's business, so
+// on the web `shown` is false and the control never renders.
+const {
+  shown: offlineShown,
+  selected: offlineSelected,
+  busy: offlineBusy,
+  setSelected: setOffline,
+} = useOfflineDoc(detailId)
+
 // Built from this document's own fetch (registry summary plus its crate), not
 // from the catalog listing: the catalog is paged, so most documents are never
 // in it. A loaded catalog row only serves as a placeholder until the fetch
@@ -579,6 +591,18 @@ watch(relatedDocs, (rows) => {
         >Learn more</RouterLink>
       </template>
       <template #actions>
+        <label
+          v-if="offlineShown"
+          class="flex cursor-pointer items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground"
+        >
+          <Switch
+            :checked="offlineSelected"
+            :disabled="offlineBusy"
+            aria-label="Available offline"
+            @update:checked="setOffline"
+          />
+          <span>Available offline</span>
+        </label>
         <Button
           v-if="current && currentUser"
           variant="outline"
