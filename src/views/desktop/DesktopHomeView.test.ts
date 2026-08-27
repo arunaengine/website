@@ -275,6 +275,16 @@ describe('desktop home', () => {
     expect(html).not.toContain('folder bound')
   })
 
+  it('does not read as online while the node is not serving yet', async () => {
+    nodeLabel.value = 'starting'
+    status.value = { ...status.value!, ready: false, message: 'The node is still starting.' }
+
+    const html = await render()
+
+    expect(html).toContain('The node is still starting.')
+    expect(html).not.toContain('online')
+  })
+
   it('separates what the sync owes from what it cannot fix alone', async () => {
     syncStatus.value = {
       realmReachable: false,

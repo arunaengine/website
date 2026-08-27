@@ -125,7 +125,7 @@ const nothingHeld = computed(() => state.value === 'ready' && !documents.value.l
       <template #breadcrumbs>
         <span>·</span>
         <Badge :variant="status.realmReachable ? 'success' : 'secondary'">{{
-          status.realmReachable ? 'online' : 'offline'
+          status.realmReachable ? 'Realm reachable' : 'Realm not answering'
         }}</Badge>
         <span>·</span>
         <span>last sync {{ lastSync }}</span>

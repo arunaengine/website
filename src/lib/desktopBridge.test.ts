@@ -65,7 +65,7 @@ describe('bridge availability', () => {
 
 describe('bridge commands', () => {
   it('normalizes the node status', async () => {
-    // A shell that reports no readiness is taken at its state alone.
+    // A shell that reports no readiness is not taken for one that is serving.
     const bridge = await withShell(() => ({ state: 'sideways', nodeId: ' n1 ', enrolled: true, uptimeSeconds: 90 }))
     await expect(bridge.nodeStatus()).resolves.toEqual({
       state: 'error',
@@ -73,7 +73,7 @@ describe('bridge commands', () => {
       realm: null,
       enrolled: true,
       enrolling: false,
-      ready: true,
+      ready: false,
       apiBaseUrl: null,
       version: null,
       uptimeSeconds: 90,
@@ -84,6 +84,9 @@ describe('bridge commands', () => {
   it('reads a node that is not listening yet', async () => {
     const bridge = await withShell(() => ({ state: 'running', enrolled: true, ready: false }))
     await expect(bridge.nodeStatus()).resolves.toMatchObject({ state: 'running', ready: false })
+
+    const silent = await withShell(() => ({ state: 'running', enrolled: true }))
+    await expect(silent.nodeStatus()).resolves.toMatchObject({ state: 'running', ready: false })
   })
 
   it('reads a node that is redeeming a code', async () => {

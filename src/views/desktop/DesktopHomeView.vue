@@ -50,7 +50,7 @@ const drafts = ref<DeviceDraft[]>([])
 const draftsState = ref<DeviceState>('idle')
 const showBind = ref(false)
 
-const online = computed(() => nodeState.value === 'running')
+const online = computed(() => nodeState.value === 'running' && status.value?.ready === true)
 const nodeTone = computed(() =>
   online.value ? (status.value?.enrolled ? 'success' : 'warn') : nodeState.value === 'error' ? 'destructive' : 'secondary',
 )

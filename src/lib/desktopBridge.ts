@@ -199,7 +199,7 @@ export function readStatus(payload: unknown): NodeStatus {
     realm: asText(raw.realm),
     enrolled: raw.enrolled === true,
     enrolling: raw.enrolling === true,
-    ready: raw.ready !== false,
+    ready: raw.ready === true,
     apiBaseUrl: asText(raw.apiBaseUrl),
     version: asText(raw.version),
     uptimeSeconds: asNumber(raw.uptimeSeconds),

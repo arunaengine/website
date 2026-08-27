@@ -200,7 +200,7 @@ describe('sync overview', () => {
   it('leads with whether the realm can be reached at all', async () => {
     const mounted = await mount()
 
-    expect(badge(mounted.root, 'online').props['data-variant']).toBe('success')
+    expect(badge(mounted.root, 'Realm reachable').props['data-variant']).toBe('success')
     expect(content(mounted.root)).toContain('3 changes pending')
     expect(button(mounted.root, 'Sync now').props.disabled).toBe(false)
     mounted.app.unmount()
@@ -210,7 +210,7 @@ describe('sync overview', () => {
     status.value = { ...status.value, realmReachable: false }
     const mounted = await mount()
 
-    expect(badge(mounted.root, 'offline').props['data-variant']).toBe('secondary')
+    expect(badge(mounted.root, 'Realm not answering').props['data-variant']).toBe('secondary')
     expect(button(mounted.root, 'Sync now').props.disabled).toBe(true)
     expect(content(mounted.root)).toContain('kept here and go out on their own')
     mounted.app.unmount()
