@@ -5,7 +5,7 @@ import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { featureEnabled } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
-import type { NavItem } from '@/components/layout/nav'
+import { navSeparator, type NavEntry, type NavItem } from '@/components/layout/nav'
 import {
   Activity,
   ArrowLeft,
@@ -15,7 +15,6 @@ import {
   ChevronsRight,
   FileJson2,
   LayoutDashboard,
-  Laptop,
   ListChecks,
   Settings,
   ShieldCheck,
@@ -25,7 +24,7 @@ import {
 
 // A layout that owns its own destinations (the desktop shell) passes them in;
 // without them the sidebar computes the portal's own.
-const props = defineProps<{ items?: NavItem[]; backLink?: boolean }>()
+const props = defineProps<{ items?: NavEntry[]; backLink?: boolean }>()
 
 const {
   isRealmAdmin,
@@ -59,21 +58,21 @@ const adminItems = computed<NavItem[]>(() => [
     : []),
 ])
 
-const portalItems = computed<NavItem[]>(() => [
+const portalItems = computed<NavEntry[]>(() => [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/buckets', icon: Boxes, label: 'Data' },
-  ...(tesEnabled || jobsEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
   { to: '/app/search', icon: FileJson2, label: 'Datasets', match: ['/app/search', '/app/metadata'] },
   { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
+  ...(tesEnabled || jobsEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
+  navSeparator,
   { to: '/app/groups', icon: Users, label: 'Groups' },
   { to: '/app/status', icon: Activity, label: 'Status' },
-  ...(desktop ? [{ to: '/app/device', icon: Laptop, label: 'This device' }] : []),
   { to: '/app/settings', icon: Settings, label: 'Settings' },
   { to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] },
-  ...adminItems.value,
+  ...(adminItems.value.length ? [navSeparator, ...adminItems.value] : []),
 ])
 
-const items = computed<NavItem[]>(() => props.items ?? portalItems.value)
+const items = computed<NavEntry[]>(() => props.items ?? portalItems.value)
 const showBackLink = computed(() => props.backLink ?? !desktop)
 
 const route = useRoute()
@@ -109,25 +108,28 @@ watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1
     </div>
 
     <nav class="flex-1 overflow-y-auto px-2.5 py-3" aria-label="Portal navigation">
-      <ul class="space-y-0.5">
-        <li v-for="item in items" :key="item.to">
-          <RouterLink
-            :to="item.to"
-            :title="collapsed ? item.label : undefined"
-            :aria-current="isActive(item) ? 'page' : undefined"
-            :aria-label="collapsed ? item.label : undefined"
-            :class="[
-              'flex items-center gap-2.5 rounded-md py-2 text-[13px] font-medium transition-colors',
-              collapsed ? 'justify-center px-0' : 'px-2.5',
-              isActive(item)
-                ? 'bg-primary/[0.14] text-foreground hover:bg-primary/[0.18]'
-                : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
-            ]"
-          >
-            <component :is="item.icon" class="h-4 w-4 shrink-0" />
-            <span v-if="!collapsed">{{ item.label }}</span>
-          </RouterLink>
-        </li>
+      <ul class="flex flex-col gap-0.5">
+        <template v-for="(item, index) in items" :key="index">
+          <li v-if="'separator' in item" role="separator" class="mx-1 my-1.5 border-t border-border/60" />
+          <li v-else>
+            <RouterLink
+              :to="item.to"
+              :title="collapsed ? item.label : undefined"
+              :aria-current="isActive(item) ? 'page' : undefined"
+              :aria-label="collapsed ? item.label : undefined"
+              :class="[
+                'flex items-center gap-2.5 rounded-md py-2 text-[13px] font-medium transition-colors',
+                collapsed ? 'justify-center px-0' : 'px-2.5',
+                isActive(item)
+                  ? 'bg-primary/[0.14] text-foreground hover:bg-primary/[0.18]'
+                  : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
+              ]"
+            >
+              <component :is="item.icon" class="h-4 w-4 shrink-0" />
+              <span v-if="!collapsed">{{ item.label }}</span>
+            </RouterLink>
+          </li>
+        </template>
       </ul>
     </nav>
 

@@ -56,19 +56,22 @@ function destinations(html: string): string[] {
 }
 
 describe('desktop shell', () => {
-  it('leads with the machine and keeps the realm behind it', async () => {
+  it('opens with the shared block and keeps the machine behind it', async () => {
     const html = await renderToString(createSSRApp(DesktopLayout))
 
     expect(destinations(html)).toEqual([
       '/app',
+      '/app/buckets',
+      '/app/search',
+      '/app/profiles',
+      '/app/compute',
       '/app/sync',
       '/app/runs',
       '/app/device',
-      '/app/buckets',
-      '/app/search',
       '/app/settings',
       '/app/docs/v1',
     ])
+    expect(html.match(/role="separator"/g)).toHaveLength(2)
     expect(html).toContain('Sync')
     expect(html).toContain('This device')
   })
@@ -97,6 +100,7 @@ describe('desktop shell', () => {
     const html = await renderToString(createSSRApp(DesktopLayout))
 
     expect(destinations(html)).toEqual(expect.arrayContaining(['/app/admin', '/app/admin/quarantine']))
+    expect(html.match(/role="separator"/g)).toHaveLength(3)
     expect(html).toContain('Admin')
   })
 

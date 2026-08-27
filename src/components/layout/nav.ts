@@ -7,3 +7,12 @@ export interface NavItem {
   exact?: boolean
   match?: string[]
 }
+
+/** A break between blocks of destinations, drawn as a rule and never labelled. */
+export interface NavSeparator {
+  separator: true
+}
+
+export type NavEntry = NavItem | NavSeparator
+
+export const navSeparator: NavSeparator = { separator: true }
