@@ -9,6 +9,7 @@ export const TOP_BAR_SEARCH_COLLAPSE_PX = 480
 
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
+import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import CoverageIcon from '@/components/search/CoverageIcon.vue'
@@ -23,7 +24,7 @@ import {
 } from '@/composables/useUnifiedSearch'
 import { truncateMiddle } from '@/lib/utils'
 import type { ObjectSearchMode } from '@/lib/api'
-import { File, FileJson2, Search, UserRound, Users, X } from '@lucide/vue'
+import { Search, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -38,6 +39,17 @@ interface QuickItem {
   routeName: string
   routeParams: Record<string, string>
   routeQuery?: Record<string, string>
+}
+
+type QuickListEntry =
+  | { kind: 'item'; item: QuickItem }
+  | { kind: 'object-notes'; key: 'object-notes' }
+
+const QUICK_KIND_LABELS: Record<QuickSection, string> = {
+  datasets: 'Dataset',
+  objects: 'Object',
+  groups: 'Group',
+  people: 'Person',
 }
 
 const PANEL_HISTORY_KEY = '__arunaGlobalSearchPanel'
@@ -95,7 +107,7 @@ const items = computed<QuickItem[]>(() => [
     key: `o:${hit.issuer_node_id}:${hit.bucket}:${hit.key}`,
     section: 'objects',
     title: hit.key,
-    subtitle: `Object · ${OBJECT_SEARCH_MODE_LABELS[hit.mode]} · Node: ${nodeDisplayName(hit.issuer_node_id)} · Group: ${truncateMiddle(hit.group_id)} · Bucket: ${hit.bucket}`,
+    subtitle: `${OBJECT_SEARCH_MODE_LABELS[hit.mode]} · Node: ${nodeDisplayName(hit.issuer_node_id)} · Group: ${truncateMiddle(hit.group_id)} · Bucket: ${hit.bucket}`,
     routeName: 'bucket',
     routeParams: { bucketId: hit.bucket },
     routeQuery: {
@@ -137,21 +149,14 @@ const quickObjectErrorDetail = computed(() => {
     : ''
   return `${OBJECT_SEARCH_MODE_LABELS[quickObjectMode.value]} unavailable.${strict} ${quickObjectError.value}`.trim()
 })
-
-const SECTION_META: Array<{ id: QuickSection; label: string }> = [
-  { id: 'datasets', label: 'Datasets' },
-  { id: 'objects', label: 'Data objects' },
-  { id: 'groups', label: 'Groups' },
-  { id: 'people', label: 'People' },
-]
-const sections = computed(() =>
-  SECTION_META
-    .map((meta) => ({ ...meta, items: items.value.filter((item) => item.section === meta.id) }))
-    .filter((section) =>
-      section.items.length ||
-      (section.id === 'objects' && (quickObjectSearched.value || Boolean(quickObjectError.value))),
-    ),
-)
+const quickListEntries = computed<QuickListEntry[]>(() => {
+  const entries: QuickListEntry[] = items.value.map((item) => ({ kind: 'item', item }))
+  entries.splice(quickDocuments.value.length + quickObjects.value.length, 0, {
+    kind: 'object-notes',
+    key: 'object-notes',
+  })
+  return entries
+})
 const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
 
 watch(items, () => (activeIndex.value = -1))
@@ -416,87 +421,94 @@ onBeforeUnmount(() => {
               />
             </div>
             <div
-              v-if="quickCoverageShown"
-              role="status"
-              class="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-1.5"
+              id="quick-search-results"
+              role="listbox"
+              :aria-busy="quickPending"
+              class="transition-opacity"
+              :class="quickStale ? 'opacity-40' : ''"
             >
-              <CoverageIcon compact :complete="quickComplete" @mousedown.prevent @click="openSearchPage" />
-              <Button
-                v-if="!quickComplete"
-                variant="ghost"
-                size="sm"
-                class="h-8 shrink-0 px-2 text-[10px]"
-                :disabled="quickPending"
-                @mousedown.prevent
-                @click="retrySearch"
+              <template
+                v-for="entry in quickListEntries"
+                :key="entry.kind === 'item' ? entry.item.key : entry.key"
               >
-                Retry
-              </Button>
-            </div>
-            <div id="quick-search-results" role="listbox" :aria-busy="quickPending">
-              <div
-                v-for="section in sections"
-                :key="section.id"
-                role="group"
-                :aria-label="section.label"
-                class="transition-opacity"
-                :class="quickStale ? 'opacity-40' : ''"
-              >
-                <div
-                  class="flex items-center gap-1.5 border-b border-border/70 bg-muted/30 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  <FileJson2 v-if="section.id === 'datasets'" class="h-3 w-3" aria-hidden="true" />
-                  <File v-else-if="section.id === 'objects'" class="h-3 w-3" aria-hidden="true" />
-                  <Users v-else-if="section.id === 'groups'" class="h-3 w-3" aria-hidden="true" />
-                  <UserRound v-else class="h-3 w-3" aria-hidden="true" />
-                  {{ section.label }}
-                </div>
-                <p
-                  v-if="section.id === 'objects' && quickObjectError"
-                  role="status"
-                  class="border-b border-border/70 bg-muted/20 px-3 py-2 text-[10px] text-muted-foreground"
-                >
-                  {{ quickObjectErrorDetail }}
-                </p>
                 <button
-                  v-for="item in section.items"
-                  :id="'qs-' + item.key"
-                  :key="item.key"
+                  v-if="entry.kind === 'item'"
+                  :id="'qs-' + entry.item.key"
                   role="option"
-                  :aria-selected="activeKey === item.key"
+                  :aria-selected="activeKey === entry.item.key"
                   :class="[
                     'flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted',
-                    activeKey === item.key ? 'bg-muted' : '',
+                    activeKey === entry.item.key ? 'bg-muted' : '',
                   ]"
                   @mousedown.prevent
-                  @click="openItem(item)"
+                  @click="openItem(entry.item)"
                 >
                   <div class="flex-1 overflow-hidden">
-                    <div class="truncate font-medium text-foreground">{{ item.title }}</div>
-                    <div v-if="item.subtitle" class="truncate text-xs text-muted-foreground">{{ item.subtitle }}</div>
+                    <div class="flex min-w-0 items-center gap-2">
+                      <div class="min-w-0 flex-1 truncate font-medium text-foreground">
+                        {{ entry.item.title }}
+                      </div>
+                      <Badge variant="outline" class="shrink-0 px-1.5 py-0 text-[10px]">
+                        {{ QUICK_KIND_LABELS[entry.item.section] }}
+                      </Badge>
+                    </div>
+                    <div v-if="entry.item.subtitle" class="truncate text-xs text-muted-foreground">
+                      {{ entry.item.subtitle }}
+                    </div>
                   </div>
                 </button>
-                <p
-                  v-if="section.id === 'objects' && quickObjectSearched && !section.items.length && !quickPending && !quickObjectError"
-                  class="border-b border-border/70 px-3 py-2.5 text-xs text-muted-foreground"
-                >
-                  {{ quickObjectPartial
-                    ? 'No visible live object was returned. Coverage is incomplete.'
-                    : 'No visible live object matched this query.' }}
-                </p>
-              </div>
+                <template v-else>
+                  <p
+                    v-if="quickObjectError"
+                    role="status"
+                    class="border-b border-border/70 bg-muted/20 px-3 py-2 text-[10px] text-muted-foreground"
+                  >
+                    {{ quickObjectErrorDetail }}
+                  </p>
+                  <p
+                    v-if="quickObjectSearched && !quickObjects.length && !quickPending && !quickObjectError"
+                    class="border-b border-border/70 px-3 py-2.5 text-xs text-muted-foreground"
+                  >
+                    {{ quickObjectPartial
+                      ? 'No visible live object was returned. Coverage is incomplete.'
+                      : 'No visible live object matched this query.' }}
+                  </p>
+                </template>
+              </template>
             </div>
             <div v-if="quickPending && !items.length" class="px-3 py-2.5 text-xs text-muted-foreground">
               Searching…
             </div>
-            <button
+            <div
               v-if="q"
               class="flex w-full items-center gap-2 border-t border-border bg-muted/30 px-3 py-2.5 text-left text-xs font-medium text-primary hover:bg-muted"
-              @mousedown.prevent
-              @click="openSearchPage"
             >
-              See all results for "{{ q }}" in Search →
-            </button>
+              <button
+                class="min-w-0 flex-1 truncate text-left"
+                @mousedown.prevent
+                @click="openSearchPage"
+              >
+                See all results for "{{ q }}" in Search →
+              </button>
+              <div
+                v-if="quickCoverageShown"
+                role="status"
+                class="ml-auto flex shrink-0 items-center gap-1"
+              >
+                <CoverageIcon compact :complete="quickComplete" @mousedown.prevent @click="openSearchPage" />
+                <Button
+                  v-if="!quickComplete"
+                  variant="ghost"
+                  size="sm"
+                  class="h-8 shrink-0 px-2 text-[10px]"
+                  :disabled="quickPending"
+                  @mousedown.prevent
+                  @click="retrySearch"
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

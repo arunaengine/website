@@ -92,6 +92,7 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
   'vue-router': { useRouter: () => ({ push: routerPush }) },
   '@vueuse/core': { useMediaQuery: mediaQuery },
   '@lucide/vue': icons,
+  '@/components/ui/Badge.vue': moduleDefault(defineComponent((_, { attrs, slots }) => () => h('span', attrs, slots.default?.()))),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
@@ -518,6 +519,7 @@ describe('narrow TopBar search panel', () => {
     search.complete.value = false
     const mounted = await mount()
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
 
     const dialog = element(mounted.root, (node) => node.props.role === 'dialog')
     expect(element(mounted.root, (node) => node.props['aria-label'] === 'Search coverage: partial')).toBeDefined()
@@ -530,7 +532,13 @@ describe('narrow TopBar search panel', () => {
     mounted.app.unmount()
   })
 
-  it('places the coverage icon before typed storage results', async () => {
+  it('flattens typed results with kind tags and puts coverage in the footer', async () => {
+    search.documents.value = [{
+      document_id: 'doc-1',
+      document_path: 'datasets/one',
+      title: 'One',
+      snippet: 'A dataset',
+    }]
     search.objects.value = [{
       kind: 'object',
       mode: 'distributed_best_effort',
@@ -553,6 +561,8 @@ describe('narrow TopBar search panel', () => {
     }
     search.objectSearched.value = true
     search.complete.value = false
+    search.groups.value = [{ group_id: 'group-a', display_name: 'Group A' }]
+    search.users.value = [{ user_id: 'user-a', name: 'Person A' }]
     const mounted = await mount()
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
     await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
@@ -560,10 +570,27 @@ describe('narrow TopBar search panel', () => {
     const icon = indexOf(mounted.root, (node) => node.props['aria-label'] === 'Search coverage: partial')
     const hit = indexOf(mounted.root, (node) => node.text.includes('reads/sample.fastq'))
     expect(icon).toBeGreaterThanOrEqual(0)
-    expect(icon).toBeLessThan(hit)
+    expect(icon).toBeGreaterThan(hit)
+    expect(allNodes(mounted.root).filter((node) => node.props.role === 'group')).toEqual([])
+    const options = allNodes(mounted.root).filter((node) => node.props.role === 'option')
+    expect(options.map((node) => node.props.id)).toEqual([
+      'qs-d:doc-1',
+      'qs-o:node-b:raw-data:reads/sample.fastq',
+      'qs-g:group-a',
+      'qs-u:user-a',
+    ])
+    expect(content(options[0])).toContain('Dataset')
+    expect(content(options[1])).toContain('Object')
+    expect(content(options[2])).toContain('Group')
+    expect(content(options[3])).toContain('Person')
     const text = content(element(mounted.root, (node) => node.props.role === 'dialog'))
+    expect(text).not.toContain('Datasets')
+    expect(text).not.toContain('Data objects')
+    expect(text).not.toContain('Groups')
+    expect(text).not.toContain('People')
     expect(text).not.toContain('Partial object inventory')
-    expect(text).toContain('Object · Distributed best-effort · Node: Storage node B · Group: group-a · Bucket: raw-data')
+    expect(text).toContain('Distributed best-effort · Node: Storage node B · Group: group-a · Bucket: raw-data')
+    expect(text).not.toContain('Object · Distributed best-effort')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
