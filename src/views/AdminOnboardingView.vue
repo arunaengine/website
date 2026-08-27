@@ -16,6 +16,7 @@ import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWa
 import DeviceLane from '@/components/onboarding/DeviceLane.vue'
 import SecretsTable, { type SecretRow } from '@/components/onboarding/SecretsTable.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { NEVER_EXPIRES_AFTER, secretStatus, useNodeOnboarding } from '@/composables/useNodeOnboarding'
 import { buildComposeSnippet, buildEnvBlock, normalizeSeedUrl, type NodeConfigInput } from '@/lib/onboarding-config'
@@ -28,6 +29,7 @@ const { apiBaseUrl, bootstrapped, currentUser, canManageOnboarding, isManagement
 const {
   secrets,
   listError,
+  listing,
   minting,
   mintError,
   revokingIds,
@@ -39,6 +41,8 @@ const {
   resetWatch,
 } = useNodeOnboarding()
 const { resolveUsers, cachedUser } = useUserDirectory()
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshSecrets)
+const spinning = computed(() => refreshBusy.value || listing.value)
 
 // The gate cascade opens the wizard only for a realm admin with the onboarding
 // permission ON a management node. Mirrors the honest states AdminView uses.
@@ -551,7 +555,9 @@ const managementPortals = computed(() =>
             <ServerCog class="h-4 w-4 text-primary" />
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Outstanding secrets</h3>
           </div>
-          <Button variant="outline" size="sm" @click="refreshSecrets"><RefreshCw class="h-3.5 w-3.5" /> Refresh</Button>
+          <Button variant="outline" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onRefresh">
+            <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Refresh
+          </Button>
         </header>
         <div class="p-5">
           <ErrorPanel v-if="listError" :message="listError" @retry="refreshSecrets" />

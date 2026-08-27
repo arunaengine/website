@@ -5,6 +5,7 @@ import * as VueRuntime from 'vue'
 import { createSSRApp, effectScope, h, nextTick, reactive } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { describe, expect, it, vi } from 'vitest'
+import { useRefresh } from '@/composables/useRefresh'
 import * as Api from '@/lib/api'
 import * as PlacementPolicies from '@/lib/placementPolicies'
 import * as Utils from '@/lib/utils'
@@ -50,6 +51,7 @@ const BucketPolicyDialogSetup = compileSetupComponent(new URL('./BucketPolicyDia
   '@/composables/usePlacementPolicies': {
     usePlacementPolicies: () => ({ ...placementPolicyMocks, sessionPolicyRefs: { value: [] } }),
   },
+  '@/composables/useRefresh': { useRefresh },
   '@/lib/api': Api,
   '@/lib/placementPolicies': PlacementPolicies,
   '@/lib/utils': Utils,

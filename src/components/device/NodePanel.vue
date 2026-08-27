@@ -6,6 +6,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { useRefresh } from '@/composables/useRefresh'
 import { appQuit, nodeLogsTail, nodeStatus, type NodeStatus } from '@/lib/desktopBridge'
 import { follow, onWake, POLL_IDLE_MS } from '@/lib/poll'
 import { formatDuration, truncateMiddle } from '@/lib/utils'
@@ -47,6 +48,9 @@ async function refresh(): Promise<void> {
     busy.value = false
   }
 }
+
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
+const spinning = computed(() => refreshBusy.value || busy.value)
 
 let stopPoll: (() => void) | null = null
 let unwake: (() => void) | null = null
@@ -118,8 +122,15 @@ const facts = computed(() => {
         </div>
         <div class="flex shrink-0 items-center gap-2">
           <Badge v-if="badge" :variant="badge.variant">{{ badge.label }}</Badge>
-          <Button variant="outline" size="sm" :disabled="busy" aria-label="Refresh node status" @click="refresh">
-            <RefreshCw class="h-3.5 w-3.5" />
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="spinning"
+            :aria-busy="spinning"
+            aria-label="Refresh node status"
+            @click="onRefresh"
+          >
+            <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" />
           </Button>
           <Button variant="outline" size="sm" :disabled="quitting" @click="quit">
             <Power class="h-3.5 w-3.5" /> {{ quitting ? 'Quitting' : 'Quit' }}

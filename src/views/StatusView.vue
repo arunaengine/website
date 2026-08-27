@@ -11,6 +11,7 @@ import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import { connectionLabel, connectionVariant, isDegradedStatus, kindVariant, statusVariant, type BadgeVariant } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
+import { useRefresh } from '@/composables/useRefresh'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { onWake, POLL_SLOW_MS } from '@/lib/poll'
 import { aggregateByLocation } from '@/lib/placement'
@@ -60,6 +61,9 @@ async function refreshStatus() {
     refreshing.value = false
   }
 }
+
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshStatus)
+const spinning = computed(() => refreshBusy.value || refreshing.value)
 
 // The base a node's latency is measured against; the local node falls back to
 // the portal's own configured API base so it is probed exactly like the rest.
@@ -237,8 +241,8 @@ watch(
     <PageHeader title="Status" description="Realm topology and local node health, refreshed every minute.">
       <template #actions>
         <span class="text-[11px] tabular-nums text-muted-foreground">Updated {{ lastUpdatedLabel }}</span>
-        <Button variant="outline" size="sm" :disabled="refreshing" @click="refreshStatus">
-          <RefreshCw class="h-3.5 w-3.5" /> Refresh
+        <Button variant="outline" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onRefresh">
+          <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Refresh
         </Button>
       </template>
     </PageHeader>

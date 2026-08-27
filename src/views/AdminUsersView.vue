@@ -14,6 +14,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { truncateMiddle } from '@/lib/utils'
 import { ApiError, type ApiUser } from '@/lib/api'
@@ -131,10 +132,12 @@ const visibleRows = computed(() => (searching.value ? searchRows.value : listRow
 const activeLoading = computed(() => (searching.value ? searchLoading.value : listLoading.value))
 const activeError = computed(() => (searching.value ? searchError.value : listError.value))
 
-function reload() {
-  if (searching.value) void runSearch(query.value.trim())
-  else void loadPage(pageIndex.value)
+function reload(): Promise<void> {
+  return searching.value ? runSearch(query.value.trim()) : loadPage(pageIndex.value)
 }
+
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(reload)
+const spinning = computed(() => refreshBusy.value || activeLoading.value)
 
 // Load once the permission gate opens; never before, so the forbidden and
 // signed-out states stay HTTP-free.
@@ -215,8 +218,8 @@ const sharedGroups = computed(() => {
         <Button variant="outline" size="sm" as-child>
           <RouterLink :to="{ name: 'admin' }">Admin</RouterLink>
         </Button>
-        <Button variant="outline" size="sm" :disabled="!ready || activeLoading" @click="reload">
-          <RefreshCw class="h-4 w-4" /> Refresh
+        <Button variant="outline" size="sm" :disabled="!ready || spinning" :aria-busy="spinning" @click="onRefresh">
+          <RefreshCw class="h-4 w-4" :class="spinning ? 'animate-spin' : ''" /> Refresh
         </Button>
       </template>
     </PageHeader>

@@ -12,6 +12,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import ReplaceLocalDialog from '@/components/desktop/ReplaceLocalDialog.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useRefresh } from '@/composables/useRefresh'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import {
   entryExpectation,
@@ -116,6 +117,8 @@ async function refresh(): Promise<void> {
   await loadPage()
 }
 
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
+
 onMounted(async () => {
   await ensureLoaded()
   await loadPage()
@@ -200,8 +203,8 @@ function when(ms: number | null | undefined): string {
         <Button v-if="folder" variant="outline" size="sm" @click="reveal(folder.root)">
           <FolderOpen class="h-3.5 w-3.5" /> Show on disk
         </Button>
-        <Button variant="outline" size="sm" :disabled="busy" @click="refresh">
-          <RefreshCw class="h-3.5 w-3.5" /> Refresh
+        <Button variant="outline" size="sm" :disabled="busy || refreshBusy" :aria-busy="refreshBusy" @click="onRefresh">
+          <RefreshCw class="h-3.5 w-3.5" :class="refreshBusy ? 'animate-spin' : ''" /> Refresh
         </Button>
         <Button
           v-if="folder"

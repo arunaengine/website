@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { useJobs } from '@/composables/useJobs'
+import { useRefresh } from '@/composables/useRefresh'
 import { formatBytes, truncateMiddle } from '@/lib/utils'
 import type { JobArtifactStatus } from '@/lib/jobs'
 import { Download, RefreshCw } from '@lucide/vue'
@@ -44,6 +45,9 @@ async function check() {
     if (id === requestId) checking.value = false
   }
 }
+
+const { busy: checkBusy, refresh: onCheck } = useRefresh(check)
+const spinning = computed(() => checkBusy.value || checking.value)
 
 async function download() {
   if (downloading.value) return
@@ -106,8 +110,8 @@ watch(() => props.jobId, () => {
           The archive is written once the job finishes<template v-if="status.jobState">, and the job
           is {{ status.jobState }}</template>.
         </p>
-        <Button variant="ghost" size="sm" :disabled="checking" @click="check">
-          <RefreshCw class="h-3.5 w-3.5" /> Check again
+        <Button variant="ghost" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onCheck">
+          <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Check again
         </Button>
       </div>
 
@@ -125,8 +129,8 @@ watch(() => props.jobId, () => {
 
       <div v-else class="flex flex-wrap items-center gap-2">
         <p class="text-xs text-muted-foreground">{{ status.message || 'The archive could not be checked.' }}</p>
-        <Button variant="ghost" size="sm" :disabled="checking" @click="check">
-          <RefreshCw class="h-3.5 w-3.5" /> Retry
+        <Button variant="ghost" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onCheck">
+          <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Retry
         </Button>
       </div>
     </template>

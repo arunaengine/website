@@ -16,6 +16,7 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useDeviceSync } from '@/composables/useDeviceSync'
 import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useJobsList } from '@/composables/useJobs'
+import { useRefresh } from '@/composables/useRefresh'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import { useRealm } from '@/composables/useRealm'
@@ -124,6 +125,8 @@ async function reload(): Promise<void> {
   ])
 }
 
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(reload)
+
 onMounted(() => void reload())
 </script>
 
@@ -138,7 +141,9 @@ onMounted(() => void reload())
         <Badge :variant="nodeTone">{{ nodeLabel }}</Badge>
       </template>
       <template #actions>
-        <Button variant="outline" size="sm" @click="reload"><RefreshCw class="h-3.5 w-3.5" /> Refresh</Button>
+        <Button variant="outline" size="sm" :disabled="refreshBusy" :aria-busy="refreshBusy" @click="onRefresh">
+          <RefreshCw class="h-3.5 w-3.5" :class="refreshBusy ? 'animate-spin' : ''" /> Refresh
+        </Button>
         <Button size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Bind a folder</Button>
       </template>
     </PageHeader>

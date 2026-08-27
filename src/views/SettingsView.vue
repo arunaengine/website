@@ -14,6 +14,7 @@ import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
+import { useRefresh } from '@/composables/useRefresh'
 import { useAuth } from '@/composables/useAuth'
 import { useWatches } from '@/composables/useWatches'
 import { RouterLink, useRoute } from 'vue-router'
@@ -45,6 +46,7 @@ const route = useRoute()
 // Optimistic until a watch request answers 404/403 (mirrors the bell's probe).
 const { available: watchesAvailable } = useWatches()
 
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 const apiBaseDraft = ref(apiBaseUrl.value)
 const tokenDraft = ref(authToken.value)
 watch(authToken, (token) => (tokenDraft.value = token))
@@ -333,7 +335,9 @@ function toggleGroup(groupId: string) {
   <div class="@container">
     <PageHeader title="Settings" description="API connection, current user, profiles, groups and credentials from the local Aruna API.">
       <template #actions>
-        <Button variant="outline" @click="refresh"><RefreshCw class="h-4 w-4" /> Refresh</Button>
+        <Button variant="outline" :disabled="refreshBusy" :aria-busy="refreshBusy" @click="onRefresh">
+          <RefreshCw class="h-4 w-4" :class="refreshBusy ? 'animate-spin' : ''" /> Refresh
+        </Button>
         <Button :disabled="!currentUser || saving || !profileDirty" @click="saveProfile"><Save class="h-4 w-4" /> Save profile</Button>
       </template>
     </PageHeader>

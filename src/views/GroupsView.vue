@@ -10,6 +10,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
+import { useRefresh } from '@/composables/useRefresh'
 import { useRoute } from 'vue-router'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Inbox, Plus, RefreshCw, Users } from '@lucide/vue'
@@ -30,6 +31,8 @@ const route = useRoute()
 
 const createGroupOpen = ref(false)
 const selectedGroupId = ref('')
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
+const spinning = computed(() => refreshBusy.value || loading.value)
 
 async function loadOwnJoinRequests() {
   if (!joinRequestsEnabled.value || !currentUser.value) return
@@ -90,7 +93,9 @@ const description = computed(() =>
   <div>
     <PageHeader title="Groups" :description="description">
       <template #actions>
-        <Button variant="outline" @click="refresh"><RefreshCw class="h-4 w-4" /> Refresh</Button>
+        <Button variant="outline" :disabled="spinning" :aria-busy="spinning" @click="onRefresh">
+          <RefreshCw class="h-4 w-4" :class="spinning ? 'animate-spin' : ''" /> Refresh
+        </Button>
         <Button :disabled="!currentUser" @click="createGroupOpen = true">
           <Plus class="h-4 w-4" /> Create group
         </Button>

@@ -6,6 +6,7 @@ import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useRefresh } from '@/composables/useRefresh'
 import type { UsageResponse } from '@/lib/api'
 import * as Quota from '@/lib/quota'
 import * as Utils from '@/lib/utils'
@@ -62,6 +63,7 @@ const GroupQuotaCards = compileClientComponent(new URL('./GroupQuotaCards.vue', 
   '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
   '@/composables/useAruna': { useAruna: () => ({ myGroups, getGroupUsage }) },
+  '@/composables/useRefresh': { useRefresh },
   '@/lib/quota': Quota,
   '@/lib/utils': Utils,
 })

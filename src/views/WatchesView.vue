@@ -10,6 +10,7 @@ import { RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useWatches } from '@/composables/useWatches'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
+import { useRefresh } from '@/composables/useRefresh'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { parseWatchPath, watchEventLabel } from '@/lib/watches'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
@@ -20,6 +21,9 @@ const { bootstrapped, currentUser, myGroups, discoverableGroups } = useAruna()
 const { available, watches, listLoaded, listLoading, listError, deletingIds, loadWatches, ensureLoaded, deleteWatch } =
   useWatches()
 const { writesDisabled } = useConnectivity()
+
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(loadWatches)
+const spinning = computed(() => refreshBusy.value || listLoading.value)
 
 const groupsById = computed(() => {
   const map = new Map<string, string>()
@@ -62,7 +66,9 @@ watch(currentUser, () => void ensureLoaded())
       description="Watches deliver a notification when data is uploaded or metadata is created under a path you follow."
     >
       <template #actions>
-        <Button variant="ghost" size="sm" @click="loadWatches"><RefreshCw class="h-4 w-4" /> Refresh</Button>
+        <Button variant="ghost" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onRefresh">
+          <RefreshCw class="h-4 w-4" :class="spinning ? 'animate-spin' : ''" /> Refresh
+        </Button>
         <RouterLink :to="{ name: 'settings' }">
           <Button variant="outline" size="sm"><ArrowLeft class="h-4 w-4" /> Settings</Button>
         </RouterLink>

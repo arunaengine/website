@@ -11,6 +11,7 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useRefresh } from '@/composables/useRefresh'
 import {
   isPlacementUnsupported,
   placementMutationErrorMessage,
@@ -123,6 +124,9 @@ async function loadPlacement() {
     loading.value = false
   }
 }
+
+const { busy: reloadBusy, refresh: onReload } = useRefresh(loadPlacement)
+const spinning = computed(() => reloadBusy.value || loading.value)
 
 function createStrategy() {
   creatingStrategy.value = true
@@ -302,8 +306,8 @@ watch(
               <SlidersHorizontal class="h-4 w-4 text-primary" />
               <h3 class="font-display text-sm font-semibold text-aruna-navy">Strategies</h3>
             </div>
-            <Button variant="ghost" size="sm" :disabled="loading || busy" @click="loadPlacement">
-              <RefreshCw class="h-3.5 w-3.5" :class="loading ? 'animate-spin' : ''" /> Reload
+            <Button variant="ghost" size="sm" :disabled="spinning || busy" :aria-busy="spinning" @click="onReload">
+              <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Reload
             </Button>
           </header>
           <div class="space-y-4 p-5">

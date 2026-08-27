@@ -5,6 +5,7 @@ import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import { useRefresh } from '@/composables/useRefresh'
 import { ApiError } from '@/lib/api'
 import * as Jobs from '@/lib/jobs'
 import * as Tes from '@/lib/tes'
@@ -285,6 +286,7 @@ describe('distributed job detail components', () => {
         '@/composables/useJobs': {
           useJobs: () => ({ headJobArtifact, downloadJobArtifact: vi.fn() }),
         },
+        '@/composables/useRefresh': { useRefresh },
         '@/lib/utils': Utils,
       },
     )
@@ -321,6 +323,7 @@ describe('distributed job detail components', () => {
               downloadJobArtifact: vi.fn(),
             }),
           },
+          '@/composables/useRefresh': { useRefresh },
           '@/lib/utils': Utils,
         },
       )

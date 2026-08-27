@@ -18,6 +18,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useRefresh } from '@/composables/useRefresh'
 import {
   ackQuarantine,
   isHexKey,
@@ -100,6 +101,9 @@ async function loadPage(index: number) {
     if (seq === listSeq) listLoading.value = false
   }
 }
+
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(() => loadPage(pageIndex.value))
+const spinning = computed(() => refreshBusy.value || listLoading.value)
 
 function resetPaging() {
   cursors.value = [undefined]
@@ -243,8 +247,8 @@ async function runPrunePass() {
         <Button variant="outline" size="sm" as-child>
           <RouterLink :to="{ name: 'admin' }">Admin</RouterLink>
         </Button>
-        <Button variant="outline" size="sm" :disabled="!ready || listLoading" @click="loadPage(pageIndex)">
-          <RefreshCw class="h-4 w-4" /> Refresh
+        <Button variant="outline" size="sm" :disabled="!ready || spinning" :aria-busy="spinning" @click="onRefresh">
+          <RefreshCw class="h-4 w-4" :class="spinning ? 'animate-spin' : ''" /> Refresh
         </Button>
         <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="!ready" @click="openPrune">
           <Trash2 class="h-4 w-4" /> Prune acknowledged

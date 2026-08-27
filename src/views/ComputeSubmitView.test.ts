@@ -18,6 +18,7 @@ import {
 } from '@/test/clientRender'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as VueUse from '@vueuse/core'
+import { useRefresh } from '@/composables/useRefresh'
 import * as Api from '@/lib/api'
 import * as NodeDisplay from '@/components/nodes/node-display'
 import * as OnboardingConfig from '@/lib/onboarding-config'
@@ -151,6 +152,7 @@ const useNodeOnboardingModule = {
   useNodeOnboarding: () => ({
     secrets: ref([]),
     listError: ref(null),
+    listing: ref(false),
     minting: ref(false),
     mintError: ref(null),
     revokingIds: ref(new Set<string>()),
@@ -265,6 +267,7 @@ const AdminOnboardingView = compileClientComponent(new URL('./AdminOnboardingVie
   '@/components/onboarding/SecretsTable.vue': moduleDefault(GenericStub),
   '@/composables/useAruna': useArunaModule,
   '@/composables/useNodeOnboarding': useNodeOnboardingModule,
+  '@/composables/useRefresh': { useRefresh },
   '@/composables/useUserDirectory': {
     useUserDirectory: () => ({ resolveUsers: vi.fn(async () => []), cachedUser: () => null }),
   },

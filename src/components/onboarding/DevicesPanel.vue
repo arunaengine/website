@@ -10,6 +10,7 @@ import SecretsTable, { type SecretRow } from '@/components/onboarding/SecretsTab
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceEnrollment } from '@/composables/useDeviceEnrollment'
+import { useRefresh } from '@/composables/useRefresh'
 import { Plus, RefreshCw, X } from '@lucide/vue'
 import type { UserDevice } from '@/lib/api'
 
@@ -17,11 +18,13 @@ const DEVICE_STEPS = ['Device', 'Hand off', 'Watch it join']
 const FIRST_STEP = 1
 
 const { currentUser } = useAruna()
-const { devices, devicesError, busyIds, deviceCount, deviceLimit, loadDevices, revoke } =
+const { devices, devicesError, busyIds, deviceCount, deviceLimit, loadingDevices, loadDevices, revoke } =
   useDeviceEnrollment()
 
 const adding = ref(false)
 const deviceStep = ref(FIRST_STEP)
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(loadDevices)
+const spinning = computed(() => refreshBusy.value || loadingDevices.value)
 
 // The session restores asynchronously, so load once it has a user rather than
 // firing an anonymous request at mount.
@@ -95,8 +98,15 @@ const rows = computed<SecretRow[]>(() =>
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <span class="text-[11px] tabular-nums text-muted-foreground">{{ capLabel }}</span>
-        <Button variant="outline" size="sm" aria-label="Refresh devices" @click="loadDevices">
-          <RefreshCw class="h-3.5 w-3.5" />
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="spinning"
+          :aria-busy="spinning"
+          aria-label="Refresh devices"
+          @click="onRefresh"
+        >
+          <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" />
         </Button>
         <Button v-if="!adding" size="sm" :disabled="!currentUser" @click="openAdd">
           <Plus class="h-3.5 w-3.5" /> Add a device

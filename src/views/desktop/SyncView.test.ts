@@ -3,6 +3,7 @@ import { computed, defineComponent, h, inject, provide, ref, type ComputedRef } 
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MIN_REFRESH_SPIN_MS, useRefresh } from '@/composables/useRefresh'
 import * as Utils from '@/lib/utils'
 import {
   button,
@@ -147,6 +148,7 @@ const SyncView = compileClientComponent(new URL('./SyncView.vue', import.meta.ur
       load: loadSync,
     }),
   },
+  '@/composables/useRefresh': { useRefresh },
   '@/composables/useSyncedFolders': {
     useSyncedFolders: () => ({ load: loadFolders, needsYouTotal }),
   },
@@ -226,6 +228,25 @@ describe('sync overview', () => {
     await flush()
     expect(button(mounted.root, 'Syncing').props.disabled).toBe(true)
     mounted.app.unmount()
+  })
+
+  it('marks the refresh busy until its minimum spin ends', async () => {
+    vi.useFakeTimers()
+    const mounted = await mount()
+    const refresh = button(mounted.root, 'Refresh')
+
+    const pending = click(refresh)
+    await flush()
+    expect(refresh.props.disabled).toBe(true)
+    expect(refresh.props['aria-busy']).toBe(true)
+    expect(loadFolders).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(MIN_REFRESH_SPIN_MS)
+    await pending
+    expect(refresh.props.disabled).toBe(false)
+    expect(refresh.props['aria-busy']).toBe(false)
+    mounted.app.unmount()
+    vi.useRealTimers()
   })
 })
 

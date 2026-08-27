@@ -15,6 +15,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useRefresh } from '@/composables/useRefresh'
 import { ApiError } from '@/lib/api'
 import { graphIriFor } from '@/lib/graphIri'
 import { listPersistentIds, pidStateMeta, withdrawPid, type PersistentIdView } from '@/lib/pid'
@@ -80,6 +81,9 @@ watch(
   { immediate: true },
 )
 
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(load)
+const spinning = computed(() => refreshBusy.value || loading.value)
+
 const pid = computed(() => view.value?.value ?? graphIriFor(props.documentId))
 const state = computed(() => view.value?.state ?? 'unknown')
 const meta = computed(() => pidStateMeta(state.value))
@@ -132,8 +136,15 @@ async function confirmWithdraw() {
       <div class="flex items-center gap-2 text-sm font-medium text-foreground">
         <Fingerprint class="h-4 w-4 text-primary" /> Persistent identifier
       </div>
-      <Button variant="ghost" size="icon" :disabled="loading" aria-label="Re-check PID status" @click="load">
-        <RefreshCw class="h-3.5 w-3.5" />
+      <Button
+        variant="ghost"
+        size="icon"
+        :disabled="spinning"
+        :aria-busy="spinning"
+        aria-label="Re-check PID status"
+        @click="onRefresh"
+      >
+        <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" />
       </Button>
     </header>
 

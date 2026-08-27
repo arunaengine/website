@@ -3,6 +3,7 @@ import { defineComponent, h, ref } from 'vue'
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useRefresh } from '@/composables/useRefresh'
 import * as DeviceApi from '@/lib/deviceApi'
 import * as SyncStates from '@/lib/syncStates'
 import * as Utils from '@/lib/utils'
@@ -107,6 +108,7 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
   '@/components/dashboard/PageHeader.vue': moduleDefault(Passthrough),
   '@/components/desktop/ReplaceLocalDialog.vue': moduleDefault(ReplaceLocalDialogStub),
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'lab node' }) },
+  '@/composables/useRefresh': { useRefresh },
   '@/composables/useSyncedFolders': {
     useSyncedFolders: () => ({
       folders: ref([folder]),

@@ -7,6 +7,7 @@ import { createRenderer, defineComponent, h, nextTick, ref, type App, type Compo
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, type RealmPlacementStrategy } from '@/lib/api'
 import { placementMutationErrorMessage } from '@/composables/usePlacement'
+import { useRefresh } from '@/composables/useRefresh'
 import * as Placement from '@/lib/placement'
 import type { RealmPlacementConfigResponse } from '@/lib/placement'
 
@@ -143,6 +144,7 @@ const PlacementAdminPanel = compileClientComponent(
         realmInfo: ref({ nodes: [] }),
       }),
     },
+    '@/composables/useRefresh': { useRefresh },
     '@/composables/usePlacement': {
       isPlacementUnsupported: () => false,
       placementMutationErrorMessage,

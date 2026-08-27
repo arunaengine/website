@@ -32,6 +32,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useBuckets } from '@/composables/useBuckets'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useRefresh } from '@/composables/useRefresh'
 import { useStaging } from '@/composables/useStaging'
 import { useStagingReferences } from '@/composables/useStagingReferences'
 import { useUploadQueue } from '@/composables/useUploadQueue'
@@ -698,18 +699,20 @@ async function loadObjects(more = false) {
 }
 
 // Everything except the bucket list, which has its own cache-aware entry points.
-function reloadContext() {
-  void loadSyncOverview()
-  if (bucket.value) {
-    void loadObjects()
-    void references.reload()
-  }
+function reloadContext(): Promise<unknown> {
+  const work: Array<Promise<unknown>> = [loadSyncOverview()]
+  if (bucket.value) work.push(loadObjects(), references.reload())
+  return Promise.all(work)
 }
 
-function refreshAll() {
-  void bucketList.refresh()
-  reloadContext()
+function refreshAll(): Promise<unknown> {
+  return Promise.all([bucketList.refresh(), reloadContext()])
 }
+
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshAll)
+const refreshSpinning = computed(() => refreshBusy.value || bucketsRefreshing.value)
+const { busy: retryBusy, refresh: onRetryObjects } = useRefresh(() => loadObjects())
+const retrySpinning = computed(() => retryBusy.value || listLoading.value)
 
 // On a fresh page load the S3 endpoint arrives asynchronously (from the
 // /info bootstrap), so loading must wait for both the key and the endpoint
@@ -2036,7 +2039,9 @@ const isEmpty = computed(
           >
             <KeyRound class="h-3 w-3" /> …{{ keyTail }}
           </span>
-          <Button variant="outline" size="sm" @click="refreshAll"><RefreshCw class="h-4 w-4" /> Refresh</Button>
+          <Button variant="outline" size="sm" :disabled="refreshSpinning" :aria-busy="refreshSpinning" @click="onRefresh">
+            <RefreshCw class="h-4 w-4" :class="refreshSpinning ? 'animate-spin' : ''" /> Refresh
+          </Button>
           <!-- Staging jobs are connected-node global, not per bucket. -->
           <Button v-if="stagingJobsEnabled" variant="outline" size="sm" @click="stagingPanelOpen = true">
             <HardDriveDownload class="h-4 w-4" /> Staging
@@ -2364,8 +2369,15 @@ const isEmpty = computed(
                 }}
               </p>
               <div class="mt-4 flex justify-center gap-2">
-                <Button v-if="!remoteEndpointMissing" variant="outline" size="sm" @click="loadObjects()">
-                  <RefreshCw class="h-3.5 w-3.5" /> Try again
+                <Button
+                  v-if="!remoteEndpointMissing"
+                  variant="outline"
+                  size="sm"
+                  :disabled="retrySpinning"
+                  :aria-busy="retrySpinning"
+                  @click="onRetryObjects"
+                >
+                  <RefreshCw class="h-3.5 w-3.5" :class="retrySpinning ? 'animate-spin' : ''" /> Try again
                 </Button>
                 <Button v-if="showSyncButton" size="sm" @click="openSyncDialog">
                   <ArrowLeftRight class="h-3.5 w-3.5" /> Sync to this node…

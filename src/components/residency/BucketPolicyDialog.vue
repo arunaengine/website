@@ -16,6 +16,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import CoverageReport from '@/components/residency/CoverageReport.vue'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
+import { useRefresh } from '@/composables/useRefresh'
 import { ApiError } from '@/lib/api'
 import {
   placementPoliciesErrorMessage,
@@ -91,6 +92,9 @@ async function load() {
     if (sequence === loadSequence) loading.value = false
   }
 }
+
+const { busy: reloadBusy, refresh: onReload } = useRefresh(load)
+const spinning = computed(() => reloadBusy.value || loading.value)
 
 let coverageSequence = 0
 async function loadCoverage(cursor?: string) {
@@ -263,7 +267,9 @@ watch(
             <Button :disabled="saving || !dirty || refErrors.length > 0" @click="saveDefaults">
               <Save class="h-3.5 w-3.5" /> {{ saving ? 'Saving…' : 'Replace default set' }}
             </Button>
-            <Button variant="outline" :disabled="saving" @click="load"><RefreshCw class="h-3.5 w-3.5" /> Reload</Button>
+            <Button variant="outline" :disabled="saving || spinning" :aria-busy="spinning" @click="onReload">
+              <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Reload
+            </Button>
             <Button variant="outline" :disabled="bulkBusy || dirty" :title="dirty ? 'Save or reset the default set before applying it' : undefined" @click="bulkOpen = true"><Activity class="h-3.5 w-3.5" /> Apply to existing objects</Button>
           </div>
         </section>

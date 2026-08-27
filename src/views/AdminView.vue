@@ -14,6 +14,7 @@ import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { featureEnabled } from '@/lib/config'
 import { formatBytes, formatNumber, shortUserId } from '@/lib/utils'
@@ -28,6 +29,7 @@ const { isAuthenticated, authPending } = useAuth()
 // show a handle instead of the raw {ulid}@{realm} identity.
 const { resolveUsers, cachedUser } = useUserDirectory()
 
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 const nodeCapability = computed(() => nodeInfo.value?.node.capabilities ?? 'server')
 
 // Placement admin is a tab of this view (config-gated); the legacy
@@ -359,7 +361,9 @@ async function save() {
   <div>
     <PageHeader title="Realm administration" description="Realm-wide usage, quotas, compute, placement strategies and residency policies.">
       <template #actions>
-        <Button variant="outline" @click="refresh"><RefreshCw class="h-4 w-4" /> Refresh</Button>
+        <Button variant="outline" :disabled="refreshBusy" :aria-busy="refreshBusy" @click="onRefresh">
+          <RefreshCw class="h-4 w-4" :class="refreshBusy ? 'animate-spin' : ''" /> Refresh
+        </Button>
       </template>
     </PageHeader>
 

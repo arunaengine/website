@@ -22,6 +22,7 @@ vi.mock('@/composables/useDeviceEnrollment', () => ({
     busyIds: ref(new Set<string>()),
     deviceCount: computed(() => devices.value.length),
     deviceLimit,
+    loadingDevices: ref(false),
     loadDevices: vi.fn(),
     revoke,
   }),

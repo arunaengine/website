@@ -18,6 +18,7 @@ import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import DeviceTransfersPanel from '@/components/desktop/DeviceTransfersPanel.vue'
 import FoldersPanel from '@/components/desktop/FoldersPanel.vue'
 import { useDeviceSync } from '@/composables/useDeviceSync'
+import { useRefresh } from '@/composables/useRefresh'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import type { DocumentSyncState, SyncDocument } from '@/lib/deviceApi'
 import { relativeTime } from '@/lib/utils'
@@ -48,6 +49,9 @@ onMounted(() => void load())
 async function reload(): Promise<void> {
   await Promise.all([load(), loadFolders()])
 }
+
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(reload)
+const spinning = computed(() => refreshBusy.value || loading.value)
 
 const DOC_BADGE: Record<DocumentSyncState, BadgeVariant> = {
   synced: 'success',
@@ -134,10 +138,12 @@ const nothingHeld = computed(() => state.value === 'ready' && !documents.value.l
         <span class="text-xs text-muted-foreground">
           {{ status.pendingTotal }} {{ status.pendingTotal === 1 ? 'change' : 'changes' }} pending
         </span>
-        <Button variant="outline" size="sm" @click="reload"><RefreshCw class="h-3.5 w-3.5" /> Refresh</Button>
+        <Button variant="outline" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onRefresh">
+          <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Refresh
+        </Button>
         <Button variant="outline" size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Bind a folder</Button>
-        <Button size="sm" :disabled="!canRun" @click="runSync">
-          <RefreshCw class="h-3.5 w-3.5" /> {{ running ? 'Syncing' : 'Sync now' }}
+        <Button size="sm" :disabled="!canRun" :aria-busy="running" @click="runSync">
+          <RefreshCw class="h-3.5 w-3.5" :class="running ? 'animate-spin' : ''" /> {{ running ? 'Syncing' : 'Sync now' }}
         </Button>
       </template>
     </PageHeader>
