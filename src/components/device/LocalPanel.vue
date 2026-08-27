@@ -1,11 +1,17 @@
 <script setup lang="ts">
 // Where the node stores its data on this machine, and whether it runs at all.
 // Folder bindings live in the node itself, not here.
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Switch from '@/components/ui/Switch.vue'
+import { useAruna } from '@/composables/useAruna'
 import { nodeSettings, pickDirectory, setNodeSettings, type NodeSettings } from '@/lib/desktopBridge'
 import { FolderOpen } from '@lucide/vue'
+
+const { nodeInfo } = useAruna()
+
+// What the node itself reports; unknown while it restarts.
+const s3Url = computed(() => nodeInfo.value?.services?.interfaces?.s3?.url ?? null)
 
 const settings = ref<NodeSettings | null>(null)
 const loadError = ref<string | null>(null)
@@ -80,6 +86,21 @@ async function save(): Promise<void> {
             }}</code>
             <Button variant="outline" size="sm" @click="chooseStorage"><FolderOpen class="h-3.5 w-3.5" /> Change</Button>
           </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <span class="text-xs font-medium text-foreground">Local S3 endpoint</span>
+            <p class="text-[11px] text-muted-foreground">
+              The node serves you an S3 endpoint on this machine. Changing this restarts the node.
+            </p>
+            <p v-if="settings.s3Enabled && s3Url" class="font-mono text-[11px] text-muted-foreground">{{ s3Url }}</p>
+          </div>
+          <Switch
+            :checked="settings.s3Enabled"
+            aria-label="Local S3 endpoint"
+            @update:checked="patch({ s3Enabled: $event })"
+          />
         </div>
 
         <div class="flex items-center justify-between gap-3">

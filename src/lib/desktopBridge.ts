@@ -64,6 +64,8 @@ export interface NodeSettings {
   storagePath: string
   paused: boolean
   autoStart: boolean
+  // The node serves the owner an S3 endpoint on loopback unless it is off.
+  s3Enabled: boolean
   compute: ComputeSettings
 }
 
@@ -183,6 +185,9 @@ function readSettings(command: string, value: unknown): NodeSettings {
     storagePath: asText(raw.storagePath) ?? '',
     paused: raw.paused === true,
     autoStart: raw.autoStart === true,
+    // Unlike the other flags this one is on by default, so only an explicit
+    // false turns the endpoint off.
+    s3Enabled: raw.s3Enabled !== false,
     compute: readCompute(raw.compute),
   }
 }

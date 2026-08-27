@@ -45,6 +45,7 @@ import {
   type BacklinkPreflightTarget,
 } from '@/lib/backlinks'
 import { featureEnabled } from '@/lib/config'
+import { isDesktop } from '@/lib/desktop'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import {
@@ -99,6 +100,7 @@ const route = useRoute()
 const router = useRouter()
 const { authToken, currentUser, bootstrapped, myGroups, getGroupUsage, isRealmAdmin, listGroupConnectors, listSyncRelationships, nodeInfo, realmInfo } = useAruna()
 const s3 = useS3()
+const desktop = isDesktop()
 
 function routeString(value: unknown): string {
   if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
@@ -2057,7 +2059,10 @@ const isEmpty = computed(
       <section v-else-if="!s3.connectedEndpoint.value" class="surface border-amber-500/30 bg-amber-500/5 p-5 text-sm text-amber-900 dark:text-amber-200">
         <div class="flex items-start gap-3">
           <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />
-          <p>This node does not advertise an S3 endpoint, so the data manager cannot connect.</p>
+          <p>
+            This node does not advertise an S3 endpoint, so the data manager cannot connect.
+            <template v-if="desktop">Turn the local S3 endpoint on under This device, Storage &amp; settings.</template>
+          </p>
         </div>
       </section>
 

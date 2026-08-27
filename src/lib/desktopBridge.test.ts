@@ -109,6 +109,7 @@ describe('bridge commands', () => {
       storagePath: '/data',
       paused: true,
       autoStart: false,
+      s3Enabled: true,
       compute: {
         backend: 'auto',
         maxCpuCores: null,
@@ -119,6 +120,16 @@ describe('bridge commands', () => {
       },
     })
     expect(invoke).toHaveBeenCalledWith('node_settings_set', { settings: { paused: true } })
+  })
+
+  it('keeps the local S3 endpoint on unless it is denied', async () => {
+    // Absent means on: the shell serves S3 by default.
+    const off = await withShell(() => ({ storagePath: '/data', s3Enabled: false }))
+    await expect(off.setNodeSettings({ s3Enabled: false })).resolves.toMatchObject({ s3Enabled: false })
+    expect(invoke).toHaveBeenCalledWith('node_settings_set', { settings: { s3Enabled: false } })
+
+    const absent = await withShell(() => ({ storagePath: '/data' }))
+    await expect(absent.nodeSettings()).resolves.toMatchObject({ s3Enabled: true })
   })
 
   it('hands the enrollment over as one payload', async () => {
