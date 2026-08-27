@@ -6,6 +6,7 @@ import SideNav from '@/components/layout/SideNav.vue'
 import TopBar from '@/components/dashboard/TopBar.vue'
 import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
+import NodeDown from '@/components/layout/NodeDown.vue'
 import TransfersPanel from '@/components/data/TransfersPanel.vue'
 import { RouterView, useRoute } from 'vue-router'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -35,7 +36,14 @@ const mainEl = ref<HTMLElement | null>(null)
 const unreachable = computed(() => realmReach.value === 'unreachable')
 
 const { isRealmAdmin, canInspectUsers, canManageOnboarding } = useAruna()
-const { start: watchNode, stop: unwatchNode } = useDeviceStatus()
+const { status, loaded, state, start: watchNode, stop: unwatchNode } = useDeviceStatus()
+const nodeDown = computed(
+  () =>
+    loaded.value &&
+    status.value?.enrolled === true &&
+    (state.value === 'stopped' || state.value === 'error') &&
+    route.name !== 'device',
+)
 
 // Same read as the portal sidebar: one Compute entry for either compute plane.
 const tesEnabled = featureEnabled('tes')
@@ -97,6 +105,7 @@ watch(
       <GlobalErrorBanner />
       <main id="main-content" ref="mainEl" tabindex="-1" class="flex-1 overflow-x-hidden outline-none">
         <RealmUnreachable v-if="unreachable" />
+        <NodeDown v-else-if="nodeDown" />
         <RouterView v-else />
       </main>
     </div>

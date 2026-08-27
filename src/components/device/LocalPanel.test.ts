@@ -15,7 +15,6 @@ import {
 interface Local {
   storagePath: string
   paused: boolean
-  autoStart: boolean
   s3Enabled: boolean
   compute: Record<string, unknown>
 }
@@ -23,7 +22,6 @@ interface Local {
 const stored = ref<Local>({
   storagePath: '/home/me/aruna',
   paused: false,
-  autoStart: true,
   s3Enabled: true,
   compute: {},
 })
@@ -68,7 +66,6 @@ beforeEach(() => {
   stored.value = {
     storagePath: '/home/me/aruna',
     paused: false,
-    autoStart: true,
     s3Enabled: true,
     compute: {},
   }
@@ -85,6 +82,7 @@ describe('the local S3 endpoint', () => {
     expect(html).toContain('serves you an S3 endpoint on this machine')
     expect(html).toContain('restarts the node')
     expect(html).toContain('http://127.0.0.1:34118')
+    expect(html).not.toContain('Start with the app')
     expect(toggle(mounted.root).props.checked).toBe(true)
     mounted.app.unmount()
   })

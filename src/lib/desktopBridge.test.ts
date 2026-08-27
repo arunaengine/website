@@ -66,7 +66,13 @@ describe('bridge availability', () => {
 describe('bridge commands', () => {
   it('normalizes the node status', async () => {
     // A shell that reports no readiness is not taken for one that is serving.
-    const bridge = await withShell(() => ({ state: 'sideways', nodeId: ' n1 ', enrolled: true, uptimeSeconds: 90 }))
+    const bridge = await withShell(() => ({
+      state: 'sideways',
+      nodeId: ' n1 ',
+      enrolled: true,
+      uptimeSeconds: 90,
+      detail: ' supervisor exited ',
+    }))
     await expect(bridge.nodeStatus()).resolves.toEqual({
       state: 'error',
       nodeId: 'n1',
@@ -78,6 +84,7 @@ describe('bridge commands', () => {
       version: null,
       uptimeSeconds: 90,
       message: null,
+      detail: 'supervisor exited',
     })
   })
 
@@ -108,7 +115,6 @@ describe('bridge commands', () => {
     await expect(bridge.setNodeSettings({ paused: true })).resolves.toEqual({
       storagePath: '/data',
       paused: true,
-      autoStart: false,
       s3Enabled: true,
       compute: {
         backend: 'auto',

@@ -2,7 +2,7 @@ import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const route = { path: '/app', hash: '' }
+const route = { name: 'dashboard', path: '/app', hash: '' }
 const permissions = {
   isRealmAdmin: ref(false),
   canInspectUsers: ref(false),
@@ -12,7 +12,11 @@ const permissions = {
 }
 const probeRealm = vi.fn(async () => undefined)
 const watchNode = vi.fn()
+const unwatchNode = vi.fn()
 const realmReach = ref('reachable')
+const nodeStatus = ref<{ enrolled: boolean } | null>(null)
+const nodeState = ref<'stopped' | 'starting' | 'running' | 'error' | 'unknown'>('unknown')
+const nodeLoaded = ref(false)
 
 const RouterLinkStub = defineComponent({
   props: { to: { type: [String, Object], required: true } },
@@ -21,6 +25,9 @@ const RouterLinkStub = defineComponent({
   },
 })
 const EmptyStub = defineComponent(() => () => null)
+const RouterViewStub = defineComponent(() => () => h('div', 'routed-view'))
+const NodeDownStub = defineComponent(() => () => h('div', 'node-down'))
+const RealmUnreachableStub = defineComponent(() => () => h('div', 'realm-unreachable'))
 // Records the variant it was handed, which is how the desktop chrome is chosen.
 const TopBarStub = defineComponent({
   props: { variant: { type: String, default: 'portal' } },
@@ -32,23 +39,39 @@ let DesktopLayout: Component
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({
     RouterLink: RouterLinkStub,
-    RouterView: EmptyStub,
+    RouterView: RouterViewStub,
     useRoute: () => route,
   }))
   vi.doMock('@/composables/useAruna', () => ({ useAruna: () => permissions }))
-  vi.doMock('@/composables/useDeviceStatus', () => ({ useDeviceStatus: () => ({ start: watchNode }) }))
+  vi.doMock('@/composables/useDeviceStatus', () => ({
+    useDeviceStatus: () => ({
+      status: nodeStatus,
+      state: nodeState,
+      loaded: nodeLoaded,
+      start: watchNode,
+      stop: unwatchNode,
+    }),
+  }))
   vi.doMock('@/lib/config', () => ({ featureEnabled: () => true }))
   vi.doMock('@/lib/desktopBoot', () => ({ probeRealm, realmReach }))
   vi.doMock('@/components/dashboard/TopBar.vue', () => ({ default: TopBarStub }))
   vi.doMock('@/components/layout/AppLogo.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/layout/GlobalErrorBanner.vue', () => ({ default: EmptyStub }))
-  vi.doMock('@/components/layout/RealmUnreachable.vue', () => ({ default: EmptyStub }))
+  vi.doMock('@/components/layout/RealmUnreachable.vue', () => ({ default: RealmUnreachableStub }))
+  vi.doMock('@/components/layout/NodeDown.vue', () => ({ default: NodeDownStub }))
   vi.doMock('@/components/data/TransfersPanel.vue', () => ({ default: EmptyStub }))
   DesktopLayout = (await import('./DesktopLayout.vue')).default
 })
 
 beforeEach(() => {
   for (const permission of Object.values(permissions)) permission.value = false
+  route.name = 'dashboard'
+  route.path = '/app'
+  route.hash = ''
+  realmReach.value = 'reachable'
+  nodeStatus.value = null
+  nodeState.value = 'unknown'
+  nodeLoaded.value = false
 })
 
 function destinations(html: string): string[] {
@@ -117,5 +140,63 @@ describe('desktop shell', () => {
     expect(html.match(/<nav/g)).toHaveLength(1)
     expect(html).not.toContain('More')
     expect(html).not.toContain('md:hidden')
+  })
+
+  it.each(['stopped', 'error'] as const)('blocks routed views when an enrolled node is %s', async (state) => {
+    nodeLoaded.value = true
+    nodeStatus.value = { enrolled: true }
+    nodeState.value = state
+
+    const html = await renderToString(createSSRApp(DesktopLayout))
+
+    expect(html).toContain('node-down')
+    expect(html).not.toContain('routed-view')
+  })
+
+  it('keeps routed views reachable while the node is running', async () => {
+    nodeLoaded.value = true
+    nodeStatus.value = { enrolled: true }
+    nodeState.value = 'running'
+
+    const html = await renderToString(createSSRApp(DesktopLayout))
+
+    expect(html).toContain('routed-view')
+    expect(html).not.toContain('node-down')
+  })
+
+  it('keeps routed views reachable before the device is enrolled', async () => {
+    nodeLoaded.value = true
+    nodeStatus.value = { enrolled: false }
+    nodeState.value = 'stopped'
+
+    const html = await renderToString(createSSRApp(DesktopLayout))
+
+    expect(html).toContain('routed-view')
+    expect(html).not.toContain('node-down')
+  })
+
+  it('keeps This device reachable while the enrolled node is down', async () => {
+    route.name = 'device'
+    route.path = '/app/device'
+    nodeLoaded.value = true
+    nodeStatus.value = { enrolled: true }
+    nodeState.value = 'error'
+
+    const html = await renderToString(createSSRApp(DesktopLayout))
+
+    expect(html).toContain('routed-view')
+    expect(html).not.toContain('node-down')
+  })
+
+  it('keeps the realm failure page ahead of the node failure page', async () => {
+    realmReach.value = 'unreachable'
+    nodeLoaded.value = true
+    nodeStatus.value = { enrolled: true }
+    nodeState.value = 'stopped'
+
+    const html = await renderToString(createSSRApp(DesktopLayout))
+
+    expect(html).toContain('realm-unreachable')
+    expect(html).not.toContain('node-down')
   })
 })

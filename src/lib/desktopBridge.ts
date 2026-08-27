@@ -47,6 +47,7 @@ export interface NodeStatus {
   uptimeSeconds: number | null
   // Why the supervisor is stopped or in error, in the owner's words.
   message: string | null
+  detail?: string | null
 }
 
 /** Which executor local runs use, and how much of the machine they may take. */
@@ -63,7 +64,6 @@ export interface ComputeSettings {
 export interface NodeSettings {
   storagePath: string
   paused: boolean
-  autoStart: boolean
   // The node serves the owner an S3 endpoint on loopback unless it is off.
   s3Enabled: boolean
   compute: ComputeSettings
@@ -184,7 +184,6 @@ function readSettings(command: string, value: unknown): NodeSettings {
   return {
     storagePath: asText(raw.storagePath) ?? '',
     paused: raw.paused === true,
-    autoStart: raw.autoStart === true,
     // Unlike the other flags this one is on by default, so only an explicit
     // false turns the endpoint off.
     s3Enabled: raw.s3Enabled !== false,
@@ -209,6 +208,7 @@ export function readStatus(payload: unknown): NodeStatus {
     version: asText(raw.version),
     uptimeSeconds: asNumber(raw.uptimeSeconds),
     message: asText(raw.message),
+    detail: asText(raw.detail),
   }
 }
 

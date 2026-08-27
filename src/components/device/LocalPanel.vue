@@ -113,14 +113,6 @@ async function save(): Promise<void> {
           <Switch :checked="settings.paused" @update:checked="patch({ paused: $event })" />
         </div>
 
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <span class="text-xs font-medium text-foreground">Start with the app</span>
-            <p class="text-[11px] text-muted-foreground">Runs the node whenever Aruna Desktop opens.</p>
-          </div>
-          <Switch :checked="settings.autoStart" @update:checked="patch({ autoStart: $event })" />
-        </div>
-
         <p
           v-if="saveError"
           class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
