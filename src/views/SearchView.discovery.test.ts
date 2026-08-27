@@ -17,21 +17,21 @@ describe('object discovery and Dataset-scoped SPARQL presentation', () => {
     expect(source).toContain(':title="hit.updated_at"')
   })
 
-  it('folds the coverage numbers into one status disclosure', () => {
-    const chip = readFileSync(
-      fileURLToPath(new URL('../components/search/ObjectCoverageStatus.vue', import.meta.url)),
+  it('keeps the coverage numbers in a modal behind an icon', () => {
+    const icon = readFileSync(
+      fileURLToPath(new URL('../components/search/CoverageIcon.vue', import.meta.url)),
       'utf8',
     )
 
-    expect(source).toContain('<ObjectCoverageStatus :coverage="objectCoverage" :status="objectCoverageStatus">')
-    expect(source).not.toContain('Nodes queried:')
-    expect(source).not.toContain('Freshness source:')
-    expect(chip).toContain(':aria-expanded="open"')
-    expect(chip).toContain(':aria-controls="detailsId"')
-    expect(chip).toContain("{ label: 'Freshness source', value: freshness.source.replaceAll('_', ' ') }")
-    expect(chip).toContain('title: freshness.as_of')
-    expect(chip).toContain("label: 'Nodes queried'")
-    expect(chip).toContain('<dl v-if="open"')
+    expect(source).toContain(':complete="objectCoverageComplete"')
+    expect(source).toContain('@click="showCoverageStats = true"')
+    expect(source).toContain('v-model:open="showCoverageStats"')
+    expect(source).toContain(':request-ms="objectRequestMs"')
+    expect(source).not.toContain('Nodes queried')
+    expect(source).not.toContain('Freshness source')
+    // The icon says nothing: no status word reaches the page itself.
+    expect(icon).toContain(':aria-label="label"')
+    expect(icon).not.toContain('{{ ')
   })
 
   it('renders the exact fixed Dataset scope and preserves retryable ambiguity', () => {

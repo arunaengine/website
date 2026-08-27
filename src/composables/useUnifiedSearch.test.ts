@@ -48,6 +48,8 @@ describe('unified document coverage', () => {
 
     expect(search.truncated.value).toBe(true)
     expect(search.partial.value).toBe(true)
+    expect(search.complete.value).toBe(false)
+    expect(search.requestMs.value).not.toBeNull()
   })
 
   it('keeps typed partial object coverage with the returned live heads', async () => {

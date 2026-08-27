@@ -30,6 +30,12 @@ export const OBJECT_SEARCH_MODE_LABELS: Record<ObjectSearchMode, string> = {
 const ALL_TYPES: SearchSectionType[] = ['documents', 'groups', 'users']
 export type UnifiedSearchSection = SearchSectionType | 'objects'
 
+// The single completeness rule for object coverage: every partition answered
+// and nothing cut off.
+export function coverageComplete(coverage: ObjectSearchCoverage | null | undefined): boolean {
+  return Boolean(coverage?.complete && !coverage.truncated)
+}
+
 export interface UnifiedSearchConfig {
   types?: SearchSectionType[]
   limit?: number
@@ -60,6 +66,9 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
   const nodesQueried = ref(0)
   const nodesFailed = ref(0)
   const truncated = ref(false)
+  // No section of the search response carries a server timing, so the round
+  // trip is measured here around the request itself.
+  const requestMs = ref<number | null>(null)
 
   const pending = ref(false)
   const loadingSection = ref<UnifiedSearchSection | null>(null)
@@ -70,8 +79,9 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
   const partial = computed(() =>
     nodesFailed.value > 0 ||
     truncated.value ||
-    Boolean(objectCoverage.value && (!objectCoverage.value.complete || objectCoverage.value.truncated)),
+    Boolean(objectCoverage.value && !coverageComplete(objectCoverage.value)),
   )
+  const complete = computed(() => !error.value && !objectError.value && !partial.value)
   const empty = computed(() =>
     !documents.value.length && !groups.value.length && !users.value.length && !objects.value.length,
   )
@@ -105,6 +115,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     nodesQueried.value = 0
     nodesFailed.value = 0
     truncated.value = false
+    requestMs.value = null
     error.value = null
     searched.value = false
     pending.value = false
@@ -152,6 +163,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     controller = new AbortController()
     pending.value = true
     error.value = null
+    const startedAt = performance.now()
     try {
       const searchObjectsNow = includeObjects && Boolean(authToken.value)
       const [unifiedOutcome, objectOutcome] = await Promise.all([
@@ -173,6 +185,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
       ])
       if (mySeq !== seq) return // superseded
       reset()
+      requestMs.value = Math.round(performance.now() - startedAt)
       if (unifiedOutcome.value) apply(unifiedOutcome.value)
       else if (unifiedOutcome.failure) {
         error.value = unifiedOutcome.failure instanceof Error
@@ -309,12 +322,14 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     nodesQueried,
     nodesFailed,
     truncated,
+    requestMs,
     pending,
     loadingSection,
     error,
     searched,
     active,
     partial,
+    complete,
     empty,
     loadMore,
     retry,

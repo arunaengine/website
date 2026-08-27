@@ -46,7 +46,8 @@ import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import SearchFilterBar, { type Facet, type FilterModel } from '@/components/search/SearchFilterBar.vue'
-import ObjectCoverageStatus from '@/components/search/ObjectCoverageStatus.vue'
+import CoverageIcon from '@/components/search/CoverageIcon.vue'
+import CoverageStatsModal from '@/components/search/CoverageStatsModal.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Pagination from '@/components/ui/Pagination.vue'
@@ -68,6 +69,7 @@ import {
 } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
 import {
+  coverageComplete,
   DEFAULT_OBJECT_SEARCH_MODE,
   OBJECT_SEARCH_MODE_LABELS,
   useUnifiedSearch,
@@ -185,6 +187,7 @@ const {
   objectCoverage,
   objectError,
   objectSearched,
+  requestMs: objectRequestMs,
   pending: objectsSearching,
   loadingSection: objectLoadingSection,
   loadMore: loadMoreUnifiedSection,
@@ -630,14 +633,12 @@ const searchStale = computed(() => searchBusy.value && visibleResults.value.leng
 const keptResults = computed(() => Boolean(searchError.value) && searchResults.value.length > 0)
 
 const objectModeOptions = Object.entries(OBJECT_SEARCH_MODE_LABELS).map(([value, label]) => ({ value, label }))
-const objectInventoryPartial = computed(() => Boolean(
-  objectCoverage.value && (!objectCoverage.value.complete || objectCoverage.value.truncated),
-))
-const objectCoverageStatus = computed<'Complete' | 'Partial' | 'Unavailable' | null>(() => {
-  if (objectError.value) return 'Unavailable'
-  if (!objectCoverage.value) return null
-  return objectInventoryPartial.value ? 'Partial' : 'Complete'
-})
+const objectInventoryPartial = computed(() =>
+  Boolean(objectCoverage.value) && !coverageComplete(objectCoverage.value),
+)
+const objectCoverageShown = computed(() => Boolean(objectCoverage.value || objectError.value))
+const objectCoverageComplete = computed(() => !objectError.value && coverageComplete(objectCoverage.value))
+const showCoverageStats = ref(false)
 
 function objectParentPrefix(key: string): string | undefined {
   const separator = key.lastIndexOf('/')
@@ -938,6 +939,11 @@ async function runQuery() {
               <Boxes class="h-4 w-4 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">Data objects</h2>
               <Spinner v-if="objectsSearching" show-label label="Searching…" />
+              <CoverageIcon
+                v-if="objectCoverageShown"
+                :complete="objectCoverageComplete"
+                @click="showCoverageStats = true"
+              />
               <div class="ml-auto flex flex-wrap items-center gap-2">
                 <Select
                   v-model="objectSearchMode"
@@ -954,33 +960,29 @@ async function runQuery() {
 
             <!-- Object inventory coverage is intentionally before every hit. -->
             <div
-              v-if="objectCoverageStatus"
+              v-if="objectCoverageShown && !objectCoverageComplete"
               role="status"
-              class="mb-3 space-y-1.5 rounded-md border px-4 py-3 text-xs"
-              :class="objectCoverageStatus === 'Complete'
-                ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-800 dark:text-emerald-200'
-                : objectCoverageStatus === 'Partial'
-                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200'
-                  : 'border-destructive/30 bg-destructive/5 text-destructive'"
+              class="mb-3 flex flex-wrap items-center gap-2 rounded-md border px-4 py-3 text-xs"
+              :class="objectError
+                ? 'border-destructive/30 bg-destructive/5 text-destructive'
+                : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200'"
             >
-              <ObjectCoverageStatus :coverage="objectCoverage" :status="objectCoverageStatus">
-                <p v-if="objectCoverageStatus === 'Partial'" class="min-w-0 flex-1 font-medium">Partial object inventory. Coverage is incomplete, so missing objects cannot be treated as absent.</p>
-                <Button
-                  v-if="objectCoverageStatus !== 'Complete'"
-                  variant="outline"
-                  size="sm"
-                  class="ml-auto"
-                  :disabled="objectsSearching"
-                  @click="retryObjectSearch"
-                >
-                  Retry
-                </Button>
-              </ObjectCoverageStatus>
-              <template v-if="!objectCoverage">
-                <p v-if="objectSearchMode === 'distributed_strict'">Distributed strict was unavailable. Strict mode did not fall back to best-effort.</p>
-                <p>{{ objectError }}</p>
-              </template>
+              <div class="min-w-0 flex-1 space-y-1.5">
+                <p v-if="objectInventoryPartial" class="font-medium">Partial object inventory. Coverage is incomplete, so missing objects cannot be treated as absent.</p>
+                <template v-if="!objectCoverage">
+                  <p v-if="objectSearchMode === 'distributed_strict'">Distributed strict was unavailable. Strict mode did not fall back to best-effort.</p>
+                  <p>{{ objectError }}</p>
+                </template>
+              </div>
+              <Button variant="outline" size="sm" :disabled="objectsSearching" @click="retryObjectSearch">Retry</Button>
             </div>
+
+            <CoverageStatsModal
+              v-model:open="showCoverageStats"
+              :coverage="objectCoverage"
+              :error="objectError"
+              :request-ms="objectRequestMs"
+            />
 
             <div v-if="objectResults.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <RouterLink

@@ -8,15 +8,15 @@ export const TOP_BAR_SEARCH_COLLAPSE_PX = 480
 </script>
 
 <script setup lang="ts">
-import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import ObjectCoverageStatus from '@/components/search/ObjectCoverageStatus.vue'
+import CoverageIcon from '@/components/search/CoverageIcon.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import {
+  coverageComplete,
   DEFAULT_OBJECT_SEARCH_MODE,
   OBJECT_SEARCH_MODE_LABELS,
   useUnifiedSearch,
@@ -73,9 +73,7 @@ const {
   pending: quickPending,
   searched: quickSearched,
   error: quickError,
-  nodesQueried: quickNodesQueried,
-  nodesFailed: quickNodesFailed,
-  truncated: quickTruncated,
+  complete: quickComplete,
   retry: retrySearch,
 } = useUnifiedSearch(q, { limit: 5, includeObjects: true, objectMode: quickObjectMode })
 
@@ -125,29 +123,13 @@ const items = computed<QuickItem[]>(() => [
 // The previous matches stay listed while a new request runs, so they are dimmed
 // rather than read as the answer to what was just typed.
 const quickStale = computed(() => quickPending.value && items.value.length > 0)
-const quickCoverage = computed<'Complete' | 'Partial' | 'Unavailable' | null>(() => {
-  if (quickError.value) return 'Unavailable'
-  if (!quickSearched.value) return null
-  return quickNodesFailed.value > 0 || quickTruncated.value ? 'Partial' : 'Complete'
-})
-const quickCoverageDetail = computed(() => {
-  if (quickCoverage.value === 'Unavailable') return quickError.value ?? 'Search is unavailable.'
-  if (quickCoverage.value !== 'Partial') return 'All document nodes answered'
-  const details: string[] = []
-  if (quickNodesFailed.value > 0) {
-    details.push(
-      `${Math.max(0, quickNodesQueried.value - quickNodesFailed.value)} of ${quickNodesQueried.value} nodes answered`,
-    )
-  }
-  if (quickTruncated.value) details.push('document results were truncated')
-  return details.join('; ')
-})
-
-const quickObjectCoverageStatus = computed<'Complete' | 'Partial' | 'Unavailable' | null>(() => {
-  if (quickObjectError.value) return 'Unavailable'
-  if (!quickObjectSearched.value || !quickObjectCoverage.value) return null
-  return quickObjectCoverage.value.complete && !quickObjectCoverage.value.truncated ? 'Complete' : 'Partial'
-})
+// One icon carries the whole answer; the numbers live on the search page.
+const quickCoverageShown = computed(() =>
+  quickSearched.value || quickObjectSearched.value || Boolean(quickError.value),
+)
+const quickObjectPartial = computed(() =>
+  Boolean(quickObjectCoverage.value) && !coverageComplete(quickObjectCoverage.value),
+)
 const quickObjectErrorDetail = computed(() => {
   if (!quickObjectError.value) return ''
   const strict = quickObjectMode.value === 'distributed_strict'
@@ -434,21 +416,13 @@ onBeforeUnmount(() => {
               />
             </div>
             <div
-              v-if="quickCoverage"
+              v-if="quickCoverageShown"
               role="status"
-              class="flex items-center gap-2 border-b border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground"
+              class="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-1.5"
             >
-              <Badge
-                :variant="
-                  quickCoverage === 'Complete' ? 'success' : quickCoverage === 'Partial' ? 'warn' : 'destructive'
-                "
-                class="px-1.5 py-0 text-[9px] uppercase"
-              >
-                {{ quickCoverage }}
-              </Badge>
-              <span class="min-w-0 flex-1 truncate" :title="quickCoverageDetail">{{ quickCoverageDetail }}</span>
+              <CoverageIcon compact :complete="quickComplete" @mousedown.prevent @click="openSearchPage" />
               <Button
-                v-if="quickCoverage !== 'Complete'"
+                v-if="!quickComplete"
                 variant="ghost"
                 size="sm"
                 class="h-8 shrink-0 px-2 text-[10px]"
@@ -477,27 +451,13 @@ onBeforeUnmount(() => {
                   <UserRound v-else class="h-3 w-3" aria-hidden="true" />
                   {{ section.label }}
                 </div>
-                <div
-                  v-if="section.id === 'objects' && quickObjectCoverageStatus"
+                <p
+                  v-if="section.id === 'objects' && quickObjectError"
                   role="status"
                   class="border-b border-border/70 bg-muted/20 px-3 py-2 text-[10px] text-muted-foreground"
                 >
-                  <ObjectCoverageStatus :coverage="quickObjectCoverage" :status="quickObjectCoverageStatus" compact>
-                    <span v-if="quickObjectError" class="min-w-0 flex-1">{{ quickObjectErrorDetail }}</span>
-                    <span v-else-if="quickObjectCoverageStatus === 'Partial'" class="min-w-0 flex-1">Partial object inventory.</span>
-                    <Button
-                      v-if="quickObjectCoverageStatus !== 'Complete'"
-                      variant="ghost"
-                      size="sm"
-                      class="h-7 shrink-0 px-2 text-[10px]"
-                      :disabled="quickPending"
-                      @mousedown.prevent
-                      @click="retrySearch"
-                    >
-                      Retry
-                    </Button>
-                  </ObjectCoverageStatus>
-                </div>
+                  {{ quickObjectErrorDetail }}
+                </p>
                 <button
                   v-for="item in section.items"
                   :id="'qs-' + item.key"
@@ -520,7 +480,7 @@ onBeforeUnmount(() => {
                   v-if="section.id === 'objects' && quickObjectSearched && !section.items.length && !quickPending && !quickObjectError"
                   class="border-b border-border/70 px-3 py-2.5 text-xs text-muted-foreground"
                 >
-                  {{ quickObjectCoverageStatus === 'Partial'
+                  {{ quickObjectPartial
                     ? 'No visible live object was returned. Coverage is incomplete.'
                     : 'No visible live object matched this query.' }}
                 </p>

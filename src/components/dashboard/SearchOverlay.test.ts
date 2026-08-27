@@ -12,7 +12,6 @@ const ButtonStub = defineComponent({
     return () => h('button', attrs, slots.default?.())
   },
 })
-const BadgeStub = defineComponent((_, { attrs, slots }) => () => h('span', attrs, slots.default?.()))
 const SpinnerStub = defineComponent((_, { attrs }) => () => h('span', attrs, 'Searching…'))
 const SelectStub = defineComponent({
   props: { modelValue: String, options: { type: Array, default: () => [] } },
@@ -42,9 +41,7 @@ const search = {
   pending: ref(false),
   searched: ref(false),
   error: ref<string | null>(null),
-  nodesQueried: ref(0),
-  nodesFailed: ref(0),
-  truncated: ref(false),
+  complete: ref(true),
   objectCursor: ref<string | null>(null),
   loadingSection: ref<string | null>(null),
   loadMore: vi.fn(),
@@ -84,24 +81,17 @@ const OBJECT_SEARCH_MODE_LABELS = {
   distributed_strict: 'Distributed strict',
 }
 
-const coverageStatus = compileClientComponent(
-  new URL('../search/ObjectCoverageStatus.vue', import.meta.url),
-  {
-    vue: VueRuntime,
-    '@lucide/vue': icons,
-    '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
-    '@/composables/useUnifiedSearch': { OBJECT_SEARCH_MODE_LABELS },
-    '@/lib/utils': { relativeTime: (value: string) => `relative ${value}` },
-  },
+const coverageIcon = compileClientComponent(
+  new URL('../search/CoverageIcon.vue', import.meta.url),
+  { vue: VueRuntime, '@lucide/vue': icons },
 ).component
 
 const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.meta.url), {
   vue: VueRuntime,
-  '@/components/search/ObjectCoverageStatus.vue': moduleDefault(coverageStatus),
+  '@/components/search/CoverageIcon.vue': moduleDefault(coverageIcon),
   'vue-router': { useRouter: () => ({ push: routerPush }) },
   '@vueuse/core': { useMediaQuery: mediaQuery },
   '@lucide/vue': icons,
-  '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
@@ -120,6 +110,8 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
   '@/composables/useUnifiedSearch': {
     DEFAULT_OBJECT_SEARCH_MODE: 'distributed_best_effort',
     OBJECT_SEARCH_MODE_LABELS,
+    coverageComplete: (coverage: { complete?: boolean; truncated?: boolean } | null) =>
+      Boolean(coverage?.complete && !coverage.truncated),
     useUnifiedSearch: (_query: unknown, config: { objectMode?: Ref<string> }) => {
       configuredObjectMode = config.objectMode
       return search
@@ -256,6 +248,10 @@ function findElement(root: HostNode, predicate: (node: HostNode) => boolean): Ho
   return allNodes(root).find((node) => node.kind === 'element' && predicate(node))
 }
 
+function indexOf(root: HostNode, predicate: (node: HostNode) => boolean): number {
+  return allNodes(root).findIndex(predicate)
+}
+
 function element(root: HostNode, predicate: (node: HostNode) => boolean): HostNode {
   const match = findElement(root, predicate)
   if (!match) throw new Error('Expected element was not rendered')
@@ -381,9 +377,7 @@ function resetSearch() {
   search.pending.value = false
   search.searched.value = false
   search.error.value = null
-  search.nodesQueried.value = 0
-  search.nodesFailed.value = 0
-  search.truncated.value = false
+  search.complete.value = true
   search.objectCursor.value = null
   search.loadingSection.value = null
   search.loadMore.mockReset()
@@ -513,7 +507,7 @@ describe('narrow TopBar search panel', () => {
     mounted.app.unmount()
   })
 
-  it('renders truncation as Partial with the shared completeness vocabulary inside the panel', async () => {
+  it('marks a degraded answer with a warning icon and no status word', async () => {
     search.documents.value = [{
       document_id: 'doc-1',
       document_path: 'datasets/one',
@@ -521,14 +515,14 @@ describe('narrow TopBar search panel', () => {
       snippet: 'A dataset',
     }]
     search.searched.value = true
-    search.nodesQueried.value = 2
-    search.truncated.value = true
+    search.complete.value = false
     const mounted = await mount()
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
 
     const dialog = element(mounted.root, (node) => node.props.role === 'dialog')
-    expect(content(dialog)).toContain('Partial')
-    expect(content(dialog)).toContain('document results were truncated')
+    expect(element(mounted.root, (node) => node.props['aria-label'] === 'Search coverage: partial')).toBeDefined()
+    expect(content(dialog)).not.toContain('Partial')
+    expect(content(dialog)).not.toContain('Complete')
     expect(content(dialog)).toContain('Retry')
     await click(element(mounted.root, (node) => node.tag === 'button' && content(node).trim() === 'Retry'))
     expect(search.retry).toHaveBeenCalledOnce()
@@ -536,7 +530,7 @@ describe('narrow TopBar search panel', () => {
     mounted.app.unmount()
   })
 
-  it('places partial object coverage before typed storage results', async () => {
+  it('places the coverage icon before typed storage results', async () => {
     search.objects.value = [{
       kind: 'object',
       mode: 'distributed_best_effort',
@@ -558,19 +552,23 @@ describe('narrow TopBar search panel', () => {
       partitions: [],
     }
     search.objectSearched.value = true
+    search.complete.value = false
     const mounted = await mount()
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
     await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
 
+    const icon = indexOf(mounted.root, (node) => node.props['aria-label'] === 'Search coverage: partial')
+    const hit = indexOf(mounted.root, (node) => node.text.includes('reads/sample.fastq'))
+    expect(icon).toBeGreaterThanOrEqual(0)
+    expect(icon).toBeLessThan(hit)
     const text = content(element(mounted.root, (node) => node.props.role === 'dialog'))
-    expect(text.indexOf('Partial object inventory')).toBeGreaterThanOrEqual(0)
-    expect(text.indexOf('Partial object inventory')).toBeLessThan(text.indexOf('reads/sample.fastq'))
+    expect(text).not.toContain('Partial object inventory')
     expect(text).toContain('Object · Distributed best-effort · Node: Storage node B · Group: group-a · Bucket: raw-data')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
 
-  it('keeps the coverage numbers behind the status chip', async () => {
+  it('shows the coverage icon alone and opens the full search page', async () => {
     search.objects.value = [{
       kind: 'object',
       mode: 'distributed_best_effort',
@@ -597,24 +595,12 @@ describe('narrow TopBar search panel', () => {
     await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
 
     const dialog = element(mounted.root, (node) => node.props.role === 'dialog')
-    expect(content(dialog)).toContain('Complete')
+    expect(content(dialog)).not.toContain('Complete')
     expect(content(dialog)).not.toContain('Nodes queried')
     expect(content(dialog)).not.toContain('Freshness source')
 
-    const toggle = element(
-      mounted.root,
-      (node) => node.tag === 'button' && content(node).includes('Coverage details'),
-    )
-    expect(toggle.props['aria-expanded']).toBe(false)
-    await click(toggle)
-
-    expect(toggle.props['aria-expanded']).toBe(true)
-    const expanded = content(dialog)
-    expect(expanded).toContain('Nodes queried')
-    expect(expanded).toContain('Nodes failed')
-    expect(expanded).toContain('Freshness source')
-    expect(expanded).toContain('live heads')
-    expect(expanded).toContain('Distributed best-effort')
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Search coverage: complete'))
+    expect(routerPush).toHaveBeenCalledWith({ name: 'search', query: { q: 'sample' } })
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -631,6 +617,7 @@ describe('narrow TopBar search panel', () => {
     configuredObjectMode.value = 'distributed_strict'
     search.objectSearched.value = true
     search.objectError.value = 'Strict coverage unavailable'
+    search.complete.value = false
     await flush()
 
     const text = content(element(mounted.root, (node) => node.props.role === 'dialog'))
