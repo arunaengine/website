@@ -150,6 +150,16 @@ export const TES_EXECUTOR_TAG = 'aruna-engine.org/executor'
 // POST /jobs/ request, which is the only surface that accepts a local target.
 export const TES_TARGET_TAG = 'aruna-engine.org/target'
 
+// Hard scheduler filters supplied by task authors. The model used by portal
+// controls omits this wire prefix so callers work only with node label keys.
+export const TES_LABEL_TAG_PREFIX = 'aruna-engine.org/label/'
+
+export function placementTags(labels: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(labels).map(([key, value]) => [`${TES_LABEL_TAG_PREFIX}${key}`, value]),
+  )
+}
+
 // ── Read-only placement tags ─────────────────────────────────────────────────
 // Agreed contract: BASIC and FULL task views carry the native job's identity
 // and, once the request is placed, its planner outcome. A node that has not
@@ -177,6 +187,7 @@ export interface TesPlacementTags {
   logicalState?: string
   executorKind?: string
   estimatedTransferBytes?: number
+  labelConstraints: Record<string, string>
 }
 
 // Non-negative decimals only: a malformed value is dropped rather than shown.
@@ -188,11 +199,18 @@ function tagBytes(value: string | undefined): number | undefined {
 
 export function tesPlacementTags(tags: Record<string, string> | undefined): TesPlacementTags {
   const read = (key: string) => tags?.[key]?.trim() || undefined
+  const labelConstraints: Record<string, string> = {}
+  for (const [key, value] of Object.entries(tags ?? {})) {
+    if (!key.startsWith(TES_LABEL_TAG_PREFIX)) continue
+    const labelKey = key.slice(TES_LABEL_TAG_PREFIX.length)
+    if (labelKey) labelConstraints[labelKey] = value
+  }
   return {
     jobId: read(TES_JOB_ID_TAG),
     logicalState: read(TES_LOGICAL_STATE_TAG),
     executorKind: read(TES_EXECUTOR_KIND_TAG),
     estimatedTransferBytes: tagBytes(read(TES_TRANSFER_BYTES_TAG)),
+    labelConstraints,
   }
 }
 

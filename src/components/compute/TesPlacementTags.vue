@@ -6,12 +6,12 @@ import { placementVerdict } from '@/lib/jobs'
 import { tesPlacementLike, tesPlacementTags } from '@/lib/tes'
 import { formatBytes, truncateMiddle } from '@/lib/utils'
 
-// The read-only tags the facade adds to BASIC and FULL task views. A node that
-// does not serve them omits the keys, and this renders nothing at all rather
-// than showing empty rows.
+// Placement outcome tags from BASIC/FULL views plus the label constraints the
+// caller submitted. Without either kind, this renders nothing at all.
 const props = defineProps<{ tags?: Record<string, string>; compact?: boolean }>()
 
 const placement = computed(() => tesPlacementTags(props.tags))
+const labelConstraints = computed(() => Object.entries(placement.value.labelConstraints))
 const like = computed(() => tesPlacementLike(placement.value))
 const verdict = computed(() => (like.value ? placementVerdict(like.value) : null))
 const verdictVariant = computed(() =>
@@ -22,7 +22,8 @@ const anything = computed(
     Boolean(placement.value.jobId)
     || Boolean(placement.value.logicalState)
     || Boolean(placement.value.executorKind)
-    || placement.value.estimatedTransferBytes !== undefined,
+    || placement.value.estimatedTransferBytes !== undefined
+    || (!props.compact && labelConstraints.value.length > 0),
 )
 </script>
 
@@ -41,6 +42,14 @@ const anything = computed(
       <span v-if="placement.estimatedTransferBytes !== undefined" class="text-muted-foreground">
         estimated transfer {{ formatBytes(placement.estimatedTransferBytes) }}
       </span>
+      <Badge
+        v-for="[key, value] in labelConstraints"
+        :key="key"
+        variant="outline"
+        class="font-mono text-[10px]"
+      >
+        {{ key }}={{ value }}
+      </Badge>
       <RouterLink
         v-if="placement.jobId"
         :to="{ name: 'job-detail', params: { jobId: placement.jobId } }"

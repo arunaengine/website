@@ -29,6 +29,7 @@ import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue
 import QuickRunResult from '@/components/compute/QuickRunResult.vue'
 import InputLocalityHint from '@/components/compute/InputLocalityHint.vue'
 import RunTargetPicker from '@/components/compute/RunTargetPicker.vue'
+import PlacementPicker from '@/components/compute/PlacementPicker.vue'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
@@ -44,7 +45,9 @@ import {
   captureOutput,
   expandDataRefEntry,
   parseS3Url,
+  placementTags,
   pruneTesTask,
+  tesPlacementTags,
   validContainerDir,
   validContainerFilePath as validContainerPath,
   type TesDataRefEntry,
@@ -126,6 +129,7 @@ const dependencies = ref<string[]>([])
 const dependencyDraft = ref('')
 const taskName = ref('Quick run')
 const groupId = ref('')
+const placementLabels = ref<Record<string, string>>({})
 // Files and folder summaries from the picker; folders expand to per-file
 // FILE inputs only at task assembly (the facade accepts FILE inputs only).
 const inputs = ref<TesDataRefEntry[]>([])
@@ -364,6 +368,7 @@ const task = computed<TesTask>(() =>
       [TES_GROUP_TAG]: groupId.value,
       [TES_IDEMPOTENCY_TAG]: runId.value,
       ...(dependencies.value.length ? { [TES_NETWORK_TAG]: 'open' } : {}),
+      ...placementTags(placementLabels.value),
     },
   }),
 )
@@ -917,6 +922,7 @@ async function applyRerun(id: string) {
     taskName.value = source.name || 'Quick run'
     const group = source.tags?.[TES_GROUP_TAG]
     if (group) groupId.value = group
+    placementLabels.value = tesPlacementTags(source.tags).labelConstraints
 
     // Data inputs: everything except the staged script and generated deno.json.
     const sourceDataInputs = (source.inputs ?? []).filter(
@@ -1088,6 +1094,7 @@ function dismissRerun() {
             :compute="runTarget.compute.value"
             :realm-name="realm.shortName"
           />
+          <PlacementPicker v-if="!runTarget.local.value" v-model="placementLabels" />
           <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runtime</div>
           <div class="grid gap-3 sm:grid-cols-3">
             <button

@@ -24,6 +24,7 @@ import type { JobFamilyResponse } from '@/lib/jobs'
 import { detectQuickRun } from '@/lib/quickRuntimes'
 import {
   TES_GROUP_TAG,
+  TES_LABEL_TAG_PREFIX,
   TES_READONLY_TAGS,
   drsDownloadHref,
   drsObjectHref,
@@ -146,11 +147,14 @@ const groupTagLabel = computed(() => {
   if (!id) return null
   return myGroups.value.find((g) => g.id === id)?.name ?? truncateMiddle(id)
 })
-// The group tag has its own row and the read-only placement tags their own
-// block, so this only lists what the caller set itself.
+// The group tag and placement tags have their own blocks, so this only lists
+// the caller's remaining tags.
 const otherTags = computed(() =>
   Object.entries(task.value?.tags ?? {}).filter(
-    ([key]) => key !== TES_GROUP_TAG && !TES_READONLY_TAGS.includes(key),
+    ([key]) =>
+      key !== TES_GROUP_TAG
+      && !key.startsWith(TES_LABEL_TAG_PREFIX)
+      && !TES_READONLY_TAGS.includes(key),
   ),
 )
 

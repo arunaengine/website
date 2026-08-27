@@ -10,6 +10,8 @@ import type { RealmNodeInfo } from '@/lib/api'
 export interface RealmNodeDisplay {
   nodeId: string
   kind: RealmNodeInfo['kind']
+  /** Latest advertised node document, including custom placement labels. */
+  info: RealmNodeInfo['info']
   /** Human label: a published name label when set, else "<kind> <short-id>". */
   label: string
   s3Url: string | null
@@ -39,6 +41,7 @@ export function useRealmNodes() {
       return {
         nodeId: node.node_id,
         kind: node.kind,
+        info: node.info,
         label: nodeLabel(node),
         // The connected node's own S3 endpoint comes from /info even when the
         // node has not published a realm document yet.

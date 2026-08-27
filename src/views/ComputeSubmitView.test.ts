@@ -102,6 +102,18 @@ const TaskJsonPreviewStub = defineComponent({
     return () => h('section', [h('h2', props.title), h('pre', JSON.stringify(props.task, null, 2))])
   },
 })
+const PlacementPickerStub = defineComponent({
+  props: { modelValue: { type: Object, required: true } },
+  emits: ['update:modelValue'],
+  setup(_, { emit }) {
+    return () => h('button', {
+      onClick: () => emit('update:modelValue', {
+        'aruna-engine.org/node': 'node-a',
+        region: 'eu-central',
+      }),
+    }, 'Set test placement')
+  },
+})
 const BadgeStub = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const KindSelectStub = defineComponent({
   props: { options: { type: Array, default: () => [] } },
@@ -226,6 +238,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/components/compute/TesInputsEditor.vue': moduleDefault(GenericStub),
   '@/components/compute/TesDataRefDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/ContainerFsTree.vue': moduleDefault(GenericStub),
+  '@/components/compute/PlacementPicker.vue': moduleDefault(PlacementPickerStub),
   '@/composables/useTes': {
     isTesUnsupported: () => false,
     useTes: () => ({
@@ -486,6 +499,7 @@ describe('run target', () => {
     expect(content(mounted.root)).toContain('Run on')
     await click(button(mounted.root, 'This computer'))
     expect(content(mounted.root)).toContain('copied to this computer')
+    expect(content(mounted.root)).not.toContain('Set test placement')
 
     await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
     await mounted.router!.push('/app/compute/new?step=1')
@@ -555,6 +569,40 @@ describe('run target', () => {
     const [request, client] = submitJob.mock.calls[0] as unknown as [Record<string, unknown>, Record<string, unknown>]
     expect(request.target).toBeUndefined()
     expect(client).toEqual({ baseUrl: 'https://node.example.org/api/v1', token: 'realm-token' })
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+})
+
+describe('placement labels', () => {
+  beforeEach(() => {
+    runTargetAvailable.value = false
+    runTargetChoice.value = 'realm'
+    submitJob.mockClear()
+    createTask.mockClear()
+  })
+
+  it('adds picker constraints to the TES task tags', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+
+    await click(button(mounted.root, 'Set test placement'))
+    await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
+    await mounted.router!.push('/app/compute/new?step=1')
+    await flush()
+    await fillValidWorkload(mounted.root)
+    await click(button(mounted.root, 'Keep workspace'))
+    await mounted.router!.push('/app/compute/new?step=2')
+    await flush()
+    await click(submitButton(mounted.root))
+    await flush()
+
+    expect(createTask).toHaveBeenCalledTimes(1)
+    const submitted = (createTask.mock.calls[0] as unknown[])[0] as Tes.TesTask
+    expect(submitted.tags).toMatchObject({
+      'aruna-engine.org/group': 'group-id',
+      'aruna-engine.org/label/aruna-engine.org/node': 'node-a',
+      'aruna-engine.org/label/region': 'eu-central',
+    })
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

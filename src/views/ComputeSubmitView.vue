@@ -16,6 +16,7 @@ import TesInputsEditor from '@/components/compute/TesInputsEditor.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
 import RunTargetPicker from '@/components/compute/RunTargetPicker.vue'
+import PlacementPicker from '@/components/compute/PlacementPicker.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
@@ -32,7 +33,9 @@ import {
   captureOutput,
   expandDataRefEntry,
   parseS3Url,
+  placementTags,
   pruneTesTask,
+  tesPlacementTags,
   validContainerDir,
   validContainerFilePath,
   type TesDataRefEntry,
@@ -94,6 +97,7 @@ function goStep(target: number) {
 const name = ref('')
 const description = ref('')
 const groupId = ref('')
+const placementLabels = ref<Record<string, string>>({})
 // Files and folder summaries from the picker; folders expand to per-file
 // FILE inputs at task assembly (the facade accepts FILE inputs only).
 const inputs = ref<TesDataRefEntry[]>([])
@@ -195,6 +199,7 @@ async function applyRerun(id: string) {
     const group = source.tags?.[TES_GROUP_TAG]
     if (group) groupId.value = group
     executorConstraint.value = source.tags?.[TES_EXECUTOR_TAG] ?? ''
+    placementLabels.value = tesPlacementTags(source.tags).labelConstraints
 
     inputs.value = (source.inputs ?? []).map((input) => ({
       kind: 'file',
@@ -298,6 +303,7 @@ const task = computed<TesTask>(() =>
     tags: {
       [TES_GROUP_TAG]: groupId.value,
       ...(executorConstraint.value.trim() ? { [TES_EXECUTOR_TAG]: executorConstraint.value.trim() } : {}),
+      ...placementTags(placementLabels.value),
     },
     workspace: workspaceMode.value
       ? { mode: workspaceMode.value, bucket: workspaceMode.value === 'existing' ? workspaceBucket.value.trim() : undefined }
@@ -655,6 +661,7 @@ async function submit() {
             :compute="runTarget.compute.value"
             :realm-name="realm.shortName"
           />
+          <PlacementPicker v-if="!runTarget.local.value" v-model="placementLabels" />
           <div>
             <label class="text-xs font-medium text-foreground">Group</label>
             <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />

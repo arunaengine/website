@@ -361,6 +361,7 @@ describe('distributed job detail components', () => {
         'aruna-engine.org/logical-state': 'succeeded',
         'aruna-engine.org/executor-kind': 'docker',
         'aruna-engine.org/estimated-transfer-bytes': '0',
+        'aruna-engine.org/label/region': 'eu-central',
       },
     })
     const taggedText = content(tagged.root)
@@ -369,6 +370,7 @@ describe('distributed job detail components', () => {
     expect(taggedText).toContain('Compute-to-data')
     expect(taggedText).toContain('succeeded')
     expect(taggedText).toContain('docker')
+    expect(taggedText).toContain('region=eu-central')
     tagged.app.unmount()
 
     const untagged = await mount(TesPlacementTags, {

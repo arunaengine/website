@@ -3,8 +3,10 @@ import {
   TES_EXECUTOR_KIND_TAG,
   TES_GROUP_TAG,
   TES_JOB_ID_TAG,
+  TES_LABEL_TAG_PREFIX,
   TES_LOGICAL_STATE_TAG,
   TES_TRANSFER_BYTES_TAG,
+  placementTags,
   pruneTesTask,
   tesPlacementLike,
   tesPlacementTags,
@@ -25,6 +27,7 @@ describe('read-only placement tags', () => {
       logicalState: 'running',
       executorKind: 'docker',
       estimatedTransferBytes: 4194304,
+      labelConstraints: {},
     })
     expect(placementVerdict(tesPlacementLike(placement)).verdict).toBe('data-to-compute')
   })
@@ -35,6 +38,7 @@ describe('read-only placement tags', () => {
       logicalState: undefined,
       executorKind: undefined,
       estimatedTransferBytes: undefined,
+      labelConstraints: {},
     })
     expect(tesPlacementLike(tesPlacementTags({}))).toBeNull()
   })
@@ -66,10 +70,14 @@ describe('read-only placement tags', () => {
         [TES_LOGICAL_STATE_TAG]: 'succeeded',
         [TES_EXECUTOR_KIND_TAG]: 'docker',
         [TES_TRANSFER_BYTES_TAG]: '0',
+        ...placementTags({ region: 'eu-central' }),
       },
     })
 
-    expect(task.tags).toEqual({ [TES_GROUP_TAG]: 'group' })
+    expect(task.tags).toEqual({
+      [TES_GROUP_TAG]: 'group',
+      [`${TES_LABEL_TAG_PREFIX}region`]: 'eu-central',
+    })
   })
 
   it('omits tags entirely when only read-only ones were set', () => {
@@ -79,5 +87,21 @@ describe('read-only placement tags', () => {
     })
 
     expect(task.tags).toBeUndefined()
+  })
+})
+
+describe('placement label constraints', () => {
+  it('prefixes label keys for TES tags and reads them back', () => {
+    const labels = {
+      'aruna-engine.org/node': 'node-id',
+      region: 'eu-central',
+    }
+    const tags = placementTags(labels)
+
+    expect(tags).toEqual({
+      [`${TES_LABEL_TAG_PREFIX}aruna-engine.org/node`]: 'node-id',
+      [`${TES_LABEL_TAG_PREFIX}region`]: 'eu-central',
+    })
+    expect(tesPlacementTags(tags).labelConstraints).toEqual(labels)
   })
 })
