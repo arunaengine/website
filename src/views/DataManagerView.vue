@@ -2074,9 +2074,14 @@ const isEmpty = computed(
             <p v-else-if="contextMismatch" class="mt-2 text-sm text-muted-foreground">
               The current session was issued by {{ issuerNodeName }} ({{ contextMismatch.issuerNodeId }}). This bucket requires {{ requiredNodeName }} ({{ contextMismatch.requiredNodeId }}). Select the group and choose Open on this node. The existing credential will not be sent to the required node.
             </p>
-            <p v-else-if="!selectedGroupId" class="mt-2 text-sm text-muted-foreground">
-              Select a group above. The portal mints a node-local session only after that explicit selection and keeps it in memory only.
-            </p>
+            <template v-else-if="!selectedGroupId">
+              <p class="mt-2 text-sm text-muted-foreground">
+                Select a group above. The portal mints a node-local session only after that explicit selection and keeps it in memory only.
+              </p>
+              <Button variant="outline" size="sm" class="mt-3" as-child>
+                <RouterLink :to="{ name: 'groups' }">Create or join a group</RouterLink>
+              </Button>
+            </template>
             <p v-else class="mt-2 text-sm text-muted-foreground">
               Open group {{ selectedGroupLabel || selectedGroupId }} on {{ requiredNodeName }}. Expired sessions block new operations and are replaced only after this explicit action.
             </p>

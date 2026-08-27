@@ -33,6 +33,11 @@ describe('Data Manager session affordances', () => {
     expect(dataManager).toContain('This session is read-only')
   })
 
+  it('offers a way out when no group is selected', () => {
+    expect(dataManager).toContain('Select a group above.')
+    expect(dataManager).toContain("<RouterLink :to=\"{ name: 'groups' }\">Create or join a group</RouterLink>")
+  })
+
   it('blocks wrong-node browsing and names both node scopes before switching', () => {
     expect(objectBrowser).toContain('v-if="contextMismatch"')
     expect(objectBrowser).toContain('contextMismatch.issuerNodeId')

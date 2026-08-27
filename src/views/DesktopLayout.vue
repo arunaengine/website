@@ -61,6 +61,8 @@ const items = computed<NavEntry[]>(() => [
   { to: '/app/runs', icon: Play, label: 'Runs' },
   { to: '/app/device', icon: Laptop, label: 'This device' },
   navSeparator,
+  { to: '/app/groups', icon: Users, label: 'Groups' },
+  { to: '/app/status', icon: Activity, label: 'Status' },
   { to: '/app/settings', icon: Settings, label: 'Settings' },
   { to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] },
   ...(adminItems.value.length ? [navSeparator, ...adminItems.value] : []),

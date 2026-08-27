@@ -68,12 +68,16 @@ describe('desktop shell', () => {
       '/app/sync',
       '/app/runs',
       '/app/device',
+      '/app/groups',
+      '/app/status',
       '/app/settings',
       '/app/docs/v1',
     ])
     expect(html.match(/role="separator"/g)).toHaveLength(2)
     expect(html).toContain('Sync')
     expect(html).toContain('This device')
+    expect(html).toContain('Groups')
+    expect(html).toContain('Status')
   })
 
   it('carries one flat list with no group headings', async () => {
