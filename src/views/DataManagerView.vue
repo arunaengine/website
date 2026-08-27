@@ -97,7 +97,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { authToken, currentUser, bootstrapped, myGroups, getGroupUsage, isManagementNode, isRealmAdmin, listGroupConnectors, listSyncRelationships, nodeInfo, realmInfo } = useAruna()
+const { authToken, currentUser, bootstrapped, myGroups, getGroupUsage, isRealmAdmin, listGroupConnectors, listSyncRelationships, nodeInfo, realmInfo } = useAruna()
 const s3 = useS3()
 
 function routeString(value: unknown): string {
@@ -2276,7 +2276,7 @@ const isEmpty = computed(
                   <Route class="h-4 w-4" /> Routing
                 </Button>
                 <Button
-                  v-if="!remoteNodeId && residencyPoliciesEnabled && isRealmAdmin && isManagementNode"
+                  v-if="!remoteNodeId && residencyPoliciesEnabled && isRealmAdmin"
                   variant="outline"
                   size="sm"
                   title="Residency policies for this bucket"
@@ -2576,7 +2576,7 @@ const isEmpty = computed(
 
     <BucketRoutingDialog v-model:open="routingDialogOpen" :bucket="bucket" :group-id="activeGroupId" />
 
-    <BucketPolicyDialog v-if="residencyPoliciesEnabled && isRealmAdmin && isManagementNode" v-model:open="residencyDialogOpen" :bucket="bucket" />
+    <BucketPolicyDialog v-if="residencyPoliciesEnabled && isRealmAdmin" v-model:open="residencyDialogOpen" :bucket="bucket" />
 
     <ObjectLocationsDialog
       :open="locationsKey !== null"

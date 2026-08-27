@@ -40,13 +40,11 @@ import {
   Trash2,
 } from '@lucide/vue'
 
-// AdminView owns the WRITE /{realm}/admin/config permission gate. This panel
-// mirrors PlacementAdminPanel's management-node gate.
+// AdminView owns the WRITE /{realm}/admin/config permission gate.
 const {
   bootstrapped,
   currentUser,
   discoverableGroups,
-  isManagementNode,
   isRealmAdmin,
   myGroups,
   realmInfo,
@@ -57,8 +55,7 @@ const ready = computed(
   () =>
     bootstrapped.value
     && Boolean(currentUser.value)
-    && isRealmAdmin.value
-    && isManagementNode.value,
+    && isRealmAdmin.value,
 )
 const knownLocations = computed(() => placementLocations(realmInfo.value?.nodes ?? []))
 const bandwidthUnitOptions = BYTE_UNITS.map(({ value, label }) => ({ value, label: `${label}/s` }))
@@ -236,16 +233,6 @@ watch(
     <div v-if="!bootstrapped" class="container space-y-3 py-8">
       <Skeleton class="h-24" />
       <Skeleton class="h-40" />
-    </div>
-
-    <div v-else-if="!isManagementNode" class="container py-8">
-      <section class="surface mx-auto max-w-xl p-8 text-center">
-        <ServerCog class="mx-auto h-8 w-8 text-muted-foreground/70" />
-        <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Management node required</h2>
-        <p class="mt-1.5 text-sm text-muted-foreground">
-          Open this portal on a management node to read or change realm compute configuration.
-        </p>
-      </section>
     </div>
 
     <div v-else class="container py-8">

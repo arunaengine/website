@@ -39,8 +39,8 @@ import {
 } from '@lucide/vue'
 
 // AdminView owns the WRITE /{realm}/admin/config permission gate. This panel
-// mirrors the placement feature flag and management-node gate.
-const { bootstrapped, currentUser, isManagementNode, isRealmAdmin } = useAruna()
+// mirrors the placement feature flag.
+const { bootstrapped, currentUser, isRealmAdmin } = useAruna()
 const {
   getPlacementDiagnostics,
   getPlacementPolicy,
@@ -62,8 +62,7 @@ const ready = computed(
     bootstrapped.value
     && residencyAdminEnabled.value
     && Boolean(currentUser.value)
-    && isRealmAdmin.value
-    && isManagementNode.value,
+    && isRealmAdmin.value,
 )
 
 // The realm listing when the node serves one, and the session-only refs when
@@ -222,16 +221,6 @@ watch(
         <EmptyState title="Residency policy administration is not enabled" description="Enable features.placementAdmin for a backend that serves residency policy routes.">
           <template #icon><MapPinned class="h-8 w-8" /></template>
         </EmptyState>
-      </section>
-    </div>
-
-    <div v-else-if="!isManagementNode" class="container py-8">
-      <section class="surface mx-auto max-w-xl p-8 text-center">
-        <MapPinned class="mx-auto h-8 w-8 text-muted-foreground/70" />
-        <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Management node required</h2>
-        <p class="mt-1.5 text-sm text-muted-foreground">
-          Open this portal on a management node to administer residency policies and local enforcement state.
-        </p>
       </section>
     </div>
 
