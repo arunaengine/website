@@ -12,6 +12,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import ObjectCoverageStatus from '@/components/search/ObjectCoverageStatus.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -20,7 +21,7 @@ import {
   OBJECT_SEARCH_MODE_LABELS,
   useUnifiedSearch,
 } from '@/composables/useUnifiedSearch'
-import { relativeTime, truncateMiddle } from '@/lib/utils'
+import { truncateMiddle } from '@/lib/utils'
 import type { ObjectSearchMode } from '@/lib/api'
 import { File, FileJson2, Search, UserRound, Users, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
@@ -147,25 +148,12 @@ const quickObjectCoverageStatus = computed<'Complete' | 'Partial' | 'Unavailable
   if (!quickObjectSearched.value || !quickObjectCoverage.value) return null
   return quickObjectCoverage.value.complete && !quickObjectCoverage.value.truncated ? 'Complete' : 'Partial'
 })
-const quickObjectCoverageDetail = computed(() => {
-  if (quickObjectError.value) {
-    const strict = quickObjectMode.value === 'distributed_strict'
-      ? ' Strict mode did not fall back to best-effort.'
-      : ''
-    return `${OBJECT_SEARCH_MODE_LABELS[quickObjectMode.value]} unavailable.${strict} ${quickObjectError.value}`.trim()
-  }
-  const coverage = quickObjectCoverage.value
-  if (!coverage) return ''
-  const parts = [
-    `${coverage.scope === 'realm' ? 'Realm' : 'This node'} scope`,
-    OBJECT_SEARCH_MODE_LABELS[coverage.mode],
-    `${coverage.index_freshness.source.replaceAll('_', ' ')} as of ${relativeTime(coverage.index_freshness.as_of)}`,
-    `nodes queried: ${coverage.nodes_queried}`,
-    `nodes failed: ${coverage.nodes_failed}`,
-  ]
-  if (coverage.truncated) parts.push('results truncated')
-  if (coverage.failed_partitions.length) parts.push(`failed partitions: ${coverage.failed_partitions.join(', ')}`)
-  return parts.join(' · ')
+const quickObjectErrorDetail = computed(() => {
+  if (!quickObjectError.value) return ''
+  const strict = quickObjectMode.value === 'distributed_strict'
+    ? ' Strict mode did not fall back to best-effort.'
+    : ''
+  return `${OBJECT_SEARCH_MODE_LABELS[quickObjectMode.value]} unavailable.${strict} ${quickObjectError.value}`.trim()
 })
 
 const SECTION_META: Array<{ id: QuickSection; label: string }> = [
@@ -492,28 +480,23 @@ onBeforeUnmount(() => {
                 <div
                   v-if="section.id === 'objects' && quickObjectCoverageStatus"
                   role="status"
-                  class="flex items-start gap-2 border-b border-border/70 bg-muted/20 px-3 py-2 text-[10px] text-muted-foreground"
+                  class="border-b border-border/70 bg-muted/20 px-3 py-2 text-[10px] text-muted-foreground"
                 >
-                  <Badge
-                    :variant="quickObjectCoverageStatus === 'Complete' ? 'success' : quickObjectCoverageStatus === 'Partial' ? 'warn' : 'destructive'"
-                    class="shrink-0 px-1.5 py-0 text-[9px] uppercase"
-                  >
-                    {{ quickObjectCoverageStatus }}
-                  </Badge>
-                  <span class="min-w-0 flex-1" :title="quickObjectCoverage?.index_freshness.as_of ?? quickObjectCoverageDetail">
-                    {{ quickObjectCoverageStatus === 'Partial' ? 'Partial object inventory. ' : '' }}{{ quickObjectCoverageDetail }}
-                  </span>
-                  <Button
-                    v-if="quickObjectCoverageStatus !== 'Complete'"
-                    variant="ghost"
-                    size="sm"
-                    class="h-7 shrink-0 px-2 text-[10px]"
-                    :disabled="quickPending"
-                    @mousedown.prevent
-                    @click="retrySearch"
-                  >
-                    Retry
-                  </Button>
+                  <ObjectCoverageStatus :coverage="quickObjectCoverage" :status="quickObjectCoverageStatus" compact>
+                    <span v-if="quickObjectError" class="min-w-0 flex-1">{{ quickObjectErrorDetail }}</span>
+                    <span v-else-if="quickObjectCoverageStatus === 'Partial'" class="min-w-0 flex-1">Partial object inventory.</span>
+                    <Button
+                      v-if="quickObjectCoverageStatus !== 'Complete'"
+                      variant="ghost"
+                      size="sm"
+                      class="h-7 shrink-0 px-2 text-[10px]"
+                      :disabled="quickPending"
+                      @mousedown.prevent
+                      @click="retrySearch"
+                    >
+                      Retry
+                    </Button>
+                  </ObjectCoverageStatus>
                 </div>
                 <button
                   v-for="item in section.items"

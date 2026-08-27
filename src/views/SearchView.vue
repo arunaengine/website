@@ -46,6 +46,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import SearchFilterBar, { type Facet, type FilterModel } from '@/components/search/SearchFilterBar.vue'
+import ObjectCoverageStatus from '@/components/search/ObjectCoverageStatus.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Pagination from '@/components/ui/Pagination.vue'
@@ -962,14 +963,8 @@ async function runQuery() {
                   ? 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200'
                   : 'border-destructive/30 bg-destructive/5 text-destructive'"
             >
-              <div class="flex flex-wrap items-center gap-2">
-                <Badge
-                  :variant="objectCoverageStatus === 'Complete' ? 'success' : objectCoverageStatus === 'Partial' ? 'warn' : 'destructive'"
-                  class="text-[10px] uppercase"
-                >
-                  {{ objectCoverageStatus }}
-                </Badge>
-                <span>Mode: {{ OBJECT_SEARCH_MODE_LABELS[objectCoverage?.mode ?? objectSearchMode] }}</span>
+              <ObjectCoverageStatus :coverage="objectCoverage" :status="objectCoverageStatus">
+                <p v-if="objectCoverageStatus === 'Partial'" class="min-w-0 flex-1 font-medium">Partial object inventory. Coverage is incomplete, so missing objects cannot be treated as absent.</p>
                 <Button
                   v-if="objectCoverageStatus !== 'Complete'"
                   variant="outline"
@@ -980,21 +975,8 @@ async function runQuery() {
                 >
                   Retry
                 </Button>
-              </div>
-              <template v-if="objectCoverage">
-                <p v-if="objectCoverageStatus === 'Partial'" class="font-medium">Partial object inventory. Coverage is incomplete, so missing objects cannot be treated as absent.</p>
-                <p>
-                  Scope: {{ objectCoverage.scope === 'realm' ? 'Realm' : 'This node' }}.
-                  Freshness source: {{ objectCoverage.index_freshness.source.replaceAll('_', ' ') }}.
-                  As of: <span :title="objectCoverage.index_freshness.as_of">{{ relativeTime(objectCoverage.index_freshness.as_of) }}</span>.
-                </p>
-                <p v-if="objectCoverage.index_freshness.oldest_observed_at">Oldest observed partition: <span :title="objectCoverage.index_freshness.oldest_observed_at">{{ relativeTime(objectCoverage.index_freshness.oldest_observed_at) }}</span>.</p>
-                <p>Nodes queried: {{ objectCoverage.nodes_queried }}. Nodes failed: {{ objectCoverage.nodes_failed }}.</p>
-                <p v-if="objectCoverage.truncated">This page is truncated. Load more before treating the result set as complete.</p>
-                <p v-if="objectCoverage.omitted_partitions">Omitted partitions: {{ objectCoverage.omitted_partitions }}.</p>
-                <p v-if="objectCoverage.failed_partitions.length" class="break-all">Failed partitions: {{ objectCoverage.failed_partitions.join(', ') }}</p>
-              </template>
-              <template v-else>
+              </ObjectCoverageStatus>
+              <template v-if="!objectCoverage">
                 <p v-if="objectSearchMode === 'distributed_strict'">Distributed strict was unavailable. Strict mode did not fall back to best-effort.</p>
                 <p>{{ objectError }}</p>
               </template>

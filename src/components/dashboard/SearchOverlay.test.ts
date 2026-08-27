@@ -78,8 +78,26 @@ function compileClientComponent(url: URL, modules: Record<string, unknown>) {
   return { component, exports: cjs.exports }
 }
 
+const OBJECT_SEARCH_MODE_LABELS = {
+  local: 'Local',
+  distributed_best_effort: 'Distributed best-effort',
+  distributed_strict: 'Distributed strict',
+}
+
+const coverageStatus = compileClientComponent(
+  new URL('../search/ObjectCoverageStatus.vue', import.meta.url),
+  {
+    vue: VueRuntime,
+    '@lucide/vue': icons,
+    '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+    '@/composables/useUnifiedSearch': { OBJECT_SEARCH_MODE_LABELS },
+    '@/lib/utils': { relativeTime: (value: string) => `relative ${value}` },
+  },
+).component
+
 const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.meta.url), {
   vue: VueRuntime,
+  '@/components/search/ObjectCoverageStatus.vue': moduleDefault(coverageStatus),
   'vue-router': { useRouter: () => ({ push: routerPush }) },
   '@vueuse/core': { useMediaQuery: mediaQuery },
   '@lucide/vue': icons,
@@ -101,11 +119,7 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
   },
   '@/composables/useUnifiedSearch': {
     DEFAULT_OBJECT_SEARCH_MODE: 'distributed_best_effort',
-    OBJECT_SEARCH_MODE_LABELS: {
-      local: 'Local',
-      distributed_best_effort: 'Distributed best-effort',
-      distributed_strict: 'Distributed strict',
-    },
+    OBJECT_SEARCH_MODE_LABELS,
     useUnifiedSearch: (_query: unknown, config: { objectMode?: Ref<string> }) => {
       configuredObjectMode = config.objectMode
       return search
@@ -552,6 +566,55 @@ describe('narrow TopBar search panel', () => {
     expect(text.indexOf('Partial object inventory')).toBeGreaterThanOrEqual(0)
     expect(text.indexOf('Partial object inventory')).toBeLessThan(text.indexOf('reads/sample.fastq'))
     expect(text).toContain('Object · Distributed best-effort · Node: Storage node B · Group: group-a · Bucket: raw-data')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('keeps the coverage numbers behind the status chip', async () => {
+    search.objects.value = [{
+      kind: 'object',
+      mode: 'distributed_best_effort',
+      issuer_node_id: 'node-b',
+      group_id: 'group-a',
+      bucket: 'raw-data',
+      key: 'reads/sample.fastq',
+    }]
+    search.objectCoverage.value = {
+      scope: 'realm',
+      mode: 'distributed_best_effort',
+      index_freshness: { source: 'live_heads', as_of: '2026-08-19T09:00:00Z' },
+      nodes_queried: 3,
+      nodes_failed: 0,
+      failed_partitions: [],
+      omitted_partitions: 0,
+      complete: true,
+      truncated: false,
+      partitions: [],
+    }
+    search.objectSearched.value = true
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
+
+    const dialog = element(mounted.root, (node) => node.props.role === 'dialog')
+    expect(content(dialog)).toContain('Complete')
+    expect(content(dialog)).not.toContain('Nodes queried')
+    expect(content(dialog)).not.toContain('Freshness source')
+
+    const toggle = element(
+      mounted.root,
+      (node) => node.tag === 'button' && content(node).includes('Coverage details'),
+    )
+    expect(toggle.props['aria-expanded']).toBe(false)
+    await click(toggle)
+
+    expect(toggle.props['aria-expanded']).toBe(true)
+    const expanded = content(dialog)
+    expect(expanded).toContain('Nodes queried')
+    expect(expanded).toContain('Nodes failed')
+    expect(expanded).toContain('Freshness source')
+    expect(expanded).toContain('live heads')
+    expect(expanded).toContain('Distributed best-effort')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

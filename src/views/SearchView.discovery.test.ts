@@ -14,10 +14,24 @@ describe('object discovery and Dataset-scoped SPARQL presentation', () => {
     expect(source).toContain('Strict mode did not fall back to best-effort')
     expect(source).toContain('OBJECT_SEARCH_MODE_LABELS[hit.mode]')
     expect(source).toContain(':to="objectHitRoute(hit)"')
-    expect(source).toContain("objectCoverage.index_freshness.source.replaceAll('_', ' ')")
-    expect(source).toContain(':title="objectCoverage.index_freshness.as_of"')
-    expect(source).toContain('relativeTime(objectCoverage.index_freshness.as_of)')
     expect(source).toContain(':title="hit.updated_at"')
+  })
+
+  it('folds the coverage numbers into one status disclosure', () => {
+    const chip = readFileSync(
+      fileURLToPath(new URL('../components/search/ObjectCoverageStatus.vue', import.meta.url)),
+      'utf8',
+    )
+
+    expect(source).toContain('<ObjectCoverageStatus :coverage="objectCoverage" :status="objectCoverageStatus">')
+    expect(source).not.toContain('Nodes queried:')
+    expect(source).not.toContain('Freshness source:')
+    expect(chip).toContain(':aria-expanded="open"')
+    expect(chip).toContain(':aria-controls="detailsId"')
+    expect(chip).toContain("{ label: 'Freshness source', value: freshness.source.replaceAll('_', ' ') }")
+    expect(chip).toContain('title: freshness.as_of')
+    expect(chip).toContain("label: 'Nodes queried'")
+    expect(chip).toContain('<dl v-if="open"')
   })
 
   it('renders the exact fixed Dataset scope and preserves retryable ambiguity', () => {
