@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
-import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
@@ -18,7 +18,7 @@ import { aggregateByLocation } from '@/lib/placement'
 import { formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
 import { ApiError } from '@/lib/api'
-import { Boxes, ChevronRight, Globe2, HardDrive, Laptop, MapPin, MapPinned, RefreshCw } from '@lucide/vue'
+import { Boxes, ChevronRight, Globe2, HardDrive, Laptop, MapPin, MapPinned } from '@lucide/vue'
 
 const route = useRoute()
 const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, currentUser, loadInfo } = useAruna()
@@ -241,9 +241,7 @@ watch(
     <PageHeader title="Status" description="Realm topology and local node health, refreshed every minute.">
       <template #actions>
         <span class="text-[11px] tabular-nums text-muted-foreground">Updated {{ lastUpdatedLabel }}</span>
-        <Button variant="outline" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onRefresh">
-          <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Refresh
-        </Button>
+        <RefreshButton :busy="spinning" @click="onRefresh" />
       </template>
     </PageHeader>
 

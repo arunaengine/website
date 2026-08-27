@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -87,7 +88,6 @@ import {
   Loader2,
   LogIn,
   Plus,
-  RefreshCw,
   Route,
   ShieldAlert,
   ShieldCheck,
@@ -2039,9 +2039,7 @@ const isEmpty = computed(
           >
             <KeyRound class="h-3 w-3" /> …{{ keyTail }}
           </span>
-          <Button variant="outline" size="sm" :disabled="refreshSpinning" :aria-busy="refreshSpinning" @click="onRefresh">
-            <RefreshCw class="h-4 w-4" :class="refreshSpinning ? 'animate-spin' : ''" /> Refresh
-          </Button>
+          <RefreshButton :busy="refreshSpinning" @click="onRefresh" />
           <!-- Staging jobs are connected-node global, not per bucket. -->
           <Button v-if="stagingJobsEnabled" variant="outline" size="sm" @click="stagingPanelOpen = true">
             <HardDriveDownload class="h-4 w-4" /> Staging
@@ -2374,16 +2372,7 @@ const isEmpty = computed(
                 }}
               </p>
               <div class="mt-4 flex justify-center gap-2">
-                <Button
-                  v-if="!remoteEndpointMissing"
-                  variant="outline"
-                  size="sm"
-                  :disabled="retrySpinning"
-                  :aria-busy="retrySpinning"
-                  @click="onRetryObjects"
-                >
-                  <RefreshCw class="h-3.5 w-3.5" :class="retrySpinning ? 'animate-spin' : ''" /> Try again
-                </Button>
+                <RefreshButton v-if="!remoteEndpointMissing" :busy="retrySpinning" label="Try again" @click="onRetryObjects" />
                 <Button v-if="showSyncButton" size="sm" @click="openSyncDialog">
                   <ArrowLeftRight class="h-3.5 w-3.5" /> Sync to this node…
                 </Button>

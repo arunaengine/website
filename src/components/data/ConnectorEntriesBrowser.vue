@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
+import { useRefresh } from '@/composables/useRefresh'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { ApiError, type ConnectorEntry } from '@/lib/api'
-import { ChevronRight, Folder, Home, Loader2, RefreshCw } from '@lucide/vue'
+import { ChevronRight, Folder, Home, Loader2 } from '@lucide/vue'
 
 // Remote listing of a source connector's entries (agreed contract:
 // GET /groups/{gid}/connectors/{cid}/entries?path=&limit=). Optionally
@@ -70,6 +72,9 @@ async function load() {
     if (mySeq === seq) loading.value = false
   }
 }
+
+const { busy: reloadBusy, refresh: onReload } = useRefresh(() => load())
+const spinning = computed(() => reloadBusy.value || loading.value)
 
 watch(
   () => [props.groupId, props.connectorId],
@@ -149,9 +154,12 @@ defineExpose({ reload: load })
             </button>
           </template>
         </nav>
-        <Button variant="ghost" size="sm" class="h-6 shrink-0 px-1.5 text-[10px]" :disabled="loading" @click="load">
-          <RefreshCw class="h-3 w-3" :class="loading ? 'animate-spin' : ''" /> Reload
-        </Button>
+        <RefreshButton
+          :busy="spinning"
+          label="Reload"
+          class="h-6 shrink-0 px-1.5 text-[10px]"
+          @click="onReload"
+        />
       </div>
 
       <div class="overflow-hidden rounded-md border border-border">

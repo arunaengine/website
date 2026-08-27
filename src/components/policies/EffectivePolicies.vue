@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue'
-import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { computed, ref, watch } from 'vue'
-import { RefreshCw, ShieldCheck } from '@lucide/vue'
+import { ShieldCheck } from '@lucide/vue'
 import { ApiError } from '@/lib/api'
 import { isPoliciesUnsupported, usePolicies } from '@/composables/usePolicies'
+import { useRefresh } from '@/composables/useRefresh'
 import { scopeLabel, type ScopedPolicy } from '@/lib/policies'
 
 // Read-only merge of realm and group policies, in the order they are evaluated.
@@ -44,6 +45,9 @@ async function load() {
   }
 }
 
+const { busy: reloadBusy, refresh: onReload } = useRefresh(load)
+const spinning = computed(() => reloadBusy.value || loading.value)
+
 watch(() => props.groupId, () => void load(), { immediate: true })
 
 defineExpose({ reload: load })
@@ -59,9 +63,7 @@ defineExpose({ reload: load })
           in order and stop at the first denial.
         </p>
       </div>
-      <Button variant="ghost" size="sm" :disabled="loading" @click="load">
-        <RefreshCw class="h-3.5 w-3.5" :class="loading ? 'animate-spin' : ''" /> Reload
-      </Button>
+      <RefreshButton :busy="spinning" label="Reload" @click="onReload" />
     </div>
 
     <div v-if="loading && !policies.length" class="space-y-2">

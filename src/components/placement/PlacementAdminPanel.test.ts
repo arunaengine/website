@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ApiError, NO_MANAGEMENT_NODE_MESSAGE, apiErrorMessage, type RealmPlacementStrategy } from '@/lib/api'
 import { placementMutationErrorMessage } from '@/composables/usePlacement'
 import { useRefresh } from '@/composables/useRefresh'
+import { refreshButton } from '@/test/clientRender'
 import * as Placement from '@/lib/placement'
 import type { RealmPlacementConfigResponse } from '@/lib/placement'
 
@@ -130,6 +131,7 @@ const PlacementAdminPanel = compileClientComponent(
     '@/components/placement/StrategyEditor.vue': moduleDefault(StrategyEditor),
     '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
     '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
     '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
     '@/components/ui/Input.vue': moduleDefault(InputStub),

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
@@ -15,7 +16,7 @@ import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { parseWatchPath, watchEventLabel } from '@/lib/watches'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
 import type { ApiWatch } from '@/lib/api'
-import { ArrowLeft, Eye, RefreshCw, Trash2 } from '@lucide/vue'
+import { ArrowLeft, Eye, Trash2 } from '@lucide/vue'
 
 const { bootstrapped, currentUser, myGroups, discoverableGroups } = useAruna()
 const { available, watches, listLoaded, listLoading, listError, deletingIds, loadWatches, ensureLoaded, deleteWatch } =
@@ -66,9 +67,7 @@ watch(currentUser, () => void ensureLoaded())
       description="Watches deliver a notification when data is uploaded or metadata is created under a path you follow."
     >
       <template #actions>
-        <Button variant="ghost" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onRefresh">
-          <RefreshCw class="h-4 w-4" :class="spinning ? 'animate-spin' : ''" /> Refresh
-        </Button>
+        <RefreshButton :busy="spinning" @click="onRefresh" />
         <RouterLink :to="{ name: 'settings' }">
           <Button variant="outline" size="sm"><ArrowLeft class="h-4 w-4" /> Settings</Button>
         </RouterLink>

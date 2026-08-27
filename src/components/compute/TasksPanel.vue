@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -13,6 +14,7 @@ import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useHiddenTasks } from '@/composables/useHiddenTasks'
+import { useRefresh } from '@/composables/useRefresh'
 import { formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import {
   TES_GROUP_TAG,
@@ -22,7 +24,7 @@ import {
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { ArchiveRestore, ChevronRight, ListPlus, RefreshCw, Trash2, Zap } from '@lucide/vue'
+import { ArchiveRestore, ChevronRight, ListPlus, Trash2, Zap } from '@lucide/vue'
 
 // Task list section of the unified Compute view. ComputeView gates the feature
 // flag and sign-in, but the panel tracks the session itself so a late or lost
@@ -273,6 +275,9 @@ function reload() {
   void fetchList()
 }
 
+const { busy: reloadBusy, refresh: onReload } = useRefresh(reload)
+const spinning = computed(() => reloadBusy.value || refreshing.value)
+
 async function init() {
   const requestId = await loadServiceInfo()
   // A sign-out or another account took over while the service info was in
@@ -395,9 +400,7 @@ onUnmounted(() => {
         <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter tasks by state" />
         <div class="ml-auto flex items-center gap-2">
           <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
-          <Button variant="ghost" size="icon-sm" :disabled="refreshing" aria-label="Refresh tasks" @click="reload">
-            <RefreshCw class="h-3.5 w-3.5" :class="refreshing ? 'animate-spin' : ''" />
-          </Button>
+          <RefreshButton :busy="spinning" sr-label="Refresh tasks" @click="onReload" />
         </div>
       </div>
 

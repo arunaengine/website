@@ -4,6 +4,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
@@ -17,6 +18,7 @@ import { useJobs } from '@/composables/useJobs'
 import { useAruna } from '@/composables/useAruna'
 import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { useS3 } from '@/composables/useS3'
+import { useRefresh } from '@/composables/useRefresh'
 import type { MetadataDocumentListItem } from '@/lib/api'
 import type { JobFamilyResponse } from '@/lib/jobs'
 import { detectQuickRun } from '@/lib/quickRuntimes'
@@ -32,7 +34,7 @@ import {
   type TesTask,
 } from '@/lib/tes'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Ban, Download, ExternalLink as ExternalLinkIcon, FileText, RefreshCw, RotateCcw, Trash2 } from '@lucide/vue'
+import { Ban, Download, ExternalLink as ExternalLinkIcon, FileText, RotateCcw, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ taskId: string; open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled'): void; (e: 'hidden'): void }>()
@@ -262,6 +264,9 @@ async function findRunCrate() {
   }
 }
 
+const { busy: crateBusy, refresh: onFindCrate } = useRefresh(findRunCrate)
+const spinning = computed(() => crateBusy.value || runCrateLoading.value)
+
 const systemLogsOpen = ref(false)
 
 // ── Cancel (two-step inline confirm) ─────────────────────────────────────────
@@ -476,9 +481,7 @@ async function confirmDelete() {
           </RouterLink>
           <div v-else class="flex flex-wrap items-center gap-2">
             <p class="text-xs text-muted-foreground">No Process Run crate at <code class="rounded bg-muted px-1">runs/&lt;task-id&gt;</code> yet; it is written once the run completes.</p>
-            <Button variant="ghost" size="sm" :disabled="runCrateLoading" @click="findRunCrate">
-              <RefreshCw class="h-3.5 w-3.5" :class="runCrateLoading ? 'animate-spin' : ''" /> Check again
-            </Button>
+            <RefreshButton :busy="spinning" label="Check again" @click="onFindCrate" />
           </div>
         </section>
 

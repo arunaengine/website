@@ -15,6 +15,7 @@ import {
   moduleDefault,
   mountApp,
   nodes,
+  refreshButton,
   type HostNode,
 } from '@/test/clientRender'
 import type { DeviceState, DeviceSyncStatus, SyncDocument } from '@/lib/deviceApi'
@@ -124,6 +125,7 @@ const SyncView = compileClientComponent(new URL('./SyncView.vue', import.meta.ur
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
   '@/components/ui/FilterChips.vue': moduleDefault(FilterChipsStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Blank),

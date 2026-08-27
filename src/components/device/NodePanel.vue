@@ -5,12 +5,13 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useRefresh } from '@/composables/useRefresh'
 import { appQuit, nodeLogsTail, nodeStatus, type NodeStatus } from '@/lib/desktopBridge'
 import { follow, onWake, POLL_IDLE_MS } from '@/lib/poll'
 import { formatDuration, truncateMiddle } from '@/lib/utils'
-import { Power, RefreshCw } from '@lucide/vue'
+import { Power } from '@lucide/vue'
 
 const LOG_LINES = 200
 
@@ -122,16 +123,7 @@ const facts = computed(() => {
         </div>
         <div class="flex shrink-0 items-center gap-2">
           <Badge v-if="badge" :variant="badge.variant">{{ badge.label }}</Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            :disabled="spinning"
-            :aria-busy="spinning"
-            aria-label="Refresh node status"
-            @click="onRefresh"
-          >
-            <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" />
-          </Button>
+          <RefreshButton :busy="spinning" sr-label="Refresh node status" @click="onRefresh" />
           <Button variant="outline" size="sm" :disabled="quitting" @click="quit">
             <Power class="h-3.5 w-3.5" /> {{ quitting ? 'Quitting' : 'Quit' }}
           </Button>

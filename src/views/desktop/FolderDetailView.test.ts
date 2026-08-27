@@ -16,6 +16,7 @@ import {
   moduleDefault,
   mountApp,
   nodes,
+  refreshButton,
   type HostNode,
 } from '@/test/clientRender'
 import type { FolderEntry, SyncedFolder } from '@/lib/deviceApi'
@@ -101,6 +102,7 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/EmptyState.vue': moduleDefault(Passthrough),
   '@/components/ui/ErrorPanel.vue': moduleDefault(Passthrough),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),

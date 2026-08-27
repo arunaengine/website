@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -11,6 +12,7 @@ import Progress from '@/components/ui/Progress.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
 import { useJobsList } from '@/composables/useJobs'
+import { useRefresh } from '@/composables/useRefresh'
 import {
   formatJobProgress,
   jobProgressPercent,
@@ -18,7 +20,7 @@ import {
   type JobStatusResponse,
 } from '@/lib/jobs'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
-import { ChevronRight, ListTodo, RefreshCw } from '@lucide/vue'
+import { ChevronRight, ListTodo } from '@lucide/vue'
 
 // System-jobs section of the unified Compute view. ComputeView gates the
 // feature flag and sign-in, but useJobsList tracks the session itself so a late
@@ -90,6 +92,9 @@ function reload() {
   void list.load()
 }
 
+const { busy: reloadBusy, refresh: onReload } = useRefresh(reload)
+const spinning = computed(() => reloadBusy.value || refreshing.value)
+
 // Infinite-scroll sentinel over the job list cursor.
 const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
@@ -160,9 +165,7 @@ onMounted(() => void list.load())
           <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter jobs by state" />
           <div class="ml-auto flex items-center gap-2">
             <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
-            <Button variant="ghost" size="icon-sm" :disabled="refreshing" aria-label="Refresh jobs" @click="reload">
-              <RefreshCw class="h-3.5 w-3.5" :class="refreshing ? 'animate-spin' : ''" />
-            </Button>
+            <RefreshButton :busy="spinning" sr-label="Refresh jobs" @click="onReload" />
           </div>
         </div>
 

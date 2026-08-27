@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -18,6 +19,7 @@ import BucketPolicyDialog from '@/components/residency/BucketPolicyDialog.vue'
 import ResidencyPolicyEditor from '@/components/residency/ResidencyPolicyEditor.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
+import { useRefresh } from '@/composables/useRefresh'
 import { placementPoliciesErrorMessage, policyRefKey } from '@/lib/placementPolicies'
 import type {
   CopyViolationBody,
@@ -31,7 +33,6 @@ import { formatBytes, formatNumber, truncateMiddle } from '@/lib/utils'
 import {
   DatabaseZap,
   MapPinned,
-  RefreshCw,
   RotateCcw,
   Search,
   ShieldAlert,
@@ -146,6 +147,9 @@ async function loadDiagnostics(cursor?: string) {
     diagnosticsLoading.value = false
   }
 }
+
+const { busy: reloadBusy, refresh: onReload } = useRefresh(() => loadDiagnostics())
+const spinning = computed(() => reloadBusy.value || diagnosticsLoading.value)
 
 const resolutionBusy = ref(false)
 const resolutionError = ref<string | null>(null)
@@ -359,9 +363,7 @@ watch(
                 <h3 class="font-display text-sm font-semibold text-aruna-navy">Local enforcement diagnostics and quarantine</h3>
               </div>
               <div class="flex gap-2">
-                <Button variant="ghost" size="sm" :disabled="diagnosticsLoading" @click="() => loadDiagnostics()">
-                  <RefreshCw class="h-3.5 w-3.5" :class="diagnosticsLoading ? 'animate-spin' : ''" /> Reload
-                </Button>
+                <RefreshButton :busy="spinning" label="Reload" @click="onReload" />
                 <Button size="sm" :disabled="resolutionBusy" @click="revalidateAll">
                   <RotateCcw class="h-3.5 w-3.5" /> {{ resolutionBusy ? 'Revalidating…' : 'Revalidate all' }}
                 </Button>

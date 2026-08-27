@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PolicyRow from '@/components/policies/PolicyRow.vue'
 import PolicyDryRun from '@/components/policies/PolicyDryRun.vue'
 import { computed, ref, watch } from 'vue'
-import { Plus, RefreshCw, Save, ShieldAlert } from '@lucide/vue'
+import { Plus, Save, ShieldAlert } from '@lucide/vue'
 import { ApiError, apiErrorMessage } from '@/lib/api'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { isPoliciesUnsupported, isStaleWrite, usePolicies } from '@/composables/usePolicies'
+import { useRefresh } from '@/composables/useRefresh'
 import {
   MAX_POLICIES_PER_SCOPE,
   POLICY_VARIABLES,
@@ -87,6 +89,9 @@ async function load() {
   }
 }
 
+const { busy: reloadBusy, refresh: onReload } = useRefresh(load)
+const spinning = computed(() => reloadBusy.value || loading.value)
+
 watch(() => [props.scope, props.groupId], () => void load(), { immediate: true })
 
 function addPolicy() {
@@ -148,9 +153,7 @@ const scopeNoun = computed(() => (props.scope === 'group' ? 'group' : 'realm'))
         </p>
       </div>
       <div class="flex shrink-0 gap-2">
-        <Button variant="ghost" size="sm" :disabled="loading" @click="load">
-          <RefreshCw class="h-3.5 w-3.5" :class="loading ? 'animate-spin' : ''" /> Reload
-        </Button>
+        <RefreshButton :busy="spinning" label="Reload" @click="onReload" />
         <Button v-if="canAdmin" variant="outline" size="sm" :disabled="atCap" @click="addPolicy">
           <Plus class="h-3.5 w-3.5" /> Add policy
         </Button>

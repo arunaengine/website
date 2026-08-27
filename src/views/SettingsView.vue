@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
 import Avatar from '@/components/ui/Avatar.vue'
@@ -21,7 +22,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ChevronRight, ExternalLink, KeyRound, Palette, Rss, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, RefreshCw, Save } from '@lucide/vue'
+import { ChevronRight, ExternalLink, KeyRound, Palette, Rss, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, Save } from '@lucide/vue'
 
 const {
   apiBaseUrl,
@@ -335,9 +336,7 @@ function toggleGroup(groupId: string) {
   <div class="@container">
     <PageHeader title="Settings" description="API connection, current user, profiles, groups and credentials from the local Aruna API.">
       <template #actions>
-        <Button variant="outline" :disabled="refreshBusy" :aria-busy="refreshBusy" @click="onRefresh">
-          <RefreshCw class="h-4 w-4" :class="refreshBusy ? 'animate-spin' : ''" /> Refresh
-        </Button>
+        <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
         <Button :disabled="!currentUser || saving || !profileDirty" @click="saveProfile"><Save class="h-4 w-4" /> Save profile</Button>
       </template>
     </PageHeader>

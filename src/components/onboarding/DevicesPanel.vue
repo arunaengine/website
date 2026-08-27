@@ -4,6 +4,7 @@
 // needs no admin gate. Rows reuse SecretsTable through its view-model props.
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import DeviceLane from '@/components/onboarding/DeviceLane.vue'
 import SecretsTable, { type SecretRow } from '@/components/onboarding/SecretsTable.vue'
@@ -11,7 +12,7 @@ import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceEnrollment } from '@/composables/useDeviceEnrollment'
 import { useRefresh } from '@/composables/useRefresh'
-import { Plus, RefreshCw, X } from '@lucide/vue'
+import { Plus, X } from '@lucide/vue'
 import type { UserDevice } from '@/lib/api'
 
 const DEVICE_STEPS = ['Device', 'Hand off', 'Watch it join']
@@ -98,16 +99,7 @@ const rows = computed<SecretRow[]>(() =>
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <span class="text-[11px] tabular-nums text-muted-foreground">{{ capLabel }}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          :disabled="spinning"
-          :aria-busy="spinning"
-          aria-label="Refresh devices"
-          @click="onRefresh"
-        >
-          <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" />
-        </Button>
+        <RefreshButton :busy="spinning" sr-label="Refresh devices" @click="onRefresh" />
         <Button v-if="!adding" size="sm" :disabled="!currentUser" @click="openAdd">
           <Plus class="h-3.5 w-3.5" /> Add a device
         </Button>

@@ -13,6 +13,7 @@ import {
   moduleDefault,
   mountApp,
   nodes,
+  refreshButton,
   typeValue,
   type HostNode,
 } from '@/test/clientRender'
@@ -204,6 +205,7 @@ const createTask = vi.fn(async () => ({ id: 'task-id' }))
 const sharedComponents = {
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/Input.vue': moduleDefault(Input),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),

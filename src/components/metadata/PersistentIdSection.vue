@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -19,7 +20,7 @@ import { useRefresh } from '@/composables/useRefresh'
 import { ApiError } from '@/lib/api'
 import { graphIriFor } from '@/lib/graphIri'
 import { listPersistentIds, pidStateMeta, withdrawPid, type PersistentIdView } from '@/lib/pid'
-import { Fingerprint, RefreshCw } from '@lucide/vue'
+import { Fingerprint } from '@lucide/vue'
 
 const REASON_MAX = 1024
 
@@ -136,16 +137,7 @@ async function confirmWithdraw() {
       <div class="flex items-center gap-2 text-sm font-medium text-foreground">
         <Fingerprint class="h-4 w-4 text-primary" /> Persistent identifier
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        :disabled="spinning"
-        :aria-busy="spinning"
-        aria-label="Re-check PID status"
-        @click="onRefresh"
-      >
-        <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" />
-      </Button>
+      <RefreshButton :busy="spinning" sr-label="Re-check PID status" @click="onRefresh" />
     </header>
 
     <div class="space-y-3 p-5">

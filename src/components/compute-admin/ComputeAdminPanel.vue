@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Input from '@/components/ui/Input.vue'
@@ -12,6 +13,7 @@ import Switch from '@/components/ui/Switch.vue'
 import ComputeQuotaFields from '@/components/compute-admin/ComputeQuotaFields.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useComputeAdmin } from '@/composables/useComputeAdmin'
+import { useRefresh } from '@/composables/useRefresh'
 import {
   BYTE_UNITS,
   computeAdminErrorMessage,
@@ -34,7 +36,6 @@ import {
   Gauge,
   Network,
   Plus,
-  RefreshCw,
   Save,
   ServerCog,
   Trash2,
@@ -215,6 +216,11 @@ async function loadAll() {
   await Promise.all([loadConfig(), loadSnapshots()])
 }
 
+const { busy: reloadBusy, refresh: onReloadAll } = useRefresh(loadAll)
+const reloadSpinning = computed(() => reloadBusy.value || loading.value || snapshotLoading.value)
+const { busy: snapshotBusy, refresh: onReloadSnapshots } = useRefresh(loadSnapshots)
+const snapshotSpinning = computed(() => snapshotBusy.value || snapshotLoading.value)
+
 let loaded = false
 watch(
   ready,
@@ -250,9 +256,7 @@ watch(
 
         <div class="space-y-6">
           <div class="flex justify-end">
-            <Button variant="ghost" size="sm" :disabled="loading || snapshotLoading" @click="loadAll">
-              <RefreshCw class="h-3.5 w-3.5" :class="(loading || snapshotLoading) ? 'animate-spin' : ''" /> Reload
-            </Button>
+            <RefreshButton :busy="reloadSpinning" label="Reload" @click="onReloadAll" />
           </div>
 
           <template v-if="loading && !draft">
@@ -413,9 +417,7 @@ watch(
                 <h3 class="font-display text-sm font-semibold text-aruna-navy">Approximate replicated view</h3>
                 <Badge v-if="snapshots?.approximate ?? true" variant="warn">approximate</Badge>
               </div>
-              <Button variant="ghost" size="sm" :disabled="snapshotLoading" @click="loadSnapshots">
-                <RefreshCw class="h-3.5 w-3.5" :class="snapshotLoading ? 'animate-spin' : ''" /> Refresh
-              </Button>
+              <RefreshButton :busy="snapshotSpinning" @click="onReloadSnapshots" />
             </header>
             <div class="space-y-5 p-5">
               <p class="text-[11px] text-muted-foreground">

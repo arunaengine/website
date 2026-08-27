@@ -2,6 +2,7 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
@@ -21,7 +22,7 @@ import { formatBytes, formatNumber, shortUserId } from '@/lib/utils'
 import { apiErrorMessage, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
-import { Database, HardDrive, Layers, Link2, Boxes, RefreshCw, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
+import { Database, HardDrive, Layers, Link2, Boxes, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
 
 const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
 const { isAuthenticated, authPending } = useAuth()
@@ -360,9 +361,7 @@ async function save() {
   <div>
     <PageHeader title="Realm administration" description="Realm-wide usage, quotas, compute, placement strategies and residency policies.">
       <template #actions>
-        <Button variant="outline" :disabled="refreshBusy" :aria-busy="refreshBusy" @click="onRefresh">
-          <RefreshCw class="h-4 w-4" :class="refreshBusy ? 'animate-spin' : ''" /> Refresh
-        </Button>
+        <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
       </template>
     </PageHeader>
 

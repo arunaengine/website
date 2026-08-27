@@ -3,6 +3,7 @@ import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -11,11 +12,12 @@ import Progress from '@/components/ui/Progress.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useStaging } from '@/composables/useStaging'
+import { useRefresh } from '@/composables/useRefresh'
 import { featureEnabled } from '@/lib/config'
 import { ApiError, type StagingJob } from '@/lib/api'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { onBeforeUnmount, ref, watch } from 'vue'
-import { HardDriveDownload, Loader2, RefreshCw } from '@lucide/vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { HardDriveDownload, Loader2 } from '@lucide/vue'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
@@ -81,6 +83,9 @@ async function loadJobs() {
     }
   }
 }
+
+const { busy: reloadBusy, refresh: onReload } = useRefresh(() => loadJobs())
+const spinning = computed(() => reloadBusy.value || loading.value)
 
 async function refreshActiveJobs() {
   if (disposed) return
@@ -178,9 +183,7 @@ function jobPercent(job: StagingJob): number {
           <DialogTitle class="flex items-center gap-2">
             <HardDriveDownload class="h-4 w-4 text-primary" /> Staging jobs
           </DialogTitle>
-          <Button variant="ghost" size="icon-sm" aria-label="Reload" :disabled="loading" @click="() => loadJobs()">
-            <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" />
-          </Button>
+          <RefreshButton :busy="spinning" sr-label="Reload" @click="onReload" />
         </div>
       </DialogHeader>
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Boxes, Globe, Layers, ListChecks, RefreshCw, ShieldCheck, SlidersHorizontal } from '@lucide/vue'
+import { Boxes, Globe, Layers, ListChecks, ShieldCheck, SlidersHorizontal } from '@lucide/vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -9,6 +10,7 @@ import MetaPathTree from './MetaPathTree.vue'
 import DataPathTree from './DataPathTree.vue'
 import { buildMetaPathTree, shortNodeId, type MetaPathFolder } from './permission-paths'
 import { useAruna } from '@/composables/useAruna'
+import { useRefresh } from '@/composables/useRefresh'
 
 const props = defineProps<{
   groupId: string
@@ -85,6 +87,9 @@ async function load(append = false) {
     loading.value = false
   }
 }
+
+const { busy: reloadBusy, refresh: onReload } = useRefresh(() => load())
+const spinning = computed(() => reloadBusy.value || loading.value)
 
 function toggle(path: string) {
   const next = new Set(expanded.value)
@@ -197,9 +202,7 @@ watch(
       <section v-if="customMode === 'meta'" class="mt-2 rounded-lg border border-border bg-background">
         <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
           <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Metadata documents</div>
-          <Button variant="ghost" size="sm" class="h-6 px-1.5 text-[10px]" :disabled="loading" @click="load()">
-            <RefreshCw class="h-3 w-3" :class="loading ? 'animate-spin' : ''" /> Reload
-          </Button>
+          <RefreshButton :busy="spinning" label="Reload" class="h-6 px-1.5 text-[10px]" @click="onReload" />
         </div>
         <div class="px-3 pb-3 pt-2">
           <p class="text-[11px] text-muted-foreground">

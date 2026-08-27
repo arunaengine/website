@@ -7,6 +7,7 @@ import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useRefresh } from '@/composables/useRefresh'
+import { refreshButton } from '@/test/clientRender'
 import type { UsageResponse } from '@/lib/api'
 import * as Quota from '@/lib/quota'
 import * as Utils from '@/lib/utils'
@@ -59,6 +60,7 @@ const GroupQuotaCards = compileClientComponent(new URL('./GroupQuotaCards.vue', 
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(SlotStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/QuotaBar.vue': moduleDefault(SlotStub),
   '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),

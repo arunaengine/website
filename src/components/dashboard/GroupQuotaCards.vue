@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { HardDrive, RefreshCw } from '@lucide/vue'
+import { HardDrive } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
@@ -169,16 +170,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Group statistics</h2>
         <Badge variant="outline" class="tabular-nums">{{ entries.length }}</Badge>
       </div>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        :disabled="refreshBusy"
-        :aria-busy="refreshBusy"
-        aria-label="Refresh group statistics"
-        @click="onRefresh"
-      >
-        <RefreshCw class="h-3.5 w-3.5" :class="refreshBusy ? 'animate-spin' : ''" />
-      </Button>
+      <RefreshButton :busy="refreshBusy" sr-label="Refresh group statistics" @click="onRefresh" />
     </header>
 
     <ErrorPanel

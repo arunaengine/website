@@ -5,6 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Select from '@/components/ui/Select.vue'
@@ -32,7 +33,7 @@ import {
   replaceableCount,
 } from '@/lib/syncStates'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { ArrowLeft, ArrowRight, FolderOpen, Link2Off, Pause, Play, RefreshCw } from '@lucide/vue'
+import { ArrowLeft, ArrowRight, FolderOpen, Link2Off, Pause, Play } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -203,9 +204,7 @@ function when(ms: number | null | undefined): string {
         <Button v-if="folder" variant="outline" size="sm" @click="reveal(folder.root)">
           <FolderOpen class="h-3.5 w-3.5" /> Show on disk
         </Button>
-        <Button variant="outline" size="sm" :disabled="busy || refreshBusy" :aria-busy="refreshBusy" @click="onRefresh">
-          <RefreshCw class="h-3.5 w-3.5" :class="refreshBusy ? 'animate-spin' : ''" /> Refresh
-        </Button>
+        <RefreshButton :busy="refreshBusy" :disabled="busy" @click="onRefresh" />
         <Button
           v-if="folder"
           variant="outline"

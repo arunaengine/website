@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
@@ -19,7 +20,7 @@ import { useUserDirectory } from '@/composables/useUserDirectory'
 import { truncateMiddle } from '@/lib/utils'
 import { ApiError, type ApiUser } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
-import { ChevronLeft, ChevronRight, RefreshCw, ShieldCheck, Users, UserSearch } from '@lucide/vue'
+import { ChevronLeft, ChevronRight, ShieldCheck, Users, UserSearch } from '@lucide/vue'
 
 const { bootstrapped, currentUser, canInspectUsers, apiGroups, listUsers, getUser, searchUsers } = useAruna()
 const { isAuthenticated } = useAuth()
@@ -218,9 +219,7 @@ const sharedGroups = computed(() => {
         <Button variant="outline" size="sm" as-child>
           <RouterLink :to="{ name: 'admin' }">Admin</RouterLink>
         </Button>
-        <Button variant="outline" size="sm" :disabled="!ready || spinning" :aria-busy="spinning" @click="onRefresh">
-          <RefreshCw class="h-4 w-4" :class="spinning ? 'animate-spin' : ''" /> Refresh
-        </Button>
+        <RefreshButton :busy="spinning" :disabled="!ready" @click="onRefresh" />
       </template>
     </PageHeader>
 

@@ -2,11 +2,12 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import { useJobs } from '@/composables/useJobs'
 import { useRefresh } from '@/composables/useRefresh'
 import { formatBytes, truncateMiddle } from '@/lib/utils'
 import type { JobArtifactStatus } from '@/lib/jobs'
-import { Download, RefreshCw } from '@lucide/vue'
+import { Download } from '@lucide/vue'
 
 // The run crate archive sits behind bearer auth, so it cannot be a plain link:
 // HEAD reports whether it is there and GET hands back a Blob the browser saves
@@ -110,9 +111,7 @@ watch(() => props.jobId, () => {
           The archive is written once the job finishes<template v-if="status.jobState">, and the job
           is {{ status.jobState }}</template>.
         </p>
-        <Button variant="ghost" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onCheck">
-          <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Check again
-        </Button>
+        <RefreshButton :busy="spinning" label="Check again" @click="onCheck" />
       </div>
 
       <p v-else-if="status.state === 'expired'" class="text-xs text-muted-foreground">
@@ -129,9 +128,7 @@ watch(() => props.jobId, () => {
 
       <div v-else class="flex flex-wrap items-center gap-2">
         <p class="text-xs text-muted-foreground">{{ status.message || 'The archive could not be checked.' }}</p>
-        <Button variant="ghost" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onCheck">
-          <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Retry
-        </Button>
+        <RefreshButton :busy="spinning" label="Retry" @click="onCheck" />
       </div>
     </template>
 

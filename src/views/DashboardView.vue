@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
@@ -16,6 +17,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useNotifications } from '@/composables/useNotifications'
+import { useRefresh } from '@/composables/useRefresh'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
@@ -51,6 +53,9 @@ async function refreshDashboard() {
     quotaRevision.value++
   }
 }
+
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshDashboard)
+const spinning = computed(() => refreshBusy.value || refreshing.value)
 
 watch(dashboardRevision, () => void refreshDashboard(), { immediate: true })
 
@@ -165,7 +170,7 @@ const pageDescription = computed(() =>
       :description="pageDescription"
     >
       <template #actions>
-        <Button variant="outline" :disabled="refreshing" @click="refreshDashboard">Refresh</Button>
+        <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
         <Button v-if="currentUser" variant="outline" @click="showNewDataset = true">
           <Plus class="h-4 w-4" /> Create dataset
         </Button>

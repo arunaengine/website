@@ -5,6 +5,7 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -12,11 +13,12 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useRefresh } from '@/composables/useRefresh'
 import { type SyncReferenceHandling, type SyncRelationship, type SyncRelationshipDetail } from '@/lib/api'
 import { arnLocationLabel, parseArunaArn, syncModeLabel, syncStateVariant } from '@/lib/sync'
 import { formatBytes, formatDuration, relativeTime } from '@/lib/utils'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ArrowLeftRight, ArrowLeft, ArrowRight, Loader2, Play, Plus, RefreshCw, Trash2 } from '@lucide/vue'
+import { ArrowLeftRight, ArrowLeft, ArrowRight, Loader2, Play, Plus, Trash2 } from '@lucide/vue'
 
 // Sync relationships touching one bucket, outgoing and incoming, presented as
 // a centered dialog opened from the sync chip. The backend only lists
@@ -155,6 +157,9 @@ async function load(silent = false) {
   }
 }
 
+const { busy: reloadBusy, refresh: onReload } = useRefresh(() => load())
+const spinning = computed(() => reloadBusy.value || loading.value)
+
 watch(
   () => [props.open, props.bucket, props.nodeId] as const,
   ([open]) => {
@@ -290,9 +295,7 @@ async function remove(row: Row) {
             <Button variant="outline" size="sm" @click="emit('new-sync')">
               <Plus class="h-3.5 w-3.5" /> New sync
             </Button>
-            <Button variant="ghost" size="icon-sm" aria-label="Reload" :disabled="loading" @click="() => load()">
-              <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" />
-            </Button>
+            <RefreshButton :busy="spinning" sr-label="Reload" @click="onReload" />
           </div>
         </div>
         <DialogDescription>

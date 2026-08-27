@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -32,7 +33,7 @@ import type {
   PolicyRefBody,
 } from '@/lib/placementPolicies'
 import { formatNumber, truncateMiddle } from '@/lib/utils'
-import { Activity, MapPinned, Plus, RefreshCw, Save, Trash2 } from '@lucide/vue'
+import { Activity, MapPinned, Plus, Save, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ open: boolean; bucket: string }>()
 const emit = defineEmits<{ (event: 'update:open', value: boolean): void }>()
@@ -267,9 +268,7 @@ watch(
             <Button :disabled="saving || !dirty || refErrors.length > 0" @click="saveDefaults">
               <Save class="h-3.5 w-3.5" /> {{ saving ? 'Saving…' : 'Replace default set' }}
             </Button>
-            <Button variant="outline" :disabled="saving || spinning" :aria-busy="spinning" @click="onReload">
-              <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Reload
-            </Button>
+            <RefreshButton :busy="spinning" :disabled="saving" size="default" label="Reload" @click="onReload" />
             <Button variant="outline" :disabled="bulkBusy || dirty" :title="dirty ? 'Save or reset the default set before applying it' : undefined" @click="bulkOpen = true"><Activity class="h-3.5 w-3.5" /> Apply to existing objects</Button>
           </div>
         </section>

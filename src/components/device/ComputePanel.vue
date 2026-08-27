@@ -5,10 +5,12 @@
 import { computed, onMounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
+import { useRefresh } from '@/composables/useRefresh'
 import {
   computeProbe,
   nodeSettings,
@@ -17,7 +19,6 @@ import {
   type ComputeSettings,
 } from '@/lib/desktopBridge'
 import { formatBytes } from '@/lib/utils'
-import { RefreshCw } from '@lucide/vue'
 
 const GIB = 1024 ** 3
 
@@ -63,6 +64,9 @@ async function runProbe(): Promise<void> {
     probing.value = false
   }
 }
+
+const { busy: probeBusy, refresh: onProbe } = useRefresh(runProbe)
+const spinning = computed(() => probeBusy.value || probing.value)
 
 onMounted(() => {
   void load()
@@ -134,9 +138,7 @@ const chosenMissing = computed(() => {
         <div class="flex shrink-0 items-center gap-2">
           <Badge v-if="compute?.enabled" variant="success">on</Badge>
           <Badge v-else variant="secondary">off</Badge>
-          <Button variant="outline" size="sm" :disabled="probing" aria-label="Look for a runtime again" @click="runProbe">
-            <RefreshCw class="h-3.5 w-3.5" :class="probing ? 'animate-spin' : ''" />
-          </Button>
+          <RefreshButton :busy="spinning" sr-label="Look for a runtime again" @click="onProbe" />
         </div>
       </div>
 

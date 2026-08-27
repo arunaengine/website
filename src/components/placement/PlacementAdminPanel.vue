@@ -5,6 +5,7 @@ import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import StrategyEditor from '@/components/placement/StrategyEditor.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Input from '@/components/ui/Input.vue'
@@ -23,7 +24,7 @@ import {
   knownLocations as computeKnownLocations,
   type RealmPlacementConfigResponse,
 } from '@/lib/placement'
-import { Link2, MapPinned, Plus, RefreshCw, SlidersHorizontal } from '@lucide/vue'
+import { Link2, MapPinned, Plus, SlidersHorizontal } from '@lucide/vue'
 
 // Realm-admin access is gated by the parent AdminView; this panel only guards
 // the placement feature flag.
@@ -297,9 +298,7 @@ watch(
               <SlidersHorizontal class="h-4 w-4 text-primary" />
               <h3 class="font-display text-sm font-semibold text-aruna-navy">Strategies</h3>
             </div>
-            <Button variant="ghost" size="sm" :disabled="spinning || busy" :aria-busy="spinning" @click="onReload">
-              <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Reload
-            </Button>
+            <RefreshButton :busy="spinning" :disabled="busy" label="Reload" @click="onReload" />
           </header>
           <div class="space-y-4 p-5">
             <template v-if="loading && !config">

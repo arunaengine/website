@@ -5,6 +5,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -23,7 +24,7 @@ import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import type { DocumentSyncState, SyncDocument } from '@/lib/deviceApi'
 import { relativeTime } from '@/lib/utils'
 import type { BadgeVariant } from '@/components/nodes/node-display'
-import { CloudOff, FileText, Plus, RefreshCw } from '@lucide/vue'
+import { CloudOff, FileText, Plus } from '@lucide/vue'
 
 const { status, state, loading, error, runError, running, runSync, load } = useDeviceSync()
 const { load: loadFolders, needsYouTotal } = useSyncedFolders()
@@ -138,13 +139,15 @@ const nothingHeld = computed(() => state.value === 'ready' && !documents.value.l
         <span class="text-xs text-muted-foreground">
           {{ status.pendingTotal }} {{ status.pendingTotal === 1 ? 'change' : 'changes' }} pending
         </span>
-        <Button variant="outline" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onRefresh">
-          <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Refresh
-        </Button>
+        <RefreshButton :busy="spinning" @click="onRefresh" />
         <Button variant="outline" size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Bind a folder</Button>
-        <Button size="sm" :disabled="!canRun" :aria-busy="running" @click="runSync">
-          <RefreshCw class="h-3.5 w-3.5" :class="running ? 'animate-spin' : ''" /> {{ running ? 'Syncing' : 'Sync now' }}
-        </Button>
+        <RefreshButton
+          :busy="running"
+          :disabled="!canRun"
+          variant="default"
+          :label="running ? 'Syncing' : 'Sync now'"
+          @click="runSync"
+        />
       </template>
     </PageHeader>
 

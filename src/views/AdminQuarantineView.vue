@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -32,7 +33,7 @@ import {
 } from '@/lib/quarantine'
 import { formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
 import { useDebounceFn } from '@vueuse/core'
-import { ChevronLeft, ChevronRight, RefreshCw, ShieldAlert, ShieldCheck, Trash2 } from '@lucide/vue'
+import { ChevronLeft, ChevronRight, ShieldAlert, ShieldCheck, Trash2 } from '@lucide/vue'
 
 const { bootstrapped, currentUser, canManageQuarantine, apiBaseUrl, authToken } = useAruna()
 const { isAuthenticated } = useAuth()
@@ -247,9 +248,7 @@ async function runPrunePass() {
         <Button variant="outline" size="sm" as-child>
           <RouterLink :to="{ name: 'admin' }">Admin</RouterLink>
         </Button>
-        <Button variant="outline" size="sm" :disabled="!ready || spinning" :aria-busy="spinning" @click="onRefresh">
-          <RefreshCw class="h-4 w-4" :class="spinning ? 'animate-spin' : ''" /> Refresh
-        </Button>
+        <RefreshButton :busy="spinning" :disabled="!ready" @click="onRefresh" />
         <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="!ready" @click="openPrune">
           <Trash2 class="h-4 w-4" /> Prune acknowledged
         </Button>

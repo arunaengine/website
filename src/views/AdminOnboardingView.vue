@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -23,7 +24,7 @@ import { buildComposeSnippet, buildEnvBlock, normalizeSeedUrl, type NodeConfigIn
 import { kindVariant } from '@/components/nodes/node-display'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { apiOrigin, type CreateOnboardingSecretResponse, type OnboardingMode, type RealmNodeInfo } from '@/lib/api'
-import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw, ServerCog, ShieldCheck } from '@lucide/vue'
+import { ArrowLeft, ArrowRight, ExternalLink, ServerCog, ShieldCheck } from '@lucide/vue'
 
 const { apiBaseUrl, bootstrapped, currentUser, canManageOnboarding, nodeInfo, realmInfo } = useAruna()
 const {
@@ -514,9 +515,7 @@ const secretRows = computed<SecretRow[]>(() =>
             <ServerCog class="h-4 w-4 text-primary" />
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Outstanding secrets</h3>
           </div>
-          <Button variant="outline" size="sm" :disabled="spinning" :aria-busy="spinning" @click="onRefresh">
-            <RefreshCw class="h-3.5 w-3.5" :class="spinning ? 'animate-spin' : ''" /> Refresh
-          </Button>
+          <RefreshButton :busy="spinning" @click="onRefresh" />
         </header>
         <div class="p-5">
           <ErrorPanel v-if="listError" :message="listError" @retry="refreshSecrets" />

@@ -6,6 +6,7 @@ import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { useRefresh } from '@/composables/useRefresh'
+import { refreshButton } from '@/test/clientRender'
 import { ApiError } from '@/lib/api'
 import * as Jobs from '@/lib/jobs'
 import * as Tes from '@/lib/tes'
@@ -283,6 +284,7 @@ describe('distributed job detail components', () => {
         '@lucide/vue': icons,
         '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
         '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+        '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
         '@/composables/useJobs': {
           useJobs: () => ({ headJobArtifact, downloadJobArtifact: vi.fn() }),
         },
@@ -317,6 +319,7 @@ describe('distributed job detail components', () => {
           '@lucide/vue': icons,
           '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
           '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+          '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
           '@/composables/useJobs': {
             useJobs: () => ({
               headJobArtifact: vi.fn(async () => status),
@@ -475,6 +478,7 @@ describe('distributed job detail components', () => {
         '@/components/ui/DetailDialog.vue': moduleDefault(OpenPassThroughStub),
         '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
         '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+        '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
         '@/components/ui/Skeleton.vue': moduleDefault(PassThroughStub),
         '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
         '@/components/nodes/CopyButton.vue': moduleDefault(PassThroughStub),
@@ -488,6 +492,7 @@ describe('distributed job detail components', () => {
           useTes: () => ({ getTask, cancelTask: vi.fn(), busy: ref(false) }),
         },
         '@/composables/useJobs': { useJobs: () => ({ getJob }) },
+        '@/composables/useRefresh': { useRefresh },
         '@/composables/useAruna': {
           useAruna: () => ({
             myGroups: ref([]),

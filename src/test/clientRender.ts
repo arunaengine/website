@@ -6,7 +6,7 @@ import { compile } from '@vue/compiler-dom'
 import { compileScript, parse } from '@vue/compiler-sfc'
 import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
-import { createRenderer, nextTick, type App, type Component } from 'vue'
+import { createRenderer, defineComponent, h, nextTick, type App, type Component } from 'vue'
 import type { Router } from 'vue-router'
 
 /** Wraps a component so a test module map can hand it back as an import. */
@@ -41,6 +41,26 @@ export function compileClientComponent(url: URL, modules: Record<string, unknown
   }).outputText
   Object.assign(component, { render: new Function('Vue', renderJavascript)(VueRuntime) })
   return component
+}
+
+const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
+const ButtonStub = defineComponent({
+  inheritAttrs: false,
+  setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
+})
+let refreshControl: Component | null = null
+
+/** The shared refresh control, compiled so a view test sees its real busy state. */
+export function refreshButton(): Component {
+  refreshControl ??= compileClientComponent(
+    new URL('../components/ui/RefreshButton.vue', import.meta.url),
+    {
+      vue: VueRuntime,
+      '@lucide/vue': new Proxy({}, { get: () => IconStub }),
+      '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    },
+  )
+  return refreshControl
 }
 
 export type HostKind = 'root' | 'element' | 'text' | 'comment'

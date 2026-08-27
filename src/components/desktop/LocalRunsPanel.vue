@@ -5,6 +5,7 @@ import { computed, onMounted, provide, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Progress from '@/components/ui/Progress.vue'
@@ -15,10 +16,11 @@ import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { JOB_CLIENT, useJobsList } from '@/composables/useJobs'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { useRefresh } from '@/composables/useRefresh'
 import { requireDevice } from '@/lib/deviceApi'
 import { formatJobProgress, jobProgressPercent, type JobStatusResponse } from '@/lib/jobs'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
-import { Cpu, RefreshCw } from '@lucide/vue'
+import { Cpu } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,6 +49,9 @@ function closeJob(): void {
 function reload(): void {
   if (reachable.value) void list.load()
 }
+
+const { busy: reloadBusy, refresh: onReload } = useRefresh(reload)
+const spinning = computed(() => reloadBusy.value || refreshing.value)
 
 onMounted(() => {
   void ensureLoaded()
@@ -101,9 +106,7 @@ watch(reachable, (now) => now && reload())
       <div v-else class="surface overflow-hidden">
         <div class="flex items-center justify-between border-b border-border bg-muted/20 px-3 py-2">
           <span class="text-[11px] text-muted-foreground">{{ jobs.length }} on this computer</span>
-          <Button variant="ghost" size="icon-sm" :disabled="refreshing" aria-label="Refresh local runs" @click="reload">
-            <RefreshCw class="h-3.5 w-3.5" :class="refreshing ? 'animate-spin' : ''" />
-          </Button>
+          <RefreshButton :busy="spinning" sr-label="Refresh local runs" @click="onReload" />
         </div>
         <ul class="divide-y divide-border">
           <li v-for="job in jobs" :key="job.job_id">

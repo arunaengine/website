@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
@@ -13,7 +14,7 @@ import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { useRefresh } from '@/composables/useRefresh'
 import { useRoute } from 'vue-router'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { Inbox, Plus, RefreshCw, Users } from '@lucide/vue'
+import { Inbox, Plus, Users } from '@lucide/vue'
 import { relativeTime } from '@/lib/utils'
 import type { JoinRequest } from '@/lib/api'
 
@@ -93,9 +94,7 @@ const description = computed(() =>
   <div>
     <PageHeader title="Groups" :description="description">
       <template #actions>
-        <Button variant="outline" :disabled="spinning" :aria-busy="spinning" @click="onRefresh">
-          <RefreshCw class="h-4 w-4" :class="spinning ? 'animate-spin' : ''" /> Refresh
-        </Button>
+        <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
         <Button :disabled="!currentUser" @click="createGroupOpen = true">
           <Plus class="h-4 w-4" /> Create group
         </Button>

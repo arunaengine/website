@@ -6,6 +6,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
@@ -141,9 +142,7 @@ onMounted(() => void reload())
         <Badge :variant="nodeTone">{{ nodeLabel }}</Badge>
       </template>
       <template #actions>
-        <Button variant="outline" size="sm" :disabled="refreshBusy" :aria-busy="refreshBusy" @click="onRefresh">
-          <RefreshCw class="h-3.5 w-3.5" :class="refreshBusy ? 'animate-spin' : ''" /> Refresh
-        </Button>
+        <RefreshButton :busy="refreshBusy" @click="onRefresh" />
         <Button size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Bind a folder</Button>
       </template>
     </PageHeader>
