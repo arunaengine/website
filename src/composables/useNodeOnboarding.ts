@@ -209,7 +209,11 @@ export function useNodeOnboarding() {
         await loadInfo()
         const node = (realmInfo.value?.nodes ?? []).find((n) => n.node_id === watch.value.claimedBy)
         if (node) {
-          const connected = node.connection_status === 'connected' || node.present
+          // A device never reports presence, so its contact is the join signal.
+          const connected =
+            node.connection_status === 'connected' ||
+            node.connection_status === 'seen' ||
+            node.present
           patchWatch({ claimedIsNode: true, phase: connected ? 'connected' : 'waiting-presence' })
           if (connected) stopWatch()
         } else {

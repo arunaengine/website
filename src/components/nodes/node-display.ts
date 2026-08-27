@@ -18,11 +18,22 @@ export const kindVariant: Record<RealmNodeInfo['kind'], BadgeVariant> = {
 }
 
 export function connectionVariant(node: RealmNodeInfo): BadgeVariant {
-  return node.connection_status === 'connected' ? 'success' : 'warn'
+  if (node.connection_status === 'connected' || node.connection_status === 'seen') return 'success'
+  // A device without recent contact is a missing signal, not a failure.
+  return node.connection_status === 'unknown' ? 'secondary' : 'warn'
 }
 
 export function connectionLabel(node: RealmNodeInfo): string {
-  return node.connection_status === 'connected' ? 'connected' : 'configured'
+  switch (node.connection_status) {
+    case 'connected':
+      return 'connected'
+    case 'seen':
+      return 'active'
+    case 'unknown':
+      return 'no recent contact'
+    default:
+      return 'configured'
+  }
 }
 
 const healthyStatuses = new Set(['ok', 'running', 'healthy', 'ready', 'up', 'enabled', 'online', 'connected', 'serving', 'active', 'available'])

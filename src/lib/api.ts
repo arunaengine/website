@@ -336,7 +336,13 @@ export interface RealmNodeInfo {
   owner?: string | null
   configured: boolean
   present: boolean
-  connection_status: 'connected' | 'configured'
+  // Infrastructure nodes report 'connected'/'configured' from realm presence.
+  // A device publishes none, so it reports 'seen' when it reached the
+  // answering node in the last three minutes and 'unknown' otherwise.
+  connection_status: 'connected' | 'configured' | 'seen' | 'unknown'
+  // Unix ms of a device's last authenticated contact with the answering node.
+  // Devices only, and absent until that node has seen one.
+  last_seen_ms?: number
   placement?: RealmNodePlacement | null
   // Latest self-published node document; null until the node publishes one.
   info?: RealmNodePublishedInfo | null

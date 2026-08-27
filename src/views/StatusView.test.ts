@@ -95,15 +95,25 @@ describe('device summary', () => {
           connection_status: 'connected',
           placement: { location: 'eu-west', weight: 1, full: false, draining: false },
         },
-        { node_id: 'laptop-alpha', kind: 'user', owner: 'user-1', configured: true, present: true, connection_status: 'connected' },
-        { node_id: 'laptop-beta', kind: 'user', owner: 'user-2', configured: true, present: false, connection_status: 'configured' },
+        {
+          node_id: 'laptop-alpha',
+          kind: 'user',
+          owner: 'user-1',
+          configured: true,
+          present: false,
+          connection_status: 'seen',
+          last_seen_ms: Date.now() - 4 * 60_000,
+        },
+        { node_id: 'laptop-beta', kind: 'user', owner: 'user-2', configured: true, present: false, connection_status: 'unknown' },
       ],
     }
 
     const text = await renderedText()
 
     expect(text).toContain('Devices')
-    expect(text).toContain('2 enrolled, 1 connected')
+    expect(text).toContain('2 enrolled, 1 active')
+    expect(text).toContain('last seen 4m ago')
+    expect(text).toContain('Devices do not announce themselves to the realm')
     expect(text).toContain('1 yours')
     expect(text).toContain('server-node')
     expect(text).not.toContain('laptop-')
@@ -112,6 +122,21 @@ describe('device summary', () => {
     expect(text).toContain('eu-west=1')
     expect(text).not.toContain('(not in placement map)')
     expect(text).toContain('1 / 1 present in DHT')
+  })
+
+  it('claims no activity for a device it has never heard from', async () => {
+    realmInfo.value = {
+      metadata_replication: { default_replication_factor: 2 },
+      nodes: [
+        { node_id: 'server-node', kind: 'server', configured: true, present: true, connection_status: 'connected' },
+        { node_id: 'laptop-gamma', kind: 'user', owner: 'user-3', configured: true, present: false, connection_status: 'unknown' },
+      ],
+    }
+
+    const text = await renderedText()
+
+    expect(text).toContain('1 enrolled, 0 active')
+    expect(text).not.toContain('last seen')
   })
 
   it('renders no device summary for a realm without devices', async () => {

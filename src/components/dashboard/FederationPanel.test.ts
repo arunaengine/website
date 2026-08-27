@@ -28,20 +28,36 @@ function realmNode(nodeId: string, kind: string): Record<string, unknown> {
   return { node_id: nodeId, kind, configured: true, present: true, connection_status: 'connected' }
 }
 
+function device(nodeId: string, status: string, lastSeenMs?: number): Record<string, unknown> {
+  return { node_id: nodeId, kind: 'user', configured: true, present: false, connection_status: status, last_seen_ms: lastSeenMs }
+}
+
 describe('devices in the realm', () => {
   it('summarizes them instead of drawing them as nodes', async () => {
     const app = createSSRApp({
       render: () =>
         h(FederationPanel, {
           nodes: [realmNode('aaaa-server-1111', 'server')],
-          devices: [realmNode('bbbb-device-2222', 'user')],
+          devices: [device('bbbb-device-2222', 'seen', 1_700_000_000_000)],
         }),
     })
 
     const html = await renderToString(app)
 
     expect(html).not.toContain('bbbb')
-    expect(html).toContain('1 enrolled, 1 connected')
+    expect(html).toContain('1 enrolled, 1 active')
+  })
+
+  it('counts a device it has never heard from as inactive', async () => {
+    const app = createSSRApp({
+      render: () =>
+        h(FederationPanel, {
+          nodes: [realmNode('aaaa-server-1111', 'server')],
+          devices: [device('cccc-device-3333', 'unknown')],
+        }),
+    })
+
+    expect(await renderToString(app)).toContain('1 enrolled, 0 active')
   })
 })
 

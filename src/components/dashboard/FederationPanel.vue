@@ -25,7 +25,9 @@ function openNode(id: string) {
 }
 
 const connectedCount = computed(() => props.nodes.filter((node) => node.connection_status === 'connected').length)
-const connectedDevices = computed(() => (props.devices ?? []).filter((device) => device.present).length)
+const activeDevices = computed(
+  () => (props.devices ?? []).filter((device) => device.connection_status === 'seen').length,
+)
 const replicationLabel = computed(() => {
   if (props.replicationFactor === null) return 'all eligible nodes'
   return props.replicationFactor === undefined ? 'unknown' : `×${props.replicationFactor}`
@@ -395,7 +397,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
         <Laptop class="h-4 w-4 shrink-0 text-muted-foreground" />
         <span class="font-medium text-foreground">Devices</span>
         <span class="tabular-nums text-muted-foreground">
-          {{ devices.length }} enrolled, {{ connectedDevices }} connected
+          {{ devices.length }} enrolled, {{ activeDevices }} active
         </span>
       </div>
     </div>

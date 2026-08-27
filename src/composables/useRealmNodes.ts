@@ -15,7 +15,7 @@ export interface RealmNodeDisplay {
   s3Url: string | null
   /** Published REST base including /api/v1, for cross-node API calls. */
   apiBase: string | null
-  /** connection_status === 'connected' && present. */
+  /** Presence-confirmed infrastructure node, or a device seen recently. */
   reachable: boolean
   isLocal: boolean
   /** Executor kinds this node advertises; empty without a compute backend. */
@@ -46,7 +46,9 @@ export function useRealmNodes() {
           node.info?.urls?.s3 ??
           (isLocal ? (nodeInfo.value?.services?.interfaces?.s3?.url ?? null) : null),
         apiBase: nodeApiBase(node),
-        reachable: node.present && node.connection_status === 'connected',
+        reachable:
+          (node.present && node.connection_status === 'connected') ||
+          node.connection_status === 'seen',
         isLocal,
         executorKinds: (node.info?.executors ?? []).map((executor) => executor.kind),
       }

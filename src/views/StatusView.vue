@@ -14,7 +14,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { onWake, POLL_SLOW_MS } from '@/lib/poll'
 import { aggregateByLocation } from '@/lib/placement'
-import { formatBytes, formatNumber, truncateMiddle } from '@/lib/utils'
+import { formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
 import { ApiError } from '@/lib/api'
 import { Boxes, ChevronRight, Globe2, HardDrive, Laptop, MapPin, MapPinned, RefreshCw } from '@lucide/vue'
@@ -151,7 +151,15 @@ const kindOrder: Record<RealmNodeInfo['kind'], number> = { management: 0, server
 // infrastructure: they are summarized only, never listed, probed or aggregated.
 const infraNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
 const deviceNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind === 'user'))
-const connectedDevices = computed(() => deviceNodes.value.filter((node) => node.present).length)
+const activeDevices = computed(
+  () => deviceNodes.value.filter((node) => node.connection_status === 'seen').length,
+)
+// Freshest device contact this node recorded, blank until it has heard from one.
+const deviceLastSeen = computed(() => {
+  const seen = deviceNodes.value.map((node) => node.last_seen_ms ?? 0)
+  const latest = Math.max(0, ...seen)
+  return latest ? relativeTime(new Date(latest).toISOString()) : ''
+})
 const ownedDevices = computed(() => {
   const userId = currentUser.value?.id
   return userId ? deviceNodes.value.filter((node) => node.owner === userId).length : 0
@@ -405,13 +413,21 @@ watch(
             No nodes reported for this realm yet.
           </li>
         </ul>
-        <div v-if="deviceNodes.length" class="flex items-center gap-3 border-t border-border px-5 py-3 text-sm">
-          <Laptop class="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span class="font-medium text-foreground">Devices</span>
-          <span class="tabular-nums text-muted-foreground">
-            {{ deviceNodes.length }} enrolled, {{ connectedDevices }} connected
-          </span>
-          <Badge v-if="ownedDevices" variant="outline" class="tabular-nums">{{ ownedDevices }} yours</Badge>
+        <div v-if="deviceNodes.length" class="border-t border-border px-5 py-3">
+          <div class="flex items-center gap-3 text-sm">
+            <Laptop class="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span class="font-medium text-foreground">Devices</span>
+            <span class="tabular-nums text-muted-foreground">
+              {{ deviceNodes.length }} enrolled, {{ activeDevices }} active
+            </span>
+            <span v-if="deviceLastSeen" class="text-xs tabular-nums text-muted-foreground">
+              last seen {{ deviceLastSeen }}
+            </span>
+            <Badge v-if="ownedDevices" variant="outline" class="tabular-nums">{{ ownedDevices }} yours</Badge>
+          </div>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Devices do not announce themselves to the realm; activity is what this node last heard from them.
+          </p>
         </div>
       </section>
 
