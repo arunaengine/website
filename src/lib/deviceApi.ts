@@ -325,7 +325,17 @@ export async function getFolder(folderId: string, client: DeviceClient): Promise
 }
 
 export async function bindFolder(body: BindFolderRequest, client: DeviceClient): Promise<SyncedFolder> {
-  return readFolder(await post<unknown>('/device/folders', client, body))
+  // The bind request is flat on the wire; only responses nest the binding.
+  const wire = {
+    root: body.root,
+    group_id: body.group_id,
+    remote_node_id: body.remote.node_id,
+    remote_bucket: body.remote.bucket,
+    remote_prefix: body.remote.prefix,
+    mode: body.mode,
+    propagate_deletes: body.propagate_deletes,
+  }
+  return readFolder(await post<unknown>('/device/folders', client, wire))
 }
 
 /** Unbinds the folder. The files on disk are never touched. */

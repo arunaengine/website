@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from './api'
 import {
+  bindFolder,
   entryExpectation,
   isDeviceUnsupported,
   isStaleExpectation,
@@ -175,6 +176,36 @@ describe('device client', () => {
   it('hands back the local node client when there is one', () => {
     const client = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
     expect(requireDevice(client, 'its runs')).toBe(client)
+  })
+})
+
+describe('bind request wire shape', () => {
+  it('flattens the remote binding', async () => {
+    // The node deserializes a flat body with deny_unknown_fields: a nested
+    // `remote` object is answered with 422 before the handler runs.
+    const request = vi.spyOn(await import('./api'), 'apiRequest').mockResolvedValue({})
+    const client = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
+    await bindFolder(
+      {
+        root: '/home/me/data',
+        group_id: 'g1',
+        remote: { node_id: 'n1', bucket: 'lab', prefix: 'raw/' },
+        mode: 'two_way',
+        propagate_deletes: true,
+      },
+      client,
+    )
+    const body = JSON.parse(String(request.mock.calls[0]?.[1]?.body))
+    expect(body).toEqual({
+      root: '/home/me/data',
+      group_id: 'g1',
+      remote_node_id: 'n1',
+      remote_bucket: 'lab',
+      remote_prefix: 'raw/',
+      mode: 'two_way',
+      propagate_deletes: true,
+    })
+    request.mockRestore()
   })
 })
 
