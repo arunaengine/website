@@ -34,7 +34,7 @@ const route = useRoute()
 const mainEl = ref<HTMLElement | null>(null)
 const unreachable = computed(() => realmReach.value === 'unreachable')
 
-const { isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine, isManagementNode } = useAruna()
+const { isRealmAdmin, canInspectUsers, canManageOnboarding, isManagementNode } = useAruna()
 const { start: watchNode, stop: unwatchNode } = useDeviceStatus()
 
 // Same read as the portal sidebar: one Compute entry for either compute plane.
@@ -47,7 +47,6 @@ const adminItems = computed(() => [
   ...(canManageOnboarding.value && isManagementNode.value
     ? [{ to: '/app/admin/onboarding', icon: Workflow, label: 'Node onboarding' }]
     : []),
-  ...(canManageQuarantine.value ? [{ to: '/app/admin/quarantine', icon: Activity, label: 'Quarantine' }] : []),
 ])
 
 const items = computed<NavEntry[]>(() => [

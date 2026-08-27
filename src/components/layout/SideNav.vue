@@ -30,7 +30,6 @@ const {
   isRealmAdmin,
   canInspectUsers,
   canManageOnboarding,
-  canManageQuarantine,
   isManagementNode,
 } = useAruna()
 
@@ -52,9 +51,6 @@ const adminItems = computed<NavItem[]>(() => [
     : []),
   ...(canManageOnboarding.value && isManagementNode.value
     ? [{ to: '/app/admin/onboarding', icon: Workflow, label: 'Node onboarding' }]
-    : []),
-  ...(canManageQuarantine.value
-    ? [{ to: '/app/admin/quarantine', icon: Activity, label: 'Quarantine' }]
     : []),
 ])
 

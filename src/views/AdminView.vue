@@ -384,6 +384,10 @@ async function save() {
         <p class="mt-1.5 text-sm text-muted-foreground">
           {{ isAuthenticated ? 'Your account does not hold WRITE permission on the realm administration configuration.' : 'Sign in with an account that can administer the realm configuration.' }}
         </p>
+        <!-- Quarantine is its own grant, so it stays reachable without it. -->
+        <Button v-if="canManageQuarantine" variant="outline" size="sm" class="mt-4" as-child>
+          <RouterLink :to="{ name: 'admin-quarantine' }">Sync quarantine</RouterLink>
+        </Button>
       </section>
     </div>
 

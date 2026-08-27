@@ -108,8 +108,21 @@ describe('Phase 5 navigation parity', () => {
       '/app/admin',
       '/app/admin/users',
       '/app/admin/onboarding',
-      '/app/admin/quarantine',
     ]))
+  })
+
+  it('leaves quarantine to the Admin view alone', () => {
+    const adminSource = readFileSync(fileURLToPath(new URL('../../views/AdminView.vue', import.meta.url)), 'utf8')
+    const sideSource = readFileSync(fileURLToPath(new URL('../layout/SideNav.vue', import.meta.url)), 'utf8')
+    const mobileSource = readFileSync(fileURLToPath(new URL('./MobileNav.vue', import.meta.url)), 'utf8')
+    const desktopSource = readFileSync(fileURLToPath(new URL('../../views/DesktopLayout.vue', import.meta.url)), 'utf8')
+
+    for (const source of [sideSource, mobileSource, desktopSource]) {
+      expect(source).not.toContain('/app/admin/quarantine')
+      expect(source).not.toContain('canManageQuarantine')
+    }
+    expect(adminSource).toContain('v-if="canManageQuarantine"')
+    expect(adminSource).toContain("{ name: 'admin-quarantine' }")
   })
 
   it('uses the same compute flag expression and a bottom sheet with readable targets', () => {

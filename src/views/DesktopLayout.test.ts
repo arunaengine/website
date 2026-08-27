@@ -103,7 +103,8 @@ describe('desktop shell', () => {
 
     const html = await renderToString(createSSRApp(DesktopLayout))
 
-    expect(destinations(html)).toEqual(expect.arrayContaining(['/app/admin', '/app/admin/quarantine']))
+    expect(destinations(html)).toEqual(expect.arrayContaining(['/app/admin']))
+    expect(destinations(html)).not.toContain('/app/admin/quarantine')
     expect(html.match(/role="separator"/g)).toHaveLength(3)
     expect(html).toContain('Admin')
   })
