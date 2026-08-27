@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import {
   ApiError,
+  apiErrorMessage,
   apiRequest,
   type ApiRequestOptions,
   type RealmPlacementMutationRequest,
@@ -38,7 +39,7 @@ export function placementMutationErrorMessage(err: unknown): string {
       return 'This placement strategy is currently referenced and cannot be removed. Remove or update its references first.'
     }
   }
-  return err instanceof Error ? err.message : String(err)
+  return apiErrorMessage(err)
 }
 
 async function getRealmPlacement(): Promise<RealmPlacementConfigResponse> {

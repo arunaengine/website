@@ -23,9 +23,9 @@ import { buildComposeSnippet, buildEnvBlock, normalizeSeedUrl, type NodeConfigIn
 import { kindVariant } from '@/components/nodes/node-display'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { apiOrigin, type CreateOnboardingSecretResponse, type OnboardingMode, type RealmNodeInfo } from '@/lib/api'
-import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw, ServerCog, ServerCrash, ShieldCheck } from '@lucide/vue'
+import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw, ServerCog, ShieldCheck } from '@lucide/vue'
 
-const { apiBaseUrl, bootstrapped, currentUser, canManageOnboarding, isManagementNode, nodeInfo, realmInfo } = useAruna()
+const { apiBaseUrl, bootstrapped, currentUser, canManageOnboarding, nodeInfo, realmInfo } = useAruna()
 const {
   secrets,
   listError,
@@ -44,14 +44,13 @@ const { resolveUsers, cachedUser } = useUserDirectory()
 const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshSecrets)
 const spinning = computed(() => refreshBusy.value || listing.value)
 
-// The gate cascade opens the wizard only for a realm admin with the onboarding
-// permission ON a management node. Mirrors the honest states AdminView uses.
+// The gate cascade opens the wizard for a realm admin with the onboarding
+// permission; a node that is not a management node relays the calls.
 const canUseWizard = computed(
-  () => bootstrapped.value && !!currentUser.value && canManageOnboarding.value && isManagementNode.value,
+  () => bootstrapped.value && !!currentUser.value && canManageOnboarding.value,
 )
 
-// Refresh the outstanding-secrets list once the gate opens (never on the
-// non-management path, so that state fires zero API calls).
+// Refresh the outstanding-secrets list once the gate opens.
 let refreshedOnce = false
 watch(
   canUseWizard,
@@ -300,14 +299,6 @@ const secretRows = computed<SecretRow[]>(() =>
     }
   }),
 )
-
-// Management nodes that published a reachable portal (the portal is served from
-// each node's REST origin, so strip the /api/v1 suffix off the published url).
-const managementPortals = computed(() =>
-  (realmInfo.value?.nodes ?? [])
-    .filter((n) => n.kind === 'management' && n.info?.urls?.api)
-    .map((n) => ({ id: n.node_id, url: normalizeSeedUrl(n.info!.urls!.api!) })),
-)
 </script>
 
 <template>
@@ -340,38 +331,6 @@ const managementPortals = computed(() =>
               ? 'Your account does not hold the onboarding permission (WRITE on /{realm}/admin/onboarding) needed to mint node onboarding secrets.'
               : 'Sign in with a realm admin account to mint node onboarding secrets.'
           }}
-        </p>
-      </section>
-    </div>
-
-    <!-- Gate 3: not a management node; honest explainer, no API call -->
-    <div v-else-if="!isManagementNode" class="container max-w-[1400px] py-8">
-      <section class="surface mx-auto max-w-2xl p-6">
-        <div class="flex items-start gap-3">
-          <ServerCrash class="mt-0.5 h-6 w-6 shrink-0 text-muted-foreground/70" />
-          <div>
-            <h2 class="font-display text-base font-semibold text-aruna-navy">Onboarding runs on management nodes</h2>
-            <p class="mt-1.5 text-sm text-muted-foreground">
-              This is a {{ nodeInfo?.node.capabilities ?? 'non-management' }} node. Onboarding secrets can only be
-              minted on a <strong class="font-medium text-foreground">management node</strong>.
-            </p>
-          </div>
-        </div>
-        <div v-if="managementPortals.length" class="mt-4 space-y-2">
-          <p class="text-xs font-medium text-foreground">Open the portal on a management node:</p>
-          <a
-            v-for="node in managementPortals"
-            :key="node.id"
-            :href="node.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-1.5 break-all text-sm text-primary hover:underline"
-          >
-            <ExternalLink class="h-3.5 w-3.5 shrink-0" /> {{ node.url }}
-          </a>
-        </div>
-        <p v-else class="mt-4 text-xs text-muted-foreground">
-          No management node has published a reachable portal URL yet. Check the Status page for the realm topology.
         </p>
       </section>
     </div>

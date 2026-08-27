@@ -18,19 +18,18 @@ import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { featureEnabled } from '@/lib/config'
 import { formatBytes, formatNumber, shortUserId } from '@/lib/utils'
-import { ApiError, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
+import { apiErrorMessage, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { Database, HardDrive, Layers, Link2, Boxes, RefreshCw, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
 
-const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine, isManagementNode, nodeInfo, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
+const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
 const { isAuthenticated, authPending } = useAuth()
 // Shared realm directory: resolves saved user-cap ids to display names so rows
 // show a handle instead of the raw {ulid}@{realm} identity.
 const { resolveUsers, cachedUser } = useUserDirectory()
 
 const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
-const nodeCapability = computed(() => nodeInfo.value?.node.capabilities ?? 'server')
 
 // Placement admin is a tab of this view (config-gated); the legacy
 // /app/admin/placement route redirects here with ?tab=placement.
@@ -344,7 +343,7 @@ function reset() {
   saveMessage.value = null
 }
 async function save() {
-  if (!dirty.value || saving.value || invalid.value || !isManagementNode.value) return
+  if (!dirty.value || saving.value || invalid.value) return
   saveError.value = null
   saveMessage.value = null
   try {
@@ -352,7 +351,7 @@ async function save() {
     reseed()
     saveMessage.value = 'Quota policy saved.'
   } catch (err) {
-    saveError.value = err instanceof ApiError ? err.message : err instanceof Error ? err.message : String(err)
+    saveError.value = apiErrorMessage(err)
   }
 }
 </script>
@@ -436,7 +435,7 @@ async function save() {
         <a href="#user-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">User caps</a>
         <RouterLink v-if="canInspectUsers" :to="{ name: 'admin-users' }" class="mt-1 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Users &rarr;</RouterLink>
         <RouterLink
-          v-if="canManageOnboarding && isManagementNode"
+          v-if="canManageOnboarding"
           :to="{ name: 'admin-onboarding' }"
           class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
@@ -466,10 +465,6 @@ async function save() {
           </div>
           <p v-else class="px-5 py-4 text-sm text-muted-foreground">Realm-wide totals need an authenticated session on a quota-aware backend.</p>
         </section>
-
-        <p v-if="!isManagementNode" class="surface px-5 py-3 text-xs text-muted-foreground">
-          This node is a {{ nodeCapability }} node, the quota policy can only be edited through a management node.
-        </p>
 
         <section id="policy" class="surface">
           <header class="flex items-center gap-2 border-b border-border px-5 py-4">
@@ -602,7 +597,7 @@ async function save() {
           </div>
           <div class="flex items-center gap-2">
             <Button variant="outline" size="sm" :disabled="!dirty || saving" @click="reset">Reset</Button>
-            <Button size="sm" :disabled="!dirty || saving || invalid || !isManagementNode" @click="save"><Save class="h-3.5 w-3.5" /> Save policy</Button>
+            <Button size="sm" :disabled="!dirty || saving || invalid" @click="save"><Save class="h-3.5 w-3.5" /> Save policy</Button>
           </div>
         </div>
       </div>

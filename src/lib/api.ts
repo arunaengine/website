@@ -23,6 +23,23 @@ export function isRateLimited(error: unknown): boolean {
   return error instanceof ApiError && error.status === RATE_LIMITED_STATUS
 }
 
+// A node that is not a management node relays management-only routes to one;
+// these codes mean no management node answered.
+const RELAY_FAILURE_CODES = ['no_management_node', 'relay_failed']
+
+export const NO_MANAGEMENT_NODE_MESSAGE = 'No management node is reachable right now. Try again later.'
+
+/** True when a management-only call found no management node to serve it. */
+export function isNoManagementNode(error: unknown): boolean {
+  return error instanceof ApiError && RELAY_FAILURE_CODES.includes(error.code ?? '')
+}
+
+/** Message to show for a failed request. */
+export function apiErrorMessage(error: unknown): string {
+  if (isNoManagementNode(error)) return NO_MANAGEMENT_NODE_MESSAGE
+  return error instanceof Error ? error.message : String(error)
+}
+
 function rateLimitMessage(response: Response): string {
   const seconds = Number(response.headers.get('Retry-After'))
   return Number.isFinite(seconds) && seconds > 0

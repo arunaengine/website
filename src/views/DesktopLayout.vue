@@ -34,7 +34,7 @@ const route = useRoute()
 const mainEl = ref<HTMLElement | null>(null)
 const unreachable = computed(() => realmReach.value === 'unreachable')
 
-const { isRealmAdmin, canInspectUsers, canManageOnboarding, isManagementNode } = useAruna()
+const { isRealmAdmin, canInspectUsers, canManageOnboarding } = useAruna()
 const { start: watchNode, stop: unwatchNode } = useDeviceStatus()
 
 // Same read as the portal sidebar: one Compute entry for either compute plane.
@@ -44,7 +44,7 @@ const jobsEnabled = featureEnabled('jobs')
 const adminItems = computed(() => [
   ...(isRealmAdmin.value ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true }] : []),
   ...(canInspectUsers.value ? [{ to: '/app/admin/users', icon: Users, label: 'Users' }] : []),
-  ...(canManageOnboarding.value && isManagementNode.value
+  ...(canManageOnboarding.value
     ? [{ to: '/app/admin/onboarding', icon: Workflow, label: 'Node onboarding' }]
     : []),
 ])

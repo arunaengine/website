@@ -17,7 +17,7 @@ import {
   placementMutationErrorMessage,
   usePlacement,
 } from '@/composables/usePlacement'
-import type { RealmPlacementBinding, RealmPlacementStrategy } from '@/lib/api'
+import { apiErrorMessage, type RealmPlacementBinding, type RealmPlacementStrategy } from '@/lib/api'
 import {
   aggregateByLocation,
   knownLocations as computeKnownLocations,
@@ -26,8 +26,8 @@ import {
 import { Link2, MapPinned, Plus, RefreshCw, SlidersHorizontal } from '@lucide/vue'
 
 // Realm-admin access is gated by the parent AdminView; this panel only guards
-// the placement-specific requirements (feature flag, management node).
-const { bootstrapped, currentUser, isRealmAdmin, isManagementNode, realmInfo } = useAruna()
+// the placement feature flag.
+const { bootstrapped, currentUser, isRealmAdmin, realmInfo } = useAruna()
 const { placementAdminEnabled, busy, getRealmPlacement, mutateRealmPlacement } = usePlacement()
 
 const locationAggregates = computed(() => aggregateByLocation(realmInfo.value?.nodes ?? []))
@@ -37,8 +37,7 @@ const ready = computed(
     bootstrapped.value &&
     placementAdminEnabled.value &&
     Boolean(currentUser.value) &&
-    isRealmAdmin.value &&
-    isManagementNode.value,
+    isRealmAdmin.value,
 )
 
 const config = ref<RealmPlacementConfigResponse | null>(null)
@@ -119,7 +118,7 @@ async function loadPlacement() {
     config.value = null
     strategyDraft.value = null
     if (isPlacementUnsupported(err)) unsupported.value = true
-    else loadError.value = err instanceof Error ? err.message : String(err)
+    else loadError.value = apiErrorMessage(err)
   } finally {
     loading.value = false
   }
@@ -270,14 +269,6 @@ watch(
         <EmptyState title="Placement administration is not enabled" description="Enable features.placementAdmin in portal-config.json for a backend that serves the realm placement API.">
           <template #icon><MapPinned class="h-8 w-8" /></template>
         </EmptyState>
-      </section>
-    </div>
-
-    <div v-else-if="!isManagementNode" class="container py-8">
-      <section class="surface mx-auto max-w-xl p-8 text-center">
-        <MapPinned class="mx-auto h-8 w-8 text-muted-foreground/70" />
-        <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Management node required</h2>
-        <p class="mt-1.5 text-sm text-muted-foreground">Open this portal on a management node to read or change realm placement configuration.</p>
       </section>
     </div>
 

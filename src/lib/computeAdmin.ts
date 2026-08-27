@@ -1,4 +1,4 @@
-import { ApiError } from '@/lib/api'
+import { ApiError, apiErrorMessage } from '@/lib/api'
 
 export interface LocationLinkBody {
   from: string
@@ -399,5 +399,5 @@ export function computeAdminErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 409) {
     return 'The compute configuration changed concurrently. Reload it before saving again.'
   }
-  return error instanceof Error ? error.message : String(error)
+  return apiErrorMessage(error)
 }

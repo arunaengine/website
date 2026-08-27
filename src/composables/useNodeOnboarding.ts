@@ -10,6 +10,7 @@
 import { onUnmounted, ref } from 'vue'
 import {
   ApiError,
+  apiErrorMessage,
   apiRequest,
   type CreateOnboardingSecretRequest,
   type CreateOnboardingSecretResponse,
@@ -73,12 +74,6 @@ export function useNodeOnboarding() {
     return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
   }
 
-  function errorMessage(err: unknown): string {
-    if (err instanceof ApiError) return err.message
-    if (err instanceof Error) return err.message
-    return String(err)
-  }
-
   function nowSecs(): number {
     return Date.now() / 1000
   }
@@ -90,8 +85,7 @@ export function useNodeOnboarding() {
       secrets.value = response.secrets
       listError.value = null
     } catch (err) {
-      // A 403 here means the view's gate copy takes over; keep the raw message.
-      listError.value = errorMessage(err)
+      listError.value = apiErrorMessage(err)
     } finally {
       listing.value = false
     }
@@ -132,7 +126,7 @@ export function useNodeOnboarding() {
       await refreshSecrets().catch(() => undefined)
       return { response, enrollmentId: pickNewEnrollment(before, response) }
     } catch (err) {
-      mintError.value = errorMessage(err)
+      mintError.value = apiErrorMessage(err)
       throw err
     } finally {
       minting.value = false
@@ -155,7 +149,7 @@ export function useNodeOnboarding() {
       // A 404 means the secret was already pruned or claimed-and-expired; the
       // row is gone either way, so treat it as a successful revoke.
       if (!(err instanceof ApiError && err.status === 404)) {
-        failure = errorMessage(err)
+        failure = apiErrorMessage(err)
       }
     } finally {
       // Refresh first (it clears listError on success), THEN surface the revoke
@@ -227,7 +221,7 @@ export function useNodeOnboarding() {
       }
     } catch (err) {
       // Transient network hiccups must not kill the watch; surface inline.
-      patchWatch({ lastError: errorMessage(err) })
+      patchWatch({ lastError: apiErrorMessage(err) })
     }
   }
 

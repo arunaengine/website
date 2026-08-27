@@ -37,7 +37,6 @@ const {
   isRealmAdmin,
   canInspectUsers,
   canManageOnboarding,
-  isManagementNode,
 } = useAruna()
 const desktop = isDesktop()
 const tesEnabled = featureEnabled('tes')
@@ -67,7 +66,7 @@ const moreNav = computed<NavItem[]>(() => [
   ...(canInspectUsers.value
     ? [{ to: '/app/admin/users', icon: Users, label: 'Users' }]
     : []),
-  ...(canManageOnboarding.value && isManagementNode.value
+  ...(canManageOnboarding.value
     ? [{ to: '/app/admin/onboarding', icon: Workflow, label: 'Node onboarding' }]
     : []),
 ])

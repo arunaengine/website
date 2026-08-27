@@ -7,7 +7,7 @@ import PolicyRow from '@/components/policies/PolicyRow.vue'
 import PolicyDryRun from '@/components/policies/PolicyDryRun.vue'
 import { computed, ref, watch } from 'vue'
 import { Plus, RefreshCw, Save, ShieldAlert } from '@lucide/vue'
-import { ApiError } from '@/lib/api'
+import { ApiError, apiErrorMessage } from '@/lib/api'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { isPoliciesUnsupported, isStaleWrite, usePolicies } from '@/composables/usePolicies'
 import {
@@ -81,7 +81,7 @@ async function load() {
     if (seq !== loadSeq) return
     if (isPoliciesUnsupported(err)) unsupported.value = true
     else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) hidden.value = true
-    else loadError.value = err instanceof Error ? err.message : String(err)
+    else loadError.value = apiErrorMessage(err)
   } finally {
     if (seq === loadSeq) loading.value = false
   }
@@ -129,7 +129,7 @@ async function save() {
     // A 409 means the stored set moved under us; the draft is kept so the
     // author can re-apply it after reloading rather than losing the edit.
     if (isStaleWrite(err)) staleWrite.value = true
-    else saveError.value = err instanceof Error ? err.message : String(err)
+    else saveError.value = apiErrorMessage(err)
   }
 }
 

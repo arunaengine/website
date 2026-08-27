@@ -55,10 +55,11 @@ const router = useRouter()
 // Inside Aruna Desktop the deep link would only re-enter this same app.
 const inDesktop = isDesktop()
 
-const { currentUser, isManagementNode, realmInfo } = useAruna()
+const { currentUser, realmInfo } = useAruna()
 const {
   minting,
   mintError,
+  noManagementNode,
   minted,
   watch: watchState,
   deviceCount,
@@ -70,7 +71,7 @@ const {
   resetWatch,
 } = useDeviceEnrollment()
 
-const canEnroll = computed(() => !!currentUser.value && isManagementNode.value)
+const canEnroll = computed(() => !!currentUser.value)
 const portals = computed(() => managementPortals(realmInfo.value))
 
 // The gate opens only once bootstrap has answered, so wait for it rather than
@@ -171,11 +172,6 @@ const stages = computed(() => watchStages(watchState.value))
       </p>
     </section>
 
-    <!-- Gate 2: only a management node redeems enrollment, so only it may mint -->
-    <section v-else-if="!isManagementNode" class="surface p-6">
-      <ManagementNodeGate :portals="portals" />
-    </section>
-
     <template v-else>
       <!-- Step 1: Device -->
       <div v-if="step === DETAILS_STEP" class="space-y-5">
@@ -212,6 +208,10 @@ const stages = computed(() => watchStages(watchState.value))
           {{ capLabel }} Enrolled devices and codes you have not redeemed yet both take a slot.
         </p>
         <RefusalNote v-if="mintError" :message="mintError" />
+        <!-- The mint is relayed to a management node; none answered -->
+        <section v-if="noManagementNode" class="surface p-6">
+          <ManagementNodeGate :portals="portals" />
+        </section>
         <div class="flex flex-wrap justify-between gap-2">
           <Button variant="outline" @click="emit('back')"><ArrowLeft class="h-4 w-4" /> Back</Button>
           <Button v-if="minted" variant="outline" @click="emit('update:step', HANDOFF_STEP)">

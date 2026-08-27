@@ -30,7 +30,6 @@ const {
   isRealmAdmin,
   canInspectUsers,
   canManageOnboarding,
-  isManagementNode,
 } = useAruna()
 
 // The shell has no landing page to go back to.
@@ -49,7 +48,7 @@ const adminItems = computed<NavItem[]>(() => [
   ...(canInspectUsers.value
     ? [{ to: '/app/admin/users', icon: Users, label: 'Users' }]
     : []),
-  ...(canManageOnboarding.value && isManagementNode.value
+  ...(canManageOnboarding.value
     ? [{ to: '/app/admin/onboarding', icon: Workflow, label: 'Node onboarding' }]
     : []),
 ])

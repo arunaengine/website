@@ -10,7 +10,9 @@
 import { computed, onUnmounted, ref } from 'vue'
 import {
   ApiError,
+  apiErrorMessage,
   apiRequest,
+  isNoManagementNode,
   type CreateOnboardingSecretResponse,
   type OnboardingSecretStatus,
   type UserDevice,
@@ -38,6 +40,7 @@ export interface DeviceWatch {
 // names the failure and the lines after it say what to do. `node` is the API
 // base the request went to, which a 403 names because the node kind decides.
 export function deviceErrorMessage(err: unknown, limit: number | null, node = ''): string {
+  if (isNoManagementNode(err)) return apiErrorMessage(err)
   if (err instanceof ApiError) {
     if (err.status === 401) return 'Your session expired.\nSign in again to enroll a device.'
     if (err.status === 403) {
@@ -78,6 +81,8 @@ export function useDeviceEnrollment() {
   const devicesError = ref<string | null>(null)
   const minting = ref(false)
   const mintError = ref<string | null>(null)
+  // The mint reached a node that found no management node to relay it to.
+  const noManagementNode = ref(false)
   // The enrollment in flight: the secret exists only here until the view leaves.
   const minted = ref<CreateOnboardingSecretResponse | null>(null)
   const busyIds = ref<Set<string>>(new Set())
@@ -127,6 +132,7 @@ export function useDeviceEnrollment() {
   ): Promise<{ response: CreateOnboardingSecretResponse; enrollmentId: string | null }> {
     minting.value = true
     mintError.value = null
+    noManagementNode.value = false
     try {
       await loadDevices()
       const before = new Set(devices.value.map((device) => device.id))
@@ -141,6 +147,7 @@ export function useDeviceEnrollment() {
       return { response, enrollmentId }
     } catch (err) {
       mintError.value = message(err)
+      noManagementNode.value = isNoManagementNode(err)
       throw err
     } finally {
       minting.value = false
@@ -259,6 +266,7 @@ export function useDeviceEnrollment() {
     devicesError,
     minting,
     mintError,
+    noManagementNode,
     minted,
     busyIds,
     watch,

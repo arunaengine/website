@@ -1,7 +1,7 @@
 import { computed, createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CreateOnboardingSecretResponse } from '@/lib/api'
+import { NO_MANAGEMENT_NODE_MESSAGE, type CreateOnboardingSecretResponse } from '@/lib/api'
 import type { DeviceWatch } from '@/composables/useDeviceEnrollment'
 
 const ENROLL_URL = 'aruna://enroll?secret=ab%2Bcd%2Fef%3D&seed=https%3A%2F%2Fnode.test&realm=R1'
@@ -18,6 +18,7 @@ const currentUser = ref<{ user_id: string } | null>({ user_id: 'u1@R1' })
 const isManagementNode = ref(true)
 const minted = ref<CreateOnboardingSecretResponse | null>(null)
 const mintError = ref<string | null>(null)
+const noManagementNode = ref(false)
 const deviceCount = ref(0)
 const deviceLimit = ref<number | null>(null)
 const watchState = ref<DeviceWatch>({ phase: 'idle', enrollmentId: null, nodeId: null, lastError: null })
@@ -35,6 +36,7 @@ vi.mock('@/composables/useDeviceEnrollment', () => ({
   useDeviceEnrollment: () => ({
     minting: ref(false),
     mintError,
+    noManagementNode,
     minted,
     watch: watchState,
     deviceCount,
@@ -68,6 +70,7 @@ beforeEach(() => {
   isManagementNode.value = true
   minted.value = null
   mintError.value = null
+  noManagementNode.value = false
   deviceCount.value = 0
   deviceLimit.value = null
   watchState.value = { phase: 'idle', enrollmentId: null, nodeId: null, lastError: null }
@@ -103,11 +106,18 @@ describe('device lane gates', () => {
     expect(await text(1)).toContain('Sign in to enroll a device')
   })
 
-  it('refuses a node that cannot redeem an enrollment', async () => {
-    // authorize_device_enrollment requires a management node, so the lane must
-    // say so instead of letting the mint fail with a 403.
+  it('offers the form on a node that is not a management node', async () => {
+    // The mint is relayed, so the lane attempts it instead of refusing first.
     isManagementNode.value = false
-    expect(await text(1)).toContain('This node does not enroll devices')
+    expect(await text(1)).toContain('Enroll this device')
+  })
+
+  it('points at a management node when none answered the mint', async () => {
+    noManagementNode.value = true
+    mintError.value = NO_MANAGEMENT_NODE_MESSAGE
+    const rendered = await text(1)
+    expect(rendered).toContain(NO_MANAGEMENT_NODE_MESSAGE)
+    expect(rendered).toContain('This node does not enroll devices')
   })
 })
 

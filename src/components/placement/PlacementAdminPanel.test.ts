@@ -5,7 +5,7 @@ import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { ApiError, type RealmPlacementStrategy } from '@/lib/api'
+import { ApiError, NO_MANAGEMENT_NODE_MESSAGE, apiErrorMessage, type RealmPlacementStrategy } from '@/lib/api'
 import { placementMutationErrorMessage } from '@/composables/usePlacement'
 import { useRefresh } from '@/composables/useRefresh'
 import * as Placement from '@/lib/placement'
@@ -140,10 +140,12 @@ const PlacementAdminPanel = compileClientComponent(
         bootstrapped: ref(true),
         currentUser: ref({ user_id: 'admin' }),
         isRealmAdmin: ref(true),
-        isManagementNode: ref(true),
+        // The routes are relayed, so the panel serves any node kind.
+        isManagementNode: ref(false),
         realmInfo: ref({ nodes: [] }),
       }),
     },
+    '@/lib/api': { ApiError, apiErrorMessage },
     '@/composables/useRefresh': { useRefresh },
     '@/composables/usePlacement': {
       isPlacementUnsupported: () => false,
@@ -245,6 +247,30 @@ async function mountPanel(defaultStrategyId: string) {
   }
   return { app, root, errors }
 }
+
+describe('placement on a node that is not a management node', () => {
+  it('renders the strategy form', async () => {
+    // The backend relays the placement routes, so the panel no longer asks
+    // which kind of node serves it.
+    const mounted = await mountPanel(familyId)
+
+    expect(content(mounted.root)).toContain('Strategies')
+    expect(button(mounted.root, 'Remove strategy')).toBeDefined()
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('reports an unreachable management node', async () => {
+    getRealmPlacement.mockRejectedValueOnce(
+      new ApiError(503, 'No management node is reachable', 'no_management_node'),
+    )
+    const mounted = await mountPanel(familyId)
+
+    expect(content(mounted.root)).toContain(NO_MANAGEMENT_NODE_MESSAGE)
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+})
 
 describe('placement job-family strategy controls', () => {
   it('badges the matching strategy and explains its immutable role', async () => {

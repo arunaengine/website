@@ -111,6 +111,15 @@ describe('Phase 5 navigation parity', () => {
     ]))
   })
 
+  it('offers node onboarding on a node that is not a management node', async () => {
+    // The onboarding routes are relayed, so the permission alone decides.
+    permissions.canManageOnboarding.value = true
+
+    for (const html of [await render(SideNav), await render(MobileNav)]) {
+      expect(portalPaths(html)).toContain('/app/admin/onboarding')
+    }
+  })
+
   it('leaves quarantine to the Admin view alone', () => {
     const adminSource = readFileSync(fileURLToPath(new URL('../../views/AdminView.vue', import.meta.url)), 'utf8')
     const sideSource = readFileSync(fileURLToPath(new URL('../layout/SideNav.vue', import.meta.url)), 'utf8')
