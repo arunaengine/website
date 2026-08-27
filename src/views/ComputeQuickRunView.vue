@@ -14,6 +14,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
+import GroupSelect from '@/components/groups/GroupSelect.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -1140,7 +1141,7 @@ function dismissRerun() {
           <div v-if="s3.endpoint.value && s3.hasActiveKey.value" class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="text-xs font-medium text-foreground">Group</label>
-              <Select v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
+              <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
               <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its Process Run crate.</p>
             </div>
             <div>

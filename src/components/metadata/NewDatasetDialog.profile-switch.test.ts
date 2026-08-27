@@ -162,6 +162,7 @@ function compileDialog(): Component {
     '@/components/ui/TabsList.vue': moduleDefault(SlotStub),
     '@/components/ui/TabsTrigger.vue': moduleDefault(SlotStub),
     '@/components/groups/CreateGroupDialog.vue': moduleDefault(SlotStub),
+    '@/components/groups/GroupSelect.vue': moduleDefault(SelectStub),
     '@/components/metadata/DatasetFilesEditor.vue': moduleDefault(FilesEditorStub),
     '@/components/metadata/DatasetEntityInstances.vue': moduleDefault(EntityControlStub),
     '@/components/metadata/ProfileControlField.vue': moduleDefault(ProfileControlStub),

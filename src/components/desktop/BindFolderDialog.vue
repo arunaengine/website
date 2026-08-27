@@ -14,6 +14,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import GroupSelect from '@/components/groups/GroupSelect.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -159,12 +160,13 @@ async function submit(): Promise<void> {
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="block">
             <span class="text-xs font-medium text-foreground">Group</span>
-            <Select
+            <GroupSelect
               v-model="groupId"
               class="mt-1"
               :options="groupOptions"
               placeholder="Pick a group"
               aria-label="Group that owns the data"
+              @navigate="emit('update:open', false)"
             />
           </label>
           <label class="block">

@@ -208,6 +208,7 @@ const sharedComponents = {
   '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/Input.vue': moduleDefault(Input),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
+  '@/components/groups/GroupSelect.vue': moduleDefault(SelectStub),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
   '@/components/ui/Skeleton.vue': moduleDefault(GenericStub),
   '@/components/onboarding/WizardSteps.vue': moduleDefault(WizardStepsStub),

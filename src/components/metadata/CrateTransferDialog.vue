@@ -16,6 +16,7 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Progress from '@/components/ui/Progress.vue'
+import GroupSelect from '@/components/groups/GroupSelect.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -429,7 +430,13 @@ function rowTarget(row: TransferRow): string {
           <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="text-xs font-medium text-foreground">Group</label>
-              <Select v-model="groupId" :options="groupOptions" placeholder="Choose a group" class="mt-1" />
+              <GroupSelect
+                v-model="groupId"
+                :options="groupOptions"
+                placeholder="Choose a group"
+                class="mt-1"
+                @navigate="emit('update:open', false)"
+              />
             </div>
             <div>
               <label class="text-xs font-medium text-foreground">Document path</label>

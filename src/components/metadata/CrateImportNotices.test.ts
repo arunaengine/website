@@ -49,7 +49,7 @@ function version13Preview() {
 }
 
 const components = Object.fromEntries(
-  'AlertTriangle Button ChevronRight Code2 Copy CreateGroupDialog Dialog DialogClose DialogContent DialogDescription DialogFooter DialogHeader DialogTitle DiscardDraftConfirm FileJson FileJson2 FileUp Input Plus Select SubcratePickerDialog Switch Tabs TabsList TabsTrigger Textarea Upload'
+  'AlertTriangle Button ChevronRight Code2 Copy CreateGroupDialog Dialog DialogClose DialogContent DialogDescription DialogFooter DialogHeader DialogTitle DiscardDraftConfirm FileJson FileJson2 FileUp GroupSelect Input Plus Select SubcratePickerDialog Switch Tabs TabsList TabsTrigger Textarea Upload'
     .split(' ').map((name) => [name, Stub]),
 )
 

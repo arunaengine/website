@@ -16,6 +16,7 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
+import GroupSelect from '@/components/groups/GroupSelect.vue'
 import ConnectorDialog from '@/components/groups/ConnectorDialog.vue'
 import ConnectorEntriesBrowser from '@/components/data/ConnectorEntriesBrowser.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
@@ -519,7 +520,13 @@ watch(
             <div class="grid gap-3 sm:grid-cols-3">
               <div>
                 <label class="text-xs font-medium text-foreground">Group</label>
-                <Select v-model="groupSel" :options="groupOptions" placeholder="Select a group" class="mt-1" />
+                <GroupSelect
+                  v-model="groupSel"
+                  :options="groupOptions"
+                  placeholder="Select a group"
+                  class="mt-1"
+                  @navigate="emit('update:open', false)"
+                />
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">Source connector</label>

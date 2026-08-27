@@ -13,6 +13,7 @@ import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
+import GroupSelect from '@/components/groups/GroupSelect.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -1506,7 +1507,13 @@ async function submit(unprofiled = false) {
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
                 <label class="text-xs font-medium text-foreground">Group</label>
-                <Select v-model="groupId" :options="groupOptions" placeholder="Choose a group" class="mt-1" />
+                <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Choose a group" class="mt-1">
+                  <template #action>
+                    <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="createGroupOpen = true">
+                      <Plus class="h-3.5 w-3.5" /> Create a group
+                    </Button>
+                  </template>
+                </GroupSelect>
               </div>
               <div>
                 <label class="text-xs font-medium text-foreground">Document path</label>
@@ -1533,16 +1540,22 @@ async function submit(unprofiled = false) {
           <div v-if="!currentUser" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             Sign in before creating metadata.
           </div>
-          <div v-else-if="!groups.length" class="flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            <span>You are not a member of any group yet; datasets belong to a group.</span>
-            <Button variant="outline" size="sm" class="shrink-0" @click="createGroupOpen = true">
-              <Plus class="h-3.5 w-3.5" /> Create a group
-            </Button>
-          </div>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label class="text-xs font-medium text-foreground">Group</label>
-              <Select v-model="groupId" :options="groupOptions" placeholder="Choose a group" class="mt-1" :invalid="scaffoldFieldErrors.group ? 'error' : undefined" />
+              <GroupSelect
+                v-model="groupId"
+                :options="groupOptions"
+                placeholder="Choose a group"
+                class="mt-1"
+                :invalid="scaffoldFieldErrors.group ? 'error' : undefined"
+              >
+                <template #action>
+                  <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="createGroupOpen = true">
+                    <Plus class="h-3.5 w-3.5" /> Create a group
+                  </Button>
+                </template>
+              </GroupSelect>
               <p v-if="scaffoldFieldErrors.group" class="mt-1 text-[11px] text-destructive">{{ scaffoldFieldErrors.group }}</p>
             </div>
             <div>

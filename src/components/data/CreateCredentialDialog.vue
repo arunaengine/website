@@ -9,6 +9,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
+import GroupSelect from '@/components/groups/GroupSelect.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import { computed, ref, watch } from 'vue'
@@ -136,13 +137,13 @@ async function submit() {
       <div v-if="!created" class="space-y-3">
         <div>
           <label class="text-xs font-medium text-foreground">Group</label>
-          <Select v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
-          <div v-if="!groupOptions.length" class="mt-1 flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            <span>You are not a member of any group yet; credentials are scoped to a group.</span>
-            <Button variant="outline" size="sm" class="shrink-0" @click="createGroupOpen = true">
-              <Plus class="h-3.5 w-3.5" /> Create a group
-            </Button>
-          </div>
+          <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1">
+            <template #action>
+              <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="createGroupOpen = true">
+                <Plus class="h-3.5 w-3.5" /> Create a group
+              </Button>
+            </template>
+          </GroupSelect>
         </div>
         <div>
           <label class="text-xs font-medium text-foreground">Expires after</label>

@@ -16,6 +16,7 @@ import TesInputsEditor from '@/components/compute/TesInputsEditor.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
 import RunTargetPicker from '@/components/compute/RunTargetPicker.vue'
+import GroupSelect from '@/components/groups/GroupSelect.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
@@ -656,7 +657,7 @@ async function submit() {
           />
           <div>
             <label class="text-xs font-medium text-foreground">Group</label>
-            <Select v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
+            <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
             <p class="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               Sets the required <code class="rounded bg-muted px-1">aruna-engine.org/group</code> tag; the node accounts the run and writes its Process Run crate under this group.
             </p>

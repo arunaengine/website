@@ -2,10 +2,10 @@
 import { ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
-import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import GroupSelect from '@/components/groups/GroupSelect.vue'
 import { ChevronDown, FileCode2, Globe, Loader2, Upload, X } from '@lucide/vue'
 import { useArtifactFetch } from './useArtifactFetch'
 import { sameSchemaOrgType } from '@/lib/profiles/uri'
@@ -149,7 +149,7 @@ watch(
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <div>
         <label class="text-xs font-medium text-foreground">Group</label>
-        <Select v-model="builder.groupId" :options="builder.groupOptions" class="mt-1" placeholder="Choose a group" :disabled="locked" :invalid="fieldError('group') ? 'error' : undefined" />
+        <GroupSelect v-model="builder.groupId" :options="builder.groupOptions" class="mt-1" placeholder="Choose a group" :disabled="locked" :invalid="fieldError('group') ? 'error' : undefined" />
         <p v-if="fieldError('group')" class="mt-1 text-[11px] text-destructive">{{ fieldError('group') }}</p>
       </div>
       <div>
