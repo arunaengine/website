@@ -1,10 +1,10 @@
 import { orcidOf } from '@/lib/identifiers'
 import { slugify } from '@/lib/profiles/emit'
-import type { ContextEntity } from '@/lib/crate/build'
-import type { LookupHit, LookupProvider } from './types'
+import type { ContextEntity, LookupHit, LookupProvider, RegistryRecord } from './types'
 import { LookupResponseError } from './types'
 
 const ORCID_SEARCH_URL = 'https://pub.orcid.org/v3.0/expanded-search/'
+const ORCID_RECORD_URL = 'https://pub.orcid.org/v3.0/'
 
 interface OrcidExpandedResult {
   'orcid-id'?: string
@@ -62,6 +62,41 @@ export function orcidResults(payload: unknown, limit = 10): LookupHit[] {
     })
   }
   return hits
+}
+
+interface OrcidRecord {
+  person?: {
+    name?: {
+      'given-names'?: { value?: string }
+      'family-name'?: { value?: string }
+      'credit-name'?: { value?: string }
+    }
+  }
+}
+
+export function orcidRecord(id: string, payload: unknown): RegistryRecord {
+  const name = (payload as OrcidRecord)?.person?.name
+  const givenName = name?.['given-names']?.value?.trim() ?? ''
+  const familyName = name?.['family-name']?.value?.trim() ?? ''
+  const credit = name?.['credit-name']?.value?.trim() ?? ''
+  return {
+    id,
+    name: credit || [givenName, familyName].filter(Boolean).join(' ') || id,
+    ...(givenName ? { givenName } : {}),
+    ...(familyName ? { familyName } : {}),
+  }
+}
+
+/** The person behind an ORCID id or orcid.org URL, straight from the registry. */
+export async function fetchOrcidRecord(value: string, signal?: AbortSignal): Promise<RegistryRecord> {
+  const id = normalizeOrcidId(value)
+  if (!id) throw new LookupResponseError(0, 'Enter an ORCID like 0000-0002-1825-0097.')
+  const response = await fetch(`${ORCID_RECORD_URL}${orcidOf(id)}`, {
+    headers: { Accept: 'application/json' },
+    signal,
+  })
+  if (!response.ok) throw new LookupResponseError(response.status, `ORCID answered ${response.status}.`)
+  return orcidRecord(id, await response.json())
 }
 
 export const orcidProvider: LookupProvider = {

@@ -1,5 +1,5 @@
 import { rorOf } from '@/lib/identifiers'
-import type { LookupHit, LookupProvider } from './types'
+import type { LookupHit, LookupProvider, RegistryRecord } from './types'
 import { LookupResponseError } from './types'
 
 const ROR_SEARCH_URL = 'https://api.ror.org/v2/organizations'
@@ -60,6 +60,22 @@ export function rorResults(payload: unknown, limit = 10): LookupHit[] {
     })
   }
   return hits
+}
+
+export function rorRecord(id: string, payload: unknown): RegistryRecord {
+  const item = (payload ?? {}) as RorItem
+  const name = item.names?.find((entry) => entry.types?.includes('ror_display'))?.value?.trim() || id
+  const url = item.links?.find((entry) => entry.type === 'website')?.value?.trim()
+  return { id, name, ...(url ? { url } : {}) }
+}
+
+/** The organization behind a ROR id or ror.org URL, straight from the registry. */
+export async function fetchRorRecord(value: string, signal?: AbortSignal): Promise<RegistryRecord> {
+  const id = normalizeRorId(value)
+  if (!id) throw new LookupResponseError(0, 'Enter a ROR id like 03yrm5c26.')
+  const response = await fetch(`${ROR_SEARCH_URL}/${rorOf(id)}`, { signal })
+  if (!response.ok) throw new LookupResponseError(response.status, `ROR answered ${response.status}.`)
+  return rorRecord(id, await response.json())
 }
 
 export const rorProvider: LookupProvider = {

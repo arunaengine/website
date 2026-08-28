@@ -1,6 +1,6 @@
 // The problems the node reported for a draft, in one shape: the check response
 // and the issues a failed write returned collapse into the same list, so the
-// review panel and the section rail count exactly the same things.
+// check panel groups exactly the same things.
 
 import type { ProfileValidationPreviewResponse } from '@/lib/api'
 
@@ -22,8 +22,6 @@ export interface WriteIssue {
   path?: string | null
   severity?: string
 }
-
-export type IssueSection = 'basics' | 'context' | 'parts'
 
 const ROOT_ID = './'
 
@@ -61,19 +59,4 @@ export function collectIssues(
       severity: severityOf(issue.severity),
     })),
   ]
-}
-
-/** The editor section that owns an entity, so a problem is reachable. */
-export function sectionOf(entityId: string, partIds: ReadonlySet<string> = new Set()): IssueSection {
-  if (!entityId || entityId === ROOT_ID) return 'basics'
-  return partIds.has(entityId) ? 'parts' : 'context'
-}
-
-export function issueCounts(
-  issues: CheckIssue[],
-  partIds: ReadonlySet<string> = new Set(),
-): Record<IssueSection, number> {
-  const counts: Record<IssueSection, number> = { basics: 0, context: 0, parts: 0 }
-  for (const issue of issues) counts[sectionOf(issue.entityId, partIds)] += 1
-  return counts
 }
