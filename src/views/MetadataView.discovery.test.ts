@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const source = readFileSync(fileURLToPath(new URL('./MetadataView.vue', import.meta.url)), 'utf8')
+function read(path: string): string {
+  return readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
+}
+
+const source = read('../components/metadata/view/DatasetFiles.vue')
+const view = read('./MetadataView.vue')
 
 describe('Dataset file discovery presentation', () => {
   it('runs backlink preflight only from the file action and renders authoritative coverage', () => {
@@ -29,6 +34,6 @@ describe('Dataset file discovery presentation', () => {
     expect(source).toContain('Content identity: {{ row.id }}')
     expect(source).toContain('Location:')
     expect(source).toContain("row.contentUrl ?? (contentW3id(row) ? '' : row.id)")
-    expect(source).toContain("query: { expert: '1', document: detailId }")
+    expect(view).toContain("query: { expert: '1', document: detailId }")
   })
 })
