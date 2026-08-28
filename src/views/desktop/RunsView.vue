@@ -3,7 +3,9 @@
 // computer, or in the realm. The realm half is the portal's own compute
 // surface, reused as it is.
 import { computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQuery } from 'vue-router'
+import Badge from '@/components/ui/Badge.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -14,24 +16,18 @@ import LocalRunsPanel from '@/components/desktop/LocalRunsPanel.vue'
 import JobsPanel from '@/components/jobs/JobsPanel.vue'
 import TasksPanel from '@/components/compute/TasksPanel.vue'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
-import { useRealm } from '@/composables/useRealm'
+import { useRouteTab } from '@/composables/useRouteTab'
 import { featureEnabled } from '@/lib/config'
 
 const route = useRoute()
 const router = useRouter()
-const { realm } = useRealm()
 const { compute, ensureLoaded } = useDeviceCompute()
 
 const tesEnabled = featureEnabled('tes')
 const jobsEnabled = featureEnabled('jobs')
 
-// The detail drawer lives on the local tab, so a deep link opens it there.
-const tab = computed({
-  get: () => (route.name === 'run' || route.query.where !== 'realm' ? 'local' : 'realm'),
-  set: (value: string) => {
-    void router.replace({ name: 'runs', query: value === 'realm' ? { where: 'realm' } : {} })
-  },
-})
+// The detail drawer lives on the local tab, so a run deep link opens it there.
+const tab = useRouteTab(['local', 'realm'], 'local')
 
 const localHint = computed(() =>
   compute.value?.backend ? `${compute.value.backend} · ${compute.value.running} running` : '',
@@ -40,12 +36,23 @@ const pageTitle = computed(() =>
   route.name === 'run' ? `Run ${String(route.params.jobId ?? '')}` : 'Runs',
 )
 
-onMounted(() => void ensureLoaded())
+onMounted(() => {
+  void ensureLoaded()
+  // An older ?where=realm link still lands on the realm tab.
+  if (route.query.where === 'realm') {
+    const query: LocationQuery = { ...route.query, tab: 'realm' }
+    delete query.where
+    void router.replace({ query })
+  }
+})
 </script>
 
 <template>
   <div>
     <PageHeader eyebrow="This computer" :title="pageTitle" description="Work you started, wherever it is executing.">
+      <template #breadcrumbs>
+        <Badge v-if="localHint" variant="outline" size="sm">{{ localHint }}</Badge>
+      </template>
       <template #actions>
         <NewRunMenu size="sm" />
       </template>
@@ -55,11 +62,10 @@ onMounted(() => void ensureLoaded())
       <Tabs v-model="tab">
         <TabsList>
           <TabsTrigger value="local">This computer</TabsTrigger>
-          <TabsTrigger value="realm">{{ realm.shortName }}</TabsTrigger>
+          <TabsTrigger value="realm">In the realm</TabsTrigger>
         </TabsList>
 
         <TabsContent value="local">
-          <p v-if="localHint" class="mb-3 font-mono text-[11px] text-muted-foreground">{{ localHint }}</p>
           <LocalRunsPanel />
         </TabsContent>
 
@@ -67,9 +73,7 @@ onMounted(() => void ensureLoaded())
           <div class="space-y-6">
             <TasksPanel v-if="tesEnabled" />
             <JobsPanel v-if="jobsEnabled" />
-            <p v-if="!tesEnabled && !jobsEnabled" class="surface px-5 py-8 text-center text-sm text-muted-foreground">
-              This realm serves no compute surface.
-            </p>
+            <EmptyState v-if="!tesEnabled && !jobsEnabled" compact title="This realm serves no compute surface." />
           </div>
         </TabsContent>
       </Tabs>

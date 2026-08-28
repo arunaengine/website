@@ -12,13 +12,18 @@ import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
 import ResidencyAdminPanel from '@/components/residency/ResidencyAdminPanel.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
+import Tabs from '@/components/ui/Tabs.vue'
+import TabsList from '@/components/ui/TabsList.vue'
+import TabsTrigger from '@/components/ui/TabsTrigger.vue'
+import TabsContent from '@/components/ui/TabsContent.vue'
+import { useRouteTab } from '@/composables/useRouteTab'
+import { RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { featureEnabled } from '@/lib/config'
-import { formatBytes, formatNumber, shortUserId } from '@/lib/utils'
+import { errorMessage, formatBytes, formatNumber, shortUserId } from '@/lib/utils'
 import { apiErrorMessage, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
@@ -37,42 +42,18 @@ const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 const placementAdminEnabled = featureEnabled('placementAdmin')
 const policiesEnabled = featureEnabled('policies')
 
-const route = useRoute()
-const router = useRouter()
-type AdminTab = 'realm' | 'compute' | 'placement' | 'residency' | 'policies'
-const tab = computed<AdminTab>(() => {
-  if (route.query.tab === 'compute') return 'compute'
-  if (route.query.tab === 'placement' && placementAdminEnabled) return 'placement'
-  if (route.query.tab === 'residency' && placementAdminEnabled) return 'residency'
-  if (route.query.tab === 'policies' && policiesEnabled) return 'policies'
-  return 'realm'
-})
-const adminTabs = computed(() => [
-  { id: 'realm' as const, label: 'Quota & usage' },
-  { id: 'compute' as const, label: 'Compute' },
-  ...(placementAdminEnabled ? [{ id: 'placement' as const, label: 'Placement' }] : []),
-  ...(placementAdminEnabled ? [{ id: 'residency' as const, label: 'Residency' }] : []),
-  ...(policiesEnabled ? [{ id: 'policies' as const, label: 'Policies' }] : []),
-])
-function setTab(next: AdminTab) {
-  void router.replace({ query: { ...route.query, tab: next === 'realm' ? undefined : next } })
-}
-
-// Roving tabindex: the tablist is one tab stop and arrows move between tabs.
-function onTabKeydown(event: KeyboardEvent, index: number) {
-  const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-  let target = step ? index + step : -1
-  if (event.key === 'Home') target = 0
-  if (event.key === 'End') target = adminTabs.value.length - 1
-  if (target < 0) return
-  event.preventDefault()
-  const count = adminTabs.value.length
-  const next = adminTabs.value[(target + count) % count]
-  setTab(next.id)
-  const list = (event.currentTarget as HTMLElement).parentElement
-  const buttons = list?.querySelectorAll<HTMLElement>('[role="tab"]')
-  buttons?.[(target + count) % count]?.focus()
-}
+// A tab a feature gate turns off is not offered and not reachable by URL.
+const adminTabs = [
+  { id: 'realm', label: 'Quota & usage' },
+  { id: 'compute', label: 'Compute' },
+  ...(placementAdminEnabled ? [{ id: 'placement', label: 'Placement' }] : []),
+  ...(placementAdminEnabled ? [{ id: 'residency', label: 'Residency' }] : []),
+  ...(policiesEnabled ? [{ id: 'policies', label: 'Policies' }] : []),
+]
+const tab = useRouteTab(
+  adminTabs.map((entry) => entry.id),
+  'realm',
+)
 
 // Mirrors aruna's `impl Default for QuotaConfig`: the effective policy when a
 // backend serves no quota block. null = unlimited.
@@ -295,7 +276,7 @@ const runUserSearch = useDebounceFn(async (term: string) => {
     if (seq === userSearchSeq) userResults.value = response.users
   } catch (err) {
     if (seq === userSearchSeq) {
-      userSearchError.value = err instanceof Error ? err.message : String(err)
+      userSearchError.value = errorMessage(err)
       userResults.value = []
     }
   } finally {
@@ -389,44 +370,29 @@ async function save() {
       </section>
     </div>
 
-    <template v-else>
-      <div v-if="adminTabs.length > 1" class="container pt-6">
+    <Tabs v-else v-model="tab">
+      <div class="container pt-6">
         <div class="overflow-x-auto">
-          <div class="flex items-center gap-1 border-b border-border" role="tablist" aria-label="Realm administration sections">
-            <button
-              v-for="(entry, index) in adminTabs"
-              :key="entry.id"
-              type="button"
-              role="tab"
-              :aria-selected="tab === entry.id"
-              :tabindex="tab === entry.id ? 0 : -1"
-              @keydown="onTabKeydown($event, index)"
-              :class="[
-                '-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-                tab === entry.id
-                  ? 'border-primary text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
-              ]"
-              @click="setTab(entry.id)"
-            >
+          <TabsList aria-label="Realm administration sections">
+            <TabsTrigger v-for="entry in adminTabs" :key="entry.id" :value="entry.id">
               {{ entry.label }}
-            </button>
-          </div>
+            </TabsTrigger>
+          </TabsList>
         </div>
       </div>
 
-      <ComputeAdminPanel v-if="tab === 'compute'" />
+      <TabsContent value="compute" class="mt-0"><ComputeAdminPanel /></TabsContent>
 
-      <PlacementAdminPanel v-else-if="tab === 'placement'" />
+      <TabsContent v-if="placementAdminEnabled" value="placement" class="mt-0"><PlacementAdminPanel /></TabsContent>
 
-      <ResidencyAdminPanel v-else-if="tab === 'residency'" />
+      <TabsContent v-if="placementAdminEnabled" value="residency" class="mt-0"><ResidencyAdminPanel /></TabsContent>
 
-      <div v-else-if="tab === 'policies'" class="container space-y-8 py-8">
+      <TabsContent v-if="policiesEnabled" value="policies" class="container mt-0 space-y-8 py-8">
         <PoliciesSection scope="realm" :can-admin="isRealmAdmin" />
         <EffectivePolicies />
-      </div>
+      </TabsContent>
 
-      <div v-else class="container grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
+      <TabsContent value="realm" class="container mt-0 grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
       <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">
         <a href="#usage" class="rounded-md px-3 py-2 font-medium text-primary bg-primary/5">Realm usage</a>
         <a href="#policy" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Quota policy</a>
@@ -600,7 +566,7 @@ async function save() {
           </div>
         </div>
       </div>
-      </div>
-    </template>
+      </TabsContent>
+    </Tabs>
   </div>
 </template>

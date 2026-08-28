@@ -20,13 +20,14 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Route, ShieldAlert, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
 import { featureEnabled } from '@/lib/config'
-import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
+import { errorMessage, formatBytes, formatNumber, relativeTime } from '@/lib/utils'
+import { useRouteTab } from '@/composables/useRouteTab'
 import {
   ApiError,
   type GroupDetailResponse,
@@ -43,7 +44,6 @@ const emit = defineEmits<{ (e: 'left'): void }>()
 const { getGroup, getGroupUsage, getGroupUsageHistory, listGroupMembers, listGroupMetadata, leaveGroup, saving, currentUser } = useAruna()
 const { joinRequestsEnabled } = useJoinRequests()
 const route = useRoute()
-const router = useRouter()
 
 // One-shot deep-link scroll to the storage section. Set per navigation (in the
 // groupId watch) and consumed after the first successful reload, so @changed
@@ -130,7 +130,7 @@ async function loadHistory() {
     if (seq !== historySeq) return
     historyPoints.value = null
     if (err instanceof ApiError && (err.status === 404 || err.status === 405)) historyUnsupported.value = true
-    else historyError.value = err instanceof Error ? err.message : String(err)
+    else historyError.value = errorMessage(err)
   } finally {
     if (seq === historySeq) historyLoading.value = false
   }
@@ -187,24 +187,25 @@ const policiesTabVisible = computed(() => featureEnabled('policies') && canAdmin
 
 // Route-driven tab state (?tab=…) so sections deep-link like ComputeView.
 const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies']
-const tab = computed(() => {
-  const value = typeof route.query.tab === 'string' ? route.query.tab : ''
-  // Bare ?connector=<id> deep links land on the Data sources tab.
-  if (!value && typeof route.query.connector === 'string' && isMember.value) return 'sources'
-  if (value === 'sources' && !isMember.value) return 'stats'
-  if (value === 'storage' && !canAdminStorage.value) return 'stats'
-  if (value === 'policies' && !policiesTabVisible.value) return 'stats'
-  return TAB_NAMES.includes(value) ? value : 'stats'
+const routeTab = useRouteTab(TAB_NAMES, 'stats')
+// The bare ?connector=<id> deep link is one-shot: picking any tab releases it so
+// the stats tab does not bounce back to sources.
+const connectorLink = ref(true)
+const tab = computed({
+  get() {
+    if (connectorLink.value && !route.query.tab && typeof route.query.connector === 'string' && isMember.value)
+      return 'sources'
+    const value = routeTab.value
+    if (value === 'sources' && !isMember.value) return 'stats'
+    if (value === 'storage' && !canAdminStorage.value) return 'stats'
+    if (value === 'policies' && !policiesTabVisible.value) return 'stats'
+    return value
+  },
+  set(next: string) {
+    connectorLink.value = false
+    routeTab.value = next
+  },
 })
-function setTab(next: string) {
-  const query = { ...route.query }
-  // The connector deep-link marker is one-shot; switching tabs clears it so
-  // the stats tab does not bounce back to sources.
-  delete query.connector
-  if (next === 'stats') delete query.tab
-  else query.tab = next
-  void router.replace({ query })
-}
 
 async function reload() {
   loadingDetail.value = true
@@ -236,12 +237,12 @@ async function reload() {
       docs.value = page.documents
       docsEstimate.value = page.total_estimate ?? null
     } catch (err) {
-      docsError.value = err instanceof Error ? err.message : String(err)
+      docsError.value = errorMessage(err)
     } finally {
       docsLoading.value = false
     }
   } catch (err) {
-    loadError.value = err instanceof Error ? err.message : String(err)
+    loadError.value = errorMessage(err)
     group.value = null
   } finally {
     loadingDetail.value = false
@@ -279,7 +280,7 @@ async function leave() {
     await leaveGroup(props.groupId)
     emit('left')
   } catch (err) {
-    leaveError.value = err instanceof Error ? err.message : String(err)
+    leaveError.value = errorMessage(err)
   }
 }
 </script>
@@ -293,8 +294,8 @@ async function leave() {
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <h4 class="truncate text-sm font-semibold text-foreground">{{ group.display_name }}</h4>
-            <Badge v-if="canManage" variant="royal" class="text-[10px] uppercase"><ShieldCheck class="mr-0.5 h-3 w-3" /> admin</Badge>
-            <Badge v-else-if="isMember" variant="secondary" class="text-[10px] uppercase">member</Badge>
+            <Badge v-if="canManage" size="sm" variant="royal" class="uppercase"><ShieldCheck class="mr-0.5 h-3 w-3" /> admin</Badge>
+            <Badge v-else-if="isMember" size="sm" variant="secondary" class="uppercase">member</Badge>
           </div>
           <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.group_id }}</div>
         </div>
@@ -305,7 +306,7 @@ async function leave() {
       </header>
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
 
-      <Tabs :model-value="tab" @update:model-value="setTab">
+      <Tabs v-model="tab">
         <div class="border-b border-border px-5 py-2">
           <TabsList class="h-auto flex-wrap">
             <TabsTrigger value="stats" class="gap-1.5"><ChartArea class="h-3.5 w-3.5" /> Stats</TabsTrigger>
@@ -336,7 +337,7 @@ async function leave() {
       <div v-if="usage" class="border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <FileJson2 class="h-3.5 w-3.5 text-primary" />
-          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Live documents</span>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Live documents</h2>
         </div>
         <dl class="grid grid-cols-3 gap-3 px-5 py-3">
           <div v-for="count in purposeCounts" :key="count.label" class="rounded-md border border-border bg-background px-3 py-2">
@@ -348,8 +349,8 @@ async function leave() {
       <div v-if="usage" id="storage" class="scroll-mt-24 border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <HardDrive class="h-3.5 w-3.5 text-primary" />
-          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Storage</span>
-          <Badge v-if="quotaBadge" :variant="quotaBadge.variant" class="text-[10px] uppercase">{{ quotaBadge.label }}</Badge>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage</h2>
+          <Badge v-if="quotaBadge" size="sm" :variant="quotaBadge.variant" class="uppercase">{{ quotaBadge.label }}</Badge>
         </div>
         <div class="px-5 py-3">
           <!-- Old backend: usage but no quota block. Do NOT claim unlimited. -->
@@ -394,7 +395,7 @@ async function leave() {
         <div class="flex flex-wrap items-center justify-between gap-2 px-5 pb-1 pt-4">
           <div class="flex items-center gap-2">
             <ChartArea class="h-3.5 w-3.5 text-primary" />
-            <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Usage history</span>
+            <h2 class="font-display text-sm font-semibold text-aruna-navy">Usage history</h2>
           </div>
           <div class="flex gap-1">
             <Button
@@ -438,7 +439,7 @@ async function leave() {
       <div>
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <FileJson2 class="h-3.5 w-3.5 text-primary" />
-          <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Documents</span>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Documents</h2>
           <Badge
             v-if="docs"
             variant="outline"
@@ -456,7 +457,7 @@ async function leave() {
             <li v-for="doc in docs.slice(0, DOC_LIMIT)" :key="doc.document_id">
               <RouterLink :to="{ name: 'dataset', params: { id: doc.document_id } }" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
                 <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80">{{ doc.document_path }}</span>
-                <Badge :variant="doc.public ? 'success' : 'secondary'" class="shrink-0 text-[10px] uppercase">{{ doc.public ? 'public' : 'private' }}</Badge>
+                <Badge size="sm" :variant="doc.public ? 'success' : 'secondary'" class="shrink-0 uppercase">{{ doc.public ? 'public' : 'private' }}</Badge>
                 <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(doc.updated_at) }}</span>
               </RouterLink>
             </li>
@@ -490,7 +491,7 @@ async function leave() {
           <div v-if="canManage && joinRequestsEnabled">
             <div class="flex items-center gap-2 px-5 pb-1 pt-4">
               <Inbox class="h-3.5 w-3.5 text-primary" />
-              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Join requests</span>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Join requests</h2>
               <Badge v-if="joinRequestCount > 0" variant="warn" class="tabular-nums">{{ joinRequestCount }}</Badge>
               <Badge v-else variant="outline" class="tabular-nums">0</Badge>
             </div>
@@ -526,7 +527,7 @@ async function leave() {
           <div class="border-b border-border">
             <div class="flex items-center gap-2 px-5 pb-1 pt-4">
               <Database class="h-3.5 w-3.5 text-primary" />
-              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Storage backends</span>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage backends</h2>
             </div>
             <StorageBackendsSection
               :group-id="group.group_id"
@@ -538,7 +539,7 @@ async function leave() {
           <div>
             <div class="flex items-center gap-2 px-5 pb-1 pt-4">
               <Route class="h-3.5 w-3.5 text-primary" />
-              <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Storage routing</span>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage routing</h2>
             </div>
             <div class="px-5 py-3">
               <GroupRoutingSection
