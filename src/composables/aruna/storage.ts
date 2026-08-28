@@ -1,0 +1,72 @@
+import {
+  type BlobLocationsResponse,
+  type BucketRoutingResponse,
+  type GroupRoutingResponse,
+  type ReplicateBlobRequest,
+  type ReplicateBlobResponse,
+  type RoutingTarget,
+  type StorageRoutingRule,
+} from '@/lib/api'
+import { request, saving } from './state'
+
+// ── Storage routing (group default and per-bucket rules) ────────────────────
+
+export async function getGroupRouting(groupId: string): Promise<GroupRoutingResponse> {
+  return request<GroupRoutingResponse>(`/groups/${groupId}/storage-routing`)
+}
+
+// An omitted target clears the group default, falling back to node routing.
+export async function putGroupRouting(
+  groupId: string,
+  target: RoutingTarget | null,
+): Promise<GroupRoutingResponse> {
+  saving.value = true
+  try {
+    return await request<GroupRoutingResponse>(`/groups/${groupId}/storage-routing`, {
+      method: 'PUT',
+      body: JSON.stringify(target ? { default_target: target } : {}),
+    })
+  } finally {
+    saving.value = false
+  }
+}
+
+export async function getBucketRouting(bucket: string): Promise<BucketRoutingResponse> {
+  return request<BucketRoutingResponse>(`/buckets/${encodeURIComponent(bucket)}/storage-routing`)
+}
+
+export async function putBucketRouting(
+  bucket: string,
+  rules: StorageRoutingRule[],
+): Promise<BucketRoutingResponse> {
+  saving.value = true
+  try {
+    return await request<BucketRoutingResponse>(
+      `/buckets/${encodeURIComponent(bucket)}/storage-routing`,
+      { method: 'PUT', body: JSON.stringify({ rules }) },
+    )
+  } finally {
+    saving.value = false
+  }
+}
+
+// Where the copies of one object version physically live. Omitting versionId
+// asks about the current version; the response names the one it resolved.
+export async function getBlobLocations(
+  bucket: string,
+  path: string,
+  versionId?: string,
+): Promise<BlobLocationsResponse> {
+  return request<BlobLocationsResponse>('/blobs/locations', {
+    query: { bucket, path, version_id: versionId },
+  })
+}
+
+// Asks one node to fetch a copy. Answered 202: the copy is queued, not stored
+// yet. Needs WRITE on the object, or on the bucket when `path` is omitted.
+export async function replicateBlob(input: ReplicateBlobRequest): Promise<ReplicateBlobResponse> {
+  return request<ReplicateBlobResponse>('/blobs/replicate', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
