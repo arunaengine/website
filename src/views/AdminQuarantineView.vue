@@ -16,7 +16,8 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Input from '@/components/ui/Input.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import CopyButton from '@/components/nodes/CopyButton.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useRefresh } from '@/composables/useRefresh'
@@ -31,7 +32,7 @@ import {
   type QuarantineRecord,
   type QuarantineUsage,
 } from '@/lib/quarantine'
-import { errorMessage, formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 import { useDebounceFn } from '@vueuse/core'
 import { ChevronLeft, ChevronRight, ShieldAlert, ShieldCheck, Trash2 } from '@lucide/vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -350,8 +351,9 @@ async function runPrunePass() {
                     {{ record.target ?? '-' }}
                   </span>
                 </td>
-                <td class="px-5 py-3 font-mono text-[11px] text-muted-foreground" :title="record.origin_node_id">
-                  {{ record.origin_node_id ? truncateMiddle(record.origin_node_id, 8, 4) : '-' }}
+                <td class="px-5 py-3 text-[11px] text-muted-foreground">
+                  <NodeLabel v-if="record.origin_node_id" :node-id="record.origin_node_id" size="sm" />
+                  <template v-else>-</template>
                 </td>
                 <td class="max-w-56 px-5 py-3">
                   <span class="block truncate text-xs text-foreground/85" :title="record.reason">{{ record.reason }}</span>

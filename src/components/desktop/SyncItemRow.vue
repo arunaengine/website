@@ -4,8 +4,8 @@ import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Progress from '@/components/ui/Progress.vue'
-import { useRealmNodes } from '@/composables/useRealmNodes'
 import { folderName, type DeviceTransfer, type TransferState } from '@/lib/deviceApi'
 import { stateVariant } from '@/lib/stateBadge'
 import { itemChip, type SyncItem } from '@/lib/syncStates'
@@ -17,8 +17,6 @@ const props = withDefaults(defineProps<{ item: SyncItem; busy?: boolean; compact
   compact: false,
 })
 const emit = defineEmits<{ (event: 'sync'): void; (event: 'pause'): void }>()
-
-const { displayName } = useRealmNodes()
 
 const folder = computed(() => (props.item.kind === 'folder' ? props.item.folder : null))
 const document = computed(() => (props.item.kind === 'document' ? props.item.document : null))
@@ -101,8 +99,7 @@ function moved(transfer: DeviceTransfer): string {
         <p v-if="folder" class="mt-1 truncate text-[11px] text-muted-foreground" :title="folder.root">
           <span class="hash">{{ folder.root }}</span>
           →
-          {{ displayName(folder.remote.node_id) }}
-          <span class="hash">{{ folder.remote.node_id }}</span>
+          <NodeLabel :node-id="folder.remote.node_id" size="sm" />
           · {{ remotePath(folder.remote.bucket, folder.remote.prefix) }}
         </p>
         <p v-else-if="document" class="hash mt-1 truncate">{{ subtitle }}</p>

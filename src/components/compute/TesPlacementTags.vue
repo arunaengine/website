@@ -2,9 +2,12 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import { JOB_STATE_META, placementVerdict, type JobState } from '@/lib/jobs'
 import { tesPlacementLike, tesPlacementTags } from '@/lib/tes'
 import { formatBytes, truncateMiddle } from '@/lib/utils'
+
+const NODE_LABEL_KEY = 'aruna-engine.org/node'
 
 // Placement outcome tags from BASIC/FULL views plus the label constraints the
 // caller submitted. Without either kind, this renders nothing at all.
@@ -57,9 +60,12 @@ const anything = computed(
         :key="key"
         variant="outline"
         size="sm"
-        class="font-mono"
+        :class="key === NODE_LABEL_KEY ? '' : 'font-mono'"
       >
-        {{ key }}={{ value }}
+        <template v-if="key === NODE_LABEL_KEY">
+          node: <NodeLabel :node-id="value" size="sm" />
+        </template>
+        <template v-else>{{ key }}={{ value }}</template>
       </Badge>
       <RouterLink
         v-if="placement.jobId"

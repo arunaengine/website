@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import type { BacklinkPreflightResponse } from '@/lib/backlinks'
@@ -110,7 +111,7 @@ function freshnessTime(updatedAtMs: number): string {
         <p class="font-medium text-foreground">Index freshness</p>
         <ul v-if="preflight.coverage.node_freshness.length" class="space-y-1 pl-4">
           <li v-for="freshness in preflight.coverage.node_freshness" :key="freshness.node_id" class="list-disc break-all">
-            {{ freshness.node_id }}: {{ displayValue(freshness.index_state) }}<template v-if="freshness.oldest_status_updated_at_ms !== null">, oldest status {{ freshnessTime(freshness.oldest_status_updated_at_ms) }}</template><template v-else>, timestamp unavailable</template>
+            <NodeLabel :node-id="freshness.node_id" size="sm" />: {{ displayValue(freshness.index_state) }}<template v-if="freshness.oldest_status_updated_at_ms !== null">, oldest status {{ freshnessTime(freshness.oldest_status_updated_at_ms) }}</template><template v-else>, timestamp unavailable</template>
           </li>
         </ul>
         <p v-else>Unknown</p>

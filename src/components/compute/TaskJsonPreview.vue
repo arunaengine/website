@@ -6,7 +6,7 @@
 // CodeSnippet; the copy button always copies the full JSON, whatever is
 // collapsed on screen.
 import { computed, ref } from 'vue'
-import CopyButton from '@/components/nodes/CopyButton.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import type { TesTask } from '@/lib/tes'
 
 const props = defineProps<{ title: string; task: TesTask }>()

@@ -12,7 +12,7 @@ import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import CopyButton from '@/components/nodes/CopyButton.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import type { BadgeVariant } from '@/components/nodes/node-display'
 import { truncateMiddle } from '@/lib/utils'
 

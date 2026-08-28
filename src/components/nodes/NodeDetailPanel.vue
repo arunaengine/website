@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue'
-import CopyButton from './CopyButton.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import LocalNodeDetails from './LocalNodeDetails.vue'
 import { connectionLabel, connectionVariant, kindLabel, kindVariant, statusVariant } from './node-display'
 import type { NodeProbe } from './node-probe'
@@ -62,8 +62,7 @@ defineProps<{
     <div>
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Node id</h2>
       <div class="mt-1 flex items-start gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5">
-        <code class="min-w-0 flex-1 break-all font-mono text-[11px] leading-relaxed text-foreground/90">{{ node.node_id }}</code>
-        <CopyButton :value="node.node_id" label="Copy node id" />
+        <NodeLabel :node-id="node.node_id" copy class="flex-1 text-foreground/90" />
       </div>
     </div>
 

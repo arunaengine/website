@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Identity of one run: its name, its state, its id and the placement tags the
 // node reported for it.
-import CopyButton from '@/components/nodes/CopyButton.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import TesPlacementTags from '@/components/compute/TesPlacementTags.vue'
 import type { TesState } from '@/lib/tes'

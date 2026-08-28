@@ -134,8 +134,11 @@ describe('PlacementPicker', () => {
       (node) => node.tag === 'select' && node.props['aria-label'] === 'Run on node',
     )
 
-    expect(content(nodeSelect)).toContain('Alpha · 01NODEAL…7890')
-    expect(content(nodeSelect)).not.toContain('Storage only')
+    // A unique display name carries the option; the id is only a tie-breaker.
+    const optionLabels = nodes(nodeSelect)
+      .filter((node) => node.tag === 'option')
+      .map((node) => content(node))
+    expect(optionLabels).toEqual(['Any node', 'Alpha', 'Beta'])
     await typeValue(nodeSelect, '01NODEALPHA1234567890')
 
     expect(mounted.model()).toEqual({
@@ -163,6 +166,29 @@ describe('PlacementPicker', () => {
       'aruna-engine.org/node': '01NODEALPHA1234567890',
       tier: 'fast',
     })
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('appends the id only when two nodes share a display name', async () => {
+    realmNodes.value = [
+      { ...NODE_FIXTURES[0], label: 'Alpha' },
+      { ...NODE_FIXTURES[1], label: 'Alpha' },
+    ]
+    const mounted = await mount()
+    const nodeSelect = element(
+      mounted.root,
+      (node) => node.tag === 'select' && node.props['aria-label'] === 'Run on node',
+    )
+    const optionLabels = nodes(nodeSelect)
+      .filter((node) => node.tag === 'option')
+      .map((node) => content(node))
+
+    expect(optionLabels).toEqual([
+      'Any node',
+      `Alpha · ${Utils.truncateMiddle(NODE_FIXTURES[0].nodeId, 8, 6)}`,
+      `Alpha · ${Utils.truncateMiddle(NODE_FIXTURES[1].nodeId, 8, 6)}`,
+    ])
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

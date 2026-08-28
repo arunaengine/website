@@ -102,7 +102,7 @@ beforeAll(async () => {
     }),
   }))
   vi.doMock('@/composables/useRealmNodes', () => ({
-    useRealmNodes: () => ({ displayName: () => 'lab node' }),
+    useRealmNodes: () => ({ nodeById: () => null, displayName: () => 'lab node' }),
   }))
   vi.doMock('@/composables/useDeviceCompute', () => ({
     useDeviceCompute: () => ({ compute, ensureLoaded: vi.fn(async () => undefined) }),

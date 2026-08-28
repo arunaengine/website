@@ -5,6 +5,7 @@
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Textarea from '@/components/ui/Textarea.vue'
@@ -108,7 +109,7 @@ async function apply(): Promise<void> {
     <Notice v-if="joined" tone="info" class="flex items-start gap-2">
       <Check class="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
       <span class="min-w-0 break-all text-muted-foreground">
-        Enrolled as {{ joined.nodeId ? truncateMiddle(joined.nodeId, 10, 6) : 'a user node' }}<span
+        Enrolled as <NodeLabel v-if="joined.nodeId" :node-id="joined.nodeId" /><template v-else>a user node</template><span
           v-if="joined.realm"
         >
           in realm {{ truncateMiddle(joined.realm, 10, 6) }}</span

@@ -6,7 +6,7 @@
 // Pass expiresAt=null for a secret with no expiry (no countdown rendered).
 import { computed, onUnmounted, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
-import CopyButton from '@/components/nodes/CopyButton.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import { ShieldAlert } from '@lucide/vue'
 import Notice from '@/components/ui/Notice.vue'
 

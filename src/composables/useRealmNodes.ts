@@ -81,7 +81,7 @@ export function useRealmNodes() {
   // an honest short-id label.
   function displayName(nodeId: string | null | undefined): string {
     if (!nodeId) return 'this node'
-    return nodeById(nodeId)?.label ?? truncateMiddle(nodeId, 8, 4)
+    return nodeById(nodeId)?.label ?? truncateMiddle(nodeId, 8, 6)
   }
 
   function isLocalNode(nodeId: string | null | undefined): boolean {

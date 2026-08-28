@@ -6,6 +6,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import FactList from '@/components/ui/FactList.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
@@ -93,14 +94,15 @@ const badge = computed(() => {
   return { label: current.state, variant: toneVariant(STATE_TONE[current.state]) }
 })
 
+const nodeId = computed(() => identity.value?.nodeId ?? status.value?.nodeId ?? null)
+
 const facts = computed(() => {
   const current = status.value
   if (!current) return []
-  const nodeId = identity.value?.nodeId ?? current.nodeId
   const realm = identity.value?.realm ?? current.realm
   const noNode = current.enrolling ? 'joining the realm' : 'not set up'
   return [
-    { label: 'Node', value: nodeId ? truncateMiddle(nodeId, 10, 6) : noNode, mono: true },
+    { label: 'Node', value: nodeId.value ?? noNode },
     { label: 'Realm', value: realm ? truncateMiddle(realm, 10, 6) : 'n/a', mono: true },
     { label: 'Local API', value: current.apiBaseUrl ?? 'n/a', mono: true },
     { label: 'Version', value: current.version ?? 'n/a', mono: true },
@@ -134,7 +136,9 @@ const facts = computed(() => {
       <Notice v-if="quitError" tone="error" class="mt-4">{{ quitError }}</Notice>
       <Notice v-if="statusError" tone="error" class="mt-4">{{ statusError }}</Notice>
       <template v-else-if="status">
-        <FactList :items="facts" class="mt-4 lg:grid-cols-3" />
+        <FactList :items="facts" class="mt-4 lg:grid-cols-3">
+          <template v-if="nodeId" #Node><NodeLabel :node-id="nodeId" /></template>
+        </FactList>
         <p v-if="status.message" class="mt-3 text-xs text-muted-foreground">{{ status.message }}</p>
         <p v-if="identityError" class="mt-3 text-xs text-muted-foreground">
           The node did not name itself: {{ identityError }}

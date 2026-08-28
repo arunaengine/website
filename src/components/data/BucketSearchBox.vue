@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -255,7 +256,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
             <template #tooltip>
               <dl class="grid max-w-72 grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
                 <dt class="text-muted-foreground">Node</dt>
-                <dd class="min-w-0 break-all"><span class="font-medium">{{ displayName(hit.node_id) }}</span><br><span class="font-mono text-[10px]">{{ hit.node_id }}</span></dd>
+                <dd class="min-w-0 break-all"><NodeLabel :node-id="hit.node_id" size="sm" /></dd>
                 <dt class="text-muted-foreground">Group</dt>
                 <dd class="min-w-0 break-all"><span class="font-medium">{{ hit.group_name || 'Unnamed group' }}</span><br><span class="font-mono text-[10px]">{{ hit.group_id }}</span></dd>
               </dl>

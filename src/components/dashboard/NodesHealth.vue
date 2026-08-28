@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useNow } from '@vueuse/core'
 import Badge from '@/components/ui/Badge.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import type { RealmNodeInfo } from '@/lib/api'
 import { connectionLabel, connectionVariant, kindLabel, kindVariant } from '@/components/nodes/node-display'
@@ -87,7 +88,7 @@ function labelChips(node: RealmNodeInfo): string[] {
     >
       <div class="flex items-center gap-2">
         <StatusDot :tone="connectionTone(node)" :label="connectionLabel(node)" />
-        <span class="min-w-0 truncate font-mono text-[13px] font-semibold text-foreground">{{ truncateMiddle(node.node_id) }}</span>
+        <NodeLabel :node-id="node.node_id" class="font-semibold text-foreground" />
         <Badge
           v-if="localPeerId && node.node_id === localPeerId"
           :variant="toneVariant('info')"

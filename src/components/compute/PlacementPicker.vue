@@ -101,17 +101,25 @@ const eligibleNodes = computed(() =>
 )
 
 const nodeOptions = computed(() => {
+  const labelCounts = new Map<string, number>()
+  for (const node of eligibleNodes.value) {
+    labelCounts.set(node.label, (labelCounts.get(node.label) ?? 0) + 1)
+  }
   const options = [
     { value: ANY_NODE_VALUE, label: 'Any node' },
+    // An option label is plain text, so only a shared display name needs the id.
     ...eligibleNodes.value.map((node) => ({
       value: node.nodeId,
-      label: `${node.label} · ${truncateMiddle(node.nodeId, 8, 4)}`,
+      label:
+        (labelCounts.get(node.label) ?? 0) > 1
+          ? `${node.label} · ${truncateMiddle(node.nodeId, 8, 6)}`
+          : node.label,
     })),
   ]
   if (selectedNodeId.value && !options.some((option) => option.value === selectedNodeId.value)) {
     options.push({
       value: selectedNodeId.value,
-      label: `Unavailable node · ${truncateMiddle(selectedNodeId.value, 8, 4)}`,
+      label: `Unavailable node · ${truncateMiddle(selectedNodeId.value, 8, 6)}`,
     })
   }
   return options

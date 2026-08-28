@@ -8,6 +8,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import FactList from '@/components/ui/FactList.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -31,7 +32,7 @@ import { classify, listDrafts, type DeviceDraft, type DeviceState } from '@/lib/
 import { isTerminalJobState, jobKindLabel, listJobs, type JobStatusResponse } from '@/lib/jobs'
 import { stateVariant } from '@/lib/stateBadge'
 import { type SyncItem } from '@/lib/syncStates'
-import { formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
+import { formatDuration, relativeTime } from '@/lib/utils'
 import { Boxes, FileText, Play, Plus, RefreshCw } from '@lucide/vue'
 
 const { realm } = useRealm()
@@ -72,7 +73,7 @@ const nodeFallback = computed(() => {
 
 const facts = computed(() => [
   { label: 'Realm', value: realm.value.shortName },
-  { label: 'Node', value: nodeId.value ? truncateMiddle(nodeId.value, 8, 6) : nodeFallback.value, mono: true },
+  { label: 'Node', value: nodeId.value ?? nodeFallback.value },
   { label: 'Version', value: status.value?.version ?? 'n/a', mono: true },
   {
     label: 'Uptime',
@@ -175,7 +176,9 @@ onMounted(() => void reload())
 
     <div class="container space-y-5 py-5">
       <!-- The plate: what the node on this disk is. -->
-      <FactList :items="facts" />
+      <FactList :items="facts">
+        <template v-if="nodeId" #Node><NodeLabel :node-id="nodeId" /></template>
+      </FactList>
 
       <Notice v-if="status?.message && !online" tone="warning">{{ status.message }}</Notice>
 

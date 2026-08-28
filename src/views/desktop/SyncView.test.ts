@@ -115,6 +115,10 @@ const setPaused = vi.fn()
 
 const Blank = defineComponent(() => () => h('div'))
 const Pass = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
+const NodeLabelStub = defineComponent({
+  props: { nodeId: String },
+  setup: (props) => () => h('span', props.nodeId),
+})
 const ButtonStub = defineComponent({
   inheritAttrs: false,
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
@@ -175,8 +179,8 @@ const SyncItemRow = compileClientComponent(new URL('../../components/desktop/Syn
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
+  '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
   '@/components/ui/Progress.vue': moduleDefault(ProgressStub),
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'lab node' }) },
   '@/lib/deviceApi': DeviceApi,
   '@/lib/stateBadge': StateBadge,
   '@/lib/syncStates': SyncStates,

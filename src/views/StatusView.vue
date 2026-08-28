@@ -5,7 +5,8 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
-import CopyButton from '@/components/nodes/CopyButton.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
@@ -203,10 +204,6 @@ const degradedNodes = computed(() =>
   }),
 )
 
-function nodeIdList(nodes: RealmNodeInfo[]): string {
-  return nodes.map((node) => truncateMiddle(node.node_id, 10, 6)).join(', ')
-}
-
 const lastUpdatedLabel = computed(() =>
   lastUpdated.value
     ? lastUpdated.value.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -253,12 +250,16 @@ watch(
 
       <Notice v-if="unreachableNodes.length" tone="error" class="p-4 text-sm">
         {{ unreachableNodes.length === 1 ? 'The browser API probe failed for 1 node' : `The browser API probe failed for ${unreachableNodes.length} nodes` }}:
-        <span class="font-mono text-xs">{{ nodeIdList(unreachableNodes) }}</span>
+        <span v-for="(node, index) in unreachableNodes" :key="node.node_id">
+          <NodeLabel :node-id="node.node_id" /><template v-if="index < unreachableNodes.length - 1">, </template>
+        </span>
       </Notice>
 
       <Notice v-if="degradedNodes.length" tone="warning" class="p-4 text-sm">
         Degraded interfaces on {{ degradedNodes.length === 1 ? 'node' : 'nodes' }}:
-        <span class="font-mono text-xs">{{ nodeIdList(degradedNodes) }}</span>
+        <span v-for="(node, index) in degradedNodes" :key="node.node_id">
+          <NodeLabel :node-id="node.node_id" /><template v-if="index < degradedNodes.length - 1">, </template>
+        </span>
       </Notice>
 
       <section class="surface p-5">
@@ -353,9 +354,7 @@ watch(
                     draining
                   </Badge>
                 </template>
-                <code class="min-w-0 truncate font-mono text-xs text-foreground/90" :title="node.node_id">
-                  {{ truncateMiddle(node.node_id, 14, 10) }}
-                </code>
+                <NodeLabel :node-id="node.node_id" class="text-foreground/90" />
                 <span
                   v-if="isLocal(node)"
                   class="shrink-0 rounded-sm border border-aruna-aqua/30 bg-aruna-aqua/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-aruna-navy dark:text-aruna-aqua"

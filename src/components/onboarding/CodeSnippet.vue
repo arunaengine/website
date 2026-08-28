@@ -3,7 +3,7 @@
 // CLI-usage block in CreateCredentialDialog. Purely presentational: the
 // device-enrollment flow (aruna#271) reuses it for its agent-config snippet, so
 // keep it free of onboarding-specific copy and API calls.
-import CopyButton from '@/components/nodes/CopyButton.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 
 defineProps<{ title: string; code: string; hint?: string }>()
 </script>

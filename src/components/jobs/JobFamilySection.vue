@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
-import CopyButton from '@/components/nodes/CopyButton.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import { placementVerdict, type JobFamilyResponse, type JobOutputResponse } from '@/lib/jobs'
 import { formatBytes, formatDuration, truncateMiddle } from '@/lib/utils'

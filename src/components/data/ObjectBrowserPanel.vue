@@ -3,6 +3,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
@@ -310,7 +311,7 @@ const isEmpty = computed(
           <KeyRound class="mx-auto h-5 w-5" />
           <p class="mt-2 font-medium text-foreground">Open a session on the required node</p>
           <p class="mt-1 text-muted-foreground">
-            The active session was issued by {{ realmNodes.displayName(contextMismatch.issuerNodeId) }} ({{ contextMismatch.issuerNodeId }}). This bucket requires {{ realmNodes.displayName(contextMismatch.requiredNodeId) }} ({{ contextMismatch.requiredNodeId }}). Browsing and selection stay disabled until the node-local session is opened.
+            The active session was issued by <NodeLabel :node-id="contextMismatch.issuerNodeId" />. This bucket requires <NodeLabel :node-id="contextMismatch.requiredNodeId" />. Browsing and selection stay disabled until the node-local session is opened.
           </p>
           <Button class="mt-3" size="sm" :disabled="switchBusy || !s3.activeContext.value?.groupId" @click="openOnThisNode">
             <Spinner v-if="switchBusy" label="Opening the session" class="text-current" />

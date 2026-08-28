@@ -31,6 +31,10 @@ const JobStateBadgeStub = defineComponent({
   setup: (props) => () => h('span', props.state),
 })
 const JobFamilyStub = defineComponent(() => () => h('section', 'native family detail'))
+const NodeLabelStub = defineComponent({
+  props: { nodeId: String },
+  setup: (props) => () => h('span', props.nodeId),
+})
 const RouterLinkStub = defineComponent((_, { slots }) => () => h('a', slots.default?.()))
 const icons = new Proxy({}, { get: () => PassThroughStub })
 const moduleDefault = (component: Component) => ({ __esModule: true, default: component })
@@ -193,7 +197,7 @@ describe('distributed job detail components', () => {
     vue: VueRuntime,
     'vue-router': { RouterLink: RouterLinkStub },
     '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
-    '@/components/nodes/CopyButton.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
     '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
     '@/lib/jobs': Jobs,
     '@/lib/utils': Utils,
@@ -346,6 +350,7 @@ describe('distributed job detail components', () => {
       vue: VueRuntime,
       'vue-router': { RouterLink: RouterLinkStub },
       '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+      '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
       '@/lib/jobs': Jobs,
       '@/lib/tes': Tes,
       '@/lib/utils': Utils,
@@ -362,6 +367,7 @@ describe('distributed job detail components', () => {
         'aruna-engine.org/executor-kind': 'docker',
         'aruna-engine.org/estimated-transfer-bytes': '0',
         'aruna-engine.org/label/region': 'eu-central',
+        'aruna-engine.org/label/aruna-engine.org/node': '01NODEALPHA',
       },
     })
     const taggedText = content(tagged.root)
@@ -373,6 +379,9 @@ describe('distributed job detail components', () => {
     expect(taggedText).not.toContain('succeeded')
     expect(taggedText).toContain('docker')
     expect(taggedText).toContain('region=eu-central')
+    // The node constraint is named, never printed as a raw key=value pair.
+    expect(taggedText.replace(/\s+/g, ' ')).toContain('node: 01NODEALPHA')
+    expect(taggedText).not.toContain('aruna-engine.org/node=')
     tagged.app.unmount()
 
     const untagged = await mount(TesPlacementTags, {
@@ -485,7 +494,7 @@ describe('distributed job detail components', () => {
         '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
         '@/components/ui/Skeleton.vue': moduleDefault(PassThroughStub),
         '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
-        '@/components/nodes/CopyButton.vue': moduleDefault(PassThroughStub),
+        '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
         '@/components/ui/ExternalLink.vue': moduleDefault(PassThroughStub),
         '@/components/jobs/JobFamilySection.vue': moduleDefault(JobFamilyStub),
         '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
