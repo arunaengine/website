@@ -139,6 +139,7 @@ export interface BindFolderRequest {
   root: string
   group_id: string
   remote: RemoteBinding
+  create_bucket: boolean
   mode: FolderMode
   propagate_deletes: boolean
 }
@@ -338,6 +339,7 @@ export async function bindFolder(body: BindFolderRequest, client: DeviceClient):
     remote_node_id: body.remote.node_id,
     remote_bucket: body.remote.bucket,
     remote_prefix: body.remote.prefix,
+    create_bucket: body.create_bucket,
     mode: body.mode,
     propagate_deletes: body.propagate_deletes,
   }

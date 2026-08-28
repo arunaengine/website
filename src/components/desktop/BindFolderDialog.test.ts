@@ -14,8 +14,7 @@ import {
 } from '@/test/clientRender'
 
 const bind = vi.fn()
-const activateContext = vi.fn(async () => undefined)
-const createBucket = vi.fn(async () => undefined)
+const useS3 = vi.fn()
 const busy = ref(false)
 const myGroups = ref([{ id: 'g1', name: 'Lab group' }])
 
@@ -102,7 +101,7 @@ const BindFolderDialog = compileClientComponent(new URL('./BindFolderDialog.vue'
     }),
   },
   '@/composables/useS3': {
-    useS3: () => ({ activateContext, createBucket }),
+    useS3,
   },
   '@/composables/useSyncedFolders': { useSyncedFolders: () => ({ bind, busy }) },
   '@/lib/workspaces': Workspaces,
@@ -118,62 +117,55 @@ async function mountReady() {
 beforeEach(() => {
   bind.mockReset()
   bind.mockResolvedValue({ folder_id: 'f1' })
-  activateContext.mockClear()
-  createBucket.mockClear()
+  useS3.mockClear()
   busy.value = false
 })
 
 describe('syncing a folder to a bucket', () => {
-  it('creates an unmatched bucket on the selected node and group before binding', async () => {
+  it('asks the node plane to create an unmatched bucket while binding', async () => {
     const mounted = await mountReady()
     await typeValue(input(mounted.root, 'aria-label', 'Bucket name'), 'new-bucket')
 
     await click(button(mounted.root, 'Sync a folder'))
 
-    expect(activateContext).toHaveBeenCalledWith('node-1', 'g1')
-    expect(createBucket).toHaveBeenCalledWith('new-bucket')
+    expect(useS3).not.toHaveBeenCalled()
     expect(bind).toHaveBeenCalledWith(
       expect.objectContaining({
         group_id: 'g1',
         remote: { node_id: 'node-1', bucket: 'new-bucket', prefix: '' },
+        create_bucket: true,
       }),
     )
+    expect(content(mounted.root)).toContain('A new name creates the bucket on the selected node.')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
 
-  it('binds an existing search hit without creating it', async () => {
+  it('binds an existing search hit without asking the node to create it', async () => {
     const mounted = await mountReady()
 
     await click(button(mounted.root, 'Use existing bucket'))
     await click(button(mounted.root, 'Sync a folder'))
 
-    expect(activateContext).not.toHaveBeenCalled()
-    expect(createBucket).not.toHaveBeenCalled()
-    expect(bind).toHaveBeenCalledWith(expect.objectContaining({ remote: expect.objectContaining({ bucket: 'lab' }) }))
+    expect(useS3).not.toHaveBeenCalled()
+    expect(bind).toHaveBeenCalledWith(
+      expect.objectContaining({
+        remote: expect.objectContaining({ bucket: 'lab' }),
+        create_bucket: false,
+      }),
+    )
     mounted.app.unmount()
   })
 
-  it('shows the node refusal verbatim', async () => {
-    bind.mockRejectedValue(new Error('the bucket "lab" does not exist on node node-1'))
+  it('shows a group conflict from the node verbatim', async () => {
+    const conflict = 'The bucket "lab" already belongs to group g2.'
+    bind.mockRejectedValue(new Error(conflict))
     const mounted = await mountReady()
-
-    await click(button(mounted.root, 'Use existing bucket'))
-    await click(button(mounted.root, 'Sync a folder'))
-
-    expect(content(mounted.root)).toContain('the bucket "lab" does not exist on node node-1')
-    mounted.app.unmount()
-  })
-
-  it('shows an S3 creation error verbatim and does not bind', async () => {
-    createBucket.mockRejectedValueOnce(new Error('S3 refused this bucket name'))
-    const mounted = await mountReady()
-    await typeValue(input(mounted.root, 'aria-label', 'Bucket name'), 'new-bucket')
+    await typeValue(input(mounted.root, 'aria-label', 'Bucket name'), 'lab')
 
     await click(button(mounted.root, 'Sync a folder'))
 
-    expect(content(mounted.root)).toContain('S3 refused this bucket name')
-    expect(bind).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain(conflict)
     mounted.app.unmount()
   })
 })

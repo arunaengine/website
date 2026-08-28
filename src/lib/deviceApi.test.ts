@@ -199,6 +199,7 @@ describe('bind request wire shape', () => {
         root: '/home/me/data',
         group_id: 'g1',
         remote: { node_id: 'n1', bucket: 'lab', prefix: 'raw/' },
+        create_bucket: true,
         mode: 'two_way',
         propagate_deletes: true,
       },
@@ -211,6 +212,7 @@ describe('bind request wire shape', () => {
       remote_node_id: 'n1',
       remote_bucket: 'lab',
       remote_prefix: 'raw/',
+      create_bucket: true,
       mode: 'two_way',
       propagate_deletes: true,
     })

@@ -19,7 +19,6 @@ import GroupSelect from '@/components/groups/GroupSelect.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { useS3 } from '@/composables/useS3'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
@@ -34,7 +33,6 @@ const emit = defineEmits<{
 
 const { myGroups } = useAruna()
 const realmNodes = useRealmNodes()
-const s3 = useS3()
 const { bind, busy } = useSyncedFolders()
 
 const root = ref('')
@@ -134,19 +132,11 @@ async function submit(): Promise<void> {
   submitting.value = true
   const name = bucket.value.trim()
   try {
-    if (!selectedBucket.value) {
-      try {
-        await s3.activateContext(nodeId.value, groupId.value)
-        await s3.createBucket(name)
-      } catch (err) {
-        error.value = err instanceof Error ? err.message : String(err)
-        return
-      }
-    }
     const folder = await bind({
       root: root.value.trim(),
       group_id: groupId.value,
       remote: { node_id: nodeId.value, bucket: name, prefix: prefix.value.trim() },
+      create_bucket: !selectedBucket.value,
       mode: mode.value,
       propagate_deletes: propagateDeletes.value,
     })
@@ -220,6 +210,9 @@ async function submit(): Promise<void> {
             @select="pickSuggestion"
           />
           <p v-if="bucketInvalid" class="mt-1 text-[11px] text-destructive">{{ bucketInvalid }}</p>
+          <p v-else class="mt-1 text-[11px] text-muted-foreground">
+            A new name creates the bucket on the selected node.
+          </p>
         </div>
 
         <label class="block">
