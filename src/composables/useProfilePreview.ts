@@ -7,10 +7,10 @@ import {
 } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 
-// Server-side preview of the crate a dialog is about to save. Advisory only:
-// the write path validates authoritatively, so a failed or missing preview
-// never blocks the form. A node that does not serve the endpoint answers
-// 404/405 and flips `unavailable`, and the caller hides the panel.
+// The node's check of the crate a form is about to save, run exactly as the
+// write would. A rejected verdict blocks the save; a failed or missing check
+// never does. A node that does not serve the endpoint answers 404/405 and
+// flips `unavailable`.
 
 const PREVIEW_DEBOUNCE_MS = 500
 
@@ -26,8 +26,8 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
   const result = shallowRef<ProfileValidationPreviewResponse | null>(null)
   const running = ref(false)
   const unavailable = ref(false)
-  // Message of the last failed request (503, 429, network). A failure does not
-  // disable the preview; the explicit action retries it.
+  // Message of the last failed request (503, 429, network, no device client).
+  // A failure does not disable the check; the explicit action retries it.
   const error = ref<string | null>(null)
 
   // Fences stale responses: only the newest request may write the refs.
@@ -50,8 +50,11 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     inFlight = controller
     running.value = true
     error.value = null
+    // The injected request is deferred so a synchronous throw (no device
+    // client) lands in `catch` and is rendered as a failed check instead of
+    // leaving `running` stuck.
     const request = options.request
-      ? options.request(rocrate, controller.signal)
+      ? Promise.resolve().then(() => options.request!(rocrate, controller.signal))
       : previewProfileValidation(rocrate, options.client(), controller.signal)
     request
       .then((response) => {
@@ -81,7 +84,7 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     }, debounceMs)
   }
 
-  // Immediate preview for the explicit "Run preview" action.
+  // Immediate check for the explicit "Check again" action.
   function previewNow(rocrate: unknown) {
     if (unavailable.value || disposed) return
     clearTimer()

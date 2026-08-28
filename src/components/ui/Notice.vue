@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 
 const props = withDefaults(
   defineProps<{
-    tone?: 'error' | 'warning' | 'info'
+    tone?: 'error' | 'warning' | 'info' | 'success'
     title?: string
     lines?: readonly string[]
     class?: string
@@ -18,6 +18,7 @@ const TONE_CLASS = {
   error: 'border-destructive/30 bg-destructive/5 text-destructive',
   warning: 'border-amber-500/30 bg-amber-500/5 text-amber-800 dark:text-amber-300',
   info: 'border-border bg-muted/50 text-muted-foreground',
+  success: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300',
 } as const
 
 const classes = computed(() =>

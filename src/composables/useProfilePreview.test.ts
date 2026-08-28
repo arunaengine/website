@@ -138,6 +138,23 @@ describe('server profile validation preview', () => {
     expect(preview.result.value?.accepted).toBe(true)
   })
 
+  it('renders a synchronous request failure instead of hanging', async () => {
+    // The desktop request throws outright while no device client is running.
+    scope = effectScope()
+    const preview = scope.run(() => useProfilePreview({
+      client: () => CLIENT,
+      request: () => { throw new Error('The local node is not running.') },
+    }))!
+
+    preview.previewNow(CRATE)
+    expect(preview.running.value).toBe(true)
+    await flush()
+
+    expect(preview.running.value).toBe(false)
+    expect(preview.unavailable.value).toBe(false)
+    expect(preview.error.value).toBe('The local node is not running.')
+  })
+
   it('drops a pending preview and the last result on reset', async () => {
     const preview = setupPreview()
 
