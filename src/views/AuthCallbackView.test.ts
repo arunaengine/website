@@ -23,6 +23,7 @@ const AuthCallbackView = compileClientComponent(new URL('./AuthCallbackView.vue'
   '@lucide/vue': icons,
   '@/components/layout/AppLogo.vue': moduleDefault(EmptyStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
   '@/composables/useAuth': { useAuth: () => ({ completeSignIn, signIn, stage, stageError }) },
   '@/lib/desktop': { isDesktop: () => true },
 })

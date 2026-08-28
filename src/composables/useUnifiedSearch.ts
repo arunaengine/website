@@ -16,6 +16,7 @@ import {
   type UnifiedSearchResponse,
 } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
+import { errorMessage } from '@/lib/utils'
 
 export const UNIFIED_DEBOUNCE_MS = 250
 // Backend rejects a query shorter than two characters with 400.
@@ -188,22 +189,18 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
       requestMs.value = Math.round(performance.now() - startedAt)
       if (unifiedOutcome.value) apply(unifiedOutcome.value)
       else if (unifiedOutcome.failure) {
-        error.value = unifiedOutcome.failure instanceof Error
-          ? unifiedOutcome.failure.message
-          : String(unifiedOutcome.failure)
+        error.value = errorMessage(unifiedOutcome.failure)
       }
       if (objectOutcome.value) applyObjects(objectOutcome.value)
       else if (objectOutcome.failure) {
-        objectError.value = objectOutcome.failure instanceof Error
-          ? objectOutcome.failure.message
-          : String(objectOutcome.failure)
+        objectError.value = errorMessage(objectOutcome.failure)
       }
       objectSearched.value = searchObjectsNow
       cursorQuery = term
       searched.value = true
     } catch (err) {
       if (mySeq !== seq) return // superseded or aborted
-      error.value = err instanceof Error ? err.message : String(err)
+      error.value = errorMessage(err)
     } finally {
       if (mySeq === seq) pending.value = false
     }
@@ -263,7 +260,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
       }
     } catch (err) {
       if (mySeq !== seq || sectionController !== pageController) return
-      const message = err instanceof Error ? err.message : String(err)
+      const message = errorMessage(err)
       if (section === 'objects') objectError.value = message
       else error.value = message
     } finally {

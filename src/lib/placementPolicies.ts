@@ -1,5 +1,6 @@
 import { ApiError, apiRequest, type ApiClientOptions } from '@/lib/api'
 import { quotaDimensionLabel } from '@/lib/computeAdmin'
+import { errorMessage } from '@/lib/utils'
 
 export interface PolicyRefBody {
   policy_id: string
@@ -428,5 +429,5 @@ export function placementPoliciesErrorMessage(
       return 'The bucket record changed while this residency run was being resumed. Start a new run.'
     }
   }
-  return error instanceof Error ? error.message : String(error)
+  return errorMessage(error)
 }

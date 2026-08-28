@@ -4,6 +4,7 @@
 import { shallowRef, type Ref } from 'vue'
 import { classify, type DeviceClient, type DeviceState } from '@/lib/deviceApi'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { errorMessage } from '@/lib/utils'
 
 export interface DeviceQuery<T> {
   data: Ref<T>
@@ -35,7 +36,7 @@ export function useDeviceQuery<T>(read: (client: DeviceClient) => Promise<T>, em
       error.value = null
     } catch (err) {
       state.value = classify(err)
-      error.value = err instanceof Error ? err.message : String(err)
+      error.value = errorMessage(err)
     }
   }
 

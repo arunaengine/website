@@ -3,12 +3,14 @@ import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
-import { formatBytes, relativeTime } from '@/lib/utils'
+import { errorMessage, formatBytes, relativeTime } from '@/lib/utils'
 import { ApiError, type ConnectorEntry } from '@/lib/api'
-import { ChevronRight, Folder, Home, Loader2 } from '@lucide/vue'
+import { ChevronRight, Folder, Home } from '@lucide/vue'
 
 // Remote listing of a source connector's entries (agreed contract:
 // GET /groups/{gid}/connectors/{cid}/entries?path=&limit=). Optionally
@@ -66,7 +68,7 @@ async function load() {
       gatewayError.value = err.message
       emit('list-failed')
     } else {
-      error.value = err instanceof Error ? err.message : String(err)
+      error.value = errorMessage(err)
     }
   } finally {
     if (mySeq === seq) loading.value = false
@@ -126,9 +128,9 @@ defineExpose({ reload: load })
 
 <template>
   <div>
-    <div v-if="unsupported" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+    <Notice v-if="unsupported" tone="warning">
       Browsing connector contents is not supported by this node yet.
-    </div>
+    </Notice>
     <template v-else>
       <div class="flex items-center justify-between gap-2 pb-2">
         <nav class="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 text-xs" aria-label="Connector path">
@@ -164,16 +166,11 @@ defineExpose({ reload: load })
 
       <div class="overflow-hidden rounded-md border border-border">
         <p v-if="error" class="border-b border-border px-3 py-2 text-xs text-destructive">{{ error }}</p>
-        <div
-          v-if="gatewayError"
-          class="border-b border-border bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-        >
+        <Notice v-if="gatewayError" tone="warning" class="rounded-none border-x-0 border-t-0">
           The node reached the source, but listing failed: {{ gatewayError }}. Retry the browser or enter a path manually.
-        </div>
+        </Notice>
         <div class="max-h-[260px] overflow-y-auto">
-          <div v-if="loading && !entries.length" class="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-            <Loader2 class="h-3.5 w-3.5 animate-spin" /> Listing…
-          </div>
+          <Spinner v-if="loading && !entries.length" show-label label="Listing…" class="px-3 py-3" />
           <table v-else class="w-full text-sm">
             <tbody>
               <tr v-for="entry in entries" :key="entry.path" class="border-t border-border first:border-t-0 hover:bg-muted/30">
@@ -242,7 +239,7 @@ defineExpose({ reload: load })
         </span>
         <Button size="sm" :disabled="!selectedList.length" @click="addSelected">
           Add {{ selectedList.length || '' }} to basket
-          <Badge v-if="selectedList.some((entry) => entry.kind === 'dir')" variant="outline" class="ml-1 text-[10px]">incl. folders</Badge>
+          <Badge v-if="selectedList.some((entry) => entry.kind === 'dir')" variant="outline" size="sm" class="ml-1">incl. folders</Badge>
         </Button>
       </div>
     </template>

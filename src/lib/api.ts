@@ -1,5 +1,6 @@
 import { portalConfig } from './config'
 import { RATE_LIMITED_STATUS, fetchWithRetry } from './fetch'
+import { errorMessage } from './utils'
 
 const DEFAULT_API_BASE_URL = '/api/v1'
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
@@ -37,7 +38,7 @@ export function isNoManagementNode(error: unknown): boolean {
 /** Message to show for a failed request. */
 export function apiErrorMessage(error: unknown): string {
   if (isNoManagementNode(error)) return NO_MANAGEMENT_NODE_MESSAGE
-  return error instanceof Error ? error.message : String(error)
+  return errorMessage(error)
 }
 
 function rateLimitMessage(response: Response): string {

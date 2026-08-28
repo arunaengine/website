@@ -8,7 +8,9 @@ const remoteHintDismissed = ref(false)
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue'
-import { Globe, Lightbulb, Loader2 } from '@lucide/vue'
+import { Globe, Lightbulb } from '@lucide/vue'
+import Spinner from '@/components/ui/Spinner.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 import {
   loadVocabulary,
   searchVocabTerms,
@@ -197,12 +199,8 @@ function pickRemote(hit: TermHit) {
     <div v-if="showRemoteSection" :class="matches.length ? 'mt-1.5 border-t border-border/60 pt-1.5' : ''">
       <p class="mb-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         More from terminology services
-        <Loader2 v-if="remotePending" class="h-3 w-3 shrink-0 animate-spin" />
-        <span
-          v-if="degraded.length"
-          class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
-          :title="degradedTooltip"
-        />
+        <Spinner v-if="remotePending" label="Searching terminology services…" class="[&>svg]:size-3" />
+        <StatusDot v-if="degraded.length" tone="attention" :label="degradedTooltip" class="size-1.5" />
       </p>
       <ul v-if="remoteHits.length" class="max-h-64 space-y-0.5 overflow-y-auto scrollbar-thin">
         <li v-for="hit in remoteHits" :key="hit.iri">

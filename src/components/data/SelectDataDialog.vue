@@ -8,6 +8,8 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
@@ -25,7 +27,7 @@ import {
 } from '@/lib/contentIdentity'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
 import { ref, watch } from 'vue'
-import { Database, KeyRound, Loader2, LogIn, Plus, ShieldAlert } from '@lucide/vue'
+import { Database, KeyRound, LogIn, Plus, ShieldAlert } from '@lucide/vue'
 
 // Picker for a dataset data reference: browse the node's own S3 data or paste
 // an external URL. Emits one `{ label, url }` entry per add, the same shape
@@ -106,7 +108,7 @@ function addExternal() {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-3xl">
+    <DialogContent class="max-w-xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Database class="h-4 w-4 text-primary" /> Add data reference
@@ -123,10 +125,10 @@ function addExternal() {
         </TabsList>
 
         <TabsContent value="node">
-          <div v-if="!s3.endpoint.value" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          <Notice v-if="!s3.endpoint.value" tone="warning" class="flex items-start gap-2">
             <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>This node does not advertise an S3 endpoint, reference external data by URL instead.</span>
-          </div>
+          </Notice>
           <div v-else-if="!s3.hasActiveKey.value" class="space-y-2 rounded-md border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
             <p class="flex items-center gap-2 font-medium text-foreground"><KeyRound class="h-3.5 w-3.5" /> S3 credentials needed to browse node data.</p>
             <Button v-if="currentUser" variant="outline" size="sm" @click="credentialDialogOpen = true">
@@ -136,7 +138,7 @@ function addExternal() {
           </div>
           <template v-else>
             <p class="pb-2 text-[11px] text-muted-foreground">Click an object to use its content identity. Its <code class="rounded bg-muted px-1">s3://bucket/key</code> location is kept as <code class="rounded bg-muted px-1">contentUrl</code>.</p>
-            <p v-if="resolving" class="flex items-center gap-2 pb-2 text-[11px] text-muted-foreground"><Loader2 class="h-3.5 w-3.5 animate-spin" /> Resolving the content identity…</p>
+            <Spinner v-if="resolving" show-label label="Resolving the content identity…" class="pb-2" />
             <ObjectBrowserPanel @select="pickObject" />
           </template>
         </TabsContent>

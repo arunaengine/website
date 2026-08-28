@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -392,9 +393,9 @@ watch(
                   </EmptyState>
                 </div>
 
-                <div class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                <Notice tone="warning">
                   Saving replaces the whole compute configuration, including every bandwidth link and group quota shown here.
-                </div>
+                </Notice>
                 <ul v-if="clientErrors.length" class="list-disc space-y-1 pl-5 text-xs text-destructive">
                   <li v-for="error in clientErrors" :key="error">{{ error }}</li>
                 </ul>
@@ -500,13 +501,13 @@ watch(
                   <p v-else class="mt-3 text-xs text-muted-foreground">Select a group to compare logical demand with its effective quota.</p>
                 </div>
 
-                <div v-if="snapshots.departure" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-3 text-xs text-amber-800 dark:text-amber-300">
+                <Notice v-if="snapshots.departure" tone="warning">
                   <div class="flex flex-wrap items-center gap-2 font-medium">
                     This node has a departure report with {{ snapshots.departure.unresolved.length }} unresolved executions.
                     <Badge v-if="snapshots.departure.truncated" variant="warn">list truncated</Badge>
                   </div>
                   <p class="mt-1">Membership generation {{ snapshots.departure.membership_generation }}. Unresolved never means finished.</p>
-                </div>
+                </Notice>
               </template>
               <div v-else-if="snapshotLoading" class="space-y-2"><Skeleton class="h-20" /><Skeleton class="h-20" /></div>
             </div>

@@ -11,10 +11,13 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { computed, ref, useId, watch } from 'vue'
-import { Cable, CheckCircle2, Loader2, PlugZap, ShieldAlert, XCircle } from '@lucide/vue'
+import { Cable, CheckCircle2, PlugZap, ShieldAlert, XCircle } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import type { ConnectorCheckResponse, SourceConnectorKind, SourceConnectorSummary } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 
 const props = defineProps<{
   open: boolean
@@ -207,7 +210,7 @@ async function testConnection() {
     if (isUnsupportedEndpoint(err)) {
       testUnsupported.value = true
     } else {
-      testError.value = err instanceof Error ? err.message : String(err)
+      testError.value = errorMessage(err)
     }
   } finally {
     testing.value = false
@@ -232,14 +235,14 @@ async function submit() {
     emit('saved', saved)
     emit('update:open', false)
   } catch (err) {
-    submitError.value = err instanceof Error ? err.message : String(err)
+    submitError.value = errorMessage(err)
   }
 }
 </script>
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-lg">
+    <DialogContent class="max-w-md">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Cable class="h-4 w-4 text-primary" />
@@ -316,10 +319,7 @@ async function submit() {
                 />
               </div>
             </template>
-            <div
-              v-if="secretsWillBeRemoved"
-              class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-            >
+            <Notice v-if="secretsWillBeRemoved" tone="warning" class="flex items-start gap-2">
               <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span v-if="toggleActive">
                 This connector has stored credentials that cannot be shown. Saving it as a public
@@ -330,7 +330,7 @@ async function submit() {
                 secret configuration, leave the fields blank to remove them, or re-enter values to keep
                 credentials on the connector.
               </span>
-            </div>
+            </Notice>
           </fieldset>
 
           <!-- Inline-config connection test result (before saving). -->
@@ -341,26 +341,17 @@ async function submit() {
             <CheckCircle2 class="h-3.5 w-3.5 shrink-0" />
             Connection OK{{ testResult.latency_ms !== undefined ? `, ${testResult.latency_ms} ms` : '' }}.
           </p>
-          <p
-            v-else-if="testResult"
-            class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-          >
+          <Notice v-else-if="testResult" tone="error" class="flex items-start gap-2">
             <XCircle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>Connection failed{{ testResult.error ? `: ${testResult.error}` : '.' }}</span>
-          </p>
-          <p v-else-if="testError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-            Connection test failed: {{ testError }}
-          </p>
+          </Notice>
+          <Notice v-else-if="testError" tone="error">Connection test failed: {{ testError }}</Notice>
           <p v-if="testUnsupported" class="text-[11px] text-muted-foreground">
             Connection tests are not supported by this node yet.
           </p>
 
-          <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-            {{ submitError }}
-          </p>
-          <div v-if="writesDisabled" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            You're offline, saving a connector needs connectivity.
-          </div>
+          <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
+          <Notice v-if="writesDisabled" tone="warning">You're offline, saving a connector needs connectivity.</Notice>
         </div>
 
         <DialogFooter class="sm:justify-between">
@@ -372,7 +363,7 @@ async function submit() {
             :title="writesDisabled ? OFFLINE_WRITE_HINT : 'Checks the connection with these settings before saving'"
             @click="testConnection"
           >
-            <Loader2 v-if="testing" class="h-3.5 w-3.5 animate-spin" />
+            <Spinner v-if="testing" />
             <PlugZap v-else class="h-3.5 w-3.5" />
             {{ testing ? 'Testing…' : 'Test connection' }}
           </Button>

@@ -13,11 +13,12 @@ import ConnectorDialog from '@/components/groups/ConnectorDialog.vue'
 import ConnectorEntriesBrowser from '@/components/data/ConnectorEntriesBrowser.vue'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { FolderSearch, KeyRound, Loader2, Pencil, PlugZap, Plus, Trash2 } from '@lucide/vue'
+import { FolderSearch, KeyRound, Pencil, PlugZap, Plus, Trash2 } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
-import { relativeTime } from '@/lib/utils'
+import { errorMessage, relativeTime } from '@/lib/utils'
 import { ApiError, type ConnectorCheckResponse, type SourceConnectorSummary } from '@/lib/api'
+import Spinner from '@/components/ui/Spinner.vue'
 
 const props = defineProps<{ groupId: string; canWrite: boolean }>()
 const emit = defineEmits<{ (e: 'count', count: number): void }>()
@@ -50,7 +51,7 @@ async function load() {
     if (seq !== loadSeq) return
     connectors.value = null
     if (err instanceof ApiError && err.status === 403) hidden.value = true
-    else loadError.value = err instanceof Error ? err.message : String(err)
+    else loadError.value = errorMessage(err)
   } finally {
     if (seq === loadSeq) loading.value = false
   }
@@ -84,7 +85,7 @@ async function confirmDelete(connector: SourceConnectorSummary) {
     confirmingId.value = null
     await load()
   } catch (err) {
-    deleteError.value = err instanceof Error ? err.message : String(err)
+    deleteError.value = errorMessage(err)
   }
 }
 
@@ -118,7 +119,7 @@ async function testConnector(connector: SourceConnectorSummary) {
     } else {
       checkResults.value = {
         ...checkResults.value,
-        [connector.connector_id]: { ok: false, error: err instanceof Error ? err.message : String(err) },
+        [connector.connector_id]: { ok: false, error: errorMessage(err) },
       }
     }
   } finally {
@@ -191,11 +192,11 @@ onBeforeUnmount(() => {
           :class="highlightedId === connector.connector_id ? 'bg-primary/5 ring-2 ring-primary/50' : ''"
         >
           <span class="text-sm font-medium text-foreground">{{ connector.name }}</span>
-          <Badge variant="secondary" class="text-[10px] uppercase">{{ connector.kind }}</Badge>
-          <Badge
+          <Badge size="sm" variant="secondary" class="uppercase">{{ connector.kind }}</Badge>
+          <Badge size="sm"
             v-if="connector.has_secret_config"
             variant="outline"
-            class="text-[10px] uppercase"
+            class="uppercase"
             title="Stored credentials; write-only, never displayed"
           >
             <KeyRound class="mr-0.5 h-3 w-3" /> credentials
@@ -203,15 +204,15 @@ onBeforeUnmount(() => {
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{{ endpointOf(connector) }}</span>
           <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(connector.updated_at) }}</span>
           <template v-if="checkResults[connector.connector_id]">
-            <Badge
+            <Badge size="sm"
               v-if="checkResults[connector.connector_id].ok"
               variant="success"
-              class="text-[10px] uppercase"
+              class="uppercase"
               :title="'latency_ms' in checkResults[connector.connector_id] && (checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms !== undefined ? `${(checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms} ms` : undefined"
             >
               ok{{ (checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms !== undefined ? ` · ${(checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms} ms` : '' }}
             </Badge>
-            <Badge v-else variant="destructive" class="max-w-[16rem] truncate text-[10px]" :title="checkResults[connector.connector_id].error">
+            <Badge v-else size="sm" variant="destructive" class="max-w-[16rem] truncate" :title="checkResults[connector.connector_id].error">
               {{ checkResults[connector.connector_id].error || 'failed' }}
             </Badge>
           </template>
@@ -224,7 +225,7 @@ onBeforeUnmount(() => {
             :disabled="checkingId !== null"
             @click="testConnector(connector)"
           >
-            <Loader2 v-if="checkingId === connector.connector_id" class="h-3 w-3 animate-spin" />
+            <Spinner v-if="checkingId === connector.connector_id" />
             <PlugZap v-else class="h-3 w-3" />
             Test
           </Button>
@@ -293,7 +294,7 @@ onBeforeUnmount(() => {
     />
 
     <Dialog :open="browseTarget !== null" @update:open="(v: boolean) => { if (!v) browseTarget = null }">
-      <DialogContent class="max-w-2xl">
+      <DialogContent class="max-w-xl">
         <DialogHeader>
           <DialogTitle class="flex items-center gap-2">
             <FolderSearch class="h-4 w-4 text-primary" /> Browse {{ browseTarget?.name }}

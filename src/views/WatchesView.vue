@@ -14,7 +14,7 @@ import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { useRefresh } from '@/composables/useRefresh'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { parseWatchPath, watchEventLabel } from '@/lib/watches'
-import { relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, relativeTime, truncateMiddle } from '@/lib/utils'
 import type { ApiWatch } from '@/lib/api'
 import { ArrowLeft, Eye, Trash2 } from '@lucide/vue'
 
@@ -47,7 +47,7 @@ async function onDelete(w: ApiWatch) {
   try {
     await deleteWatch(w.id)
   } catch (err) {
-    reportGlobalError(`Could not remove watch: ${err instanceof Error ? err.message : String(err)}`)
+    reportGlobalError(`Could not remove watch: ${errorMessage(err)}`)
   }
 }
 
@@ -68,9 +68,9 @@ watch(currentUser, () => void ensureLoaded())
     >
       <template #actions>
         <RefreshButton :busy="spinning" @click="onRefresh" />
-        <RouterLink :to="{ name: 'settings' }">
-          <Button variant="outline" size="sm"><ArrowLeft class="h-4 w-4" /> Settings</Button>
-        </RouterLink>
+        <Button variant="outline" size="sm" as-child>
+          <RouterLink :to="{ name: 'settings' }"><ArrowLeft class="h-4 w-4" /> Settings</RouterLink>
+        </Button>
       </template>
     </PageHeader>
 
@@ -80,19 +80,17 @@ watch(currentUser, () => void ensureLoaded())
         <Skeleton class="h-40" />
       </template>
 
-      <div v-else-if="!currentUser" class="surface px-5 py-10 text-center">
-        <p class="text-sm font-medium text-foreground">Sign in to manage your watches.</p>
-        <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-          Watches belong to your account and follow you across devices.
-        </p>
-      </div>
+      <EmptyState
+        v-else-if="!currentUser"
+        title="Sign in to manage your watches."
+        description="Watches belong to your account and follow you across devices."
+      />
 
-      <div v-else-if="!available" class="surface px-5 py-10 text-center">
-        <p class="text-sm font-medium text-foreground">Watches are not available.</p>
-        <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-          This node's backend does not serve watch subscriptions for your session.
-        </p>
-      </div>
+      <EmptyState
+        v-else-if="!available"
+        title="Watches are not available."
+        description="This node's backend does not serve watch subscriptions for your session."
+      />
 
       <template v-else>
         <ErrorPanel v-if="listError" :message="listError" @retry="loadWatches" />
@@ -120,7 +118,7 @@ watch(currentUser, () => void ensureLoaded())
             <li v-for="{ w, info, groupName } in rows" :key="w.id" class="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary" class="text-[10px] uppercase">{{ info?.namespace === 'meta' ? 'metadata' : info?.namespace === 's3' ? 'data' : 'watch' }}</Badge>
+                  <Badge variant="secondary" size="sm" class="uppercase">{{ info?.namespace === 'meta' ? 'metadata' : info?.namespace === 's3' ? 'data' : 'watch' }}</Badge>
                   <RouterLink
                     v-if="info?.link"
                     :to="info.link"
@@ -132,7 +130,8 @@ watch(currentUser, () => void ensureLoaded())
                   <Badge
                     v-if="w.health === 'needs_attention'"
                     variant="warn"
-                    class="text-[10px] uppercase"
+                    size="sm"
+                    class="uppercase"
                     title="This watch may not be delivering events, remove and re-create it if notifications stay silent."
                   >needs attention</Badge>
                 </div>

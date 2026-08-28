@@ -20,6 +20,7 @@ import { parseDatasetDraft } from '@/lib/crate/parse'
 import { isDesktop } from '@/lib/desktop'
 import { previewDeviceDraft, requireDevice } from '@/lib/deviceApi'
 import { ApiError, profileValidationFindings, type RoCrateStructuralViolation } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 import { ArrowLeft, Plus } from '@lucide/vue'
 
 const route = useRoute()
@@ -67,7 +68,7 @@ async function load() {
     })
     keywordsText.value = draft.value.basics.keywords?.join(', ') ?? ''
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : String(error)
+    loadError.value = errorMessage(error)
   } finally {
     loading.value = false
   }
@@ -167,7 +168,7 @@ async function save() {
     })
     await router.push({ name: 'dataset', params: { id: documentId.value } })
   } catch (error) {
-    submitError.value = error instanceof Error ? error.message : String(error)
+    submitError.value = errorMessage(error)
     writeIssues.value = [
       ...structuralViolations(error).map((issue) => ({
         code: issue.code,
@@ -193,9 +194,9 @@ async function save() {
   <div>
     <PageHeader title="Edit dataset" description="Edit and review the complete RO-Crate dataset.">
       <template #actions>
-        <RouterLink :to="{ name: 'dataset', params: { id: documentId } }">
-          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Dataset</Button>
-        </RouterLink>
+        <Button variant="outline" as-child>
+          <RouterLink :to="{ name: 'dataset', params: { id: documentId } }"><ArrowLeft class="h-4 w-4" /> Dataset</RouterLink>
+        </Button>
       </template>
     </PageHeader>
 

@@ -9,10 +9,12 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogTrigger from '@/components/ui/DialogTrigger.vue'
+import Notice from '@/components/ui/Notice.vue'
 import { Eye, EyeOff } from '@lucide/vue'
 import { useWatches } from '@/composables/useWatches'
 import { WATCH_EVENT_KINDS, watchKindDescription, type WatchEventKind } from '@/lib/watches'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
+import { errorMessage } from '@/lib/utils'
 
 // "Watch this" affordance for one canonical resource prefix. The event kind is
 // bound to the prefix namespace (s3/… ⇒ data_uploaded, meta/… ⇒
@@ -62,7 +64,7 @@ async function onCreate() {
     await createWatch(props.pathPrefix, selected.value)
     open.value = false
   } catch (err) {
-    dialogError.value = err instanceof Error ? err.message : String(err)
+    dialogError.value = errorMessage(err)
   }
 }
 
@@ -74,7 +76,7 @@ async function onDelete() {
     await deleteWatch(id)
     open.value = false
   } catch (err) {
-    dialogError.value = err instanceof Error ? err.message : String(err)
+    dialogError.value = errorMessage(err)
   }
 }
 </script>
@@ -151,9 +153,7 @@ async function onDelete() {
           {{ existing?.events.join(', ').replace(/_/g, ' ') }} events.
         </p>
 
-        <p v-if="dialogError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          {{ dialogError }}
-        </p>
+        <Notice v-if="dialogError" tone="error">{{ dialogError }}</Notice>
       </div>
 
       <DialogFooter>

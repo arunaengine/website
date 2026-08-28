@@ -14,6 +14,7 @@ import { UserPlus, X } from '@lucide/vue'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { useAruna } from '@/composables/useAruna'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
+import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ groupId: string; groupName?: string }>()
 
@@ -54,7 +55,7 @@ async function submit() {
   } catch (err) {
     // A 404 here means the realm advertises the flag but the backend has no
     // endpoint; surface the raw message honestly.
-    submitError.value = err instanceof Error ? err.message : String(err)
+    submitError.value = errorMessage(err)
   }
 }
 
@@ -64,7 +65,7 @@ async function withdraw() {
   try {
     await withdrawRequest(req)
   } catch (err) {
-    reportGlobalError(err instanceof Error ? err.message : String(err))
+    reportGlobalError(errorMessage(err))
   }
 }
 </script>
@@ -72,7 +73,7 @@ async function withdraw() {
 <template>
   <template v-if="visible">
     <div v-if="pending" class="flex items-center gap-1.5">
-      <Badge variant="warn" class="text-[10px] uppercase">requested</Badge>
+      <Badge size="sm" variant="warn" class="uppercase">requested</Badge>
       <Button variant="ghost" size="sm" :disabled="busy" @click="withdraw">
         <X class="h-3.5 w-3.5" /> Withdraw
       </Button>

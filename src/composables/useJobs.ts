@@ -22,6 +22,7 @@ import {
   type JobState,
   type JobStatusResponse,
 } from '@/lib/jobs'
+import { errorMessage } from '@/lib/utils'
 
 // Durable job monitoring. Every network path remains feature-gated so a runtime
 // portal config can explicitly disable the surface.
@@ -66,10 +67,6 @@ export const JOB_CLIENT: InjectionKey<JobClient> = Symbol('aruna.jobClient')
 function useJobClient(explicit?: JobClient): JobClient {
   if (explicit) return explicit
   return (getCurrentInstance() ? inject(JOB_CLIENT, null) : null) ?? client
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 export async function cancelJob(jobId: string): Promise<JobStatusResponse> {

@@ -130,7 +130,7 @@ function entityName(entity: ContextEntity): string {
 
 <template>
   <Dialog :open="open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogContent class="max-w-2xl">
+    <DialogContent class="max-w-xl">
       <DialogHeader>
         <DialogTitle>{{ editing ? 'Edit context' : 'Add context' }}</DialogTitle>
         <DialogDescription>Add a described entity or reuse one from a dataset already loaded in this session.</DialogDescription>

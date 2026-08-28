@@ -5,10 +5,13 @@ import Textarea from '@/components/ui/Textarea.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Notice from '@/components/ui/Notice.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
-import { ChevronDown, FileCode2, Globe, Loader2, Upload, X } from '@lucide/vue'
+import { ChevronDown, FileCode2, Globe, Upload, X } from '@lucide/vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useArtifactFetch } from './useArtifactFetch'
 import { sameSchemaOrgType } from '@/lib/profiles/uri'
+import { errorMessage } from '@/lib/utils'
 import type { ProfileEntityRule } from '@/lib/profiles/types'
 import type { ProfileBuilder } from './useProfileBuilder'
 
@@ -60,7 +63,7 @@ async function attachShapesText(text: string, fileName: string) {
     try {
       lift = liftShapes(text)
     } catch (err) {
-      shapesError.value = `Not parseable as Turtle: ${err instanceof Error ? err.message : String(err)}`
+      shapesError.value = `Not parseable as Turtle: ${errorMessage(err)}`
       return
     }
     if (!lift.shapeCount) {
@@ -107,7 +110,7 @@ async function shapesFromUrl() {
   } catch (err) {
     shapesError.value = err instanceof TypeError
       ? 'Could not fetch that URL. If it is hosted on another server (or redirects to one, like a w3id.org id), that server does not allow browser (cross-origin) access. Download the file and upload it instead.'
-      : err instanceof Error ? err.message : String(err)
+      : errorMessage(err)
   } finally {
     shapesBusy.value = false
   }
@@ -137,9 +140,9 @@ watch(
 
 <template>
   <section class="space-y-4">
-    <div v-if="builder.needsToken" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+    <Notice v-if="builder.needsToken" tone="warning">
       Add a bearer token in Settings before creating profiles.
-    </div>
+    </Notice>
 
     <div>
       <h4 class="text-sm font-semibold text-foreground">Profile basics</h4>
@@ -247,7 +250,7 @@ watch(
           <div class="flex min-w-[220px] flex-1 items-center gap-2">
             <Input v-model="shapesUrl" placeholder="https://…/shapes.ttl" @keydown.enter="shapesFromUrl" />
             <Button type="button" variant="outline" size="sm" :disabled="shapesBusy || !shapesUrl.trim()" @click="shapesFromUrl">
-              <Loader2 v-if="shapesBusy" class="size-3.5 animate-spin" />
+              <Spinner v-if="shapesBusy" class="text-current" aria-hidden="true" />
               <Globe v-else class="size-3.5" /> Fetch
             </Button>
           </div>

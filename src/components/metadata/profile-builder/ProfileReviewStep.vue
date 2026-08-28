@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
@@ -13,6 +14,7 @@ import { buildProfileArtifactTexts, parseProfileCrate } from '@/lib/profiles/roc
 import { validateProfileData } from '@/lib/profiles/validate'
 import { obligationBadgeVariant, PROFILE_ENTITY_SOURCE_LABELS, PROFILE_OBLIGATION_LABELS, PROFILE_VALUE_KIND_LABELS } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
+import { errorMessage } from '@/lib/utils'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import type { ProfileBuilder } from './useProfileBuilder'
 
@@ -121,7 +123,7 @@ const roundTrip = computed<{ parsed: ReturnType<typeof parseProfileCrate> | null
   try {
     return { parsed: parseProfileCrate(builder.generatedCrate), error: null }
   } catch (err) {
-    return { parsed: null, error: err instanceof Error ? err.message : String(err) }
+    return { parsed: null, error: errorMessage(err) }
   }
 })
 const controls = computed(() => {
@@ -145,27 +147,21 @@ function violationsFor(property: string) {
 <template>
   <section class="space-y-4">
     <!-- Validation summary -->
-    <div v-if="builder.allErrors.length" class="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-      <div class="flex items-center gap-2 text-sm font-medium text-destructive">
+    <Notice v-if="builder.allErrors.length" tone="error" :lines="builder.allErrors" class="rounded-lg p-3">
+      <div class="flex items-center gap-2 text-sm font-medium">
         <AlertTriangle class="h-4 w-4" /> {{ builder.allErrors.length }} {{ builder.allErrors.length === 1 ? 'issue' : 'issues' }} to fix before creating
       </div>
-      <ul class="mt-2 space-y-1 text-xs text-destructive">
-        <li v-for="error in builder.allErrors" :key="error">{{ error }}</li>
-      </ul>
-    </div>
+    </Notice>
     <div v-else class="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
       <CheckCircle2 class="h-4 w-4" /> This profile is ready to create.
     </div>
 
     <!-- Non-blocking authoring suggestions (e.g. prefer a schema.org term). -->
-    <div v-if="builder.rulesHints.length" class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-      <div class="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300">
+    <Notice v-if="builder.rulesHints.length" tone="warning" :lines="builder.rulesHints" class="rounded-lg p-3">
+      <div class="flex items-center gap-2 text-sm font-medium">
         <Lightbulb class="h-4 w-4" /> Suggestions
       </div>
-      <ul class="mt-2 space-y-1 text-xs text-amber-800 dark:text-amber-300">
-        <li v-for="hint in builder.rulesHints" :key="hint">{{ hint }}</li>
-      </ul>
-    </div>
+    </Notice>
 
     <!-- Imported SHACL that no rule below represents. Repeated from the Rules
          step so it is still in view at the point of committing. -->
@@ -179,7 +175,7 @@ function violationsFor(property: string) {
         <p v-if="!entity.rules.length" class="mt-1 text-[11px] text-muted-foreground">No property rules.</p>
         <ul v-else class="mt-1 space-y-1">
           <li v-for="rule in entity.rules" :key="rule.key" class="flex flex-wrap items-center gap-1.5 text-[11px] text-foreground">
-            <Badge :variant="obligationBadgeVariant(rule.obligation)" class="text-[10px]">{{ rule.obligation }}</Badge>
+            <Badge :variant="obligationBadgeVariant(rule.obligation)" size="sm">{{ rule.obligation }}</Badge>
             <span class="font-medium">{{ rule.label }}</span>
             <span class="text-muted-foreground">{{ rule.target }}</span>
             <span v-if="rule.repeatable" class="inline-flex items-center gap-0.5 text-muted-foreground"><Repeat2 class="h-3 w-3" /> repeatable</span>
@@ -197,7 +193,7 @@ function violationsFor(property: string) {
         <ul class="mt-1 space-y-1">
           <li v-for="rule in entity.rules" :key="rule.label" class="text-[11px] text-foreground">
             <span class="inline-flex items-center gap-1.5">
-              <Badge :variant="obligationBadgeVariant(rule.obligation)" class="text-[10px]">{{ PROFILE_OBLIGATION_LABELS[rule.obligation].label }}</Badge>
+              <Badge :variant="obligationBadgeVariant(rule.obligation)" size="sm">{{ PROFILE_OBLIGATION_LABELS[rule.obligation].label }}</Badge>
               <span class="font-medium">{{ rule.label }}</span>
             </span>
             <ul class="ml-4 list-disc space-y-0.5 text-muted-foreground">
@@ -233,7 +229,7 @@ function violationsFor(property: string) {
         >
           <label class="flex items-center gap-2 text-xs font-medium text-foreground">
             {{ control.label }}
-            <Badge v-if="control.obligation" :variant="obligationBadgeVariant(control.obligation)" class="text-[10px]">
+            <Badge v-if="control.obligation" :variant="obligationBadgeVariant(control.obligation)" size="sm">
               {{ PROFILE_OBLIGATION_LABELS[control.obligation].label }}
             </Badge>
           </label>
@@ -274,9 +270,9 @@ function violationsFor(property: string) {
       >
         <span class="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
           Generated files
-          <Badge variant="secondary" class="text-[10px]">profile.html · mode.json · schema.json · shapes.ttl</Badge>
+          <Badge variant="secondary" size="sm">profile.html · mode.json · schema.json · shapes.ttl</Badge>
           <!-- Imported source shapes: read-only chip with count. -->
-          <Badge v-if="builder.customShapesMeta" variant="secondary" class="inline-flex items-center gap-1 text-[10px]">
+          <Badge v-if="builder.customShapesMeta" variant="secondary" size="sm" class="inline-flex items-center gap-1">
             <FileCode2 class="h-3 w-3" /> {{ builder.customShapesMeta.fileName }} merged into shapes.ttl<template v-if="builder.customShapesMeta.shapeCount !== undefined"> · {{ builder.customShapesMeta.shapeCount }} {{ builder.customShapesMeta.shapeCount === 1 ? 'shape' : 'shapes' }}</template>
           </Badge>
         </span>

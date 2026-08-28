@@ -9,6 +9,7 @@ import { apiRequest, type InfoResponse } from '@/lib/api'
 import { onWake, POLL_IDLE_MS } from '@/lib/poll'
 import type { DeviceClient } from '@/lib/deviceApi'
 import type { NodeStatus } from '@/lib/desktopBridge'
+import { errorMessage } from '@/lib/utils'
 
 const status = ref<NodeStatus | null>(null)
 const error = ref<string | null>(null)
@@ -23,17 +24,13 @@ let unlisten: (() => void) | null = null
 let unwake: (() => void) | null = null
 let reading: Promise<void> | null = null
 
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
 async function read(): Promise<void> {
   try {
     const { nodeStatus } = await import('@/lib/desktopBridge')
     status.value = await nodeStatus()
     error.value = null
   } catch (err) {
-    error.value = message(err)
+    error.value = errorMessage(err)
   } finally {
     loaded.value = true
   }
@@ -128,7 +125,7 @@ async function readIdentity(client: DeviceClient): Promise<void> {
     identityError.value = null
   } catch (err) {
     identity.value = null
-    identityError.value = message(err)
+    identityError.value = errorMessage(err)
   }
 }
 

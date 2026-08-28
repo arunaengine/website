@@ -54,12 +54,12 @@ function onSignIn() {
           <LogIn class="h-3.5 w-3.5" />
           Sign in
         </Button>
-        <RouterLink v-else to="/app">
-          <Button size="sm">
+        <Button v-else size="sm" as-child>
+          <RouterLink to="/app">
             Open portal
             <ArrowRight class="h-3.5 w-3.5" />
-          </Button>
-        </RouterLink>
+          </RouterLink>
+        </Button>
       </div>
     </div>
   </header>

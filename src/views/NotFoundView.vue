@@ -17,12 +17,12 @@ const route = useRoute()
         {{ route.fullPath }}
       </p>
       <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
-        <RouterLink :to="{ name: 'dashboard' }">
-          <Button variant="outline"><LayoutDashboard class="h-4 w-4" /> Dashboard</Button>
-        </RouterLink>
-        <RouterLink :to="{ name: 'datasets' }">
-          <Button><FileJson2 class="h-4 w-4" /> Datasets</Button>
-        </RouterLink>
+        <Button variant="outline" as-child>
+          <RouterLink :to="{ name: 'dashboard' }"><LayoutDashboard class="h-4 w-4" /> Dashboard</RouterLink>
+        </Button>
+        <Button as-child>
+          <RouterLink :to="{ name: 'datasets' }"><FileJson2 class="h-4 w-4" /> Datasets</RouterLink>
+        </Button>
       </div>
     </div>
   </div>

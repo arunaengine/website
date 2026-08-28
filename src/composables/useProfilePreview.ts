@@ -5,6 +5,7 @@ import {
   type ApiClientOptions,
   type ProfileValidationPreviewResponse,
 } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 
 // Server-side preview of the crate a dialog is about to save. Advisory only:
 // the write path validates authoritatively, so a failed or missing preview
@@ -66,7 +67,7 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
           result.value = null
           return
         }
-        error.value = cause instanceof Error ? cause.message : String(cause)
+        error.value = errorMessage(cause)
       })
   }
 

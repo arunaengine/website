@@ -15,8 +15,9 @@ import { useRefresh } from '@/composables/useRefresh'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Inbox, Plus, Users } from '@lucide/vue'
-import { relativeTime } from '@/lib/utils'
+import { errorMessage, relativeTime } from '@/lib/utils'
 import type { JoinRequest } from '@/lib/api'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 const { currentUser, myGroups, discoverableGroups, loading, refresh } = useAruna()
 const { authPending } = useAuth()
@@ -66,7 +67,7 @@ async function withdraw(req: JoinRequest) {
   try {
     await withdrawRequest(req)
   } catch (err) {
-    reportGlobalError(err instanceof Error ? err.message : String(err))
+    reportGlobalError(errorMessage(err))
   }
 }
 
@@ -100,6 +101,13 @@ const description = computed(() =>
     ? 'Your groups in this realm, manage members, roles and permissions.'
     : 'Groups in this realm. Sign in from the top bar to create and manage groups.',
 )
+
+const emptyGroupsMessage = computed(() => {
+  if (loading.value || authPending.value) return 'Loading groups…'
+  return currentUser.value
+    ? 'You are not a member of any group yet, create one to get started.'
+    : 'Sign in to see the groups you belong to.'
+})
 </script>
 
 <template>
@@ -146,19 +154,12 @@ const description = computed(() =>
               <GroupDetail :group-id="group.id" @left="router.push({ name: 'groups' })" />
             </div>
           </li>
-          <li v-if="!myGroups.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
-            <p>
-              {{
-                loading || authPending
-                  ? 'Loading groups…'
-                  : currentUser
-                    ? 'You are not a member of any group yet, create one to get started.'
-                    : 'Sign in to see the groups you belong to.'
-              }}
-            </p>
-            <Button v-if="currentUser && !loading" variant="outline" size="sm" class="mt-3" @click="createGroupOpen = true">
-              <Plus class="h-3.5 w-3.5" /> Create group
-            </Button>
+          <li v-if="!myGroups.length" class="p-3">
+            <EmptyState compact :title="emptyGroupsMessage">
+              <Button v-if="currentUser && !loading" variant="outline" size="sm" @click="createGroupOpen = true">
+                <Plus class="h-3.5 w-3.5" /> Create group
+              </Button>
+            </EmptyState>
           </li>
         </ul>
       </section>
@@ -193,9 +194,9 @@ const description = computed(() =>
               </p>
             </div>
             <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(req.created_at) }}</span>
-            <Badge v-if="req.status === 'pending'" variant="warn" class="shrink-0 text-[10px] uppercase">pending</Badge>
-            <Badge v-else-if="req.status === 'approved'" variant="success" class="shrink-0 text-[10px] uppercase">approved</Badge>
-            <Badge v-else variant="destructive" class="shrink-0 text-[10px] uppercase">denied</Badge>
+            <Badge v-if="req.status === 'pending'" size="sm" variant="warn" class="shrink-0 uppercase">pending</Badge>
+            <Badge v-else-if="req.status === 'approved'" size="sm" variant="success" class="shrink-0 uppercase">approved</Badge>
+            <Badge v-else size="sm" variant="destructive" class="shrink-0 uppercase">denied</Badge>
             <Button
               v-if="req.status === 'pending'"
               variant="ghost"

@@ -23,6 +23,7 @@ import { useDeviceEnrollment } from '@/composables/useDeviceEnrollment'
 import { applyEnrollment, ENROLLMENT_TTL_SECS, watchStages } from '@/composables/useDeviceSetup'
 import { isDesktop } from '@/lib/desktop'
 import { buildDeviceEnv, managementPortals } from '@/lib/onboarding-config'
+import { errorMessage } from '@/lib/utils'
 import {
   ArrowLeft,
   ArrowRight,
@@ -139,7 +140,7 @@ async function applyHere(): Promise<void> {
     await applyEnrollment(enrollUrl.value, deviceName.value.trim())
     void router.push({ name: 'device' })
   } catch (err) {
-    applyError.value = err instanceof Error ? err.message : String(err)
+    applyError.value = errorMessage(err)
   } finally {
     applying.value = false
   }
@@ -306,9 +307,9 @@ const stages = computed(() => watchStages(watchState.value))
         </p>
         <ClaimWatchStep :stages="stages" :error="watchState.lastError">
           <template #actions>
-            <RouterLink :to="{ name: 'settings', hash: '#devices' }">
-              <Button variant="outline" size="sm"><ExternalLink class="h-4 w-4" /> My devices</Button>
-            </RouterLink>
+            <Button variant="outline" size="sm" as-child>
+              <RouterLink :to="{ name: 'settings', hash: '#devices' }"><ExternalLink class="h-4 w-4" /> My devices</RouterLink>
+            </Button>
             <Button variant="outline" size="sm" @click="emit('update:step', HANDOFF_STEP)">
               <ArrowLeft class="h-4 w-4" /> Hand-off
             </Button>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
@@ -254,13 +255,13 @@ function emptyStateText(): string {
         >
           <component :is="isOpen(entry.__uid) ? ChevronDown : ChevronRight" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span class="truncate">{{ summary(entry, index) }}</span>
-          <span v-if="entryHasError(index)" class="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" aria-label="Has errors" />
+          <StatusDot v-if="entryHasError(index)" tone="failed" label="Has errors" class="size-1.5" />
         </button>
         <span v-else class="flex min-w-0 items-center gap-2 text-xs font-medium text-foreground">
           <Link2 class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span class="truncate">{{ summary(entry, index) }}</span>
-          <Badge variant="secondary" class="shrink-0 text-[10px]">existing</Badge>
-          <span v-if="entryHasError(index)" class="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" aria-label="Has errors" />
+          <Badge variant="secondary" size="sm" class="shrink-0">existing</Badge>
+          <StatusDot v-if="entryHasError(index)" tone="failed" label="Has errors" class="size-1.5" />
         </span>
         <div class="flex shrink-0 items-center gap-1">
           <!-- Single-valued fields keep one entry; the toggle switches how it is

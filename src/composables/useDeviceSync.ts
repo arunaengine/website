@@ -17,6 +17,7 @@ import { useDeviceQuery } from '@/composables/useDeviceQuery'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { isDesktop } from '@/lib/desktop'
 import { follow, onWake, POLL_ACTIVE_MS, POLL_IDLE_MS } from '@/lib/poll'
+import { errorMessage } from '@/lib/utils'
 
 const EMPTY: DeviceSyncStatus = {
   realmReachable: false,
@@ -32,10 +33,6 @@ const running = ref(false)
 const runError = ref<string | null>(null)
 
 const { deviceClient } = useDeviceStatus()
-
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
 
 // What the status said when the run was asked for. The button stays busy until
 // a later read shows the run actually moved.
@@ -80,7 +77,7 @@ async function runSync(): Promise<void> {
   } catch (err) {
     running.value = false
     mark = null
-    runError.value = message(err)
+    runError.value = errorMessage(err)
     return
   }
   await read()

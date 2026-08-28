@@ -9,11 +9,14 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import { Check, Layers, Loader2 } from '@lucide/vue'
+import { Check, Layers } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
 import { graphIriFor } from '@/lib/graphIri'
+import { errorMessage } from '@/lib/utils'
 import type { MetadataDocumentListItem } from '@/lib/api'
 
 // Catalog picker for subcrate linking, shared by the detail page's Subcrates
@@ -109,7 +112,7 @@ async function confirm() {
     )
     emit('select', items)
   } catch (err) {
-    resolveError.value = err instanceof Error ? err.message : String(err)
+    resolveError.value = errorMessage(err)
   } finally {
     resolving.value = false
   }
@@ -118,7 +121,7 @@ async function confirm() {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-lg">
+    <DialogContent class="max-w-md">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2"><Layers class="h-4 w-4 text-primary" /> Link subcrates</DialogTitle>
         <DialogDescription>
@@ -150,23 +153,30 @@ async function confirm() {
           </span>
           <Check v-if="selected.has(item.documentId)" class="h-4 w-4 shrink-0 text-primary" />
         </button>
-        <p v-if="searching && !candidates.length" class="px-1 py-4 text-center text-xs text-muted-foreground">Searching…</p>
-        <p v-else-if="!candidates.length" class="px-1 py-4 text-center text-xs text-muted-foreground">
-          {{ searchable ? 'No documents match the search.' : 'Type at least two characters to search the realm.' }}
-        </p>
+        <Spinner
+          v-if="searching && !candidates.length"
+          show-label
+          label="Searching…"
+          class="flex justify-center px-1 py-4"
+        />
+        <EmptyState
+          v-else-if="!candidates.length"
+          compact
+          :title="searchable ? 'No documents match the search.' : 'Type at least two characters to search the realm.'"
+        />
       </div>
       <p v-if="!searchable" class="text-[11px] text-muted-foreground">
         Showing the catalog pages loaded so far. Search to reach every document in the realm.
       </p>
 
-      <p v-if="searchError || resolveError || error" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+      <Notice v-if="searchError || resolveError || error" tone="error">
         {{ searchError || resolveError || error }}
-      </p>
+      </Notice>
 
       <DialogFooter>
         <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <Button :disabled="!selected.size || busy || resolving" @click="confirm">
-          <Loader2 v-if="busy || resolving" class="size-3.5 animate-spin" />
+          <Spinner v-if="busy || resolving" class="text-current" aria-hidden="true" />
           <template v-else>Link {{ selected.size || '' }} {{ selected.size === 1 ? 'subcrate' : 'subcrates' }}</template>
         </Button>
       </DialogFooter>

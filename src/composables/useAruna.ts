@@ -77,6 +77,7 @@ import {
   type UnifiedSearchOptions,
   type UnifiedSearchResponse,
 } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 import {
   parseProfileCrate,
   parseProfileCrateForControls,
@@ -2198,12 +2199,6 @@ function slugify(value: string): string {
 
 function roleSummary(roles: Array<{ name: string }>): string {
   return roles.length ? `Roles: ${roles.map((role) => role.name).join(', ')}` : ''
-}
-
-function errorMessage(err: unknown): string {
-  if (err instanceof ApiError) return err.message
-  if (err instanceof Error) return err.message
-  return String(err)
 }
 
 if (typeof window !== 'undefined') {

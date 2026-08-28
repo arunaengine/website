@@ -7,6 +7,7 @@ import Textarea from '@/components/ui/Textarea.vue'
 import { computed, ref } from 'vue'
 import { FlaskConical, ShieldCheck, ShieldX } from '@lucide/vue'
 import { usePolicies } from '@/composables/usePolicies'
+import { errorMessage } from '@/lib/utils'
 import {
   scopeLabel,
   traceLabel,
@@ -102,7 +103,7 @@ async function run() {
     }
     result.value = await dryRun(request)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errorMessage(err)
   } finally {
     running.value = false
   }
@@ -220,11 +221,11 @@ async function run() {
             :key="`${entry.policy_id}-${index}`"
             class="flex flex-wrap items-center gap-2 rounded-md bg-background/60 px-2.5 py-1.5 text-xs"
           >
-            <Badge variant="outline" class="text-[10px]">{{ scopeLabel(entry.scope) }}</Badge>
+            <Badge variant="outline" size="sm">{{ scopeLabel(entry.scope) }}</Badge>
             <span class="font-mono text-foreground">{{ entry.name }}</span>
             <Badge
               :variant="entry.result === 'Denied' ? 'destructive' : entry.result === 'Error' ? 'warn' : 'secondary'"
-              class="text-[10px]"
+              size="sm"
             >
               {{ traceLabel(entry.result) }}
             </Badge>

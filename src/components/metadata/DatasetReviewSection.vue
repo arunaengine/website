@@ -2,9 +2,11 @@
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Notice from '@/components/ui/Notice.vue'
 import VisibilitySelect from '@/components/metadata/VisibilitySelect.vue'
 import type { ProfileValidationPreviewResponse } from '@/lib/api'
-import { Check, Clipboard, Loader2, Play, Send } from '@lucide/vue'
+import { Check, Clipboard, Play, Send } from '@lucide/vue'
+import Spinner from '@/components/ui/Spinner.vue'
 
 const props = defineProps<{
   rocrate: unknown
@@ -87,15 +89,13 @@ async function copyJson() {
         <p class="text-xs text-muted-foreground">The node write remains authoritative.</p>
       </div>
       <Button variant="outline" size="sm" :disabled="previewRunning" @click="emit('preview')">
-        <Loader2 v-if="previewRunning" class="h-3.5 w-3.5 animate-spin" />
+        <Spinner v-if="previewRunning" class="text-current" aria-hidden="true" />
         <Play v-else class="h-3.5 w-3.5" />
         Run preview
       </Button>
     </div>
 
-    <p v-if="previewError" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-      {{ previewError }}
-    </p>
+    <Notice v-if="previewError" tone="warning">{{ previewError }}</Notice>
     <p v-if="previewResult && !issues.length" class="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
       <Check class="h-3.5 w-3.5" /> No validation findings.
     </p>
@@ -135,12 +135,10 @@ async function copyJson() {
       <pre class="max-h-96 overflow-auto rounded-lg border border-border bg-muted/30 p-3 text-[11px] leading-relaxed"><code>{{ json }}</code></pre>
     </div>
 
-    <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-      {{ submitError }}
-    </p>
+    <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
     <div class="flex justify-end">
       <Button :disabled="!canCreate || saving" @click="emit('create')">
-        <Loader2 v-if="saving" class="h-4 w-4 animate-spin" />
+        <Spinner v-if="saving" class="text-current" aria-hidden="true" />
         <Send v-else class="h-4 w-4" />
         {{ saving ? (busyLabel ?? 'Creating') : (actionLabel ?? 'Create dataset') }}
       </Button>

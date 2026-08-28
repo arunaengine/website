@@ -6,7 +6,7 @@ import { statusVariant } from './node-display'
 import { backendQuota } from '@/lib/storage'
 import { formatBytes } from '@/lib/utils'
 import type { InfoResponse } from '@/lib/api'
-import { TriangleAlert } from '@lucide/vue'
+import Notice from '@/components/ui/Notice.vue'
 
 const props = defineProps<{ info: InfoResponse }>()
 
@@ -82,7 +82,7 @@ const backends = computed(() =>
     </dl>
 
     <div>
-      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Interfaces</div>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Interfaces</h2>
       <ul class="mt-1.5 space-y-1.5">
         <li
           v-for="iface in interfaces"
@@ -90,7 +90,7 @@ const backends = computed(() =>
           class="flex items-center gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5"
         >
           <span class="w-10 shrink-0 text-xs font-medium text-foreground">{{ iface.label }}</span>
-          <Badge :variant="statusVariant(iface.status)" class="shrink-0 text-[10px] uppercase">{{ iface.status || 'unknown' }}</Badge>
+          <Badge size="sm" :variant="statusVariant(iface.status)" class="shrink-0 uppercase">{{ iface.status || 'unknown' }}</Badge>
           <span class="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-muted-foreground" :title="iface.url || iface.bind || ''">
             {{ iface.url || iface.bind || '-' }}
           </span>
@@ -99,7 +99,7 @@ const backends = computed(() =>
     </div>
 
     <div v-if="services.length">
-      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Services</div>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Services</h2>
       <div class="mt-1.5 flex flex-wrap gap-2">
         <span
           v-for="service in services"
@@ -107,13 +107,13 @@ const backends = computed(() =>
           class="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/60 px-2 py-1 text-xs text-foreground"
         >
           {{ service.name }}
-          <Badge :variant="statusVariant(service.status)" class="text-[10px] uppercase">{{ service.status }}</Badge>
+          <Badge size="sm" :variant="statusVariant(service.status)" class="uppercase">{{ service.status }}</Badge>
         </span>
       </div>
     </div>
 
     <div v-if="backends.length">
-      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Storage backends</div>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage backends</h2>
       <ul class="mt-1.5 space-y-1.5">
         <li
           v-for="backend in backends"
@@ -122,19 +122,19 @@ const backends = computed(() =>
         >
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-xs font-medium text-foreground">{{ backend.name }}</span>
-            <Badge variant="secondary" class="text-[10px] uppercase">{{ backend.backend }}</Badge>
-            <Badge v-if="backend.default" variant="royal" class="text-[10px] uppercase">default</Badge>
-            <Badge v-if="backend.class" variant="outline" class="text-[10px]">class {{ backend.class }}</Badge>
-            <Badge
+            <Badge size="sm" variant="secondary" class="uppercase">{{ backend.backend }}</Badge>
+            <Badge v-if="backend.default" size="sm" variant="royal" class="uppercase">default</Badge>
+            <Badge v-if="backend.class" size="sm" variant="outline">class {{ backend.class }}</Badge>
+            <Badge size="sm"
               v-if="backend.allow_tenants"
               variant="accent"
-              class="text-[10px] uppercase"
+              class="uppercase"
               title="Groups can send their uploads to this storage class"
             >
               available to groups
             </Badge>
             <span class="flex-1" />
-            <Badge :variant="statusVariant(backend.status)" class="text-[10px] uppercase">{{ backend.status }}</Badge>
+            <Badge size="sm" :variant="statusVariant(backend.status)" class="uppercase">{{ backend.status }}</Badge>
           </div>
           <div class="mt-1">
             <QuotaBar
@@ -157,17 +157,8 @@ const backends = computed(() =>
     </div>
 
     <div v-if="info.warnings.length">
-      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Warnings</div>
-      <ul class="mt-1.5 space-y-1">
-        <li
-          v-for="(warning, index) in info.warnings"
-          :key="index"
-          class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-xs text-amber-800 dark:text-amber-300"
-        >
-          <TriangleAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span class="min-w-0 break-words">{{ warning }}</span>
-        </li>
-      </ul>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Warnings</h2>
+      <Notice tone="warning" class="mt-1.5" :lines="info.warnings" />
     </div>
   </div>
 </template>

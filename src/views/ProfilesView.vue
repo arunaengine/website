@@ -30,6 +30,10 @@ import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { cloneLiftNotes } from '@/lib/shacl/lift'
 import type { MetadataProfile } from '@/data/types'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
+import { errorMessage } from '@/lib/utils'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -110,7 +114,7 @@ async function confirmDelete() {
     showDelete.value = false
     router.push({ name: 'profiles' })
   } catch (err) {
-    deleteError.value = err instanceof Error ? err.message : String(err)
+    deleteError.value = errorMessage(err)
   }
 }
 
@@ -148,7 +152,7 @@ async function ensureFullProfile(profile: MetadataProfile | undefined, force = f
   } catch (err) {
     profileLoadErrors.value = {
       ...profileLoadErrors.value,
-      [docId]: err instanceof Error ? err.message : String(err),
+      [docId]: errorMessage(err),
     }
   } finally {
     loadingCrateIds.value = { ...loadingCrateIds.value, [docId]: false }
@@ -448,17 +452,18 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
           </p>
         </div>
 
-        <div v-if="selectedLoadingFull" class="flex items-center gap-2 px-1 text-xs text-muted-foreground">
-          <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" aria-hidden="true" />
-          Preparing profile rules…
-        </div>
+        <Spinner v-if="selectedLoadingFull" label="Preparing profile rules…" show-label class="px-1" />
 
-        <div v-else-if="selectedRuleState === 'unavailable'" class="surface border-destructive/40 bg-destructive/5 px-5 py-4">
-          <p class="text-sm font-medium text-destructive">Profile rules are unavailable.</p>
-          <p class="mt-1 text-xs text-destructive/90">{{ selectedLoadError }}</p>
-          <p class="mt-1 text-xs text-muted-foreground">The crate may still be materializing. Retry runs the same bounded preparation check again.</p>
+        <Notice
+          v-else-if="selectedRuleState === 'unavailable'"
+          tone="error"
+          title="Profile rules are unavailable."
+          class="px-5 py-4"
+        >
+          <p class="mt-1">{{ selectedLoadError }}</p>
+          <p class="mt-1">The crate may still be materializing. Retry runs the same bounded preparation check again.</p>
           <Button variant="outline" size="sm" class="mt-3" @click="ensureFullProfile(selected, true)">Retry</Button>
-        </div>
+        </Notice>
 
         <section v-if="selectedRuleState === 'ready' && additionalRequirements.length" class="surface space-y-2 p-5">
           <div>
@@ -474,7 +479,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
             <header class="border-b border-border px-5 py-4">
               <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-foreground">
                 <span>This profile</span>
-                <Badge :variant="obligationBadgeVariant(entry.obligation)" class="text-[10px] font-semibold uppercase tracking-wide">{{ entry.obligation }}</Badge>
+                <Badge size="sm" :variant="obligationBadgeVariant(entry.obligation)" class="font-semibold uppercase tracking-wide">{{ entry.obligation }}</Badge>
                 <span>include an entity of type</span>
                 <b class="font-semibold text-aruna-navy">{{ entityTypeLabel(entry.rule.type) }}</b>
                 <span v-if="entry.rule.label && entry.rule.label.toLowerCase() !== entityTypeLabel(entry.rule.type).toLowerCase()" class="text-muted-foreground">- {{ entry.rule.label }}</span>
@@ -488,7 +493,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
             <div v-if="entry.rule.propertyRules.length">
               <div v-for="group in groupByObligation(entry.rule.propertyRules)" :key="group.obligation" class="border-l-2" :class="OBLIGATION_ACCENT[group.obligation]">
                 <div class="flex flex-wrap items-center gap-2 bg-muted/20 px-5 py-2">
-                  <Badge :variant="obligationBadgeVariant(group.obligation)" class="text-[10px] font-semibold uppercase tracking-wide">{{ group.obligation }}</Badge>
+                  <Badge size="sm" :variant="obligationBadgeVariant(group.obligation)" class="font-semibold uppercase tracking-wide">{{ group.obligation }}</Badge>
                   <span class="text-xs font-semibold text-foreground">{{ PROFILE_OBLIGATION_LABELS[group.obligation].label }}</span>
                   <span class="text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[group.obligation].help }}</span>
                 </div>
@@ -525,23 +530,19 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 </ul>
               </div>
             </div>
-            <div v-else class="px-5 py-6 text-center text-xs text-muted-foreground">
-              No property rules defined for this entity type.
-            </div>
+            <EmptyState v-else compact title="No property rules defined for this entity type." />
           </div>
         </template>
 
-        <div v-else-if="selectedRuleState === 'ready' && (selected.shapesText || selected.customShapesText)" class="surface px-5 py-10 text-center text-sm text-muted-foreground">
-          No editable controls could be generated. The retained SHACL requirements still apply during validation.
-        </div>
-        <div v-else-if="selectedRuleState === 'empty'" class="surface px-5 py-10 text-center text-sm text-muted-foreground">
-          No rules are defined for this profile.
-        </div>
+        <EmptyState
+          v-else-if="selectedRuleState === 'ready' && (selected.shapesText || selected.customShapesText)"
+          title="No editable controls could be generated."
+          description="The retained SHACL requirements still apply during validation."
+        />
+        <EmptyState v-else-if="selectedRuleState === 'empty'" title="No rules are defined for this profile." />
       </section>
 
-      <section v-else class="surface p-10 text-center text-sm text-muted-foreground">
-        Select a visible profile document.
-      </section>
+      <EmptyState v-else title="Select a visible profile document." />
     </div>
 
     <Dialog :open="showDelete" @update:open="(value: boolean) => (showDelete = value)">
@@ -552,7 +553,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
             Deletes <span class="font-medium text-foreground">{{ selected?.name }}</span> and its graph from the catalog. Published S3 artifacts are not touched.
           </DialogDescription>
         </DialogHeader>
-        <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
+        <Notice v-if="deleteError" tone="error">{{ deleteError }}</Notice>
         <DialogFooter>
           <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
           <Button variant="destructive" :disabled="saving" @click="confirmDelete">{{ saving ? 'Deleting…' : 'Delete' }}</Button>

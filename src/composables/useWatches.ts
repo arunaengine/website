@@ -8,6 +8,7 @@ import {
   type WatchListResponse,
 } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
+import { errorMessage } from '@/lib/utils'
 
 // Module-singleton state shared by every watch surface (buttons, settings
 // list), mirroring useNotifications: 404/405 marks the endpoints absent and
@@ -28,10 +29,6 @@ const available = computed(() => supported.value && !forbidden.value && Boolean(
 
 function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 function noteUnavailable(err: unknown): boolean {

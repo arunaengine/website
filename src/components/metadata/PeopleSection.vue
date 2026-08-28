@@ -50,11 +50,11 @@ watch(
 
     <div class="space-y-4 px-5 py-4">
       <div v-for="group in groups" :key="group.key">
-        <div class="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <h3 class="mb-2 flex items-center gap-1.5 font-display text-sm font-semibold text-aruna-navy">
           <component :is="group.icon" class="h-3.5 w-3.5 text-primary/60" />
           {{ group.label }}
-          <span>{{ group.entities.length }}</span>
-        </div>
+          <span class="text-xs font-normal text-muted-foreground">{{ group.entities.length }}</span>
+        </h3>
         <div class="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <ContextualEntityCard
             v-for="entity in cardsOf(group)"

@@ -11,7 +11,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
 import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES, type QuotaState } from '@/lib/quota'
-import { formatBytes } from '@/lib/utils'
+import { errorMessage, formatBytes } from '@/lib/utils'
 import type { GroupQuotaStatus } from '@/lib/api'
 
 const { myGroups, getGroupUsage } = useAruna()
@@ -105,7 +105,7 @@ async function fetchEntry(entry: CardEntry, seq: number) {
   } catch (err) {
     if (seq !== loadSeq) return
     entry.status = 'error'
-    entry.error = err instanceof Error ? err.message : String(err)
+    entry.error = errorMessage(err)
   }
   entries.value = [...entries.value]
 }
@@ -196,7 +196,8 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
           <Badge
             v-if="entry.status === 'ready' && badgeFor(entry)"
             :variant="badgeFor(entry)!.variant"
-            class="shrink-0 text-[10px] uppercase"
+            size="sm"
+            class="shrink-0 uppercase"
           >
             {{ badgeFor(entry)!.label }}
           </Badge>

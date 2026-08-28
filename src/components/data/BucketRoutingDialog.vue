@@ -10,12 +10,15 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Notice from '@/components/ui/Notice.vue'
 import RoutingTargetPicker from '@/components/groups/RoutingTargetPicker.vue'
 import { computed, ref, watch } from 'vue'
 import { Plus, Route, TriangleAlert, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
+import { errorMessage } from '@/lib/utils'
 import {
   ApiError,
   type GroupBackendResponse,
@@ -65,7 +68,7 @@ async function load() {
   } catch (err) {
     if (seq !== loadSeq) return
     if (err instanceof ApiError && (err.status === 403 || err.status === 401)) hidden.value = true
-    else loadError.value = err instanceof Error ? err.message : String(err)
+    else loadError.value = errorMessage(err)
   } finally {
     if (seq === loadSeq) loading.value = false
   }
@@ -106,14 +109,14 @@ async function save() {
     rules.value = stored.rules
     warnings.value = stored.warnings
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err)
+    saveError.value = errorMessage(err)
   }
 }
 </script>
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-2xl">
+    <DialogContent class="max-w-xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Route class="h-4 w-4 text-primary" /> Storage routing for {{ props.bucket }}
@@ -124,9 +127,11 @@ async function save() {
         </DialogDescription>
       </DialogHeader>
 
-      <div v-if="hidden" class="text-xs text-muted-foreground">
-        Storage routing is only visible to admins of the group that owns this bucket.
-      </div>
+      <EmptyState
+        v-if="hidden"
+        compact
+        title="Storage routing is only visible to admins of the group that owns this bucket."
+      />
       <Skeleton v-else-if="loading && !rules.length" class="h-24" />
       <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
       <template v-else>
@@ -176,9 +181,12 @@ async function save() {
               <Trash2 class="h-3.5 w-3.5" />
             </Button>
           </div>
-          <p v-if="!rules.length" class="px-1 text-xs text-muted-foreground">
-            No rules yet. New files follow the group default, and then this node's own routing.
-          </p>
+          <EmptyState
+            v-if="!rules.length"
+            compact
+            title="No rules yet."
+            description="New files follow the group default, and then this node's own routing."
+          />
         </div>
 
         <Button variant="outline" size="sm" class="justify-self-start" @click="addRule">
@@ -190,14 +198,15 @@ async function save() {
         </p>
         <p v-if="incomplete" class="text-xs text-destructive">Every rule needs a target.</p>
         <p v-if="saveError" class="text-xs text-destructive">{{ saveError }}</p>
-        <p
+        <Notice
           v-for="warning in warnings"
           :key="warning"
-          class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+          tone="warning"
+          class="flex items-start gap-2"
         >
           <TriangleAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{{ warning }}</span>
-        </p>
+        </Notice>
 
         <DialogFooter>
           <DialogClose as-child><Button type="button" variant="outline">Close</Button></DialogClose>

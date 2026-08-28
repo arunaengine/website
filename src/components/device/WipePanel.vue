@@ -4,7 +4,9 @@
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
 import { wipeDevice } from '@/lib/desktopBridge'
+import { errorMessage } from '@/lib/utils'
 import { Trash2 } from '@lucide/vue'
 
 // Echoed back to the shell, which demands the phrase before it wipes anything.
@@ -27,7 +29,7 @@ async function wipe(): Promise<void> {
     wipeInput.value = ''
     emit('wiped')
   } catch (err) {
-    wipeError.value = err instanceof Error ? err.message : String(err)
+    wipeError.value = errorMessage(err)
   } finally {
     wiping.value = false
   }
@@ -48,11 +50,6 @@ async function wipe(): Promise<void> {
         <Trash2 class="h-3.5 w-3.5" /> {{ wiping ? 'Wiping…' : 'Wipe device' }}
       </Button>
     </div>
-    <p
-      v-if="wipeError"
-      class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-    >
-      {{ wipeError }}
-    </p>
+    <Notice v-if="wipeError" tone="error">{{ wipeError }}</Notice>
   </div>
 </template>

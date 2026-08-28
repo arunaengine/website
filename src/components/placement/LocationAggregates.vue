@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { MapPin } from '@lucide/vue'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import type { LocationAggregate } from '@/lib/placement'
@@ -60,8 +61,6 @@ function connectedWidth(a: LocationAggregate): string {
         </p>
       </li>
     </ul>
-    <p v-else class="px-1 py-6 text-center text-xs text-muted-foreground">
-      No nodes are mapped to placement locations yet.
-    </p>
+    <EmptyState v-else compact title="No nodes are mapped to placement locations yet." />
   </div>
 </template>

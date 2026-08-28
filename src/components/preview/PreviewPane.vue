@@ -6,10 +6,12 @@ import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useObjectPreview } from '@/composables/useObjectPreview'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { formatBytes } from '@/lib/utils'
-import { Download, Link2, Loader2, ShieldAlert } from '@lucide/vue'
+import { Download, Link2, ShieldAlert } from '@lucide/vue'
 
 const props = defineProps<{
   open: boolean
@@ -137,25 +139,26 @@ async function download() {
       </div>
 
       <div class="mt-4 min-h-0 flex-1 overflow-auto">
-        <div
+        <Spinner
           v-if="preview.status.value === 'loading'"
-          class="flex items-center gap-2 py-10 text-sm text-muted-foreground"
-        >
-          <Loader2 class="h-4 w-4 animate-spin" /> Loading preview…
-        </div>
+          show-label
+          label="Loading preview…"
+          class="flex py-10 text-sm"
+        />
 
-        <div
+        <Notice
           v-else-if="preview.status.value === 'error' && preview.corsBlocked.value"
-          class="surface flex flex-col items-center gap-3 border-amber-500/30 bg-amber-500/5 px-5 py-10 text-center"
+          tone="warning"
+          class="flex flex-col items-center gap-3 px-5 py-10 text-center"
         >
-          <ShieldAlert class="h-5 w-5 text-amber-600 dark:text-amber-400" />
-          <p class="text-sm font-medium text-amber-900 dark:text-amber-200">This object could not be fetched for preview.</p>
-          <p class="max-w-md text-xs text-amber-800/90 dark:text-amber-300/90">
+          <ShieldAlert class="h-5 w-5" aria-hidden="true" />
+          <p class="text-sm font-medium">This object could not be fetched for preview.</p>
+          <p class="max-w-md">
             The bucket does not allow this portal's origin to read objects in the browser (CORS). Downloading the
             file still works.
           </p>
           <Button variant="outline" size="sm" @click="download"><Download class="h-4 w-4" /> Download</Button>
-        </div>
+        </Notice>
 
         <ErrorPanel
           v-else-if="preview.status.value === 'error'"

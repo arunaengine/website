@@ -46,7 +46,7 @@ const emit = defineEmits<{ (e: 'toggle-favourite', id: string): void }>()
     <div class="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
       <span class="truncate">{{ props.doc.author || props.doc.ulid }}</span>
       <div class="flex shrink-0 items-center gap-1.5">
-        <Badge v-if="props.score !== undefined" variant="outline" class="text-[10px]">score {{ props.score.toFixed(2) }}</Badge>
+        <Badge v-if="props.score !== undefined" variant="outline" size="sm">score {{ props.score.toFixed(2) }}</Badge>
         <ProfileChip :doc="props.doc" />
       </div>
     </div>

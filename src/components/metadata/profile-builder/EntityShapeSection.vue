@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import PropertyRuleRow from './PropertyRuleRow.vue'
 import PropertyTermPicker from './PropertyTermPicker.vue'
@@ -170,16 +171,17 @@ function changeType(choice: { uri: string; label: string }) {
       </div>
     </div>
 
-    <div
+    <Notice
       v-if="isUnreferenced"
-      class="flex flex-wrap items-center gap-2 border-b border-amber-500/30 bg-amber-500/5 px-4 py-2 text-[11px] text-amber-800 dark:text-amber-300"
+      tone="warning"
+      class="flex flex-wrap items-center gap-2 rounded-none border-0 border-b px-4 py-2 text-[11px]"
     >
       <TriangleAlert class="size-3.5 shrink-0" />
       <span>Nothing references this shape yet, so it has no effect.</span>
       <Button v-if="rootEntity && rootEntity !== entity" type="button" variant="outline" size="sm" @click="referenceFromRoot">
         Reference it from {{ rootEntity.label || 'the Root Dataset' }}
       </Button>
-    </div>
+    </Notice>
 
     <div v-if="expanded" class="space-y-1.5 p-3">
       <PropertyRuleRow

@@ -13,6 +13,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import BucketPolicyDialog from '@/components/residency/BucketPolicyDialog.vue'
@@ -251,16 +252,13 @@ watch(
               <Badge variant="outline">{{ libraryEntries.length }}</Badge>
             </header>
             <div class="space-y-4 p-5">
-              <div
-                v-if="!listed"
-                class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-              >
+              <Notice v-if="!listed" tone="warning">
                 {{
                   listState === 'loading'
                     ? 'Reading the realm policy list…'
                     : 'This node serves no residency policy list. The library below contains only policies created this session, exact id and digest lookups, and refs found while inspecting buckets.'
                 }}
-              </div>
+              </Notice>
               <p v-else class="text-xs text-muted-foreground">
                 Published policies as this node holds them, ordered by id. It is a replicated local
                 view, so a very recent publication elsewhere may not be here yet.
@@ -444,7 +442,7 @@ watch(
       <BucketPolicyDialog v-model:open="bucketDialogOpen" :bucket="bucketDialogName" />
 
       <Dialog :open="releaseTarget !== null" @update:open="(value: boolean) => { if (!value && !resolutionBusy) releaseTarget = null }">
-        <DialogContent class="max-w-lg">
+        <DialogContent class="max-w-md">
           <DialogHeader>
             <DialogTitle>Release this local copy?</DialogTitle>
             <DialogDescription>

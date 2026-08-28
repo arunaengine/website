@@ -16,6 +16,8 @@ import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { BACKEND_KINDS, BACKEND_KIND_SCHEMAS, backendSchema } from '@/lib/storage'
 import type { GroupBackendKind, GroupBackendResponse } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
+import Notice from '@/components/ui/Notice.vue'
 
 const props = defineProps<{
   open: boolean
@@ -143,7 +145,7 @@ async function submit() {
     emit('saved', saved)
     emit('update:open', false)
   } catch (err) {
-    submitError.value = err instanceof Error ? err.message : String(err)
+    submitError.value = errorMessage(err)
   }
 }
 
@@ -163,7 +165,7 @@ async function changeCredentials(existing: GroupBackendResponse): Promise<GroupB
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-lg">
+    <DialogContent class="max-w-md">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Database class="h-4 w-4 text-primary" />
@@ -266,9 +268,7 @@ async function changeCredentials(existing: GroupBackendResponse): Promise<GroupB
             </div>
           </fieldset>
 
-          <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-            {{ submitError }}
-          </p>
+          <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
           <p class="text-[11px] text-muted-foreground">
             The node tries the credentials against the backend before it saves them.
           </p>

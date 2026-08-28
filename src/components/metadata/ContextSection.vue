@@ -65,10 +65,10 @@ function timeLabel(iso: string): string {
         <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <component :is="iconOf(entity.kind)" class="h-4 w-4 shrink-0 text-primary/70" />
           <h3 class="min-w-0 truncate text-sm font-semibold text-foreground" :title="entity.id">{{ entity.name }}</h3>
-          <Badge v-if="entity.profileLabel" variant="royal" class="text-[10px]">{{ entity.profileLabel }}</Badge>
+          <Badge v-if="entity.profileLabel" variant="royal" size="sm">{{ entity.profileLabel }}</Badge>
           <span v-if="entity.types.length" class="font-mono text-[10px] text-muted-foreground/70">{{ entity.types.join(' · ') }}</span>
           <span v-if="entity.relations.length" class="ml-auto flex shrink-0 flex-wrap gap-1">
-            <Badge v-for="relation in entity.relations" :key="relation" variant="outline" class="text-[10px] uppercase">{{ relation }}</Badge>
+            <Badge v-for="relation in entity.relations" :key="relation" variant="outline" size="sm" class="uppercase">{{ relation }}</Badge>
           </span>
         </div>
 
@@ -83,11 +83,11 @@ function timeLabel(iso: string): string {
       </div>
 
       <div v-if="comments.length" class="px-5 py-4">
-        <div class="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <h3 class="mb-2 flex items-center gap-1.5 font-display text-sm font-semibold text-aruna-navy">
           <MessageSquare class="h-3.5 w-3.5 text-primary/60" />
           Comments
-          <span>{{ comments.length }}</span>
-        </div>
+          <span class="text-xs font-normal text-muted-foreground">{{ comments.length }}</span>
+        </h3>
         <ul class="space-y-3">
           <li v-for="comment in comments" :key="comment.id" class="text-sm">
             <p class="whitespace-pre-wrap text-foreground/85">{{ comment.text }}</p>

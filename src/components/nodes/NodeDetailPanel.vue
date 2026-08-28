@@ -20,11 +20,11 @@ defineProps<{
     <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Kind</dt>
-        <dd class="mt-1"><Badge :variant="kindVariant[node.kind]" class="text-[10px] uppercase">{{ node.kind }}</Badge></dd>
+        <dd class="mt-1"><Badge size="sm" :variant="kindVariant[node.kind]" class="uppercase">{{ node.kind }}</Badge></dd>
       </div>
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Connection</dt>
-        <dd class="mt-1"><Badge :variant="connectionVariant(node)" class="text-[10px] uppercase">{{ connectionLabel(node) }}</Badge></dd>
+        <dd class="mt-1"><Badge size="sm" :variant="connectionVariant(node)" class="uppercase">{{ connectionLabel(node) }}</Badge></dd>
       </div>
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Configured</dt>
@@ -37,7 +37,7 @@ defineProps<{
     </dl>
 
     <div class="border-t border-border/70 pt-3">
-      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Placement</div>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Placement</h2>
       <dl v-if="node.placement" class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Location</dt>
@@ -60,7 +60,7 @@ defineProps<{
     </div>
 
     <div>
-      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Node id</div>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Node id</h2>
       <div class="mt-1 flex items-start gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5">
         <code class="min-w-0 flex-1 break-all font-mono text-[11px] leading-relaxed text-foreground/90">{{ node.node_id }}</code>
         <CopyButton :value="node.node_id" label="Copy node id" />
@@ -76,7 +76,7 @@ defineProps<{
     </div>
 
     <div v-if="probe?.usage" class="border-t border-border/70 pt-3">
-      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Storage usage</div>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage usage</h2>
       <dl class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Objects</dt>
@@ -98,7 +98,7 @@ defineProps<{
       <div class="border-t border-border/70 pt-3">
         <div class="mb-2 flex items-center gap-2">
           <span class="text-[10px] font-semibold uppercase tracking-wider text-primary">{{ isLocal ? 'This node' : 'Node details' }}</span>
-          <Badge :variant="statusVariant(probe.info.node.status)" class="text-[10px] uppercase">{{ probe.info.node.status || 'unknown' }}</Badge>
+          <Badge size="sm" :variant="statusVariant(probe.info.node.status)" class="uppercase">{{ probe.info.node.status || 'unknown' }}</Badge>
         </div>
         <LocalNodeDetails :info="probe.info" />
       </div>

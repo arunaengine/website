@@ -11,6 +11,7 @@ import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { backendSchema, backendSummary } from '@/lib/storage'
 import { ApiError, type GroupBackendResponse } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ groupId: string; canAdmin: boolean }>()
 const emit = defineEmits<{
@@ -54,7 +55,7 @@ async function load() {
     if (seq !== loadSeq) return
     backends.value = null
     if (err instanceof ApiError && (err.status === 403 || err.status === 401)) hidden.value = true
-    else loadError.value = err instanceof Error ? err.message : String(err)
+    else loadError.value = errorMessage(err)
   } finally {
     if (seq === loadSeq) loading.value = false
   }
@@ -88,7 +89,7 @@ async function disable(backend: GroupBackendResponse) {
     confirmingId.value = null
     await load()
   } catch (err) {
-    actionError.value = err instanceof Error ? err.message : String(err)
+    actionError.value = errorMessage(err)
   }
 }
 
@@ -99,7 +100,7 @@ async function enable(backend: GroupBackendResponse) {
     await load()
   } catch (err) {
     if (isUnsupportedEndpoint(err)) enableUnsupported.value = true
-    else actionError.value = err instanceof Error ? err.message : String(err)
+    else actionError.value = errorMessage(err)
   }
 }
 
@@ -139,11 +140,11 @@ function kindLabel(backend: GroupBackendResponse): string {
         >
           <Database class="h-3.5 w-3.5 shrink-0 text-primary" />
           <span class="text-sm font-medium text-foreground">{{ backend.name }}</span>
-          <Badge variant="secondary" class="text-[10px] uppercase">{{ kindLabel(backend) }}</Badge>
-          <Badge
+          <Badge size="sm" variant="secondary" class="uppercase">{{ kindLabel(backend) }}</Badge>
+          <Badge size="sm"
             v-if="backend.disabled"
             variant="warn"
-            class="text-[10px] uppercase"
+            class="uppercase"
             title="New uploads no longer go here; files already stored stay readable"
           >
             disabled

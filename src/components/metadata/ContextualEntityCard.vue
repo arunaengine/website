@@ -53,7 +53,7 @@ const idLink = computed(() => {
       <span class="min-w-0 truncate text-sm font-medium text-foreground" :title="entity.id">{{ entity.name }}</span>
       <span v-if="entity.version" class="shrink-0 text-xs text-muted-foreground">{{ entity.version }}</span>
       <span v-if="entity.roles.length" class="ml-auto flex shrink-0 gap-1">
-        <Badge v-for="role in entity.roles" :key="role" variant="outline" class="text-[10px] uppercase">{{ role }}</Badge>
+        <Badge v-for="role in entity.roles" :key="role" variant="outline" size="sm" class="uppercase">{{ role }}</Badge>
       </span>
     </div>
 

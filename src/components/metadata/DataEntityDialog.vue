@@ -11,6 +11,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import ScrollArea from '@/components/ui/ScrollArea.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
+import FactList, { type Fact } from '@/components/ui/FactList.vue'
 import EntityFieldList from '@/components/metadata/EntityFieldList.vue'
 import { ArrowLeft, Check, Copy, File as FileIcon, Folder, Info } from '@lucide/vue'
 import { presentDataEntity } from '@/lib/cratePresenter'
@@ -73,6 +74,16 @@ const typeChips = computed(() =>
   })),
 )
 
+const facts = computed<Fact[]>(() =>
+  entity.value
+    ? [
+        { key: 'size', label: 'Size', value: formatContentSize(entity.value.contentSize) },
+        { key: 'format', label: 'Format', value: entity.value.encodingFormat || '-' },
+        { key: 'location', label: 'Location', value: entity.value.contentUrl || '-' },
+      ]
+    : [],
+)
+
 const copied = ref(false)
 let copyTimer: number | undefined
 async function copyId() {
@@ -85,7 +96,7 @@ async function copyId() {
 
 <template>
   <Dialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogContent class="max-h-[calc(100vh-2rem)] max-w-2xl overflow-hidden">
+    <DialogContent class="max-h-[calc(100vh-2rem)] max-w-xl overflow-hidden">
       <DialogHeader>
         <DialogTitle class="flex min-w-0 items-center gap-2">
           <Info class="h-4 w-4 shrink-0 text-primary" />
@@ -112,31 +123,20 @@ async function copyId() {
         <div class="flex flex-wrap gap-1.5">
           <template v-for="chip in typeChips" :key="chip.uri">
             <ExternalLink v-if="chip.href" :href="chip.href" :label="chip.label" class="chip text-primary" :title="chip.uri" />
-            <Badge v-else variant="outline" class="text-[10px] uppercase">{{ chip.label }}</Badge>
+            <Badge v-else variant="outline" size="sm" class="uppercase">{{ chip.label }}</Badge>
           </template>
-          <Badge v-if="entity.profileLabel" variant="outline" class="text-[10px]">{{ entity.profileLabel }}</Badge>
+          <Badge v-if="entity.profileLabel" variant="outline" size="sm">{{ entity.profileLabel }}</Badge>
         </div>
 
-        <dl class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <div class="surface-muted rounded-md px-3 py-2">
-            <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Size</dt>
-            <dd class="truncate text-sm text-foreground" :title="entity.contentSize">{{ formatContentSize(entity.contentSize) }}</dd>
-          </div>
-          <div class="surface-muted rounded-md px-3 py-2">
-            <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Format</dt>
-            <dd class="truncate text-sm text-foreground" :title="entity.encodingFormat">{{ entity.encodingFormat || '-' }}</dd>
-          </div>
-          <div class="surface-muted col-span-2 rounded-md px-3 py-2 sm:col-span-1">
-            <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Location</dt>
-            <dd class="truncate text-sm">
-              <ExternalLink v-if="entity.contentUrl" :href="entity.contentUrl" :label="entity.contentUrl" :title="entity.contentUrl" />
-              <span v-else class="text-foreground">-</span>
-            </dd>
-          </div>
-        </dl>
+        <FactList :items="facts">
+          <template #location>
+            <ExternalLink v-if="entity.contentUrl" :href="entity.contentUrl" :label="entity.contentUrl" :title="entity.contentUrl" />
+            <span v-else>-</span>
+          </template>
+        </FactList>
 
         <div v-if="entity.children.length" class="space-y-1">
-          <p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Contents</p>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Contents</h3>
           <ul class="divide-y divide-border/50 rounded-md border border-border/60">
             <li v-for="child in entity.children" :key="child.id">
               <button

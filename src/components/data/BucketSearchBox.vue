@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
@@ -9,7 +11,8 @@ import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, useId, watch } from 'vue'
-import { AlertTriangle, ArrowLeftRight, Loader2, Search, X } from '@lucide/vue'
+import { errorMessage } from '@/lib/utils'
+import { AlertTriangle, ArrowLeftRight, Search, X } from '@lucide/vue'
 
 // Federated bucket search over GET /search/buckets, rendered as a compact
 // combobox: one input, results in a dropdown overlay. Local and remote hits
@@ -148,7 +151,7 @@ const runSearch = useDebounceFn(async (term: string) => {
   } catch (err) {
     if (mySeq !== seq) return
     hits.value = []
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errorMessage(err)
   } finally {
     if (mySeq === seq) searching.value = false
   }
@@ -221,20 +224,18 @@ function pinNodeId(hit: BucketSearchHit): string | null {
       :id="listId"
       class="absolute left-0 right-0 top-9 z-40 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
     >
-      <div
+      <Notice
         v-if="partial && searched"
-        role="status"
-        class="flex items-center gap-1.5 border-b border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-800 dark:text-amber-300"
+        tone="warning"
+        class="flex items-center gap-1.5 rounded-none border-x-0 border-t-0"
       >
         <AlertTriangle class="h-3.5 w-3.5 shrink-0" />
         <span>Partial results, {{ nodesQueried - nodesFailed }} of {{ nodesQueried }} nodes answered; matches on failed nodes are missing.</span>
-      </div>
+      </Notice>
 
       <p v-if="error" class="px-2.5 py-2 text-[11px] text-destructive">{{ error }}</p>
 
-      <div v-else-if="searching && !visibleHits.length" class="flex items-center gap-2 px-2.5 py-2 text-[11px] text-muted-foreground">
-        <Loader2 class="h-3 w-3 animate-spin" /> Searching buckets…
-      </div>
+      <Spinner v-else-if="searching && !visibleHits.length" show-label label="Searching buckets…" class="px-2.5 py-2" />
 
       <ul v-else-if="visibleHits.length" role="listbox" class="max-h-64 overflow-y-auto p-1">
         <li v-for="(hit, index) in visibleHits" :key="hit.arn">
@@ -279,9 +280,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
         {{ allowNew ? 'No existing bucket matched. This name will create a new target bucket.' : 'No buckets matched.' }}
       </p>
 
-      <div v-else class="flex items-center gap-2 px-2.5 py-2 text-[11px] text-muted-foreground">
-        <Loader2 class="h-3 w-3 animate-spin" /> Searching buckets…
-      </div>
+      <Spinner v-else show-label label="Searching buckets…" class="px-2.5 py-2" />
     </div>
   </div>
 </template>

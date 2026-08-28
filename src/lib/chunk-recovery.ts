@@ -3,11 +3,13 @@
 // exist. A failed dynamic import then breaks navigation silently. On such a
 // failure, reload once from the server to pick up the new index.html; a
 // sessionStorage stamp keyed by target prevents reload loops.
+import { errorMessage } from './utils'
+
 const STAMP_KEY = 'aruna.chunkReload'
 const LOOP_WINDOW_MS = 10_000
 
 export function isChunkError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error)
+  const message = errorMessage(error)
   return (
     /Failed to fetch dynamically imported module/i.test(message) ||
     /error loading dynamically imported module/i.test(message) ||

@@ -3,15 +3,15 @@ import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
-import Dialog from '@/components/ui/Dialog.vue'
+import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
-import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Input from '@/components/ui/Input.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StatCard from '@/components/ui/StatCard.vue'
@@ -208,20 +208,18 @@ watch(
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogContent class="max-h-[90vh] max-w-5xl overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle class="flex items-center gap-2">
-          <MapPinned class="h-4 w-4 text-primary" /> Residency defaults for {{ props.bucket }}
-        </DialogTitle>
-        <DialogDescription>
-          The whole residency policy set governs versions minted after this change; existing heads keep their own refs until a successor is minted.
-        </DialogDescription>
-      </DialogHeader>
+  <DetailDialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
+    <DialogHeader>
+      <DialogTitle class="flex items-center gap-2">
+        <MapPinned class="h-4 w-4 text-primary" /> Residency defaults for {{ props.bucket }}
+      </DialogTitle>
+      <DialogDescription>
+        The whole residency policy set governs versions minted after this change; existing heads keep their own refs until a successor is minted.
+      </DialogDescription>
+    </DialogHeader>
 
-      <div v-if="hidden" class="text-xs text-muted-foreground">
-        Bucket residency defaults require realm configuration permission.
-      </div>
+    <div class="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto">
+      <EmptyState v-if="hidden" compact title="Bucket residency defaults require realm configuration permission." />
       <div v-else-if="loading && !placement" class="space-y-3">
         <Skeleton class="h-20" />
         <Skeleton class="h-40" />
@@ -293,9 +291,9 @@ watch(
               <StatCard label="Replanned" :value="formatNumber(bulkProgress.replanned)" />
               <StatCard label="Blocked" :value="formatNumber(bulkProgress.blocked.length)" />
             </div>
-            <p v-if="bulkProgress.message" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            <Notice v-if="bulkProgress.message" tone="warning">
               {{ bulkProgress.message }}
-            </p>
+            </Notice>
             <div v-if="bulkProgress.blocked.length" class="overflow-x-auto rounded-md border border-border">
               <table class="w-full min-w-[480px] text-left text-xs">
                 <thead class="border-b border-border bg-muted/40 text-muted-foreground"><tr><th class="px-3 py-2 font-medium">Blocked key</th><th class="px-3 py-2 font-medium">Reason</th></tr></thead>
@@ -329,11 +327,11 @@ watch(
             <Button variant="outline" size="sm" :disabled="coverageLoading" @click="loadCoverage(coverage.cursor)">Next responder page</Button>
           </div>
         </section>
-
-        <DialogFooter>
-          <DialogClose as-child><Button type="button" variant="outline">Close</Button></DialogClose>
-        </DialogFooter>
       </template>
-    </DialogContent>
-  </Dialog>
+    </div>
+
+    <DialogFooter class="mt-4">
+      <DialogClose as-child><Button type="button" variant="outline">Close</Button></DialogClose>
+    </DialogFooter>
+  </DetailDialog>
 </template>

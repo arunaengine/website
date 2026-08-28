@@ -29,16 +29,17 @@ import { RouterLink } from 'vue-router'
             </p>
           </div>
           <div class="flex flex-wrap gap-3 lg:justify-end">
-            <RouterLink to="/app">
-              <Button
-                variant="outline"
-                size="lg"
-                class="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
-              >
+            <Button
+              variant="outline"
+              size="lg"
+              class="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              as-child
+            >
+              <RouterLink to="/app">
                 Open the portal
                 <ArrowRight class="h-4 w-4" />
-              </Button>
-            </RouterLink>
+              </RouterLink>
+            </Button>
           </div>
         </div>
       </div>

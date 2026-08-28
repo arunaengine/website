@@ -20,6 +20,7 @@ import {
 } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
 import { normalizeSeedUrl } from '@/lib/onboarding-config'
+import { errorMessage } from '@/lib/utils'
 
 export const WATCH_INTERVAL_MS = 5_000
 
@@ -66,7 +67,7 @@ export function deviceErrorMessage(err: unknown, limit: number | null, node = ''
     }
     return err.message
   }
-  return err instanceof Error ? err.message : String(err)
+  return errorMessage(err)
 }
 
 function idleWatch(): DeviceWatch {

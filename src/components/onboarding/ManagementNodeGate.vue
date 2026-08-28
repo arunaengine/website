@@ -10,6 +10,7 @@ import { useAruna } from '@/composables/useAruna'
 import { isDesktop } from '@/lib/desktop'
 import { normalizeSeedUrl } from '@/lib/onboarding-config'
 import { ArrowRightLeft, ExternalLink, LoaderCircle, ServerCrash } from '@lucide/vue'
+import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ portals: Array<{ id: string; url: string }> }>()
 
@@ -31,7 +32,7 @@ async function switchTo(url: string): Promise<void> {
       failure.value = `Aruna Desktop stored ${target.origin} but has not switched to it. Try again.`
     }
   } catch (err) {
-    failure.value = err instanceof Error ? err.message : String(err)
+    failure.value = errorMessage(err)
   } finally {
     switching.value = null
   }

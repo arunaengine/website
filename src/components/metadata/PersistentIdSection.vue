@@ -11,6 +11,7 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
@@ -20,6 +21,7 @@ import { useRefresh } from '@/composables/useRefresh'
 import { ApiError } from '@/lib/api'
 import { graphIriFor } from '@/lib/graphIri'
 import { listPersistentIds, pidStateMeta, withdrawPid, type PersistentIdView } from '@/lib/pid'
+import { errorMessage } from '@/lib/utils'
 import { Fingerprint } from '@lucide/vue'
 
 const REASON_MAX = 1024
@@ -33,10 +35,6 @@ const { apiBaseUrl, authToken, currentUser, canWithdrawPids } = useAruna()
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 const view = ref<PersistentIdView | null>(null)
@@ -222,7 +220,7 @@ async function confirmWithdraw() {
             </p>
           </div>
         </div>
-        <p v-if="withdrawError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ withdrawError }}</p>
+        <Notice v-if="withdrawError" tone="error">{{ withdrawError }}</Notice>
         <DialogFooter>
           <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
           <Button variant="destructive" :disabled="withdrawing || !withdrawValid" @click="confirmWithdraw">

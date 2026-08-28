@@ -13,6 +13,7 @@ import {
 import * as CrateBuild from '@/lib/crate/build'
 import * as CrateParse from '@/lib/crate/parse'
 import * as Api from '@/lib/api'
+import * as Utils from '@/lib/utils'
 
 const sourceCrate = CrateBuild.buildRoCrate({
   basics: {
@@ -103,6 +104,7 @@ const DatasetEditView = compileClientComponent(new URL('./DatasetEditView.vue', 
   '@/lib/desktop': { isDesktop: () => false },
   '@/lib/deviceApi': { previewDeviceDraft: vi.fn(), requireDevice: vi.fn() },
   '@/lib/api': Api,
+  '@/lib/utils': Utils,
 })
 
 beforeEach(() => {

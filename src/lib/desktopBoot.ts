@@ -6,6 +6,7 @@ import { readonly, ref } from 'vue'
 import { portalConfig } from './config'
 import { desktopContext, isDesktop } from './desktop'
 import { fetchWithTimeout } from './fetch'
+import { errorMessage } from './utils'
 
 // One attempt is bounded far below the API client's 30s, and the ladder spans
 // enough time that a realm still starting up answers within it.
@@ -50,7 +51,7 @@ async function unreachable(): Promise<string | null> {
     JSON.parse(await response.text())
     return null
   } catch (err) {
-    return err instanceof Error ? err.message : String(err)
+    return errorMessage(err)
   }
 }
 

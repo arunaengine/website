@@ -5,7 +5,7 @@ import Input from '@/components/ui/Input.vue'
 import { ref, watch } from 'vue'
 import { Check, X } from '@lucide/vue'
 import { useJoinRequests } from '@/composables/useJoinRequests'
-import { relativeTime } from '@/lib/utils'
+import { errorMessage, relativeTime } from '@/lib/utils'
 import type { ApiRole, JoinRequest } from '@/lib/api'
 
 const props = defineProps<{ groupId: string; roles: ApiRole[] }>()
@@ -35,7 +35,7 @@ async function reload() {
     setCount()
   } catch (err) {
     // A 404 here means a backend without aruna#248 yet; render it inline.
-    loadError.value = err instanceof Error ? err.message : String(err)
+    loadError.value = errorMessage(err)
   } finally {
     loading.value = false
   }
@@ -82,7 +82,7 @@ async function confirm(req: JoinRequest) {
     setCount()
     emit('changed')
   } catch (err) {
-    decideError.value = err instanceof Error ? err.message : String(err)
+    decideError.value = errorMessage(err)
   }
 }
 </script>

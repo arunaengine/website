@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ChevronDown, FileCode2, AlertTriangle } from '@lucide/vue'
+import Notice from '@/components/ui/Notice.vue'
 import type { LiftNote } from '@/lib/shacl/lift'
 
 // What an imported SHACL file could not become. Rendered next to the rules (and
@@ -24,7 +25,7 @@ function scopeText(note: LiftNote): string {
 </script>
 
 <template>
-  <div v-if="notes.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+  <Notice v-if="notes.length" tone="warning">
     <div class="flex items-center gap-2 font-medium">
       <AlertTriangle class="h-3.5 w-3.5 shrink-0" />
       Imported from SHACL, with parts the builder cannot turn into inputs
@@ -35,7 +36,7 @@ function scopeText(note: LiftNote): string {
       <ul class="mt-1 list-disc space-y-0.5 pl-4">
         <li v-for="note in noField" :key="note.message">
           {{ note.message }}
-          <span v-if="scopeText(note)" class="text-amber-700/80 dark:text-amber-300/70">({{ scopeText(note) }})</span>
+          <span v-if="scopeText(note)" class="opacity-75">({{ scopeText(note) }})</span>
         </li>
       </ul>
     </template>
@@ -54,7 +55,7 @@ function scopeText(note: LiftNote): string {
     <ul v-if="detailsOpen" class="mt-1 list-disc space-y-0.5 pl-4">
       <li v-for="note in partial" :key="note.message">
         {{ note.message }}
-        <span v-if="scopeText(note)" class="text-amber-700/80 dark:text-amber-300/70">({{ scopeText(note) }})</span>
+        <span v-if="scopeText(note)" class="opacity-75">({{ scopeText(note) }})</span>
       </li>
     </ul>
 
@@ -67,5 +68,5 @@ function scopeText(note: LiftNote): string {
         The original constraints are <b>not</b> included, so nothing above is checked. Upload the file under SHACL shapes (advanced) in the Basics step to include them.
       </span>
     </p>
-  </div>
+  </Notice>
 </template>

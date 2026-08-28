@@ -7,6 +7,7 @@ import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Notice from '@/components/ui/Notice.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
@@ -23,6 +24,7 @@ import { buildDataset, signedInUserEntity, type ContextEntity, type DatasetDraft
 import { isDesktop } from '@/lib/desktop'
 import { previewDeviceDraft, requireDevice } from '@/lib/deviceApi'
 import { ApiError, profileValidationFindings, type RoCrateStructuralViolation } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
 import { emitEntityEntries, emitSelectObject, slugify } from '@/lib/profiles/emit'
 import { type EntityEntry } from '@/lib/profiles/entityEntries'
@@ -152,7 +154,7 @@ watch(selectedProfileId, async () => {
     if (draft.profile) draft.profile.contextTerms = loaded.contextTerms
     profileValues.value = defaultControlValues(profileControls.value)
   } catch (error) {
-    profileError.value = error instanceof Error ? error.message : String(error)
+    profileError.value = errorMessage(error)
   } finally {
     profileLoading.value = false
   }
@@ -407,7 +409,7 @@ async function create() {
     })
     await router.push({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
-    submitError.value = error instanceof Error ? error.message : String(error)
+    submitError.value = errorMessage(error)
     writeIssues.value = [
       ...writeStructuralViolations(error).map((issue) => ({
         code: issue.code,
@@ -516,12 +518,12 @@ async function create() {
               @update:model-value="(value) => (profileValues = { ...profileValues, [control.property]: value })"
             />
           </div>
-          <div v-if="parsedProfile?.liftNotes.length" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            <p class="font-medium">Additional SHACL requirements</p>
-            <ul class="mt-1 list-disc space-y-1 pl-4">
-              <li v-for="(note, index) in parsedProfile.liftNotes" :key="index">{{ note.message }}</li>
-            </ul>
-          </div>
+          <Notice
+            v-if="parsedProfile?.liftNotes.length"
+            tone="warning"
+            title="Additional SHACL requirements"
+            :lines="parsedProfile.liftNotes.map((note) => note.message)"
+          />
         </section>
 
         <section id="dataset-context" class="surface scroll-mt-24 space-y-5 p-6">

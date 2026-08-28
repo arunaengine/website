@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import { coverageLimitLabel } from '@/lib/placementPolicies'
 import type { CoverageResponse } from '@/lib/placementPolicies'
@@ -58,11 +59,11 @@ defineProps<{ report: CoverageResponse }>()
     </div>
     <EmptyState v-else title="No attachment gaps in this page" description="This does not claim that every realm copy is compliant." />
 
-    <div data-testid="coverage-limits" class="flex flex-wrap items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+    <Notice data-testid="coverage-limits" tone="warning" class="flex flex-wrap items-center gap-1.5">
       <span class="font-medium">Report caveats:</span>
       <Badge v-for="limit in report.limits" :key="limit" variant="warn">{{ coverageLimitLabel(limit) }}</Badge>
       <span v-if="!report.limits.length">No additional backend caveats were returned; completion is still responder-local.</span>
-    </div>
+    </Notice>
     <p class="text-[11px] text-muted-foreground">
       Complete means this responder's bounded iterator was exhausted. It never means realm-wide convergence.
     </p>

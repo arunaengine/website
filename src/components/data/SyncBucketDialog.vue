@@ -2,6 +2,8 @@
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -16,8 +18,9 @@ import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { ApiError, type BucketSearchHit, type CreateSyncRelationshipRequest, type SyncMode, type SyncReferenceHandling, type SyncRelationship } from '@/lib/api'
 import { isWorkspaceBucket } from '@/lib/workspaces'
+import { errorMessage } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
-import { ArrowRight, Loader2 } from '@lucide/vue'
+import { ArrowRight } from '@lucide/vue'
 
 // Creates a sync relationship for one bucket (optionally narrowed to a key
 // prefix). Two directions share the dialog:
@@ -49,6 +52,10 @@ const sourceNode = computed(() => (props.sourceNodeId ? realmNodes.nodeById(prop
 // Pull mode POSTs to the source node's API; without a published URL the
 // relationship must be created from that node's own portal.
 const sourceApiBase = computed(() => sourceNode.value?.apiBase ?? null)
+const sourceUnreachable = computed(() => pullMode.value && !sourceApiBase.value)
+const targetUnreachable = computed(
+  () => Boolean(targetNodeId.value) && realmNodes.nodeById(targetNodeId.value)?.reachable === false,
+)
 
 const sourcePrefix = ref('')
 const targetNodeId = ref('')
@@ -178,7 +185,7 @@ async function submit() {
         error.value = err.message
       }
     } else {
-      error.value = err instanceof Error ? err.message : String(err)
+      error.value = errorMessage(err)
     }
   } finally {
     busy.value = false
@@ -188,7 +195,7 @@ async function submit() {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-lg">
+    <DialogContent class="max-w-md">
       <DialogHeader>
         <DialogTitle>{{ pullMode ? 'Sync to this node' : 'Sync bucket' }}</DialogTitle>
         <DialogDescription>
@@ -201,10 +208,12 @@ async function submit() {
       <div class="space-y-4">
         <!-- Direction summary -->
         <div class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
-          <Badge :variant="pullMode ? 'outline' : 'accent'" class="text-[10px]">{{ sourceNodeLabel }}</Badge>
+          <Badge :variant="pullMode ? 'outline' : 'accent'" size="sm">{{ sourceNodeLabel }}</Badge>
+          <Badge v-if="sourceUnreachable" variant="warn" size="sm">Realm unreachable</Badge>
           <span class="min-w-0 truncate font-mono">{{ sourceBucket }}{{ sourcePrefix.trim() ? `/${sourcePrefix.trim().replace(/\/$/, '')}` : '' }}</span>
           <ArrowRight class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <Badge :variant="pullMode ? 'accent' : 'outline'" class="text-[10px]">{{ targetNodeId ? targetNodeLabel : 'target node' }}</Badge>
+          <Badge :variant="pullMode ? 'accent' : 'outline'" size="sm">{{ targetNodeId ? targetNodeLabel : 'target node' }}</Badge>
+          <Badge v-if="targetUnreachable" variant="warn" size="sm">Realm unreachable</Badge>
           <span class="min-w-0 truncate font-mono">{{ targetBucket.trim() || 'target-bucket' }}{{ targetPrefix.trim() ? `/${targetPrefix.trim().replace(/\/$/, '')}` : '' }}</span>
         </div>
 
@@ -224,7 +233,7 @@ async function submit() {
         <div class="space-y-1 text-xs">
           <span class="font-medium text-foreground">Target node</span>
           <p v-if="pullMode" class="flex items-center gap-2">
-            <Badge variant="accent" class="text-[10px]">{{ targetNodeLabel }}</Badge>
+            <Badge variant="accent" size="sm">{{ targetNodeLabel }}</Badge>
             <span class="text-muted-foreground">The connected node receives the data.</span>
           </p>
           <Select
@@ -297,19 +306,19 @@ async function submit() {
           <Switch :checked="replicateDeletes" @update:checked="(v: boolean) => (replicateDeletes = v)" />
         </label>
 
-        <p v-if="sameEndpoint" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+        <Notice v-if="sameEndpoint" tone="warning">
           Source and target are the same bucket and prefix, pick a different node, bucket or prefix.
-        </p>
-        <p v-if="pullMode && !sourceApiBase" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+        </Notice>
+        <Notice v-if="sourceUnreachable" tone="warning">
           {{ sourceNodeLabel }} does not publish an API URL, so the sync cannot be created from here. Create it from that node's portal instead.
-        </p>
-        <p v-if="error" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ error }}</p>
+        </Notice>
+        <Notice v-if="error" tone="error">{{ error }}</Notice>
       </div>
 
       <DialogFooter>
         <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <Button :disabled="!canSubmit" @click="submit">
-          <Loader2 v-if="busy" class="h-4 w-4 animate-spin" />
+          <Spinner v-if="busy" label="Creating the sync" class="text-current" />
           {{ busy ? 'Creating…' : mode === 'once' ? 'Sync now' : 'Create sync' }}
         </Button>
       </DialogFooter>

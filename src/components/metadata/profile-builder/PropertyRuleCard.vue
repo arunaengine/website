@@ -4,6 +4,7 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import { ChevronDown, ChevronRight, Lock, Plus, Trash2, X } from '@lucide/vue'
 import {
   OBLIGATION_ACCENT,
@@ -587,16 +588,17 @@ watch(advancedNeedsAttention, (needsAttention) => {
       />
       <!-- A selected other-type target has no rule, so no sub-form is generated:
            offer to create one in a click. -->
-      <div
+      <Notice
         v-for="target in unresolvedTargets"
         :key="target.uri"
-        class="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 px-2.5 py-1.5 text-[11px] text-amber-800 dark:text-amber-300"
+        tone="warning"
+        class="flex flex-wrap items-center gap-2 border-dashed px-2.5 py-1.5 text-[11px]"
       >
         <span>No entity rule defines <b>{{ target.label }}</b>, no sub-form is generated for it yet.</span>
         <Button v-if="!anyLock" type="button" variant="outline" size="sm" @click="createEntityRule(target.uri)">
           <Plus class="h-3 w-3" /> Create entity rule for {{ target.label }}
         </Button>
-      </div>
+      </Notice>
     </div>
 
     <p class="mt-2 text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[property.obligation].help }}</p>

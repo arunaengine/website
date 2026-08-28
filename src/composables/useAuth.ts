@@ -11,6 +11,7 @@ import {
   pkceChallengeS256,
   randomUrlSafeString,
 } from '@/lib/oidc'
+import { errorMessage } from '@/lib/utils'
 
 const VERIFIER_KEY = 'aruna.oidc.verifier'
 const STATE_KEY = 'aruna.oidc.state'
@@ -117,7 +118,7 @@ async function signIn(options: { onboardingSecret?: string; redirectTo?: string 
     )
   } catch (err) {
     stage.value = 'error'
-    stageError.value = err instanceof Error ? err.message : String(err)
+    stageError.value = errorMessage(err)
   }
 }
 
@@ -190,7 +191,7 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
     if (appliedArunaToken) aruna.setAuthToken('')
     window.sessionStorage.removeItem(ID_TOKEN_KEY)
     stage.value = 'error'
-    stageError.value = err instanceof Error ? err.message : String(err)
+    stageError.value = errorMessage(err)
     throw err
   } finally {
     if (consumeTransaction) {

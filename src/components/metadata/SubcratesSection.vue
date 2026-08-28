@@ -3,14 +3,16 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
-import { Layers, Loader2, Plus, X } from '@lucide/vue'
+import { Layers, Plus, X } from '@lucide/vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentListItem, type MetadataDocumentSummary } from '@/lib/api'
 import { addSubcrateLink, isProjectCrate, removeSubcrateLink, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
 import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
-import { isHttpUrl } from '@/lib/utils'
+import { errorMessage, isHttpUrl } from '@/lib/utils'
 
 const props = defineProps<{
   // The displayed (resolved) crate; writes always go through a fresh raw fetch.
@@ -109,7 +111,7 @@ async function linkSelected(items: MetadataDocumentListItem[]) {
     emit('changed', summary)
   } catch (err) {
     if (err instanceof ApiError && err.status === 403) error.value = 'You need write permission in the owning group.'
-    else error.value = err instanceof Error ? err.message : String(err)
+    else error.value = errorMessage(err)
   } finally {
     busy.value = false
   }
@@ -126,7 +128,7 @@ async function unlink(link: SubcrateLink) {
     emit('changed', summary)
   } catch (err) {
     if (err instanceof ApiError && err.status === 403) error.value = 'You need write permission in the owning group.'
-    else error.value = err instanceof Error ? err.message : String(err)
+    else error.value = errorMessage(err)
   } finally {
     removingIri.value = null
   }
@@ -139,7 +141,7 @@ async function unlink(link: SubcrateLink) {
       <div class="flex items-center gap-2 text-sm font-medium text-foreground">
         <Layers class="h-4 w-4 text-primary" /> Subcrates
         <span v-if="links.length" class="text-xs font-normal text-muted-foreground">{{ links.length }}</span>
-        <Badge v-if="isProject" variant="outline" class="text-[10px] uppercase">Project crate</Badge>
+        <Badge v-if="isProject" variant="outline" size="sm" class="uppercase">Project crate</Badge>
       </div>
       <Button v-if="canWrite" variant="outline" size="sm" @click="openPicker"><Plus class="size-3.5" /> Link subcrate</Button>
     </div>
@@ -163,7 +165,7 @@ async function unlink(link: SubcrateLink) {
           </div>
         </div>
         <div class="flex shrink-0 items-center gap-1.5">
-          <Badge variant="outline" class="text-[10px] uppercase">{{ resolveDocumentId(link) ? 'subcrate' : 'external subcrate' }}</Badge>
+          <Badge variant="outline" size="sm" class="uppercase">{{ resolveDocumentId(link) ? 'subcrate' : 'external subcrate' }}</Badge>
           <Button
             v-if="canWrite"
             variant="ghost"
@@ -174,15 +176,18 @@ async function unlink(link: SubcrateLink) {
             title="Unlink subcrate (the child document itself is kept)"
             @click="unlink(link)"
           >
-            <Loader2 v-if="removingIri === link.iri" class="size-3.5 animate-spin" />
+            <Spinner v-if="removingIri === link.iri" class="text-current" aria-hidden="true" />
             <X v-else class="size-3.5" />
           </Button>
         </div>
       </li>
     </ul>
-    <p v-else class="px-5 py-6 text-xs text-muted-foreground">
-      No subcrates linked yet. Link existing metadata crates to make this a project-level crate that groups them.
-    </p>
+    <EmptyState
+      v-else
+      compact
+      title="No subcrates linked yet."
+      description="Link existing metadata crates to make this a project-level crate that groups them."
+    />
     <p v-if="error" class="border-t border-border px-5 py-2.5 text-xs text-destructive">{{ error }}</p>
 
     <SubcratePickerDialog

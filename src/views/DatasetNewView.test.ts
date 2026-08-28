@@ -18,6 +18,7 @@ import * as Api from '@/lib/api'
 import * as ProfileControls from '@/lib/profiles/controls'
 import * as ProfileEmit from '@/lib/profiles/emit'
 import * as EntityTree from '@/lib/profiles/entityTree'
+import * as Utils from '@/lib/utils'
 
 const groups = ref([{ id: 'group-1', name: 'Research group' }])
 const profiles = ref([])
@@ -168,6 +169,7 @@ const DatasetNewView = compileClientComponent(new URL('./DatasetNewView.vue', im
   '@/components/ui/Textarea.vue': moduleDefault(TextareaStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
+  '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/groups/GroupSelect.vue': moduleDefault(SelectStub),
   '@/components/groups/CreateGroupDialog.vue': moduleDefault(EmptyStub),
   '@/components/metadata/ProfileControlField.vue': moduleDefault(EmptyStub),
@@ -207,6 +209,7 @@ const DatasetNewView = compileClientComponent(new URL('./DatasetNewView.vue', im
   '@/lib/profiles/controls': ProfileControls,
   '@/lib/profiles/emit': ProfileEmit,
   '@/lib/profiles/entityTree': EntityTree,
+  '@/lib/utils': Utils,
 })
 
 beforeEach(() => {

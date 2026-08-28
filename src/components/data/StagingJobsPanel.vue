@@ -9,15 +9,17 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Progress from '@/components/ui/Progress.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useStaging } from '@/composables/useStaging'
 import { useRefresh } from '@/composables/useRefresh'
 import { featureEnabled } from '@/lib/config'
 import { ApiError, type StagingJob } from '@/lib/api'
-import { formatBytes, relativeTime } from '@/lib/utils'
+import { errorMessage, formatBytes, relativeTime } from '@/lib/utils'
+import { stateVariant, toneVariant } from '@/lib/stateBadge'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { HardDriveDownload, Loader2 } from '@lucide/vue'
+import { HardDriveDownload } from '@lucide/vue'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
@@ -74,7 +76,7 @@ async function loadJobs() {
       jobs.value = []
       nextCursor.value = undefined
     } else {
-      error.value = err instanceof Error ? err.message : String(err)
+      error.value = errorMessage(err)
     }
   } finally {
     if (myRequest === requestId && !disposed) {
@@ -116,7 +118,7 @@ async function loadMore() {
     schedulePoll()
   } catch (err) {
     if (!disposed && myRequest === requestId) {
-      loadMoreError.value = err instanceof Error ? err.message : String(err)
+      loadMoreError.value = errorMessage(err)
     }
   } finally {
     if (!disposed && myRequest === requestId) loadingMore.value = false
@@ -139,10 +141,9 @@ onBeforeUnmount(() => {
   clearPoll()
 })
 
-function jobBadge(job: StagingJob): 'secondary' | 'success' | 'warn' | 'destructive' {
-  if (job.state === 'done') return job.errors.length ? 'warn' : 'success'
-  if (job.state === 'failed') return 'destructive'
-  return 'secondary'
+function jobBadge(job: StagingJob) {
+  if (job.state === 'done' && job.errors.length) return toneVariant('attention')
+  return stateVariant(job.state)
 }
 
 function jobLabel(job: StagingJob): string {
@@ -189,26 +190,26 @@ function jobPercent(job: StagingJob): number {
 
       <div class="scrollbar-thin min-h-0 flex-1 space-y-6 overflow-y-auto">
       <section class="space-y-2">
-        <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Node registry</p>
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Node registry</h2>
         <div v-if="loading" class="space-y-2">
           <Skeleton class="h-12 w-full" />
           <Skeleton class="h-12 w-full" />
         </div>
-        <p
+        <EmptyState
           v-else-if="noRegistry"
-          class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
-        >
-          This backend does not keep a staging job registry yet (aruna#276). Jobs submitted from this browser appear below.
-        </p>
+          compact
+          title="This backend does not keep a staging job registry yet (aruna#276)."
+          description="Jobs submitted from this browser appear below."
+        />
         <ErrorPanel v-else-if="error" :message="error" @retry="loadJobs" />
         <EmptyState v-else-if="!jobs.length" title="No staging jobs" />
         <div v-else class="space-y-2">
             <div v-for="job in jobs" :key="job.job_id" class="space-y-1 rounded-md border border-border px-3 py-2">
               <div class="flex items-center gap-2 text-xs">
-              <Loader2 v-if="job.state === 'running' || job.state === 'queued'" class="h-3 w-3 shrink-0 animate-spin text-primary" />
-              <Badge :variant="jobBadge(job)" class="text-[10px] uppercase">{{ jobLabel(job) }}</Badge>
+              <Spinner v-if="job.state === 'running' || job.state === 'queued'" label="Staging" class="text-primary" />
+              <Badge :variant="jobBadge(job)" size="sm" class="uppercase">{{ jobLabel(job) }}</Badge>
               <span class="min-w-0 flex-1 truncate font-mono">{{ job.bucket }}</span>
-              <Badge variant="outline" class="shrink-0 text-[10px]">{{ job.strategy }}</Badge>
+              <Badge variant="outline" size="sm" class="shrink-0">{{ job.strategy }}</Badge>
             </div>
             <div class="flex items-center gap-1 text-[11px] text-muted-foreground">
               <span>{{ relativeTime(job.submitted_at) }}</span>
@@ -243,14 +244,14 @@ function jobPercent(job: StagingJob): number {
         </div>
         <div v-if="nextCursor || loadMoreError" class="space-y-1 text-center">
           <Button v-if="nextCursor" variant="outline" size="sm" :disabled="loadingMore" @click="loadMore">
-            <Loader2 v-if="loadingMore" class="h-3 w-3 animate-spin" /> Load more
+            <Spinner v-if="loadingMore" label="Loading more staging jobs" class="text-current" /> Load more
           </Button>
           <p v-if="loadMoreError" class="text-[10px] text-destructive">{{ loadMoreError }}</p>
         </div>
       </section>
 
       <section class="space-y-2">
-        <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">This session</p>
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">This session</h2>
         <EmptyState v-if="!staging.submissions.value.length" title="Nothing staged this session" />
         <div v-else class="space-y-2">
           <div
@@ -259,13 +260,10 @@ function jobPercent(job: StagingJob): number {
             class="space-y-0.5 rounded-md border border-border px-3 py-2"
           >
             <div class="flex items-center gap-2 text-xs">
-              <Loader2 v-if="submission.state === 'running'" class="h-3 w-3 shrink-0 animate-spin text-primary" />
-              <Badge
-                :variant="submission.state === 'running' ? 'secondary' : submission.state === 'done' ? 'success' : 'destructive'"
-                class="text-[10px] uppercase"
-              >{{ submission.state }}</Badge>
+              <Spinner v-if="submission.state === 'running'" label="Staging" class="text-primary" />
+              <Badge :variant="stateVariant(submission.state)" size="sm" class="uppercase">{{ submission.state }}</Badge>
               <span class="min-w-0 flex-1 truncate font-mono">{{ submission.bucket }}/{{ submission.key }}</span>
-              <Badge variant="outline" class="shrink-0 text-[10px]">{{ submission.strategy }}</Badge>
+              <Badge variant="outline" size="sm" class="shrink-0">{{ submission.strategy }}</Badge>
             </div>
             <p class="text-[11px] text-muted-foreground">{{ relativeTime(submission.submittedAt) }}</p>
             <p v-if="submission.error" class="text-[11px] text-destructive">{{ submission.error }}</p>

@@ -17,8 +17,8 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
-import { truncateMiddle } from '@/lib/utils'
-import { ApiError, type ApiUser } from '@/lib/api'
+import { errorMessage, truncateMiddle } from '@/lib/utils'
+import type { ApiUser } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
 import { ChevronLeft, ChevronRight, ShieldCheck, Users, UserSearch } from '@lucide/vue'
 
@@ -28,10 +28,6 @@ const { isAuthenticated } = useAuth()
 const { resolveUser } = useUserDirectory()
 
 const ready = computed(() => bootstrapped.value && !!currentUser.value && canInspectUsers.value)
-
-function errorMessage(err: unknown): string {
-  return err instanceof ApiError || err instanceof Error ? err.message : String(err)
-}
 
 // Search hits carry only id + name; rows from GET /users are complete.
 interface UserRow {
@@ -366,7 +362,7 @@ const sharedGroups = computed(() => {
     </div>
 
     <Dialog :open="detailOpen" @update:open="(v: boolean) => (detailOpen = v)">
-      <DialogContent class="flex max-h-[85vh] w-[92vw] max-w-2xl flex-col gap-0 overflow-hidden bg-background p-0">
+      <DialogContent class="flex max-h-[85vh] w-[92vw] max-w-xl flex-col gap-0 overflow-hidden bg-background p-0">
         <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-6">
           <DialogTitle class="sr-only">User details</DialogTitle>
 
@@ -395,7 +391,7 @@ const sharedGroups = computed(() => {
           </div>
 
           <section class="space-y-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Identity subjects</h3>
+            <h2 class="font-display text-sm font-semibold text-aruna-navy">Identity subjects</h2>
             <p v-if="!detail.subject_ids.length" class="text-xs text-muted-foreground">No linked identity subjects.</p>
             <ul v-else class="space-y-1">
               <li
@@ -410,7 +406,7 @@ const sharedGroups = computed(() => {
           </section>
 
           <section class="space-y-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Attributes</h3>
+            <h2 class="font-display text-sm font-semibold text-aruna-navy">Attributes</h2>
             <p v-if="!detailAttributes.length" class="text-xs text-muted-foreground">No attributes set.</p>
             <dl v-else class="grid grid-cols-[minmax(8rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
               <template v-for="[key, value] in detailAttributes" :key="key">
@@ -421,7 +417,7 @@ const sharedGroups = computed(() => {
           </section>
 
           <section class="space-y-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Shared groups</h3>
+            <h2 class="font-display text-sm font-semibold text-aruna-navy">Shared groups</h2>
             <p v-if="!sharedGroups.length" class="text-xs text-muted-foreground">
               You share no groups with this user.
             </p>

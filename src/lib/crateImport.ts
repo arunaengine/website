@@ -1,5 +1,6 @@
 import { crateGraph, crateRootId, dataEntitiesOf, isLeafFile, stringProp } from '@/lib/dataEntities'
 import { classifyRoCrateSpecIri, type RoCrateSpecVersion } from '@/lib/rocrateVersions'
+import { errorMessage } from '@/lib/utils'
 
 // Shared RO-Crate import helpers: structural validation + preview summary for
 // every surface that accepts an uploaded/pasted crate (the metadata detail
@@ -36,7 +37,7 @@ export function analyzeCrateJson(text: string, source: string): CrateImportPrevi
   try {
     json = JSON.parse(text)
   } catch (err) {
-    throw new Error(`Not valid JSON: ${err instanceof Error ? err.message : String(err)}`)
+    throw new Error(`Not valid JSON: ${errorMessage(err)}`)
   }
   if (!isRecord(json)) throw new Error('Expected a JSON object, not an array or scalar.')
   if (!('@context' in json)) throw new Error('Not an RO-Crate: the top-level @context is missing.')

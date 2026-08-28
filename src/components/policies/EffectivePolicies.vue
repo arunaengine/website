@@ -7,6 +7,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import { computed, ref, watch } from 'vue'
 import { ShieldCheck } from '@lucide/vue'
 import { ApiError } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 import { isPoliciesUnsupported, usePolicies } from '@/composables/usePolicies'
 import { useRefresh } from '@/composables/useRefresh'
 import { scopeLabel, type ScopedPolicy } from '@/lib/policies'
@@ -39,7 +40,7 @@ async function load() {
     if (seq !== loadSeq) return
     if (isPoliciesUnsupported(err)) unsupported.value = true
     else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) hidden.value = true
-    else error.value = err instanceof Error ? err.message : String(err)
+    else error.value = errorMessage(err)
   } finally {
     if (seq === loadSeq) loading.value = false
   }
@@ -90,12 +91,12 @@ defineExpose({ reload: load })
       <ul class="space-y-2">
         <li v-for="(policy, index) in policies" :key="`${policy.policy_id}-${index}`" class="surface-muted p-3">
           <div class="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" class="text-[10px]">{{ scopeLabel(policy.scope) }}</Badge>
+            <Badge variant="outline" size="sm">{{ scopeLabel(policy.scope) }}</Badge>
             <span class="text-sm font-medium text-foreground">{{ policy.name }}</span>
-            <Badge :variant="policy.kind === 'require' ? 'warn' : 'destructive'" class="text-[10px] uppercase">
+            <Badge :variant="policy.kind === 'require' ? 'warn' : 'destructive'" size="sm" class="uppercase">
               {{ policy.kind }}
             </Badge>
-            <Badge v-if="!policy.enabled" variant="secondary" class="text-[10px] uppercase">off</Badge>
+            <Badge v-if="!policy.enabled" variant="secondary" size="sm" class="uppercase">off</Badge>
           </div>
           <p v-if="policy.when" class="mt-1.5 font-mono text-xs text-muted-foreground">
             when {{ policy.when }}

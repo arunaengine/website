@@ -4,6 +4,7 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
 import PolicyRow from '@/components/policies/PolicyRow.vue'
 import PolicyDryRun from '@/components/policies/PolicyDryRun.vue'
 import { computed, ref, watch } from 'vue'
@@ -164,9 +165,7 @@ const scopeNoun = computed(() => (props.scope === 'group' ? 'group' : 'realm'))
       This scope holds the maximum of {{ MAX_POLICIES_PER_SCOPE }} policies.
     </p>
 
-    <div v-if="unsupported" class="surface-muted px-4 py-6 text-center text-sm text-muted-foreground">
-      This node does not serve the policy API yet.
-    </div>
+    <EmptyState v-if="unsupported" compact title="This node does not serve the policy API yet." />
 
     <template v-else>
       <div v-if="loading && !draft.length" class="space-y-2">
@@ -198,13 +197,12 @@ const scopeNoun = computed(() => (props.scope === 'group' ? 'group' : 'realm'))
         />
       </div>
 
-      <div v-if="staleWrite" class="surface border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm">
-        <p class="font-medium text-amber-800 dark:text-amber-200">Someone else changed this policy set.</p>
-        <p class="mt-1 text-muted-foreground">
+      <Notice v-if="staleWrite" tone="warning" title="Someone else changed this policy set." class="text-sm">
+        <p class="mt-1">
           Your edits are still here. Reload to pull their version, then re-apply what you need.
         </p>
         <Button variant="outline" size="sm" class="mt-2" @click="load">Reload</Button>
-      </div>
+      </Notice>
 
       <p v-if="saveError" class="text-sm text-destructive">{{ saveError }}</p>
       <p v-else-if="canAdmin && writesDisabled" class="text-sm text-muted-foreground">

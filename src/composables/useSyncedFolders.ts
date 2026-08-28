@@ -26,6 +26,7 @@ import {
 } from '@/lib/deviceApi'
 import { needsYouCount } from '@/lib/syncStates'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { errorMessage } from '@/lib/utils'
 
 const query = useDeviceQuery<SyncedFolder[]>(listFolders, [])
 const folders = query.data
@@ -61,10 +62,6 @@ function replace(folder: SyncedFolder): SyncedFolder {
     ? folders.value.map((entry) => (entry.folder_id === folder.folder_id ? folder : entry))
     : [...folders.value, folder]
   return folder
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }
 
 async function folderAction<T>(folderId: string, work: () => Promise<T>): Promise<T> {

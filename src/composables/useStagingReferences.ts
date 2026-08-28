@@ -5,6 +5,7 @@ import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useAruna } from './useAruna'
 import { aggregateReferences } from '@/lib/references'
 import type { StagingReferenceEntry } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 
 export type StagingReferencesStatus = 'unknown' | 'loading' | 'loaded' | 'error'
 
@@ -39,7 +40,7 @@ export function useStagingReferences(bucket: Ref<string>, active?: Ref<boolean>)
       status.value = 'loaded'
     } catch (caught) {
       if (id !== requestId || signal.aborted) return
-      error.value = caught instanceof Error ? caught.message : String(caught)
+      error.value = errorMessage(caught)
       status.value = 'error'
     } finally {
       if (id === requestId) loading.value = false

@@ -15,6 +15,8 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import DatasetReferencesPreflightPanel from '@/components/data/DatasetReferencesPreflightPanel.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Popover from '@/components/ui/Popover.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
@@ -68,7 +70,7 @@ import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
 import { parseArunaArn, prefixesOverlap, syncBucketKey } from '@/lib/sync'
-import { formatBytes, relativeTime } from '@/lib/utils'
+import { errorMessage, formatBytes, relativeTime } from '@/lib/utils'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -86,7 +88,6 @@ import {
   History,
   KeyRound,
   Link2,
-  Loader2,
   LogIn,
   Plus,
   Route,
@@ -1310,7 +1311,7 @@ async function loadBacklinkPreflight(
       : response
   } catch (error) {
     if (requestId !== backlinkPreflightRequestId || controller.signal.aborted) return
-    backlinkPreflightError.value = error instanceof Error ? error.message : String(error)
+    backlinkPreflightError.value = errorMessage(error)
   } finally {
     if (requestId === backlinkPreflightRequestId) {
       backlinkPreflightBusy.value = false
@@ -1463,7 +1464,7 @@ async function loadBulkBacklinkPreflight(
         if (result.status === 'fulfilled') responses.push({ key, response: result.value })
         else failures.push({
           key,
-          message: result.reason instanceof Error ? result.reason.message : String(result.reason),
+          message: errorMessage(result.reason),
         })
       })
     }
@@ -2029,7 +2030,7 @@ const isEmpty = computed(
             :disabled="!selectedGroupId || !requiredNodeId || contextBusy || contextReady"
             @click="openSelectedContext"
           >
-            <Loader2 v-if="contextBusy" class="h-4 w-4 animate-spin" />
+            <Spinner v-if="contextBusy" label="Opening the session" class="text-current" />
             <KeyRound v-else class="h-4 w-4" />
             {{ contextReady ? 'Session active' : contextMismatch || remoteNodeId ? 'Open on this node' : 'Open group' }}
           </Button>
@@ -2052,19 +2053,17 @@ const isEmpty = computed(
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <section v-if="!s3.connectedEndpoint.value && !bootstrapped" class="surface flex items-center gap-2 p-5 text-sm text-muted-foreground">
-        <Loader2 class="h-4 w-4 animate-spin" /> Connecting to the node…
+      <section v-if="!s3.connectedEndpoint.value && !bootstrapped" class="surface p-5">
+        <Spinner show-label label="Connecting to the node…" class="text-sm" />
       </section>
 
-      <section v-else-if="!s3.connectedEndpoint.value" class="surface border-amber-500/30 bg-amber-500/5 p-5 text-sm text-amber-900 dark:text-amber-200">
-        <div class="flex items-start gap-3">
-          <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />
-          <p>
-            This node does not advertise an S3 endpoint, so the data manager cannot connect.
-            <template v-if="desktop">Turn the local S3 endpoint on under This device, Storage &amp; settings.</template>
-          </p>
-        </div>
-      </section>
+      <Notice v-else-if="!s3.connectedEndpoint.value" tone="warning" class="flex items-start gap-3 p-5 text-sm">
+        <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />
+        <p>
+          This node does not advertise an S3 endpoint, so the data manager cannot connect.
+          <template v-if="desktop">Turn the local S3 endpoint on under This device, Storage &amp; settings.</template>
+        </p>
+      </Notice>
 
       <section v-else-if="!contextReady" class="surface p-6">
         <div class="flex items-start gap-3">
@@ -2094,12 +2093,9 @@ const isEmpty = computed(
       </section>
 
       <section v-else class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <div
-          v-if="sessionWarning"
-          class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-800 lg:col-span-2 dark:text-amber-300"
-        >
+        <Notice v-if="sessionWarning" tone="warning" class="lg:col-span-2">
           {{ sessionWarning }}
-        </div>
+        </Notice>
         <aside class="space-y-3">
           <div class="surface p-3">
             <BucketSearchBox :sync-by-bucket="syncByBucket" @open="openSearchHit" @sync="openSyncFromHit" />
@@ -2114,14 +2110,12 @@ const isEmpty = computed(
                 <Badge variant="outline">{{ sidebarBuckets.length }}</Badge>
               </div>
             </header>
-            <div v-if="bucketsLoading" class="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
-              <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading buckets…
-            </div>
-            <div v-else-if="bucketsError && bucketsAuthError" class="m-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            <Spinner v-if="bucketsLoading" show-label label="Loading buckets…" class="px-4 py-4" />
+            <Notice v-else-if="bucketsError && bucketsAuthError" tone="warning" class="m-3">
               <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
-              <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ bucketsError }}</p>
+              <p class="mt-1 break-all font-mono text-[10px]">{{ bucketsError }}</p>
               <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
-            </div>
+            </Notice>
             <p v-else-if="bucketsError && !bucketsLoaded" class="px-4 py-3 text-xs text-destructive">{{ bucketsError }}</p>
             <template v-else>
               <!-- A failed revalidation keeps the last good list and reports itself above it. -->
@@ -2218,9 +2212,7 @@ const isEmpty = computed(
         </aside>
 
         <div class="min-w-0 space-y-4">
-          <div v-if="!bucket" class="surface grid place-items-center p-12 text-sm text-muted-foreground">
-            Select a bucket to browse its objects.
-          </div>
+          <EmptyState v-if="!bucket" title="Select a bucket to browse its objects." />
 
           <template v-else>
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -2229,12 +2221,13 @@ const isEmpty = computed(
                 <Badge
                   v-if="remoteNodeId"
                   variant="outline"
-                  class="shrink-0 text-[10px]"
+                  size="sm"
+                  class="shrink-0"
                   :title="remoteNodeId"
                 >
                   on {{ realmNodes.displayName(remoteNodeId) }}
                 </Badge>
-                <Loader2 v-if="listLoading" class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+                <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
               </div>
               <div class="flex items-center gap-2">
                 <input ref="fileInput" type="file" multiple class="hidden" @change="onFileInput" />
@@ -2392,11 +2385,11 @@ const isEmpty = computed(
               @dragleave="dragActive = false"
               @drop.prevent="onDrop"
             >
-              <div v-if="listError && listAuthError" class="border-b border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
+              <Notice v-if="listError && listAuthError" tone="warning" class="rounded-none border-x-0 border-t-0">
                 <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
-                <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ listError }}</p>
+                <p class="mt-1 break-all font-mono text-[10px]">{{ listError }}</p>
                 <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
-              </div>
+              </Notice>
               <p v-else-if="listError" class="border-b border-border px-4 py-3 text-xs text-destructive">{{ listError }}</p>
               <table class="w-full text-sm">
                 <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -2608,7 +2601,7 @@ const isEmpty = computed(
     />
 
     <Dialog :open="newFolderOpen" @update:open="(v: boolean) => (newFolderOpen = v)">
-      <DialogContent class="max-w-sm">
+      <DialogContent class="max-w-md">
         <DialogHeader>
           <DialogTitle>New folder</DialogTitle>
           <DialogDescription>
@@ -2619,7 +2612,7 @@ const isEmpty = computed(
         <div class="space-y-2">
           <Input v-model="newFolderName" placeholder="folder-name" class="font-mono text-xs" @keyup.enter="createFolder" />
           <p v-if="newFolderName.trim().includes('/')" class="text-xs text-destructive">The folder name cannot contain '/'.</p>
-          <p v-if="newFolderError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ newFolderError }}</p>
+          <Notice v-if="newFolderError" tone="error">{{ newFolderError }}</Notice>
         </div>
         <DialogFooter>
           <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
@@ -2629,7 +2622,7 @@ const isEmpty = computed(
     </Dialog>
 
     <Dialog :open="bulkDeleteTarget !== null" @update:open="(v: boolean) => { if (!v) closeBulkDelete() }">
-      <DialogContent class="max-h-[90vh] max-w-lg overflow-y-auto">
+      <DialogContent class="max-h-[90vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             Delete {{ bulkDeleteTarget?.keys.length ?? 0 }} selected key{{ bulkDeleteTarget?.keys.length === 1 ? '' : 's' }}
@@ -2680,9 +2673,7 @@ const isEmpty = computed(
           </fieldset>
 
           <template v-if="bulkDeleteMode === 'all_versions_purge'">
-            <p v-if="bulkPurgePreflightBusy" class="flex items-center gap-2 text-muted-foreground">
-              <Loader2 class="h-3 w-3 animate-spin" /> Loading permanent deletion preflights…
-            </p>
+            <Spinner v-if="bulkPurgePreflightBusy" show-label label="Loading permanent deletion preflights…" />
             <section v-else class="space-y-2 rounded-md border border-border px-3 py-2">
               <h4 class="font-medium text-foreground">Preflight inventory</h4>
               <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
@@ -2785,9 +2776,7 @@ const isEmpty = computed(
           </DialogDescription>
         </DialogHeader>
         <div v-if="deleteTarget?.type === 'folder'" class="space-y-2 text-xs">
-          <p v-if="deleteTarget.count === null" class="flex items-center gap-2 text-muted-foreground">
-            <Loader2 class="h-3 w-3 animate-spin" /> Counting objects…
-          </p>
+          <Spinner v-if="deleteTarget.count === null" show-label label="Counting objects…" />
           <p v-else-if="deleteTarget.count >= 0" class="text-muted-foreground">
             Contains {{ deleteTarget.count }}{{ deleteTarget.countTruncated ? '+' : '' }} object{{ deleteTarget.count === 1 && !deleteTarget.countTruncated ? '' : 's' }}.
           </p>
@@ -2802,23 +2791,15 @@ const isEmpty = computed(
 
         <section aria-label="Source bindings" class="space-y-1 rounded-md border border-border px-3 py-2 text-xs">
           <h4 class="font-medium text-foreground">Source bindings</h4>
-          <p v-if="destructiveSourceReferences.status.value === 'loading'" class="flex items-center gap-2 text-muted-foreground">
-            <Loader2 class="h-3 w-3 animate-spin" /> Checking source bindings…
-          </p>
-          <div
-            v-else-if="destructiveSourceReferences.status.value === 'error'"
-            class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
-          >
+          <Spinner v-if="destructiveSourceReferences.status.value === 'loading'" show-label label="Checking source bindings…" />
+          <Notice v-else-if="destructiveSourceReferences.status.value === 'error'" tone="warning">
             <p class="font-medium">Source-binding lookup failed.</p>
             <p>Existing source bindings are unknown.</p>
-            <p v-if="destructiveSourceReferences.error.value" class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ destructiveSourceReferences.error.value }}</p>
-          </div>
-          <p
-            v-else-if="destructiveSourceReferences.status.value === 'unknown'"
-            class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
-          >
+            <p v-if="destructiveSourceReferences.error.value" class="mt-1 break-all font-mono text-[10px]">{{ destructiveSourceReferences.error.value }}</p>
+          </Notice>
+          <Notice v-else-if="destructiveSourceReferences.status.value === 'unknown'" tone="warning">
             Source-binding coverage is unknown for this scope.
-          </p>
+          </Notice>
           <p v-else-if="destructiveSourceBindings.length" class="text-amber-800 dark:text-amber-300">
             {{ destructiveSourceBindings.length }} source binding{{ destructiveSourceBindings.length === 1 ? '' : 's' }} apply to this scope. Deletion does not detach source bindings.
           </p>
@@ -2833,7 +2814,7 @@ const isEmpty = computed(
           <h4 class="font-medium text-foreground">Sync relationships</h4>
           <p class="text-muted-foreground">This scope overlaps a sync relationship. Sync state is separate from Dataset references and source bindings.</p>
         </section>
-        <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
+        <Notice v-if="deleteError" tone="error">{{ deleteError }}</Notice>
         <DialogFooter>
           <DialogClose as-child><Button variant="outline" :disabled="deleteBusy">Cancel</Button></DialogClose>
           <Button variant="destructive" :disabled="deleteBusy || (deleteTarget?.type === 'object' ? !s3.canWrite(deleteTarget.bucket, deleteTarget.object.key, deleteTarget.nodeId) : deleteTarget?.type === 'folder' ? !s3.canDeletePrefix(deleteTarget.bucket, deleteTarget.folder.prefix, deleteTarget.nodeId) : true)" @click="confirmDelete">{{ deleteBusy ? 'Deleting…' : 'Delete' }}</Button>
@@ -2842,7 +2823,7 @@ const isEmpty = computed(
     </Dialog>
 
     <Dialog :open="permanentDeleteTarget !== null" @update:open="(v: boolean) => { if (!v) closePermanentDelete() }">
-      <DialogContent class="max-h-[90vh] max-w-lg overflow-y-auto">
+      <DialogContent class="max-h-[90vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ permanentDeleteActionLabel }}</DialogTitle>
           <DialogDescription v-if="permanentDeleteTarget?.type === 'file'">
@@ -2861,9 +2842,7 @@ const isEmpty = computed(
         </DialogHeader>
 
         <div v-if="permanentDeleteTarget" class="space-y-3 text-xs">
-          <p v-if="permanentDeletePreflightBusy" class="flex items-center gap-2 text-muted-foreground">
-            <Loader2 class="h-3 w-3 animate-spin" /> Loading deletion preflight…
-          </p>
+          <Spinner v-if="permanentDeletePreflightBusy" show-label label="Loading deletion preflight…" />
 
           <template v-else-if="permanentDeletePreflight">
             <section class="space-y-2 rounded-md border border-border px-3 py-2">
@@ -2897,9 +2876,10 @@ const isEmpty = computed(
               </p>
             </section>
 
-            <section
+            <Notice
               v-if="permanentDeleteTarget.type === 'bucket' && permanentDeletePreflight.sync_relationships_apply_to_bucket_delete"
-              class="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300"
+              tone="warning"
+              class="space-y-2"
             >
               <h4 class="font-medium">Sync-relationship removal</h4>
               <template v-if="permanentDeletePreflight.sync_relationships.length">
@@ -2913,7 +2893,7 @@ const isEmpty = computed(
                 </ul>
               </template>
               <p v-else>No sync relationships will be removed.</p>
-            </section>
+            </Notice>
 
           </template>
 
@@ -2925,23 +2905,15 @@ const isEmpty = computed(
 
           <section aria-label="Source bindings" class="space-y-1 rounded-md border border-border px-3 py-2">
             <h4 class="font-medium text-foreground">Source bindings</h4>
-            <p v-if="destructiveSourceReferences.status.value === 'loading'" class="flex items-center gap-2 text-muted-foreground">
-              <Loader2 class="h-3 w-3 animate-spin" /> Checking source bindings…
-            </p>
-            <div
-              v-else-if="destructiveSourceReferences.status.value === 'error'"
-              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
-            >
+            <Spinner v-if="destructiveSourceReferences.status.value === 'loading'" show-label label="Checking source bindings…" />
+            <Notice v-else-if="destructiveSourceReferences.status.value === 'error'" tone="warning">
               <p class="font-medium">Source-binding lookup failed.</p>
               <p>Existing source bindings are unknown.</p>
-              <p v-if="destructiveSourceReferences.error.value" class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ destructiveSourceReferences.error.value }}</p>
-            </div>
-            <p
-              v-else-if="destructiveSourceReferences.status.value === 'unknown'"
-              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
-            >
+              <p v-if="destructiveSourceReferences.error.value" class="mt-1 break-all font-mono text-[10px]">{{ destructiveSourceReferences.error.value }}</p>
+            </Notice>
+            <Notice v-else-if="destructiveSourceReferences.status.value === 'unknown'" tone="warning">
               Source-binding coverage is unknown for this scope.
-            </p>
+            </Notice>
             <p v-else-if="destructiveSourceBindings.length" class="text-amber-800 dark:text-amber-300">
               {{ destructiveSourceBindings.length }} source binding{{ destructiveSourceBindings.length === 1 ? '' : 's' }} apply to this scope. Deletion does not detach source bindings.
             </p>
@@ -2981,12 +2953,9 @@ const isEmpty = computed(
               <p>Versions and markers removed: {{ permanentDeleteStatus.result.versions_removed }}</p>
               <p>Multipart uploads removed: {{ permanentDeleteStatus.result.multipart_uploads_removed }}</p>
             </template>
-            <p
-              v-if="permanentDeleteStatus?.state === 'failed'"
-              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
-            >
+            <Notice v-if="permanentDeleteStatus?.state === 'failed'" tone="warning">
               The purge stopped after committing the progress shown above. Work committed by completed batches remains deleted.
-            </p>
+            </Notice>
           </section>
 
           <section
@@ -2994,9 +2963,7 @@ const isEmpty = computed(
             class="space-y-2 rounded-md border border-border px-3 py-2"
           >
             <h4 class="font-medium text-foreground">Remaining after refresh</h4>
-            <p v-if="permanentDeleteRemainingBusy" class="flex items-center gap-2 text-muted-foreground">
-              <Loader2 class="h-3 w-3 animate-spin" /> Refreshing the selected scope…
-            </p>
+            <Spinner v-if="permanentDeleteRemainingBusy" show-label label="Refreshing the selected scope…" />
             <dl v-else-if="permanentDeleteRemaining" class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
               <div v-for="row in storageInventoryRows(permanentDeleteRemaining)" :key="row.label" class="contents">
                 <dt>{{ row.label }}</dt>
@@ -3011,7 +2978,7 @@ const isEmpty = computed(
           </section>
         </div>
 
-        <p v-if="permanentDeleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ permanentDeleteError }}</p>
+        <Notice v-if="permanentDeleteError" tone="error">{{ permanentDeleteError }}</Notice>
         <DialogFooter>
           <Button variant="outline" :disabled="permanentDeleteBusy" @click="closePermanentDelete">
             {{ permanentDeleteStatus?.state === 'succeeded' ? 'Close' : 'Cancel' }}
@@ -3041,23 +3008,17 @@ const isEmpty = computed(
           </DialogDescription>
         </DialogHeader>
         <div v-if="precheck" class="space-y-2 text-xs">
-          <div
-            v-if="precheck.projected.state === 'over-ceiling'"
-            class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive"
-          >
+          <Notice v-if="precheck.projected.state === 'over-ceiling'" tone="error">
             This upload adds <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
             <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>. It would exceed the group's hard cap of
             <strong>{{ formatBytes(precheck.projected.ceilingBytes ?? 0) }}</strong>, the node rejects writes above the cap with <code>QuotaExceeded</code>.
-          </div>
-          <div
-            v-else
-            class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300"
-          >
+          </Notice>
+          <Notice v-else tone="warning">
             This upload adds <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
             <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>. It crosses the group quota of
             <strong>{{ formatBytes(precheck.projected.quotaBytes ?? 0) }}</strong> into the grace headroom. Uploads still succeed until the hard cap of
             <strong>{{ formatBytes(precheck.projected.ceilingBytes ?? 0) }}</strong>.
-          </div>
+          </Notice>
           <p class="text-muted-foreground">Counters on remote nodes can lag, so these numbers are approximate.</p>
         </div>
         <DialogFooter>

@@ -4,11 +4,12 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import RoutingTargetPicker from '@/components/groups/RoutingTargetPicker.vue'
 import { computed, ref, watch } from 'vue'
-import { TriangleAlert } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { targetLabel } from '@/lib/storage'
 import { ApiError, type GroupBackendResponse, type RoutingTarget } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
+import Notice from '@/components/ui/Notice.vue'
 
 const props = defineProps<{ groupId: string; backends: GroupBackendResponse[]; canAdmin: boolean }>()
 
@@ -40,7 +41,7 @@ async function load() {
   } catch (err) {
     if (seq !== loadSeq) return
     if (err instanceof ApiError && (err.status === 403 || err.status === 401)) hidden.value = true
-    else loadError.value = err instanceof Error ? err.message : String(err)
+    else loadError.value = errorMessage(err)
   } finally {
     if (seq === loadSeq) loading.value = false
   }
@@ -56,7 +57,7 @@ async function save() {
     draft.value = response.default_target ?? null
     warnings.value = response.warnings
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err)
+    saveError.value = errorMessage(err)
   }
 }
 </script>
@@ -96,14 +97,7 @@ async function save() {
       </div>
       <p v-else class="text-xs text-foreground">New uploads go to: {{ targetLabel(stored, props.backends) }}</p>
       <p v-if="saveError" class="text-xs text-destructive">{{ saveError }}</p>
-      <p
-        v-for="warning in warnings"
-        :key="warning"
-        class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-      >
-        <TriangleAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>{{ warning }}</span>
-      </p>
+      <Notice v-if="warnings.length" tone="warning" :lines="warnings" />
     </template>
   </div>
 </template>

@@ -8,6 +8,7 @@ import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import type { MetadataDoc } from '@/data/types'
 import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
@@ -172,11 +173,11 @@ const pageDescription = computed(() =>
         <Button v-if="currentUser" variant="outline" @click="router.push({ name: 'dataset-new' })">
           <Plus class="h-4 w-4" /> Create dataset
         </Button>
-        <RouterLink :to="{ name: 'datasets' }">
-          <Button :variant="currentUser ? 'default' : 'outline'">
+        <Button :variant="currentUser ? 'default' : 'outline'" as-child>
+          <RouterLink :to="{ name: 'datasets' }">
             Open Datasets <ArrowRight class="h-4 w-4" />
-          </Button>
-        </RouterLink>
+          </RouterLink>
+        </Button>
       </template>
     </PageHeader>
 
@@ -247,7 +248,7 @@ const pageDescription = computed(() =>
       <section v-if="currentUser" aria-labelledby="my-groups-heading" class="space-y-3.5">
         <h2 id="my-groups-heading" class="font-display text-[15px] font-semibold text-foreground/85">My groups</h2>
         <GroupQuotaCards v-if="myGroups.length" :refresh-revision="quotaRevision" />
-        <p v-else class="surface px-5 py-4 text-sm text-muted-foreground">You do not belong to any groups yet.</p>
+        <EmptyState v-else compact title="You do not belong to any groups yet." />
       </section>
 
       <section v-if="currentUser" aria-labelledby="node-health-heading" class="space-y-3.5">
@@ -288,8 +289,8 @@ const pageDescription = computed(() =>
                 </div>
               </RouterLink>
             </li>
-            <li v-if="!recentMetadata.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
-              No visible Datasets yet.
+            <li v-if="!recentMetadata.length" class="px-5 py-6">
+              <EmptyState compact title="No visible Datasets yet." />
             </li>
           </ul>
         </div>

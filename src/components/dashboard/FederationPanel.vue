@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useNow } from '@vueuse/core'
 import { RouterLink, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import NodesHealth from '@/components/dashboard/NodesHealth.vue'
 import type { RealmNodeInfo } from '@/lib/api'
 import { connectionLabel, connectionVariant, kindVariant } from '@/components/nodes/node-display'
@@ -213,9 +214,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
     </div>
 
     <div class="surface overflow-hidden rounded-xl p-0">
-      <div v-if="!nodes.length" class="px-5 py-12 text-center text-xs text-muted-foreground">
-        This realm has no nodes yet.
-      </div>
+      <EmptyState v-if="!nodes.length" class="m-5" title="This realm has no nodes yet." />
 
       <template v-else>
         <!-- Topology: a single SVG so connections truly terminate at nodes -->
@@ -377,7 +376,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
         <!-- Real aggregates: kinds and self-published labels -->
         <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Kinds</span>
-          <Badge v-for="[kind, count] in kindCounts" :key="kind" :variant="kindVariant[kind]" class="text-[10px]">
+          <Badge v-for="[kind, count] in kindCounts" :key="kind" :variant="kindVariant[kind]" size="sm">
             {{ kind }} · {{ count }}
           </Badge>
         </div>

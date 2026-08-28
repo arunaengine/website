@@ -25,6 +25,7 @@ import { kindVariant } from '@/components/nodes/node-display'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { apiOrigin, type CreateOnboardingSecretResponse, type OnboardingMode, type RealmNodeInfo } from '@/lib/api'
 import { ArrowLeft, ArrowRight, ExternalLink, ServerCog, ShieldCheck } from '@lucide/vue'
+import Notice from '@/components/ui/Notice.vue'
 
 const { apiBaseUrl, bootstrapped, currentUser, canManageOnboarding, nodeInfo, realmInfo } = useAruna()
 const {
@@ -309,9 +310,9 @@ const secretRows = computed<SecretRow[]>(() =>
       description="Mint single-use secrets, generate the new node's configuration, and watch it join the realm."
     >
       <template #actions>
-        <RouterLink :to="{ name: 'admin' }">
-          <Button variant="outline" size="sm"><ArrowLeft class="h-4 w-4" /> Admin</Button>
-        </RouterLink>
+        <Button variant="outline" size="sm" as-child>
+          <RouterLink :to="{ name: 'admin' }"><ArrowLeft class="h-4 w-4" /> Admin</RouterLink>
+        </Button>
       </template>
     </PageHeader>
 
@@ -405,9 +406,7 @@ const secretRows = computed<SecretRow[]>(() =>
                 <Select v-model="expiresIn" :options="EXPIRY_OPTIONS" class="mt-1" />
                 <p class="mt-1 text-[11px] text-muted-foreground">The server clamps this to between 1 minute and 24 hours.</p>
               </div>
-              <p v-if="mintError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                {{ mintError }}
-              </p>
+              <Notice v-if="mintError" tone="error">{{ mintError }}</Notice>
               <div class="flex justify-between">
                 <Button variant="outline" @click="currentStep = 1"><ArrowLeft class="h-4 w-4" /> Back</Button>
                 <Button :disabled="minting || !seedUrl.trim()" @click="doMint">

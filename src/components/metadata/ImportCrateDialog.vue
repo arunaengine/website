@@ -10,12 +10,14 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import { profileReferenceIri, useAruna } from '@/composables/useAruna'
 import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
 import type { DatasetDraft } from '@/lib/crate/build'
 import { parseDatasetDraft } from '@/lib/crate/parse'
 import { slugify } from '@/lib/profiles/emit'
+import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
   open: boolean
@@ -47,7 +49,7 @@ function importPreviewFrom(text: string, source: string) {
     importPreview.value = analyzeCrateJson(text, source)
   } catch (error) {
     importPreview.value = null
-    importError.value = error instanceof Error ? error.message : String(error)
+    importError.value = errorMessage(error)
   }
 }
 
@@ -105,7 +107,7 @@ watch(
 
 <template>
   <Dialog :open="props.open" @update:open="requestClose">
-    <DialogContent class="max-w-3xl" @interact-outside="(event: Event) => event.preventDefault()">
+    <DialogContent class="max-w-xl" @interact-outside="(event: Event) => event.preventDefault()">
       <div class="contents" :inert="confirmDiscardOpen">
         <DialogHeader>
           <DialogTitle class="flex items-center gap-2">
@@ -131,10 +133,10 @@ watch(
             <Textarea v-model="importPaste" rows="6" class="font-mono text-xs" spellcheck="false" placeholder='{ "@context": "https://w3id.org/ro/crate/1.1/context", "@graph": [ … ] }' />
             <Button type="button" variant="outline" size="sm" :disabled="!importPaste.trim()" @click="importPreviewFrom(importPaste, 'pasted JSON')">Preview pasted JSON</Button>
           </div>
-          <div v-if="importError" class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <Notice v-if="importError" tone="error" class="flex items-start gap-2">
             <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>{{ importError }}</span>
-          </div>
+          </Notice>
           <template v-if="importPreview">
             <div class="space-y-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
               <div class="flex items-center gap-2 font-medium text-foreground">
@@ -149,17 +151,17 @@ watch(
                 {{ importPreview.fileCount }} referenced data {{ importPreview.fileCount === 1 ? 'file' : 'files' }}.
               </p>
             </div>
-            <div v-if="importPreview.unknownSpecVersion" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            <Notice v-if="importPreview.unknownSpecVersion" tone="warning" class="flex items-start gap-2">
               <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>RO-Crate {{ importPreview.unknownSpecVersion }} is not recognized by this portal. The backend may reject this dataset.</span>
-            </div>
-            <div v-if="unrecognizedImportProfiles.length" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            </Notice>
+            <Notice v-if="unrecognizedImportProfiles.length" tone="warning" class="flex items-start gap-2">
               <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 This crate declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
                 <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. The reference stays in the draft, but the backend may reject it until the Profile is registered.
               </span>
-            </div>
+            </Notice>
           </template>
         </div>
 

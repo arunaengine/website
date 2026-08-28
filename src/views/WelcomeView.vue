@@ -8,6 +8,8 @@ import { useRouter } from 'vue-router'
 import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
+import { errorMessage } from '@/lib/utils'
 import { validateRealm } from '@/lib/desktopBridge'
 import { awaitRealm, insecureRealm } from '@/lib/desktopWelcome'
 import { ArrowRight, KeyRound } from '@lucide/vue'
@@ -43,7 +45,7 @@ async function connect(): Promise<void> {
     failure.value = `Aruna Desktop stored ${target.origin} but has not switched to it. Try again.`
   } catch (err) {
     // The shell classifies the failure; its wording is the whole answer.
-    failure.value = err instanceof Error ? err.message : String(err)
+    failure.value = errorMessage(err)
   } finally {
     checking.value = false
     connecting.value = null
@@ -109,23 +111,15 @@ function toEnroll(): void {
             <p class="mt-1 text-[11px] text-muted-foreground">https:// is assumed.</p>
           </div>
 
-          <p
-            v-if="insecure"
-            class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300"
-          >
+          <Notice v-if="insecure" tone="warning">
             This address uses plain http on a non-local host, and browser sign-in (PKCE) needs a secure context.
             Use https, or a localhost or tunnel address.
-          </p>
+          </Notice>
 
           <p v-if="connecting" class="text-xs text-muted-foreground" aria-live="polite">
             Connecting to {{ connecting }}…
           </p>
-          <p
-            v-if="failure"
-            class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-          >
-            {{ failure }}
-          </p>
+          <Notice v-if="failure" tone="error">{{ failure }}</Notice>
 
           <Button class="w-full" :disabled="!address.trim() || checking" @click="connect">
             {{ action }} <ArrowRight class="h-4 w-4" />

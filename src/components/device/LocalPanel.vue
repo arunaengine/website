@@ -3,9 +3,11 @@
 // Folder bindings live in the node itself, not here.
 import { computed, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { useAruna } from '@/composables/useAruna'
 import { nodeSettings, pickDirectory, setNodeSettings, type NodeSettings } from '@/lib/desktopBridge'
+import { errorMessage } from '@/lib/utils'
 import { FolderOpen } from '@lucide/vue'
 
 const { nodeInfo } = useAruna()
@@ -19,16 +21,12 @@ const saveError = ref<string | null>(null)
 const saved = ref(false)
 const saving = ref(false)
 
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
 async function load(): Promise<void> {
   try {
     settings.value = await nodeSettings()
     loadError.value = null
   } catch (err) {
-    loadError.value = message(err)
+    loadError.value = errorMessage(err)
   }
 }
 
@@ -53,7 +51,7 @@ async function save(): Promise<void> {
     settings.value = await setNodeSettings(settings.value)
     saved.value = true
   } catch (err) {
-    saveError.value = message(err)
+    saveError.value = errorMessage(err)
   } finally {
     saving.value = false
   }
@@ -70,18 +68,13 @@ async function save(): Promise<void> {
         </p>
       </div>
 
-      <p
-        v-if="loadError"
-        class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-      >
-        {{ loadError }}
-      </p>
+      <Notice v-if="loadError" tone="error">{{ loadError }}</Notice>
 
       <template v-else-if="settings">
         <div>
           <span class="text-xs font-medium text-foreground">Storage location</span>
           <div class="mt-1 flex flex-wrap items-center gap-2">
-            <code class="min-w-0 flex-1 truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs">{{
+            <code class="surface-muted min-w-0 flex-1 truncate px-3 py-2 font-mono text-xs">{{
               settings.storagePath || 'not set'
             }}</code>
             <Button variant="outline" size="sm" @click="chooseStorage"><FolderOpen class="h-3.5 w-3.5" /> Change</Button>
@@ -113,12 +106,7 @@ async function save(): Promise<void> {
           <Switch :checked="settings.paused" @update:checked="patch({ paused: $event })" />
         </div>
 
-        <p
-          v-if="saveError"
-          class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-        >
-          {{ saveError }}
-        </p>
+        <Notice v-if="saveError" tone="error">{{ saveError }}</Notice>
 
         <div class="flex items-center justify-end gap-3">
           <span v-if="saved" class="text-[11px] text-muted-foreground">Saved.</span>

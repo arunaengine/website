@@ -187,7 +187,7 @@ describe('Data Manager version-aware deletion', () => {
   it('renders failed staging lookup as failed instead of a successful empty result', () => {
     expect(stagingReferencesSource).toContain("'unknown' | 'loading' | 'loaded' | 'error'")
     expect(stagingReferencesSource).toContain("status.value = 'error'")
-    expect(stagingReferencesSource).toContain('error.value = caught instanceof Error')
+    expect(stagingReferencesSource).toContain('error.value = errorMessage(caught)')
     expect(template.match(/aria-label="Source bindings"/g)).toHaveLength(2)
     const sourceBindings = template.slice(
       template.indexOf('aria-label="Source bindings"'),

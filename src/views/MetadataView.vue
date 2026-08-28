@@ -2,8 +2,11 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import DetailsSection from '@/components/metadata/DetailsSection.vue'
 import PeopleSection from '@/components/metadata/PeopleSection.vue'
@@ -40,7 +43,7 @@ import { useS3 } from '@/composables/useS3'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
-import { isHttpUrl, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, isHttpUrl, relativeTime, truncateMiddle } from '@/lib/utils'
 import { metaWatchPathPrefix } from '@/lib/watches'
 import { parseRunCrate, runClaimedIds } from '@/lib/runCrate'
 import { presentCrate } from '@/lib/cratePresenter'
@@ -95,7 +98,7 @@ async function toggleFav() {
   try {
     await toggleFavourite(detailId.value)
   } catch (err) {
-    reportGlobalError(err instanceof Error ? err.message : String(err))
+    reportGlobalError(errorMessage(err))
   } finally {
     favBusy.value = false
   }
@@ -114,7 +117,7 @@ async function confirmDelete() {
     showDelete.value = false
     router.push({ name: 'datasets' })
   } catch (err) {
-    deleteError.value = err instanceof Error ? err.message : String(err)
+    deleteError.value = errorMessage(err)
   }
 }
 // The owning group_id is the document's realmId (see mapMetadataDoc), with the
@@ -211,7 +214,7 @@ async function fetchCrate(id: string) {
   } catch (err) {
     if (token !== crateFetchToken) return
     if (err instanceof CrateNotReadyError) crateNotReady.value = true
-    else crateError.value = err instanceof Error ? err.message : String(err)
+    else crateError.value = errorMessage(err)
   } finally {
     if (token === crateFetchToken) loadingCrate.value = false
   }
@@ -250,7 +253,7 @@ async function resolveDoc(id: string) {
     else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) docState.value = 'forbidden'
     else {
       docState.value = 'error'
-      docError.value = err instanceof Error ? err.message : String(err)
+      docError.value = errorMessage(err)
     }
   } finally {
     if (token === resolveToken) resolvingDoc.value = false
@@ -414,7 +417,7 @@ async function loadBacklinks(row: DataEntity) {
     )
   } catch (err) {
     if (controller.signal.aborted) return
-    backlinkError.value = err instanceof Error ? err.message : String(err)
+    backlinkError.value = errorMessage(err)
   } finally {
     if (backlinkController === controller) {
       backlinkController = null
@@ -677,9 +680,9 @@ watch(relatedDocs, (rows) => {
         </DropdownMenu>
         <Button v-if="current && canWrite" variant="outline" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })"><Pencil class="h-4 w-4" /> Edit</Button>
         <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
-        <RouterLink :to="{ name: 'datasets' }">
-          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Datasets</Button>
-        </RouterLink>
+        <Button variant="outline" as-child>
+          <RouterLink :to="{ name: 'datasets' }"><ArrowLeft class="h-4 w-4" /> Datasets</RouterLink>
+        </Button>
       </template>
     </PageHeader>
 
@@ -706,7 +709,7 @@ watch(relatedDocs, (rows) => {
                 </span>
                 <ProfileChip :doc="current" status-only />
               </div>
-              <h1 class="mt-3 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ current.title }}</h1>
+              <h2 class="mt-3 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ current.title }}</h2>
               <p class="mt-3 max-w-3xl text-sm leading-relaxed text-foreground/85">{{ current.description || 'No description in RO-Crate summary.' }}</p>
               <div class="mt-4 flex flex-wrap gap-1.5">
                 <span v-for="keyword in current.keywords" :key="keyword" class="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-foreground/80">#{{ keyword }}</span>
@@ -715,7 +718,7 @@ watch(relatedDocs, (rows) => {
             </div>
             <div class="flex shrink-0 flex-col items-end gap-1.5">
               <Badge variant="secondary">{{ relativeTime(current.updatedAt) }}</Badge>
-              <Badge v-if="projectCrate" variant="outline" class="gap-1 text-[10px] uppercase"><Layers class="h-3 w-3" /> Project crate</Badge>
+              <Badge v-if="projectCrate" variant="outline" size="sm" class="gap-1 uppercase"><Layers class="h-3 w-3" /> Project crate</Badge>
             </div>
           </div>
 
@@ -800,8 +803,8 @@ watch(relatedDocs, (rows) => {
             <FileJson2 class="h-4 w-4 text-primary" /> Referenced data
             <span v-if="dataEntities.length" class="text-xs font-normal text-muted-foreground">{{ dataEntities.length }}</span>
             <div class="ml-auto flex flex-wrap items-center justify-end gap-1.5">
-              <Badge variant="outline" class="text-[10px]">Node: {{ nodeDisplayName(localNodeId) }}</Badge>
-              <Badge v-if="hasS3Access" variant="accent" class="text-[10px]" :title="s3Endpoint ?? undefined">S3 access active</Badge>
+              <Badge variant="outline" size="sm">Node: {{ nodeDisplayName(localNodeId) }}</Badge>
+              <Badge v-if="hasS3Access" variant="accent" size="sm" :title="s3Endpoint ?? undefined">S3 access active</Badge>
             </div>
           </div>
 
@@ -885,7 +888,7 @@ watch(relatedDocs, (rows) => {
                         <div class="flex flex-wrap items-center gap-2">
                           <Link2 class="h-4 w-4 text-primary" />
                           <h3 class="font-display text-sm font-semibold text-aruna-navy">Authoritative Realm backlink lookup</h3>
-                          <Badge v-if="backlinkResult" :variant="backlinkComplete ? 'success' : 'warn'" class="text-[10px] uppercase">
+                          <Badge v-if="backlinkResult" :variant="backlinkComplete ? 'success' : 'warn'" size="sm" class="uppercase">
                             {{ backlinkComplete ? 'Complete' : 'Partial' }}
                           </Badge>
                         </div>
@@ -924,7 +927,7 @@ watch(relatedDocs, (rows) => {
                             <p v-for="excluded in backlinkResult.coverage.excluded_forms" :key="excluded.form" class="break-all">Excluded form {{ excluded.form }}: {{ excluded.reason }}</p>
                           </div>
                           <div class="mt-3">
-                            <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Index freshness</p>
+                            <h4 class="font-display text-sm font-semibold text-aruna-navy">Index freshness</h4>
                             <ul v-if="backlinkResult.coverage.node_freshness.length" class="mt-1 divide-y divide-border/60 rounded-md border border-border/60 text-[11px] text-muted-foreground">
                               <li v-for="freshness in backlinkResult.coverage.node_freshness" :key="freshness.node_id" class="flex flex-wrap gap-x-2 px-3 py-1.5">
                                 <span class="font-mono" :title="freshness.node_id">{{ nodeDisplayName(freshness.node_id) }}</span>
@@ -935,7 +938,7 @@ watch(relatedDocs, (rows) => {
                             <p v-else class="mt-1 text-[11px] text-muted-foreground">No per-node freshness detail was returned.</p>
                           </div>
                           <div class="mt-3">
-                            <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Visible referencing Datasets</p>
+                            <h4 class="font-display text-sm font-semibold text-aruna-navy">Visible referencing Datasets</h4>
                             <ul v-if="backlinkTarget?.visible_references.length" class="mt-1 divide-y divide-border/60 rounded-md border border-border/60">
                               <li v-for="reference in backlinkTarget.visible_references" :key="reference.document_id" class="px-3 py-2 text-xs">
                                 <RouterLink :to="{ name: 'dataset', params: { id: reference.document_id } }" class="font-medium text-primary hover:underline">{{ reference.title }}</RouterLink>
@@ -955,13 +958,15 @@ watch(relatedDocs, (rows) => {
             </tbody>
           </table>
 
-          <div v-if="crateNotReady" class="flex items-center gap-3 px-5 py-4 text-xs text-muted-foreground">
-            <span>The crate is still being prepared.</span>
+          <EmptyState v-if="crateNotReady" compact title="The crate is still being prepared.">
             <Button variant="outline" size="sm" @click="fetchCrate(detailId)">Retry</Button>
-          </div>
-          <p v-else-if="!loadingCrate && !dataEntities.length" class="px-5 py-6 text-xs text-muted-foreground">
-            This Dataset does not reference any data files. Files can be attached by editing the crate.
-          </p>
+          </EmptyState>
+          <EmptyState
+            v-else-if="!loadingCrate && !dataEntities.length"
+            compact
+            title="This Dataset does not reference any data files."
+            description="Files can be attached by editing the crate."
+          />
         </section>
 
         <section v-if="relatedDocs.length" class="surface overflow-hidden">
@@ -987,7 +992,7 @@ watch(relatedDocs, (rows) => {
                 :title="row.iri"
               />
               <span v-else class="min-w-0 truncate text-muted-foreground" :title="row.iri">{{ row.label }}</span>
-              <Badge variant="outline" class="shrink-0 text-[10px] uppercase">{{ row.documentId ? 'in portal' : 'external' }}</Badge>
+              <Badge variant="outline" size="sm" class="shrink-0 uppercase">{{ row.documentId ? 'in portal' : 'external' }}</Badge>
             </li>
           </ul>
         </section>
@@ -1001,9 +1006,9 @@ watch(relatedDocs, (rows) => {
               <h3 class="text-sm font-medium text-foreground">Query this Dataset</h3>
               <p class="mt-1 text-xs text-muted-foreground">Open the SPARQL workbench with this exact Dataset scope fixed.</p>
             </div>
-            <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }">
-              <Button variant="outline" size="sm"><Code2 class="h-3.5 w-3.5" /> Query this Dataset</Button>
-            </RouterLink>
+            <Button variant="outline" size="sm" as-child>
+              <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }"><Code2 class="h-3.5 w-3.5" /> Query this Dataset</RouterLink>
+            </Button>
           </div>
         </section>
 
@@ -1016,35 +1021,42 @@ watch(relatedDocs, (rows) => {
         />
       </template>
 
-      <div v-else-if="docState === 'loading'" class="surface p-12 text-center text-sm text-muted-foreground">
-        Loading Dataset…
-      </div>
+      <Spinner
+        v-else-if="docState === 'loading'"
+        show-label
+        label="Loading Dataset…"
+        class="surface flex justify-center p-12 text-sm"
+      />
 
-      <div v-else-if="docState === 'preparing'" class="surface px-5 py-12 text-center">
-        <p class="text-sm font-medium text-foreground">{{ acceptedPreparing ? 'Accepted, preparing Dataset' : 'Dataset is still being prepared' }}</p>
-        <p class="mx-auto mt-2 max-w-md break-all font-mono text-xs text-muted-foreground">{{ detailId }}</p>
-        <Button variant="outline" size="sm" class="mt-5" :disabled="resolvingDoc" @click="resolveDoc(detailId)">
+      <EmptyState
+        v-else-if="docState === 'preparing'"
+        :title="acceptedPreparing ? 'Accepted, preparing Dataset' : 'Dataset is still being prepared'"
+        :description="detailId"
+      >
+        <Button variant="outline" size="sm" :disabled="resolvingDoc" @click="resolveDoc(detailId)">
           {{ resolvingDoc ? 'Checking…' : 'Retry' }}
         </Button>
-      </div>
+      </EmptyState>
 
-      <div v-else-if="docState === 'not-found'" class="surface px-5 py-12 text-center">
-        <p class="text-sm font-medium text-foreground">This Dataset does not exist or has been deleted.</p>
-        <p class="mx-auto mt-2 max-w-md break-all font-mono text-xs text-muted-foreground">{{ detailId }}</p>
-        <RouterLink :to="{ name: 'datasets' }" class="mt-5 inline-flex">
-          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Datasets</Button>
-        </RouterLink>
-      </div>
+      <EmptyState
+        v-else-if="docState === 'not-found'"
+        title="This Dataset does not exist or has been deleted."
+        :description="detailId"
+      >
+        <Button variant="outline" as-child>
+          <RouterLink :to="{ name: 'datasets' }"><ArrowLeft class="h-4 w-4" /> Datasets</RouterLink>
+        </Button>
+      </EmptyState>
 
-      <div v-else-if="docState === 'forbidden'" class="surface px-5 py-12 text-center">
-        <p class="text-sm font-medium text-foreground">This Dataset is not public.</p>
-        <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-          {{ currentUser ? 'Sign in with an account that can see it.' : 'Sign in with an account that can see it, using the button in the top bar.' }}
-        </p>
-        <RouterLink :to="{ name: 'datasets' }" class="mt-5 inline-flex">
-          <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Datasets</Button>
-        </RouterLink>
-      </div>
+      <EmptyState
+        v-else-if="docState === 'forbidden'"
+        title="This Dataset is not public."
+        :description="currentUser ? 'Sign in with an account that can see it.' : 'Sign in with an account that can see it, using the button in the top bar.'"
+      >
+        <Button variant="outline" as-child>
+          <RouterLink :to="{ name: 'datasets' }"><ArrowLeft class="h-4 w-4" /> Datasets</RouterLink>
+        </Button>
+      </EmptyState>
 
       <ErrorPanel
         v-else-if="docState === 'error'"
@@ -1087,7 +1099,7 @@ watch(relatedDocs, (rows) => {
             >Learn more</RouterLink>
           </DialogDescription>
         </DialogHeader>
-        <p v-if="deleteError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ deleteError }}</p>
+        <Notice v-if="deleteError" tone="error">{{ deleteError }}</Notice>
         <DialogFooter>
           <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
           <Button variant="destructive" :disabled="saving" @click="confirmDelete">{{ saving ? 'Deleting…' : 'Delete' }}</Button>

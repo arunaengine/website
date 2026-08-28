@@ -2,6 +2,9 @@
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -9,7 +12,7 @@ import { useStagingReferences } from '@/composables/useStagingReferences'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { computed, ref, watch } from 'vue'
-import { Boxes, KeyRound, Link2, Loader2 } from '@lucide/vue'
+import { Boxes, KeyRound, Link2 } from '@lucide/vue'
 
 // Read-only bucket/object browser (no uploads, deletes or routing; the Data
 // Manager keeps its own richer inline browser). Two shapes:
@@ -283,9 +286,7 @@ const isEmpty = computed(
         <span class="text-xs font-semibold text-foreground">Buckets</span>
         <Badge variant="outline">{{ visibleBuckets.length }}</Badge>
       </header>
-      <div v-if="bucketsLoading" class="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-        <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading…
-      </div>
+      <Spinner v-if="bucketsLoading" show-label label="Loading…" class="px-3 py-3" />
       <p v-else-if="bucketsError" class="px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
       <ul v-else-if="visibleBuckets.length" class="max-h-[260px] overflow-y-auto py-1">
         <li v-for="entry in visibleBuckets" :key="entry.name">
@@ -300,24 +301,24 @@ const isEmpty = computed(
           </button>
         </li>
       </ul>
-      <p v-else class="px-3 py-3 text-xs text-muted-foreground">No buckets in this group yet.</p>
+      <EmptyState v-else compact title="No buckets in this group yet." />
     </aside>
 
     <div class="min-w-0">
-      <div v-if="contextMismatch" class="grid min-h-[160px] place-items-center rounded-md border border-amber-500/30 bg-amber-500/5 p-5 text-center text-xs">
+      <Notice v-if="contextMismatch" tone="warning" class="grid min-h-[160px] place-items-center p-5 text-center">
         <div class="max-w-lg">
-          <KeyRound class="mx-auto h-5 w-5 text-amber-700 dark:text-amber-300" />
+          <KeyRound class="mx-auto h-5 w-5" />
           <p class="mt-2 font-medium text-foreground">Open a session on the required node</p>
           <p class="mt-1 text-muted-foreground">
             The active session was issued by {{ realmNodes.displayName(contextMismatch.issuerNodeId) }} ({{ contextMismatch.issuerNodeId }}). This bucket requires {{ realmNodes.displayName(contextMismatch.requiredNodeId) }} ({{ contextMismatch.requiredNodeId }}). Browsing and selection stay disabled until the node-local session is opened.
           </p>
           <Button class="mt-3" size="sm" :disabled="switchBusy || !s3.activeContext.value?.groupId" @click="openOnThisNode">
-            <Loader2 v-if="switchBusy" class="h-3.5 w-3.5 animate-spin" />
+            <Spinner v-if="switchBusy" label="Opening the session" class="text-current" />
             <KeyRound v-else class="h-3.5 w-3.5" /> Open on this node
           </Button>
           <p v-if="switchError" class="mt-2 text-destructive">{{ switchError }}</p>
         </div>
-      </div>
+      </Notice>
       <div v-else-if="!s3.hasActiveKey.value" class="grid min-h-[160px] place-items-center rounded-md border border-border bg-muted/20 p-5 text-center text-xs">
         <div class="max-w-lg">
           <KeyRound class="mx-auto h-5 w-5 text-muted-foreground" />
@@ -326,19 +327,17 @@ const isEmpty = computed(
             The session is missing or expired. Open the same explicit group on {{ requiredNodeId ? realmNodes.displayName(requiredNodeId) : 'the selected node' }} before browsing.
           </p>
           <Button class="mt-3" size="sm" :disabled="switchBusy || !s3.activeContext.value?.groupId" @click="openOnThisNode">
-            <Loader2 v-if="switchBusy" class="h-3.5 w-3.5 animate-spin" />
+            <Spinner v-if="switchBusy" label="Opening the session" class="text-current" />
             <KeyRound v-else class="h-3.5 w-3.5" /> Open group
           </Button>
           <p v-if="switchError" class="mt-2 text-destructive">{{ switchError }}</p>
         </div>
       </div>
-      <div v-else-if="!activeBucket" class="grid h-full min-h-[160px] place-items-center rounded-md border border-dashed border-border text-xs text-muted-foreground">
-        Select a bucket to browse its objects.
-      </div>
+      <EmptyState v-else-if="!activeBucket" class="h-full" title="Select a bucket to browse its objects." />
       <template v-else>
         <div class="flex min-w-0 items-center gap-2 pb-2">
           <Breadcrumbs :bucket="activeBucket" :path="prefix" @navigate="navigateTo" />
-          <Loader2 v-if="listLoading" class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+          <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
         </div>
         <div class="overflow-hidden rounded-md border border-border">
           <p v-if="listError" class="border-b border-border px-3 py-2 text-xs text-destructive">{{ listError }}</p>
@@ -437,7 +436,7 @@ const isEmpty = computed(
           </span>
           <Button size="sm" :disabled="!selectedList.length" @click="addSelected">
             Add {{ selectedList.length || '' }}
-            <Badge v-if="selectedFolderCount" variant="outline" class="ml-1 text-[10px]">incl. folders</Badge>
+            <Badge v-if="selectedFolderCount" variant="outline" size="sm" class="ml-1">incl. folders</Badge>
           </Button>
         </div>
       </template>

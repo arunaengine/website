@@ -12,6 +12,7 @@ import {
 } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
+import { errorMessage } from '@/lib/utils'
 
 const STREAM_RETRY_MS = 3_000
 const PAGE_SIZE = 20
@@ -46,11 +47,6 @@ const unreadDisplay = computed(() => {
 
 function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
-}
-
-function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message
-  return String(err)
 }
 
 // 404/405 = endpoints absent (older backend); 403 = this token may not read

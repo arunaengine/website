@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import {
   AlertTriangle,
@@ -11,14 +12,14 @@ import {
   Code2,
   Copy,
   FileJson,
-  Loader2,
   Upload,
 } from '@lucide/vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { crateGraph } from '@/lib/dataEntities'
 import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
-import { copyToClipboard } from '@/lib/utils'
+import { copyToClipboard, errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
   crate: unknown
@@ -102,7 +103,7 @@ function preview(text: string, source: string) {
     pendingImport.value = analyzeCrateJson(text, source)
   } catch (err) {
     pendingImport.value = null
-    importError.value = err instanceof Error ? err.message : String(err)
+    importError.value = errorMessage(err)
   }
 }
 
@@ -138,7 +139,7 @@ async function confirmImport() {
     emit('imported', summary)
   } catch (err) {
     if (err instanceof ApiError && err.status === 403) importError.value = 'You need write permission in the owning group.'
-    else importError.value = err instanceof Error ? err.message : String(err)
+    else importError.value = errorMessage(err)
   } finally {
     importing.value = false
   }
@@ -194,10 +195,10 @@ async function confirmImport() {
         <Button type="button" variant="outline" size="sm" :disabled="!pasteText.trim()" @click="previewPaste">Preview pasted JSON</Button>
       </div>
 
-      <div v-if="importError" class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+      <Notice v-if="importError" tone="error" class="flex items-start gap-2">
         <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span>{{ importError }}</span>
-      </div>
+      </Notice>
 
       <div v-if="pendingImport" class="space-y-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
         <div class="flex items-center gap-2 font-medium text-foreground">
@@ -211,24 +212,24 @@ async function confirmImport() {
           {{ pendingImport.entityCount }} {{ pendingImport.entityCount === 1 ? 'entity' : 'entities' }} in the graph,
           {{ pendingImport.fileCount }} referenced data {{ pendingImport.fileCount === 1 ? 'file' : 'files' }}.
         </p>
-        <div v-if="pendingImport.unknownSpecVersion" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300">
+        <Notice v-if="pendingImport.unknownSpecVersion" tone="warning" class="flex items-start gap-2">
           <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>RO-Crate {{ pendingImport.unknownSpecVersion }} is not recognized by this portal. The backend may reject this import.</span>
-        </div>
-        <div v-if="unrecognizedImportProfiles.length" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300">
+        </Notice>
+        <Notice v-if="unrecognizedImportProfiles.length" tone="warning" class="flex items-start gap-2">
           <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             This crate declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
             <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. You can still import it.
           </span>
-        </div>
-        <div class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-800 dark:text-amber-300">
+        </Notice>
+        <Notice tone="warning" class="flex items-start gap-2">
           <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>Importing replaces this document's current metadata, every field and file reference. This cannot be undone.</span>
-        </div>
+        </Notice>
         <div class="flex flex-wrap items-center gap-2">
           <Button type="button" variant="destructive" size="sm" :disabled="importing || saving" @click="confirmImport">
-            <Loader2 v-if="importing" class="size-3.5 animate-spin" />
+            <Spinner v-if="importing" class="text-current" aria-hidden="true" />
             <template v-else>Replace metadata</template>
           </Button>
           <Button type="button" variant="ghost" size="sm" :disabled="importing" @click="pendingImport = null">Cancel</Button>

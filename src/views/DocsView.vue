@@ -45,9 +45,9 @@ const topicGroups = computed(() => {
         </template>
       </template>
       <template v-if="topic" #actions>
-        <RouterLink :to="{ name: 'docs' }">
-          <Button variant="outline"><ChevronLeft class="h-4 w-4" /> All topics</Button>
-        </RouterLink>
+        <Button variant="outline" as-child>
+          <RouterLink :to="{ name: 'docs' }"><ChevronLeft class="h-4 w-4" /> All topics</RouterLink>
+        </Button>
       </template>
     </PageHeader>
 
@@ -62,9 +62,9 @@ const topicGroups = computed(() => {
             <BookOpen class="h-4 w-4" /> Docs home
           </RouterLink>
           <div v-for="group in topicGroups" :key="group.kind" class="mt-4">
-            <p class="px-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 class="px-2.5 font-display text-sm font-semibold text-aruna-navy">
               {{ group.kind === 'Concept' ? 'Concepts' : 'Task guides' }}
-            </p>
+            </h2>
             <ul class="mt-1 space-y-0.5">
               <li v-for="entry in group.topics" :key="entry.slug">
                 <RouterLink
@@ -110,7 +110,7 @@ const topicGroups = computed(() => {
             title="Docs topic not found"
             description="This topic is not part of the current versioned guide."
           >
-            <RouterLink :to="{ name: 'docs' }"><Button variant="outline">Browse Docs</Button></RouterLink>
+            <Button variant="outline" as-child><RouterLink :to="{ name: 'docs' }">Browse Docs</RouterLink></Button>
           </EmptyState>
 
           <template v-else>

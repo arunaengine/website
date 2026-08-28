@@ -24,6 +24,7 @@ import type {
   QuarantineResolveRequest,
   QuarantineResolveResponse,
 } from '@/lib/placementPolicies'
+import { errorMessage } from '@/lib/utils'
 
 const residencyAdminEnabled = computed(() => featureEnabled('placementAdmin'))
 const sessionPolicies = ref<PolicyResponse[]>([])
@@ -107,10 +108,10 @@ async function loadPolicyPage(more = false): Promise<void> {
       listState.value = 'unsupported'
       return
     }
-    if (more) listError.value = error instanceof Error ? error.message : String(error)
+    if (more) listError.value = errorMessage(error)
     else {
       listState.value = 'error'
-      listError.value = error instanceof Error ? error.message : String(error)
+      listError.value = errorMessage(error)
     }
   } finally {
     listLoadingMore.value = false

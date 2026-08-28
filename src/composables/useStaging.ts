@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { useAruna } from './useAruna'
 import { ApiError, type StageBlobResponse, type StagingStrategy } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 
 export interface StagingSubmission {
   id: number
@@ -62,7 +63,7 @@ export function stagingErrorMessage(err: unknown, strategy?: StagingStrategy): s
         return err.message
     }
   }
-  return err instanceof Error ? err.message : String(err)
+  return errorMessage(err)
 }
 
 async function submitStaging(input: {

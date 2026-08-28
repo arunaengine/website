@@ -1,4 +1,5 @@
 import type { InfoResponse, RealmNodeInfo, UsageResponse } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 
 export interface NodeProbe {
   state: 'ok' | 'unreachable'
@@ -54,7 +55,7 @@ export async function probeNode(apiBase: string): Promise<NodeProbe> {
       state: 'unreachable',
       info: null,
       usage: null,
-      error: timedOut ? `timed out after ${PROBE_TIMEOUT_MS / 1000}s` : err instanceof Error ? err.message : String(err),
+      error: timedOut ? `timed out after ${PROBE_TIMEOUT_MS / 1000}s` : errorMessage(err),
     }
   }
 }

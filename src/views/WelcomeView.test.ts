@@ -42,6 +42,11 @@ const InputStub = defineComponent({
       })
   },
 })
+const NoticeStub = defineComponent({
+  props: { title: String, lines: { type: Array, default: () => [] } },
+  setup: (props, { slots }) => () =>
+    h('div', [props.title ?? '', slots.default?.() ?? [], (props.lines as string[]).join(' ')]),
+})
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
 const WelcomeView = compileClientComponent(new URL('./WelcomeView.vue', import.meta.url), {
@@ -51,6 +56,8 @@ const WelcomeView = compileClientComponent(new URL('./WelcomeView.vue', import.m
   '@/components/layout/AppLogo.vue': moduleDefault(EmptyStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
+  '@/lib/utils': { errorMessage: (err: unknown) => (err instanceof Error ? err.message : String(err)) },
   '@/lib/desktopBridge': { validateRealm },
   '@/lib/desktopWelcome': { awaitRealm, insecureRealm: () => false },
 })

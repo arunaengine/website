@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useAuth } from '@/composables/useAuth'
 import { isDesktop } from '@/lib/desktop'
 import { onMounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink, type LocationQuery } from 'vue-router'
-import { Loader2 } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -63,22 +63,23 @@ watch(
       </div>
       <div class="surface p-8">
         <template v-if="stage !== 'error'">
-          <Loader2 class="mx-auto h-6 w-6 animate-spin text-primary" />
-          <p class="mt-4 text-sm text-muted-foreground">
-            {{ stageLabels[stage] ?? 'Completing sign-in…' }}
-          </p>
+          <Spinner
+            show-label
+            class="flex-col gap-4 text-sm [&>svg]:size-6 [&>svg]:text-primary"
+            :label="stageLabels[stage] ?? 'Completing sign-in…'"
+          />
         </template>
         <template v-else>
           <h1 class="font-display text-base font-semibold text-foreground">Sign-in failed</h1>
           <p class="mt-2 text-sm text-muted-foreground">{{ stageError }}</p>
           <div class="mt-6 flex justify-center gap-2">
             <Button @click="retry">Try again</Button>
-            <RouterLink v-if="inDesktop" :to="{ name: 'welcome', query: { change: '1' } }">
-              <Button variant="outline">Change realm</Button>
-            </RouterLink>
-            <RouterLink v-else to="/app">
-              <Button variant="outline">Browse as guest</Button>
-            </RouterLink>
+            <Button v-if="inDesktop" variant="outline" as-child>
+              <RouterLink :to="{ name: 'welcome', query: { change: '1' } }">Change realm</RouterLink>
+            </Button>
+            <Button v-else variant="outline" as-child>
+              <RouterLink to="/app">Browse as guest</RouterLink>
+            </Button>
           </div>
         </template>
       </div>

@@ -8,6 +8,7 @@ import Textarea from '@/components/ui/Textarea.vue'
 import { computed, ref, watch } from 'vue'
 import { CheckCircle2, ChevronDown, ChevronRight, Trash2, XCircle } from '@lucide/vue'
 import { usePolicies } from '@/composables/usePolicies'
+import { errorMessage } from '@/lib/utils'
 import {
   MAX_POLICY_EXPRESSION_BYTES,
   POLICY_KINDS,
@@ -66,7 +67,7 @@ async function check() {
     })
   } catch (err) {
     analysis.value = null
-    checkError.value = err instanceof Error ? err.message : String(err)
+    checkError.value = errorMessage(err)
   } finally {
     checking.value = false
   }
@@ -95,11 +96,11 @@ const summary = computed(() => props.policy.expression.trim() || 'No expression 
           <span class="truncate text-sm font-medium text-foreground">
             {{ policy.name || 'Unnamed policy' }}
           </span>
-          <Badge :variant="policy.kind === 'require' ? 'warn' : 'destructive'" class="text-[10px] uppercase">
+          <Badge :variant="policy.kind === 'require' ? 'warn' : 'destructive'" size="sm" class="uppercase">
             {{ policy.kind }}
           </Badge>
-          <Badge v-if="!policy.enabled" variant="secondary" class="text-[10px] uppercase">off</Badge>
-          <Badge v-if="problems.length" variant="warn" class="text-[10px] uppercase">incomplete</Badge>
+          <Badge v-if="!policy.enabled" variant="secondary" size="sm" class="uppercase">off</Badge>
+          <Badge v-if="problems.length" variant="warn" size="sm" class="uppercase">incomplete</Badge>
         </div>
         <p v-if="!open" class="mt-1 truncate font-mono text-xs text-muted-foreground">{{ summary }}</p>
       </div>

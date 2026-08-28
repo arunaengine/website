@@ -13,6 +13,8 @@ import { computed, ref, watch } from 'vue'
 import { Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type GroupDetailResponse } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
+import Notice from '@/components/ui/Notice.vue'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{
@@ -67,7 +69,7 @@ async function submit() {
     emit('update:open', false)
   } catch (err) {
     capReached.value = err instanceof ApiError && err.status === 409
-    submitError.value = err instanceof Error ? err.message : String(err)
+    submitError.value = errorMessage(err)
   }
 }
 </script>
@@ -89,9 +91,7 @@ async function submit() {
           <label class="text-xs font-medium text-foreground">Group name</label>
           <Input v-model="name" class="mt-1" placeholder="e.g. Climate Modelling Lab" @keyup.enter="submit" />
         </div>
-        <div v-if="submitError" class="rounded-md border px-3 py-2 text-xs" :class="capReached ? 'border-amber-500/30 bg-amber-500/5 text-amber-800 dark:text-amber-300' : 'border-destructive/30 bg-destructive/5 text-destructive'">
-          {{ submitError }}
-        </div>
+        <Notice v-if="submitError" :tone="capReached ? 'warning' : 'error'">{{ submitError }}</Notice>
       </div>
 
       <DialogFooter>

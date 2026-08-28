@@ -3,6 +3,7 @@ import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Nav from '@/components/layout/nav'
+import * as Utils from '@/lib/utils'
 import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
 
 const route = { name: 'dashboard', path: '/app', hash: '' }
@@ -43,6 +44,11 @@ const TopBarStub = defineComponent({
 })
 const icons = new Proxy({}, { get: () => EmptyStub })
 
+const Notice = compileClientComponent(new URL('../components/ui/Notice.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/lib/utils': Utils,
+})
+
 const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterView: RouterViewStub, useRoute: () => route },
@@ -53,6 +59,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/components/layout/RealmUnreachable.vue': moduleDefault(RealmUnreachableStub),
   '@/components/layout/NodeDown.vue': moduleDefault(NodeDownStub),
   '@/components/data/TransfersPanel.vue': moduleDefault(EmptyStub),
+  '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/composables/useAruna': { useAruna: () => permissions },
   '@/composables/useDeviceStatus': {
     useDeviceStatus: () => ({
@@ -66,6 +73,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/lib/config': { featureEnabled: () => true },
   '@/lib/desktopBridge': { appQuit },
   '@/lib/desktopBoot': { probeRealm, realmReach },
+  '@/lib/utils': Utils,
   '@/components/layout/nav': Nav,
 })
 

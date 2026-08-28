@@ -5,6 +5,7 @@
 import { computed, onMounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -18,7 +19,7 @@ import {
   type ComputeProbe,
   type ComputeSettings,
 } from '@/lib/desktopBridge'
-import { formatBytes } from '@/lib/utils'
+import { errorMessage, formatBytes } from '@/lib/utils'
 
 const GIB = 1024 ** 3
 
@@ -40,16 +41,12 @@ const BACKEND_OPTIONS = [
   { value: 'off', label: 'Off' },
 ]
 
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
 async function load(): Promise<void> {
   try {
     settings.value = (await nodeSettings()).compute
     loadError.value = null
   } catch (err) {
-    loadError.value = message(err)
+    loadError.value = errorMessage(err)
   }
 }
 
@@ -59,7 +56,7 @@ async function runProbe(): Promise<void> {
     probe.value = await computeProbe()
     probeError.value = null
   } catch (err) {
-    probeError.value = message(err)
+    probeError.value = errorMessage(err)
   } finally {
     probing.value = false
   }
@@ -100,7 +97,7 @@ async function save(): Promise<void> {
     saved.value = true
     await loadLive()
   } catch (err) {
-    saveError.value = message(err)
+    saveError.value = errorMessage(err)
   } finally {
     saving.value = false
   }
@@ -142,12 +139,7 @@ const chosenMissing = computed(() => {
         </div>
       </div>
 
-      <p
-        v-if="loadError"
-        class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-      >
-        {{ loadError }}
-      </p>
+      <Notice v-if="loadError" tone="error">{{ loadError }}</Notice>
 
       <template v-else-if="settings">
         <div class="grid gap-3 sm:grid-cols-2">
@@ -231,19 +223,11 @@ const chosenMissing = computed(() => {
           />
         </div>
 
-        <p
-          v-if="chosenMissing"
-          class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-        >
+        <Notice v-if="chosenMissing" tone="warning">
           {{ chosenMissing }} Runs sent here will be refused until it is available.
-        </p>
+        </Notice>
 
-        <p
-          v-if="saveError"
-          class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-        >
-          {{ saveError }}
-        </p>
+        <Notice v-if="saveError" tone="error">{{ saveError }}</Notice>
 
         <div class="flex flex-wrap items-center justify-end gap-3">
           <span class="mr-auto text-[11px] text-muted-foreground">Saving restarts the node on this machine.</span>
@@ -257,7 +241,7 @@ const chosenMissing = computed(() => {
       <h3 class="font-display text-sm font-semibold text-aruna-navy">What this machine offers</h3>
       <p v-if="probeError" class="text-xs text-muted-foreground">The shell could not look for a runtime: {{ probeError }}</p>
       <dl v-else-if="probe" class="grid gap-3 sm:grid-cols-2">
-        <div class="rounded-md border border-border/70 px-3 py-2">
+        <div class="surface-inline px-3 py-2">
           <dt class="text-xs font-medium text-foreground">Docker</dt>
           <dd class="mt-0.5 font-mono text-[11px] text-muted-foreground">
             {{ probe.docker.available ? (probe.docker.version ?? 'available') : 'not answering' }}
@@ -266,7 +250,7 @@ const chosenMissing = computed(() => {
             {{ probe.docker.socket }}
           </dd>
         </div>
-        <div class="rounded-md border border-border/70 px-3 py-2">
+        <div class="surface-inline px-3 py-2">
           <dt class="text-xs font-medium text-foreground">Apptainer</dt>
           <dd class="mt-0.5 font-mono text-[11px] text-muted-foreground">
             {{ probe.apptainer.available ? (probe.apptainer.version ?? 'available') : 'not installed' }}

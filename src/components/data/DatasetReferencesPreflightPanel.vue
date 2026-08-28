@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Loader2 } from '@lucide/vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import type { BacklinkPreflightResponse } from '@/lib/backlinks'
 import { relativeTime } from '@/lib/utils'
 
@@ -46,14 +47,12 @@ function freshnessTime(updatedAtMs: number): string {
 <template>
   <section aria-label="Dataset references" class="space-y-2 rounded-md border border-border px-3 py-2 text-xs">
     <h4 class="font-medium text-foreground">Dataset references</h4>
-    <p v-if="busy" class="flex items-center gap-2 text-muted-foreground">
-      <Loader2 class="h-3 w-3 animate-spin" />
-      {{ selection ? 'Checking Dataset references for the selected keys…' : 'Checking Dataset references…' }}
-    </p>
-    <div
-      v-else-if="error"
-      class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-amber-800 dark:text-amber-300"
-    >
+    <Spinner
+      v-if="busy"
+      show-label
+      :label="selection ? 'Checking Dataset references for the selected keys…' : 'Checking Dataset references…'"
+    />
+    <Notice v-else-if="error" tone="warning">
       <p class="font-medium">
         {{ selection ? 'Dataset-reference lookup failed for part or all of the selection.' : 'Dataset-reference lookup failed.' }}
       </p>
@@ -62,15 +61,12 @@ function freshnessTime(updatedAtMs: number): string {
           ? 'Reference and last-resolvable-location impact are unknown for those keys.'
           : 'Reference and last-resolvable-location impact are unknown.' }}
       </p>
-      <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ error }}</p>
-    </div>
+      <p class="mt-1 break-all font-mono text-[10px]">{{ error }}</p>
+    </Notice>
     <template v-else-if="preflight">
-      <p
-        v-if="partial"
-        class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
-      >
+      <Notice v-if="partial" tone="warning" class="font-medium">
         Dataset-reference coverage is partial. References or remaining locations may be missing.
-      </p>
+      </Notice>
       <p v-if="!referencesReported" class="text-muted-foreground">
         No visible or restricted Dataset references were reported for the covered forms.
       </p>
@@ -91,18 +87,12 @@ function freshnessTime(updatedAtMs: number): string {
         <p v-if="target.hidden_references_exist" class="font-medium text-amber-800 dark:text-amber-300">
           Other restricted Datasets reference this content
         </p>
-        <p
-          v-if="target.would_remove_last_resolvable_aruna_location"
-          class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
-        >
+        <Notice v-if="target.would_remove_last_resolvable_aruna_location" tone="warning" class="font-medium">
           This operation would remove this content's last resolvable Aruna location.
-        </p>
-        <p
-          v-else-if="!target.location_impact_complete"
-          class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
-        >
+        </Notice>
+        <Notice v-else-if="!target.location_impact_complete" tone="warning" class="font-medium">
           The last-resolvable-location impact is unknown for this content.
-        </p>
+        </Notice>
       </div>
       <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
         <dt>Queried scope</dt>
@@ -134,11 +124,8 @@ function freshnessTime(updatedAtMs: number): string {
         </ul>
       </div>
     </template>
-    <p
-      v-else
-      class="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 font-medium text-amber-800 dark:text-amber-300"
-    >
+    <Notice v-else tone="warning" class="font-medium">
       Dataset-reference coverage and last-resolvable-location impact are unknown.
-    </p>
+    </Notice>
   </section>
 </template>

@@ -12,7 +12,11 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import FactList, { type Fact } from '@/components/ui/FactList.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Progress from '@/components/ui/Progress.vue'
@@ -26,7 +30,7 @@ import { useJobDetail } from '@/composables/useJobs'
 import { useNotifications } from '@/composables/useNotifications'
 import { useS3 } from '@/composables/useS3'
 import { formatJobProgress, isTerminalJobState, jobProgressPercent } from '@/lib/jobs'
-import { formatBytes } from '@/lib/utils'
+import { errorMessage, formatBytes } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import {
   ARCHIVE_FILE_ACCEPT,
@@ -42,7 +46,7 @@ import {
   type ExportReportDetail,
   type ImportReportDetail,
 } from '@/lib/rocrateArchive'
-import { Download, FileArchive, FolderPlus, FolderTree, Loader2, Upload } from '@lucide/vue'
+import { Download, FileArchive, FolderPlus, FolderTree, Upload } from '@lucide/vue'
 
 type TransferRow = ArchiveReportRow<Partial<ImportReportDetail & ExportReportDetail>>
 
@@ -190,6 +194,28 @@ const progressText = computed(() => (job.value ? formatJobProgress(job.value.pro
 const importResult = computed(() => importJobResult(job.value?.result))
 const exportResult = computed(() => exportJobResult(job.value?.result))
 const createdDocumentId = computed(() => importResult.value?.document_id ?? null)
+const importFacts = computed<Fact[]>(() => {
+  const r = importResult.value
+  return r
+    ? [
+        { label: 'Entries', value: String(r.entries_total) },
+        { label: 'Imported', value: String(r.imported) },
+        { label: 'Unlisted', value: String(r.unlisted) },
+        { label: 'Failed', value: String(r.failed) },
+      ]
+    : []
+})
+const exportFacts = computed<Fact[]>(() => {
+  const r = exportResult.value
+  return r
+    ? [
+        { label: 'Included', value: String(r.included) },
+        { label: 'External', value: String(r.omitted.external) },
+        { label: 'Denied', value: String(r.omitted.denied) },
+        { label: 'Missing', value: String(r.omitted.missing) },
+      ]
+    : []
+})
 const artifactReady = computed(() => job.value?.state === 'succeeded' && Boolean(exportResult.value?.artifact))
 
 const rows = ref<TransferRow[]>([])
@@ -233,7 +259,7 @@ async function loadReport(cursor?: string) {
     rows.value = cursor ? [...rows.value, ...result.page.rows] : result.page.rows
     reportCursor.value = result.page.next_cursor ?? null
   } catch (err) {
-    if (jobId === activeJobId.value) reportError.value = err instanceof Error ? err.message : String(err)
+    if (jobId === activeJobId.value) reportError.value = errorMessage(err)
   } finally {
     reportLoading.value = false
   }
@@ -311,7 +337,7 @@ async function startImport() {
     )
     activeJobId.value = submitted.job_id
   } catch (err) {
-    submitError.value = err instanceof Error ? err.message : String(err)
+    submitError.value = errorMessage(err)
   } finally {
     busy.value = ''
   }
@@ -326,7 +352,7 @@ async function startExport() {
     const submitted = await submitExport(props.documentId, client(), attemptKey.value)
     activeJobId.value = submitted.job_id
   } catch (err) {
-    submitError.value = err instanceof Error ? err.message : String(err)
+    submitError.value = errorMessage(err)
   } finally {
     busy.value = ''
   }
@@ -340,7 +366,7 @@ async function downloadArtifact() {
   try {
     downloadedName.value = await downloadArchiveArtifact(jobId, client())
   } catch (err) {
-    submitError.value = err instanceof Error ? err.message : String(err)
+    submitError.value = errorMessage(err)
   } finally {
     busy.value = ''
   }
@@ -391,7 +417,7 @@ function rowTarget(row: TransferRow): string {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="flex max-h-[88vh] max-w-2xl flex-col">
+    <DialogContent class="flex max-h-[88vh] max-w-xl flex-col">
       <DialogHeader class="pr-8">
         <DialogTitle class="flex items-center gap-2">
           <FileArchive class="h-4 w-4 text-primary" />
@@ -454,9 +480,12 @@ function rowTarget(row: TransferRow): string {
                 @update:model-value="onBucketPick"
               />
               <Input v-else v-model="bucket" placeholder="my-bucket" class="mt-1" />
-              <p v-if="bucketsLoading && !bucketsLoaded" class="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Loader2 class="h-3 w-3 animate-spin" /> Loading buckets…
-              </p>
+              <Spinner
+                v-if="bucketsLoading && !bucketsLoaded"
+                show-label
+                label="Loading buckets…"
+                class="mt-1 flex text-[11px]"
+              />
               <p v-else-if="bucketsError && !authRejected" class="mt-1 text-[11px] text-destructive">{{ bucketsError }}</p>
             </div>
             <div>
@@ -514,13 +543,13 @@ function rowTarget(row: TransferRow): string {
         <section v-if="activeJobId" class="space-y-3">
           <div class="flex flex-wrap items-center gap-2">
             <JobStateBadge v-if="job" :state="job.state" />
-            <Loader2 v-if="job && !terminal" class="h-3.5 w-3.5 animate-spin text-primary" />
+            <Spinner v-if="job && !terminal" label="Working…" class="text-primary" />
             <span class="text-xs text-muted-foreground">{{ progressText }}</span>
           </div>
           <Progress v-if="progressPercent !== null && !terminal" :value="progressPercent" :warn="101" :critical="101" />
-          <p v-if="loadState === 'unsupported'" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          <Notice v-if="loadState === 'unsupported'" tone="warning">
             This backend does not serve the durable jobs API, so the transfer cannot be followed here.
-          </p>
+          </Notice>
           <div v-else-if="loadState === 'error'" class="space-y-1">
             <p class="text-xs text-destructive">{{ loadError }}</p>
             <Button variant="outline" size="sm" @click="load">Try again</Button>
@@ -528,55 +557,21 @@ function rowTarget(row: TransferRow): string {
           <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
           <p v-if="job?.error" class="whitespace-pre-wrap break-words text-xs text-destructive">{{ job.error.message }}</p>
 
-          <dl v-if="importResult" class="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-            <div class="surface-muted p-2">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Entries</dt>
-              <dd class="mt-0.5 font-medium text-foreground">{{ importResult.entries_total }}</dd>
-            </div>
-            <div class="surface-muted p-2">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Imported</dt>
-              <dd class="mt-0.5 font-medium text-foreground">{{ importResult.imported }}</dd>
-            </div>
-            <div class="surface-muted p-2">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Unlisted</dt>
-              <dd class="mt-0.5 font-medium text-foreground">{{ importResult.unlisted }}</dd>
-            </div>
-            <div class="surface-muted p-2">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Failed</dt>
-              <dd class="mt-0.5 font-medium text-foreground">{{ importResult.failed }}</dd>
-            </div>
-          </dl>
+          <FactList v-if="importResult" :items="importFacts" />
 
-          <dl v-if="exportResult" class="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-            <div class="surface-muted p-2">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Included</dt>
-              <dd class="mt-0.5 font-medium text-foreground">{{ exportResult.included }}</dd>
-            </div>
-            <div class="surface-muted p-2">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">External</dt>
-              <dd class="mt-0.5 font-medium text-foreground">{{ exportResult.omitted.external }}</dd>
-            </div>
-            <div class="surface-muted p-2">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Denied</dt>
-              <dd class="mt-0.5 font-medium text-foreground">{{ exportResult.omitted.denied }}</dd>
-            </div>
-            <div class="surface-muted p-2">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Missing</dt>
-              <dd class="mt-0.5 font-medium text-foreground">{{ exportResult.omitted.missing }}</dd>
-            </div>
-          </dl>
+          <FactList v-if="exportResult" :items="exportFacts" />
           <p v-if="exportResult?.artifact" class="text-[11px] text-muted-foreground">
             Archive {{ formatBytes(exportResult.artifact.size) }}
             <template v-if="downloadedName"> · saved as {{ downloadedName }}</template>
           </p>
 
-          <RouterLink v-if="createdDocumentId" :to="{ name: 'dataset', params: { id: createdDocumentId } }">
-            <Button variant="outline" size="sm" @click="emit('update:open', false)">Open the created document</Button>
-          </RouterLink>
+          <Button v-if="createdDocumentId" variant="outline" size="sm" as-child @click="emit('update:open', false)">
+            <RouterLink :to="{ name: 'dataset', params: { id: createdDocumentId } }">Open the created document</RouterLink>
+          </Button>
 
           <div v-if="terminal" class="space-y-2">
             <div class="flex items-center gap-2">
-              <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Report</p>
+              <h3 class="font-display text-sm font-semibold text-aruna-navy">Report</h3>
               <span v-if="rows.length" class="text-[11px] text-muted-foreground">{{ rows.length }} rows</span>
             </div>
             <div v-if="reportPending || reportError" class="flex items-center gap-2">
@@ -585,13 +580,13 @@ function rowTarget(row: TransferRow): string {
               </p>
               <Button variant="ghost" size="sm" :disabled="reportLoading" @click="retryReport">Retry</Button>
             </div>
-            <p v-else-if="!rows.length && !reportLoading" class="text-xs text-muted-foreground">This job produced no report rows.</p>
+            <EmptyState v-else-if="!rows.length && !reportLoading" compact title="This job produced no report rows." />
             <div v-else-if="rows.length" class="max-h-64 overflow-y-auto rounded-md border border-border">
               <table class="w-full text-[11px]">
                 <tbody>
                   <tr v-for="row in rows" :key="row.entry_key" class="border-b border-border last:border-0 align-top">
                     <td class="px-2 py-1.5">
-                      <Badge :variant="codeVariant(row.code)" class="text-[10px] uppercase">{{ row.code }}</Badge>
+                      <Badge :variant="codeVariant(row.code)" size="sm" class="uppercase">{{ row.code }}</Badge>
                     </td>
                     <td class="px-2 py-1.5">
                       <p class="break-all font-mono text-foreground">{{ rowSource(row) }}</p>
@@ -623,16 +618,16 @@ function rowTarget(row: TransferRow): string {
           {{ isImport ? 'Import another' : 'Run again' }}
         </Button>
         <Button v-if="artifactReady" :disabled="busy === 'downloading'" @click="downloadArtifact">
-          <Loader2 v-if="busy === 'downloading'" class="h-4 w-4 animate-spin" />
+          <Spinner v-if="busy === 'downloading'" class="text-current" aria-hidden="true" />
           <Download v-else class="h-4 w-4" /> Download archive
         </Button>
         <Button v-if="isImport && !activeJobId" :disabled="!importReady || Boolean(busy)" @click="startImport">
-          <Loader2 v-if="busy" class="h-4 w-4 animate-spin" />
+          <Spinner v-if="busy" class="text-current" aria-hidden="true" />
           <Upload v-else class="h-4 w-4" />
           {{ busy === 'uploading' ? 'Uploading…' : busy === 'submitting' ? 'Submitting…' : 'Upload and import' }}
         </Button>
         <Button v-if="!isImport && !activeJobId" :disabled="!props.documentId || Boolean(busy)" @click="startExport">
-          <Loader2 v-if="busy" class="h-4 w-4 animate-spin" />
+          <Spinner v-if="busy" class="text-current" aria-hidden="true" />
           <FileArchive v-else class="h-4 w-4" /> Start export
         </Button>
       </DialogFooter>

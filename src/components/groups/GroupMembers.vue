@@ -10,7 +10,7 @@ import { ShieldCheck, UserMinus, UserPlus, X } from '@lucide/vue'
 import { useDebounceFn } from '@vueuse/core'
 import { useAruna } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
-import { shortUserId } from '@/lib/utils'
+import { errorMessage, shortUserId } from '@/lib/utils'
 import type { ApiRole, GroupMember, UserSearchHit } from '@/lib/api'
 
 const props = defineProps<{
@@ -85,7 +85,7 @@ const runSearch = useDebounceFn(async (term: string) => {
     const response = await searchUsers(term)
     results.value = response.users
   } catch (err) {
-    searchError.value = err instanceof Error ? err.message : String(err)
+    searchError.value = errorMessage(err)
     results.value = []
   } finally {
     searching.value = false
@@ -115,7 +115,7 @@ async function addMember() {
     selectedUser.value = null
     emit('changed')
   } catch (err) {
-    memberError.value = err instanceof Error ? err.message : String(err)
+    memberError.value = errorMessage(err)
   }
 }
 
@@ -125,7 +125,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
     await removeGroupMember(props.groupId, member.user_id, roleId)
     emit('changed')
   } catch (err) {
-    memberError.value = err instanceof Error ? err.message : String(err)
+    memberError.value = errorMessage(err)
   }
 }
 </script>

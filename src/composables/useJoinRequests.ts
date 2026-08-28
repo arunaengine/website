@@ -9,6 +9,7 @@ import {
 } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
 import { useAruna } from '@/composables/useAruna'
+import { errorMessage } from '@/lib/utils'
 
 // Join requests (aruna#248). The backend does not serve these endpoints yet;
 // every path here is gated behind the `joinRequests` feature flag, so with the
@@ -59,10 +60,6 @@ function assertEnabled() {
       'Join requests are not enabled on this portal (portal-config features.joinRequests)',
     )
   }
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 // Sibling composable to useAruna: it does not export its raw request() helper,

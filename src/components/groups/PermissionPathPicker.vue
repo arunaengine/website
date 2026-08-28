@@ -11,6 +11,7 @@ import DataPathTree from './DataPathTree.vue'
 import { buildMetaPathTree, shortNodeId, type MetaPathFolder } from './permission-paths'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
+import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
   groupId: string
@@ -82,7 +83,7 @@ async function load(append = false) {
     // Open the first level so the tree reads as a browser, not a blank box.
     expanded.value = new Set(tree.value.folders.map((folder) => folder.path))
   } catch (err) {
-    loadError.value = err instanceof Error ? err.message : String(err)
+    loadError.value = errorMessage(err)
   } finally {
     loading.value = false
   }
@@ -138,7 +139,7 @@ watch(
 
 <template>
   <div>
-    <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Scopes</div>
+    <h2 class="font-display text-sm font-semibold text-aruna-navy">Scopes</h2>
     <div class="mt-1.5 flex flex-wrap gap-1.5">
       <button
         v-for="scope in SCOPES"
@@ -201,7 +202,7 @@ watch(
 
       <section v-if="customMode === 'meta'" class="mt-2 rounded-lg border border-border bg-background">
         <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
-          <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Metadata documents</div>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Metadata documents</h2>
           <RefreshButton :busy="spinning" label="Reload" class="h-6 px-1.5 text-[10px]" @click="onReload" />
         </div>
         <div class="px-3 pb-3 pt-2">
@@ -239,7 +240,7 @@ watch(
 
       <section v-else class="mt-2 rounded-lg border border-border bg-background">
         <div class="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-2">
-          <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Files</div>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Files</h2>
           <div class="flex min-w-0 items-center gap-1.5">
             <span class="shrink-0 text-[11px] text-muted-foreground">Node</span>
             <Select

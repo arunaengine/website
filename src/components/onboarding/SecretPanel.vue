@@ -8,6 +8,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import { ShieldAlert } from '@lucide/vue'
+import Notice from '@/components/ui/Notice.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -66,12 +67,10 @@ const absoluteLabel = computed(() =>
 
 <template>
   <div class="space-y-3">
-    <div
-      class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-    >
+    <Notice tone="warning" class="flex items-start gap-2">
       <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span>{{ notice }}</span>
-    </div>
+    </Notice>
     <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
       <div class="min-w-0">
         <div class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ secretLabel }}</div>
@@ -80,7 +79,7 @@ const absoluteLabel = computed(() =>
       <CopyButton :value="secret" :label="`Copy ${secretLabel.toLowerCase()}`" />
     </div>
     <div v-if="expiresAt != null" class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-      <Badge :variant="expired ? 'destructive' : 'outline'" class="text-[10px] uppercase">
+      <Badge size="sm" :variant="expired ? 'destructive' : 'outline'" class="uppercase">
         {{ expired ? 'Expired' : `Expires in ${countdownLabel}` }}
       </Badge>
       <span class="tabular-nums">{{ absoluteLabel }}</span>

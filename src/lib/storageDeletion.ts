@@ -1,4 +1,5 @@
 import { ApiError, apiRequest, type ApiClientOptions } from './api'
+import { errorMessage } from './utils'
 
 export type StorageDeletionScope =
   | { kind: 'file'; bucket: string; key: string }
@@ -199,6 +200,5 @@ export function isStorageDeletionNotFound(error: unknown): boolean {
 }
 
 export function storageDeletionErrorMessage(error: unknown): string {
-  if (error instanceof ApiError || error instanceof Error) return error.message
-  return String(error)
+  return errorMessage(error)
 }

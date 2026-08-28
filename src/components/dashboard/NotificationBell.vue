@@ -9,7 +9,8 @@ import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { Bell, Check, Eye, ListChecks, Loader2 } from '@lucide/vue'
+import Spinner from '@/components/ui/Spinner.vue'
+import { Bell, Check, Eye, ListChecks } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useNotifications } from '@/composables/useNotifications'
 import { useWatches } from '@/composables/useWatches'
@@ -176,7 +177,7 @@ function onLoadMore(event: Event) {
             class="justify-center py-2 text-xs text-muted-foreground"
             @select="onLoadMore"
           >
-            <Loader2 v-if="loadingMore" class="h-3.5 w-3.5 animate-spin" />
+            <Spinner v-if="loadingMore" label="Loading more notifications…" />
             <span v-else>Load more</span>
           </DropdownMenuItem>
         </template>

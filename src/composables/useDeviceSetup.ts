@@ -6,7 +6,7 @@ import type { WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useDeviceEnrollment, WATCH_INTERVAL_MS, type DeviceWatch } from '@/composables/useDeviceEnrollment'
 import { bounded, clearEnrolled, skipSetup } from '@/lib/desktopWelcome'
 import { parseEnrollInput } from '@/lib/enrollLink'
-import { truncateMiddle } from '@/lib/utils'
+import { errorMessage, truncateMiddle } from '@/lib/utils'
 
 // One hour, the mint default. Long enough to install the desktop app, short
 // enough that a code left on screen stops working the same session.
@@ -85,7 +85,7 @@ export function useDeviceSetup() {
       void follow()
     } catch (err) {
       // mint already worded its own failures.
-      if (!mintError.value) applyError.value = err instanceof Error ? err.message : String(err)
+      if (!mintError.value) applyError.value = errorMessage(err)
     } finally {
       applying.value = false
     }

@@ -63,10 +63,10 @@ const isSelf = computed(() => currentUser.value?.id === userId.value)
         <div class="flex items-start gap-4">
           <Avatar :user="{ name: user.name, initials: initials(user.name), avatarColor: colorFor(user.user_id) }" size="lg" />
           <div class="min-w-0 flex-1">
-            <h1 class="font-display text-xl font-semibold tracking-tight text-aruna-navy">
+            <h2 class="font-display text-xl font-semibold tracking-tight text-aruna-navy">
               {{ user.name }}
               <span v-if="isSelf" class="ml-1 text-xs font-normal text-muted-foreground">(you)</span>
-            </h1>
+            </h2>
             <div v-if="attributes.affiliation" class="mt-0.5 text-sm text-muted-foreground">{{ attributes.affiliation }}</div>
             <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
               <a v-if="attributes.email" :href="`mailto:${attributes.email}`" class="text-primary hover:underline">{{ attributes.email }}</a>

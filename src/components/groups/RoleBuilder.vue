@@ -8,6 +8,7 @@ import PermissionPathPicker from './PermissionPathPicker.vue'
 import { describeTarget } from './permission-paths'
 import { useAruna } from '@/composables/useAruna'
 import type { ApiRole, GroupDetailResponse, GroupPermissionLevel } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 
 // Composes a role as a list of access rules (path + level) and submits the
 // whole permission map at once. Editing recreates the role with the same name,
@@ -118,7 +119,7 @@ async function submit() {
         await deleteGroupRole(props.group.group_id, props.role.role_id)
       } catch (err) {
         error.value = `The updated role was created, but the previous "${props.role.name}" could not be removed: ${
-          err instanceof Error ? err.message : String(err)
+          errorMessage(err)
         }. Delete it from the list.`
         return
       }
@@ -127,7 +128,7 @@ async function submit() {
     }
     emit('saved')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errorMessage(err)
   }
 }
 </script>
@@ -188,9 +189,9 @@ async function submit() {
 
       <div class="min-w-0 lg:sticky lg:top-20 lg:self-start">
         <div class="rounded-lg border border-border bg-muted/10 p-4">
-          <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">
             {{ role?.public ? 'Everyone, including anonymous visitors, can' : 'Members with this role can' }}
-          </div>
+          </h2>
           <p v-if="!grants.length" class="mt-1.5 text-xs text-muted-foreground">
             Add your first access rule, choose what members of this role can reach.
           </p>

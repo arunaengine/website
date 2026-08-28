@@ -2,6 +2,7 @@ import { computed, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { createSwrCache, type SwrFailure } from '@/lib/swr'
 import type { ListMetadataResponse } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 
 // Module singleton: the browse window outlives the Discover view, so leaving it
 // and coming back repaints the page that was on screen instead of a skeleton,
@@ -44,7 +45,7 @@ function keyOf(params: CatalogPageParams): string {
 function onFailure(err: unknown): SwrFailure {
   // Nothing a listing can fail with makes the last answer for this exact window
   // wrong, so it is never discarded; the message rides beside it.
-  return { message: err instanceof Error ? err.message : String(err) }
+  return { message: errorMessage(err) }
 }
 
 export function useCatalogBrowse() {

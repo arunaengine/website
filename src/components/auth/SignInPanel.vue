@@ -4,6 +4,7 @@
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { featureEnabled } from '@/lib/config'
@@ -81,12 +82,7 @@ function startSignIn() {
         <Button class="w-full sm:w-auto sm:self-start" :disabled="signingIn" @click="startSignIn">
           <LogIn class="h-4 w-4" /> {{ signingIn ? 'Opening sign-in…' : 'Sign in' }}
         </Button>
-        <p
-          v-if="stageError"
-          class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs leading-relaxed text-destructive"
-        >
-          {{ stageError }}
-        </p>
+        <Notice v-if="stageError" tone="error">{{ stageError }}</Notice>
         <div class="border-t border-border/70 pt-3">
           <button
             type="button"

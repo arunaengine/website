@@ -31,9 +31,10 @@ import {
   type QuarantineRecord,
   type QuarantineUsage,
 } from '@/lib/quarantine'
-import { formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
 import { useDebounceFn } from '@vueuse/core'
 import { ChevronLeft, ChevronRight, ShieldAlert, ShieldCheck, Trash2 } from '@lucide/vue'
+import Notice from '@/components/ui/Notice.vue'
 
 const { bootstrapped, currentUser, canManageQuarantine, apiBaseUrl, authToken } = useAruna()
 const { isAuthenticated } = useAuth()
@@ -42,10 +43,6 @@ const ready = computed(() => bootstrapped.value && !!currentUser.value && canMan
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 function quarantinedAt(record: QuarantineRecord): string {
@@ -417,7 +414,7 @@ async function runPrunePass() {
     </div>
 
     <Dialog :open="inspectOpen" @update:open="(v: boolean) => (inspectOpen = v)">
-      <DialogContent class="flex max-h-[85vh] w-[92vw] max-w-2xl flex-col gap-0 overflow-hidden bg-background p-0">
+      <DialogContent class="flex max-h-[85vh] w-[92vw] max-w-xl flex-col gap-0 overflow-hidden bg-background p-0">
         <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-6">
           <DialogTitle class="sr-only">Quarantine record details</DialogTitle>
 
@@ -436,12 +433,12 @@ async function runPrunePass() {
             </div>
 
             <section class="space-y-2">
-              <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Rejection</h3>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Rejection</h2>
               <p class="rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">{{ inspected.record.reason }}</p>
             </section>
 
             <section class="space-y-2">
-              <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Record</h3>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Record</h2>
               <dl class="grid grid-cols-[minmax(8rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
                 <template v-for="[key, value] in inspectFields" :key="key">
                   <dt class="text-muted-foreground">{{ key }}</dt>
@@ -451,7 +448,7 @@ async function runPrunePass() {
             </section>
 
             <section class="space-y-2">
-              <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Decoded event</h3>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Decoded event</h2>
               <Skeleton v-if="inspectLoading && !inspected.event" class="h-10" />
               <pre
                 v-else-if="inspected.event"
@@ -493,7 +490,7 @@ async function runPrunePass() {
           <span v-if="pruneResult.next_cursor">More records remain unscanned.</span>
           <span v-else>All records have been scanned.</span>
         </p>
-        <p v-if="pruneError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ pruneError }}</p>
+        <Notice v-if="pruneError" tone="error">{{ pruneError }}</Notice>
         <DialogFooter>
           <DialogClose as-child><Button variant="outline">{{ pruneResult ? 'Close' : 'Cancel' }}</Button></DialogClose>
           <Button

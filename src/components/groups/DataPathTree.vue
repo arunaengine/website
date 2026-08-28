@@ -4,6 +4,7 @@ import { ChevronRight, File, Folder } from '@lucide/vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { ApiError, listGroupDataPaths, type DataPathEntry } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
+import { errorMessage } from '@/lib/utils'
 
 // Lazy data-path browser: each level fetches GET /groups/{id}/data-paths for its
 // own prefix, so expanding a folder loads exactly one page of that folder. An
@@ -70,7 +71,7 @@ async function load(append: boolean) {
   } catch (err) {
     if (err instanceof ApiError && (err.status === 403 || err.status === 401)) status.value = 'forbidden'
     else if (err instanceof ApiError && (err.status === 404 || err.status === 405)) status.value = 'unavailable'
-    else error.value = err instanceof Error ? err.message : String(err)
+    else error.value = errorMessage(err)
   } finally {
     loading.value = false
     loadingMore.value = false

@@ -20,9 +20,10 @@ import { useAuth } from '@/composables/useAuth'
 import { useWatches } from '@/composables/useWatches'
 import { RouterLink, useRoute } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
-import { relativeTime } from '@/lib/utils'
+import { errorMessage, relativeTime } from '@/lib/utils'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronRight, ExternalLink, KeyRound, Palette, Rss, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, Save } from '@lucide/vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 const {
   apiBaseUrl,
@@ -151,7 +152,7 @@ async function saveProfile() {
     })
     profileMessage.value = 'Profile saved.'
   } catch (err) {
-    profileError.value = err instanceof Error ? err.message : String(err)
+    profileError.value = errorMessage(err)
   }
 }
 
@@ -321,7 +322,7 @@ async function revoke(accessKeyId: string) {
   try {
     await revokeS3Credential(accessKeyId)
   } catch (err) {
-    revokeError.value = err instanceof Error ? err.message : String(err)
+    revokeError.value = errorMessage(err)
   }
 }
 
@@ -493,12 +494,12 @@ function toggleGroup(groupId: string) {
         <section id="default-profile" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2"><ListChecks class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Default metadata profile</h3></div>
-            <RouterLink :to="{ name: 'profiles' }"><Button variant="outline" size="sm">Browse profiles <ArrowRight class="h-3.5 w-3.5" /></Button></RouterLink>
+            <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'profiles' }">Browse profiles <ArrowRight class="h-3.5 w-3.5" /></RouterLink></Button>
           </header>
           <div class="grid gap-2 p-5 sm:grid-cols-2">
             <button v-for="profile in profiles" :key="profile.id" type="button" class="flex items-start gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/40" :class="preferredProfileId === profile.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="preferredProfileId = profile.id">
               <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" :style="{ backgroundColor: profile.iconColor }"><ListChecks class="h-4 w-4" /></span>
-              <div class="min-w-0 flex-1"><div class="flex items-center gap-2"><span class="text-sm font-medium text-foreground">{{ profile.name }}</span><Badge v-if="preferredProfileId === profile.id" variant="accent" class="text-[10px] uppercase">default</Badge></div><p class="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{{ profile.description }}</p></div>
+              <div class="min-w-0 flex-1"><div class="flex items-center gap-2"><span class="text-sm font-medium text-foreground">{{ profile.name }}</span><Badge v-if="preferredProfileId === profile.id" size="sm" variant="accent" class="uppercase">default</Badge></div><p class="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{{ profile.description }}</p></div>
             </button>
             <div v-if="!profiles.length" class="text-sm text-muted-foreground">No visible profile documents.</div>
           </div>
@@ -522,15 +523,16 @@ function toggleGroup(groupId: string) {
                 <GroupDetail :group-id="group.id" @left="selectedGroupId = ''" />
               </div>
             </li>
-            <li v-if="!myGroups.length" class="px-5 py-6 text-center text-xs text-muted-foreground">
-              <p>You are not a member of any group yet, create one to get started.</p>
-              <Button v-if="currentUser" variant="outline" size="sm" class="mt-3" @click="createGroupOpen = true">
-                <Plus class="h-3.5 w-3.5" /> Create group
-              </Button>
+            <li v-if="!myGroups.length" class="p-3">
+              <EmptyState compact title="You are not a member of any group yet, create one to get started.">
+                <Button v-if="currentUser" variant="outline" size="sm" @click="createGroupOpen = true">
+                  <Plus class="h-3.5 w-3.5" /> Create group
+                </Button>
+              </EmptyState>
             </li>
           </ul>
           <div v-if="discoverableGroups.length" class="border-t border-border">
-            <div class="px-5 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Other groups in this realm</div>
+            <h2 class="px-5 pb-1 pt-4 font-display text-sm font-semibold text-aruna-navy">Other groups in this realm</h2>
             <ul class="divide-y divide-border">
               <li v-for="group in discoverableGroups" :key="group.id">
                 <button type="button" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40" :class="selectedGroupId === group.id ? 'bg-muted/30' : ''" @click="toggleGroup(group.id)">
@@ -550,7 +552,7 @@ function toggleGroup(groupId: string) {
         <section id="credentials" class="surface scroll-mt-20 overflow-hidden lg:scroll-mt-[4.5rem]">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2">
-              <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">CLI and service access</h3><Badge variant="secondary" class="text-[10px] uppercase">Advanced</Badge><Badge variant="outline">{{ visibleCredentials.length }}</Badge>
+              <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">CLI and service access</h3><Badge size="sm" variant="secondary" class="uppercase">Advanced</Badge><Badge variant="outline">{{ visibleCredentials.length }}</Badge>
               <button
                 v-if="inactiveCredentials.length"
                 type="button"
@@ -569,7 +571,7 @@ function toggleGroup(groupId: string) {
             <table class="min-w-max w-full text-sm">
               <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th><th class="px-5 py-2"></th></tr></thead>
               <tbody>
-                <tr v-for="credential in visibleCredentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase text-[10px]">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
+                <tr v-for="credential in visibleCredentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge size="sm" :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
                 <tr v-if="!visibleCredentials.length">
                   <td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">
                     <template v-if="inactiveCredentials.length">
@@ -615,7 +617,7 @@ function toggleGroup(groupId: string) {
             <Separator />
             <div class="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Harvesting external OAI-PMH sources into this node</span>
-              <Badge variant="outline" class="text-[10px] uppercase">Coming soon</Badge>
+              <Badge size="sm" variant="outline" class="uppercase">Coming soon</Badge>
             </div>
           </div>
         </section>

@@ -8,6 +8,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
@@ -16,6 +17,7 @@ import { computed, ref, watch } from 'vue'
 import { ChevronRight, KeyRound, Plus, ShieldAlert, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
+import { errorMessage } from '@/lib/utils'
 import type { CreateS3CredentialsResponse } from '@/lib/api'
 
 const props = defineProps<{ open: boolean }>()
@@ -117,14 +119,14 @@ async function submit() {
       ...(active.length ? { path_restrictions: active } : {}),
     })
   } catch (err) {
-    submitError.value = err instanceof Error ? err.message : String(err)
+    submitError.value = errorMessage(err)
   }
 }
 </script>
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-lg">
+    <DialogContent class="max-w-md">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <KeyRound class="h-4 w-4 text-primary" /> Create CLI or service key
@@ -172,16 +174,16 @@ async function submit() {
             </p>
           </div>
         </div>
-        <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        <Notice v-if="submitError" tone="error">
           {{ submitError }}
-        </p>
+        </Notice>
       </div>
 
       <div v-else class="space-y-3">
-        <div class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+        <Notice tone="warning" class="flex items-start gap-2">
           <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>The secret is shown once and cannot be retrieved later. The portal never stores or uses this key.</span>
-        </div>
+        </Notice>
         <div class="space-y-2 text-sm">
           <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
             <div class="min-w-0">

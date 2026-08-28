@@ -7,6 +7,7 @@ import { computed, ref } from 'vue'
 import { Lock, Pencil, Plus, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import type { ApiRole, GroupDetailResponse } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
   group: GroupDetailResponse
@@ -105,7 +106,7 @@ async function removeRole(role: ApiRole) {
     await deleteGroupRole(props.group.group_id, role.role_id)
     emit('changed')
   } catch (err) {
-    roleError.value = err instanceof Error ? err.message : String(err)
+    roleError.value = errorMessage(err)
   }
 }
 </script>
@@ -132,10 +133,10 @@ async function removeRole(role: ApiRole) {
           <tr v-for="role in sortedRoles" :key="role.role_id" class="border-t border-border">
             <td class="px-5 py-2.5 font-medium text-foreground">
               {{ role.name }}
-              <Badge v-if="role.public" variant="secondary" class="ml-1 text-[10px] uppercase" title="Applies to everyone, including anonymous requests">public</Badge>
+              <Badge v-if="role.public" size="sm" variant="secondary" class="ml-1 uppercase" title="Applies to everyone, including anonymous requests">public</Badge>
             </td>
             <td v-for="scope in scopes" :key="scope.label" class="px-3 py-2.5">
-              <Badge v-if="cellLevel(role, scope.paths)" :variant="levelVariant(cellLevel(role, scope.paths)!)" class="text-[10px] uppercase">
+              <Badge v-if="cellLevel(role, scope.paths)" size="sm" :variant="levelVariant(cellLevel(role, scope.paths)!)" class="uppercase">
                 {{ cellLevel(role, scope.paths) }}
               </Badge>
               <span v-else class="text-muted-foreground">-</span>

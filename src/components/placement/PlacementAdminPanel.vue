@@ -305,9 +305,7 @@ watch(
               <Skeleton class="h-8" />
               <Skeleton class="h-32" />
             </template>
-            <div v-else-if="unsupported" class="rounded-md border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
-              This backend does not serve <code class="font-mono">/info/realm/placement</code>.
-            </div>
+            <EmptyState v-else-if="unsupported" compact title="This backend does not serve /info/realm/placement." />
             <ErrorPanel v-else-if="loadError" :message="loadError" @retry="loadPlacement" />
             <template v-else-if="config">
               <div class="flex flex-wrap items-center gap-2">

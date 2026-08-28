@@ -4,6 +4,7 @@
 // already-allowed connect-src path, so the iframe never touches the S3 origin.
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { ExternalLink, FileText } from '@lucide/vue'
 
@@ -45,12 +46,12 @@ onBeforeUnmount(() => {
     :title="name || 'PDF document'"
     class="h-full min-h-[70vh] w-full rounded-md border border-border bg-background"
   />
-  <div v-else class="surface flex flex-col items-center gap-3 px-5 py-14 text-center">
-    <FileText class="h-8 w-8 text-muted-foreground/70" />
-    <p class="text-sm font-medium text-foreground">{{ name || 'PDF document' }}</p>
-    <p class="max-w-md text-xs text-muted-foreground">
-      The PDF could not be loaded inline (the bucket may not allow this portal's origin). The document opens in your browser's PDF viewer instead.
-    </p>
+  <EmptyState
+    v-else
+    :title="name || 'PDF document'"
+    description="The PDF could not be loaded inline (the bucket may not allow this portal's origin). The document opens in your browser's PDF viewer instead."
+  >
+    <template #icon><FileText class="h-8 w-8" /></template>
     <Button size="sm" @click="openTab"><ExternalLink class="h-4 w-4" /> Open PDF in new tab</Button>
-  </div>
+  </EmptyState>
 </template>

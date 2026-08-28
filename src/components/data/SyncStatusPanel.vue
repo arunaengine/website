@@ -10,15 +10,19 @@ import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRefresh } from '@/composables/useRefresh'
 import { type SyncReferenceHandling, type SyncRelationship, type SyncRelationshipDetail } from '@/lib/api'
 import { arnLocationLabel, parseArunaArn, syncModeLabel, syncStateVariant } from '@/lib/sync'
-import { formatBytes, formatDuration, relativeTime } from '@/lib/utils'
+import { errorMessage, formatBytes, formatDuration, relativeTime } from '@/lib/utils'
+import type { StateTone } from '@/lib/stateBadge'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ArrowLeftRight, ArrowLeft, ArrowRight, Loader2, Play, Plus, Trash2 } from '@lucide/vue'
+import { ArrowLeftRight, ArrowLeft, ArrowRight, Play, Plus, Trash2 } from '@lucide/vue'
 
 // Sync relationships touching one bucket, outgoing and incoming, presented as
 // a centered dialog opened from the sync chip. The backend only lists
@@ -148,7 +152,7 @@ async function load(silent = false) {
     detailRetryNeeded.value = settled.some((result) => result.status === 'rejected')
   } catch (err) {
     if (myRequest !== requestId) return
-    if (!silent) error.value = err instanceof Error ? err.message : String(err)
+    if (!silent) error.value = errorMessage(err)
   } finally {
     if (myRequest === requestId && !disposed) {
       loading.value = false
@@ -205,12 +209,12 @@ function counterpart(row: Row): { nodeId: string | null; label: string } {
   return { nodeId: parseArunaArn(arn)?.nodeId ?? null, label: arnLocationLabel(arn) }
 }
 
-function stateDotClass(state: string): string {
+function stateDotTone(state: SyncRelationship['state']): StateTone {
   const variant = syncStateVariant(state)
-  if (variant === 'success') return 'bg-emerald-500'
-  if (variant === 'warn') return 'bg-amber-500'
-  if (variant === 'destructive') return 'bg-destructive'
-  return 'bg-muted-foreground/50'
+  if (variant === 'success') return 'done'
+  if (variant === 'warn') return 'attention'
+  if (variant === 'destructive') return 'failed'
+  return 'idle'
 }
 
 function lastError(row: Row): string | null {
@@ -233,7 +237,7 @@ async function rerun(row: Row) {
   } catch (err) {
     rowError.value = {
       ...rowError.value,
-      [row.relationship.id]: err instanceof Error ? err.message : String(err),
+      [row.relationship.id]: errorMessage(err),
     }
   } finally {
     busyId.value = null
@@ -255,7 +259,7 @@ async function setReferenceHandling(row: Row, value: string) {
   } catch (err) {
     rowError.value = {
       ...rowError.value,
-      [row.relationship.id]: err instanceof Error ? err.message : String(err),
+      [row.relationship.id]: errorMessage(err),
     }
   } finally {
     busyId.value = null
@@ -274,7 +278,7 @@ async function remove(row: Row) {
   } catch (err) {
     rowError.value = {
       ...rowError.value,
-      [row.relationship.id]: err instanceof Error ? err.message : String(err),
+      [row.relationship.id]: errorMessage(err),
     }
   } finally {
     busyId.value = null
@@ -284,7 +288,7 @@ async function remove(row: Row) {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="flex max-h-[85vh] max-w-3xl flex-col">
+    <DialogContent class="flex max-h-[85vh] max-w-xl flex-col">
       <DialogHeader>
         <div class="flex items-center justify-between gap-2 pr-8">
           <DialogTitle class="flex min-w-0 items-center gap-2">
@@ -304,12 +308,9 @@ async function remove(row: Row) {
       </DialogHeader>
 
       <section class="scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto">
-        <p
-          v-if="remoteQueryError"
-          class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-900 dark:text-amber-200"
-        >
+        <Notice v-if="remoteQueryError" tone="warning">
           {{ remoteQueryError }}
-        </p>
+        </Notice>
         <div v-if="loading && !rows.length" class="space-y-2">
           <Skeleton class="h-16 w-full" />
           <Skeleton class="h-16 w-full" />
@@ -326,18 +327,14 @@ async function remove(row: Row) {
           >
             <!-- Line 1: identity (flexible, truncating) + metrics right-aligned. -->
             <div class="flex items-center gap-2 text-xs">
-              <span
-                class="h-2 w-2 shrink-0 rounded-full"
-                :class="stateDotClass(row.relationship.state)"
-                :title="row.relationship.state"
-              />
-              <Badge variant="outline" class="shrink-0 text-[10px]">{{ syncModeLabel(row.relationship.mode) }}</Badge>
+              <StatusDot :tone="stateDotTone(row.relationship.state)" :label="row.relationship.state" />
+              <Badge variant="outline" size="sm" class="shrink-0">{{ syncModeLabel(row.relationship.mode) }}</Badge>
               <component
                 :is="row.direction === 'outgoing' ? ArrowRight : ArrowLeft"
                 class="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                 :aria-label="row.direction"
               />
-              <Badge variant="outline" class="shrink-0 text-[10px]" :title="counterpart(row).nodeId ?? undefined">
+              <Badge variant="outline" size="sm" class="shrink-0" :title="counterpart(row).nodeId ?? undefined">
                 {{ realmNodes.displayName(counterpart(row).nodeId) }}
               </Badge>
               <span class="min-w-0 flex-1 truncate font-mono" :title="counterpart(row).label">{{ counterpart(row).label }}</span>
@@ -363,7 +360,7 @@ async function remove(row: Row) {
                 <Badge
                   v-if="hostedOn[row.relationship.id]"
                   variant="secondary"
-                  class="text-[10px]"
+                  size="sm"
                   :title="`Listed by node ${hostedOn[row.relationship.id]}`"
                 >
                   on {{ realmNodes.displayName(hostedOn[row.relationship.id]) }}
@@ -394,8 +391,8 @@ async function remove(row: Row) {
                   :disabled="busyId !== null"
                   @update:model-value="(value: string) => setReferenceHandling(row, value)"
                 />
-                <Badge v-else variant="outline" class="text-[10px]">{{ row.relationship.reference_handling }}</Badge>
-                <Loader2 v-if="busyId === row.relationship.id" class="h-3.5 w-3.5 animate-spin text-primary" />
+                <Badge v-else variant="outline" size="sm">{{ row.relationship.reference_handling }}</Badge>
+                <Spinner v-if="busyId === row.relationship.id" label="Working" class="text-primary" />
                 <Button
                   v-if="row.direction === 'outgoing'"
                   variant="ghost"

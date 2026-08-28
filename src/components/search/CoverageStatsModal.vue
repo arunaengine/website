@@ -80,7 +80,7 @@ const groups = computed<StatGroup[]>(() => {
 
 <template>
   <Dialog :open="open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-h-[85vh] max-w-lg overflow-y-auto">
+    <DialogContent class="max-h-[85vh] max-w-md overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Query coverage</DialogTitle>
         <DialogDescription>What this answer covered, and how long it took.</DialogDescription>
@@ -89,7 +89,7 @@ const groups = computed<StatGroup[]>(() => {
       <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
 
       <section v-for="group in groups" :key="group.title" class="space-y-1.5">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{{ group.title }}</h3>
+        <h3 class="font-display text-sm font-semibold text-aruna-navy">{{ group.title }}</h3>
         <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">
           <template v-for="row in group.rows" :key="row.label">
             <dt class="text-muted-foreground">{{ row.label }}</dt>

@@ -3,6 +3,8 @@ import { computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
+import Notice from '@/components/ui/Notice.vue'
+import { stateVariant } from '@/lib/stateBadge'
 import { useAruna } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { useS3 } from '@/composables/useS3'
@@ -22,9 +24,9 @@ const tesEnabled = computed(() => featureEnabled('tes'))
 
 const status = computed(() => {
   const s = props.run.actionStatus
-  if (s === 'CompletedActionStatus') return { label: 'succeeded', variant: 'success' as const }
-  if (s === 'FailedActionStatus') return { label: 'failed', variant: 'destructive' as const }
-  return s ? { label: s, variant: 'outline' as const } : null
+  if (s === 'CompletedActionStatus') return 'succeeded'
+  if (s === 'FailedActionStatus') return 'failed'
+  return s || null
 })
 
 // The agent Person carries a `{ulid}@{realm}` identifier; resolve it to a
@@ -148,7 +150,7 @@ const flow = computed(() => [
   <section class="surface overflow-hidden" aria-label="Run provenance">
     <div class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
       <Play class="h-4 w-4 text-primary" /> {{ run.actionName || run.name || 'Process run' }}
-      <Badge v-if="status" :variant="status.variant" class="text-[10px] uppercase">{{ status.label }}</Badge>
+      <Badge v-if="status" :variant="stateVariant(status)" size="sm" class="uppercase">{{ status }}</Badge>
       <RouterLink
         v-if="tesEnabled && run.runId"
         class="ml-auto inline-flex items-center gap-1.5 text-xs font-normal text-primary hover:underline"
@@ -202,15 +204,15 @@ const flow = computed(() => [
       </div>
     </dl>
 
-    <p v-if="run.error" class="mx-5 mb-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ run.error }}</p>
+    <Notice v-if="run.error" tone="error" class="mx-5 mb-4">{{ run.error }}</Notice>
 
     <div class="space-y-4 border-t border-border px-5 py-4">
       <template v-for="(stage, i) in flow" :key="stage.key">
         <!-- Executor sits between inputs and outputs, mirroring the data flow. -->
         <div v-if="i === 1" class="rounded-md border border-border bg-muted/30 p-3">
-          <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <h3 class="flex items-center gap-2 font-display text-sm font-semibold text-aruna-navy">
             <Terminal class="h-3.5 w-3.5" /> Executor
-          </div>
+          </h3>
           <dl v-if="instrumentLabel || containerLabel || run.command" class="mt-2 space-y-2 text-xs">
             <div v-if="instrumentLabel">
               <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Software</dt>
@@ -236,10 +238,10 @@ const flow = computed(() => [
         </div>
 
         <div>
-          <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <h3 class="flex items-center gap-2 font-display text-sm font-semibold text-aruna-navy">
             <component :is="stage.icon" class="h-3.5 w-3.5" /> {{ stage.label }}
-            <span v-if="stage.rows.length" class="font-normal normal-case">{{ stage.rows.length }}</span>
-          </div>
+            <span v-if="stage.rows.length" class="text-xs font-normal text-muted-foreground">{{ stage.rows.length }}</span>
+          </h3>
           <p v-if="!stage.rows.length" class="mt-2 text-xs text-muted-foreground">{{ stage.empty }}</p>
           <ul v-else class="mt-2 space-y-1.5">
             <li v-for="row in stage.rows" :key="row.id" class="flex flex-wrap items-center gap-2 text-[11px]">

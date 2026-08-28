@@ -448,7 +448,7 @@ onBeforeUnmount(() => {
                       <div class="min-w-0 flex-1 truncate font-medium text-foreground">
                         {{ entry.item.title }}
                       </div>
-                      <Badge variant="outline" class="shrink-0 px-1.5 py-0 text-[10px]">
+                      <Badge variant="outline" size="sm" class="shrink-0">
                         {{ QUICK_KIND_LABELS[entry.item.section] }}
                       </Badge>
                     </div>

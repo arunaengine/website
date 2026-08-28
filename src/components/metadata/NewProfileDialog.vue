@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import Dialog from '@/components/ui/Dialog.vue'
-import DialogContent from '@/components/ui/DialogContent.vue'
+import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
@@ -8,6 +7,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import Input from '@/components/ui/Input.vue'
 import Switch from '@/components/ui/Switch.vue'
@@ -30,6 +30,7 @@ import type { MetadataProfile } from '@/data/types'
 import { buildProfileArtifactTexts, buildProfileCrate } from '@/lib/profiles/rocrate'
 import { entityRulesToMode } from '@/lib/profiles/mode'
 import { parseS3Url } from '@/lib/tes'
+import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
   open: boolean
@@ -141,9 +142,9 @@ watch(
   },
 )
 
-// Dialog discard guard: outside clicks never close the dialog; an explicit close
-// (X, Escape, Cancel) while the builder has edits asks before discarding. The
-// open watcher below resets all state, so "Discard" only needs to close.
+// Dialog discard guard: any close (outside click, X, Escape, Cancel) while the
+// builder has edits asks before discarding. The open watcher below resets all
+// state, so "Discard" only needs to close.
 const confirmDiscardOpen = ref(false)
 function requestClose(next: boolean) {
   if (next) {
@@ -310,7 +311,7 @@ async function submit() {
     emit('created', profile)
     emit('update:open', false)
   } catch (err) {
-    builder.submitError = err instanceof Error ? err.message : String(err)
+    builder.submitError = errorMessage(err)
   } finally {
     publishing.value = false
   }
@@ -318,185 +319,182 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="requestClose">
-    <DialogContent class="max-h-[calc(100vh-2rem)] max-w-6xl overflow-y-auto" @interact-outside="(event: Event) => event.preventDefault()">
-      <DialogHeader>
-        <DialogTitle class="flex items-center gap-2">
-          <ListChecks class="h-4 w-4 text-primary" /> {{ isEditing ? 'Edit metadata profile' : 'New metadata profile' }}
-        </DialogTitle>
-        <DialogDescription>
-          <template v-if="isEditing">Adjust the profile's rules and details; saving replaces the stored profile crate in place.</template>
-          <template v-else>Define which RO-Crate entities must, should, or may exist, and the property rules for each, step by step.</template>
-        </DialogDescription>
-      </DialogHeader>
+  <DetailDialog :open="props.open" @update:open="requestClose">
+    <DialogHeader>
+      <DialogTitle class="flex items-center gap-2">
+        <ListChecks class="h-4 w-4 text-primary" /> {{ isEditing ? 'Edit metadata profile' : 'New metadata profile' }}
+      </DialogTitle>
+      <DialogDescription>
+        <template v-if="isEditing">Adjust the profile's rules and details; saving replaces the stored profile crate in place.</template>
+        <template v-else>Define which RO-Crate entities must, should, or may exist, and the property rules for each, step by step.</template>
+      </DialogDescription>
+    </DialogHeader>
 
-      <!-- Step indicator -->
-      <div class="flex items-center gap-2">
-        <template v-for="(s, index) in steps" :key="s.n">
-          <button
-            type="button"
-            class="flex items-center gap-2"
-            :class="s.n > step ? 'cursor-default' : 'cursor-pointer'"
-            :disabled="s.n > step"
-            @click="goToStep(s.n)"
-          >
-            <span
-              class="flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition-colors"
-              :class="s.n < step
-                ? 'border-transparent bg-primary text-primary-foreground'
-                : s.n === step
-                  ? 'border-primary text-primary'
-                  : 'border-border text-muted-foreground'"
-            >
-              <Check v-if="s.n < step" class="h-3.5 w-3.5" />
-              <template v-else>{{ s.n }}</template>
-            </span>
-            <span
-              class="text-sm font-medium"
-              :class="s.n === step ? 'text-foreground' : 'text-muted-foreground'"
-            >{{ s.label }}</span>
-          </button>
-          <div v-if="index < steps.length - 1" class="h-px flex-1 bg-border" />
-        </template>
-      </div>
-
-      <div class="max-h-[72vh] overflow-y-auto px-1 scrollbar-thin">
-        <ProfileBasicsStep v-if="step === 1 && isEditing" :builder="builder" locked />
-        <Tabs v-else-if="step === 1" v-model="startTab">
-          <TabsList>
-            <TabsTrigger value="create"><Plus class="mr-1 size-3.5" /> Create</TabsTrigger>
-            <TabsTrigger value="import"><FileUp class="mr-1 size-3.5" /> Import existing</TabsTrigger>
-          </TabsList>
-          <TabsContent value="create" class="space-y-4">
-            <p v-if="!builder.importSummary" class="text-[11px] text-muted-foreground">
-              Starting from an existing profile crate or a Describo/Crate-O mode file? Switch to
-              <button type="button" class="font-medium text-aruna-royal underline-offset-2 hover:underline" @click="startTab = 'import'">Import existing</button>
-              above.
-            </p>
-            <div v-if="builder.importSummary" class="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
-              <CheckCircle2 class="h-3.5 w-3.5 shrink-0" />
-              <span>
-                Imported from {{ builder.importSummary.kind === 'mode' ? 'a mode file' : 'a profile crate' }}<template v-if="builder.importSummary.name">: <b>{{ builder.importSummary.name }}</b></template>, review the prefilled fields below.
-              </span>
-            </div>
-            <ProfileBasicsStep :builder="builder" />
-          </TabsContent>
-          <TabsContent value="import">
-            <ImportProfileSection :builder="builder" @imported="startTab = 'create'" />
-          </TabsContent>
-        </Tabs>
-        <ProfileEntityRulesStep v-else-if="step === 2" :builder="builder" />
-        <ProfileReviewStep v-else :builder="builder" />
-
-        <div v-if="builder.submitError" class="mt-4 text-xs text-destructive">{{ builder.submitError }}</div>
-      </div>
-
-      <div
-        v-if="step < 3 && currentStepCallout.length"
-        class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-      >
-        <div class="font-medium">To continue:</div>
-        <ul class="mt-1 list-disc space-y-0.5 pl-4">
-          <li v-for="error in currentStepCallout" :key="error">{{ error }}</li>
-        </ul>
-      </div>
-
-      <!-- Publish destination. Always rendered on the review step, including when
-           the profile is private or publishing is blocked: an author who came
-           looking for "which bucket does this go to" must find an answer rather
-           than an absent control. -->
-      <div v-if="step === 3" class="rounded-md border border-border px-3 py-2">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div class="text-xs font-medium text-foreground">Publish destination</div>
-            <p class="mt-0.5 text-[11px] text-muted-foreground">
-              Where this profile's artifacts (mode.json, schema.json, profile.html, shapes.ttl) are stored.
-            </p>
-          </div>
-          <label class="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
-            Public profile
-            <Switch :checked="builder.isPublic" @update:checked="(value: boolean) => (builder.isPublic = value)" />
-          </label>
-        </div>
-
-        <!-- Private: nothing is uploaded, so there is no bucket to choose. -->
-        <p v-if="!builder.isPublic" class="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
-          <Lock class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>
-            This profile is private, so its artifacts stay embedded in the profile document and no bucket is used.
-            Turn on <b class="text-foreground">Public profile</b> to publish them where other tools can fetch them without a token.
-          </span>
-        </p>
-
-        <!-- Public, but nothing to publish with yet. -->
-        <div
-          v-else-if="publishBlocked"
-          class="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300"
+    <!-- Step indicator -->
+    <div class="mt-4 flex items-center gap-2">
+      <template v-for="(s, index) in steps" :key="s.n">
+        <button
+          type="button"
+          class="flex items-center gap-2"
+          :class="s.n > step ? 'cursor-default' : 'cursor-pointer'"
+          :disabled="s.n > step"
+          @click="goToStep(s.n)"
         >
-          <span class="flex items-center gap-2">
-            <KeyRound class="h-3.5 w-3.5 shrink-0" />
-            <template v-if="!s3.endpoint.value">
-              Public profiles publish their artifacts to this node's S3 storage, but the node does not advertise an S3 endpoint.
-            </template>
-            <template v-else>
-              Choosing a bucket needs S3 credentials for this group, create them to pick a destination and publish.
-            </template>
+          <span
+            class="flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition-colors"
+            :class="s.n < step
+              ? 'border-transparent bg-primary text-primary-foreground'
+              : s.n === step
+                ? 'border-primary text-primary'
+                : 'border-border text-muted-foreground'"
+          >
+            <Check v-if="s.n < step" class="h-3.5 w-3.5" />
+            <template v-else>{{ s.n }}</template>
           </span>
-          <Button v-if="s3.endpoint.value" variant="outline" size="sm" @click="credentialDialogOpen = true">
-            <Plus class="size-3.5" /> Create credentials
-          </Button>
-        </div>
+          <span
+            class="text-sm font-medium"
+            :class="s.n === step ? 'text-foreground' : 'text-muted-foreground'"
+          >{{ s.label }}</span>
+        </button>
+        <div v-if="index < steps.length - 1" class="h-px flex-1 bg-border" />
+      </template>
+    </div>
 
-        <div v-else class="mt-2 grid gap-2 sm:grid-cols-2">
-          <div>
-            <label class="text-[11px] font-medium text-muted-foreground">Bucket</label>
-            <Select
-              class="mt-1"
-              :options="destBucketOptions"
-              :model-value="selectedDestBucket"
-              aria-label="Publish destination bucket"
-              @update:model-value="onDestBucketChange"
-            />
+    <div class="mt-4 min-h-0 flex-1 overflow-y-auto px-1 scrollbar-thin">
+      <ProfileBasicsStep v-if="step === 1 && isEditing" :builder="builder" locked />
+      <Tabs v-else-if="step === 1" v-model="startTab">
+        <TabsList>
+          <TabsTrigger value="create"><Plus class="mr-1 size-3.5" /> Create</TabsTrigger>
+          <TabsTrigger value="import"><FileUp class="mr-1 size-3.5" /> Import existing</TabsTrigger>
+        </TabsList>
+        <TabsContent value="create" class="space-y-4">
+          <p v-if="!builder.importSummary" class="text-[11px] text-muted-foreground">
+            Starting from an existing profile crate or a Describo/Crate-O mode file? Switch to
+            <button type="button" class="font-medium text-aruna-royal underline-offset-2 hover:underline" @click="startTab = 'import'">Import existing</button>
+            above.
+          </p>
+          <div v-if="builder.importSummary" class="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+            <CheckCircle2 class="h-3.5 w-3.5 shrink-0" />
+            <span>
+              Imported from {{ builder.importSummary.kind === 'mode' ? 'a mode file' : 'a profile crate' }}<template v-if="builder.importSummary.name">: <b>{{ builder.importSummary.name }}</b></template>, review the prefilled fields below.
+            </span>
           </div>
-          <div>
-            <label class="text-[11px] font-medium text-muted-foreground">Prefix</label>
-            <Input
-              class="mt-1"
-              :model-value="destPrefix"
-              placeholder="profiles/slug"
-              aria-label="Publish destination prefix"
-              @update:model-value="(value: string | number) => onDestPrefixInput(String(value))"
-            />
-          </div>
+          <ProfileBasicsStep :builder="builder" />
+        </TabsContent>
+        <TabsContent value="import">
+          <ImportProfileSection :builder="builder" @imported="startTab = 'create'" />
+        </TabsContent>
+      </Tabs>
+      <ProfileEntityRulesStep v-else-if="step === 2" :builder="builder" />
+      <ProfileReviewStep v-else :builder="builder" />
+
+      <Notice v-if="builder.submitError" tone="error" class="mt-4">{{ builder.submitError }}</Notice>
+    </div>
+
+    <Notice
+      v-if="step < 3 && currentStepCallout.length"
+      tone="warning"
+      title="To continue:"
+      :lines="currentStepCallout"
+      class="mt-4"
+    />
+
+    <!-- Publish destination. Always rendered on the review step, including when
+         the profile is private or publishing is blocked: an author who came
+         looking for "which bucket does this go to" must find an answer rather
+         than an absent control. -->
+    <div v-if="step === 3" class="mt-4 rounded-md border border-border px-3 py-2">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div class="text-xs font-medium text-foreground">Publish destination</div>
+          <p class="mt-0.5 text-[11px] text-muted-foreground">
+            Where this profile's artifacts (mode.json, schema.json, profile.html, shapes.ttl) are stored.
+          </p>
         </div>
-        <template v-if="builder.isPublic && !publishBlocked">
-          <p class="mt-2 text-[11px] text-muted-foreground">
-            Files go to <code class="text-foreground">{{ destExamplePath }}</code>
-          </p>
-          <p class="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
-            Everything under this destination becomes publicly readable.
-          </p>
-        </template>
+        <label class="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+          Public profile
+          <Switch :checked="builder.isPublic" @update:checked="(value: boolean) => (builder.isPublic = value)" />
+        </label>
       </div>
 
-      <DialogFooter class="sm:justify-between">
-        <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
-        <div class="flex items-center gap-2">
-          <Button v-if="step > 1" variant="outline" @click="goBack">
-            <ArrowLeft class="h-3.5 w-3.5" /> Back
-          </Button>
-          <Button v-if="step < 3" :disabled="currentStepErrors.length > 0" @click="goNext">
-            Next <ArrowRight class="h-3.5 w-3.5" />
-          </Button>
-          <Button v-else :disabled="formErrors.length > 0 || saving || publishing || publishBlocked" @click="submit">
-            {{ publishing ? 'Publishing…' : saving ? 'Saving…' : isEditing ? 'Save profile' : 'Create profile' }}
-          </Button>
+      <!-- Private: nothing is uploaded, so there is no bucket to choose. -->
+      <p v-if="!builder.isPublic" class="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+        <Lock class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>
+          This profile is private, so its artifacts stay embedded in the profile document and no bucket is used.
+          Turn on <b class="text-foreground">Public profile</b> to publish them where other tools can fetch them without a token.
+        </span>
+      </p>
+
+      <!-- Public, but nothing to publish with yet. -->
+      <Notice
+        v-else-if="publishBlocked"
+        tone="warning"
+        class="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]"
+      >
+        <span class="flex items-center gap-2">
+          <KeyRound class="h-3.5 w-3.5 shrink-0" />
+          <template v-if="!s3.endpoint.value">
+            Public profiles publish their artifacts to this node's S3 storage, but the node does not advertise an S3 endpoint.
+          </template>
+          <template v-else>
+            Choosing a bucket needs S3 credentials for this group, create them to pick a destination and publish.
+          </template>
+        </span>
+        <Button v-if="s3.endpoint.value" variant="outline" size="sm" @click="credentialDialogOpen = true">
+          <Plus class="size-3.5" /> Create credentials
+        </Button>
+      </Notice>
+
+      <div v-else class="mt-2 grid gap-2 sm:grid-cols-2">
+        <div>
+          <label class="text-[11px] font-medium text-muted-foreground">Bucket</label>
+          <Select
+            class="mt-1"
+            :options="destBucketOptions"
+            :model-value="selectedDestBucket"
+            aria-label="Publish destination bucket"
+            @update:model-value="onDestBucketChange"
+          />
         </div>
-      </DialogFooter>
+        <div>
+          <label class="text-[11px] font-medium text-muted-foreground">Prefix</label>
+          <Input
+            class="mt-1"
+            :model-value="destPrefix"
+            placeholder="profiles/slug"
+            aria-label="Publish destination prefix"
+            @update:model-value="(value: string | number) => onDestPrefixInput(String(value))"
+          />
+        </div>
+      </div>
+      <template v-if="builder.isPublic && !publishBlocked">
+        <p class="mt-2 text-[11px] text-muted-foreground">
+          Files go to <code class="text-foreground">{{ destExamplePath }}</code>
+        </p>
+        <p class="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+          Everything under this destination becomes publicly readable.
+        </p>
+      </template>
+    </div>
 
-      <CreateCredentialDialog v-model:open="credentialDialogOpen" />
+    <DialogFooter class="mt-4 sm:justify-between">
+      <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
+      <div class="flex items-center gap-2">
+        <Button v-if="step > 1" variant="outline" @click="goBack">
+          <ArrowLeft class="h-3.5 w-3.5" /> Back
+        </Button>
+        <Button v-if="step < 3" :disabled="currentStepErrors.length > 0" @click="goNext">
+          Next <ArrowRight class="h-3.5 w-3.5" />
+        </Button>
+        <Button v-else :disabled="formErrors.length > 0 || saving || publishing || publishBlocked" @click="submit">
+          {{ publishing ? 'Publishing…' : saving ? 'Saving…' : isEditing ? 'Save profile' : 'Create profile' }}
+        </Button>
+      </div>
+    </DialogFooter>
 
-      <DiscardDraftConfirm :open="confirmDiscardOpen" @keep="confirmDiscardOpen = false" @discard="discardDraft" />
-    </DialogContent>
-  </Dialog>
+    <CreateCredentialDialog v-model:open="credentialDialogOpen" />
+
+    <DiscardDraftConfirm :open="confirmDiscardOpen" @keep="confirmDiscardOpen = false" @discard="discardDraft" />
+  </DetailDialog>
 </template>

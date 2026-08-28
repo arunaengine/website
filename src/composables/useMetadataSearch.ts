@@ -12,6 +12,7 @@ import { featureEnabled } from '@/lib/config'
 import { useAruna } from '@/composables/useAruna'
 import { createSwrCache, type SwrFailure } from '@/lib/swr'
 import type { MetadataDoc } from '@/data/types'
+import { errorMessage } from '@/lib/utils'
 
 export const SEARCH_DEBOUNCE_MS = 300
 // aruna#258 page cap: a single page never exceeds 100 hits.
@@ -207,7 +208,7 @@ export function useMetadataSearch(
     if (err instanceof DOMException && err.name === 'AbortError') return { message: '' }
     // Nothing a search can fail with makes the last answer for this exact key
     // wrong, so the page is never discarded; the message rides beside it.
-    return { message: err instanceof Error ? err.message : String(err) }
+    return { message: errorMessage(err) }
   }
 
   function hasCached(key: string): boolean {
@@ -368,7 +369,7 @@ export function useMetadataSearch(
       } else {
         // A failed page must not wipe the page already on screen; surface it
         // via the manual "Try again".
-        pageError.value = err instanceof Error ? err.message : String(err)
+        pageError.value = errorMessage(err)
       }
       return false
     } finally {

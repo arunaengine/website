@@ -4,10 +4,13 @@ import Input from '@/components/ui/Input.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
-import { Upload, Globe, FileJson, FileCode2, CheckCircle2, AlertTriangle, Loader2, ListChecks } from '@lucide/vue'
+import Notice from '@/components/ui/Notice.vue'
+import { Upload, Globe, FileJson, FileCode2, CheckCircle2, AlertTriangle, ListChecks } from '@lucide/vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { isModeFile, MODELED_MODE_KEYS, modeBasics, modeToEntityRules } from '@/lib/profiles/mode'
 import { missingShapesArtifacts, parseProfileCrate, resolveProfileArtifacts } from '@/lib/profiles/rocrate'
 import { isRecord } from '@/lib/profiles/uri'
+import { errorMessage } from '@/lib/utils'
 import { useAruna } from '@/composables/useAruna'
 import { useArtifactFetch } from './useArtifactFetch'
 import LiftNotesPanel from './LiftNotesPanel.vue'
@@ -162,7 +165,7 @@ async function liftText(text: string): Promise<LiftResult> {
   try {
     return liftShapes(text)
   } catch (err) {
-    throw new Error(`Not parseable as Turtle: ${err instanceof Error ? err.message : String(err)}`)
+    throw new Error(`Not parseable as Turtle: ${errorMessage(err)}`)
   }
 }
 
@@ -235,7 +238,7 @@ function apply(result: ProfileImportResult) {
 }
 
 function fail(err: unknown) {
-  error.value = err instanceof Error ? err.message : String(err)
+  error.value = errorMessage(err)
   pendingImport.value = null
 }
 
@@ -303,7 +306,7 @@ async function fromUrl() {
       </span>
       <Select v-model="storedId" :options="storedOptions" placeholder="Choose a profile" class="h-8 min-w-[200px] flex-1 text-xs" />
       <Button type="button" variant="outline" size="sm" :disabled="storedBusy || !storedId" @click="fromStored">
-        <Loader2 v-if="storedBusy" class="size-3.5 animate-spin" />
+        <Spinner v-if="storedBusy" class="text-current" aria-hidden="true" />
         <template v-else>Use as starting point</template>
       </Button>
     </div>
@@ -317,16 +320,16 @@ async function fromUrl() {
       <div class="flex min-w-[220px] flex-1 items-center gap-2">
         <Input v-model="url" placeholder="https://…/mode.json or …/shapes.ttl" @keydown.enter="fromUrl" />
         <Button type="button" variant="outline" size="sm" :disabled="busy || !url.trim()" @click="fromUrl">
-          <Loader2 v-if="busy" class="size-3.5 animate-spin" />
+          <Spinner v-if="busy" class="text-current" aria-hidden="true" />
           <Globe v-else class="size-3.5" /> Fetch
         </Button>
       </div>
     </div>
 
-    <div v-if="error" class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+    <Notice v-if="error" tone="error" class="flex items-start gap-2">
       <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span>{{ error }}</span>
-    </div>
+    </Notice>
 
     <div v-if="pendingShacl" class="space-y-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
       <div class="flex items-center gap-2 font-medium text-foreground">
@@ -375,7 +378,7 @@ async function fromUrl() {
     <!-- Attach-only imports where nothing could be lifted: say why, right here. -->
     <LiftNotesPanel v-if="shaclNotice && builder.liftNotes.length" :notes="builder.liftNotes" attached />
 
-    <div v-if="pendingImport" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+    <Notice v-if="pendingImport" tone="warning">
       <div class="flex items-center gap-2 font-medium">
         <AlertTriangle class="h-3.5 w-3.5 shrink-0" />
         Importing replaces your current draft, the basics and every rule you have edited.
@@ -384,7 +387,7 @@ async function fromUrl() {
         <Button type="button" variant="outline" size="sm" @click="apply(pendingImport)">Replace draft</Button>
         <Button type="button" variant="ghost" size="sm" @click="pendingImport = null">Keep editing</Button>
       </div>
-    </div>
+    </Notice>
 
     <div v-if="builder.importSummary" class="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
       <div class="flex items-center gap-2 font-medium">

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import {
   emptySelector,
@@ -55,9 +56,9 @@ async function publish() {
 
 <template>
   <div class="space-y-5">
-    <div class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+    <Notice tone="warning">
       Residency policies are immutable and digest-identified. Publishing a changed definition requires a new policy id.
-    </div>
+    </Notice>
 
     <div class="grid gap-4 sm:grid-cols-2">
       <div>

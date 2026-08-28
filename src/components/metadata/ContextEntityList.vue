@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { Pencil, Trash2 } from '@lucide/vue'
 import type { ContextEntity, RootRole } from '@/lib/crate/build'
 
@@ -46,9 +47,7 @@ function entityType(entity: ContextEntity): string {
       <p class="font-mono text-[11px] text-muted-foreground">./</p>
     </div>
 
-    <p v-if="!entities.length" class="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
-      No context entities yet.
-    </p>
+    <EmptyState v-if="!entities.length" compact title="No context entities yet." />
 
     <section v-for="group in groups" :key="group.role" class="space-y-2">
       <h3 class="text-xs font-semibold capitalize text-foreground">{{ group.role }}</h3>

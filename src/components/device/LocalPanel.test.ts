@@ -1,6 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as Utils from '@/lib/utils'
 import {
   button,
   click,
@@ -41,10 +42,16 @@ const SwitchStub = defineComponent({
 })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
+const Notice = compileClientComponent(new URL('../ui/Notice.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/lib/utils': Utils,
+})
+
 const LocalPanel = compileClientComponent(new URL('./LocalPanel.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': icons,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/composables/useAruna': {
     useAruna: () => ({
@@ -56,6 +63,7 @@ const LocalPanel = compileClientComponent(new URL('./LocalPanel.vue', import.met
     setNodeSettings,
     pickDirectory: async () => null,
   },
+  '@/lib/utils': Utils,
 })
 
 function toggle(root: HostNode): HostNode {

@@ -7,6 +7,7 @@ import { computed, ref, type ComponentPublicInstance } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import { AlertTriangle } from '@lucide/vue'
 import type { BadgeVariant } from '@/components/nodes/node-display'
+import Notice from '@/components/ui/Notice.vue'
 
 export interface KindOption {
   value: string
@@ -91,10 +92,10 @@ function tabindexFor(index: number): number {
         <span class="min-w-0 flex-1">
           <span class="flex flex-wrap items-center gap-2">
             <span class="font-display text-sm font-semibold text-aruna-navy">{{ option.title }}</span>
-            <Badge
+            <Badge size="sm"
               v-if="option.badgeLabel"
               :variant="option.badgeVariant ?? 'outline'"
-              class="text-[10px] uppercase"
+              class="uppercase"
             >
               {{ option.badgeLabel }}
             </Badge>
@@ -102,13 +103,10 @@ function tabindexFor(index: number): number {
           <span class="mt-1 block text-xs leading-relaxed text-muted-foreground">{{ option.description }}</span>
         </span>
       </button>
-      <div
-        v-if="option.warning"
-        class="mt-1.5 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] leading-relaxed text-amber-800 dark:text-amber-300"
-      >
+      <Notice v-if="option.warning" tone="warning" class="mt-1.5 flex items-start gap-2 text-[11px]">
         <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span>{{ option.warning }}</span>
-      </div>
+      </Notice>
     </div>
   </div>
 </template>
