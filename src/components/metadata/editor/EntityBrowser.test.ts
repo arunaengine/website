@@ -2,6 +2,7 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
 import {
+  button,
   click,
   compileClientComponent,
   content,
@@ -35,9 +36,9 @@ const EntityBrowser = compileClientComponent(new URL('./EntityBrowser.vue', impo
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
+  './icons': { entityIcon: () => EmptyStub },
   './AddEntityDialog.vue': moduleDefault(EmptyStub),
   './AddFilesDialog.vue': moduleDefault(EmptyStub),
-  './CrateGraph.vue': moduleDefault(EmptyStub),
   '@/lib/crate/editor': Editor,
 })
 
@@ -99,6 +100,23 @@ describe('EntityBrowser', () => {
 
     expect(content(row(mounted.root, 'Ada Lovelace'))).toContain(String(issues.length))
     expect(content(row(mounted.root, 'reads.csv'))).not.toContain('1')
+    mounted.app.unmount()
+  })
+
+  it('separates adding data from adding context', async () => {
+    const mounted = await mount()
+
+    expect(button(mounted.root, 'Add data entity')).toBeDefined()
+    expect(button(mounted.root, 'Add contextual entity')).toBeDefined()
+    mounted.app.unmount()
+  })
+
+  it('hands the graph over to the page', async () => {
+    const asked: boolean[] = []
+    const mounted = await mount({ onGraph: () => asked.push(true) })
+
+    await click(button(mounted.root, 'Graph'))
+    expect(asked).toEqual([true])
     mounted.app.unmount()
   })
 

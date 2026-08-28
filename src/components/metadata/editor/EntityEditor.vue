@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import RootForm from './RootForm.vue'
 import EntityHeader from './EntityHeader.vue'
@@ -9,17 +10,17 @@ import AddPropertyPopover from './AddPropertyPopover.vue'
 import {
   addValue,
   defaultValue,
-  displayName,
   findEntity,
-  propertyTerm,
-  referencesTo,
   rootId,
+  toRoCrate,
   type CrateDraft,
   type DraftValueKind,
   type LiveIssue,
 } from '@/lib/crate/editor'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
-import { Plus, Search } from '@lucide/vue'
+import { Plus } from '@lucide/vue'
+
+const ROOT_VIEW_KEY = 'aruna.dataset.rootView'
 
 const props = defineProps<{
   draft: CrateDraft
@@ -36,15 +37,30 @@ const emit = defineEmits<{
 }>()
 
 const propertyOpen = ref(false)
-const referencesOpen = ref(false)
+const rootView = ref<'form' | 'properties'>('form')
 
 const entity = computed(() => findEntity(props.draft, props.selected))
 const isRoot = computed(() => props.selected === rootId(props.draft))
-const uses = computed(() => referencesTo(props.draft, props.selected).map((use) => ({
-  ...use,
-  name: displayName(findEntity(props.draft, use.entityId)),
-  label: propertyTerm(props.vocab, use.property)?.label ?? use.property,
-})))
+const asRows = computed(() => !isRoot.value || rootView.value === 'properties')
+const json = computed(() => JSON.stringify(toRoCrate(props.draft), null, 2))
+
+onMounted(() => {
+  try {
+    const stored = globalThis.localStorage?.getItem(ROOT_VIEW_KEY)
+    if (stored === 'properties' || stored === 'form') rootView.value = stored
+  } catch {
+    rootView.value = 'form'
+  }
+})
+
+function pickView(view: 'form' | 'properties') {
+  rootView.value = view
+  try {
+    globalThis.localStorage?.setItem(ROOT_VIEW_KEY, view)
+  } catch {
+    // A browser without writable storage simply forgets the choice.
+  }
+}
 
 function addProperty(picked: { key: string; kind: DraftValueKind }) {
   propertyOpen.value = false
@@ -55,8 +71,32 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
 
 <template>
   <section v-if="entity" class="surface">
+    <EntityHeader
+      :draft="draft"
+      :entity="entity"
+      :vocab="vocab"
+      @update="(next) => emit('update', next)"
+      @select="(id) => emit('select', id)"
+    >
+      <template v-if="isRoot" #view>
+        <div class="inline-flex items-center rounded-md border border-border p-0.5">
+          <button
+            v-for="view in (['form', 'properties'] as const)"
+            :key="view"
+            type="button"
+            class="rounded-[3px] px-2.5 py-1 text-xs font-medium capitalize"
+            :class="rootView === view ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            :aria-pressed="rootView === view"
+            @click="pickView(view)"
+          >
+            {{ view === 'form' ? 'Form' : 'Properties' }}
+          </button>
+        </div>
+      </template>
+    </EntityHeader>
+
     <RootForm
-      v-if="isRoot"
+      v-if="isRoot && !asRows"
       :draft="draft"
       :vocab="vocab"
       :issues="issues"
@@ -66,31 +106,20 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
       @select="(id) => emit('select', id)"
       @profile="(id) => emit('profile', id)"
     />
-    <template v-else>
-      <EntityHeader
-        :draft="draft"
-        :entity="entity"
-        :vocab="vocab"
-        @update="(next) => emit('update', next)"
-        @select="(id) => emit('select', id)"
-      />
-      <PropertyEditor
-        :draft="draft"
-        :entity="entity"
-        :vocab="vocab"
-        :skip="['name']"
-        :issues="issues"
-        @update="(next) => emit('update', next)"
-        @select="(id) => emit('select', id)"
-      />
-    </template>
+    <PropertyEditor
+      v-else
+      :draft="draft"
+      :entity="entity"
+      :vocab="vocab"
+      :locked="isRoot ? ['hasPart'] : []"
+      :issues="issues"
+      @update="(next) => emit('update', next)"
+      @select="(id) => emit('select', id)"
+    />
 
     <div class="relative flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
       <Button variant="outline" size="sm" @click="propertyOpen = !propertyOpen">
         <Plus class="h-3.5 w-3.5" /> Add property
-      </Button>
-      <Button variant="ghost" size="sm" @click="referencesOpen = !referencesOpen">
-        <Search class="h-3.5 w-3.5" /> Find references ({{ uses.length }})
       </Button>
       <AddPropertyPopover
         v-if="propertyOpen"
@@ -102,17 +131,15 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
       />
     </div>
 
-    <ul v-if="referencesOpen && uses.length" class="divide-y divide-border border-t border-border">
-      <li v-for="use in uses" :key="`${use.entityId}:${use.property}:${use.index}`" class="flex items-center gap-3 px-5 py-2">
-        <span class="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          {{ use.name || use.entityId }} · {{ use.label }}
-        </span>
-        <Button variant="ghost" size="sm" @click="emit('select', use.entityId)">Open</Button>
-      </li>
-    </ul>
-    <p v-else-if="referencesOpen" class="border-t border-border px-5 py-3 text-xs text-muted-foreground">
-      Nothing in this dataset points at this yet.
-    </p>
+    <details v-if="isRoot && asRows" class="border-t border-border">
+      <summary class="cursor-pointer px-5 py-2.5 text-xs font-medium text-foreground">Show JSON-LD</summary>
+      <div class="border-t border-border p-5">
+        <div class="mb-2 flex justify-end">
+          <CopyButton :value="json" label="Copy the JSON-LD" />
+        </div>
+        <pre class="max-h-96 overflow-auto rounded-md bg-muted/30 p-3 text-[11px] leading-relaxed"><code>{{ json }}</code></pre>
+      </div>
+    </details>
   </section>
 
   <EmptyState v-else title="Pick something on the left to edit it." />

@@ -9,13 +9,19 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import LookupBox from '@/components/metadata/LookupBox.vue'
 import TypeBrowser from './TypeBrowser.vue'
 import {
   addEntity,
+  addValue,
   autoId,
   idHint,
+  linkProperties,
+  propertyKey,
+  rootEntity,
+  rootId,
   typeLabel,
   type CrateDraft,
   type DraftEntity,
@@ -33,6 +39,10 @@ const props = defineProps<{
   vocab: VocabIndex | null
   /** Property range: the type list starts narrowed to what it accepts. */
   range?: string[]
+  /** Contextual entities only: File, Dataset and MediaObject stay out. */
+  excludeData?: boolean
+  /** Offers to link the new entity from the root in the same step. */
+  offerLink?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -49,6 +59,23 @@ const importing = ref(false)
 const lookupError = ref('')
 const extra = ref<Record<string, DraftValue[]>>({})
 const related = ref<ContextEntity[]>([])
+const linkAs = ref('')
+
+// The link a new author or publisher almost always needs, offered up front.
+const PRESELECTED: Readonly<Record<string, string>> = { Person: 'author', Organization: 'publisher' }
+
+const linkOptions = computed(() => {
+  if (!props.offerLink || !type.value) return []
+  const root = rootEntity(props.draft)
+  return linkProperties(props.vocab, root?.types ?? [], [type.value])
+    .map((term) => ({ value: propertyKey(term), label: term.label }))
+})
+
+watch([type, linkOptions], () => {
+  const preselected = PRESELECTED[typeLabel(type.value)] ?? ''
+  const offered = linkOptions.value.some((option) => option.value === preselected)
+  linkAs.value = offered ? preselected : ''
+})
 
 const registry = computed(() => {
   const label = typeLabel(type.value)
@@ -73,6 +100,7 @@ watch(() => props.open, (open) => {
   lookupError.value = ''
   extra.value = {}
   related.value = []
+  linkAs.value = ''
 }, { immediate: true })
 
 // The identifier follows the name until someone edits it themselves.
@@ -144,7 +172,13 @@ function create() {
     id: identifier.value,
     properties: extra.value,
   })
-  emit('created', created)
+  const linked = linkAs.value
+    ? addValue(created.draft, rootId(created.draft), linkAs.value, {
+        kind: 'reference',
+        value: created.entity.id,
+      })
+    : created.draft
+  emit('created', { draft: linked, entity: created.entity })
   emit('update:open', false)
 }
 </script>
@@ -166,6 +200,7 @@ function create() {
           v-model:only-matching="onlyMatching"
           :vocab="vocab"
           :range="range"
+          :exclude-data="excludeData"
         />
 
         <div v-if="type" class="space-y-3 border-t border-border pt-4">
@@ -176,9 +211,12 @@ function create() {
                 v-model="name"
                 :kind="registry.kind"
                 aria-label="Name"
-                :placeholder="`Search ${registry.label} by name, or paste an id`"
+                :placeholder="`Search ${registry.label} by name or id`"
                 @select="useHit"
               />
+              <p class="text-[11px] text-muted-foreground">
+                Search {{ registry.label }} by name or id, or simply type the name yourself.
+              </p>
               <div v-if="typedId" class="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -205,6 +243,18 @@ function create() {
               @update:model-value="(value: string | number) => { identifier = String(value); idTouched = true }"
             />
             <p class="mt-1 text-[11px] text-muted-foreground">{{ idHint(type) }}</p>
+          </div>
+
+          <div v-if="offerLink && linkOptions.length">
+            <label class="text-xs font-medium text-foreground">Link to this dataset as</label>
+            <Select
+              :model-value="linkAs"
+              :options="[{ value: '', label: 'Do not link' }, ...linkOptions]"
+              class="mt-1"
+              placeholder="Do not link"
+              aria-label="Link to this dataset as"
+              @update:model-value="(value: string) => (linkAs = value)"
+            />
           </div>
         </div>
       </div>

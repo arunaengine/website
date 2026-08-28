@@ -10,6 +10,7 @@ import {
   flush,
   moduleDefault,
   mountApp,
+  nodes,
   typeValue,
   type HostNode,
 } from '@/test/clientRender'
@@ -33,6 +34,18 @@ afterEach(() => {
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const EmptyStub = defineComponent(() => () => null)
+const SelectStub = defineComponent({
+  props: { modelValue: { type: String, default: '' }, options: { type: Array, default: () => [] } },
+  emits: ['update:modelValue'],
+  setup(props, { attrs, emit }) {
+    return () => h('select', {
+      ...attrs,
+      value: props.modelValue,
+      onChange: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
+    }, (props.options as Array<{ value: string; label: string }>).map((option) =>
+      h('option', { value: option.value }, option.label)))
+  },
+})
 const InputStub = defineComponent({
   props: { modelValue: { type: [String, Number], default: '' } },
   emits: ['update:modelValue'],
@@ -71,6 +84,7 @@ const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', 
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
+  '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
   '@/components/metadata/LookupBox.vue': moduleDefault(LookupBox),
   './TypeBrowser.vue': moduleDefault(TypeBrowser),
@@ -91,6 +105,13 @@ function mount(props: Record<string, unknown> = {}, created: Created[] = []) {
 
 function field(root: HostNode, label: string): HostNode {
   return element(root, (node) => node.tag === 'input' && node.props['aria-label'] === label)
+}
+
+// The type list renders each name in its own bold span.
+function typeNames(root: HostNode): string[] {
+  return nodes(root)
+    .filter((node) => String(node.props.class ?? '').includes('text-sm font-medium'))
+    .map((node) => content(node).trim())
 }
 
 describe('AddEntityDialog', () => {
@@ -142,6 +163,43 @@ describe('AddEntityDialog', () => {
       properties: { name: [{ kind: 'text', value: 'Giessen' }] },
     })
     expect(Editor.findEntity(created[0].draft, '#giessen')).toBeDefined()
+    mounted.app.unmount()
+  })
+
+  it('keeps data types out of the contextual list', async () => {
+    const mounted = await mount({ excludeData: true })
+
+    expect(typeNames(mounted.root)).toContain('Person')
+    expect(typeNames(mounted.root)).not.toContain('File')
+    expect(typeNames(mounted.root)).not.toContain('Dataset')
+    mounted.app.unmount()
+  })
+
+  it('names the registry a person or an organization is searched in', async () => {
+    const mounted = await mount()
+
+    await click(button(mounted.root, 'Person'))
+    expect(content(mounted.root)).toContain('Search ORCID by name or id')
+
+    await click(button(mounted.root, 'Organization'))
+    expect(content(mounted.root)).toContain('Search ROR by name or id')
+    mounted.app.unmount()
+  })
+
+  it('links a new person to the dataset as its author', async () => {
+    const created: Created[] = []
+    const mounted = await mount({ offerLink: true }, created)
+
+    await click(button(mounted.root, 'Person'))
+    const select = element(mounted.root, (node) => node.props['aria-label'] === 'Link to this dataset as')
+    expect(select.props.value).toBe('author')
+    expect(content(select)).toContain('Do not link')
+
+    await click(button(mounted.root, 'Create'))
+
+    expect(created[0].draft.entities[0].properties.author).toEqual([
+      { kind: 'reference', value: created[0].entity.id },
+    ])
     mounted.app.unmount()
   })
 

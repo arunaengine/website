@@ -1,21 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import CopyButton from '@/components/ui/CopyButton.vue'
 import type { ProfileValidationPreviewResponse } from '@/lib/api'
 import { collectIssues, type WriteIssue } from '@/lib/crate/issues'
 import { displayName, findEntity, rootId, type CrateDraft } from '@/lib/crate/editor'
 import { truncateMiddle } from '@/lib/utils'
 import { Check, RefreshCw, Send, TriangleAlert } from '@lucide/vue'
 
-// The node checks the draft exactly as a save would, without saving. The check
-// runs on demand and once more before every save. Only its verdict (or a
-// refused write) blocks; advisory findings never do.
+// The node validates the draft exactly as a save would, without saving. It runs
+// on demand and once more before every save. Only its verdict (or a refused
+// write) blocks; advisory findings never do.
 
-const JSON_LD_KEY = 'aruna.dataset.showJsonLd'
 
 const props = defineProps<{
   draft: CrateDraft
@@ -38,7 +36,6 @@ const emit = defineEmits<{
   (e: 'jump', entityId: string): void
 }>()
 
-const json = computed(() => JSON.stringify(props.rocrate, null, 2))
 const issues = computed(() => collectIssues(props.previewResult, props.writeIssues ?? []))
 const violations = computed(() => issues.value.filter((issue) => issue.severity === 'violation'))
 
@@ -65,7 +62,7 @@ const outcome = computed<'checking' | 'rejected' | 'failed' | 'accepted' | 'none
 })
 
 const failureReason = computed(() => props.previewUnavailable
-  ? 'This node does not offer draft checks; the save is still validated.'
+  ? 'This node does not offer draft validation; the save is still validated.'
   : (props.previewError ?? ''))
 const profileLine = computed(() => {
   const referenced = props.previewResult?.profile_iri || props.previewResult?.profile_id
@@ -81,45 +78,27 @@ function entityName(entityId: string): string {
   const entity = findEntity(props.draft, entityId)
   return entity ? displayName(entity) : entityId
 }
-
-const showJson = ref(false)
-function rememberJson(event: Event) {
-  showJson.value = Boolean((event.target as HTMLDetailsElement).open)
-  try {
-    globalThis.localStorage?.setItem(JSON_LD_KEY, String(showJson.value))
-  } catch {
-    // A browser without writable storage simply forgets the choice.
-  }
-}
-
-onMounted(() => {
-  try {
-    showJson.value = globalThis.localStorage?.getItem(JSON_LD_KEY) === 'true'
-  } catch {
-    showJson.value = false
-  }
-})
 </script>
 
 <template>
   <section class="surface space-y-4 p-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Check with the node</h2>
-        <p class="text-xs text-muted-foreground">The node checks the dataset exactly as it would on save, without saving anything. Saving runs the check first.</p>
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Validation</h2>
+        <p class="text-xs text-muted-foreground">The node validates the dataset exactly as it would on save, without saving anything. Saving validates first.</p>
       </div>
       <Button variant="outline" size="sm" :disabled="previewRunning" @click="emit('preview')">
         <Spinner v-if="previewRunning" class="text-current" aria-hidden="true" />
         <RefreshCw v-else class="h-3.5 w-3.5" />
-        {{ outcome === 'none' ? 'Check with the node' : 'Check again' }}
+        {{ outcome === 'none' ? 'Validate' : 'Validate again' }}
       </Button>
     </div>
 
     <p v-if="outcome === 'checking'" class="flex items-center gap-2 text-xs text-muted-foreground">
-      <Spinner class="text-primary" aria-hidden="true" /> Checking…
+      <Spinner class="text-primary" aria-hidden="true" /> Validating…
     </p>
 
-    <p v-else-if="outcome === 'none'" class="text-xs text-muted-foreground">Not checked yet. Saving checks first.</p>
+    <p v-else-if="outcome === 'none'" class="text-xs text-muted-foreground">Not validated yet. Saving validates first.</p>
 
     <div v-else-if="outcome === 'accepted'" class="space-y-3">
       <Notice tone="success">
@@ -143,7 +122,7 @@ onMounted(() => {
       </section>
     </div>
 
-    <Notice v-else-if="outcome === 'failed'" tone="warning">Could not check: {{ failureReason }}</Notice>
+    <Notice v-else-if="outcome === 'failed'" tone="warning">Could not validate: {{ failureReason }}</Notice>
 
     <div v-else-if="outcome === 'rejected'" class="space-y-3">
       <p class="flex items-center gap-2 text-xs font-medium text-destructive">
@@ -172,16 +151,6 @@ onMounted(() => {
         </ul>
       </section>
     </div>
-
-    <details class="rounded-lg border border-border" :open="showJson" @toggle="rememberJson">
-      <summary class="cursor-pointer px-3 py-2 text-xs font-medium text-foreground">Show JSON-LD</summary>
-      <div class="border-t border-border p-3">
-        <div class="mb-2 flex justify-end">
-          <CopyButton :value="json" label="Copy the JSON-LD" />
-        </div>
-        <pre class="max-h-96 overflow-auto rounded-md bg-muted/30 p-3 text-[11px] leading-relaxed"><code>{{ json }}</code></pre>
-      </div>
-    </details>
 
     <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
     <div class="flex justify-end">

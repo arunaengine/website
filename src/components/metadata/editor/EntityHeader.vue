@@ -4,17 +4,18 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Popover from '@/components/ui/Popover.vue'
 import TypeBrowser from './TypeBrowser.vue'
 import {
   displayName,
   entityGroup,
+  findEntity,
+  propertyTerm,
   referencesTo,
   removeEntity,
   renameEntity,
-  setProperty,
   setTypes,
   typeLabel,
-  updateValue,
   type CrateDraft,
   type DraftEntity,
 } from '@/lib/crate/editor'
@@ -40,16 +41,11 @@ const badge = computed(() => {
   if (group.value !== 'data') return 'Contextual'
   return props.entity.types.map(typeLabel).includes('File') ? 'File' : 'Dataset'
 })
-const name = computed(() => props.entity.properties.name?.[0]?.value ?? '')
-const uses = computed(() => referencesTo(props.draft, props.entity.id))
-
-function rename(value: string) {
-  if (props.entity.properties.name?.length) {
-    emit('update', updateValue(props.draft, props.entity.id, 'name', 0, value))
-    return
-  }
-  emit('update', setProperty(props.draft, props.entity.id, 'name', [{ kind: 'text', value }]))
-}
+const uses = computed(() => referencesTo(props.draft, props.entity.id).map((use) => ({
+  ...use,
+  name: displayName(findEntity(props.draft, use.entityId)) || use.entityId,
+  label: propertyTerm(props.vocab, use.property)?.label ?? use.property,
+})))
 
 function startIdEdit() {
   idDraft.value = props.entity.id
@@ -81,19 +77,37 @@ function remove() {
   <header class="space-y-3 border-b border-border px-5 py-4">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0 flex-1 space-y-1">
-        <div class="flex items-center gap-2">
+        <div class="flex min-w-0 items-center gap-2">
           <Badge :variant="group === 'root' ? 'default' : group === 'data' ? 'sky' : 'secondary'">
             {{ badge }}
           </Badge>
-          <Input
-            :model-value="name"
-            class="h-9 min-w-0 flex-1"
-            :aria-label="`Name of ${displayName(entity)}`"
-            placeholder="Give this a name"
-            @update:model-value="(value: string | number) => rename(String(value))"
-          />
+          <h2 class="min-w-0 truncate font-display text-sm font-semibold text-aruna-navy">
+            {{ displayName(entity) }}
+          </h2>
+          <Popover v-if="uses.length" align="start">
+            <button
+              type="button"
+              class="chip h-6 shrink-0 hover:text-foreground"
+              :aria-label="`Used by ${uses.length}`"
+            >
+              Used by {{ uses.length }}
+            </button>
+            <template #content>
+              <ul class="space-y-1">
+                <li v-for="use in uses" :key="`${use.entityId}:${use.property}:${use.index}`">
+                  <button
+                    type="button"
+                    class="w-full truncate rounded-sm px-1 py-1 text-left text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                    @click="emit('select', use.entityId)"
+                  >
+                    {{ use.name }} · {{ use.label }}
+                  </button>
+                </li>
+              </ul>
+            </template>
+          </Popover>
         </div>
-        <div class="pl-1">
+        <div class="flex items-center gap-2 pl-1">
           <Input
             v-if="idEditing"
             v-model="idDraft"
@@ -102,35 +116,36 @@ function remove() {
             @keydown.enter="commitId"
             @blur="commitId"
           />
-          <button
-            v-else
-            type="button"
-            class="hash hover:text-foreground"
-            :title="entity.id"
-            aria-label="Edit the identifier"
-            @click="startIdEdit"
-          >
-            {{ truncateMiddle(entity.id, 18, 10) }} <span class="text-[10px]">click to edit</span>
-          </button>
+          <template v-else>
+            <span class="hash truncate" :title="entity.id">{{ truncateMiddle(entity.id, 18, 10) }}</span>
+            <Button
+              variant="link"
+              size="sm"
+              class="h-auto p-0 text-[11px]"
+              aria-label="Edit identifier"
+              @click="startIdEdit"
+            >
+              Edit identifier
+            </Button>
+          </template>
         </div>
       </div>
-      <Button
-        v-if="group !== 'root'"
-        variant="ghost"
-        size="icon-sm"
-        :aria-label="`Remove ${displayName(entity)}`"
-        @click="uses.length ? (confirmRemove = true) : remove()"
-      >
-        <Trash2 class="h-3.5 w-3.5" />
-      </Button>
+      <div class="flex shrink-0 items-center gap-2">
+        <slot name="view" />
+        <Button
+          v-if="group !== 'root'"
+          variant="ghost"
+          size="icon-sm"
+          :aria-label="`Remove ${displayName(entity)}`"
+          @click="uses.length ? (confirmRemove = true) : remove()"
+        >
+          <Trash2 class="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
 
     <div class="flex flex-wrap items-center gap-1.5">
-      <span
-        v-for="type in entity.types"
-        :key="type"
-        class="chip h-6"
-      >
+      <span v-for="type in entity.types" :key="type" class="chip h-6">
         {{ typeLabel(type) }}
         <button
           v-if="entity.types.length > 1"

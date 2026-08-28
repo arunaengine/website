@@ -39,6 +39,9 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuContent.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuItem.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuSub.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuSubTrigger.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuSubContent.vue': moduleDefault(Passthrough),
   './ValueInput.vue': moduleDefault(EmptyStub),
   './ReferenceValue.vue': moduleDefault(EmptyStub),
   './LinkEntityPopover.vue': moduleDefault(EmptyStub),
@@ -47,10 +50,10 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
 
 const RootForm = compileClientComponent(new URL('./RootForm.vue', import.meta.url), {
   ...shared,
-  '@/components/ui/Badge.vue': moduleDefault(Passthrough),
   '@/components/ui/Select.vue': moduleDefault(EmptyStub),
   '@/components/ui/Textarea.vue': moduleDefault(InputStub),
   './PropertyEditor.vue': moduleDefault(EmptyStub),
+  './PropertyRow.vue': moduleDefault(PropertyRow),
 })
 
 function rows(root: Parameters<typeof nodes>[0], className: string) {

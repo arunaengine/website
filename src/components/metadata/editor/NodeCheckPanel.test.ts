@@ -58,11 +58,11 @@ function mount(props: Record<string, unknown>) {
 }
 
 describe('NodeCheckPanel', () => {
-  it('waits for an explicit check before it says anything', async () => {
+  it('waits for an explicit run before it says anything', async () => {
     const mounted = await mount({})
 
-    expect(content(mounted.root)).toContain('Not checked yet. Saving checks first.')
-    expect(button(mounted.root, 'Check with the node')).toBeDefined()
+    expect(content(mounted.root)).toContain('Not validated yet. Saving validates first.')
+    expect(button(mounted.root, 'Validate')).toBeDefined()
     mounted.app.unmount()
   })
 
@@ -113,17 +113,17 @@ describe('NodeCheckPanel', () => {
     mounted.app.unmount()
   })
 
-  it('explains a check that could not run', async () => {
+  it('explains a run that could not happen', async () => {
     const mounted = await mount({ previewUnavailable: true })
 
-    expect(content(mounted.root)).toContain('Could not check: This node does not offer draft checks; the save is still validated.')
+    expect(content(mounted.root)).toContain('Could not validate: This node does not offer draft validation; the save is still validated.')
     mounted.app.unmount()
   })
 
-  it('shows only the run in progress while checking', async () => {
+  it('shows only the run in progress while validating', async () => {
     const mounted = await mount({ previewRunning: true, previewResult: verdict({ accepted: false, state: 'invalid' }) })
 
-    expect(content(mounted.root)).toContain('Checking')
+    expect(content(mounted.root)).toContain('Validating')
     expect(content(mounted.root)).not.toContain('would reject')
     mounted.app.unmount()
   })
@@ -132,16 +132,6 @@ describe('NodeCheckPanel', () => {
     const mounted = await mount({ canSave: false })
 
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
-    mounted.app.unmount()
-  })
-
-  it('keeps the JSON-LD behind a closed disclosure', async () => {
-    const mounted = await mount({ previewResult: verdict() })
-    const details = element(mounted.root, (node) => node.tag === 'details')
-
-    expect(details.props.open).toBe(false)
-    expect(nodes(mounted.root).some((node) => node.tag === 'summary')).toBe(true)
-    expect(content(mounted.root)).toContain('Show JSON-LD')
     mounted.app.unmount()
   })
 })

@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import AddEntityDialog from './AddEntityDialog.vue'
 import AddFilesDialog from './AddFilesDialog.vue'
-import CrateGraph from './CrateGraph.vue'
+import { entityIcon } from './icons'
 import {
   displayName,
   entityGroup,
@@ -16,17 +16,7 @@ import {
   type LiveIssue,
 } from '@/lib/crate/editor'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
-import {
-  Building2,
-  File as FileIcon,
-  FolderTree,
-  Network,
-  Package,
-  Plus,
-  Tag,
-  Upload,
-  User,
-} from '@lucide/vue'
+import { Network, Plus, Upload } from '@lucide/vue'
 
 const props = defineProps<{
   draft: CrateDraft
@@ -38,27 +28,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select', entityId: string): void
   (e: 'update', draft: CrateDraft): void
+  (e: 'graph'): void
 }>()
 
 const query = ref('')
 const addOpen = ref(false)
 const filesOpen = ref(false)
-const graphOpen = ref(false)
-
-const ICONS: Record<string, typeof User> = {
-  Person: User,
-  Organization: Building2,
-  File: FileIcon,
-  Dataset: FolderTree,
-}
 
 function iconFor(entity: DraftEntity) {
-  if (entity.id === props.draft.entities[0]?.id) return Package
-  for (const type of entity.types) {
-    const icon = ICONS[typeLabel(type)]
-    if (icon) return icon
-  }
-  return Tag
+  return entityIcon(entity, entity.id === props.draft.entities[0]?.id)
 }
 
 function matches(entity: DraftEntity): boolean {
@@ -96,27 +74,17 @@ function countFor(entityId: string) {
           placeholder="Search this dataset"
           aria-label="Search entities"
         />
-        <div class="flex items-center gap-2">
-          <Button size="sm" class="h-8 flex-1" @click="addOpen = true">
-            <Plus class="h-3.5 w-3.5" /> Add entity
+        <div class="flex flex-col gap-2">
+          <Button variant="outline" size="sm" class="h-8 justify-start" @click="filesOpen = true">
+            <Upload class="h-3.5 w-3.5" /> Add data entity
           </Button>
-          <Button variant="outline" size="sm" class="h-8 flex-1" @click="filesOpen = true">
-            <Upload class="h-3.5 w-3.5" /> Add files
+          <Button variant="outline" size="sm" class="h-8 justify-start" @click="addOpen = true">
+            <Plus class="h-3.5 w-3.5" /> Add contextual entity
           </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          class="h-8 w-full justify-start"
-          :aria-pressed="graphOpen"
-          @click="graphOpen = !graphOpen"
-        >
-          <Network class="h-3.5 w-3.5" /> {{ graphOpen ? 'Hide the graph' : 'Show the graph' }}
+        <Button variant="ghost" size="sm" class="h-8 w-full justify-start" @click="emit('graph')">
+          <Network class="h-3.5 w-3.5" /> Graph
         </Button>
-      </div>
-
-      <div v-if="graphOpen" class="border-b border-border p-2">
-        <CrateGraph :draft="draft" :selected="selected" @select="(id) => emit('select', id)" />
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
@@ -162,6 +130,8 @@ function countFor(entityId: string) {
       :open="addOpen"
       :draft="draft"
       :vocab="vocab"
+      exclude-data
+      offer-link
       @update:open="(value) => (addOpen = value)"
       @created="(created) => { emit('update', created.draft); emit('select', created.entity.id) }"
     />

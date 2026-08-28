@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
-import { CURATED_TYPES, typeLabel, vocabTypeUri } from '@/lib/crate/editor'
+import { CURATED_TYPES, isDataType, typeLabel, vocabTypeUri } from '@/lib/crate/editor'
 import { normalizeTypeUri } from '@/lib/profiles/uri'
 import type { VocabIndex, VocabTerm } from '@/lib/profiles/vocabulary'
 
@@ -11,6 +11,8 @@ const props = defineProps<{
   /** Property range: when set, "Only matching types" narrows the list to it. */
   range?: string[]
   onlyMatching?: boolean
+  /** Contextual entities only: the types that describe stored data are hidden. */
+  excludeData?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'update:modelValue', type: string): void
@@ -31,6 +33,7 @@ const curated = computed(() => CURATED_TYPES.map((type) => ({
 const rangeTypes = computed(() => new Set((props.vocab?.classesInRange(props.range) ?? []).map((term) => term.uri)))
 
 function allowed(type: string): boolean {
+  if (props.excludeData && isDataType(type)) return false
   if (!props.onlyMatching || !rangeTypes.value.size) return true
   return rangeTypes.value.has(vocabTypeUri(type))
 }

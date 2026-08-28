@@ -10,7 +10,6 @@ import {
   flush,
   moduleDefault,
   mountApp,
-  typeValue,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
 import * as ProfileSeed from '@/lib/crate/profileSeed'
@@ -46,24 +45,25 @@ function seeded(draft: Editor.CrateDraft): Editor.CrateDraft {
 
 const EmptyStub = defineComponent(() => () => null)
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
-const InputStub = defineComponent({
-  props: { modelValue: { type: [String, Number], default: '' } },
-  emits: ['update:modelValue'],
-  setup(props, { attrs, emit }) {
-    return () => h('input', {
-      ...attrs,
-      value: props.modelValue,
-      onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
-    })
-  },
-})
 const PageHeaderStub = defineComponent({
   props: { title: String },
-  setup: (props, { slots }) => () => h('header', [h('h1', props.title), slots.actions?.()]),
+  setup: (props, { slots }) => () => h('header', [h('h1', props.title), slots.breadcrumbs?.(), slots.actions?.()]),
+})
+const GroupSelectStub = defineComponent({
+  props: { modelValue: { type: String, default: '' } },
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () =>
+    h('button', { 'aria-label': 'Group', onClick: () => emit('update:modelValue', 'group-1') }, props.modelValue),
 })
 const BrowserStub = defineComponent({
   props: { draft: { type: Object, required: true } },
-  setup: (props) => () => h('p', `Entities ${(props.draft as Editor.CrateDraft).entities.length}`),
+  emits: ['graph'],
+  setup(props, { emit }) {
+    return () => h('div', [
+      h('p', `Entities ${(props.draft as Editor.CrateDraft).entities.length}`),
+      h('button', { onClick: () => emit('graph') }, 'Show the graph'),
+    ])
+  },
 })
 const EditorStub = defineComponent({
   props: { draft: { type: Object, required: true } },
@@ -75,6 +75,7 @@ const EditorStub = defineComponent({
     ])
   },
 })
+const GraphStub = defineComponent(() => () => h('p', 'Graph pane'))
 const NodeCheckStub = defineComponent({
   props: { canSave: Boolean, actionLabel: String },
   emits: ['save'],
@@ -87,18 +88,16 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   'vue-router': { useRoute: () => route, useRouter: () => ({ push: routerPush }) },
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
-  '@/components/ui/Badge.vue': moduleDefault(EmptyStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/Input.vue': moduleDefault(InputStub),
-  '@/components/ui/Textarea.vue': moduleDefault(InputStub),
   '@/components/ui/Skeleton.vue': moduleDefault(EmptyStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(EmptyStub),
-  '@/components/groups/GroupSelect.vue': moduleDefault(EmptyStub),
+  '@/components/groups/GroupSelect.vue': moduleDefault(GroupSelectStub),
   '@/components/groups/CreateGroupDialog.vue': moduleDefault(EmptyStub),
   '@/components/metadata/VisibilitySelect.vue': moduleDefault(EmptyStub),
   '@/components/metadata/ImportCrateDialog.vue': moduleDefault(EmptyStub),
   '@/components/metadata/editor/EntityBrowser.vue': moduleDefault(BrowserStub),
   '@/components/metadata/editor/EntityEditor.vue': moduleDefault(EditorStub),
+  '@/components/metadata/editor/EditorGraph.vue': moduleDefault(GraphStub),
   '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(EmptyStub),
   '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckStub),
   '@/composables/useAruna': {
@@ -137,16 +136,10 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/lib/crate/profileSeed': ProfileSeed,
 })
 
-async function start(name = 'Example dataset') {
-  const mounted = await mountApp(DatasetEditorView)
-  await typeValue(element(mounted.root, (node) => node.props['aria-label'] === 'Dataset name'), name)
-  await click(button(mounted.root, 'Continue'))
-  return mounted
-}
-
 beforeEach(() => {
   route.name = 'dataset-new'
   route.params = {}
+  groups.value = [{ id: 'group-1', name: 'Research group' }]
   profiles.value = []
   createMetadata.mockReset().mockResolvedValue({ document_id: 'dataset-1' })
   replaceMetadataRoCrate.mockReset().mockResolvedValue({ document_id: 'dataset-1' })
@@ -163,23 +156,29 @@ beforeEach(() => {
 })
 
 describe('DatasetEditorView', () => {
-  it('asks three questions before it opens the editor', async () => {
+  it('opens the editor on an empty root, asking nothing first', async () => {
     const mounted = await mountApp(DatasetEditorView)
 
-    expect(content(mounted.root)).toContain('Start a dataset')
-    expect(button(mounted.root, 'Continue').props.disabled).toBe(true)
-
-    await typeValue(element(mounted.root, (node) => node.props['aria-label'] === 'Dataset name'), 'Example dataset')
-    await click(button(mounted.root, 'Continue'))
-
-    expect(content(mounted.root)).not.toContain('Start a dataset')
     expect(content(mounted.root)).toContain('Entities 1')
-    expect(content(mounted.root)).toContain('Example dataset')
+    expect(content(mounted.root)).toContain('New dataset')
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
     mounted.app.unmount()
   })
 
-  it('checks with the node before it writes anything', async () => {
-    const mounted = await start()
+  it('keeps Create out of reach until there is a name and a group', async () => {
+    groups.value = []
+    const mounted = await mountApp(DatasetEditorView)
+
+    await click(button(mounted.root, 'Seed dataset'))
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Group'))
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('validates the draft before it writes anything', async () => {
+    const mounted = await mountApp(DatasetEditorView)
     await click(button(mounted.root, 'Seed dataset'))
     await click(button(mounted.root, 'Create dataset'))
     await flush()
@@ -199,7 +198,7 @@ describe('DatasetEditorView', () => {
 
   it('writes nothing when the node rejects the draft', async () => {
     verify.mockResolvedValue(false)
-    const mounted = await start()
+    const mounted = await mountApp(DatasetEditorView)
     await click(button(mounted.root, 'Seed dataset'))
     await click(button(mounted.root, 'Create dataset'))
     await flush()
@@ -210,15 +209,13 @@ describe('DatasetEditorView', () => {
     mounted.app.unmount()
   })
 
-  it('keeps Continue out of reach until the dataset has a name', async () => {
+  it('swaps the editor for the graph when the browser asks', async () => {
     const mounted = await mountApp(DatasetEditorView)
-    const name = element(mounted.root, (node) => node.props['aria-label'] === 'Dataset name')
 
-    await typeValue(name, '   ')
-    expect(button(mounted.root, 'Continue').props.disabled).toBe(true)
+    await click(button(mounted.root, 'Show the graph'))
 
-    await typeValue(name, 'Example dataset')
-    expect(button(mounted.root, 'Continue').props.disabled).toBe(false)
+    expect(content(mounted.root)).toContain('Graph pane')
+    expect(content(mounted.root)).not.toContain('Seed dataset')
     mounted.app.unmount()
   })
 

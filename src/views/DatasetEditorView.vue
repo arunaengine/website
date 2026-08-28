@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
-import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import Input from '@/components/ui/Input.vue'
-import Textarea from '@/components/ui/Textarea.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
@@ -35,12 +32,13 @@ import {
   newDraft,
   rootEntity,
   rootId,
-  ROOT_ID,
   toRoCrate,
-  updateValue,
   type CrateDraft,
 } from '@/lib/crate/editor'
 import { FileJson2, Plus } from '@lucide/vue'
+
+// The graph carries Vue Flow and dagre; only the Graph tab pays for them.
+const EditorGraph = defineAsyncComponent(() => import('@/components/metadata/editor/EditorGraph.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -61,10 +59,8 @@ const documentId = computed(() => String(route.params.id ?? ''))
 
 const draft = ref<CrateDraft>(newDraft())
 const vocab = shallowRef<VocabIndex | null>(null)
-const selected = ref(ROOT_ID)
-const started = ref(false)
-const startName = ref('')
-const startDescription = ref('')
+const selected = ref(rootId(draft.value))
+const tab = ref<'editor' | 'graph'>('editor')
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const importOpen = ref(false)
@@ -78,8 +74,6 @@ onMounted(() => void loadVocabIndex().then((index) => (vocab.value = index)))
 const rootName = computed(() => entityName(rootEntity(draft.value)))
 const title = computed(() => rootName.value || (mode.value === 'edit' ? 'Edit dataset' : 'New dataset'))
 const groupOptions = computed(() => groups.value.map((group) => ({ value: group.id, label: group.name })))
-const groupName = computed(() =>
-  groups.value.find((group) => group.id === draft.value.groupId)?.name ?? draft.value.groupId ?? '')
 const profileOptions = computed(() =>
   profiles.value.map((profile) => ({ value: profile.id, label: profile.name })))
 const expectation = computed(() => {
@@ -131,7 +125,6 @@ function declaredProfile(): string {
 
 const crate = computed(() => toRoCrate(draft.value))
 const issues = computed(() => liveIssues(draft.value, vocab.value, expectation.value))
-const editing = computed(() => mode.value === 'edit' || started.value)
 
 const desktop = isDesktop()
 const deviceStatus = desktop ? useDeviceStatus() : null
@@ -145,20 +138,16 @@ const preview = useProfilePreview({
     : {}),
 })
 
-const canSave = computed(() => Boolean(rootName.value))
-
-function begin() {
-  let next = newDraft({ groupId: draft.value.groupId, visibility: draft.value.visibility })
-  next = updateValue(next, ROOT_ID, 'name', 0, startName.value.trim())
-  next = updateValue(next, ROOT_ID, 'description', 0, startDescription.value.trim())
-  draft.value = next
-  selected.value = ROOT_ID
-  started.value = true
-}
+const canSave = computed(() => Boolean(rootName.value && draft.value.groupId))
 
 function update(next: CrateDraft) {
   draft.value = next
   if (!findEntity(next, selected.value)) selected.value = rootId(next)
+}
+
+function open(entityId: string) {
+  selected.value = entityId
+  tab.value = 'editor'
 }
 
 function pickProfile(id: string) {
@@ -182,8 +171,8 @@ function discard() {
     : { name: 'datasets' })
 }
 
-// The node checks the crate before every write; a rejected verdict stops here
-// and the panel shows what it found.
+// The node validates the crate before every write; a rejected verdict stops
+// here and the panel shows what it found.
 async function save() {
   if (!canSave.value || saving.value) return
   submitError.value = null
@@ -230,18 +219,28 @@ async function save() {
     <PageHeader
       eyebrow="Datasets"
       :title="title"
-      description="Describe the dataset and everything it refers to, then check it with the node."
+      description="Describe the dataset and everything it refers to, then validate it with the node."
     >
       <template #breadcrumbs>
-        <template v-if="editing">
-          <Badge v-if="groupName" variant="outline" size="sm">{{ groupName }}</Badge>
-          <VisibilitySelect
-            compact
-            :model-value="draft.visibility"
-            :group-id="draft.groupId"
-            @update:model-value="(value) => (draft.visibility = value)"
-          />
-        </template>
+        <GroupSelect
+          v-model="draft.groupId"
+          :options="groupOptions"
+          class="h-7 w-44 text-xs"
+          placeholder="Choose a group"
+          aria-label="Group"
+        >
+          <template #action>
+            <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="createGroupOpen = true">
+              <Plus class="h-3.5 w-3.5" /> Create a group
+            </Button>
+          </template>
+        </GroupSelect>
+        <VisibilitySelect
+          compact
+          :model-value="draft.visibility"
+          :group-id="draft.groupId"
+          @update:model-value="(value) => (draft.visibility = value)"
+        />
       </template>
       <template #actions>
         <Button v-if="mode === 'create'" variant="outline" size="sm" @click="importOpen = true">
@@ -259,58 +258,6 @@ async function save() {
       <ErrorPanel :message="loadError" @retry="load" />
     </div>
 
-    <div v-else-if="!editing" class="container py-10">
-      <section class="surface mx-auto max-w-lg space-y-5 p-6">
-        <div>
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Start a dataset</h2>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Three answers and the editor opens. Everything else can follow later.
-          </p>
-        </div>
-        <div>
-          <label class="text-xs font-medium text-foreground">Group</label>
-          <GroupSelect
-            v-model="draft.groupId"
-            :options="groupOptions"
-            class="mt-1"
-            placeholder="Choose a group"
-            aria-label="Group"
-          >
-            <template #action>
-              <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="createGroupOpen = true">
-                <Plus class="h-3.5 w-3.5" /> Create a group
-              </Button>
-            </template>
-          </GroupSelect>
-        </div>
-        <div>
-          <label class="text-xs font-medium text-foreground" for="start-name">Name</label>
-          <Input
-            id="start-name"
-            v-model="startName"
-            class="mt-1"
-            aria-label="Dataset name"
-            placeholder="What this dataset is called"
-            @keydown.enter="startName.trim() && begin()"
-          />
-        </div>
-        <div>
-          <label class="text-xs font-medium text-foreground" for="start-description">Description</label>
-          <Textarea
-            id="start-description"
-            v-model="startDescription"
-            rows="3"
-            class="mt-1 font-sans"
-            aria-label="Dataset description"
-            placeholder="What it contains and how it was made"
-          />
-        </div>
-        <div class="flex justify-end">
-          <Button :disabled="!startName.trim()" @click="begin">Continue</Button>
-        </div>
-      </section>
-    </div>
-
     <template v-else>
       <div class="container flex items-start gap-5 py-6">
         <EntityBrowser
@@ -321,40 +268,67 @@ async function save() {
           :group-id="draft.groupId"
           @select="(id) => (selected = id)"
           @update="update"
+          @graph="tab = 'graph'"
         />
         <div class="min-w-0 flex-1 space-y-5">
-          <EntityEditor
+          <div class="inline-flex items-center rounded-md border border-border p-0.5" role="tablist">
+            <button
+              v-for="pane in (['editor', 'graph'] as const)"
+              :key="pane"
+              type="button"
+              role="tab"
+              class="rounded-[3px] px-3 py-1 text-xs font-medium"
+              :class="tab === pane ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :aria-selected="tab === pane"
+              @click="tab = pane"
+            >
+              {{ pane === 'editor' ? 'Editor' : 'Graph' }}
+            </button>
+          </div>
+
+          <template v-if="tab === 'editor'">
+            <EntityEditor
+              :draft="draft"
+              :selected="selected"
+              :vocab="vocab"
+              :issues="issues"
+              :profiles="profileOptions"
+              :profile-id="profileId"
+              @update="update"
+              @select="(id) => (selected = id)"
+              @profile="pickProfile"
+            />
+            <NodeCheckPanel
+              :draft="draft"
+              :rocrate="crate"
+              :preview-result="preview.result.value"
+              :preview-running="preview.running.value"
+              :preview-error="preview.error.value"
+              :preview-unavailable="preview.unavailable.value"
+              :write-issues="writeIssues"
+              :submit-error="submitError"
+              :saving="saving"
+              :can-save="canSave"
+              :action-label="mode === 'edit' ? 'Save changes' : 'Create dataset'"
+              :busy-label="mode === 'edit' ? 'Saving' : 'Creating'"
+              @preview="preview.previewNow(crate)"
+              @save="save"
+              @jump="open"
+            />
+          </template>
+          <EditorGraph
+            v-else
             :draft="draft"
-            :selected="selected"
             :vocab="vocab"
-            :issues="issues"
-            :profiles="profileOptions"
-            :profile-id="profileId"
-            @update="update"
+            :selected="selected"
             @select="(id) => (selected = id)"
-            @profile="pickProfile"
-          />
-          <NodeCheckPanel
-            :draft="draft"
-            :rocrate="crate"
-            :preview-result="preview.result.value"
-            :preview-running="preview.running.value"
-            :preview-error="preview.error.value"
-            :preview-unavailable="preview.unavailable.value"
-            :write-issues="writeIssues"
-            :submit-error="submitError"
-            :saving="saving"
-            :can-save="canSave"
-            :action-label="mode === 'edit' ? 'Save changes' : 'Create dataset'"
-            :busy-label="mode === 'edit' ? 'Saving' : 'Creating'"
-            @preview="preview.previewNow(crate)"
-            @save="save"
-            @jump="(id) => (selected = id)"
+            @open="open"
+            @update="update"
           />
         </div>
       </div>
 
-      <IssueDrawer :draft="draft" :issues="issues" @jump="(id) => (selected = id)" />
+      <IssueDrawer :draft="draft" :issues="issues" @jump="open" />
     </template>
 
     <ImportCrateDialog
@@ -363,7 +337,6 @@ async function save() {
       @imported="(imported) => {
         draft = { ...imported, groupId: draft.groupId, visibility: draft.visibility }
         selected = rootId(draft)
-        started = true
       }"
     />
     <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (draft.groupId = group.group_id)" />
