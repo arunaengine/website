@@ -1,6 +1,8 @@
 import { ApiError, apiRequest, apiUrl, type ApiClientOptions } from './api'
 import { fetchWithRetry } from './fetch'
 import type { BadgeVariant } from '@/components/nodes/node-display'
+import { stateVariant } from './stateBadge'
+import { errorMessage } from './utils'
 
 // Durable background jobs, verified against aruna api/src/routes/jobs.rs and
 // core/src/structs/job.rs. The surface is owner-scoped and rejects
@@ -357,7 +359,7 @@ export function isNativeSubmitUnsupported(error: unknown): boolean {
 // A plain-language reason for the refusals this surface actually produces.
 // The 503 reason rides in the message, because `code` is the generic status.
 export function submitErrorMessage(error: unknown): string {
-  if (!(error instanceof ApiError)) return error instanceof Error ? error.message : String(error)
+  if (!(error instanceof ApiError)) return errorMessage(error)
   if (error.status === 503) {
     if (error.message === 'job_placement_unavailable') {
       return 'No node could admit this job right now. Retrying keeps the same idempotency key, so a submission that already committed is not duplicated.'
@@ -621,18 +623,47 @@ export function isTerminalJobState(state: JobState): boolean {
   return JOB_TERMINAL_STATES.has(state)
 }
 
-// One place fixes the job state machine colours (Badge variants).
-export const JOB_STATE_META: Record<JobState, { label: string; variant: BadgeVariant }> = {
-  queued: { label: 'Queued', variant: 'secondary' },
-  claimed: { label: 'Claimed', variant: 'sky' },
-  preparing: { label: 'Preparing', variant: 'sky' },
-  ready: { label: 'Ready', variant: 'accent' },
-  running: { label: 'Running', variant: 'accent' },
-  cancelling: { label: 'Cancelling', variant: 'warn' },
-  indeterminate: { label: 'Indeterminate', variant: 'warn' },
-  succeeded: { label: 'Succeeded', variant: 'success' },
-  failed: { label: 'Failed', variant: 'destructive' },
-  cancelled: { label: 'Cancelled', variant: 'outline' },
+const JOB_STATE_LABEL: Record<JobState, string> = {
+  queued: 'Queued',
+  claimed: 'Claimed',
+  preparing: 'Preparing',
+  ready: 'Ready',
+  running: 'Running',
+  cancelling: 'Cancelling',
+  indeterminate: 'Indeterminate',
+  succeeded: 'Succeeded',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+}
+
+// Colours come from the shared state vocabulary.
+export const JOB_STATE_META = Object.fromEntries(
+  (Object.keys(JOB_STATE_LABEL) as JobState[]).map((state) => [
+    state,
+    { label: JOB_STATE_LABEL[state], variant: stateVariant(state) },
+  ]),
+) as Record<JobState, { label: string; variant: BadgeVariant }>
+
+const JOB_KIND_LABEL: Record<string, string> = {
+  probe: 'Probe',
+  execution: 'Execution',
+  write_run_crate: 'Write run crate',
+  terminal_cleanup: 'Terminal cleanup',
+  staging: 'Staging',
+  import_rocrate: 'Import RO-Crate',
+  export_rocrate: 'Export RO-Crate',
+  harvest: 'Harvest',
+  mint_persistent_id: 'Mint persistent id',
+  storage_purge: 'Storage purge',
+}
+
+// `kind` stays open for kinds the backend adds, so an unknown one reads as its
+// own words rather than as a raw identifier.
+export function jobKindLabel(kind: string): string {
+  const known = JOB_KIND_LABEL[kind]
+  if (known) return known
+  const words = kind.replaceAll('_', ' ').trim()
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : kind
 }
 
 // "12 / 40 steps" with a known total, "12 steps" without one.

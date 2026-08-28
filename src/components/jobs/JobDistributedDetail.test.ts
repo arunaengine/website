@@ -368,7 +368,9 @@ describe('distributed job detail components', () => {
 
     expect(tagged.errors).toEqual([])
     expect(taggedText).toContain('Compute-to-data')
-    expect(taggedText).toContain('succeeded')
+    // The logical state is worded by the shared job state map, never raw.
+    expect(taggedText).toContain('Succeeded')
+    expect(taggedText).not.toContain('succeeded')
     expect(taggedText).toContain('docker')
     expect(taggedText).toContain('region=eu-central')
     tagged.app.unmount()
@@ -428,9 +430,8 @@ describe('distributed job detail components', () => {
       vue: VueRuntime,
       '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
       '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-      '@/components/ui/Dialog.vue': moduleDefault(OpenPassThroughStub),
+      '@/components/ui/DetailDialog.vue': moduleDefault(OpenPassThroughStub),
       '@/components/ui/DialogClose.vue': moduleDefault(PassThroughStub),
-      '@/components/ui/DialogContent.vue': moduleDefault(PassThroughStub),
       '@/components/ui/DialogDescription.vue': moduleDefault(PassThroughStub),
       '@/components/ui/DialogFooter.vue': moduleDefault(PassThroughStub),
       '@/components/ui/DialogHeader.vue': moduleDefault(PassThroughStub),
@@ -478,6 +479,7 @@ describe('distributed job detail components', () => {
         'vue-router': { RouterLink: RouterLinkStub, useRouter: () => ({ push: vi.fn() }) },
         '@lucide/vue': icons,
         '@/components/ui/DetailDialog.vue': moduleDefault(OpenPassThroughStub),
+        '@/components/ui/Notice.vue': moduleDefault(PassThroughStub),
         '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
         '@/components/ui/Button.vue': moduleDefault(ButtonStub),
         '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),

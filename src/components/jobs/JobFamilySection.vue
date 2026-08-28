@@ -38,12 +38,12 @@ function outputUrl(output: JobOutputResponse): string {
 
 <template>
   <section class="space-y-3">
-    <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Distributed execution</h3>
+    <h3 class="font-display text-sm font-semibold text-aruna-navy">Distributed execution</h3>
 
     <div class="surface space-y-3 p-3">
       <div class="flex flex-wrap items-center gap-2">
         <JobStateBadge :state="family.logical_state" />
-        <Badge v-if="family.cancel_requested" variant="outline" class="text-[10px] text-muted-foreground">
+        <Badge v-if="family.cancel_requested" variant="outline" size="sm" class="text-muted-foreground">
           cancel requested
         </Badge>
       </div>
@@ -195,12 +195,13 @@ function outputUrl(output: JobOutputResponse): string {
         <Badge
           v-if="family.eventually_consistent"
           variant="outline"
-          class="text-[10px] text-muted-foreground"
+          size="sm"
+          class="text-muted-foreground"
         >Eventually consistent</Badge>
-        <Badge v-if="family.partial" variant="outline" class="text-[10px] text-muted-foreground">
+        <Badge v-if="family.partial" variant="outline" size="sm" class="text-muted-foreground">
           Partial responder view
         </Badge>
-        <Badge v-if="family.locally_exhausted" variant="outline" class="text-[10px] text-muted-foreground">
+        <Badge v-if="family.locally_exhausted" variant="outline" size="sm" class="text-muted-foreground">
           Locally exhausted
         </Badge>
         <span v-if="family.responder_node_id" class="text-[11px] text-muted-foreground">

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
-import { placementVerdict } from '@/lib/jobs'
+import { JOB_STATE_META, placementVerdict, type JobState } from '@/lib/jobs'
 import { tesPlacementLike, tesPlacementTags } from '@/lib/tes'
 import { formatBytes, truncateMiddle } from '@/lib/utils'
 
@@ -15,8 +15,18 @@ const labelConstraints = computed(() => Object.entries(placement.value.labelCons
 const like = computed(() => tesPlacementLike(placement.value))
 const verdict = computed(() => (like.value ? placementVerdict(like.value) : null))
 const verdictVariant = computed(() =>
-  verdict.value?.verdict === 'compute-to-data' ? 'success' : 'sky',
+  verdict.value?.verdict === 'compute-to-data'
+    ? 'success'
+    : verdict.value?.verdict === 'data-to-compute'
+      ? 'sky'
+      : 'secondary',
 )
+// The logical state is a JobState, so it is worded by the shared state map.
+const logicalStateLabel = computed(() => {
+  const state = placement.value.logicalState
+  if (!state) return ''
+  return JOB_STATE_META[state as JobState]?.label ?? state
+})
 const anything = computed(
   () =>
     Boolean(placement.value.jobId)
@@ -29,11 +39,11 @@ const anything = computed(
 
 <template>
   <div v-if="anything" class="flex flex-wrap items-center gap-1.5 text-[11px]">
-    <Badge v-if="verdict" :variant="verdictVariant" class="text-[10px]" :title="verdict.explanation">
+    <Badge v-if="verdict" :variant="verdictVariant" size="sm" :title="verdict.explanation">
       {{ verdict.label }}
     </Badge>
-    <Badge v-if="placement.logicalState" variant="outline" class="text-[10px]">
-      {{ placement.logicalState }}
+    <Badge v-if="placement.logicalState" variant="outline" size="sm" title="Logical state">
+      {{ logicalStateLabel }}
     </Badge>
     <template v-if="!compact">
       <span v-if="placement.executorKind" class="text-muted-foreground">
@@ -46,7 +56,8 @@ const anything = computed(
         v-for="[key, value] in labelConstraints"
         :key="key"
         variant="outline"
-        class="font-mono text-[10px]"
+        size="sm"
+        class="font-mono"
       >
         {{ key }}={{ value }}
       </Badge>

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Notice from '@/components/ui/Notice.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
 import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
@@ -15,10 +16,10 @@ import { useRefresh } from '@/composables/useRefresh'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { onWake, POLL_SLOW_MS } from '@/lib/poll'
 import { aggregateByLocation } from '@/lib/placement'
-import { formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
-import { ApiError } from '@/lib/api'
 import { Boxes, ChevronRight, Globe2, HardDrive, Laptop, MapPin, MapPinned } from '@lucide/vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 const route = useRoute()
 const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, currentUser, loadInfo } = useAruna()
@@ -47,7 +48,7 @@ async function refreshStatus() {
         lastUpdated.value = new Date()
       },
       (err) => {
-        statusError.value = err instanceof ApiError || err instanceof Error ? err.message : String(err)
+        statusError.value = errorMessage(err)
       },
     )
     // The first round needs a node list; later rounds probe the last-known one.
@@ -246,28 +247,19 @@ watch(
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <div
-        v-if="statusError"
-        class="surface border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-800 dark:text-amber-300"
-      >
+      <Notice v-if="statusError" tone="warning" class="p-4 text-sm">
         Status refresh failed: {{ statusError }}
-      </div>
+      </Notice>
 
-      <div
-        v-if="unreachableNodes.length"
-        class="surface border-red-500/30 bg-red-500/5 p-4 text-sm text-red-800 dark:text-red-300"
-      >
+      <Notice v-if="unreachableNodes.length" tone="error" class="p-4 text-sm">
         {{ unreachableNodes.length === 1 ? 'The browser API probe failed for 1 node' : `The browser API probe failed for ${unreachableNodes.length} nodes` }}:
         <span class="font-mono text-xs">{{ nodeIdList(unreachableNodes) }}</span>
-      </div>
+      </Notice>
 
-      <div
-        v-if="degradedNodes.length"
-        class="surface border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-800 dark:text-amber-300"
-      >
+      <Notice v-if="degradedNodes.length" tone="warning" class="p-4 text-sm">
         Degraded interfaces on {{ degradedNodes.length === 1 ? 'node' : 'nodes' }}:
         <span class="font-mono text-xs">{{ nodeIdList(degradedNodes) }}</span>
-      </div>
+      </Notice>
 
       <section class="surface p-5">
         <div class="flex flex-wrap items-start justify-between gap-4">
@@ -346,7 +338,7 @@ watch(
                 <ChevronRight
                   :class="['h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', expandedId === node.node_id && 'rotate-90']"
                 />
-                <Badge :variant="kindVariant[node.kind]" class="w-24 justify-center text-[10px] uppercase">
+                <Badge :variant="kindVariant[node.kind]" size="sm" class="w-24 justify-center uppercase">
                   {{ node.kind }}
                 </Badge>
                 <template v-if="node.placement">
@@ -354,10 +346,10 @@ watch(
                     <MapPin class="h-3 w-3" />
                     {{ node.placement.location }}
                   </span>
-                  <Badge v-if="node.placement.full" variant="destructive" class="hidden shrink-0 text-[10px] uppercase sm:inline-flex">
+                  <Badge v-if="node.placement.full" variant="destructive" size="sm" class="hidden shrink-0 uppercase sm:inline-flex">
                     full
                   </Badge>
-                  <Badge v-if="node.placement.draining" variant="warn" class="hidden shrink-0 text-[10px] uppercase sm:inline-flex">
+                  <Badge v-if="node.placement.draining" variant="warn" size="sm" class="hidden shrink-0 uppercase sm:inline-flex">
                     draining
                   </Badge>
                 </template>
@@ -396,14 +388,12 @@ watch(
               <Badge
                 v-if="restBadge(node)"
                 :variant="restBadge(node)!.variant"
-                class="shrink-0 text-[10px] uppercase"
+                size="sm"
+                class="shrink-0 uppercase"
               >
                 {{ restBadge(node)!.label }}
               </Badge>
-              <Badge :variant="connectionVariant(node)" class="shrink-0 gap-1.5 text-[10px] uppercase">
-                <span
-                  :class="['h-1.5 w-1.5 rounded-full', node.connection_status === 'connected' ? 'bg-emerald-500' : 'bg-amber-500']"
-                />
+              <Badge :variant="connectionVariant(node)" size="sm" class="shrink-0 uppercase">
                 {{ connectionLabel(node) }}
               </Badge>
             </div>
@@ -411,8 +401,8 @@ watch(
               <NodeDetailPanel :node="node" :is-local="isLocal(node)" :probe="probeFor(node)" />
             </div>
           </li>
-          <li v-if="!sortedNodes.length && !deviceNodes.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
-            No nodes reported for this realm yet.
+          <li v-if="!sortedNodes.length && !deviceNodes.length" class="p-3">
+            <EmptyState compact title="No nodes reported for this realm yet." />
           </li>
         </ul>
         <div v-if="deviceNodes.length" class="border-t border-border px-5 py-3">
@@ -439,7 +429,7 @@ watch(
             <HardDrive class="h-4 w-4 text-primary" />
             <h2 class="font-display text-sm font-semibold text-aruna-navy">This node</h2>
           </div>
-          <Badge :variant="statusVariant(nodeInfo.node.status)" class="text-[10px] uppercase">
+          <Badge :variant="statusVariant(nodeInfo.node.status)" size="sm" class="uppercase">
             {{ nodeInfo.node.status || 'unknown' }}
           </Badge>
         </header>

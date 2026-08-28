@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Button from '@/components/ui/Button.vue'
 import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -14,7 +15,7 @@ import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
 import JobReportPanel from '@/components/jobs/JobReportPanel.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import { useJobDetail } from '@/composables/useJobs'
-import { formatJobProgress, isTerminalJobState, jobProgressPercent } from '@/lib/jobs'
+import { formatJobProgress, isTerminalJobState, jobKindLabel, jobProgressPercent } from '@/lib/jobs'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
 import { Ban, History } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
@@ -76,19 +77,16 @@ async function confirmCancel() {
         <Skeleton class="h-24 w-full" />
       </div>
 
-      <div
-        v-else-if="loadState === 'unsupported'"
-        class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-      >
+      <Notice v-else-if="loadState === 'unsupported'" tone="warning">
         This backend does not serve the durable jobs API yet. Job details cannot be loaded.
-      </div>
+      </Notice>
 
       <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the job.'" @retry="load" />
 
       <div v-else-if="job" class="space-y-6">
         <div class="space-y-2 pr-8">
           <div class="flex flex-wrap items-center gap-2">
-            <h2 class="font-display text-lg font-semibold capitalize text-aruna-navy">{{ job.kind }} job</h2>
+            <h2 class="font-display text-lg font-semibold text-aruna-navy">{{ jobKindLabel(job.kind) }} job</h2>
             <JobStateBadge :state="job.state" />
             <Badge v-if="job.cancel_requested && !terminal" variant="warn">cancel requested</Badge>
           </div>
@@ -99,7 +97,7 @@ async function confirmCancel() {
         </div>
 
         <section class="space-y-2">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Progress</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Progress</h3>
           <Progress
             v-if="progressPercent !== null"
             :value="progressPercent"
@@ -128,7 +126,7 @@ async function confirmCancel() {
                 class="text-primary hover:underline"
                 title="Open this workspace bucket in the data manager"
               >{{ job.workspace_bucket }}</RouterLink>
-              <Badge v-if="job.workspace_mode" variant="outline" class="ml-1.5 text-[10px] uppercase">{{ job.workspace_mode }}</Badge>
+              <Badge v-if="job.workspace_mode" variant="outline" size="sm" class="ml-1.5 uppercase">{{ job.workspace_mode }}</Badge>
             </dd>
           </template>
           <template v-else-if="job.workspace_mode">
@@ -145,22 +143,22 @@ async function confirmCancel() {
         </template>
 
         <section v-if="job.error" class="space-y-2">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Last error</h3>
-          <div class="space-y-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
-            <Badge :variant="errorKindVariant" class="text-[10px] uppercase">{{ job.error.kind }}</Badge>
-            <p class="whitespace-pre-wrap break-words text-xs text-foreground">{{ job.error.message }}</p>
-          </div>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Last error</h3>
+          <Notice tone="error" class="space-y-1.5">
+            <Badge :variant="errorKindVariant" size="sm" class="uppercase">{{ job.error.kind }}</Badge>
+            <p class="whitespace-pre-wrap break-words">{{ job.error.message }}</p>
+          </Notice>
         </section>
 
         <section v-if="prettyResult !== null" class="space-y-2">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Result</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Result</h3>
           <pre
             class="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]"
           >{{ prettyResult }}</pre>
         </section>
 
         <section v-if="prettyRunCrate !== null" class="space-y-2">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Run crate</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Run crate</h3>
           <pre
             class="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]"
           >{{ prettyRunCrate }}</pre>

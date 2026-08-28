@@ -2,10 +2,12 @@
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Progress from '@/components/ui/Progress.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useUploadQueue, type UploadQueueItem } from '@/composables/useUploadQueue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { AlertTriangle, ChevronDown, ChevronUp, Loader2, UploadCloud, X } from '@lucide/vue'
+import { AlertTriangle, ChevronDown, ChevronUp, UploadCloud, X } from '@lucide/vue'
+import { stateVariant, type BadgeVariant } from '@/lib/stateBadge'
 
 // Compact floating transfers list, bottom-right (file-transfer toasts): one
 // row per queued upload with live progress. Completed rows clear themselves
@@ -52,11 +54,9 @@ onBeforeUnmount(() => {
   timers.clear()
 })
 
-function stateVariant(item: UploadQueueItem): 'accent' | 'secondary' | 'warn' | 'destructive' {
-  if (item.state === 'done') return 'accent'
+function transferVariant(item: UploadQueueItem): BadgeVariant {
   if (item.pausedForSession) return 'warn'
-  if (item.state === 'error') return 'destructive'
-  return 'secondary'
+  return stateVariant(item.state)
 }
 </script>
 
@@ -79,7 +79,7 @@ function stateVariant(item: UploadQueueItem): 'accent' | 'secondary' | 'warn' | 
       </span>
       <span v-if="overallProgress !== null" class="font-mono text-[11px] text-muted-foreground">{{ overallProgress }}%</span>
       <span class="ml-auto flex items-center gap-1">
-        <Loader2 v-if="activeCount" class="h-3.5 w-3.5 animate-spin text-primary" />
+        <Spinner v-if="activeCount" label="Uploading" class="text-primary" />
         <component :is="collapsed ? ChevronUp : ChevronDown" class="h-4 w-4 text-muted-foreground" />
       </span>
     </button>
@@ -94,8 +94,9 @@ function stateVariant(item: UploadQueueItem): 'accent' | 'secondary' | 'warn' | 
           <span class="min-w-0 flex-1 truncate font-mono" :title="`${item.bucket}/${item.key}`">{{ item.name }}</span>
           <Badge
             v-if="item.state !== 'uploading' && item.state !== 'queued'"
-            :variant="stateVariant(item)"
-            class="shrink-0 text-[10px] uppercase"
+            :variant="transferVariant(item)"
+            size="sm"
+            class="shrink-0 uppercase"
           >
             {{ item.pausedForSession ? 'PAUSED' : item.state }}
           </Badge>

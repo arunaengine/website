@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
@@ -15,6 +16,7 @@ import { useJobsList } from '@/composables/useJobs'
 import { useRefresh } from '@/composables/useRefresh'
 import {
   formatJobProgress,
+  jobKindLabel,
   jobProgressPercent,
   type JobState,
   type JobStatusResponse,
@@ -129,26 +131,21 @@ onMounted(() => void list.load())
 
     <ErrorPanel v-else-if="listState === 'error'" :message="listError || 'Failed to load jobs.'" @retry="reload" />
 
-    <p
-      v-else-if="listState === 'unsupported'"
-      class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-    >
+    <Notice v-else-if="listState === 'unsupported'" tone="warning">
       This backend does not serve the durable jobs API yet. Jobs cannot be listed.
-    </p>
+    </Notice>
 
-    <p
+    <EmptyState
       v-else-if="listState === 'forbidden'"
-      class="surface px-5 py-8 text-center text-sm text-muted-foreground"
-    >
-      This token cannot list jobs, path-restricted tokens have no access to the job surface.
-    </p>
+      compact
+      title="This token cannot list jobs, path-restricted tokens have no access to the job surface."
+    />
 
-    <p
+    <EmptyState
       v-else-if="listState === 'signed-out'"
-      class="surface px-5 py-8 text-center text-sm text-muted-foreground"
-    >
-      Sign in to see the background jobs this node runs for your account.
-    </p>
+      compact
+      title="Sign in to see the background jobs this node runs for your account."
+    />
 
     <EmptyState
       v-else-if="listState === 'ready' && !jobs.length"
@@ -169,9 +166,12 @@ onMounted(() => void list.load())
           </div>
         </div>
 
-        <p v-if="!visibleJobs.length" class="px-5 py-8 text-center text-sm text-muted-foreground">
-          No {{ emptyGroupLabel }}jobs in the loaded list.
-        </p>
+        <EmptyState
+          v-if="!visibleJobs.length"
+          compact
+          class="rounded-none border-0 shadow-none"
+          :title="`No ${emptyGroupLabel}jobs in the loaded list.`"
+        />
 
         <table v-else class="w-full text-sm">
           <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -194,14 +194,14 @@ onMounted(() => void list.load())
             >
               <td class="px-5 py-2.5">
                 <button type="button" class="w-full text-left" @click.stop="openJob(job)">
-                  <span class="font-medium capitalize text-foreground">{{ job.kind }}</span>
+                  <span class="font-medium text-foreground">{{ jobKindLabel(job.kind) }}</span>
                   <span class="block font-mono text-[11px] text-muted-foreground" :title="job.job_id">{{ truncateMiddle(job.job_id) }}</span>
                 </button>
               </td>
               <td class="px-5 py-2.5">
                 <div class="flex items-center gap-1.5">
                   <JobStateBadge :state="job.state" />
-                  <Badge v-if="job.cancel_requested && !job.finished_at" variant="warn" class="text-[10px]">cancelling</Badge>
+                  <Badge v-if="job.cancel_requested && !job.finished_at" variant="warn" size="sm">cancelling</Badge>
                 </div>
               </td>
               <td class="px-5 py-2.5">

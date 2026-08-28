@@ -2,9 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import Dialog from '@/components/ui/Dialog.vue'
+import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
-import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -13,7 +12,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useJobs } from '@/composables/useJobs'
 import type { JobAuditConflict, JobAuditRecord, JobAuditScope } from '@/lib/jobs'
-import { truncateMiddle } from '@/lib/utils'
+import { errorMessage, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{ jobId: string; open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void }>()
@@ -32,10 +31,6 @@ const moreError = ref<string | null>(null)
 let requestId = 0
 
 const sortedRecords = computed(() => [...records.value].sort((left, right) => left.at_ms - right.at_ms))
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
 
 function setScope(value: JobAuditScope) {
   scope.value = value
@@ -159,117 +154,116 @@ watch(
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogContent class="flex max-h-[85vh] w-[92vw] max-w-5xl flex-col overflow-hidden">
-      <DialogHeader>
-        <DialogTitle>Job audit trail</DialogTitle>
-        <DialogDescription>
-          Immutable records displayed by event time. API pages arrive in stable record-key order.
-        </DialogDescription>
-      </DialogHeader>
+  <DetailDialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
+    <DialogHeader>
+      <DialogTitle>Job audit trail</DialogTitle>
+      <DialogDescription>
+        Immutable records displayed by event time. API pages arrive in stable record-key order.
+      </DialogDescription>
+    </DialogHeader>
 
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="inline-flex rounded-md border border-border p-0.5" role="group" aria-label="Audit scope">
-          <Button
-            size="sm"
-            :variant="scope === 'family' ? 'secondary' : 'ghost'"
-            :aria-pressed="scope === 'family'"
-            @click="setScope('family')"
-          >Family</Button>
-          <Button
-            size="sm"
-            :variant="scope === 'submission' ? 'secondary' : 'ghost'"
-            :aria-pressed="scope === 'submission'"
-            @click="setScope('submission')"
-          >Submission</Button>
-        </div>
-        <p class="text-[11px] text-muted-foreground">
-          {{ scope === 'family' ? 'Current request family' : 'All request families for this submission' }}
-        </p>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="inline-flex rounded-md border border-border p-0.5" role="group" aria-label="Audit scope">
+        <Button
+          size="sm"
+          :variant="scope === 'family' ? 'secondary' : 'ghost'"
+          :aria-pressed="scope === 'family'"
+          @click="setScope('family')"
+        >Family</Button>
+        <Button
+          size="sm"
+          :variant="scope === 'submission' ? 'secondary' : 'ghost'"
+          :aria-pressed="scope === 'submission'"
+          @click="setScope('submission')"
+        >Submission</Button>
+      </div>
+      <p class="text-[11px] text-muted-foreground">
+        {{ scope === 'family' ? 'Current request family' : 'All request families for this submission' }}
+      </p>
+    </div>
+
+    <div class="scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+      <div v-if="loading" class="space-y-2">
+        <Skeleton class="h-10 w-full" />
+        <Skeleton class="h-16 w-full" />
+        <Skeleton class="h-16 w-full" />
       </div>
 
-      <div class="scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-        <div v-if="loading" class="space-y-2">
-          <Skeleton class="h-10 w-full" />
-          <Skeleton class="h-16 w-full" />
-          <Skeleton class="h-16 w-full" />
+      <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
+
+      <template v-else>
+        <div v-if="sortedRecords.length" class="overflow-x-auto rounded-md border border-border">
+          <table class="w-full min-w-[48rem] text-left text-[11px]">
+            <thead class="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th scope="col" class="w-44 px-3 py-2 font-medium">Event time</th>
+                <th scope="col" class="w-24 px-3 py-2 font-medium">Kind</th>
+                <th scope="col" class="px-3 py-2 font-medium">Details</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              <tr v-for="record in sortedRecords" :key="record.digest">
+                <td class="whitespace-nowrap px-3 py-2 text-muted-foreground" :title="auditTimeTitle(record.at_ms)">
+                  {{ formatAuditTime(record.at_ms) }}
+                </td>
+                <td class="px-3 py-2">
+                  <Badge variant="secondary" size="sm" class="uppercase">{{ record.kind }}</Badge>
+                  <Badge
+                    v-if="record.conflicting_family"
+                    variant="outline"
+                    size="sm"
+                    class="mt-1 block w-fit text-muted-foreground"
+                  >conflicting family</Badge>
+                </td>
+                <td class="px-3 py-2">
+                  <div class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground">
+                    <span v-for="detail in recordDetails(record)" :key="detail">{{ detail }}</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="text-xs text-muted-foreground">No audit records are available in this scope.</p>
+
+        <div v-if="nextCursor || moreError" class="flex flex-wrap items-center gap-3">
+          <Button v-if="nextCursor" variant="outline" size="sm" :disabled="loadingMore" @click="load(false)">
+            {{ loadingMore ? 'Loading records…' : 'Load more records' }}
+          </Button>
+          <p v-if="moreError" class="text-[11px] text-destructive">{{ moreError }}</p>
         </div>
 
-        <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
-
-        <template v-else>
-          <div v-if="sortedRecords.length" class="overflow-x-auto rounded-md border border-border">
-            <table class="w-full min-w-[48rem] text-left text-[11px]">
-              <thead class="bg-muted/50 text-muted-foreground">
-                <tr>
-                  <th scope="col" class="w-44 px-3 py-2 font-medium">Event time</th>
-                  <th scope="col" class="w-24 px-3 py-2 font-medium">Kind</th>
-                  <th scope="col" class="px-3 py-2 font-medium">Details</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border">
-                <tr v-for="record in sortedRecords" :key="record.digest">
-                  <td class="whitespace-nowrap px-3 py-2 text-muted-foreground" :title="auditTimeTitle(record.at_ms)">
-                    {{ formatAuditTime(record.at_ms) }}
-                  </td>
-                  <td class="px-3 py-2">
-                    <Badge variant="secondary" class="text-[10px] uppercase">{{ record.kind }}</Badge>
-                    <Badge
-                      v-if="record.conflicting_family"
-                      variant="outline"
-                      class="mt-1 block w-fit text-[10px] text-muted-foreground"
-                    >conflicting family</Badge>
-                  </td>
-                  <td class="px-3 py-2">
-                    <div class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground">
-                      <span v-for="detail in recordDetails(record)" :key="detail">{{ detail }}</span>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        <section v-if="conflicts.length" class="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+          <div>
+            <h3 class="text-xs font-semibold text-foreground">Record-key conflicts</h3>
+            <p class="text-[11px] text-muted-foreground">
+              These records were refused because a different digest already occupied the same stable key.
+            </p>
           </div>
-          <p v-else class="text-xs text-muted-foreground">No audit records are available in this scope.</p>
+          <ul class="divide-y divide-border" aria-label="Audit record conflicts">
+            <li v-for="conflict in conflicts" :key="conflict.digest" class="grid gap-1 py-2 text-[11px] sm:grid-cols-[6rem_1fr]">
+              <Badge variant="outline" size="sm" class="w-fit uppercase">{{ conflict.kind }}</Badge>
+              <div class="space-y-0.5 text-muted-foreground">
+                <p :title="conflict.digest">Refused digest <span class="font-mono">{{ truncateMiddle(conflict.digest) }}</span></p>
+                <p :title="conflict.retained">Retained digest <span class="font-mono">{{ truncateMiddle(conflict.retained) }}</span></p>
+                <p :title="auditTimeTitle(conflict.observed_at_ms)">Observed {{ formatAuditTime(conflict.observed_at_ms) }}</p>
+              </div>
+            </li>
+          </ul>
+        </section>
 
-          <div v-if="nextCursor || moreError" class="flex flex-wrap items-center gap-3">
-            <Button v-if="nextCursor" variant="outline" size="sm" :disabled="loadingMore" @click="load(false)">
-              {{ loadingMore ? 'Loading records…' : 'Load more records' }}
-            </Button>
-            <p v-if="moreError" class="text-[11px] text-destructive">{{ moreError }}</p>
+        <div v-if="projectionDigest" class="space-y-1 text-[11px] text-muted-foreground">
+          <div class="flex flex-wrap items-center gap-2">
+            <span>Projection digest <span class="font-mono" :title="projectionDigest">{{ truncateMiddle(projectionDigest) }}</span></span>
+            <Badge v-if="partial" variant="outline" size="sm" class="text-muted-foreground">Partial responder view</Badge>
           </div>
+          <p v-if="partial">This responder could not reduce every record in the family.</p>
+        </div>
+      </template>
+    </div>
 
-          <section v-if="conflicts.length" class="space-y-2 rounded-md border border-border bg-muted/20 p-3">
-            <div>
-              <h3 class="text-xs font-semibold text-foreground">Record-key conflicts</h3>
-              <p class="text-[11px] text-muted-foreground">
-                These records were refused because a different digest already occupied the same stable key.
-              </p>
-            </div>
-            <ul class="divide-y divide-border" aria-label="Audit record conflicts">
-              <li v-for="conflict in conflicts" :key="conflict.digest" class="grid gap-1 py-2 text-[11px] sm:grid-cols-[6rem_1fr]">
-                <Badge variant="outline" class="w-fit text-[10px] uppercase">{{ conflict.kind }}</Badge>
-                <div class="space-y-0.5 text-muted-foreground">
-                  <p :title="conflict.digest">Refused digest <span class="font-mono">{{ truncateMiddle(conflict.digest) }}</span></p>
-                  <p :title="conflict.retained">Retained digest <span class="font-mono">{{ truncateMiddle(conflict.retained) }}</span></p>
-                  <p :title="auditTimeTitle(conflict.observed_at_ms)">Observed {{ formatAuditTime(conflict.observed_at_ms) }}</p>
-                </div>
-              </li>
-            </ul>
-          </section>
-
-          <div v-if="projectionDigest" class="space-y-1 text-[11px] text-muted-foreground">
-            <div class="flex flex-wrap items-center gap-2">
-              <span>Projection digest <span class="font-mono" :title="projectionDigest">{{ truncateMiddle(projectionDigest) }}</span></span>
-              <Badge v-if="partial" variant="outline" class="text-[10px] text-muted-foreground">Partial responder view</Badge>
-            </div>
-            <p v-if="partial">This responder could not reduce every record in the family.</p>
-          </div>
-        </template>
-      </div>
-
-      <DialogFooter>
-        <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+    <DialogFooter>
+      <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
+    </DialogFooter>
+  </DetailDialog>
 </template>

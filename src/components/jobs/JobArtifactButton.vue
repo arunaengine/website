@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import { useJobs } from '@/composables/useJobs'
 import { useRefresh } from '@/composables/useRefresh'
-import { formatBytes, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, truncateMiddle } from '@/lib/utils'
 import type { JobArtifactStatus } from '@/lib/jobs'
 import { Download } from '@lucide/vue'
 
@@ -41,7 +41,7 @@ async function check() {
     status.value = result
   } catch (err) {
     if (id !== requestId) return
-    status.value = { state: 'error', message: err instanceof Error ? err.message : String(err) }
+    status.value = { state: 'error', message: errorMessage(err) }
   } finally {
     if (id === requestId) checking.value = false
   }
@@ -69,7 +69,7 @@ async function download() {
     anchor.download = result.filename || `${props.jobId}-run-crate.zip`
     anchor.click()
   } catch (err) {
-    downloadError.value = err instanceof Error ? err.message : String(err)
+    downloadError.value = errorMessage(err)
   } finally {
     downloading.value = false
   }
@@ -84,7 +84,7 @@ watch(() => props.jobId, () => {
 
 <template>
   <section class="space-y-2">
-    <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Run crate archive</h3>
+    <h3 class="font-display text-sm font-semibold text-aruna-navy">Run crate archive</h3>
 
     <p v-if="checking && !status" class="text-xs text-muted-foreground">Checking for an archive…</p>
 
@@ -97,7 +97,7 @@ watch(() => props.jobId, () => {
           <span v-if="status.size !== undefined" class="text-[11px] text-muted-foreground">
             {{ formatBytes(status.size) }}
           </span>
-          <Badge v-if="status.etag" variant="outline" class="font-mono text-[10px]" :title="`ETag ${status.etag}`">
+          <Badge v-if="status.etag" variant="outline" size="sm" class="font-mono" :title="`ETag ${status.etag}`">
             {{ truncateMiddle(status.etag) }}
           </Badge>
         </div>

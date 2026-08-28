@@ -8,13 +8,18 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Notice from '@/components/ui/Notice.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Copy, HardDrive, Server, ShieldAlert, TriangleAlert } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { copyState, scanLimitText } from '@/lib/storage'
+import { stateVariant, toneVariant } from '@/lib/stateBadge'
+import { errorMessage } from '@/lib/utils'
 import { ApiError, type BlobCopyResponse, type BlobLocationsResponse } from '@/lib/api'
 
 const props = defineProps<{ open: boolean; bucket: string; objectKey: string; groupId: string | null }>()
@@ -62,7 +67,7 @@ async function load() {
     // 404 covers both an unknown object and a node that does not serve the
     // endpoint; neither claim can be made on its own, so say both.
     if (err instanceof ApiError && err.status === 404) missing.value = true
-    else loadError.value = err instanceof Error ? err.message : String(err)
+    else loadError.value = errorMessage(err)
   } finally {
     if (seq === loadSeq) loading.value = false
   }
@@ -89,11 +94,11 @@ function otherPath(copy: BlobCopyResponse): string | null {
   return `${copy.bucket}/${copy.key}`
 }
 
-function stateVariant(state: string): 'success' | 'warn' | 'secondary' | 'outline' {
-  if (state === 'present') return 'success'
-  if (state === 'pending' || state === 'unreachable') return 'warn'
-  if (state === 'not-stored') return 'secondary'
-  return 'outline'
+// 'present' and 'not-stored' are copy words the shared vocabulary does not carry.
+function copyVariant(state: string) {
+  if (state === 'present') return toneVariant('done')
+  if (state === 'not-stored') return toneVariant('idle')
+  return stateVariant(state)
 }
 
 // ── Replication ──────────────────────────────────────────────────────────────
@@ -137,7 +142,7 @@ async function replicate() {
     } else if (err instanceof ApiError && err.status === 403) {
       replicateError.value = 'Adding a copy needs WRITE permission on this file.'
     } else {
-      replicateError.value = err instanceof Error ? err.message : String(err)
+      replicateError.value = errorMessage(err)
     }
   } finally {
     replicating.value = false
@@ -147,7 +152,7 @@ async function replicate() {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-2xl">
+    <DialogContent class="max-w-xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <HardDrive class="h-4 w-4 text-primary" /> Storage locations
@@ -158,10 +163,12 @@ async function replicate() {
       </DialogHeader>
 
       <Skeleton v-if="loading && !summary" class="h-24" />
-      <p v-else-if="missing" class="text-xs text-muted-foreground">
-        Nothing recorded for this file. Either this node does not know it, or it cannot say where
-        files are stored yet.
-      </p>
+      <EmptyState
+        v-else-if="missing"
+        compact
+        title="Nothing recorded for this file."
+        description="Either this node does not know it, or it cannot say where files are stored yet."
+      />
       <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
       <template v-else-if="summary">
         <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
@@ -191,8 +198,8 @@ async function replicate() {
             >
               {{ otherPath(copy) }}
             </span>
-            <Badge v-if="copy.local" variant="outline" class="text-[10px] uppercase">this node</Badge>
-            <Badge :variant="stateVariant(copy.state)" class="text-[10px] uppercase" :title="copyState(copy.state).description">
+            <Badge v-if="copy.local" variant="outline" size="sm" class="uppercase">this node</Badge>
+            <Badge :variant="copyVariant(copy.state)" size="sm" class="uppercase" :title="copyState(copy.state).description">
               {{ copyState(copy.state).label }}
             </Badge>
             <span class="min-w-0 flex-1 truncate text-right text-[11px] text-muted-foreground">
@@ -207,15 +214,12 @@ async function replicate() {
               <template v-else>{{ copyState(copy.state).description }}</template>
             </span>
           </li>
-          <li v-if="!copies.length" class="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-            No node reported a copy of this file.
+          <li v-if="!copies.length">
+            <EmptyState compact title="No node reported a copy of this file." />
           </li>
         </ul>
 
-        <div
-          v-if="onGroupBackend"
-          class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-        >
+        <Notice v-if="onGroupBackend" tone="warning" class="flex items-start gap-2">
           <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             A copy is on storage your group runs, not on this node. Keeping it safe, backed up and
@@ -228,7 +232,7 @@ async function replicate() {
               Your group's storage
             </RouterLink>
           </span>
-        </div>
+        </Notice>
 
         <div
           v-if="!summary.complete"
@@ -279,7 +283,7 @@ async function replicate() {
         </p>
 
         <div class="flex justify-end">
-          <Button variant="outline" size="sm" :disabled="loading" @click="load">Refresh</Button>
+          <RefreshButton :busy="loading" @click="load" />
         </div>
       </template>
     </DialogContent>

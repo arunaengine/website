@@ -11,7 +11,7 @@ import {
   reportPendingState,
   type JobReportRow,
 } from '@/lib/jobs'
-import { truncateMiddle } from '@/lib/utils'
+import { errorMessage, truncateMiddle } from '@/lib/utils'
 
 // The frozen per-entry report of an RO-Crate import or export. Only those two
 // job kinds keep one, so an absent report is the normal answer everywhere else
@@ -57,10 +57,6 @@ function codeLabel(code: string): string {
 function codeVariant(code: string): 'success' | 'destructive' | 'warn' {
   if (GOOD_CODES.has(code)) return 'success'
   return BAD_CODES.has(code) ? 'destructive' : 'warn'
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 async function load() {
@@ -128,7 +124,7 @@ const summary = computed(() => {
 <template>
   <section class="space-y-2">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
-      <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Report</h3>
+      <h3 class="font-display text-sm font-semibold text-aruna-navy">Report</h3>
       <span v-if="panelState === 'ready' && digest" class="font-mono text-[10px] text-muted-foreground" :title="digest">
         snapshot {{ truncateMiddle(digest) }}
       </span>
@@ -156,7 +152,7 @@ const summary = computed(() => {
 
     <template v-else-if="panelState === 'ready'">
       <div v-if="summary.length" class="flex flex-wrap gap-1.5">
-        <Badge v-for="[code, count] in summary" :key="code" :variant="codeVariant(code)" class="text-[10px]">
+        <Badge v-for="[code, count] in summary" :key="code" :variant="codeVariant(code)" size="sm">
           {{ codeLabel(code) }} {{ count }}
         </Badge>
       </div>
@@ -174,7 +170,7 @@ const summary = computed(() => {
             <tr v-for="(row, index) in rows" :key="`${row.entry_key}:${index}`">
               <td class="max-w-72 break-all px-3 py-2 font-mono text-foreground">{{ row.entry_key }}</td>
               <td class="px-3 py-2">
-                <Badge :variant="codeVariant(row.code)" class="text-[10px]">{{ codeLabel(row.code) }}</Badge>
+                <Badge :variant="codeVariant(row.code)" size="sm">{{ codeLabel(row.code) }}</Badge>
               </td>
               <td class="max-w-96 break-words px-3 py-2 text-muted-foreground">{{ row.message || 'n/a' }}</td>
             </tr>

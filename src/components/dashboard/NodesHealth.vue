@@ -2,8 +2,10 @@
 import { computed } from 'vue'
 import { useNow } from '@vueuse/core'
 import Badge from '@/components/ui/Badge.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 import type { RealmNodeInfo } from '@/lib/api'
 import { connectionLabel, connectionVariant, kindVariant } from '@/components/nodes/node-display'
+import { stateTone, toneVariant } from '@/lib/stateBadge'
 import { formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
 
 // Visual node-health grid over the realm's real published node data (no
@@ -63,6 +65,11 @@ function loadTextTone(node: RealmNodeInfo): string {
   return 'text-muted-foreground'
 }
 
+// Mirrors connectionVariant: no recent contact is a missing signal, not a fault.
+function connectionTone(node: RealmNodeInfo) {
+  return node.connection_status === 'unknown' ? ('idle' as const) : stateTone(node.connection_status)
+}
+
 function labelChips(node: RealmNodeInfo): string[] {
   return Object.entries(node.info?.labels ?? {}).map(([key, value]) => `${key}=${value}`)
 }
@@ -79,26 +86,17 @@ function labelChips(node: RealmNodeInfo): string[] {
       @click="$emit('select', node.node_id)"
     >
       <div class="flex items-center gap-2">
-        <span class="relative flex h-2 w-2 shrink-0">
-          <span
-            v-if="node.connection_status === 'connected'"
-            class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60 opacity-75"
-          />
-          <span
-            :class="[
-              'relative inline-flex h-2 w-2 rounded-full',
-              node.connection_status === 'connected' ? 'bg-emerald-500' : 'bg-muted-foreground/50',
-            ]"
-          />
-        </span>
+        <StatusDot :tone="connectionTone(node)" :label="connectionLabel(node)" />
         <span class="min-w-0 truncate font-mono text-[13px] font-semibold text-foreground">{{ truncateMiddle(node.node_id) }}</span>
-        <span
+        <Badge
           v-if="localPeerId && node.node_id === localPeerId"
-          class="rounded-sm border border-aruna-aqua/30 bg-aruna-aqua/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-aruna-aqua"
+          :variant="toneVariant('info')"
+          size="sm"
+          class="uppercase tracking-wider"
         >
           this node
-        </span>
-        <Badge :variant="kindVariant[node.kind]" class="ml-auto shrink-0 text-[10px] uppercase">{{ node.kind }}</Badge>
+        </Badge>
+        <Badge :variant="kindVariant[node.kind]" size="sm" class="ml-auto shrink-0 uppercase">{{ node.kind }}</Badge>
       </div>
 
       <div class="mt-3">
@@ -132,7 +130,7 @@ function labelChips(node: RealmNodeInfo): string[] {
       </div>
 
       <div class="mt-2 flex flex-wrap items-center gap-1">
-        <Badge :variant="connectionVariant(node)" class="text-[9px] uppercase">{{ connectionLabel(node) }}</Badge>
+        <Badge :variant="connectionVariant(node)" size="sm" class="uppercase">{{ connectionLabel(node) }}</Badge>
         <span v-for="chip in labelChips(node).slice(0, 3)" :key="chip" class="chip text-[10px]">{{ chip }}</span>
         <span v-if="labelChips(node).length > 3" class="text-[10px] text-muted-foreground">+{{ labelChips(node).length - 3 }}</span>
       </div>

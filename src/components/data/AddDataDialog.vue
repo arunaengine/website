@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import Dialog from '@/components/ui/Dialog.vue'
-import DialogContent from '@/components/ui/DialogContent.vue'
+import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
@@ -11,6 +10,8 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Progress from '@/components/ui/Progress.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -27,7 +28,8 @@ import { type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { invalidSourcePath, invalidSourcePrefix } from '@/composables/useStaging'
 import { useBuilderBasket, type BuilderRow } from '@/composables/useBuilderBasket'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
-import { formatBytes } from '@/lib/utils'
+import { errorMessage, formatBytes } from '@/lib/utils'
+import { stateVariant, toneVariant } from '@/lib/stateBadge'
 import { ApiError, type BucketSearchHit, type ConnectorEntry, type SourceConnectorSummary, type StagingReferenceEntry, type UsageResponse } from '@/lib/api'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { computed, ref, watch } from 'vue'
@@ -37,9 +39,7 @@ import {
   Boxes,
   CloudDownload,
   FolderInput,
-  Loader2,
   Plus,
-  RefreshCw,
   Upload,
   UploadCloud,
   X,
@@ -129,7 +129,7 @@ async function loadConnectors() {
     connectors.value = response.connectors
   } catch (err) {
     if (seq !== connLoadSeq) return
-    connectorsError.value = err instanceof Error ? err.message : String(err)
+    connectorsError.value = errorMessage(err)
     connectors.value = []
   } finally {
     if (seq === connLoadSeq) connectorsLoading.value = false
@@ -321,7 +321,7 @@ function syncCreateError(err: unknown): string {
     if (err.status === 401 || err.status === 403) return 'You need read access on the source bucket to import from it.'
     return err.message
   }
-  return err instanceof Error ? err.message : String(err)
+  return errorMessage(err)
 }
 
 const otherPendingCount = computed(
@@ -423,11 +423,10 @@ const kindLabel: Record<BuilderRow['sourceKind'], string> = {
   connector: 'Connector',
   upload: 'Upload',
 }
-function stateVariant(state: BuilderRow['state']): 'secondary' | 'success' | 'destructive' | 'outline' {
-  if (state === 'done') return 'success'
-  if (state === 'error') return 'destructive'
-  if (state === 'blocked') return 'outline'
-  return 'secondary'
+function rowVariant(state: BuilderRow['state']) {
+  if (state === 'blocked') return toneVariant('attention')
+  if (state === 'submitting') return toneVariant('progress')
+  return stateVariant(state)
 }
 function rowEditable(row: BuilderRow): boolean {
   return row.state === 'ready' || row.state === 'blocked'
@@ -454,391 +453,390 @@ watch(
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="flex max-h-[88vh] max-w-4xl flex-col">
-      <DialogHeader>
-        <DialogTitle class="flex items-center gap-2">
-          <Upload class="h-4 w-4 text-primary" /> Add data
-        </DialogTitle>
-        <DialogDescription>
-          Collect local files, connector sources and objects from other buckets, then submit them into
-          <span class="font-mono text-xs">{{ bucket }}/{{ prefix }}</span>.
-        </DialogDescription>
-      </DialogHeader>
+  <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
+    <DialogHeader>
+      <DialogTitle class="flex items-center gap-2">
+        <Upload class="h-4 w-4 text-primary" /> Add data
+      </DialogTitle>
+      <DialogDescription>
+        Collect local files, connector sources and objects from other buckets, then submit them into
+        <span class="font-mono text-xs">{{ bucket }}/{{ prefix }}</span>.
+      </DialogDescription>
+    </DialogHeader>
 
-      <div class="scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-1">
-        <Tabs v-model="tab">
-          <TabsList>
-            <TabsTrigger value="local"><Upload class="mr-1 h-3.5 w-3.5" /> Local files</TabsTrigger>
-            <TabsTrigger value="connector"><CloudDownload class="mr-1 h-3.5 w-3.5" /> From connector</TabsTrigger>
-            <TabsTrigger value="other"><Boxes class="mr-1 h-3.5 w-3.5" /> Other buckets</TabsTrigger>
-          </TabsList>
+    <div class="scrollbar-thin mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto px-1">
+      <Tabs v-model="tab">
+        <TabsList>
+          <TabsTrigger value="local"><Upload class="mr-1 h-3.5 w-3.5" /> Local files</TabsTrigger>
+          <TabsTrigger value="connector"><CloudDownload class="mr-1 h-3.5 w-3.5" /> From connector</TabsTrigger>
+          <TabsTrigger value="other"><Boxes class="mr-1 h-3.5 w-3.5" /> Other buckets</TabsTrigger>
+        </TabsList>
 
-          <!-- Local files & folders -->
-          <TabsContent value="local" class="space-y-3">
-            <div
-              class="rounded-md border-2 border-dashed p-8 text-center transition-colors"
-              :class="dragActive ? 'border-primary bg-primary/5 ring-2 ring-primary ring-offset-2' : 'border-border'"
-              @dragover.prevent="dragActive = true"
-              @dragleave="dragActive = false"
-              @drop.prevent="onDrop"
-            >
-              <UploadCloud class="mx-auto h-8 w-8 text-muted-foreground" />
-              <p class="mt-2 text-sm text-foreground">Drop files here to add them to the basket</p>
-              <p class="mt-1 text-xs text-muted-foreground">or</p>
-              <input ref="fileInput" type="file" multiple class="hidden" @change="onBrowse" />
-              <input ref="folderInput" type="file" webkitdirectory class="hidden" @change="onBrowse" />
-              <div class="mt-2 flex items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  :disabled="writesDisabled"
-                  :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
-                  @click="fileInput?.click()"
-                >
-                  Browse files
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  :disabled="writesDisabled"
-                  :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
-                  @click="folderInput?.click()"
-                >
-                  <FolderInput class="h-3.5 w-3.5" /> Browse folder
-                </Button>
-              </div>
-            </div>
-            <p class="text-[11px] text-muted-foreground">
-              Uploads are multipart (16 MiB parts), run up to three at a time, and keep going while you navigate.
-              A picked folder keeps its structure under the target prefix.
-            </p>
-          </TabsContent>
-
-          <!-- From connector -->
-          <TabsContent value="connector" class="space-y-3">
-            <div class="grid gap-3 sm:grid-cols-3">
-              <div>
-                <label class="text-xs font-medium text-foreground">Group</label>
-                <GroupSelect
-                  v-model="groupSel"
-                  :options="groupOptions"
-                  placeholder="Select a group"
-                  class="mt-1"
-                  @navigate="emit('update:open', false)"
-                />
-              </div>
-              <div>
-                <label class="text-xs font-medium text-foreground">Source connector</label>
-                <Select
-                  v-model="connectorSel"
-                  :options="connectorOptions"
-                  placeholder="Select a connector"
-                  class="mt-1"
-                  :disabled="!connectorOptions.length"
-                />
-              </div>
-              <div>
-                <label class="text-xs font-medium text-foreground">Strategy</label>
-                <Select v-model="connectorStrategy" :options="STRATEGY_OPTIONS" class="mt-1" />
-              </div>
-            </div>
-
-            <p v-if="connectorsLoading" class="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 class="h-3.5 w-3.5 animate-spin" /> Loading connectors…
-            </p>
-            <p v-else-if="connectorsError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-              {{ connectorsError }}
-            </p>
-            <EmptyState
-              v-else-if="!connectors.length"
-              title="No source connectors"
-              description="This group has no registered source connectors yet. Register one to ingest data from an external HTTP, S3, WebDAV, or FTP source."
-            >
+        <!-- Local files & folders -->
+        <TabsContent value="local" class="space-y-3">
+          <div
+            class="rounded-md border-2 border-dashed p-8 text-center transition-colors"
+            :class="dragActive ? 'border-primary bg-primary/5 ring-2 ring-primary ring-offset-2' : 'border-border'"
+            @dragover.prevent="dragActive = true"
+            @dragleave="dragActive = false"
+            @drop.prevent="onDrop"
+          >
+            <UploadCloud class="mx-auto h-8 w-8 text-muted-foreground" />
+            <p class="mt-2 text-sm text-foreground">Drop files here to add them to the basket</p>
+            <p class="mt-1 text-xs text-muted-foreground">or</p>
+            <input ref="fileInput" type="file" multiple class="hidden" @change="onBrowse" />
+            <input ref="folderInput" type="file" webkitdirectory class="hidden" @change="onBrowse" />
+            <div class="mt-2 flex items-center justify-center gap-2">
               <Button
-                v-if="groupSel"
+                variant="outline"
                 size="sm"
                 :disabled="writesDisabled"
                 :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
-                @click="registerOpen = true"
+                @click="fileInput?.click()"
               >
-                <Plus class="h-3.5 w-3.5" /> Register a connector
+                Browse files
               </Button>
-            </EmptyState>
+              <Button
+                variant="outline"
+                size="sm"
+                :disabled="writesDisabled"
+                :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+                @click="folderInput?.click()"
+              >
+                <FolderInput class="h-3.5 w-3.5" /> Browse folder
+              </Button>
+            </div>
+          </div>
+          <p class="text-[11px] text-muted-foreground">
+            Uploads are multipart (16 MiB parts), run up to three at a time, and keep going while you navigate.
+            A picked folder keeps its structure under the target prefix.
+          </p>
+        </TabsContent>
 
-            <template v-else-if="connectorSel">
-              <ConnectorEntriesBrowser
-                v-if="!entriesUnsupported"
-                :group-id="groupSel"
-                :connector-id="connectorSel"
-                :checked-paths="existingConnectorPaths"
-                selectable
-                @add="addConnectorSelection"
-                @unsupported="entriesUnsupported = true"
-                @list-failed="entriesListingFailed = true"
+        <!-- From connector -->
+        <TabsContent value="connector" class="space-y-3">
+          <div class="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label class="text-xs font-medium text-foreground">Group</label>
+              <GroupSelect
+                v-model="groupSel"
+                :options="groupOptions"
+                placeholder="Select a group"
+                class="mt-1"
+                @navigate="emit('update:open', false)"
               />
-              <div v-if="entriesUnsupported || entriesListingFailed" class="space-y-2">
-                <p v-if="entriesUnsupported" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
-                  Browsing connector contents is not supported by this node yet. Type the source path instead.
+            </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Source connector</label>
+              <Select
+                v-model="connectorSel"
+                :options="connectorOptions"
+                placeholder="Select a connector"
+                class="mt-1"
+                :disabled="!connectorOptions.length"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Strategy</label>
+              <Select v-model="connectorStrategy" :options="STRATEGY_OPTIONS" class="mt-1" />
+            </div>
+          </div>
+
+          <Spinner v-if="connectorsLoading" show-label label="Loading connectors…" />
+          <Notice v-else-if="connectorsError" tone="error">
+            {{ connectorsError }}
+          </Notice>
+          <EmptyState
+            v-else-if="!connectors.length"
+            title="No source connectors"
+            description="This group has no registered source connectors yet. Register one to ingest data from an external HTTP, S3, WebDAV, or FTP source."
+          >
+            <Button
+              v-if="groupSel"
+              size="sm"
+              :disabled="writesDisabled"
+              :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+              @click="registerOpen = true"
+            >
+              <Plus class="h-3.5 w-3.5" /> Register a connector
+            </Button>
+          </EmptyState>
+
+          <template v-else-if="connectorSel">
+            <ConnectorEntriesBrowser
+              v-if="!entriesUnsupported"
+              :group-id="groupSel"
+              :connector-id="connectorSel"
+              :checked-paths="existingConnectorPaths"
+              selectable
+              @add="addConnectorSelection"
+              @unsupported="entriesUnsupported = true"
+              @list-failed="entriesListingFailed = true"
+            />
+            <div v-if="entriesUnsupported || entriesListingFailed" class="space-y-2">
+              <Notice v-if="entriesUnsupported" tone="warning">
+                Browsing connector contents is not supported by this node yet. Type the source path instead.
+              </Notice>
+              <div>
+                <label class="text-xs font-medium text-foreground">Source path</label>
+                <div class="mt-1 flex items-center gap-2">
+                  <Input v-model="connectorPath" class="font-mono text-xs" placeholder="folder/file.fastq.gz" @keyup.enter="addTypedConnectorPath" />
+                  <Button size="sm" class="shrink-0" :disabled="!connectorPath.trim() || connectorPathError" @click="addTypedConnectorPath">
+                    <Plus class="h-3.5 w-3.5" /> Add
+                  </Button>
+                </div>
+                <p v-if="connectorPathError" class="mt-1 text-[11px] text-destructive">
+                  Use a relative path without leading '/', backslashes, or '.'/'..' segments.
                 </p>
-                <div>
-                  <label class="text-xs font-medium text-foreground">Source path</label>
-                  <div class="mt-1 flex items-center gap-2">
-                    <Input v-model="connectorPath" class="font-mono text-xs" placeholder="folder/file.fastq.gz" @keyup.enter="addTypedConnectorPath" />
-                    <Button size="sm" class="shrink-0" :disabled="!connectorPath.trim() || connectorPathError" @click="addTypedConnectorPath">
-                      <Plus class="h-3.5 w-3.5" /> Add
+                <p v-else class="mt-1 text-[11px] text-muted-foreground">
+                  End a folder path with '/' or use '.' to add the connector root.
+                </p>
+              </div>
+            </div>
+            <div class="flex justify-end">
+              <button class="text-xs text-primary hover:underline" @click="registerOpen = true">Register another connector</button>
+            </div>
+          </template>
+        </TabsContent>
+
+        <!-- Other buckets -->
+        <TabsContent value="other" class="space-y-3">
+          <p class="text-[11px] text-muted-foreground">
+            Import objects from another bucket, local or on another realm node. "Copy (once)" duplicates the
+            selection into <span class="font-mono">{{ bucket }}/{{ prefix }}</span> now; "Reference" exposes it
+            there without copying the data.
+          </p>
+
+          <div>
+            <label class="text-xs font-medium text-foreground">Source bucket</label>
+            <div class="mt-1">
+              <BucketSearchBox
+                v-model="sourceSearch"
+                mode="picker"
+                :exclude-local-bucket="bucket"
+                placeholder="Find a bucket on any node…"
+                @select="pickSearchHit"
+              />
+            </div>
+          </div>
+
+          <template v-if="sourceBucket">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="font-medium text-foreground">Browsing</span>
+              <span class="font-mono">{{ sourceBucket }}</span>
+              <Badge v-if="sourceNodeId" variant="outline" size="sm" :title="sourceNodeId">
+                on {{ realmNodes.displayName(sourceNodeId) }}
+              </Badge>
+              <div class="ml-auto flex items-center gap-1.5">
+                <label class="text-[11px] text-muted-foreground">Add as</label>
+                <Select v-model="otherDefaultMode" :options="OTHER_MODE_OPTIONS" class="h-8 w-36 text-xs" />
+              </div>
+            </div>
+            <ObjectBrowserPanel :bucket="sourceBucket" :node-id="sourceNodeId" selectable @add="addOtherSelection" />
+          </template>
+
+          <section v-if="otherRows.length" class="overflow-hidden rounded-md border border-border">
+            <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-3 py-2">
+              <div class="flex items-center gap-2">
+                <ArrowLeftRight class="h-4 w-4 text-primary" />
+                <h3 class="text-sm font-semibold text-foreground">Imports</h3>
+                <Badge variant="outline">{{ otherRows.length }}</Badge>
+              </div>
+              <Button
+                size="sm"
+                :disabled="!otherPendingCount || otherBusy || writesDisabled"
+                :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+                @click="createOtherRelationships"
+              >
+                <Spinner v-if="otherBusy" label="Importing" class="text-current" />
+                Import {{ otherPendingCount || '' }}
+              </Button>
+            </header>
+            <ul class="divide-y divide-border">
+              <li v-for="row in otherRows" :key="row.id" class="space-y-1 px-3 py-2">
+                <div class="flex items-center gap-2 text-xs">
+                  <Badge v-if="row.isPrefix" variant="outline" size="sm" class="shrink-0 uppercase">folder</Badge>
+                  <span class="min-w-0 truncate font-mono" :title="`${row.bucket}/${row.sourcePrefix}`">
+                    {{ row.bucket }}/{{ row.sourcePrefix }}
+                  </span>
+                  <Badge v-if="row.nodeId" variant="outline" size="sm" class="shrink-0" :title="row.nodeId">
+                    on {{ realmNodes.displayName(row.nodeId) }}
+                  </Badge>
+                  <div class="ml-auto flex shrink-0 items-center gap-1.5">
+                    <Select
+                      v-if="row.state === 'ready' || row.state === 'error'"
+                      :model-value="row.mode"
+                      :options="OTHER_MODE_OPTIONS"
+                      class="h-7 w-32 text-xs"
+                      :aria-label="`Import mode for ${row.sourcePrefix}`"
+                      @update:model-value="(v: string) => (row.mode = v as OtherMode)"
+                    />
+                    <Badge v-else variant="outline" size="sm">{{ row.mode === 'once' ? 'Copy (once)' : 'Reference' }}</Badge>
+                    <Spinner v-if="row.state === 'creating'" label="Creating the import" class="text-primary" />
+                    <Badge v-else-if="row.state === 'done'" :variant="stateVariant('done')" size="sm" class="uppercase">done</Badge>
+                    <Badge v-else-if="row.state === 'error'" :variant="stateVariant('failed')" size="sm" class="uppercase">failed</Badge>
+                    <Button
+                      v-if="row.state !== 'creating'"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Remove import"
+                      @click="removeOtherRow(row.id)"
+                    >
+                      <X class="size-3.5" />
                     </Button>
                   </div>
-                  <p v-if="connectorPathError" class="mt-1 text-[11px] text-destructive">
-                    Use a relative path without leading '/', backslashes, or '.'/'..' segments.
-                  </p>
-                  <p v-else class="mt-1 text-[11px] text-muted-foreground">
-                    End a folder path with '/' or use '.' to add the connector root.
-                  </p>
                 </div>
-              </div>
-              <div class="flex justify-end">
-                <button class="text-xs text-primary hover:underline" @click="registerOpen = true">Register another connector</button>
-              </div>
-            </template>
-          </TabsContent>
-
-          <!-- Other buckets -->
-          <TabsContent value="other" class="space-y-3">
-            <p class="text-[11px] text-muted-foreground">
-              Import objects from another bucket, local or on another realm node. "Copy (once)" duplicates the
-              selection into <span class="font-mono">{{ bucket }}/{{ prefix }}</span> now; "Reference" exposes it
-              there without copying the data.
+                <p class="truncate text-[10px] text-muted-foreground" :title="`${bucket}/${otherTargetPrefix(row)}`">
+                  into {{ bucket }}/{{ otherTargetPrefix(row) }}
+                </p>
+                <p v-if="row.error" class="text-[10px] text-destructive">{{ row.error }}</p>
+              </li>
+            </ul>
+            <p class="border-t border-border px-3 py-1.5 text-[10px] text-muted-foreground">
+              Each import becomes a sync relationship; created ones appear under the bucket's sync status.
             </p>
+          </section>
+        </TabsContent>
+      </Tabs>
 
-            <div>
-              <label class="text-xs font-medium text-foreground">Source bucket</label>
-              <div class="mt-1">
-                <BucketSearchBox
-                  v-model="sourceSearch"
-                  mode="picker"
-                  :exclude-local-bucket="bucket"
-                  placeholder="Find a bucket on any node…"
-                  @select="pickSearchHit"
-                />
-              </div>
-            </div>
-
-            <template v-if="sourceBucket">
-              <div class="flex flex-wrap items-center gap-2 text-xs">
-                <span class="font-medium text-foreground">Browsing</span>
-                <span class="font-mono">{{ sourceBucket }}</span>
-                <Badge v-if="sourceNodeId" variant="outline" class="text-[10px]" :title="sourceNodeId">
-                  on {{ realmNodes.displayName(sourceNodeId) }}
-                </Badge>
-                <div class="ml-auto flex items-center gap-1.5">
-                  <label class="text-[11px] text-muted-foreground">Add as</label>
-                  <Select v-model="otherDefaultMode" :options="OTHER_MODE_OPTIONS" class="h-8 w-36 text-xs" />
-                </div>
-              </div>
-              <ObjectBrowserPanel :bucket="sourceBucket" :node-id="sourceNodeId" selectable @add="addOtherSelection" />
-            </template>
-
-            <section v-if="otherRows.length" class="overflow-hidden rounded-md border border-border">
-              <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-3 py-2">
+      <!-- Basket -->
+      <section class="overflow-hidden rounded-md border border-border">
+        <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-3 py-2">
+          <div class="flex items-center gap-2">
+            <FolderInput class="h-4 w-4 text-primary" />
+            <h3 class="text-sm font-semibold text-foreground">Basket</h3>
+            <Badge variant="outline">{{ basket.summary.value.total }}</Badge>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span v-if="basket.summary.value.ready">{{ basket.summary.value.ready }} ready</span>
+            <span v-if="basket.summary.value.blocked" class="text-amber-700 dark:text-amber-400">{{ basket.summary.value.blocked }} blocked</span>
+            <span v-if="basket.summary.value.submitting" class="text-primary">{{ basket.summary.value.submitting }} running</span>
+            <span v-if="basket.summary.value.done" class="text-emerald-700 dark:text-emerald-400">{{ basket.summary.value.done }} done</span>
+            <span v-if="basket.summary.value.error" class="text-destructive">{{ basket.summary.value.error }} failed</span>
+            <Button v-if="basket.summary.value.done" variant="ghost" size="sm" @click="basket.clearDone">Clear done</Button>
+          </div>
+        </header>
+        <EmptyState
+          v-if="!basket.rows.value.length"
+          compact
+          title="The basket is empty."
+          description="Add files or connector sources from the tabs above."
+        />
+        <table v-else class="w-full text-sm">
+          <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th class="px-3 py-1.5 text-left font-semibold">Source</th>
+              <th class="px-3 py-1.5 text-left font-semibold">Target key</th>
+              <th class="px-3 py-1.5 text-left font-semibold">State</th>
+              <th class="px-3 py-1.5"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in basket.rows.value" :key="row.id" class="border-t border-border align-top">
+              <td class="px-3 py-2">
                 <div class="flex items-center gap-2">
-                  <ArrowLeftRight class="h-4 w-4 text-primary" />
-                  <h3 class="text-sm font-semibold text-foreground">Imports</h3>
-                  <Badge variant="outline">{{ otherRows.length }}</Badge>
+                  <Badge variant="secondary" size="sm" class="uppercase">{{ kindLabel[row.sourceKind] }}</Badge>
+                  <Badge v-if="row.isPrefix" variant="outline" size="sm" class="uppercase">folder</Badge>
+                  <span class="min-w-0 truncate font-mono text-xs" :title="row.source">{{ row.source }}</span>
                 </div>
-                <Button
-                  size="sm"
-                  :disabled="!otherPendingCount || otherBusy || writesDisabled"
-                  :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
-                  @click="createOtherRelationships"
-                >
-                  <Loader2 v-if="otherBusy" class="h-3.5 w-3.5 animate-spin" />
-                  Import {{ otherPendingCount || '' }}
-                </Button>
-              </header>
-              <ul class="divide-y divide-border">
-                <li v-for="row in otherRows" :key="row.id" class="space-y-1 px-3 py-2">
-                  <div class="flex items-center gap-2 text-xs">
-                    <Badge v-if="row.isPrefix" variant="outline" class="shrink-0 text-[10px] uppercase">folder</Badge>
-                    <span class="min-w-0 truncate font-mono" :title="`${row.bucket}/${row.sourcePrefix}`">
-                      {{ row.bucket }}/{{ row.sourcePrefix }}
-                    </span>
-                    <Badge v-if="row.nodeId" variant="outline" class="shrink-0 text-[10px]" :title="row.nodeId">
-                      on {{ realmNodes.displayName(row.nodeId) }}
-                    </Badge>
-                    <div class="ml-auto flex shrink-0 items-center gap-1.5">
-                      <Select
-                        v-if="row.state === 'ready' || row.state === 'error'"
-                        :model-value="row.mode"
-                        :options="OTHER_MODE_OPTIONS"
-                        class="h-7 w-32 text-xs"
-                        :aria-label="`Import mode for ${row.sourcePrefix}`"
-                        @update:model-value="(v: string) => (row.mode = v as OtherMode)"
-                      />
-                      <Badge v-else variant="outline" class="text-[10px]">{{ row.mode === 'once' ? 'Copy (once)' : 'Reference' }}</Badge>
-                      <Loader2 v-if="row.state === 'creating'" class="h-3.5 w-3.5 animate-spin text-primary" />
-                      <Badge v-else-if="row.state === 'done'" variant="success" class="text-[10px] uppercase">done</Badge>
-                      <Badge v-else-if="row.state === 'error'" variant="destructive" class="text-[10px] uppercase">failed</Badge>
-                      <Button
-                        v-if="row.state !== 'creating'"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Remove import"
-                        @click="removeOtherRow(row.id)"
-                      >
-                        <X class="size-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  <p class="truncate text-[10px] text-muted-foreground" :title="`${bucket}/${otherTargetPrefix(row)}`">
-                    into {{ bucket }}/{{ otherTargetPrefix(row) }}
-                  </p>
-                  <p v-if="row.error" class="text-[10px] text-destructive">{{ row.error }}</p>
-                </li>
-              </ul>
-              <p class="border-t border-border px-3 py-1.5 text-[10px] text-muted-foreground">
-                Each import becomes a sync relationship; created ones appear under the bucket's sync status.
-              </p>
-            </section>
-          </TabsContent>
-        </Tabs>
-
-        <!-- Basket -->
-        <section class="overflow-hidden rounded-md border border-border">
-          <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-3 py-2">
-            <div class="flex items-center gap-2">
-              <FolderInput class="h-4 w-4 text-primary" />
-              <h3 class="text-sm font-semibold text-foreground">Basket</h3>
-              <Badge variant="outline">{{ basket.summary.value.total }}</Badge>
-            </div>
-            <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              <span v-if="basket.summary.value.ready">{{ basket.summary.value.ready }} ready</span>
-              <span v-if="basket.summary.value.blocked" class="text-amber-700 dark:text-amber-400">{{ basket.summary.value.blocked }} blocked</span>
-              <span v-if="basket.summary.value.submitting" class="text-primary">{{ basket.summary.value.submitting }} running</span>
-              <span v-if="basket.summary.value.done" class="text-emerald-700 dark:text-emerald-400">{{ basket.summary.value.done }} done</span>
-              <span v-if="basket.summary.value.error" class="text-destructive">{{ basket.summary.value.error }} failed</span>
-              <Button v-if="basket.summary.value.done" variant="ghost" size="sm" @click="basket.clearDone">Clear done</Button>
-            </div>
-          </header>
-          <div v-if="!basket.rows.value.length" class="px-4 py-8 text-center text-xs text-muted-foreground">
-            The basket is empty. Add files or connector sources from the tabs above.
-          </div>
-          <table v-else class="w-full text-sm">
-            <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th class="px-3 py-1.5 text-left font-semibold">Source</th>
-                <th class="px-3 py-1.5 text-left font-semibold">Target key</th>
-                <th class="px-3 py-1.5 text-left font-semibold">State</th>
-                <th class="px-3 py-1.5"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in basket.rows.value" :key="row.id" class="border-t border-border align-top">
-                <td class="px-3 py-2">
-                  <div class="flex items-center gap-2">
-                    <Badge variant="secondary" class="text-[10px] uppercase">{{ kindLabel[row.sourceKind] }}</Badge>
-                    <Badge v-if="row.isPrefix" variant="outline" class="text-[10px] uppercase">folder</Badge>
-                    <span class="min-w-0 truncate font-mono text-xs" :title="row.source">{{ row.source }}</span>
-                  </div>
-                  <Select
-                    v-if="row.strategy && rowEditable(row)"
-                    :model-value="row.strategy"
-                    :options="STRATEGY_OPTIONS"
-                    class="mt-1 h-7 w-56 text-[10px]"
-                    :aria-label="`Staging strategy for ${row.source}`"
-                    @update:model-value="(value: string) => (row.strategy = value as 'snapshot' | 'reference')"
+                <Select
+                  v-if="row.strategy && rowEditable(row)"
+                  :model-value="row.strategy"
+                  :options="STRATEGY_OPTIONS"
+                  class="mt-1 h-7 w-56 text-[10px]"
+                  :aria-label="`Staging strategy for ${row.source}`"
+                  @update:model-value="(value: string) => (row.strategy = value as 'snapshot' | 'reference')"
+                />
+                <span v-else-if="row.strategy" class="text-[10px] text-muted-foreground">{{ row.strategy }}</span>
+                <span v-else-if="row.size !== null" class="text-[10px] text-muted-foreground">{{ formatBytes(row.size) }}</span>
+              </td>
+              <td class="px-3 py-2">
+                <Input
+                  :model-value="row.targetKey"
+                  :disabled="!rowEditable(row)"
+                  class="h-8 font-mono text-xs"
+                  @update:model-value="(v: string | number) => basket.editKey(row.id, String(v))"
+                />
+                <p v-if="rowOverwrites(row)" class="mt-1 flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
+                  <AlertTriangle class="h-3 w-3 shrink-0" /> Overwrites existing object
+                </p>
+              </td>
+              <td class="px-3 py-2">
+                <div class="flex items-center gap-2">
+                  <Spinner v-if="row.state === 'submitting'" label="Submitting" class="text-primary" />
+                  <Badge :variant="rowVariant(row.state)" size="sm" class="uppercase">{{ row.state }}</Badge>
+                  <Progress
+                    v-if="row.state === 'submitting'"
+                    :value="row.progress"
+                    :indeterminate="row.sourceKind !== 'upload' && row.progressTotal == null"
+                    :warn="101"
+                    :critical="101"
+                    class="h-1.5 w-16"
                   />
-                  <span v-else-if="row.strategy" class="text-[10px] text-muted-foreground">{{ row.strategy }}</span>
-                  <span v-else-if="row.size !== null" class="text-[10px] text-muted-foreground">{{ formatBytes(row.size) }}</span>
-                </td>
-                <td class="px-3 py-2">
-                  <Input
-                    :model-value="row.targetKey"
-                    :disabled="!rowEditable(row)"
-                    class="h-8 font-mono text-xs"
-                    @update:model-value="(v: string | number) => basket.editKey(row.id, String(v))"
-                  />
-                  <p v-if="rowOverwrites(row)" class="mt-1 flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
-                    <AlertTriangle class="h-3 w-3 shrink-0" /> Overwrites existing object
-                  </p>
-                </td>
-                <td class="px-3 py-2">
-                  <div class="flex items-center gap-2">
-                    <Loader2 v-if="row.state === 'submitting'" class="h-3 w-3 shrink-0 animate-spin text-primary" />
-                    <Badge :variant="stateVariant(row.state)" class="text-[10px] uppercase">{{ row.state }}</Badge>
-                    <Progress
-                      v-if="row.state === 'submitting'"
-                      :value="row.progress"
-                      :indeterminate="row.sourceKind !== 'upload' && row.progressTotal == null"
-                      :warn="101"
-                      :critical="101"
-                      class="h-1.5 w-16"
-                    />
-                  </div>
-                  <p v-if="row.state === 'submitting' && row.phase" class="mt-1 text-[10px] text-muted-foreground">
-                    {{ row.phase }}
-                    <template v-if="row.progressTotal != null">
-                      · {{ row.progressUnit === 'bytes' ? formatBytes(row.progressCurrent ?? 0) : row.progressCurrent }}
-                      / {{ row.progressUnit === 'bytes' ? formatBytes(row.progressTotal) : row.progressTotal }}
-                    </template>
-                    <span v-if="row.currentPath" class="block truncate font-mono" :title="row.currentPath">{{ row.currentPath }}</span>
-                  </p>
-                  <p v-if="row.blockedReason && row.state === 'blocked'" class="mt-1 text-[10px] text-amber-700 dark:text-amber-400">{{ row.blockedReason }}</p>
-                  <p v-if="row.error" class="mt-1 text-[10px] text-destructive">{{ row.error }}</p>
-                </td>
-                <td class="px-3 py-2">
-                  <div class="flex items-center justify-end gap-1">
-                    <Button
-                      v-if="row.state === 'error' || row.state === 'blocked'"
-                      variant="ghost"
-                      size="sm"
-                      class="h-6 px-2"
-                      @click="basket.retryRow(row.id)"
-                    >Retry</Button>
-                    <Button variant="ghost" size="icon-sm" aria-label="Remove" @click="basket.removeRow(row.id)"><X class="size-3.5" /></Button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
+                </div>
+                <p v-if="row.state === 'submitting' && row.phase" class="mt-1 text-[10px] text-muted-foreground">
+                  {{ row.phase }}
+                  <template v-if="row.progressTotal != null">
+                    · {{ row.progressUnit === 'bytes' ? formatBytes(row.progressCurrent ?? 0) : row.progressCurrent }}
+                    / {{ row.progressUnit === 'bytes' ? formatBytes(row.progressTotal) : row.progressTotal }}
+                  </template>
+                  <span v-if="row.currentPath" class="block truncate font-mono" :title="row.currentPath">{{ row.currentPath }}</span>
+                </p>
+                <p v-if="row.blockedReason && row.state === 'blocked'" class="mt-1 text-[10px] text-amber-700 dark:text-amber-400">{{ row.blockedReason }}</p>
+                <p v-if="row.error" class="mt-1 text-[10px] text-destructive">{{ row.error }}</p>
+              </td>
+              <td class="px-3 py-2">
+                <div class="flex items-center justify-end gap-1">
+                  <Button
+                    v-if="row.state === 'error' || row.state === 'blocked'"
+                    variant="ghost"
+                    size="sm"
+                    class="h-6 px-2"
+                    @click="basket.retryRow(row.id)"
+                  >Retry</Button>
+                  <Button variant="ghost" size="icon-sm" aria-label="Remove" @click="basket.removeRow(row.id)"><X class="size-3.5" /></Button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
 
-        <!-- Advisory quota precheck (same rules as the old toolbar upload). -->
-        <div v-if="precheck" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
-          <p
-            v-if="precheck.projected.state === 'over-ceiling'"
-            class="text-destructive"
-          >
-            These uploads add <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
-            <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>, past the hard cap of
-            <strong>{{ formatBytes(precheck.projected.ceilingBytes ?? 0) }}</strong>; the node rejects writes above it with <code>QuotaExceeded</code>.
-          </p>
-          <p v-else class="text-amber-800 dark:text-amber-300">
-            These uploads add <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
-            <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>, past the quota of
-            <strong>{{ formatBytes(precheck.projected.quotaBytes ?? 0) }}</strong> into the grace headroom.
-          </p>
-          <p class="mt-1 text-muted-foreground">Counters on remote nodes can lag, so these numbers are approximate. The check is advisory; you can still submit.</p>
-          <div class="mt-2 flex items-center gap-2">
-            <Button size="sm" @click="confirmPrecheckSubmit">Submit anyway</Button>
-            <Button variant="ghost" size="sm" @click="precheck = null">Cancel</Button>
-          </div>
-        </div>
-      </div>
-
-      <DialogFooter class="sm:justify-between">
-        <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
-        <Button
-          :disabled="!basket.canSubmit.value || writesDisabled"
-          :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
-          @click="submitAll"
+      <!-- Advisory quota precheck (same rules as the old toolbar upload). -->
+      <Notice v-if="precheck" tone="warning">
+        <p
+          v-if="precheck.projected.state === 'over-ceiling'"
+          class="text-destructive"
         >
-          <RefreshCw v-if="basket.busy.value" class="h-4 w-4 animate-spin" /><CloudDownload v-else class="h-4 w-4" />
-          Submit {{ basket.summary.value.ready || '' }}
-        </Button>
-      </DialogFooter>
+          These uploads add <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
+          <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>, past the hard cap of
+          <strong>{{ formatBytes(precheck.projected.ceilingBytes ?? 0) }}</strong>; the node rejects writes above it with <code>QuotaExceeded</code>.
+        </p>
+        <p v-else>
+          These uploads add <strong>{{ formatBytes(precheck.totalBytes) }}</strong> to a group already using
+          <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>, past the quota of
+          <strong>{{ formatBytes(precheck.projected.quotaBytes ?? 0) }}</strong> into the grace headroom.
+        </p>
+        <p class="mt-1 text-muted-foreground">Counters on remote nodes can lag, so these numbers are approximate. The check is advisory; you can still submit.</p>
+        <div class="mt-2 flex items-center gap-2">
+          <Button size="sm" @click="confirmPrecheckSubmit">Submit anyway</Button>
+          <Button variant="ghost" size="sm" @click="precheck = null">Cancel</Button>
+        </div>
+      </Notice>
+    </div>
 
-      <ConnectorDialog v-model:open="registerOpen" :group-id="groupSel" @saved="onConnectorSaved" />
-    </DialogContent>
-  </Dialog>
+    <DialogFooter class="mt-4 sm:justify-between">
+      <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
+      <Button
+        :disabled="!basket.canSubmit.value || writesDisabled"
+        :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+        @click="submitAll"
+      >
+        <Spinner v-if="basket.busy.value" label="Submitting" class="text-current" /><CloudDownload v-else class="h-4 w-4" />
+        Submit {{ basket.summary.value.ready || '' }}
+      </Button>
+    </DialogFooter>
+
+    <ConnectorDialog v-model:open="registerOpen" :group-id="groupSel" @saved="onConnectorSaved" />
+  </DetailDialog>
 </template>

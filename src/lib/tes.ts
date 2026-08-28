@@ -1,4 +1,5 @@
 import type { BadgeVariant } from '@/components/nodes/node-display'
+import { stateVariant } from './stateBadge'
 import type { PlacementLike } from '@/lib/jobs'
 import type { WorkspaceChoice } from '@/lib/workspaces'
 
@@ -257,20 +258,28 @@ export function isActiveTesState(state: TesState | undefined): boolean {
   return state === undefined ? true : TES_ACTIVE_STATES.has(state)
 }
 
-// One place fixes the TES state machine colours (Badge variants).
-export const TES_STATE_META: Record<TesState, { label: string; variant: BadgeVariant }> = {
-  UNKNOWN: { label: 'Unknown', variant: 'outline' },
-  QUEUED: { label: 'Queued', variant: 'secondary' },
-  INITIALIZING: { label: 'Initializing', variant: 'sky' },
-  RUNNING: { label: 'Running', variant: 'accent' },
-  PAUSED: { label: 'Paused', variant: 'warn' },
-  COMPLETE: { label: 'Complete', variant: 'success' },
-  EXECUTOR_ERROR: { label: 'Executor error', variant: 'destructive' },
-  SYSTEM_ERROR: { label: 'System error', variant: 'destructive' },
-  CANCELING: { label: 'Canceling', variant: 'warn' },
-  CANCELED: { label: 'Canceled', variant: 'outline' },
-  PREEMPTED: { label: 'Preempted', variant: 'warn' },
+const TES_STATE_LABEL: Record<TesState, string> = {
+  UNKNOWN: 'Unknown',
+  QUEUED: 'Queued',
+  INITIALIZING: 'Initializing',
+  RUNNING: 'Running',
+  PAUSED: 'Paused',
+  COMPLETE: 'Complete',
+  EXECUTOR_ERROR: 'Executor error',
+  SYSTEM_ERROR: 'System error',
+  CANCELING: 'Cancelling',
+  CANCELED: 'Cancelled',
+  PREEMPTED: 'Preempted',
 }
+
+// Colours come from the shared state vocabulary, so a running task and a
+// running job read the same everywhere.
+export const TES_STATE_META = Object.fromEntries(
+  (Object.keys(TES_STATE_LABEL) as TesState[]).map((state) => [
+    state,
+    { label: TES_STATE_LABEL[state], variant: stateVariant(state) },
+  ]),
+) as Record<TesState, { label: string; variant: BadgeVariant }>
 
 // ── Data references ──────────────────────────────────────────────────────────
 // Same canonical id the profile publish flow emits (useProfilePublish.ts keeps

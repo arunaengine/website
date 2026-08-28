@@ -10,6 +10,7 @@ import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import RealmSwitcher from '@/components/layout/RealmSwitcher.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 import SearchOverlay from '@/components/dashboard/SearchOverlay.vue'
 import { ChevronDown, Plus, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
@@ -19,6 +20,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { statusTone } from '@/components/nodes/node-display'
 
 // 'desktop' is the Aruna Desktop chrome: no realm switcher and no dataset
 // shortcut, and the machine's own node takes the leading slot instead.
@@ -38,14 +40,10 @@ const desktop = computed(() => props.variant === 'desktop')
 const sessionBroken = computed(() => hasSession.value && !currentUser.value && Boolean(authError.value))
 const signingIn = computed(() => stage.value === 'redirecting')
 
-const NODE_DOT: Record<string, string> = {
-  running: 'bg-emerald-500',
-  starting: 'bg-sky-500 animate-pulse',
-  stopped: 'bg-muted-foreground/60',
-  error: 'bg-destructive',
-  unknown: 'bg-muted-foreground/40',
-}
-const nodeDot = computed(() => NODE_DOT[nodeState.value] ?? NODE_DOT.unknown)
+// A device that is still coming up is in progress, not merely unknown.
+const nodeTone = computed(() =>
+  nodeState.value === 'starting' ? ('progress' as const) : statusTone(nodeState.value),
+)
 
 onMounted(() => {
   if (desktop.value) watchNode()
@@ -76,7 +74,7 @@ async function handleSignOut() {
         class="flex h-9 min-w-0 shrink items-center gap-2 rounded-md border border-border/70 bg-card px-2.5 transition-colors hover:border-border hover:bg-muted"
         :title="`This device: ${nodeLabel}`"
       >
-        <span :class="['h-1.5 w-1.5 shrink-0 rounded-full', nodeDot]" aria-hidden="true" />
+        <StatusDot :tone="nodeTone" :label="nodeLabel" class="size-1.5" />
         <span class="text-[12px] font-medium leading-none text-foreground">{{ nodeLabel }}</span>
         <span class="hidden h-3 w-px shrink-0 bg-border sm:block" aria-hidden="true" />
         <span class="hidden max-w-32 truncate text-[12px] leading-none text-muted-foreground sm:block">{{

@@ -1,15 +1,7 @@
 import type { RealmNodeInfo } from '@/lib/api'
+import { stateVariant, toneVariant, type BadgeVariant, type StateTone } from '@/lib/stateBadge'
 
-export type BadgeVariant =
-  | 'default'
-  | 'secondary'
-  | 'outline'
-  | 'success'
-  | 'warn'
-  | 'destructive'
-  | 'accent'
-  | 'royal'
-  | 'sky'
+export type { BadgeVariant }
 
 export const kindVariant: Record<RealmNodeInfo['kind'], BadgeVariant> = {
   management: 'royal',
@@ -18,9 +10,10 @@ export const kindVariant: Record<RealmNodeInfo['kind'], BadgeVariant> = {
 }
 
 export function connectionVariant(node: RealmNodeInfo): BadgeVariant {
-  if (node.connection_status === 'connected' || node.connection_status === 'seen') return 'success'
-  // A device without recent contact is a missing signal, not a failure.
-  return node.connection_status === 'unknown' ? 'secondary' : 'warn'
+  // A node without recent contact is a missing signal, not a failure.
+  return node.connection_status === 'unknown'
+    ? toneVariant('idle')
+    : stateVariant(node.connection_status)
 }
 
 export function connectionLabel(node: RealmNodeInfo): string {
@@ -41,16 +34,20 @@ const degradedStatuses = new Set(['degraded', 'syncing', 'partial', 'known'])
 const idleStatuses = new Set(['disabled', 'off', 'stopped', 'inactive', 'not_configured'])
 const failedStatuses = new Set(['error', 'failed', 'unhealthy', 'down', 'offline', 'unavailable', 'unreachable'])
 
-export function statusVariant(status?: string | null): BadgeVariant {
+export function statusTone(status?: string | null): StateTone {
   const value = (status ?? '').toLowerCase()
-  if (healthyStatuses.has(value)) return 'success'
-  if (degradedStatuses.has(value)) return 'warn'
-  if (idleStatuses.has(value)) return 'secondary'
-  if (failedStatuses.has(value)) return 'destructive'
-  return 'outline'
+  if (healthyStatuses.has(value)) return 'done'
+  if (degradedStatuses.has(value)) return 'attention'
+  if (idleStatuses.has(value)) return 'idle'
+  if (failedStatuses.has(value)) return 'failed'
+  return 'count'
+}
+
+export function statusVariant(status?: string | null): BadgeVariant {
+  return toneVariant(statusTone(status))
 }
 
 export function isDegradedStatus(status?: string | null): boolean {
-  const variant = statusVariant(status)
-  return variant === 'warn' || variant === 'destructive'
+  const tone = statusTone(status)
+  return tone === 'attention' || tone === 'failed'
 }

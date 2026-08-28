@@ -2,6 +2,7 @@
 // wins by default, so the states that wait for a decision are named as such and
 // sort to the top; nothing here ever describes an automatic overwrite.
 import type { BadgeVariant } from '@/components/nodes/node-display'
+import { stateVariant, toneVariant, type StateTone } from './stateBadge'
 import {
   folderName,
   type DeviceTransfer,
@@ -28,15 +29,6 @@ export type SyncItem =
     }
   | { kind: 'document'; document: SyncDocument }
 
-const DOCUMENT_BADGE: Record<DocumentSyncState, BadgeVariant> = {
-  synced: 'success',
-  pending: 'sky',
-  publishing: 'sky',
-  invalid: 'warn',
-  failed: 'destructive',
-  local_only: 'outline',
-}
-
 const DOCUMENT_LABEL: Record<DocumentSyncState, string> = {
   synced: 'In sync',
   pending: 'Pending',
@@ -58,34 +50,34 @@ export function itemChip(item: SyncItem): ItemChip {
     const detail = documentDetail(item.document)
     return {
       label: DOCUMENT_LABEL[item.document.state],
-      variant: DOCUMENT_BADGE[item.document.state],
+      variant: stateVariant(item.document.state),
       ...(detail ? { detail } : {}),
     }
   }
 
   const { folder } = item
-  if (folder.state === 'paused') return { label: 'Paused', variant: 'secondary' }
+  if (folder.state === 'paused') return { label: 'Paused', variant: toneVariant('idle') }
 
   const folderTransfers = item.transfers?.filter((transfer) => transfer.folder_id === folder.folder_id) ?? []
   const failedTransfer = folderTransfers.find((transfer) => transfer.state === 'failed')
   const failedMessage = folderTransfers.find((transfer) => transfer.state === 'failed' && transfer.message)?.message
   const errorDetail = folder.last_error ?? item.actionError ?? failedMessage ?? undefined
   if (folder.state === 'error' || folder.counters.errors > 0 || errorDetail || failedTransfer) {
-    return { label: 'Error', variant: 'destructive', ...(errorDetail ? { detail: errorDetail } : {}) }
+    return { label: 'Error', variant: toneVariant('failed'), ...(errorDetail ? { detail: errorDetail } : {}) }
   }
 
   const needsYou = needsYouCount(folder.counters)
-  if (needsYou) return { label: `Needs you ${needsYou}`, variant: 'warn' }
+  if (needsYou) return { label: `Needs you ${needsYou}`, variant: toneVariant('attention') }
 
   const activeTransfers = folderTransfers.filter(
     (transfer) => transfer.state === 'queued' || transfer.state === 'running',
   ).length
   const syncing = folder.counters.uploading || activeTransfers
-  if (syncing) return { label: `Syncing ${syncing}`, variant: 'sky' }
+  if (syncing) return { label: `Syncing ${syncing}`, variant: toneVariant('progress') }
 
   return {
     label: 'In sync',
-    variant: 'success',
+    variant: toneVariant('done'),
     detail: folder.last_reconcile_ms === null ? 'Never checked' : undefined,
   }
 }
@@ -160,15 +152,15 @@ export function orderEntries(entries: FolderEntry[]): FolderEntry[] {
   })
 }
 
-const TONE_BADGE: Record<EntryTone, BadgeVariant> = {
-  settled: 'secondary',
-  moving: 'sky',
-  decide: 'warn',
-  error: 'destructive',
+const ENTRY_STATE_TONE: Record<EntryTone, StateTone> = {
+  settled: 'idle',
+  moving: 'progress',
+  decide: 'attention',
+  error: 'failed',
 }
 
 export function entryBadge(state: EntryState): BadgeVariant {
-  return TONE_BADGE[entryMeta(state).tone]
+  return toneVariant(ENTRY_STATE_TONE[entryMeta(state).tone])
 }
 
 /**
