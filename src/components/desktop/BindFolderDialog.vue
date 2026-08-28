@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -18,6 +19,7 @@ import GroupSelect from '@/components/groups/GroupSelect.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useS3 } from '@/composables/useS3'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
@@ -32,6 +34,7 @@ const emit = defineEmits<{
 
 const { myGroups } = useAruna()
 const realmNodes = useRealmNodes()
+const s3 = useS3()
 const { bind, busy } = useSyncedFolders()
 
 const root = ref('')
@@ -43,6 +46,8 @@ const mode = ref<FolderMode>('two_way')
 const propagateDeletes = ref(true)
 const error = ref<string | null>(null)
 const pickError = ref<string | null>(null)
+const submitting = ref(false)
+const selectedBucket = ref<BucketSearchHit | null>(null)
 
 // Only realm nodes hold the other half of a folder; other devices never do.
 const nodeChoices = computed(() =>
@@ -80,7 +85,9 @@ watch(
     propagateDeletes.value = true
     error.value = null
     pickError.value = null
+    selectedBucket.value = null
   },
+  { immediate: true },
 )
 
 async function chooseFolder(): Promise<void> {
@@ -95,9 +102,15 @@ async function chooseFolder(): Promise<void> {
 }
 
 function pickSuggestion(hit: BucketSearchHit): void {
+  selectedBucket.value = hit
   bucket.value = hit.bucket
   if (hit.node_id) nodeId.value = hit.node_id
 }
+
+watch([bucket, nodeId], ([name, selectedNode]) => {
+  const hit = selectedBucket.value
+  if (hit && (hit.bucket !== name.trim() || hit.node_id !== selectedNode)) selectedBucket.value = null
+})
 
 const bucketInvalid = computed(() => {
   const name = bucket.value.trim()
@@ -111,17 +124,29 @@ const canSubmit = computed(
   () =>
     Boolean(root.value.trim() && groupId.value && nodeId.value && bucket.value.trim()) &&
     !bucketInvalid.value &&
-    !busy.value,
+    !busy.value &&
+    !submitting.value,
 )
 
 async function submit(): Promise<void> {
   if (!canSubmit.value) return
   error.value = null
+  submitting.value = true
+  const name = bucket.value.trim()
   try {
+    if (!selectedBucket.value) {
+      try {
+        await s3.activateContext(nodeId.value, groupId.value)
+        await s3.createBucket(name)
+      } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err)
+        return
+      }
+    }
     const folder = await bind({
       root: root.value.trim(),
       group_id: groupId.value,
-      remote: { node_id: nodeId.value, bucket: bucket.value.trim(), prefix: prefix.value.trim() },
+      remote: { node_id: nodeId.value, bucket: name, prefix: prefix.value.trim() },
       mode: mode.value,
       propagate_deletes: propagateDeletes.value,
     })
@@ -129,6 +154,8 @@ async function submit(): Promise<void> {
     emit('update:open', false)
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    submitting.value = false
   }
 }
 </script>
@@ -137,7 +164,7 @@ async function submit(): Promise<void> {
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
     <DialogContent class="max-w-xl">
       <DialogHeader>
-        <DialogTitle>Bind a folder</DialogTitle>
+        <DialogTitle>Sync a folder</DialogTitle>
         <DialogDescription>
           Pick a folder on this computer and the bucket it belongs to. The folder keeps living where it is.
         </DialogDescription>
@@ -229,18 +256,13 @@ async function submit(): Promise<void> {
           {{ modeHint }}
         </p>
 
-        <p
-          v-if="error"
-          class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-        >
-          {{ error }}
-        </p>
+        <RefusalNote v-if="error" :message="error" />
       </div>
 
       <DialogFooter>
         <DialogClose as-child><Button variant="ghost">Cancel</Button></DialogClose>
         <Button :disabled="!canSubmit" @click="submit">
-          <Loader2 v-if="busy" class="h-4 w-4 animate-spin" /> Bind folder
+          <Loader2 v-if="busy || submitting" class="h-4 w-4 animate-spin" /> Sync a folder
         </Button>
       </DialogFooter>
     </DialogContent>
