@@ -84,6 +84,19 @@ export function isHttpUrl(value: unknown): value is string {
   }
 }
 
+// The one way the portal turns a thrown value into a sentence. Fetch and the
+// SDKs reject with plain objects as often as with Errors.
+export function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'string') return err
+  if (err && typeof err === 'object') {
+    const record = err as Record<string, unknown>
+    if (typeof record.error === 'string') return record.error
+    if (typeof record.message === 'string') return record.message
+  }
+  return String(err)
+}
+
 export function copyToClipboard(text: string): Promise<void> {
   if (typeof navigator !== 'undefined' && navigator.clipboard) {
     return navigator.clipboard.writeText(text)

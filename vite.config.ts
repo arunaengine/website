@@ -58,6 +58,9 @@ export default defineConfig({
     // libraries, so no DOM shim is needed and startup stays fast.
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Unbounded workers starve the SFC transforms and the slower suites time
+    // out at 5s; four keeps the whole run well inside it.
+    maxWorkers: 4,
   },
   server: {
     host: process.env.ARUNA_DEV_HOST || '127.0.0.1',

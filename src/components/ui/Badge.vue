@@ -26,15 +26,22 @@ const badgeVariants = cva(
           'border-transparent bg-aruna-royal/10 text-aruna-royal ring-1 ring-inset ring-aruna-royal/25 dark:bg-aruna-royal/20 dark:text-aruna-aqua dark:ring-aruna-royal/35',
         sky: 'border-transparent bg-aruna-sky/10 text-sky-700 ring-1 ring-inset ring-aruna-sky/25 dark:bg-aruna-sky/15 dark:text-aruna-aqua dark:ring-aruna-sky/25',
       },
+      size: {
+        md: '',
+        sm: 'text-[10px] px-1.5 py-0 leading-4',
+      },
     },
-    defaultVariants: { variant: 'default' },
+    defaultVariants: { variant: 'default', size: 'md' },
   },
 )
 
 type Variant = VariantProps<typeof badgeVariants>['variant']
+type Size = VariantProps<typeof badgeVariants>['size']
 
-const props = defineProps<{ variant?: Variant; class?: string }>()
-const classes = computed(() => cn(badgeVariants({ variant: props.variant }), props.class))
+const props = defineProps<{ variant?: Variant; size?: Size; class?: string }>()
+const classes = computed(() =>
+  cn(badgeVariants({ variant: props.variant, size: props.size }), props.class),
+)
 </script>
 
 <template>
