@@ -1,16 +1,14 @@
 <script setup lang="ts">
-// Runs this machine executed itself. Both the list and the detail drawer talk
+// Runs this computer executed itself. Both the list and the detail drawer talk
 // to the node's own API, so the job client is provided down this subtree.
 import { computed, onMounted, provide, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
-import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import ListShell from '@/components/ui/ListShell.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
 import NewRunMenu from '@/components/compute/NewRunMenu.vue'
@@ -55,6 +53,13 @@ function reload(): void {
 const { busy: reloadBusy, refresh: onReload } = useRefresh(reload)
 const spinning = computed(() => reloadBusy.value || refreshing.value)
 
+// The states the shared list shell models; the rest are answered above it.
+const shellState = computed<'loading' | 'error' | 'empty' | 'ready'>(() => {
+  if (listState.value === 'error') return 'error'
+  if (listState.value === 'idle' || listState.value === 'loading') return 'loading'
+  return jobs.value.length ? 'ready' : 'empty'
+})
+
 onMounted(() => {
   void ensureLoaded()
   reload()
@@ -65,45 +70,39 @@ watch(reachable, (now) => now && reload())
 <template>
   <div class="space-y-4">
     <p class="text-xs text-muted-foreground">
-      Jobs this computer ran itself, against data it already holds. They never leave the machine, and the realm is not
-      told about them.
+      Runs this computer executed itself, against data it already holds. They never leave this computer, and the realm
+      is not told about them.
     </p>
 
     <DeviceSurfaceState v-if="!reachable" state="offline" subject="its runs" />
 
     <template v-else>
       <Notice v-if="compute && !compute.enabled" tone="warning">
-        Running jobs on this computer is switched off. Turn it on under This device to use it.
+        Running work on this computer is switched off. Turn it on under This device to use it.
       </Notice>
 
-      <div v-if="listState === 'idle' || listState === 'loading'" class="space-y-2">
-        <Skeleton v-for="n in 3" :key="n" class="h-12" />
-      </div>
+      <Notice v-if="listState === 'unsupported'" tone="warning">
+        This node version does not list runs yet, so the runs on this computer cannot be shown.
+      </Notice>
 
-      <ErrorPanel
-        v-else-if="listState === 'error'"
-        :message="listError || 'The local runs could not be listed.'"
+      <ListShell
+        v-else
+        :state="shellState"
+        :error="listError || 'The runs on this computer could not be listed.'"
+        :rows="3"
+        empty-title="Nothing has run here yet"
+        empty-description="Start a run and pick This computer as the place to run it."
         @retry="reload"
-      />
-
-      <Notice v-else-if="listState === 'unsupported'" tone="warning">
-        This node version does not serve a job list yet, so local runs cannot be shown.
-      </Notice>
-
-      <EmptyState
-        v-else-if="!jobs.length"
-        title="Nothing has run here yet"
-        description="Submit a task and pick This computer as the place to run it."
       >
         <template #icon><Cpu class="h-6 w-6" /></template>
-        <NewRunMenu size="sm" />
-      </EmptyState>
-
-      <div v-else class="surface overflow-hidden">
-        <div class="flex items-center justify-between border-b border-border bg-muted/20 px-3 py-2">
+        <template #empty-actions><NewRunMenu size="sm" /></template>
+        <template #filters>
           <span class="text-[11px] text-muted-foreground">{{ jobs.length }} on this computer</span>
-          <RefreshButton :busy="spinning" sr-label="Refresh local runs" @click="onReload" />
-        </div>
+        </template>
+        <template #tools>
+          <RefreshButton :busy="spinning" sr-label="Refresh the runs on this computer" @click="onReload" />
+        </template>
+
         <ul class="divide-y divide-border">
           <li v-for="job in jobs" :key="job.job_id">
             <button
@@ -134,10 +133,11 @@ watch(reachable, (now) => now && reload())
             </button>
           </li>
         </ul>
-        <div v-if="nextCursor" class="border-t border-border px-4 py-2 text-center">
+
+        <template v-if="nextCursor" #footer>
           <Button variant="ghost" size="sm" @click="list.loadMore()">Load more</Button>
-        </div>
-      </div>
+        </template>
+      </ListShell>
     </template>
 
     <JobDetailPanel

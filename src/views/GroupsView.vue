@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
+import ListShell from '@/components/ui/ListShell.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import GroupDetail from '@/components/groups/GroupDetail.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
@@ -17,7 +18,6 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Inbox, Plus, Users } from '@lucide/vue'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import type { JoinRequest } from '@/lib/api'
-import EmptyState from '@/components/ui/EmptyState.vue'
 
 const { currentUser, myGroups, discoverableGroups, loading, refresh } = useAruna()
 const { authPending } = useAuth()
@@ -102,11 +102,16 @@ const description = computed(() =>
     : 'Groups in this realm. Sign in from the top bar to create and manage groups.',
 )
 
-const emptyGroupsMessage = computed(() => {
-  if (loading.value || authPending.value) return 'Loading groups…'
-  return currentUser.value
+const emptyGroupsMessage = computed(() =>
+  currentUser.value
     ? 'You are not a member of any group yet, create one to get started.'
-    : 'Sign in to see the groups you belong to.'
+    : 'Sign in to see the groups you belong to.',
+)
+
+// The shell owns the wait: the message below it only names an empty result.
+const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
+  if (myGroups.value.length) return 'ready'
+  return loading.value || authPending.value ? 'loading' : 'empty'
 })
 </script>
 
@@ -122,14 +127,19 @@ const emptyGroupsMessage = computed(() => {
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <section class="surface overflow-hidden">
-        <header class="flex items-center justify-between border-b border-border px-5 py-4">
-          <div class="flex items-center gap-2">
-            <Users class="h-4 w-4 text-primary" />
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Your groups</h2>
-            <Badge variant="outline" class="tabular-nums">{{ myGroups.length }}</Badge>
-          </div>
-        </header>
+      <ListShell :state="shellState" :rows="3" :empty-title="emptyGroupsMessage">
+        <template #icon><Users class="h-6 w-6" /></template>
+        <template #empty-actions>
+          <Button v-if="currentUser" variant="outline" size="sm" @click="createGroupOpen = true">
+            <Plus class="h-3.5 w-3.5" /> Create group
+          </Button>
+        </template>
+        <template #filters>
+          <Users class="h-4 w-4 text-primary" />
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Your groups</h2>
+          <Badge variant="outline" class="tabular-nums">{{ myGroups.length }}</Badge>
+        </template>
+
         <ul class="divide-y divide-border">
           <li v-for="group in myGroups" :key="group.id">
             <button
@@ -154,15 +164,8 @@ const emptyGroupsMessage = computed(() => {
               <GroupDetail :group-id="group.id" @left="router.push({ name: 'groups' })" />
             </div>
           </li>
-          <li v-if="!myGroups.length" class="p-3">
-            <EmptyState compact :title="emptyGroupsMessage">
-              <Button v-if="currentUser && !loading" variant="outline" size="sm" @click="createGroupOpen = true">
-                <Plus class="h-3.5 w-3.5" /> Create group
-              </Button>
-            </EmptyState>
-          </li>
         </ul>
-      </section>
+      </ListShell>
 
       <section
         v-if="joinRequestsEnabled && currentUser && (ownRequests.length || ownRequestsError)"

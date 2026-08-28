@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
-import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import ListShell from '@/components/ui/ListShell.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Progress from '@/components/ui/Progress.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
@@ -30,8 +29,8 @@ import { ChevronRight, ListTodo } from '@lucide/vue'
 const router = useRouter()
 const route = useRoute()
 
-// Deep-linkable job drawer driven by the :jobId route param (the back button
-// closes it, the task drawer's taskId precedent).
+// Deep-linkable detail drawer driven by the :jobId route param, so the back
+// button closes it.
 const openJobId = computed(() =>
   route.name === 'job' && route.params.jobId ? String(route.params.jobId) : '',
 )
@@ -97,22 +96,12 @@ function reload() {
 const { busy: reloadBusy, refresh: onReload } = useRefresh(reload)
 const spinning = computed(() => reloadBusy.value || refreshing.value)
 
-// Infinite-scroll sentinel over the job list cursor.
-const sentinel = ref<HTMLElement | null>(null)
-let observer: IntersectionObserver | null = null
-if (typeof IntersectionObserver !== 'undefined') {
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) void list.loadMore()
-    },
-    { rootMargin: '200px' },
-  )
-  watch(sentinel, (el, previous) => {
-    if (previous) observer?.unobserve(previous)
-    if (el) observer?.observe(el)
-  })
-}
-onUnmounted(() => observer?.disconnect())
+// The states the shared list shell models; the rest are answered above it.
+const shellState = computed<'loading' | 'error' | 'empty' | 'ready'>(() => {
+  if (listState.value === 'error') return 'error'
+  if (listState.value === 'idle' || listState.value === 'loading') return 'loading'
+  return jobs.value.length ? 'ready' : 'empty'
+})
 
 onMounted(() => void list.load())
 </script>
@@ -120,124 +109,112 @@ onMounted(() => void list.load())
 <template>
   <div class="space-y-4">
     <p class="text-xs text-muted-foreground">
-      System jobs are durable background jobs <span class="font-medium text-foreground">the node runs for your account</span>, staging, provenance and maintenance. They cannot be submitted here, only monitored and cancelled.
+      System jobs are the background work <span class="font-medium text-foreground">a node runs for your account</span>, staging, provenance and maintenance. You cannot start one here, only follow it or cancel it.
     </p>
 
-    <!-- 'idle' is the gap before the first load lands, 'loading' also covers a
-         session that has not resolved yet. -->
-    <div v-if="listState === 'idle' || listState === 'loading'" class="surface divide-y divide-border overflow-hidden">
-      <div v-for="n in 5" :key="n" class="px-5 py-3"><Skeleton class="h-6 w-full" /></div>
-    </div>
-
-    <ErrorPanel v-else-if="listState === 'error'" :message="listError || 'Failed to load jobs.'" @retry="reload" />
-
-    <Notice v-else-if="listState === 'unsupported'" tone="warning">
-      This backend does not serve the durable jobs API yet. Jobs cannot be listed.
+    <Notice v-if="listState === 'unsupported'" tone="warning">
+      This node does not serve system jobs yet, so none can be listed.
     </Notice>
 
     <EmptyState
       v-else-if="listState === 'forbidden'"
       compact
-      title="This token cannot list jobs, path-restricted tokens have no access to the job surface."
+      title="This token cannot list system jobs, path-restricted tokens have no access to them."
     />
 
     <EmptyState
       v-else-if="listState === 'signed-out'"
       compact
-      title="Sign in to see the background jobs this node runs for your account."
+      title="Sign in to see the system jobs a node runs for your account."
     />
 
-    <EmptyState
-      v-else-if="listState === 'ready' && !jobs.length"
-      title="No jobs yet"
-      description="Background jobs the system runs for your account appear here."
+    <ListShell
+      v-else
+      :state="shellState"
+      :error="listError || 'The system jobs could not be listed.'"
+      empty-title="No system jobs yet"
+      empty-description="Background work a node runs for your account appears here."
+      @retry="reload"
     >
       <template #icon><ListTodo class="h-7 w-7" /></template>
-    </EmptyState>
+      <template #filters>
+        <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter system jobs by state" />
+      </template>
+      <template #tools>
+        <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
+        <RefreshButton :busy="spinning" sr-label="Refresh system jobs" @click="onReload" />
+      </template>
 
-    <template v-else-if="jobs.length">
-      <div class="surface overflow-hidden">
-        <!-- List toolbar -->
-        <div class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-3 py-2">
-          <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter jobs by state" />
-          <div class="ml-auto flex items-center gap-2">
-            <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
-            <RefreshButton :busy="spinning" sr-label="Refresh jobs" @click="onReload" />
-          </div>
+      <EmptyState
+        v-if="!visibleJobs.length"
+        compact
+        class="rounded-none border-0 shadow-none"
+        :title="`No ${emptyGroupLabel}system jobs in the loaded list.`"
+      />
+
+      <table v-else class="w-full text-sm">
+        <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <tr>
+            <th class="px-5 py-2 text-left font-semibold">Kind</th>
+            <th class="px-5 py-2 text-left font-semibold">State</th>
+            <th class="px-5 py-2 text-left font-semibold">Progress</th>
+            <th class="hidden px-5 py-2 text-left font-semibold sm:table-cell">Attempts</th>
+            <th class="px-5 py-2 text-left font-semibold">Created</th>
+            <th class="hidden px-5 py-2 text-left font-semibold md:table-cell">Updated</th>
+            <th class="px-5 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="job in visibleJobs" :key="job.job_id" class="border-t border-border hover:bg-muted/40">
+            <td class="px-5 py-2.5">
+              <button
+                type="button"
+                class="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                :aria-label="`Open ${jobKindLabel(job.kind)} ${job.job_id}`"
+                @click="openJob(job)"
+              >
+                <span class="font-medium text-foreground">{{ jobKindLabel(job.kind) }}</span>
+                <span class="block font-mono text-[11px] text-muted-foreground" :title="job.job_id">{{ truncateMiddle(job.job_id) }}</span>
+              </button>
+            </td>
+            <td class="px-5 py-2.5">
+              <div class="flex items-center gap-1.5">
+                <JobStateBadge :state="job.state" />
+                <Badge v-if="job.cancel_requested && !job.finished_at" variant="warn" size="sm">cancelling</Badge>
+              </div>
+            </td>
+            <td class="px-5 py-2.5">
+              <div class="min-w-[8rem] max-w-[14rem] space-y-1">
+                <Progress
+                  v-if="jobProgressPercent(job.progress) !== null"
+                  :value="jobProgressPercent(job.progress)!"
+                  :label="`Progress: ${formatJobProgress(job.progress)}`"
+                  class="h-1.5"
+                />
+                <span class="block text-[11px] text-muted-foreground">{{ formatJobProgress(job.progress) }}</span>
+              </div>
+            </td>
+            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground sm:table-cell">{{ job.attempts }}</td>
+            <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="job.created_at">
+              {{ relativeTime(job.created_at) }}
+            </td>
+            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground md:table-cell" :title="job.updated_at">
+              {{ relativeTime(job.updated_at) }}
+            </td>
+            <td class="px-5 py-2.5 text-right">
+              <ChevronRight class="ml-auto h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <template v-if="nextCursor || moreError" #footer>
+        <div class="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" size="sm" :disabled="loadingMore" @click="list.loadMore()">Load more</Button>
+          <span v-if="moreError" class="text-xs text-destructive">{{ moreError }}</span>
         </div>
-
-        <EmptyState
-          v-if="!visibleJobs.length"
-          compact
-          class="rounded-none border-0 shadow-none"
-          :title="`No ${emptyGroupLabel}jobs in the loaded list.`"
-        />
-
-        <table v-else class="w-full text-sm">
-          <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th class="px-5 py-2 text-left font-semibold">Kind</th>
-              <th class="px-5 py-2 text-left font-semibold">State</th>
-              <th class="px-5 py-2 text-left font-semibold">Progress</th>
-              <th class="hidden px-5 py-2 text-left font-semibold sm:table-cell">Attempts</th>
-              <th class="px-5 py-2 text-left font-semibold">Created</th>
-              <th class="hidden px-5 py-2 text-left font-semibold md:table-cell">Updated</th>
-              <th class="px-5 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="job in visibleJobs"
-              :key="job.job_id"
-              class="cursor-pointer border-t border-border hover:bg-muted/40"
-              @click="openJob(job)"
-            >
-              <td class="px-5 py-2.5">
-                <button type="button" class="w-full text-left" @click.stop="openJob(job)">
-                  <span class="font-medium text-foreground">{{ jobKindLabel(job.kind) }}</span>
-                  <span class="block font-mono text-[11px] text-muted-foreground" :title="job.job_id">{{ truncateMiddle(job.job_id) }}</span>
-                </button>
-              </td>
-              <td class="px-5 py-2.5">
-                <div class="flex items-center gap-1.5">
-                  <JobStateBadge :state="job.state" />
-                  <Badge v-if="job.cancel_requested && !job.finished_at" variant="warn" size="sm">cancelling</Badge>
-                </div>
-              </td>
-              <td class="px-5 py-2.5">
-                <div class="min-w-[8rem] max-w-[14rem] space-y-1">
-                  <Progress
-                    v-if="jobProgressPercent(job.progress) !== null"
-                    :value="jobProgressPercent(job.progress)!"
-                    :label="`Job progress: ${formatJobProgress(job.progress)}`"
-                    class="h-1.5"
-                  />
-                  <span class="block text-[11px] text-muted-foreground">{{ formatJobProgress(job.progress) }}</span>
-                </div>
-              </td>
-              <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground sm:table-cell">{{ job.attempts }}</td>
-              <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="job.created_at">
-                {{ relativeTime(job.created_at) }}
-              </td>
-              <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground md:table-cell" :title="job.updated_at">
-                {{ relativeTime(job.updated_at) }}
-              </td>
-              <td class="px-5 py-2.5 text-right"><ChevronRight class="ml-auto h-4 w-4 text-muted-foreground" /></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div v-if="loadingMore" class="surface divide-y divide-border overflow-hidden">
-        <div v-for="n in 2" :key="n" class="px-5 py-3"><Skeleton class="h-6 w-full" /></div>
-      </div>
-      <div v-if="moreError" class="flex items-center gap-2 text-xs text-destructive">
-        {{ moreError }}
-        <Button variant="outline" size="sm" @click="list.loadMore()">Try again</Button>
-      </div>
-      <!-- IntersectionObserver sentinel. -->
-      <div v-if="nextCursor && !moreError" ref="sentinel" class="h-1" aria-hidden="true" />
-    </template>
+      </template>
+    </ListShell>
 
     <JobDetailPanel
       v-if="openJobId"

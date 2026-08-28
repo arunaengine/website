@@ -9,11 +9,11 @@ import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
+import ListShell from '@/components/ui/ListShell.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
@@ -108,9 +108,19 @@ const lastSync = computed(() =>
   status.value.lastSyncMs ? relativeTime(new Date(status.value.lastSyncMs).toISOString()) : 'never',
 )
 const canRun = computed(() => state.value === 'ready' && status.value.realmReachable && !running.value)
-const nothingSynced = computed(
-  () => state.value === 'ready' && listState.value === 'ready' && !items.value.length && !uploadItems.value.length,
-)
+
+// A device read that failed is answered by DeviceSurfaceState alone; while one
+// is still in flight the shell keeps the wait.
+const blocked = computed(() => {
+  const state = surface.value?.state
+  return state !== undefined && state !== 'idle' && state !== 'loading'
+})
+
+const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
+  if (items.value.length) return 'ready'
+  if (surface.value) return 'loading'
+  return spinning.value && !uploadItems.value.length ? 'loading' : 'empty'
+})
 
 function itemKey(item: SyncItem): string {
   return item.kind === 'folder' ? `folder:${item.folder.folder_id}` : `document:${item.document.documentId}`
@@ -186,66 +196,68 @@ async function findOfflineDataset(): Promise<void> {
         @retry="surface.retry()"
       />
 
-      <div v-if="spinning && !items.length && !uploadItems.length" class="space-y-3">
-        <Skeleton v-for="n in 2" :key="n" class="h-28" />
-      </div>
-
-      <EmptyState
-        v-else-if="nothingSynced"
-        title="Nothing syncs with this computer yet"
-        description="Sync a folder or keep a realm dataset offline."
+      <ListShell
+        v-if="!blocked"
+        :state="shellState"
+        :rows="2"
+        empty-title="Nothing syncs with this computer yet"
+        empty-description="Sync a folder or keep a realm dataset offline."
       >
         <template #icon><FileText class="h-6 w-6" /></template>
-        <div class="flex flex-wrap justify-center gap-2">
-          <Button size="sm" @click="showBind = true"><FolderSync class="h-4 w-4" /> Sync a folder…</Button>
-          <Button variant="outline" size="sm" @click="findOfflineDataset">
-            <Search class="h-4 w-4" /> Keep a dataset offline…
-          </Button>
-        </div>
-      </EmptyState>
-
-      <template v-else>
-        <section v-if="items.length" class="space-y-3">
-          <header class="flex flex-wrap items-center justify-between gap-3">
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Synced items</h2>
-            <FilterChips v-model="filter" :options="chips" aria-label="Filter synced items by state" />
-          </header>
-
-          <EmptyState v-if="!shown.length" compact title="No synced item is in this state." />
-          <ul v-else class="surface divide-y divide-border/70 overflow-hidden">
-            <SyncItemRow
-              v-for="item in shown"
-              :key="itemKey(item)"
-              :item="item"
-              :busy="busy"
-              @sync="item.kind === 'folder' && runFolder(item.folder)"
-              @pause="item.kind === 'folder' && toggleFolder(item.folder)"
-            />
-          </ul>
-        </section>
-
-        <section v-if="uploadItems.length" class="space-y-3">
-          <header class="flex flex-wrap items-center gap-2">
-            <Upload class="h-4 w-4 text-primary" />
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Uploads from this window</h2>
-            <Badge variant="outline" size="sm">{{ uploadItems.length }}</Badge>
-          </header>
-          <div class="surface space-y-2 px-5 py-3.5">
-            <div v-for="item in uploadItems.slice(0, 3)" :key="item.id" class="flex items-center gap-3 text-[11px]">
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-foreground">{{ item.name }}</p>
-                <p class="hash truncate">{{ item.bucket }}/{{ item.key }}</p>
-                <p v-if="item.error" class="text-destructive">{{ item.error }}</p>
-              </div>
-              <Progress :value="item.progress" :label="`${item.name}: ${item.progress}%`" class="h-1.5 w-28" />
-              <span class="text-muted-foreground">{{ formatBytes(item.size) }}</span>
-            </div>
-            <p v-if="uploadItems.length > 3" class="text-[11px] text-muted-foreground">
-              and {{ uploadItems.length - 3 }} more
-            </p>
+        <template #empty-actions>
+          <div class="flex flex-wrap justify-center gap-2">
+            <Button size="sm" @click="showBind = true"><FolderSync class="h-4 w-4" /> Sync a folder…</Button>
+            <Button variant="outline" size="sm" @click="findOfflineDataset">
+              <Search class="h-4 w-4" /> Keep a dataset offline…
+            </Button>
           </div>
-        </section>
-      </template>
+        </template>
+        <template #filters>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Synced items</h2>
+        </template>
+        <template #tools>
+          <FilterChips v-model="filter" :options="chips" aria-label="Filter synced items by state" />
+        </template>
+
+        <EmptyState
+          v-if="!shown.length"
+          compact
+          class="rounded-none border-0 shadow-none"
+          title="No synced item is in this state."
+        />
+        <ul v-else class="divide-y divide-border/70">
+          <SyncItemRow
+            v-for="item in shown"
+            :key="itemKey(item)"
+            :item="item"
+            :busy="busy"
+            @sync="item.kind === 'folder' && runFolder(item.folder)"
+            @pause="item.kind === 'folder' && toggleFolder(item.folder)"
+          />
+        </ul>
+      </ListShell>
+
+      <section v-if="uploadItems.length" class="space-y-3">
+        <header class="flex flex-wrap items-center gap-2">
+          <Upload class="h-4 w-4 text-primary" />
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Uploads from this window</h2>
+          <Badge variant="outline" size="sm">{{ uploadItems.length }}</Badge>
+        </header>
+        <div class="surface space-y-2 px-5 py-3.5">
+          <div v-for="item in uploadItems.slice(0, 3)" :key="item.id" class="flex items-center gap-3 text-[11px]">
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-foreground">{{ item.name }}</p>
+              <p class="hash truncate">{{ item.bucket }}/{{ item.key }}</p>
+              <p v-if="item.error" class="text-destructive">{{ item.error }}</p>
+            </div>
+            <Progress :value="item.progress" :label="`${item.name}: ${item.progress}%`" class="h-1.5 w-28" />
+            <span class="text-muted-foreground">{{ formatBytes(item.size) }}</span>
+          </div>
+          <p v-if="uploadItems.length > 3" class="text-[11px] text-muted-foreground">
+            and {{ uploadItems.length - 3 }} more
+          </p>
+        </div>
+      </section>
     </div>
 
     <BindFolderDialog v-model:open="showBind" @bound="loadFolders" />

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
+import ListShell from '@/components/ui/ListShell.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import TesPlacementTags from '@/components/compute/TesPlacementTags.vue'
@@ -29,7 +29,7 @@ import {
 } from '@/lib/tes'
 import { ArchiveRestore, ChevronRight, Trash2 } from '@lucide/vue'
 
-// Task list section of the unified Compute view. ComputeView gates the feature
+// Run list section of the unified Compute view. ComputeView gates the feature
 // flag and sign-in, but the panel tracks the session itself so a late or lost
 // login never strands the list in its pre-fetch state.
 const router = useRouter()
@@ -38,14 +38,11 @@ const { getTesServiceInfo, listTasks } = useTes()
 const { currentUser, myGroups } = useAruna()
 const { authPending } = useAuth()
 
-// Deep-linkable task drawer driven by the :taskId route param (the back button
+// Deep-linkable run drawer driven by the :taskId route param (the back button
 // closes it, DataManagerView's bucket-param precedent).
 const openTaskId = computed(() =>
   route.name === 'task' && route.params.taskId ? String(route.params.taskId) : '',
 )
-function openTask(task: TesTask) {
-  if (task.id) void router.push({ name: 'task', params: { taskId: task.id } })
-}
 function closeTask() {
   void router.push({ name: 'compute' })
 }
@@ -270,6 +267,34 @@ function reload() {
 const { busy: reloadBusy, refresh: onReload } = useRefresh(reload)
 const spinning = computed(() => reloadBusy.value || refreshing.value)
 
+// Hiding every run brings the run-mode chooser back; the Deleted view only
+// stands aside while it still has something to show.
+const listEmpty = computed(
+  () => !shownTasks.value.length && (stateGroup.value !== 'deleted' || !hiddenTasks.value.length),
+)
+const shellState = computed<'loading' | 'error' | 'empty' | 'ready'>(() => {
+  switch (listState.value) {
+    case 'idle':
+    case 'loading':
+      return 'loading'
+    case 'error':
+      return 'error'
+    case 'unsupported':
+    case 'signed-out':
+      return 'empty'
+    default:
+      return listEmpty.value ? 'empty' : 'ready'
+  }
+})
+const emptyTitle = computed(() => {
+  if (listState.value === 'unsupported') return 'Runs cannot be listed until this node accepts them.'
+  if (listState.value === 'signed-out') return 'Sign in to see the runs you started on this node.'
+  return 'No runs yet'
+})
+const emptyDescription = computed(() =>
+  listState.value === 'ready' ? 'Start your first run with a quick script or a custom run.' : undefined,
+)
+
 async function init() {
   const requestId = await loadServiceInfo()
   // A sign-out or another account took over while the service info was in
@@ -316,84 +341,67 @@ onUnmounted(() => {
 <template>
   <div class="space-y-4">
     <p class="text-xs text-muted-foreground">
-      Tasks are runs <span class="font-medium text-foreground">you submit</span> to this node, start one with Quick run or describe a full GA4GH TES task.
+      Runs are the work <span class="font-medium text-foreground">you start</span> on this node; begin with Quick run, or describe a custom run.
     </p>
 
-    <!-- Service banner: capability and version only; the realm identity
-         already sits in the page header badge. -->
+    <!-- Service banner: capability and storage only; the protocol version lives
+         in the tooltip and the realm identity in the page header badge. -->
     <p v-if="serviceState === 'ready' && serviceInfo" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-      <span class="font-medium text-foreground">Task execution service</span>
-      <span>·</span>
-      <span>GA4GH TES {{ serviceInfo.type.version }}</span>
+      <span class="font-medium text-foreground" :title="`GA4GH TES ${serviceInfo.type.version}`">Run service</span>
       <template v-if="serviceInfo.storage?.length">
         <span>·</span>
         <Badge v-for="s in serviceInfo.storage" :key="s" variant="outline" class="font-mono">{{ s }}</Badge>
       </template>
     </p>
     <Notice v-else-if="serviceState === 'unsupported'" tone="warning">
-      This node does not expose the TES endpoint. Configure a compute backend before enabling TES.
+      This node does not accept runs. Configure a compute backend first.
     </Notice>
-    <ErrorPanel v-else-if="serviceState === 'error'" :message="serviceError || 'Failed to load the TES service info.'" @retry="loadServiceInfo" />
+    <ErrorPanel v-else-if="serviceState === 'error'" :message="serviceError || 'Failed to load the run service info.'" @retry="loadServiceInfo" />
 
-    <!-- List. 'idle' is the pre-fetch gap while init() awaits service info and
-         'loading' also covers a session that has not resolved yet, show the
-         same skeleton instead of a blank area. -->
-    <div v-if="listState === 'idle' || listState === 'loading'" class="surface divide-y divide-border overflow-hidden">
-      <div v-for="n in 5" :key="n" class="px-5 py-3"><Skeleton class="h-6 w-full" /></div>
-    </div>
-
-    <ErrorPanel v-else-if="listState === 'error'" :message="listError || 'Failed to load tasks.'" @retry="reload" />
-
-    <EmptyState
-      v-else-if="listState === 'unsupported'"
-      compact
-      title="Tasks cannot be listed until this node exposes the GA4GH TES endpoint."
-    />
-
-    <EmptyState v-else-if="listState === 'signed-out'" compact title="Sign in to see the tasks you submitted to this node." />
-
-    <!-- First-run empty state doubles as the run-mode chooser. Branch on the
-         SHOWN list so hiding every task brings the chooser back, and only stand
-         aside for the Deleted chip view while it still has something to show. -->
-    <EmptyState
-      v-else-if="listState === 'ready' && !shownTasks.length && (stateGroup !== 'deleted' || !hiddenTasks.length)"
-      title="No compute tasks yet"
-      description="Start your first run with a quick script or a full task."
+    <!-- 'loading' also covers the pre-fetch gap while init() awaits service
+         info and a session that has not resolved yet. -->
+    <ListShell
+      :state="shellState"
+      :error="listError || 'Failed to load the runs.'"
+      :empty-title="emptyTitle"
+      :empty-description="emptyDescription"
+      :compact="listState !== 'ready'"
+      @retry="reload"
     >
-      <div class="space-y-4">
-        <NewRunMenu size="sm" />
-        <p v-if="hiddenTasks.length" class="text-xs text-muted-foreground">
-          {{ hiddenTasks.length }} deleted {{ hiddenTasks.length === 1 ? 'run' : 'runs' }} hidden from this list.
-          <button type="button" class="text-primary hover:underline" @click="stateGroup = 'deleted'">Show</button>
-        </p>
-      </div>
-    </EmptyState>
+      <template #filters>
+        <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter runs by state" />
+      </template>
+      <template #tools>
+        <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
+        <RefreshButton :busy="spinning" sr-label="Refresh runs" @click="onReload" />
+      </template>
 
-    <div v-else-if="tasks.length" class="surface overflow-hidden">
-      <!-- List toolbar -->
-      <div class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-3 py-2">
-        <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter tasks by state" />
-        <div class="ml-auto flex items-center gap-2">
-          <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
-          <RefreshButton :busy="spinning" sr-label="Refresh tasks" @click="onReload" />
+      <!-- The first-run empty state doubles as the run-mode chooser. -->
+      <template #empty-actions>
+        <div v-if="listState === 'ready'" class="space-y-4">
+          <NewRunMenu size="sm" />
+          <p v-if="hiddenTasks.length" class="text-xs text-muted-foreground">
+            {{ hiddenTasks.length }} deleted {{ hiddenTasks.length === 1 ? 'run' : 'runs' }} hidden from this list.
+            <button type="button" class="text-primary hover:underline" @click="stateGroup = 'deleted'">Show</button>
+          </p>
         </div>
-      </div>
+      </template>
 
       <EmptyState
         v-if="!visibleTasks.length"
         compact
         class="rounded-none border-0 shadow-none"
-        :title="`No ${emptyGroupLabel}tasks in the loaded list.`"
+        :title="`No ${emptyGroupLabel}runs in the loaded list.`"
       />
 
       <table v-else class="w-full text-sm">
         <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th class="px-5 py-2 text-left font-semibold">Task</th>
+            <th class="px-5 py-2 text-left font-semibold">Run</th>
             <th class="px-5 py-2 text-left font-semibold">State</th>
             <th class="hidden px-5 py-2 text-left font-semibold md:table-cell">Group</th>
             <th class="hidden px-5 py-2 text-left font-semibold lg:table-cell">Resources</th>
-            <th class="px-5 py-2 text-left font-semibold">Submitted</th>
+            <th class="px-5 py-2 text-left font-semibold">Started</th>
             <th class="hidden px-5 py-2 text-left font-semibold sm:table-cell">Duration</th>
             <th class="px-5 py-2"></th>
           </tr>
@@ -402,12 +410,17 @@ onUnmounted(() => {
           <tr
             v-for="task in visibleTasks"
             :key="task.id || task.name"
-            class="border-t border-border"
-            :class="task.id ? 'cursor-pointer hover:bg-muted/40' : ''"
-            @click="openTask(task)"
+            class="border-t border-border hover:bg-muted/40"
           >
             <td class="px-5 py-2.5">
-              <div class="font-medium text-foreground">{{ task.name || 'Untitled task' }}</div>
+              <RouterLink
+                v-if="task.id"
+                class="font-medium text-foreground hover:text-primary hover:underline"
+                :to="{ name: 'task', params: { taskId: task.id } }"
+              >
+                {{ task.name || 'Untitled run' }}
+              </RouterLink>
+              <div v-else class="font-medium text-foreground">{{ task.name || 'Untitled run' }}</div>
               <div v-if="task.id" class="font-mono text-[11px] text-muted-foreground" :title="task.id">{{ truncateMiddle(task.id) }}</div>
             </td>
             <td class="px-5 py-2.5">
@@ -433,7 +446,7 @@ onUnmounted(() => {
                   v-if="stateGroup === 'deleted' && task.id"
                   variant="outline"
                   size="sm"
-                  :aria-label="`Restore ${task.name || 'task'} to the list`"
+                  :aria-label="`Restore ${task.name || 'run'} to the list`"
                   @click.stop="unhide(task.id)"
                 >
                   <ArchiveRestore class="h-3.5 w-3.5" /> Restore
@@ -444,7 +457,7 @@ onUnmounted(() => {
                     variant="ghost"
                     size="icon-sm"
                     class="text-muted-foreground hover:text-destructive"
-                    :aria-label="`Delete ${task.name || 'task'} from the list`"
+                    :aria-label="`Delete ${task.name || 'run'} from the list`"
                     title="Delete from list (this browser only)"
                     @click.stop="requestRowDelete(task.id)"
                   >
@@ -454,16 +467,17 @@ onUnmounted(() => {
                     <Trash2 class="h-3.5 w-3.5" /> Delete?
                   </Button>
                 </template>
-                <ChevronRight v-if="task.id" class="h-4 w-4 text-muted-foreground" />
+                <ChevronRight v-if="task.id" class="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               </div>
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-if="nextPageToken" class="border-t border-border px-5 py-2">
+
+      <template v-if="nextPageToken" #footer>
         <Button variant="ghost" size="sm" :disabled="refreshing" @click="fetchList({ more: true })">Load more</Button>
-      </div>
-    </div>
+      </template>
+    </ListShell>
 
     <TaskDetailPanel
       v-if="openTaskId"
