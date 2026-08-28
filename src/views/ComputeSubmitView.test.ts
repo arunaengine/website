@@ -20,6 +20,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as VueUse from '@vueuse/core'
 import { useRefresh } from '@/composables/useRefresh'
+import * as CustomRun from '@/composables/useCustomRun'
 import * as Api from '@/lib/api'
 import * as NodeDisplay from '@/components/nodes/node-display'
 import * as OnboardingConfig from '@/lib/onboarding-config'
@@ -284,7 +285,9 @@ const sharedComponents = {
   '@/components/ui/Skeleton.vue': moduleDefault(GenericStub),
   '@/components/onboarding/WizardSteps.vue': moduleDefault(WizardStepsStub),
 }
-const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vue', import.meta.url), {
+// The wizard steps are separate components; each is compiled against the same
+// stubs and handed to the view as its import.
+const stepModules = {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
@@ -295,9 +298,38 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/components/compute/TaskJsonPreview.vue': moduleDefault(TaskJsonPreviewStub),
   '@/components/compute/ExecutorStepsEditor.vue': moduleDefault(ExecutorStub),
   '@/components/compute/TesInputsEditor.vue': moduleDefault(GenericStub),
-  '@/components/compute/TesDataRefDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/ContainerFsTree.vue': moduleDefault(GenericStub),
+  '@/components/compute/RunPlacementSection.vue': moduleDefault(RunPlacementSection),
+  '@/composables/useCustomRun': CustomRun,
+  '@/lib/tes': Tes,
+  '@/lib/jobs': { ...Jobs, submitJob },
+}
+const stepComponent = (path: string) =>
+  moduleDefault(compileClientComponent(new URL(path, import.meta.url), stepModules))
+const BasicsStep = stepComponent('../components/compute/custom/BasicsStep.vue')
+const ReviewStep = stepComponent('../components/compute/custom/ReviewStep.vue')
+const WorkloadStep = moduleDefault(
+  compileClientComponent(new URL('../components/compute/custom/WorkloadStep.vue', import.meta.url), {
+    ...stepModules,
+    '@/components/compute/custom/ContainerFilesystem.vue': stepComponent(
+      '../components/compute/custom/ContainerFilesystem.vue',
+    ),
+    '@/components/compute/custom/AdvancedPlacement.vue': stepComponent(
+      '../components/compute/custom/AdvancedPlacement.vue',
+    ),
+  }),
+)
+const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vue', import.meta.url), {
+  vue: VueRuntime,
+  'vue-router': RouterRuntime,
+  '@lucide/vue': icons,
+  ...sharedComponents,
+  '@/components/compute/custom/BasicsStep.vue': BasicsStep,
+  '@/components/compute/custom/WorkloadStep.vue': WorkloadStep,
+  '@/components/compute/custom/ReviewStep.vue': ReviewStep,
+  '@/components/compute/TesDataRefDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/ComputeGates.vue': moduleDefault(ComputeGates),
+  '@/composables/useCustomRun': CustomRun,
   '@/components/compute/RerunPrefillNote.vue': moduleDefault(RerunPrefillNote),
   '@/components/compute/RunPlacementSection.vue': moduleDefault(RunPlacementSection),
   '@/components/compute/WizardNavBar.vue': moduleDefault(WizardNavBar),
