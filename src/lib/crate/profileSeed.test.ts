@@ -1,0 +1,84 @@
+import { describe, expect, it } from 'vitest'
+import { applyProfile, profileExpectation } from './profileSeed'
+import { findEntity, newDraft } from './editor'
+import type { MetadataProfile } from '@/data/types'
+import type { ProfilePropertyRule } from '@/lib/profiles/types'
+
+function rule(overrides: Partial<ProfilePropertyRule>): ProfilePropertyRule {
+  return {
+    id: overrides.valueName ?? 'rule',
+    label: overrides.label ?? 'Rule',
+    description: '',
+    kind: 'text',
+    propertyUri: `http://schema.org/${overrides.valueName ?? 'rule'}`,
+    valueName: overrides.valueName ?? 'rule',
+    obligation: 'MUST',
+    ...overrides,
+  }
+}
+
+function profile(): MetadataProfile {
+  return {
+    id: 'profile-1',
+    name: 'Genomics',
+    shortName: 'Genomics',
+    description: '',
+    domain: 'life sciences',
+    iconColor: 'sky',
+    suggestedKeywords: [],
+    managed: false,
+    propertyRules: [
+      rule({ valueName: 'identifier', label: 'Identifier' }),
+      rule({ valueName: 'author', label: 'Author', kind: 'entity', entityTypes: ['http://schema.org/Person'] }),
+      rule({ valueName: 'citation', label: 'Citation', obligation: 'SHOULD' }),
+    ],
+    entityRules: [{
+      id: 'person',
+      label: 'Person',
+      description: '',
+      type: 'http://schema.org/Person',
+      className: 'Person',
+      propertyRules: [rule({ valueName: 'affiliation', label: 'Affiliation' })],
+    }],
+  }
+}
+
+describe('profile seeding', () => {
+  it('pre-adds a row per mandatory root property', () => {
+    const draft = applyProfile(newDraft(), profile())
+    const root = draft.entities[0]
+
+    expect(root.properties.identifier).toEqual([{ kind: 'text', value: '' }])
+    expect(root.properties.citation).toBeUndefined()
+  })
+
+  it('creates the entity a mandatory reference points at', () => {
+    const draft = applyProfile(newDraft(), profile(), 'https://example.test/profile')
+    const person = findEntity(draft, '#person')
+
+    expect(draft.entities[0].properties.author).toEqual([{ kind: 'reference', value: '#person' }])
+    expect(draft.entities[0].properties.conformsTo).toEqual([
+      { kind: 'reference', value: 'https://example.test/profile' },
+    ])
+    expect(person?.types).toEqual(['Person'])
+    expect(person?.properties.affiliation).toEqual([{ kind: 'text', value: '' }])
+  })
+
+  it('leaves a filled row alone', () => {
+    const first = applyProfile(newDraft(), profile())
+    const edited = { ...first, entities: first.entities.map((entity) => (entity.id === './'
+      ? { ...entity, properties: { ...entity.properties, identifier: [{ kind: 'text' as const, value: 'doi:10' }] } }
+      : entity)) }
+
+    expect(applyProfile(edited, profile()).entities[0].properties.identifier)
+      .toEqual([{ kind: 'text', value: 'doi:10' }])
+  })
+
+  it('names the mandatory properties and types as expectations', () => {
+    expect(profileExpectation(profile())).toEqual({
+      name: 'Genomics',
+      properties: ['identifier', 'author'],
+      types: ['http://schema.org/Person'],
+    })
+  })
+})

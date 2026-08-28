@@ -42,7 +42,7 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     timer = undefined
   }
 
-  function run(rocrate: unknown) {
+  function run(rocrate: unknown): Promise<void> {
     generation += 1
     const current = generation
     inFlight?.abort()
@@ -56,7 +56,7 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     const request = options.request
       ? Promise.resolve().then(() => options.request!(rocrate, controller.signal))
       : previewProfileValidation(rocrate, options.client(), controller.signal)
-    request
+    return request
       .then((response) => {
         if (current !== generation || disposed) return
         result.value = response
@@ -88,7 +88,17 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
   function previewNow(rocrate: unknown) {
     if (unavailable.value || disposed) return
     clearTimer()
-    run(rocrate)
+    void run(rocrate)
+  }
+
+  // The check a save runs first: it answers the verdict, and a check that
+  // could not run answers acceptance so it never blocks the write.
+  async function verify(rocrate: unknown): Promise<boolean> {
+    if (unavailable.value || disposed) return true
+    clearTimer()
+    await run(rocrate)
+    if (error.value || unavailable.value) return true
+    return result.value?.accepted !== false
   }
 
   // Drops pending work and the last result (e.g. when the profile changes).
@@ -108,5 +118,5 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     inFlight?.abort()
   })
 
-  return { result, running, unavailable, error, preview, previewNow, reset }
+  return { result, running, unavailable, error, preview, previewNow, verify, reset }
 }

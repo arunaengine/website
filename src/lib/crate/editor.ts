@@ -95,6 +95,11 @@ export function displayName(entity: DraftEntity | undefined): string {
   return person || entity.id
 }
 
+/** The name someone typed, without the identifier fallback of displayName. */
+export function entityName(entity: DraftEntity | undefined): string {
+  return entity?.properties.name?.[0]?.value.trim() ?? ''
+}
+
 export function typeLabel(type: string): string {
   return termNameFromUri(type)
 }
@@ -148,6 +153,36 @@ export function idHint(type: string): string {
 export function partIds(draft: CrateDraft): Set<string> {
   const root = rootEntity(draft)
   return new Set((root?.properties.hasPart ?? []).map((value) => value.value))
+}
+
+/** Root properties the dedicated form owns; the row list leaves them out. */
+export const ROOT_FORM_PROPERTIES = [
+  'name',
+  'description',
+  'datePublished',
+  'license',
+  'keywords',
+  'publisher',
+  'contactPoint',
+  'funder',
+  'conformsTo',
+]
+
+export const LICENSE_PRESETS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'https://creativecommons.org/licenses/by/4.0/', label: 'CC BY 4.0' },
+  { value: 'https://creativecommons.org/licenses/by-sa/4.0/', label: 'CC BY-SA 4.0' },
+  { value: 'https://creativecommons.org/publicdomain/zero/1.0/', label: 'CC0 1.0' },
+  { value: 'https://spdx.org/licenses/MIT.html', label: 'MIT' },
+  { value: 'https://www.apache.org/licenses/LICENSE-2.0', label: 'Apache 2.0' },
+]
+
+export type PromotableProperty = 'license' | 'publisher' | 'contactPoint' | 'funder'
+
+export const PROMOTED_TYPES: Readonly<Record<PromotableProperty, string>> = {
+  license: 'CreativeWork',
+  publisher: 'Organization',
+  contactPoint: 'ContactPoint',
+  funder: 'Organization',
 }
 
 export type EntityGroup = 'root' | 'data' | 'contextual'
@@ -389,6 +424,43 @@ export function changeKind(
     (position === index ? { kind, value: entry.value } : entry)))
 }
 
+/** Turns a plain root value into a linked entity of the type that fits. */
+export function promoteField(
+  draft: CrateDraft,
+  property: PromotableProperty,
+): { draft: CrateDraft; entity: DraftEntity } {
+  const root = rootEntity(draft)
+  const current = root?.properties[property]?.find((value) => value.kind !== 'reference')?.value.trim() ?? ''
+  const name = LICENSE_PRESETS.find((option) => option.value === current)?.label || current
+  const properties: Record<string, DraftValue[]> = {}
+  if (property === 'license' && isAbsoluteUri(current)) properties.url = [{ kind: 'url', value: current }]
+  if (property === 'contactPoint' && current.includes('@')) properties.email = [{ kind: 'text', value: current }]
+  const created = addEntity(draft, { type: PROMOTED_TYPES[property], name, properties })
+  const linked = setProperty(created.draft, rootId(draft), property, [
+    { kind: 'reference', value: created.entity.id },
+  ])
+  return { draft: linked, entity: created.entity }
+}
+
+export interface ReferenceUse {
+  entityId: string
+  property: string
+  index: number
+}
+
+/** Every place in the draft that points at this entity. */
+export function referencesTo(draft: CrateDraft, id: string): ReferenceUse[] {
+  const uses: ReferenceUse[] = []
+  for (const entity of draft.entities) {
+    for (const [property, list] of Object.entries(entity.properties)) {
+      for (const [index, value] of list.entries()) {
+        if (value.kind === 'reference' && value.value === id) uses.push({ entityId: entity.id, property, index })
+      }
+    }
+  }
+  return uses
+}
+
 // ---------------------------------------------------------------------------
 // Data entities
 // ---------------------------------------------------------------------------
@@ -396,6 +468,8 @@ export function changeKind(
 export interface FilePart {
   id: string
   name: string
+  /** `Dataset` for a picked folder; `File` for a single object. */
+  type?: string
   contentUrl?: string
   encodingFormat?: string
   contentSize?: string
@@ -422,7 +496,7 @@ export function addFilePart(draft: CrateDraft, part: FilePart): CrateDraft {
     ...(part.encodingFormat ? { encodingFormat: textValue(part.encodingFormat) } : {}),
     ...(part.contentSize ? { contentSize: textValue(part.contentSize) } : {}),
   }
-  const added = addEntity(draft, { type: 'File', id: part.id, properties })
+  const added = addEntity(draft, { type: part.type ?? 'File', id: part.id, properties })
   return linkPart(added.draft, part.id)
 }
 
@@ -529,8 +603,19 @@ function filled(entity: DraftEntity | undefined, property: string): boolean {
   return Boolean(entity?.properties[property]?.some((value) => value.value.trim()))
 }
 
+/** What a selected profile asks of the draft, checked as suggestions. */
+export interface ProfileExpectation {
+  name: string
+  properties: string[]
+  types: string[]
+}
+
 /** Everything the editor can say about a draft on its own, all advisory. */
-export function liveIssues(draft: CrateDraft, vocab: VocabIndex | null = null): LiveIssue[] {
+export function liveIssues(
+  draft: CrateDraft,
+  vocab: VocabIndex | null = null,
+  profile: ProfileExpectation | null = null,
+): LiveIssue[] {
   const issues: LiveIssue[] = []
   const root = rootEntity(draft)
   const ids = new Set(draft.entities.map((entity) => entity.id))
@@ -597,6 +682,27 @@ export function liveIssues(draft: CrateDraft, vocab: VocabIndex | null = null): 
         })
       }
     }
+  }
+
+  for (const property of profile?.properties ?? []) {
+    if (filled(root, property) || ROOT_EXPECTED.some((expected) => expected.property === property)) continue
+    issues.push({
+      key: `profile:${property}`,
+      severity: 'warning',
+      message: `${profile?.name} expects ${property}.`,
+      entityId: rootId(draft),
+      property,
+    })
+  }
+  for (const type of profile?.types ?? []) {
+    const label = typeLabel(type)
+    if (draft.entities.some((entity) => entity.types.some((candidate) => typeLabel(candidate) === label))) continue
+    issues.push({
+      key: `profileType:${type}`,
+      severity: 'warning',
+      message: `${profile?.name} expects a ${label}.`,
+      entityId: rootId(draft),
+    })
   }
   return issues
 }

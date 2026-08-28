@@ -11,11 +11,14 @@ import {
   fromRoCrate,
   liveIssues,
   newDraft,
+  promoteField,
+  referencesTo,
   orderedEntities,
   removeEntity,
   removeValue,
   renameEntity,
   toRoCrate,
+  updateValue,
   valueKindsFor,
   type CrateDraft,
 } from './editor'
@@ -129,6 +132,38 @@ describe('crate draft', () => {
   })
 })
 
+describe('promoting a root field', () => {
+  it('turns a license preset into a linked CreativeWork', () => {
+    const draft = updateValue(seeded(), './', 'license', 0, 'https://creativecommons.org/licenses/by/4.0/')
+    const promoted = promoteField(draft, 'license')
+
+    expect(promoted.entity.types).toEqual(['CreativeWork'])
+    expect(promoted.entity.properties.name[0].value).toBe('CC BY 4.0')
+    expect(promoted.entity.properties.url[0].value).toBe('https://creativecommons.org/licenses/by/4.0/')
+    expect(findEntity(promoted.draft, './')?.properties.license).toEqual([
+      { kind: 'reference', value: promoted.entity.id },
+    ])
+  })
+
+  it('keeps an address as the email of a new ContactPoint', () => {
+    const draft = addValue(seeded(), './', 'contactPoint', { kind: 'text', value: 'team@example.org' })
+    const promoted = promoteField(draft, 'contactPoint')
+
+    expect(promoted.entity.types).toEqual(['ContactPoint'])
+    expect(promoted.entity.properties.email[0].value).toBe('team@example.org')
+    expect(promoted.draft.entities[0].properties.contactPoint[0].kind).toBe('reference')
+  })
+
+  it('lists every place an entity is referenced from', () => {
+    const draft = addValue(seeded(), './', 'publisher', { kind: 'reference', value: '#ada-lovelace' })
+
+    expect(referencesTo(draft, '#ada-lovelace')).toEqual([
+      { entityId: './', property: 'author', index: 0 },
+      { entityId: './', property: 'publisher', index: 0 },
+    ])
+  })
+})
+
 describe('live issues', () => {
   it('asks the root for the four things a dataset needs', () => {
     const issues = liveIssues(newDraft())
@@ -164,6 +199,15 @@ describe('live issues', () => {
 
     expect(issue?.severity).toBe('warning')
     expect(issue?.message).toContain('Person')
+  })
+
+  it('passes on what a selected profile asks for', () => {
+    const profile = { name: 'Genomics', properties: ['identifier'], types: ['Person', 'Place'] }
+    const keys = liveIssues(seeded(), null, profile).map((issue) => issue.key)
+
+    expect(keys).toContain('profile:identifier')
+    expect(keys).toContain('profileType:Place')
+    expect(keys).not.toContain('profileType:Person')
   })
 
   it('warns about a value left empty', () => {
