@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
+import NewRunMenu from '@/components/compute/NewRunMenu.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -19,13 +20,13 @@ import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useJobsList } from '@/composables/useJobs'
 import { useRefresh } from '@/composables/useRefresh'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
-import { useUploadQueue } from '@/composables/useUploadQueue'
 import { useRealm } from '@/composables/useRealm'
 import { featureEnabled } from '@/lib/config'
 import { classify, folderName, listDrafts, type DeviceDraft, type DeviceState } from '@/lib/deviceApi'
 import { isTerminalJobState, listJobs, type JobStatusResponse } from '@/lib/jobs'
+import { itemChip } from '@/lib/syncStates'
 import { formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Boxes, Cpu, FileText, Play, Plus, RefreshCw } from '@lucide/vue'
+import { Boxes, FileText, Play, Plus, RefreshCw } from '@lucide/vue'
 
 const { realm } = useRealm()
 const { currentUser } = useAruna()
@@ -37,11 +38,9 @@ const {
   needsYouTotal,
   ensureLoaded: ensureFolders,
 } = useSyncedFolders()
-const { all: syncTransfers, active: activeTransfers, state: transfersState, load: loadTransfers } =
-  useDeviceTransfers()
-const { items: uploadItems } = useUploadQueue()
+const { all: syncTransfers, load: loadTransfers } = useDeviceTransfers()
 const { compute, ensureLoaded: ensureCompute } = useDeviceCompute()
-const { status: syncStatus, state: syncState, needsOwner, load: loadSync } = useDeviceSync()
+const { status: syncStatus, state: syncState, load: loadSync } = useDeviceSync()
 
 const jobsEnabled = featureEnabled('jobs')
 const realmRuns = useJobsList({ pageSize: 10 })
@@ -77,10 +76,6 @@ const facts = computed(() => [
 
 const activeLocalRuns = computed(() => localRuns.value.filter((job) => !isTerminalJobState(job.state)))
 const activeRealmRuns = computed(() => realmRuns.jobs.value.filter((job) => !isTerminalJobState(job.state)))
-const activeUploads = computed(
-  () => uploadItems.value.filter((item) => item.state === 'queued' || item.state === 'uploading').length,
-)
-
 async function loadLocalRuns(): Promise<void> {
   const client = deviceClient.value
   if (!client) {
@@ -143,7 +138,7 @@ onMounted(() => void reload())
       </template>
       <template #actions>
         <RefreshButton :busy="refreshBusy" @click="onRefresh" />
-        <Button size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Bind a folder</Button>
+        <Button size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Sync a folder</Button>
       </template>
     </PageHeader>
 
@@ -164,7 +159,7 @@ onMounted(() => void reload())
       </p>
 
       <div class="grid gap-4 lg:grid-cols-2">
-        <!-- Sync: the folders, what is still owed, and what is moving now -->
+        <!-- Sync -->
         <section class="surface flex flex-col overflow-hidden lg:col-span-2">
           <header class="flex items-center justify-between border-b border-border px-5 py-3">
             <div class="flex items-center gap-2">
@@ -173,87 +168,119 @@ onMounted(() => void reload())
             </div>
             <RouterLink :to="{ name: 'sync' }" class="text-xs font-medium text-primary hover:underline">Open</RouterLink>
           </header>
-          <div class="grid flex-1 gap-5 px-5 py-4 sm:grid-cols-3">
-            <div class="min-w-0">
-              <p class="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Folders</p>
-              <Skeleton v-if="foldersState === 'loading'" class="mt-2 h-12" />
-              <DeviceSurfaceState
-                v-else-if="foldersState !== 'ready'"
-                class="mt-2"
-                :state="foldersState"
-                subject="its folders"
-                :error="foldersError"
-                compact
-              />
-              <template v-else-if="folders.length">
-                <p class="mt-1 text-sm text-foreground">
-                  <span class="font-display text-xl font-bold">{{ folders.length }}</span>
-                  {{ folders.length === 1 ? 'folder' : 'folders' }} bound
-                </p>
-                <ul class="mt-2 space-y-1">
-                  <li v-for="folder in folders.slice(0, 3)" :key="folder.folder_id" class="truncate font-mono text-[11px] text-muted-foreground">
-                    {{ folderName(folder.root) }} · {{ folder.counters.in_sync }} in sync
-                  </li>
-                </ul>
-                <RouterLink
-                  v-if="needsYouTotal"
-                  :to="{ name: 'sync' }"
-                  class="mt-3 inline-flex rounded-md bg-amber-500/10 px-2.5 py-1 text-[12px] font-medium text-amber-800 hover:bg-amber-500/15 dark:text-amber-200"
-                >{{ needsYouTotal }} waiting for your decision</RouterLink>
-              </template>
-              <div v-else class="mt-1 space-y-2">
-                <p class="text-sm text-muted-foreground">No folder on this computer is bound yet.</p>
-                <Button variant="outline" size="sm" @click="showBind = true">Bind a folder</Button>
-              </div>
+          <div class="flex-1 px-5 py-4">
+            <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              <Badge :variant="syncStatus.realmReachable ? 'success' : 'secondary'">
+                {{ syncStatus.realmReachable ? 'Realm reachable' : 'Realm not answering' }}
+              </Badge>
+              <span>·</span>
+              <span>
+                last sync
+                {{ syncStatus.lastSyncMs ? relativeTime(new Date(syncStatus.lastSyncMs).toISOString()) : 'never' }}
+              </span>
+              <span>·</span>
+              <span>{{ syncStatus.pendingTotal }} {{ syncStatus.pendingTotal === 1 ? 'change' : 'changes' }} pending</span>
             </div>
 
-            <div class="min-w-0">
-              <p class="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Changes</p>
-              <DeviceSurfaceState
-                v-if="syncState !== 'ready'"
-                class="mt-2"
-                :state="syncState"
-                subject="its sync status"
-                compact
-              />
-              <template v-else>
-                <p class="mt-1 text-sm text-foreground">
-                  <span class="font-display text-xl font-bold">{{ syncStatus.pendingTotal }}</span>
-                  {{ syncStatus.pendingTotal === 1 ? 'change' : 'changes' }} pending
-                </p>
-                <p class="mt-1 text-[11px] text-muted-foreground">
-                  {{ syncStatus.realmReachable ? 'The realm is answering.' : 'Offline: your edits go out once it answers.' }}
-                </p>
-                <RouterLink
-                  v-if="needsOwner"
-                  :to="{ name: 'sync', query: { tab: 'documents' } }"
-                  class="mt-3 inline-flex rounded-md bg-amber-500/10 px-2.5 py-1 text-[12px] font-medium text-amber-800 hover:bg-amber-500/15 dark:text-amber-200"
-                >{{ needsOwner }} {{ needsOwner === 1 ? 'needs' : 'need' }} your attention</RouterLink>
-              </template>
+            <Skeleton v-if="foldersState === 'loading' || syncState === 'loading'" class="mt-3 h-12" />
+            <DeviceSurfaceState
+              v-else-if="foldersState !== 'ready'"
+              class="mt-3"
+              :state="foldersState"
+              subject="its folders"
+              :error="foldersError"
+              compact
+            />
+            <DeviceSurfaceState
+              v-else-if="syncState !== 'ready'"
+              class="mt-3"
+              :state="syncState"
+              subject="its sync status"
+              compact
+            />
+
+            <ul v-else-if="folders.length || syncStatus.documents.length" class="mt-3 divide-y divide-border/70">
+              <li
+                v-for="item in [...folders, ...syncStatus.documents].slice(0, 3)"
+                :key="'folder_id' in item ? `folder:${item.folder_id}` : `document:${item.documentId}`"
+                class="flex items-start gap-3 py-2.5"
+              >
+                <div class="min-w-0 flex-1">
+                  <RouterLink
+                    :to="
+                      'folder_id' in item
+                        ? { name: 'folder', params: { folderId: item.folder_id } }
+                        : { name: 'metadata-detail', params: { id: item.documentId } }
+                    "
+                    class="truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
+                  >{{ 'folder_id' in item ? folderName(item.root) : item.path || item.documentId }}</RouterLink>
+                  <p class="truncate font-mono text-[10px] text-muted-foreground">
+                    {{ 'folder_id' in item ? item.root : item.path || item.documentId }}
+                  </p>
+                  <p
+                    v-if="
+                      itemChip(
+                        'folder_id' in item
+                          ? {
+                              kind: 'folder',
+                              folder: item,
+                              transfers: syncTransfers.filter((transfer) => transfer.folder_id === item.folder_id),
+                            }
+                          : { kind: 'document', document: item },
+                      ).detail
+                    "
+                    class="mt-0.5 text-[10px] text-muted-foreground"
+                  >
+                    {{
+                      itemChip(
+                        'folder_id' in item
+                          ? {
+                              kind: 'folder',
+                              folder: item,
+                              transfers: syncTransfers.filter((transfer) => transfer.folder_id === item.folder_id),
+                            }
+                          : { kind: 'document', document: item },
+                      ).detail
+                    }}
+                  </p>
+                </div>
+                <Badge
+                  :variant="
+                    itemChip(
+                      'folder_id' in item
+                        ? {
+                            kind: 'folder',
+                            folder: item,
+                            transfers: syncTransfers.filter((transfer) => transfer.folder_id === item.folder_id),
+                          }
+                        : { kind: 'document', document: item },
+                    ).variant
+                  "
+                  class="text-[10px]"
+                >{{
+                  itemChip(
+                    'folder_id' in item
+                      ? {
+                          kind: 'folder',
+                          folder: item,
+                          transfers: syncTransfers.filter((transfer) => transfer.folder_id === item.folder_id),
+                        }
+                      : { kind: 'document', document: item },
+                  ).label
+                }}</Badge>
+              </li>
+            </ul>
+
+            <div v-else class="mt-3 flex flex-wrap items-center gap-3">
+              <p class="text-sm text-muted-foreground">Nothing syncs with this computer yet.</p>
+              <Button variant="outline" size="sm" @click="showBind = true">Sync a folder</Button>
             </div>
 
-            <div class="min-w-0">
-              <p class="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Transfers</p>
-              <p class="mt-1 text-sm text-foreground">
-                <span class="font-display text-xl font-bold">{{ activeTransfers.length + activeUploads }}</span>
-                in flight
-              </p>
-              <p class="mt-1 text-[11px] text-muted-foreground">
-                {{ syncTransfers.length }} from folder sync · {{ uploadItems.length }} from this window
-              </p>
-              <DeviceSurfaceState
-                v-if="transfersState !== 'ready'"
-                class="mt-2"
-                :state="transfersState"
-                subject="its transfers"
-                compact
-              />
-              <ul class="mt-2 space-y-1">
-                <li v-for="transfer in syncTransfers.slice(0, 3)" :key="transfer.id" class="truncate font-mono text-[11px] text-muted-foreground">
-                  {{ transfer.direction === 'upload' ? '↑' : '↓' }} {{ transfer.path }}
-                </li>
-              </ul>
-            </div>
+            <RouterLink
+              v-if="needsYouTotal"
+              :to="{ name: 'sync' }"
+              class="mt-3 inline-flex rounded-md bg-amber-500/10 px-2.5 py-1 text-[12px] font-medium text-amber-800 hover:bg-amber-500/15 dark:text-amber-200"
+            >{{ needsYouTotal }} waiting for your decision</RouterLink>
           </div>
         </section>
 
@@ -331,9 +358,7 @@ onMounted(() => void reload())
       </div>
 
       <section class="flex flex-wrap items-center gap-2">
-        <RouterLink :to="{ name: 'compute-new' }">
-          <Button variant="outline" size="sm"><Cpu class="h-3.5 w-3.5" /> Run something</Button>
-        </RouterLink>
+        <NewRunMenu variant="outline" size="sm" />
         <RouterLink :to="{ name: 'buckets' }">
           <Button variant="outline" size="sm"><Boxes class="h-3.5 w-3.5" /> Open buckets</Button>
         </RouterLink>

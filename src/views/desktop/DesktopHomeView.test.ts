@@ -59,6 +59,7 @@ const RouterLinkStub = defineComponent({
 })
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const BadgeStub = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
+const NewRunMenuStub = defineComponent(() => () => h('button', 'New run'))
 
 let DesktopHomeView: Component
 
@@ -121,6 +122,7 @@ beforeAll(async () => {
   vi.doMock('@/composables/useUploadQueue', () => ({ useUploadQueue: () => ({ items: uploadItems }) }))
   vi.doMock('@/lib/config', () => ({ featureEnabled: () => true }))
   vi.doMock('@/components/desktop/BindFolderDialog.vue', () => ({ default: EmptyStub }))
+  vi.doMock('@/components/compute/NewRunMenu.vue', () => ({ default: NewRunMenuStub }))
   vi.doMock('@/components/ui/Button.vue', () => ({ default: ButtonStub }))
   vi.doMock('@/components/ui/Badge.vue', () => ({ default: BadgeStub }))
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: EmptyStub }))
@@ -179,9 +181,8 @@ describe('desktop home', () => {
   it('puts the decisions the folders are waiting for in front', async () => {
     const html = await render()
 
-    expect(html).toContain('folder bound')
     expect(html).toContain('data-2026')
-    expect(html).toContain('412 in sync')
+    expect(html).toContain('Needs you 2')
     expect(html).toContain('2 waiting for your decision')
   })
 
@@ -194,7 +195,19 @@ describe('desktop home', () => {
     expect(html).toContain('Sync')
   })
 
-  it('counts transfers from both halves of the machine', async () => {
+  it('reflects a folder transfer in that folder chip', async () => {
+    folders.value = [
+      folder({
+        counters: {
+          in_sync: 412,
+          uploading: 0,
+          conflicts: 0,
+          pending_replacements: 0,
+          remote_deleted: 0,
+          errors: 0,
+        },
+      }),
+    ]
     syncTransfers.value = [
       {
         id: 't1',
@@ -211,13 +224,9 @@ describe('desktop home', () => {
         message: null,
       },
     ]
-    uploadItems.value = [{ id: 1, state: 'uploading' }]
-
     const html = await render()
 
-    expect(html).toContain('2</span> in flight')
-    expect(html).toContain('1 from folder sync')
-    expect(html).toContain('raw/scan.tiff')
+    expect(html).toContain('Syncing 1')
   })
 
   it('separates the runs by where they execute', async () => {
@@ -310,9 +319,58 @@ describe('desktop home', () => {
 
     const html = await render()
 
-    expect(html).toContain('3</span> changes pending')
-    expect(html).toContain('2 need your attention')
-    expect(html).toContain('Offline: your edits go out once it answers.')
+    expect(html).toContain('3 changes pending')
+    expect(html).toContain('Realm not answering')
+    expect(html).toContain('Invalid')
+    expect(html).toContain('2 validation findings')
+  })
+
+  it('shows at most three merged folder and document rows', async () => {
+    syncStatus.value = {
+      ...syncStatus.value,
+      documents: [
+        {
+          documentId: 'd1',
+          path: 'lab/one.json',
+          groupId: 'g1',
+          state: 'synced',
+          pendingEdits: 0,
+          localOnly: false,
+          validationFindings: 0,
+          lastError: null,
+          lastSyncedMs: null,
+        },
+        {
+          documentId: 'd2',
+          path: 'lab/two.json',
+          groupId: 'g1',
+          state: 'synced',
+          pendingEdits: 0,
+          localOnly: false,
+          validationFindings: 0,
+          lastError: null,
+          lastSyncedMs: null,
+        },
+        {
+          documentId: 'd3',
+          path: 'lab/three.json',
+          groupId: 'g1',
+          state: 'synced',
+          pendingEdits: 0,
+          localOnly: false,
+          validationFindings: 0,
+          lastError: null,
+          lastSyncedMs: null,
+        },
+      ],
+    }
+
+    const html = await render()
+
+    expect(html).toContain('data-2026')
+    expect(html).toContain('lab/one.json')
+    expect(html).toContain('lab/two.json')
+    expect(html).not.toContain('lab/three.json')
   })
 
   it('invents no drafts while the first read is still in flight', async () => {
