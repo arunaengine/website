@@ -4,6 +4,10 @@ import { describe, expect, it } from 'vitest'
 import { PROCESS_RUN_PROFILE_URI } from '@/lib/profiles/builtinProfiles'
 import { datasetPurposeLabel, datasetPurposeMatches, datasetPurposeOf } from './SearchView.vue'
 
+function read(path: string): string {
+  return readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
+}
+
 describe('Datasets purpose filters', () => {
   it('classifies the three purposes with Profile taking precedence', () => {
     expect(datasetPurposeOf({ type: 'Dataset', conformsToIds: [] })).toBe('dataset')
@@ -26,16 +30,21 @@ describe('Datasets purpose filters', () => {
     expect(datasetPurposeLabel('process-run')).toBe('Process Run')
     expect(datasetPurposeLabel('unknown')).toBe('Purpose unknown')
 
-    const source = readFileSync(fileURLToPath(new URL('./SearchView.vue', import.meta.url)), 'utf8')
-    expect(source).toContain("{ value: 'dataset', label: 'Dataset' }")
-    expect(source).toContain("{ value: 'profile', label: 'Profile' }")
-    expect(source).toContain("{ value: 'process-run', label: 'Process Run' }")
-    expect(source).toContain('datasetPurposeLabel(datasetPurposeOf(line.doc))')
-    expect(source).toContain('text-muted-foreground">Purpose unknown</span>')
-    expect(source).not.toContain('class="w-fit text-[10px] uppercase">Dataset</Badge>')
-    expect(source).not.toContain('class="w-fit text-[10px] uppercase">Profile</Badge>')
-    expect(source).not.toContain('class="w-fit text-[10px] uppercase">Process Run</Badge>')
-    expect(source).toContain('profileReferenceIri(profile)')
-    expect(source).not.toContain("document_path.startsWith('profiles/')")
+    const filters = read('../components/datasets/DatasetFilters.vue')
+    const card = read('../components/datasets/DatasetCard.vue')
+    const hits = read('../components/datasets/DatasetHits.vue')
+    const search = read('../composables/useDatasetSearch.ts')
+    const sources = [filters, card, hits, search].join('\n')
+
+    expect(filters).toContain("{ value: 'dataset', label: 'Dataset' }")
+    expect(filters).toContain("{ value: 'profile', label: 'Profile' }")
+    expect(filters).toContain("{ value: 'process-run', label: 'Process Run' }")
+    expect(card).toContain('datasetPurposeLabel(datasetPurposeOf(doc))')
+    expect(hits).toContain('text-muted-foreground">Purpose unknown</span>')
+    expect(sources).not.toContain('class="w-fit text-[10px] uppercase">Dataset</Badge>')
+    expect(sources).not.toContain('class="w-fit text-[10px] uppercase">Profile</Badge>')
+    expect(sources).not.toContain('class="w-fit text-[10px] uppercase">Process Run</Badge>')
+    expect(search).toContain('profileReferenceIri(profile)')
+    expect(sources).not.toContain("document_path.startsWith('profiles/')")
   })
 })
