@@ -3,78 +3,41 @@ import AppLogo from '@/components/layout/AppLogo.vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
-import { featureEnabled } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
-import { navRowClass, navSeparator, type NavEntry, type NavItem } from '@/components/layout/nav'
-import {
-  Activity,
-  ArrowLeft,
-  BookOpen,
-  Boxes,
-  ChevronsLeft,
-  ChevronsRight,
-  FileJson2,
-  LayoutDashboard,
-  ListChecks,
-  Settings,
-  ShieldCheck,
-  Users,
-  Workflow,
-} from '@lucide/vue'
+import { navEntries, navItemActive, navRowClass, type NavEntry, type NavItem } from '@/components/layout/nav'
+import { ArrowLeft, ChevronsLeft, ChevronsRight } from '@lucide/vue'
 
 // A layout that owns its own destinations (the desktop shell) passes them in;
-// without them the sidebar computes the portal's own.
+// without them the sidebar builds the portal's own from the one definition.
 const props = defineProps<{ items?: NavEntry[]; backLink?: boolean }>()
 
 const {
   isRealmAdmin,
   canInspectUsers,
   canManageOnboarding,
+  canManageQuarantine,
 } = useAruna()
 
 // The shell has no landing page to go back to.
 const desktop = isDesktop()
 
-// Config resolves before the app mounts, so a plain read is safe here. The
-// unified Compute entry appears when either compute plane (TES tasks or
-// durable jobs) is enabled; the view degrades per flag.
-const tesEnabled = featureEnabled('tes')
-const jobsEnabled = featureEnabled('jobs')
-
-const adminItems = computed<NavItem[]>(() => [
-  ...(isRealmAdmin.value
-    ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true }]
-    : []),
-  ...(canInspectUsers.value
-    ? [{ to: '/app/admin/users', icon: Users, label: 'Users' }]
-    : []),
-  ...(canManageOnboarding.value
-    ? [{ to: '/app/admin/onboarding', icon: Workflow, label: 'Node onboarding' }]
-    : []),
-])
-
-const portalItems = computed<NavEntry[]>(() => [
-  { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/app/buckets', icon: Boxes, label: 'Data' },
-  { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'] },
-  { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
-  ...(tesEnabled || jobsEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
-  navSeparator,
-  { to: '/app/groups', icon: Users, label: 'Groups' },
-  { to: '/app/status', icon: Activity, label: 'Status' },
-  { to: '/app/settings', icon: Settings, label: 'Settings' },
-  { to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] },
-  ...(adminItems.value.length ? [navSeparator, ...adminItems.value] : []),
-])
-
-const items = computed<NavEntry[]>(() => props.items ?? portalItems.value)
+const items = computed<NavEntry[]>(
+  () =>
+    props.items ??
+    navEntries({
+      desktop: false,
+      isRealmAdmin: isRealmAdmin.value,
+      canInspectUsers: canInspectUsers.value,
+      canManageOnboarding: canManageOnboarding.value,
+      canManageQuarantine: canManageQuarantine.value,
+    }),
+)
 const showBackLink = computed(() => props.backLink ?? !desktop)
 
 const route = useRoute()
 
 function isActive(item: NavItem): boolean {
-  if (item.exact) return route.path === item.to
-  return (item.match ?? [item.to]).some((prefix) => route.path.startsWith(prefix))
+  return navItemActive(item, route.path)
 }
 
 const COLLAPSE_KEY = 'aruna.sidebarCollapsed'

@@ -10,9 +10,8 @@ import { BookOpen, Link as LinkIcon } from '@lucide/vue'
       <div class="md:col-span-2">
         <AppLogo :size="24" subtitle="the data orchestration engine" />
         <p class="mt-4 max-w-sm text-sm text-muted-foreground">
-          Federated data management for research. Each organization runs its
-          own node, keeps authority over its data and shares through the
-          realm.
+          Data management for research. Each organization runs its own node,
+          keeps authority over its data and shares through the realm.
         </p>
       </div>
       <div>
@@ -23,8 +22,8 @@ import { BookOpen, Link as LinkIcon } from '@lucide/vue'
         </h4>
         <ul class="mt-3 space-y-2 text-sm text-foreground/80">
           <li><a href="/app" class="hover:text-foreground">Dashboard</a></li>
-          <li><a href="/app/data" class="hover:text-foreground">Data manager</a></li>
-          <li><a href="/app/datasets" class="hover:text-foreground">Metadata catalog</a></li>
+          <li><a href="/app/buckets" class="hover:text-foreground">Data</a></li>
+          <li><a href="/app/datasets" class="hover:text-foreground">Datasets</a></li>
           <li><a href="/app/query" class="hover:text-foreground">SPARQL workbench</a></li>
           <li><a href="/app/groups" class="hover:text-foreground">Groups &amp; access</a></li>
         </ul>

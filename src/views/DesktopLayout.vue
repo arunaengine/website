@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// App shell of Aruna Desktop. Same bones as AppLayout and the same opening
-// block of destinations, with the machine's own surfaces behind it. No mobile
-// bar: this shell only ever runs in a desktop window.
+// App shell of Aruna Desktop. Same bones as AppLayout and the same navigation
+// definition, with this computer's own surfaces behind it. No mobile bar: this
+// shell only ever runs in a desktop window.
 import SideNav from '@/components/layout/SideNav.vue'
 import TopBar from '@/components/dashboard/TopBar.vue'
 import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
@@ -13,27 +13,11 @@ import { RouterView, useRoute } from 'vue-router'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
-import { featureEnabled } from '@/lib/config'
 import { appQuit } from '@/lib/desktopBridge'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
 import { errorMessage } from '@/lib/utils'
-import { navRowClass, navSeparator, type NavEntry } from '@/components/layout/nav'
-import {
-  Activity,
-  BookOpen,
-  Boxes,
-  FileJson2,
-  LayoutDashboard,
-  Laptop,
-  ListChecks,
-  Play,
-  Power,
-  RefreshCw,
-  Settings,
-  ShieldCheck,
-  Users,
-  Workflow,
-} from '@lucide/vue'
+import { navEntries, navRowClass, type NavEntry } from '@/components/layout/nav'
+import { Power } from '@lucide/vue'
 
 const route = useRoute()
 const mainEl = ref<HTMLElement | null>(null)
@@ -41,7 +25,7 @@ const unreachable = computed(() => realmReach.value === 'unreachable')
 const quitting = ref(false)
 const quitError = ref<string | null>(null)
 
-const { isRealmAdmin, canInspectUsers, canManageOnboarding } = useAruna()
+const { isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine } = useAruna()
 const { status, loaded, state, start: watchNode, stop: unwatchNode } = useDeviceStatus()
 const nodeDown = computed(
   () =>
@@ -62,35 +46,15 @@ async function quit(): Promise<void> {
   }
 }
 
-// Same read as the portal sidebar: one Compute entry for either compute plane.
-const tesEnabled = featureEnabled('tes')
-const jobsEnabled = featureEnabled('jobs')
-
-const adminItems = computed(() => [
-  ...(isRealmAdmin.value ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true }] : []),
-  ...(canInspectUsers.value ? [{ to: '/app/admin/users', icon: Users, label: 'Users' }] : []),
-  ...(canManageOnboarding.value
-    ? [{ to: '/app/admin/onboarding', icon: Workflow, label: 'Node onboarding' }]
-    : []),
-])
-
-const items = computed<NavEntry[]>(() => [
-  { to: '/app', icon: LayoutDashboard, label: 'Home', exact: true },
-  { to: '/app/buckets', icon: Boxes, label: 'Data' },
-  { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'] },
-  { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
-  ...(tesEnabled || jobsEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
-  navSeparator,
-  { to: '/app/sync', icon: RefreshCw, label: 'Sync', match: ['/app/sync', '/app/folders', '/app/transfers'] },
-  { to: '/app/runs', icon: Play, label: 'Runs' },
-  { to: '/app/device', icon: Laptop, label: 'This device' },
-  navSeparator,
-  { to: '/app/groups', icon: Users, label: 'Groups' },
-  { to: '/app/status', icon: Activity, label: 'Status' },
-  { to: '/app/settings', icon: Settings, label: 'Settings' },
-  { to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] },
-  ...(adminItems.value.length ? [navSeparator, ...adminItems.value] : []),
-])
+const items = computed<NavEntry[]>(() =>
+  navEntries({
+    desktop: true,
+    isRealmAdmin: isRealmAdmin.value,
+    canInspectUsers: canInspectUsers.value,
+    canManageOnboarding: canManageOnboarding.value,
+    canManageQuarantine: canManageQuarantine.value,
+  }),
+)
 
 onMounted(() => {
   void probeRealm()

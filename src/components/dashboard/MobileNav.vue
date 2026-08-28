@@ -2,34 +2,13 @@
 import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
-import { featureEnabled } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
 import Sheet from '@/components/ui/Sheet.vue'
 import SheetContent from '@/components/ui/SheetContent.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
-import {
-  Activity,
-  BookOpen,
-  Boxes,
-  FileJson2,
-  Laptop,
-  LayoutDashboard,
-  ListChecks,
-  MoreHorizontal,
-  Settings,
-  ShieldCheck,
-  Users,
-  Workflow,
-} from '@lucide/vue'
-
-interface NavItem {
-  to: string
-  icon: unknown
-  label: string
-  exact?: boolean
-  match?: string[]
-}
+import { navEntries, navItemActive, type NavItem } from '@/components/layout/nav'
+import { MoreHorizontal } from '@lucide/vue'
 
 const route = useRoute()
 const moreOpen = ref(false)
@@ -37,45 +16,26 @@ const {
   isRealmAdmin,
   canInspectUsers,
   canManageOnboarding,
+  canManageQuarantine,
 } = useAruna()
-const desktop = isDesktop()
-const tesEnabled = featureEnabled('tes')
-const jobsEnabled = featureEnabled('jobs')
 
-const primaryNav = computed<NavItem[]>(() => [
-  { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'] },
-  { to: '/app/buckets', icon: Boxes, label: 'Data' },
-  ...(tesEnabled || jobsEnabled
-    ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }]
-    : []),
-  { to: '/app/groups', icon: Users, label: 'Groups' },
-])
+// The same list the sidebar renders, in the same order: the bottom bar takes
+// the primary entries and the More sheet keeps every other one reachable.
+const items = computed<NavItem[]>(() =>
+  navEntries({
+    desktop: isDesktop(),
+    isRealmAdmin: isRealmAdmin.value,
+    canInspectUsers: canInspectUsers.value,
+    canManageOnboarding: canManageOnboarding.value,
+    canManageQuarantine: canManageQuarantine.value,
+  }).filter((entry): entry is NavItem => !('separator' in entry)),
+)
 
-// Anything enabled here that is not promoted to the fixed bar belongs in More.
-// This keeps future destinations reachable instead of silently dropping them.
-const moreNav = computed<NavItem[]>(() => [
-  { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
-  { to: '/app/status', icon: Activity, label: 'Status' },
-  { to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] },
-  ...(desktop ? [{ to: '/app/device', icon: Laptop, label: 'This device' }] : []),
-  { to: '/app/settings', icon: Settings, label: 'Settings' },
-  ...(isRealmAdmin.value
-    ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true }]
-    : []),
-  ...(canInspectUsers.value
-    ? [{ to: '/app/admin/users', icon: Users, label: 'Users' }]
-    : []),
-  ...(canManageOnboarding.value
-    ? [{ to: '/app/admin/onboarding', icon: Workflow, label: 'Node onboarding' }]
-    : []),
-])
+const primaryNav = computed(() => items.value.filter((item) => item.primary))
+const moreNav = computed(() => items.value.filter((item) => !item.primary))
 
 function isActive(item: NavItem): boolean {
-  if (item.exact) return route.path === item.to
-  return (item.match ?? [item.to]).some(
-    (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
-  )
+  return navItemActive(item, route.path)
 }
 
 const moreActive = computed(() => moreNav.value.some(isActive))
