@@ -4,7 +4,6 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import EditMetadataDialog from '@/components/metadata/EditMetadataDialog.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import DetailsSection from '@/components/metadata/DetailsSection.vue'
 import PeopleSection from '@/components/metadata/PeopleSection.vue'
@@ -102,7 +101,6 @@ async function toggleFav() {
   }
 }
 
-const showEdit = ref(false)
 const showDelete = ref(false)
 const deleteError = ref<string | null>(null)
 // The document's S3 key path, for the delete confirmation copy.
@@ -114,7 +112,7 @@ async function confirmDelete() {
   try {
     await deleteMetadataDocument(current.value.ulid)
     showDelete.value = false
-    router.push({ name: 'search' })
+    router.push({ name: 'datasets' })
   } catch (err) {
     deleteError.value = err instanceof Error ? err.message : String(err)
   }
@@ -136,8 +134,6 @@ const watchPathPrefix = computed(() => {
   return metaWatchPathPrefix(groupId, currentPath.value)
 })
 
-// The edit dialog returns the stored summary; adopt it so visibility and
-// timestamps update without another catalog round trip.
 async function onSaved(summary?: MetadataDocumentSummary) {
   if (summary) fetchedSummary.value = summary
   await fetchCrate(detailId.value)
@@ -679,9 +675,9 @@ watch(relatedDocs, (rows) => {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button v-if="current && canWrite" variant="outline" @click="showEdit = true"><Pencil class="h-4 w-4" /> Edit</Button>
+        <Button v-if="current && canWrite" variant="outline" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })"><Pencil class="h-4 w-4" /> Edit</Button>
         <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="deleteError = null; showDelete = true"><Trash2 class="h-4 w-4" /> Delete</Button>
-        <RouterLink :to="{ name: 'search' }">
+        <RouterLink :to="{ name: 'datasets' }">
           <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Datasets</Button>
         </RouterLink>
       </template>
@@ -693,7 +689,7 @@ watch(relatedDocs, (rows) => {
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-1">
-                <RouterLink v-if="currentProfile" :to="{ name: 'profile-detail', params: { profileId: currentProfile.id } }" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:opacity-80">
+                <RouterLink v-if="currentProfile" :to="{ name: 'profile', params: { profileId: currentProfile.id } }" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:opacity-80">
                   <ListChecks class="h-3 w-3" /> Reference: {{ currentProfile.name }}
                 </RouterLink>
                 <ExternalLink
@@ -852,7 +848,7 @@ watch(relatedDocs, (rows) => {
                       <span v-if="referencedBy.get(row.id)?.length" class="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] font-normal text-muted-foreground">
                         <Link2 class="h-3 w-3 shrink-0" /> Loaded-crate cache only:
                         <template v-for="(ref, i) in referencedBy.get(row.id) ?? []" :key="ref.documentId">
-                          <RouterLink :to="{ name: 'metadata-detail', params: { id: ref.documentId } }" class="text-primary hover:underline" @click.stop>{{ ref.title }}</RouterLink><span v-if="i < (referencedBy.get(row.id)?.length ?? 0) - 1">,</span>
+                          <RouterLink :to="{ name: 'dataset', params: { id: ref.documentId } }" class="text-primary hover:underline" @click.stop>{{ ref.title }}</RouterLink><span v-if="i < (referencedBy.get(row.id)?.length ?? 0) - 1">,</span>
                         </template>
                       </span>
                     </td>
@@ -942,7 +938,7 @@ watch(relatedDocs, (rows) => {
                             <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Visible referencing Datasets</p>
                             <ul v-if="backlinkTarget?.visible_references.length" class="mt-1 divide-y divide-border/60 rounded-md border border-border/60">
                               <li v-for="reference in backlinkTarget.visible_references" :key="reference.document_id" class="px-3 py-2 text-xs">
-                                <RouterLink :to="{ name: 'metadata-detail', params: { id: reference.document_id } }" class="font-medium text-primary hover:underline">{{ reference.title }}</RouterLink>
+                                <RouterLink :to="{ name: 'dataset', params: { id: reference.document_id } }" class="font-medium text-primary hover:underline">{{ reference.title }}</RouterLink>
                               </li>
                             </ul>
                             <p v-else class="mt-1 text-xs text-muted-foreground">
@@ -977,7 +973,7 @@ watch(relatedDocs, (rows) => {
             <li v-for="row in relatedDocs" :key="row.iri" class="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
               <RouterLink
                 v-if="row.documentId"
-                :to="{ name: 'metadata-detail', params: { id: row.documentId } }"
+                :to="{ name: 'dataset', params: { id: row.documentId } }"
                 class="min-w-0 truncate font-medium text-primary hover:underline"
                 :title="row.iri"
               >
@@ -1005,7 +1001,7 @@ watch(relatedDocs, (rows) => {
               <h3 class="text-sm font-medium text-foreground">Query this Dataset</h3>
               <p class="mt-1 text-xs text-muted-foreground">Open the SPARQL workbench with this exact Dataset scope fixed.</p>
             </div>
-            <RouterLink :to="{ name: 'search', query: { expert: '1', document: detailId } }">
+            <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }">
               <Button variant="outline" size="sm"><Code2 class="h-3.5 w-3.5" /> Query this Dataset</Button>
             </RouterLink>
           </div>
@@ -1035,7 +1031,7 @@ watch(relatedDocs, (rows) => {
       <div v-else-if="docState === 'not-found'" class="surface px-5 py-12 text-center">
         <p class="text-sm font-medium text-foreground">This Dataset does not exist or has been deleted.</p>
         <p class="mx-auto mt-2 max-w-md break-all font-mono text-xs text-muted-foreground">{{ detailId }}</p>
-        <RouterLink :to="{ name: 'search' }" class="mt-5 inline-flex">
+        <RouterLink :to="{ name: 'datasets' }" class="mt-5 inline-flex">
           <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Datasets</Button>
         </RouterLink>
       </div>
@@ -1045,7 +1041,7 @@ watch(relatedDocs, (rows) => {
         <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
           {{ currentUser ? 'Sign in with an account that can see it.' : 'Sign in with an account that can see it, using the button in the top bar.' }}
         </p>
-        <RouterLink :to="{ name: 'search' }" class="mt-5 inline-flex">
+        <RouterLink :to="{ name: 'datasets' }" class="mt-5 inline-flex">
           <Button variant="outline"><ArrowLeft class="h-4 w-4" /> Datasets</Button>
         </RouterLink>
       </div>
@@ -1066,8 +1062,6 @@ watch(relatedDocs, (rows) => {
       :size="previewTarget.size"
       :content-type="previewTarget.contentType"
     />
-
-    <EditMetadataDialog v-if="current" v-model:open="showEdit" :document-id="current.ulid" :profile="currentProfile" @saved="onSaved" />
 
     <DataEntityDialog
       v-model:open="infoOpen"
