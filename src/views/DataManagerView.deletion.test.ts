@@ -8,8 +8,8 @@ const dataManagerSource = readFileSync(
   fileURLToPath(new URL('./DataManagerView.vue', import.meta.url)),
   'utf8',
 )
-const useS3Source = readFileSync(
-  fileURLToPath(new URL('../composables/useS3.ts', import.meta.url)),
+const s3ObjectsSource = readFileSync(
+  fileURLToPath(new URL('../composables/s3/objects.ts', import.meta.url)),
   'utf8',
 )
 const backlinksSource = readFileSync(
@@ -28,21 +28,52 @@ const datasetReferencesSource = readFileSync(
   fileURLToPath(new URL('../components/data/DatasetReferencesPreflightPanel.vue', import.meta.url)),
   'utf8',
 )
-const { descriptor } = parse(dataManagerSource, { filename: 'DataManagerView.vue' })
-const template = descriptor.template?.content ?? ''
-const script = descriptor.scriptSetup?.content ?? ''
-const { descriptor: datasetReferencesDescriptor } = parse(datasetReferencesSource, {
-  filename: 'DatasetReferencesPreflightPanel.vue',
-})
-const datasetReferencesTemplate = datasetReferencesDescriptor.template?.content ?? ''
+const managerSource = readFileSync(
+  fileURLToPath(new URL('../composables/useDataManager.ts', import.meta.url)),
+  'utf8',
+)
+const preflightSource = readFileSync(
+  fileURLToPath(new URL('../components/data/manager/useDeletionPreflight.ts', import.meta.url)),
+  'utf8',
+)
+const deletionFlowSource = readFileSync(
+  fileURLToPath(new URL('../components/data/manager/DeletionFlow.vue', import.meta.url)),
+  'utf8',
+)
+const bulkDeleteSource = readFileSync(
+  fileURLToPath(new URL('../components/data/manager/BulkDeleteDialog.vue', import.meta.url)),
+  'utf8',
+)
+const objectBrowserSource = readFileSync(
+  fileURLToPath(new URL('../components/data/manager/ObjectBrowser.vue', import.meta.url)),
+  'utf8',
+)
 
-function functionSource(name: string): string {
-  const start = script.indexOf(`function ${name}(`)
-  const end = script.indexOf('\nfunction ', start + 1)
-  return script.slice(start, end < 0 ? undefined : end)
+function sfc(source: string, filename: string) {
+  const { descriptor } = parse(source, { filename })
+  return {
+    template: descriptor.template?.content ?? '',
+    script: descriptor.scriptSetup?.content ?? '',
+  }
 }
 
-function buttonOpeningTag(handler: string): string {
+const dataManager = sfc(dataManagerSource, 'DataManagerView.vue')
+const deletionFlow = sfc(deletionFlowSource, 'DeletionFlow.vue')
+const bulkDelete = sfc(bulkDeleteSource, 'BulkDeleteDialog.vue')
+const objectBrowser = sfc(objectBrowserSource, 'ObjectBrowser.vue')
+const datasetReferencesTemplate = sfc(
+  datasetReferencesSource,
+  'DatasetReferencesPreflightPanel.vue',
+).template
+
+// Handles both top-level and composable-scoped (indented) declarations.
+function functionSource(source: string, name: string): string {
+  const start = source.indexOf(`function ${name}(`)
+  const end = source.slice(start + 1).search(/\n\s*(?:async )?function /)
+  return end < 0 ? source.slice(start) : source.slice(start, start + 1 + end)
+}
+
+function buttonOpeningTag(template: string, handler: string): string {
   const click = template.indexOf(`@click="${handler}"`)
   const start = template.lastIndexOf('<Button', click)
   const end = template.indexOf('>', click)
@@ -57,52 +88,52 @@ describe('Data Manager version-aware deletion', () => {
       'Delete markers',
       'Open multipart uploads',
     ]) {
-      expect(dataManagerSource).toContain(label)
+      expect(deletionFlowSource).toContain(label)
     }
-    expect(template).toContain('!permanentDeletePreflight.counts.complete')
-    expect(template).toContain('more than shown')
-    expect(template).toContain('permanentDeletePreflight.truncation.versions_truncated')
-    expect(template).toContain('permanentDeletePreflight.truncation.multipart_uploads_truncated')
-    expect(template).toContain('permanentDeletePreflight.permissions.read')
-    expect(template).toContain('permanentDeletePreflight.permissions.purge')
-    expect(template).toContain('sync_relationships_apply_to_bucket_delete')
-    expect(template).toContain('Sync-relationship removal')
-    expect(template).toContain('This confirmed side effect is not a blocker.')
-    expect(template).not.toContain('relationship.blocker')
+    expect(deletionFlow.template).toContain('!permanentDeletePreflight.counts.complete')
+    expect(deletionFlow.template).toContain('more than shown')
+    expect(deletionFlow.template).toContain('permanentDeletePreflight.truncation.versions_truncated')
+    expect(deletionFlow.template).toContain('permanentDeletePreflight.truncation.multipart_uploads_truncated')
+    expect(deletionFlow.template).toContain('permanentDeletePreflight.permissions.read')
+    expect(deletionFlow.template).toContain('permanentDeletePreflight.permissions.purge')
+    expect(deletionFlow.template).toContain('sync_relationships_apply_to_bucket_delete')
+    expect(deletionFlow.template).toContain('Sync-relationship removal')
+    expect(deletionFlow.template).toContain('This confirmed side effect is not a blocker.')
+    expect(deletionFlow.template).not.toContain('relationship.blocker')
   })
 
   it('routes every permanent scope through one job and keeps partial progress visible', () => {
-    expect(template).toContain('Permanently delete all versions')
-    expect(template).toContain('Permanently delete folder and all versions')
-    expect(dataManagerSource).toContain("{ kind: 'bucket', bucket: name }")
-    expect(dataManagerSource).toContain('startStoragePurge(')
-    expect(dataManagerSource).toContain('getStoragePurgeJob(')
-    expect(dataManagerSource).toContain('retainStoragePurgeProgress(')
-    expect(template).toContain('Committed entries from completed batches:')
-    expect(template).toContain('Work committed by completed batches remains deleted.')
-    expect(template).toContain('Remaining after refresh')
-    expect(template).toContain('Retry purge')
-    expect(template).toContain('Reusing the existing purge for this retry.')
-    expect(dataManagerSource).toContain('target.operation,')
+    expect(objectBrowser.template).toContain('Permanently delete all versions')
+    expect(objectBrowser.template).toContain('Permanently delete folder and all versions')
+    expect(deletionFlowSource).toContain("{ kind: 'bucket', bucket: name }")
+    expect(deletionFlowSource).toContain('startStoragePurge(')
+    expect(deletionFlowSource).toContain('getStoragePurgeJob(')
+    expect(deletionFlowSource).toContain('retainStoragePurgeProgress(')
+    expect(deletionFlow.template).toContain('Committed entries from completed batches:')
+    expect(deletionFlow.template).toContain('Work committed by completed batches remains deleted.')
+    expect(deletionFlow.template).toContain('Remaining after refresh')
+    expect(deletionFlow.template).toContain('Retry purge')
+    expect(deletionFlow.template).toContain('Reusing the existing purge for this retry.')
+    expect(deletionFlowSource).toContain('target.operation,')
   })
 
   it('keeps ordinary file and folder deletion version-less and truthfully worded', () => {
-    expect(useS3Source).toContain(
+    expect(s3ObjectsSource).toContain(
       'new DeleteObjectCommand({ Bucket: bucket, Key: key })',
     )
-    expect(useS3Source).toContain(
+    expect(s3ObjectsSource).toContain(
       'Delete: { Objects: keys.map((key) => ({ Key: key })), Quiet: false }',
     )
-    expect(useS3Source).not.toContain('ListObjectVersionsCommand')
+    expect(s3ObjectsSource).not.toContain('ListObjectVersionsCommand')
     // Reading a PUT's version id is fine; a delete must never send one.
-    expect(useS3Source).not.toContain('VersionId:')
-    expect(template).toContain(
+    expect(s3ObjectsSource).not.toContain('VersionId:')
+    expect(deletionFlow.template).toContain(
       'Delete markers are written for current objects; earlier versions stay retrievable by version ID.',
     )
-    expect(template).toContain(
+    expect(deletionFlow.template).toContain(
       'A delete marker is written; earlier versions stay retrievable by version ID.',
     )
-    expect(template).not.toContain('ALL objects under it are permanently deleted.')
+    expect(deletionFlow.template).not.toContain('ALL objects under it are permanently deleted.')
   })
 
   it('runs the distributed partial-tolerant reference preflight before every destructive dialog', () => {
@@ -111,20 +142,20 @@ describe('Data Manager version-aware deletion', () => {
     expect(backlinksSource).toContain('allow_partial: request.allow_partial ?? true')
 
     for (const name of ['openDeleteObject', 'openDeleteFolder']) {
-      const source = functionSource(name)
+      const source = functionSource(deletionFlow.script, name)
       expect(source).toContain('loadBacklinkPreflight(')
       expect(source).toContain("'latest_version_tombstone'")
       expect(source.indexOf('loadBacklinkPreflight(')).toBeLessThan(source.indexOf('deleteTarget.value = target'))
     }
 
-    const permanent = functionSource('openPermanentDelete')
+    const permanent = functionSource(deletionFlow.script, 'openPermanentDelete')
     expect(permanent).toContain("loadBacklinkPreflight(scope, 'all_versions_purge', nodeId)")
     expect(permanent.indexOf('loadBacklinkPreflight(')).toBeLessThan(
       permanent.indexOf('permanentDeleteTarget.value = target'),
     )
-    expect(functionSource('openPermanentDeleteObject')).toContain('openPermanentDelete(')
-    expect(functionSource('openPermanentDeleteFolder')).toContain('openPermanentDelete(')
-    expect(functionSource('openDeleteBucket')).toContain('openPermanentDelete(')
+    expect(functionSource(deletionFlow.script, 'openPermanentDeleteObject')).toContain('openPermanentDelete(')
+    expect(functionSource(deletionFlow.script, 'openPermanentDeleteFolder')).toContain('openPermanentDelete(')
+    expect(functionSource(deletionFlow.script, 'openDeleteBucket')).toContain('openPermanentDelete(')
   })
 
   it('drops a sibling-key result before a single-file preflight can render it', () => {
@@ -163,13 +194,15 @@ describe('Data Manager version-aware deletion', () => {
       path_style_endpoint_coverage_complete: false,
       realm_coverage_complete: false,
     })
-    expect(functionSource('loadBacklinkPreflight')).toContain(
+    expect(functionSource(preflightSource, 'loadBacklinkPreflight')).toContain(
       'exactFileBacklinkPreflight(response, scope.bucket, scope.key)',
     )
   })
 
   it('renders visible, restricted, last-location, and partial coverage warnings in all dialogs', () => {
-    expect(template.match(/<DatasetReferencesPreflightPanel/g)).toHaveLength(3)
+    expect(
+      `${deletionFlow.template}${bulkDelete.template}`.match(/<DatasetReferencesPreflightPanel/g),
+    ).toHaveLength(3)
     expect(datasetReferencesTemplate).toContain('aria-label="Dataset references"')
     expect(datasetReferencesTemplate).not.toContain('RDF Dataset references')
     expect(datasetReferencesTemplate).toContain("params: { id: reference.document_id }")
@@ -188,10 +221,10 @@ describe('Data Manager version-aware deletion', () => {
     expect(stagingReferencesSource).toContain("'unknown' | 'loading' | 'loaded' | 'error'")
     expect(stagingReferencesSource).toContain("status.value = 'error'")
     expect(stagingReferencesSource).toContain('error.value = errorMessage(caught)')
-    expect(template.match(/aria-label="Source bindings"/g)).toHaveLength(2)
-    const sourceBindings = template.slice(
-      template.indexOf('aria-label="Source bindings"'),
-      template.indexOf('</section>', template.indexOf('aria-label="Source bindings"')),
+    expect(deletionFlow.template.match(/aria-label="Source bindings"/g)).toHaveLength(2)
+    const sourceBindings = deletionFlow.template.slice(
+      deletionFlow.template.indexOf('aria-label="Source bindings"'),
+      deletionFlow.template.indexOf('</section>', deletionFlow.template.indexOf('aria-label="Source bindings"')),
     )
     expect(sourceBindings).toContain("destructiveSourceReferences.status.value === 'error'")
     expect(sourceBindings).toContain('Source-binding lookup failed.')
@@ -201,9 +234,9 @@ describe('Data Manager version-aware deletion', () => {
   })
 
   it('keeps warnings advisory and uses one confirmation without a typed override', () => {
-    const ordinaryConfirm = buttonOpeningTag('confirmDelete')
-    const permanentConfirm = buttonOpeningTag('confirmPermanentDelete')
-    const bulkConfirm = buttonOpeningTag('confirmBulkDelete')
+    const ordinaryConfirm = buttonOpeningTag(deletionFlow.template, 'confirmDelete')
+    const permanentConfirm = buttonOpeningTag(deletionFlow.template, 'confirmPermanentDelete')
+    const bulkConfirm = buttonOpeningTag(bulkDelete.template, 'confirmBulkDelete')
     for (const button of [ordinaryConfirm, permanentConfirm, bulkConfirm]) {
       expect(button).not.toContain('backlinkPreflightPartial')
       expect(button).not.toContain('backlinkPreflightError')
@@ -211,8 +244,8 @@ describe('Data Manager version-aware deletion', () => {
       expect(button).not.toContain('would_remove_last_resolvable_aruna_location')
       expect(button).not.toContain('backlinkPreflightBusy')
     }
-    expect(dataManagerSource).not.toContain('permanentDeleteConfirm')
-    expect(template).not.toContain('placeholder="bucket name"')
+    expect(deletionFlowSource).not.toContain('permanentDeleteConfirm')
+    expect(deletionFlow.template).not.toContain('placeholder="bucket name"')
   })
 
   it('keeps the cache-backed reverse index explicitly labelled as non-authoritative', () => {
@@ -223,27 +256,27 @@ describe('Data Manager version-aware deletion', () => {
 
 describe('Data Manager explicit multi-file deletion', () => {
   it('keeps selection in the Data Manager listing and preserves it across refreshes', () => {
-    expect(script).toContain('const selectedObjectKeys = ref<Set<string>>(new Set())')
-    expect(template).toContain('aria-label="Select all listed objects"')
-    expect(template).toContain(':checked="selectedObjectKeys.has(object.key)"')
-    expect(template).toContain('Delete selected ({{ selectedObjectCount }})')
+    expect(managerSource).toContain('const selectedObjectKeys = ref<Set<string>>(new Set())')
+    expect(objectBrowser.template).toContain('aria-label="Select all listed objects"')
+    expect(objectBrowser.template).toContain(':checked="selectedObjectKeys.has(object.key)"')
+    expect(objectBrowser.template).toContain('Delete selected ({{ selectedObjectCount }})')
 
-    expect(functionSource('clearObjectListing')).toContain('selectedObjectKeys.value = new Set()')
-    expect(functionSource('loadObjects')).not.toContain('selectedObjectKeys.value = new Set()')
+    expect(functionSource(managerSource, 'clearObjectListing')).toContain('selectedObjectKeys.value = new Set()')
+    expect(functionSource(managerSource, 'loadObjects')).not.toContain('selectedObjectKeys.value = new Set()')
 
-    const prune = functionSource('pruneSelectedObjectKeys')
+    const prune = functionSource(managerSource, 'pruneSelectedObjectKeys')
     expect(prune).toContain("scope.kind === 'bucket'")
     expect(prune).toContain('key.startsWith(scope.prefix)')
-    expect(functionSource('confirmDelete')).toContain("{ kind: 'prefix', bucket: target.bucket, prefix: target.folder.prefix }")
-    expect(functionSource('refreshAfterPermanentDelete')).toContain(
+    expect(functionSource(deletionFlow.script, 'confirmDelete')).toContain("{ kind: 'prefix', bucket: target.bucket, prefix: target.folder.prefix }")
+    expect(functionSource(deletionFlow.script, 'refreshAfterPermanentDelete')).toContain(
       'pruneSelectedObjectKeys(scope, target.nodeId)',
     )
   })
 
   it('runs one bounded selection preflight phase and renders every D5 warning class', () => {
-    const open = functionSource('openBulkDelete')
-    const preflight = functionSource('loadBulkBacklinkPreflight')
-    const merge = functionSource('mergeBulkBacklinkPreflights')
+    const open = functionSource(bulkDelete.script, 'openBulkDelete')
+    const preflight = functionSource(preflightSource, 'loadBulkBacklinkPreflight')
+    const merge = functionSource(preflightSource, 'mergeBulkBacklinkPreflights')
     expect(open).toContain("loadBulkBacklinkPreflight(target, 'latest_version_tombstone')")
     expect(preflight).toContain('target.keys.slice(offset, offset + BULK_PREFLIGHT_CONCURRENCY)')
     expect(preflight).toContain("{ kind: 'file', bucket: target.bucket, key }")
@@ -259,37 +292,47 @@ describe('Data Manager explicit multi-file deletion', () => {
   })
 
   it('caps ordinary batches and retains exact mixed-success and transport outcomes', () => {
-    const ordinary = functionSource('deleteSelectedOrdinary')
-    const retain = functionSource('recordBulkDeleteResults')
-    expect(script).toContain('const BULK_DELETE_BATCH_SIZE = 1_000')
+    const ordinary = functionSource(bulkDelete.script, 'deleteSelectedOrdinary')
+    const retain = functionSource(bulkDelete.script, 'recordBulkDeleteResults')
+    expect(bulkDelete.script).toContain('const BULK_DELETE_BATCH_SIZE = 1_000')
     expect(ordinary).toContain('keys.slice(offset, offset + BULK_DELETE_BATCH_SIZE)')
     expect(ordinary).toContain('Promise.allSettled(')
     expect(ordinary).toContain('s3.deleteObject(target.bucket, key, target.nodeId)')
     expect(ordinary).toContain('status: bulkDeleteFailureStatus(result.reason)')
-    expect(functionSource('bulkDeleteFailureStatus')).toContain("return 'unknown'")
+    expect(functionSource(bulkDelete.script, 'bulkDeleteFailureStatus')).toContain("return 'unknown'")
     expect(retain).toContain("if (result.status === 'committed') nextSelection.delete(result.key)")
     expect(retain).not.toContain("if (result.status === 'failed') nextSelection.delete(result.key)")
     expect(retain).not.toContain("if (result.status === 'unknown') nextSelection.delete(result.key)")
-    expect(template).toContain('Committed keys')
-    expect(template).toContain('Failed keys stay selected for review or retry.')
-    expect(template).toContain('Unknown keys stay selected for review or retry.')
+    expect(bulkDelete.template).toContain('Committed keys')
+    expect(bulkDelete.template).toContain('Failed keys stay selected for review or retry.')
+    expect(bulkDelete.template).toContain('Unknown keys stay selected for review or retry.')
   })
 
   it('keeps folder deletion separate and offers both selected-file semantics', () => {
-    expect(template).toContain('Delete markers for {{ bulkDeleteTarget.keys.length }} selected key')
-    expect(template).toContain('Permanently purge all versions for {{ bulkDeleteTarget.keys.length }} selected key')
-    expect(functionSource('loadBulkPurgePreflights')).toContain('getStorageDeletionPreflight(')
-    expect(functionSource('loadBulkPurgePreflights')).toContain("{ kind: 'file', bucket: target.bucket, key }")
-    expect(functionSource('deleteSelectedPermanently')).toContain('runBulkPurgeScope(')
-    expect(functionSource('runBulkPurgeScope')).toContain('startStoragePurge(')
-    expect(functionSource('openDeleteFolder')).not.toContain('selectedObjectKeys')
-    expect(functionSource('openPermanentDeleteFolder')).not.toContain('selectedObjectKeys')
-    expect(template.match(/<Bomb class="size-3\.5"/g)).toHaveLength(2)
+    expect(bulkDelete.template).toContain('Delete markers for {{ bulkDeleteTarget.keys.length }} selected key')
+    expect(bulkDelete.template).toContain('Permanently purge all versions for {{ bulkDeleteTarget.keys.length }} selected key')
+    expect(functionSource(bulkDelete.script, 'loadBulkPurgePreflights')).toContain('getStorageDeletionPreflight(')
+    expect(functionSource(bulkDelete.script, 'loadBulkPurgePreflights')).toContain("{ kind: 'file', bucket: target.bucket, key }")
+    expect(functionSource(bulkDelete.script, 'deleteSelectedPermanently')).toContain('runBulkPurgeScope(')
+    expect(functionSource(bulkDelete.script, 'runBulkPurgeScope')).toContain('startStoragePurge(')
+    expect(functionSource(deletionFlow.script, 'openDeleteFolder')).not.toContain('selectedObjectKeys')
+    expect(functionSource(deletionFlow.script, 'openPermanentDeleteFolder')).not.toContain('selectedObjectKeys')
+    expect(objectBrowser.template.match(/<Bomb class="size-3\.5"/g)).toHaveLength(2)
   })
 
   it('keeps new UI copy free of em dashes and the retired label namespace', () => {
-    const renderedTemplate = `${template}\n${datasetReferencesTemplate}`.replace(/<!--[\s\S]*?-->/g, '')
+    const renderedTemplate = [
+      dataManager.template,
+      deletionFlow.template,
+      bulkDelete.template,
+      objectBrowser.template,
+      datasetReferencesTemplate,
+    ]
+      .join('\n')
+      .replace(/<!--[\s\S]*?-->/g, '')
     expect(renderedTemplate).not.toContain('\u2014')
-    expect(dataManagerSource).not.toMatch(/aruna[.]io/)
+    for (const source of [dataManagerSource, managerSource, deletionFlowSource, bulkDeleteSource, objectBrowserSource]) {
+      expect(source).not.toMatch(/aruna[.]io/)
+    }
   })
 })
